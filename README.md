@@ -33,6 +33,32 @@ Calls your local Ollama models.
     model: "llama3"
 ```
 
+### `fetch_url`
+Fetches content from a URL.
+
+**Parameters:**
+- `url`: URL to fetch (or pass URL as input)
+
+**Example:**
+```yaml
+- node: fetch_url
+  params:
+    url: "https://example.com"
+```
+
+### `file_write`
+Writes content to a file.
+
+**Parameters:**
+- `path`: Output file path (required)
+
+**Example:**
+```yaml
+- node: file_write
+  params:
+    path: "output.txt"
+```
+
 ## Project Structure
 
 ```
