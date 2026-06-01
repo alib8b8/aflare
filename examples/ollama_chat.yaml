@@ -1,0 +1,8 @@
+name: Ollama Chat
+description: A simple workflow to chat with Ollama locally
+
+steps:
+  - node: ollama
+    params:
+      model: "llama3"
+      prompt: "Hello! Tell me a short joke."

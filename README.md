@@ -13,8 +13,24 @@ A zero-code AI workflow engine that runs in your terminal.
 ## Quick Start
 
 ```bash
-# Run an example workflow
-llm-box examples/simple.yaml
+# Run an example Ollama workflow (requires local Ollama)
+llm-box examples/ollama_chat.yaml
+```
+
+## Built-in Nodes
+
+### `ollama`
+Calls your local Ollama models.
+
+**Parameters:**
+- `model`: Model name (default: `llama3`)
+- `endpoint`: Ollama API endpoint (default: `http://localhost:11434`)
+
+**Example:**
+```yaml
+- node: ollama
+  params:
+    model: "llama3"
 ```
 
 ## Project Structure
