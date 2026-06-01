@@ -1,0 +1,16 @@
+name: Complete Workflow Demo
+description: Fetch a webpage, summarize with Ollama, save to file
+
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+
+  - node: ollama
+    params:
+      model: "llama3"
+      prompt: "Summarize the following content in 3 sentences:"
+
+  - node: file_write
+    params:
+      path: "summary.txt"
