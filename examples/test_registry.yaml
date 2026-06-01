@@ -1,0 +1,7 @@
+name: Node Registry Test
+description: Test workflow to verify node registry works
+
+steps:
+  - node: test_node
+    params:
+      message: "Hello from test workflow!"
