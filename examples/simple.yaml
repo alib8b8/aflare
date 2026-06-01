@@ -1,0 +1,17 @@
+name: Simple Text Processing
+description: A basic example workflow
+
+steps:
+  - node: text_input
+    params:
+      prompt: "Hello, world!"
+
+  - node: ollama_chat
+    params:
+      model: "llama2"
+      system_prompt: "You are a helpful assistant."
+      prompt: "Respond to this message."
+
+  - node: text_output
+    params:
+      format: "markdown"

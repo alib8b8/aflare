@@ -1,39 +1,40 @@
-# Project Name
+# llm-box
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-## Description
-
-A modern, open-source project template.
+A zero-code AI workflow engine that runs in your terminal.
 
 ## Features
 
-- 🚀 Modern architecture
-- 📦 Clean codebase
-- 🎯 Well-documented
-- 🔒 Secure by default
+- 📝 Define workflows with simple YAML
+- 🔄 Chain nodes together to process text data
+- 📟 Real-time TUI for monitoring execution
+- 🔌 Extensible - community can add new nodes easily
+- 💻 Completely offline, powered by Ollama
 
 ## Quick Start
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/your-repo.git
-
-# Navigate to project
-cd your-repo
-
-# Get started
-# Follow installation steps
+# Run an example workflow
+llm-box examples/simple.yaml
 ```
 
-## Documentation
+## Project Structure
 
-Detailed documentation coming soon.
-
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md).
+```
+llm-box/
+├── cmd/
+│   └── llm-box/
+│       └── main.go          # Entry point
+├── internal/
+│   ├── workflow/            # Workflow parsing & execution
+│   │   ├── types.go         # Core data structures
+│   │   └── parser.go        # YAML parser
+│   ├── nodes/               # Built-in node implementations
+│   └── tui/                 # Terminal user interface
+├── nodes/                   # Community-contributed nodes
+├── examples/                # Example workflow files
+└── go.mod
+```
 
 ## License
 
-[MIT](LICENSE) - feel free to use this project.
+MIT

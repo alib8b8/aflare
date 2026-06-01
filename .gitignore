@@ -1,36 +1,24 @@
-# Dependencies
-node_modules/
+# Binaries
+llm-box
+llm-box-*
+*.exe
+
+# Go
 vendor/
-__pycache__/
-*.py[cod]
-
-# Build outputs
-build/
-dist/
-*.egg-info/
-.next/
-.out/
-
-# Environment files
-.env
-.env.local
-.env.*.local
+*.test
+*.out
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-npm-debug.log*
-
-# Temporary files
-*.tmp
-*.temp
-cache/
+# Build
+dist/
+build/
