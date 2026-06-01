@@ -1,45 +1,36 @@
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-.yarn/install-state.gz
+# Dependencies
+node_modules/
+vendor/
+__pycache__/
+*.py[cod]
 
-# testing
-/coverage
+# Build outputs
+build/
+dist/
+*.egg-info/
+.next/
+.out/
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
-.env*.local
+# Environment files
 .env
-.env.development
-.env.test
-.env.production
+.env.local
+.env.*.local
 
-# vercel
-.vercel
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# OS files
+.DS_Store
+Thumbs.db
 
-# backend
-backend/uploads/
-backend/*.db
-backend/*.sqlite
-backend/*.sqlite3
-backend/logs/
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+*.tmp
+*.temp
+cache/
