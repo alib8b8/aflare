@@ -1,609 +1,513 @@
-# llm-box
+<div align="center">
+  <img src="docs/logo.svg" alt="llm-box" width="200" />
+  <h1>llm-box</h1>
+  <p><strong>Build terminal workflows using plain English</strong></p>
+  <p>No YAML. No drag-and-drop builders. No boilerplate.</p>
 
-<p align="center">
-  <img src="docs/logo.svg" alt="llm-box" width="200"/>
-</p>
-
-<p align="center">
-  <strong>Build terminal workflows using plain English.</strong>
-</p>
-
-<p align="center">
-  <a href="https://github.com/alib8b8/llm-box/releases">
-    <img src="https://img.shields.io/github/v/release/alib8b8/llm-box?style=flat-square" alt="release"/>
-  </a>
-  <a href="https://golang.org/">
-    <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square" alt="go"/>
-  </a>
-  <a href="LICENSE">
-    <img src="https://img.shields.io/github/license/alib8b8/llm-box?style=flat-square" alt="license"/>
-  </a>
-  <a href="https://github.com/alib8b8/llm-box/stargazers">
-    <img src="https://img.shields.io/github/stars/alib8b8/llm-box?style=flat-square" alt="stars"/>
-  </a>
-</p>
-
----
-
-No YAML. No drag-and-drop builders. No boilerplate.
-
-Turn repetitive terminal tasks into reusable workflows directly from your terminal.
+  <p>
+    <a href="https://github.com/alib8b8/llm-box/releases">
+      <img src="https://img.shields.io/github/v/release/alib8b8/llm-box?style=flat-square" alt="release" />
+    </a>
+    <a href="https://golang.org/">
+      <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square" alt="Go" />
+    </a>
+    <a href="LICENSE">
+      <img src="https://img.shields.io/github/license/alib8b8/llm-box?style=flat-square" alt="license" />
+    </a>
+    <a href="https://github.com/alib8b8/llm-box/stargazers">
+      <img src="https://img.shields.io/github/stars/alib8b8/llm-box?style=flat-square" alt="stars" />
+    </a>
+    <a href="https://github.com/alib8b8/llm-box/commits">
+      <img src="https://img.shields.io/github/last-commit/alib8b8/llm-box?style=flat-square" alt="last commit" />
+    </a>
+    <a href="https://github.com/alib8b8/llm-box/actions/workflows/release.yml">
+      <img src="https://img.shields.io/github/actions/workflow/status/alib8b8/llm-box/release.yml?branch=main&style=flat-square" alt="CI status" />
+    </a>
+  </p>
+</div>
 
 ---
 
-## Demo
+## 🚀 Quick Start
 
-![llm-box demo](docs/demo.gif)
+Install in 60 seconds:
 
-> **30 seconds to see it in action:** Run `vhs docs/demo.tape` to generate the demo GIF locally.
+```bash
+# Linux/macOS
+curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
+
+# Windows
+# Download from releases: https://github.com/alib8b8/llm-box/releases/latest
+Invoke-WebRequest -Uri "https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-windows-amd64.exe" -OutFile llm-box.exe
+```
+
+Create and run your first workflow:
+
+```bash
+# Create
+llm-box create "fetch Hacker News top stories and save to stories.txt"
+
+# Run
+llm-box run hn_workflow.yaml
+```
 
 ---
 
-## Why llm-box
+## 💡 Why This Exists
 
 Most workflow tools force developers to choose between:
 
 | Approach | Problem |
 |----------|---------|
-| Complex shell scripts | Hard to read, maintain, or share |
+| Complex bash scripts | Hard to read, maintain, share |
 | Heavy visual builders | Slow, opaque, require GUI |
-| Endless configuration files | Steep learning curve, verbose syntax |
+| Endless config files | Steep learning curve, verbose syntax |
 
-**llm-box provides a lightweight terminal-first approach.**
+**llm-box provides a lightweight, terminal-first alternative.**
 
-- Describe a workflow naturally
+- Describe what you want naturally
 - Execute it instantly
 - Keep everything transparent and scriptable
+- No lock-in, no vendor lock
 
 ---
 
-## Features
+## ✨ Features
 
-- **Terminal First** — Native command-line experience, no GUI required
-- **Natural Language Workflow Creation** — Define workflows in plain English
-- **Lightweight Runtime** — Single static binary, zero dependencies
-- **Workflow Reusability** — Save, share, and version control your workflows
-- **Fast Setup** — 60 seconds from zero to running workflow
-- **Extensible Architecture** — Build custom nodes in any language
-- **Open Source** — MIT licensed, community-driven
-
----
-
-## Quick Start
-
-### Installation (60 seconds)
-
-**Linux / macOS:**
-```bash
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
-```
-
-**Windows:**
-```powershell
-# Download from releases page
-# https://github.com/alib8b8/llm-box/releases/latest
-Invoke-WebRequest -Uri "https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-windows-amd64.exe" -OutFile llm-box.exe
-```
-
-**Build from source:**
-```bash
-git clone https://github.com/alib8b8/llm-box.git
-cd llm-box
-go install ./cmd/llm-box
-```
-
-### Create Your First Workflow
-
-```bash
-llm-box create "Fetch the top 5 Hacker News stories and save to file"
-```
-
-### Run It
-
-```bash
-llm-box run my_workflow.yaml
-```
-
-### See Results
-
-```
-✅ Fetched HN stories
-✅ Saved to hn_stories.txt
-
-Workflow completed in 3.2s
-```
+- **Terminal First** - Native CLI, works anywhere you have a terminal
+- **Plain English Workflows** - Define what you want, not how to do it
+- **Single Binary** - Zero dependencies, install and run
+- **Workflow Reusability** - Save, version, and share your workflows
+- **Extensible Node System** - Build custom nodes in any language
+- **MIT Licensed** - Open source, use freely
+- **Cross Platform** - Linux, macOS, Windows supported
+- **Beautiful TUI** - Real-time progress feedback
 
 ---
 
-## Examples
+## 🎬 Demo
 
-Here are 10 practical workflows you can build with llm-box:
+![llm-box demo](docs/demo.svg)
+
+> **Generate your own demo**
+> Run `vhs docs/demo.tape` to create a high-quality GIF.
+
+---
+
+## 🔧 Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        User (Terminal)                      │
+└─────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Natural Language Parser                   │
+│            "Fetch HN stories and summarize"               │
+└─────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Task Planner                           │
+│         Convert intent into executable steps              │
+└─────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Execution Engine                          │
+│  ┌──────────┐ ┌───────────┐ ┌────────────┐ ┌───────────┐ │
+│  │fetch_url │ │transform  │ │execute_cmd │ │file_write│ │
+│  └──────────┘ └───────────┘ └────────────┘ └───────────┘ │
+│  ┌──────────┐ ┌───────────┐ ┌────────────┐ ┌───────────┐ │
+│  │ollama    │ │notify     │ │combine     │ │custom node│ │
+│  └──────────┘ └───────────┘ └────────────┘ └───────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       Output                              │
+│                 (Terminal / File / Notification)         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Components:**
+1. **Parser** - Interprets plain English commands
+2. **Planner** - Breaks down into steps
+3. **Engine** - Executes with dependency management
+4. **Nodes** - Built-in and extensible actions
+5. **Output** - Formatted results
+
+---
+
+## 📚 10 Real Use Cases
 
 ### 1. Daily GitHub Summary
 
-**Goal:** Get an overview of your GitHub activity
+**Goal:** Get an overview of your activity
 
-**Input:** GitHub username
+**Input:**
+```bash
+llm-box create "fetch my recent GitHub activity and save summary to github-digest.md"
+```
 
 **Workflow:**
 ```yaml
-name: "GitHub Daily Summary"
+name: GitHub Daily Digest
 steps:
   - node: fetch_url
     params:
-      url: "https://github.com/{username}"
+      url: https://github.com/your-username
   - node: transform
     params:
-      operation: "extract_repos"
+      operation: extract_repos_and_activity
   - node: file_write
     params:
-      path: "daily_summary.txt"
+      path: github-digest.md
 ```
-
-**Output:** List of recent repositories with star counts
 
 ---
 
 ### 2. Research Assistant
 
-**Goal:** Collect and summarize research materials
+**Goal:** Collect and summarize technical docs
 
-**Input:** List of URLs
+**Input:**
+```bash
+llm-box create "fetch 3 tech blog posts about containerization and save key takeaways"
+```
 
 **Workflow:**
 ```yaml
-name: "Research Summary"
+name: Research Assistant
 steps:
   - node: fetch_url
     params:
-      url: "{{input}}"
+      url: https://example.com/blog1
+  - node: fetch_url
+    params:
+      url: https://example.com/blog2
+  - node: fetch_url
+    params:
+      url: https://example.com/blog3
   - node: transform
     params:
-      operation: "extract_key_points"
+      operation: combine_and_summarize
   - node: file_write
     params:
-      path: "research_notes.md"
+      path: research-notes.md
 ```
-
-**Output:** Structured markdown notes from web sources
 
 ---
 
 ### 3. Documentation Generator
 
-**Goal:** Auto-generate README from code structure
+**Goal:** Auto-generate API docs
 
-**Input:** Repository path
+**Input:**
+```bash
+llm-box create "scan my Go project and generate API overview"
+```
 
 **Workflow:**
 ```yaml
-name: "Docs Generator"
+name: Docs Generator
 steps:
   - node: execute
     params:
-      command: "find . -name '*.go' | head -20"
+      command: find . -name "*.go"
   - node: transform
     params:
-      operation: "extract_functions"
+      operation: extract_functions_and_types
   - node: file_write
     params:
-      path: "API.md"
+      path: API.md
 ```
-
-**Output:** Markdown documentation of code structure
 
 ---
 
-### 4. Log Monitoring
+### 4. Log Monitor
 
-**Goal:** Real-time monitoring with alerts
+**Goal:** Watch logs and notify on errors
 
-**Input:** Log file path and pattern
+**Input:**
+```bash
+llm-box create "monitor server logs for 5xx errors and alert"
+```
 
 **Workflow:**
 ```yaml
-name: "Log Monitor"
+name: Log Monitor
 steps:
   - node: execute
     params:
-      command: "tail -f {{input}}"
+      command: tail -n 100 /var/log/server.log
   - node: transform
     params:
-      operation: "filter_errors"
+      operation: filter_errors
   - node: notify
     params:
-      channel: "stdout"
+      channel: stdout
 ```
-
-**Output:** Filtered log stream with error highlights
 
 ---
 
-### 5. Release Notes Creation
+### 5. Release Notes Creator
 
-**Goal:** Generate changelog from git commits
+**Goal:** Generate changelog from commits
 
-**Input:** Git repository path
+**Input:**
+```bash
+llm-box create "turn git commit history into release notes"
+```
 
 **Workflow:**
 ```yaml
-name: "Release Notes"
+name: Release Notes Generator
 steps:
   - node: execute
     params:
-      command: "git log --oneline -20"
+      command: git log --oneline --since="2 weeks ago"
   - node: transform
     params:
-      operation: "group_by_type"
+      operation: group_by_commit_type
   - node: file_write
     params:
-      path: "RELEASE_NOTES.md"
+      path: RELEASE-NOTES.md
 ```
-
-**Output:** Structured release notes grouped by commit type
 
 ---
 
-### 6. Data Collection
+### 6. Data Collector
 
-**Goal:** Aggregate data from multiple sources
+**Goal:** Aggregate data from multiple APIs
 
-**Input:** List of API endpoints
+**Input:**
+```bash
+llm-box create "fetch weather and stock data, combine into report"
+```
 
 **Workflow:**
 ```yaml
-name: "Data Aggregator"
+name: Daily Report Generator
 steps:
   - node: fetch_url
     params:
-      url: "{{item}}"
-  - node: transform
+      url: https://api.weather.gov/forecast
+  - node: fetch_url
     params:
-      operation: "extract_json"
+      url: https://api.stock.example.com/quote/ABC
   - node: combine
     params:
-      format: "csv"
+      format: markdown
   - node: file_write
     params:
-      path: "data.csv"
+      path: daily-report.md
 ```
-
-**Output:** Combined CSV file from multiple sources
 
 ---
 
-### 7. File Organization
+### 7. File Organizer
 
-**Goal:** Auto-organize downloads folder
+**Goal:** Auto-sort downloads folder
 
-**Input:** Downloads directory path
+**Input:**
+```bash
+llm-box create "organize downloads folder by file type"
+```
 
 **Workflow:**
 ```yaml
-name: "File Organizer"
+name: Downloads Organizer
 steps:
   - node: execute
     params:
-      command: "ls -la {{input}}"
+      command: ls -la ~/Downloads
   - node: transform
     params:
-      operation: "group_by_extension"
+      operation: group_by_extension
   - node: execute
     params:
-      command: "mkdir -p images documents archives && mv *.jpg *.png images/ 2>/dev/null; true"
+      command: mkdir -p ~/Downloads/images ~/Downloads/documents
+  - node: execute
+    params:
+      command: mv ~/Downloads/*.jpg ~/Downloads/*.png ~/Downloads/images/
 ```
-
-**Output:** Organized folder structure
 
 ---
 
 ### 8. Content Workflow
 
-**Goal:** Process markdown files for publishing
+**Goal:** Prepare posts for publishing
 
-**Input:** Markdown file path
+**Input:**
+```bash
+llm-box create "take markdown post and generate HTML version"
+```
 
 **Workflow:**
 ```yaml
-name: "Content Processor"
+name: Content Processor
 steps:
   - node: fetch_url
     params:
-      url: "file://{{input}}"
+      url: file://post.md
   - node: transform
     params:
-      operation: "add_frontmatter"
-  - node: transform
-    params:
-      operation: "optimize_images"
+      operation: markdown_to_html
   - node: file_write
     params:
-      path: "_site/{{basename}}.html"
+      path: post.html
 ```
-
-**Output:** HTML file ready for publishing
 
 ---
 
 ### 9. DevOps Automation
 
-**Goal:** Deploy with zero downtime
+**Goal:** Deploy with health checks
 
-**Input:** Service name and environment
+**Input:**
+```bash
+llm-box create "build docker image and deploy with health check"
+```
 
 **Workflow:**
 ```yaml
-name: "Zero Downtime Deploy"
+name: Zero Downtime Deploy
 steps:
   - node: execute
     params:
-      command: "docker build -t {{service}} ."
+      command: docker build -t my-service .
   - node: execute
     params:
-      command: "docker-compose up -d --no-deps {{service}}"
+      command: docker-compose up -d --no-deps my-service
   - node: execute
     params:
-      command: "sleep 5 && curl -f http://localhost/health"
+      command: sleep 30 && curl -f http://localhost/health
   - node: notify
     params:
-      channel: "slack"
+      channel: stdout
 ```
-
-**Output:** Deployed service with health verification
 
 ---
 
 ### 10. Team Reporting
 
-**Goal:** Generate weekly team metrics
+**Goal:** Weekly team metrics
 
-**Input:** Date range and team members
+**Input:**
+```bash
+llm-box create "compile weekly issue and commit stats"
+```
 
 **Workflow:**
 ```yaml
-name: "Team Report"
+name: Team Weekly Report
 steps:
   - node: execute
     params:
-      command: "gh issue list --assignee @me --since '{{start}}' --state all"
+      command: gh issue list --repo my-org/my-repo --since "1 week ago" --state all
   - node: transform
     params:
-      operation: "count_by_label"
+      operation: count_by_label
   - node: execute
     params:
-      command: "git log --author '{{author}}' --since '{{start}}' --oneline"
+      command: git log --author="@my-team.com" --since="1 week ago" --oneline
   - node: file_write
     params:
-      path: "weekly_report.md"
-```
-
-**Output:** Markdown report with issues and commits
-
----
-
-## Why Not Alternatives
-
-| Tool | Learning Curve | Configuration | Visual Builder | Terminal Native |
-|------|----------------|---------------|----------------|-----------------|
-| Bash | Medium | Scripts | No | Yes |
-| Makefile | High | Makefiles | No | Yes |
-| Zapier | Low | GUI | Yes | No |
-| n8n | Medium | GUI + YAML | Yes | No |
-| Airflow | High | Python | Yes | No |
-| **llm-box** | **Low** | **Plain Text** | **No** | **Yes** |
-
-**llm-box wins on:** Learning curve, configuration simplicity, and terminal-native experience.
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         User                                │
-│                    (Terminal Input)                         │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   Natural Language Parser                   │
-│            "Fetch HN stories and summarize"                │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     Task Planner                            │
-│           Converts intent to executable steps               │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Execution Engine                         │
-│  ┌─────────┐  ┌──────────┐  ┌───────────┐  ┌──────────┐  │
-│  │ fetch   │  │ transform │  │ execute   │  │ file     │  │
-│  │  _url   │  │          │  │           │  │ _write   │  │
-│  └─────────┘  └──────────┘  └───────────┘  └──────────┘  │
-│                                                              │
-│  ┌─────────┐  ┌──────────┐  ┌───────────┐  ┌──────────┐  │
-│  │ ollama  │  │  notify  │  │ combine   │  │  custom  │  │
-│  │         │  │          │  │           │  │  nodes   │  │
-│  └─────────┘  └──────────┘  └───────────┘  └──────────┘  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                       Output                               │
-│              (Terminal / File / Notification)               │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Components:**
-
-1. **Natural Language Parser** — Interprets plain English commands
-2. **Task Planner** — Breaks down workflows into executable steps
-3. **Execution Engine** — Runs nodes sequentially with dependency management
-4. **Node System** — Extensible set of built-in and custom nodes
-5. **Output Handler** — Formats and delivers results
-
----
-
-## Built-in Nodes
-
-### fetch_url
-Fetch content from web pages.
-```yaml
-- node: fetch_url
-  params:
-    url: "https://example.com"
-```
-
-### ollama
-Call local LLM models for processing.
-```yaml
-- node: ollama
-  params:
-    model: "llama3"
-    prompt: "Summarize: {{input}}"
-```
-
-### file_write
-Save output to files.
-```yaml
-- node: file_write
-  params:
-    path: "output.txt"
-```
-
-### execute
-Run shell commands.
-```yaml
-- node: execute
-  params:
-    command: "git status"
-```
-
-### notify
-Send notifications.
-```yaml
-- node: notify
-  params:
-    channel: "slack"
-    message: "Deployment complete!"
+      path: team-report.md
 ```
 
 ---
 
-## Roadmap
+## ❓ FAQ
 
-### v0.1 — Initial Release ✓
+### What makes this different from Bash scripts?
+llm-box adds structure, reusability, and a beautiful UI without losing the power of the terminal.
+
+### Do I have to write YAML?
+No! Describe what you want in plain English, and llm-box generates the YAML for you.
+
+### Can I extend it?
+Yes! Build custom nodes in any language. See [docs/contributing.md](docs/contributing.md).
+
+### Is it production-ready?
+v0.1 is early access. v1.0 (stable) is planned for Q3 2026.
+
+### Which platforms are supported?
+Linux, macOS, and Windows are fully supported.
+
+### Where can I get help?
+Open a [GitHub Discussion](https://github.com/alib8b8/llm-box/discussions) or file an issue.
+
+---
+
+## 🗺️ Roadmap
+
+### v0.1 - Initial Release ✓
 - [x] Basic workflow creation
-- [x] Workflow execution engine
+- [x] Execution engine
 - [x] Built-in nodes (fetch_url, file_write, ollama)
 - [x] Terminal UI
 
-### v0.2 — Community Features
+### v0.2 - Plugin System
 - [ ] Plugin system for custom nodes
-- [ ] Workflow templates marketplace
+- [ ] Workflow template library
 - [ ] Workflow sharing via URL
 
-### v0.3 — Collaboration
-- [ ] Team workflow library
+### v0.3 - Team Features
+- [ ] Team workflow repository
 - [ ] Workflow versioning
-- [ ] Cloud sync
+- [ ] Cloud sync (optional)
 
-### v0.4 — Enterprise
-- [ ] Team collaboration features
+### v0.4 - Enterprise
 - [ ] Access control
 - [ ] Audit logging
+- [ ] Scheduled workflows
 
-### v1.0 — Stable Release
-- [ ] Production-ready
-- [ ] Comprehensive documentation
+### v1.0 - Stable
+- [ ] Production readiness
+- [ ] Comprehensive docs
 - [ ] Long-term support
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-We welcome contributions from developers of all skill levels!
+We welcome contributors of all skill levels!
 
 ### Ways to Contribute
-
-- **Go Developers** — Build new nodes, improve the core engine
-- **Documentation Contributors** — Improve docs, write tutorials
-- **Workflow Designers** — Share your workflows, create templates
-- **Community Builders** — Help others, report bugs, suggest features
+- **Go Developers** - Build new nodes, improve core
+- **Documentation** - Improve docs, write tutorials
+- **Workflow Designers** - Share your workflows
+- **Community Builders** - Help others on Discussions
 
 ### Quick Start
 
-1. Fork the repository
-2. Create your branch: `git checkout -b feature/amazing-feature`
-3. Make your changes
-4. Run tests: `go test ./...`
-5. Commit: `git commit -m 'feat: add amazing feature'`
-6. Push: `git push origin feature/amazing-feature`
-7. Open a Pull Request
-
-### Development Setup
-
 ```bash
-# Clone the repository
 git clone https://github.com/alib8b8/llm-box.git
 cd llm-box
-
-# Install dependencies
 go mod download
-
-# Run tests
 go test ./...
-
-# Build locally
 go build -o llm-box ./cmd/llm-box
+./llm-box help
 ```
 
----
-
-## Project Structure
-
-```
-llm-box/
-├── cmd/
-│   └── llm-box/
-│       └── main.go           # Entry point
-├── internal/
-│   ├── workflow/             # Workflow parsing & execution
-│   │   ├── parser.go
-│   │   ├── executor.go
-│   │   └── types.go
-│   ├── nodes/                # Built-in nodes
-│   │   ├── fetch_url.go
-│   │   ├── file_write.go
-│   │   ├── ollama.go
-│   │   └── node.go
-│   └── tui/                  # Terminal UI
-│       └── model.go
-├── nodes/                    # Community nodes
-├── examples/                 # Example workflows
-├── docs/                     # Documentation
-├── CONTRIBUTING.md
-├── LICENSE
-└── README.md
-```
+See [docs/contributing.md](docs/contributing.md) for guidelines.
 
 ---
 
-## License
+## 📄 License
 
-MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=alib8b8/llm-box&type=Timeline)](https://star-history.com/#alib8b8/llm-box&Timeline)
+MIT License - see [LICENSE](LICENSE) for full details.
 
 ---
 
-<p align="center">
-  <strong>If this project helps you, please give it a ⭐</strong>
-</p>
+<div align="center">
+  <p>If this project helps you, please give it a ⭐</p>
+  <p>
+    <a href="https://github.com/alib8b8/llm-box/stargazers">
+      <img src="https://api.star-history.com/svg?repos=alib8b8/llm-box&type=Timeline" alt="Star History" />
+    </a>
+  </p>
+</div>
