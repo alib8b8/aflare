@@ -38,27 +38,21 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Build (Unix)
-        if: matrix.os != 'windows'
+      - name: Build
         env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
         run: |
-          BIN_NAME="llm-box-${{ matrix.os }}-${{ matrix.arch }}"
-          go build -ldflags "-s -w" -o "${BIN_NAME}" ./cmd/llm-box
-          sha256sum "${BIN_NAME}" > "${BIN_NAME}.sha256"
-          echo "BIN_NAME=${BIN_NAME}" >> $GITHUB_ENV
-
-      - name: Build (Windows)
-        if: matrix.os == 'windows'
-        env:
-          GOOS: ${{ matrix.os }}
-          GOARCH: ${{ matrix.arch }}
-        run: |
-          $BIN_NAME = "llm-box-${{ matrix.os }}-${{ matrix.arch }}.exe"
-          go build -ldflags "-s -w" -o $BIN_NAME ./cmd/llm-box
-          Get-FileHash -Path $BIN_NAME -Algorithm SHA256 | Format-List | Out-File -FilePath "${BIN_NAME}.sha256"
-          echo "BIN_NAME=$BIN_NAME" | Out-File -FilePath $env:GITHUB_ENV -Append
+          set -eux
+          EXT=""
+          if [ "$GOOS" = "windows" ]; then
+            EXT=".exe"
+          fi
+          BIN_NAME="llm-box-${GOOS}-${GOARCH}${EXT}"
+          go build -ldflags="-s -w" -o "${BIN_NAME}" ./cmd/llm-box
+          sha256sum "${BIN_NAME}" | tee "${BIN_NAME}.sha256"
+          echo "BIN_NAME=${BIN_NAME}" >> "$GITHUB_ENV"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -87,37 +81,43 @@ jobs:
       - name: Generate checksums.txt
         run: |
           cd artifacts
-          sha256sum llm-box-* | grep -v ".sha256" > checksums.txt
+          for f in $(find . -type f -name "llm-box-*" ! -name "*.sha256"); do
+            sha256sum "$f"
+          done > checksums.txt
           cat checksums.txt
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/llm-box-*
-            artifacts/checksums.txt
+          tag_name: ${{ github.ref_name }}
+          name: "llm-box ${{ github.ref_name }}"
           body: |
             ## 🚀 Release ${{ github.ref_name }}
 
-            ### Changes
-            - Cross-platform binaries for Linux, macOS, and Windows
-            - ARM64 support for Linux and macOS
+            Cross-platform binaries for **llm-box** — 终端里的零代码 AI 工作流引擎。
 
             ### Downloads
-            - `llm-box-linux-amd64` - Linux x86_64
-            - `llm-box-linux-arm64` - Linux ARM64
-            - `llm-box-darwin-amd64` - macOS Intel
-            - `llm-box-darwin-arm64` - macOS Apple Silicon
-            - `llm-box-windows-amd64.exe` - Windows x86_64
-            - `llm-box-windows-arm64.exe` - Windows ARM64
 
-            ### Installation
+            | File | Platform |
+            | --- | --- |
+            | `llm-box-linux-amd64` | Linux x86_64 |
+            | `llm-box-linux-arm64` | Linux ARM64 |
+            | `llm-box-darwin-amd64` | macOS Intel |
+            | `llm-box-darwin-arm64` | macOS Apple Silicon |
+            | `llm-box-windows-amd64.exe` | Windows x86_64 |
+            | `llm-box-windows-arm64.exe` | Windows ARM64 |
+
+            ### Install (Linux / macOS)
+
             ```bash
-            # Linux/macOS
             curl -sL https://raw.githubusercontent.com/alib8b8/HKAIC/main/install.sh | bash
             ```
 
             ### Verify
-            Check SHA256 checksums in `checksums.txt`
+
+            Check SHA256 checksums in `checksums.txt`.
+          files: |
+            artifacts/llm-box-*
+            artifacts/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
