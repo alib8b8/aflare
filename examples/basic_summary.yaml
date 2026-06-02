@@ -4,13 +4,13 @@ description: "抓取网页内容，使用 Ollama 进行总结，保存结果"
 steps:
   - node: fetch_url
     params:
-      url: "https://en.wikipedia.org/wiki/Artificial_intelligence"
-  
+      url: "https://example.com"
+
   - node: ollama
     params:
       model: "llama3"
       prompt: "请用中文简要总结以下内容：\n\n{{input}}\n\n总结："
-  
+
   - node: file_write
     params:
       path: "ai_summary.txt"

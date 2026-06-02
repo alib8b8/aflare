@@ -1,0 +1,11 @@
+name: "node_name"
+description: "Brief one-line description of what the node does"
+entry: "main.py"
+# Optional: list all required params and their purpose
+# params:
+#   - name: "param1"
+#     required: true
+#     description: "What this param is for"
+#   - name: "param2"
+#     required: false
+#     default: "default_value"

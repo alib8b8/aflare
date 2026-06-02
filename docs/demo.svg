@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e1e2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#181825;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7D56F4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#9B7DFF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="720" fill="url(#bg)"/>
+
+  <!-- Terminal top bar -->
+  <rect x="20" y="20" width="1160" height="40" rx="8" fill="#313244"/>
+  <circle cx="45" cy="40" r="7" fill="#f38ba8"/>
+  <circle cx="70" cy="40" r="7" fill="#f9e2af"/>
+  <circle cx="95" cy="40" r="7" fill="#a6e3a1"/>
+  <text x="600" y="46" font-family="monospace" font-size="16" fill="#cdd6f4" text-anchor="middle">llm-box — terminal AI workflows</text>
+
+  <!-- Title in TUI -->
+  <rect x="20" y="80" width="1160" height="55" rx="8" fill="url(#titleGrad)"/>
+  <text x="50" y="116" font-family="monospace" font-size="26" font-weight="bold" fill="#ffffff">🚀 llm-box - basic_summary.yaml</text>
+
+  <!-- Workflow path -->
+  <text x="50" y="170" font-family="monospace" font-size="20" fill="#7D56F4" font-weight="bold">📁 examples/basic_summary.yaml</text>
+
+  <!-- Steps section header -->
+  <text x="50" y="220" font-family="monospace" font-size="20" fill="#7D56F4" font-weight="bold">📋 Steps:</text>
+
+  <!-- Step 1 -->
+  <text x="50" y="265" font-family="monospace" font-size="20" fill="#cdd6f4">1. fetch_url</text>
+  <text x="350" y="265" font-family="monospace" font-size="20" fill="#a6e3a1" font-weight="bold">✅ done (1.2s)</text>
+
+  <!-- Step 2 -->
+  <text x="50" y="305" font-family="monospace" font-size="20" fill="#cdd6f4">2. ollama</text>
+  <text x="350" y="305" font-family="monospace" font-size="20" fill="#a6e3a1" font-weight="bold">✅ done (3.4s)</text>
+
+  <!-- Step 3 -->
+  <text x="50" y="345" font-family="monospace" font-size="20" fill="#cdd6f4">3. file_write</text>
+  <text x="350" y="345" font-family="monospace" font-size="20" fill="#f9e2af" font-weight="bold">🔄 running...</text>
+
+  <!-- Output preview box -->
+  <rect x="20" y="390" width="1160" height="240" rx="8" fill="#1e1e2e" stroke="#89b4fa" stroke-width="2"/>
+  <text x="50" y="425" font-family="monospace" font-size="20" fill="#7D56F4" font-weight="bold">📄 Output Preview (last step):</text>
+  <text x="50" y="465" font-family="monospace" font-size="16" fill="#a6adc8">Artificial intelligence (AI) is intelligence demonstrated</text>
+  <text x="50" y="490" font-family="monospace" font-size="16" fill="#a6adc8">by machines, as opposed to the natural intelligence displayed</text>
+  <text x="50" y="515" font-family="monospace" font-size="16" fill="#a6adc8">by humans and animals. Leading AI textbooks define the</text>
+  <text x="50" y="540" font-family="monospace" font-size="16" fill="#a6adc8">field as the study of "intelligent agents": any system that</text>
+  <text x="50" y="565" font-family="monospace" font-size="16" fill="#a6adc8">perceives its environment and takes actions that maximize</text>
+  <text x="50" y="590" font-family="monospace" font-size="16" fill="#a6adc8">its chance of achieving its goals.</text>
+
+  <!-- Footer -->
+  <text x="50" y="670" font-family="monospace" font-size="18" fill="#a6e3a1" font-weight="bold">⏳ Running... (press q to quit)</text>
+  <text x="900" y="670" font-family="monospace" font-size="18" fill="#6c7086">v0.1.0</text>
+</svg>

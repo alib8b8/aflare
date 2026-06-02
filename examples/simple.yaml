@@ -1,17 +1,11 @@
 name: Simple Text Processing
-description: A basic example workflow
+description: A basic example workflow using built-in nodes
 
 steps:
-  - node: text_input
+  - node: fetch_url
     params:
-      prompt: "Hello, world!"
+      url: "https://example.com"
 
-  - node: ollama_chat
+  - node: file_write
     params:
-      model: "llama2"
-      system_prompt: "You are a helpful assistant."
-      prompt: "Respond to this message."
-
-  - node: text_output
-    params:
-      format: "markdown"
+      path: "simple_output.txt"

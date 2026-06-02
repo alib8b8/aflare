@@ -1,17 +1,24 @@
 # llm-box
 
-> 终端里的零代码 AI 工作流引擎
+> **零代码，终端里搭 AI 流水线，完全离线。**
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8.svg?style=flat-square)](https://golang.org)
 [![License](https://img.shields.io/github/license/alib8b8/HKAIC.svg?style=flat-square)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/alib8b8/HKAIC.svg?style=flat-square&label=Stars)](https://github.com/alib8b8/HKAIC/stargazers)
 [![Community Nodes](https://img.shields.io/badge/Community%20Nodes-5+-purple.svg?style=flat-square)](nodes/)
+[![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg?style=flat-square)](#-quick-start)
 
 ---
 
 ## 🎬 Demo
 
-![llm-box demo](https://raw.githubusercontent.com/alib8b8/HKAIC/main/docs/demo.gif)
+![llm-box demo](https://raw.githubusercontent.com/alib8b8/HKAIC/main/docs/demo.svg)
+
+> 📹 录制约 20 秒的终端操作展示：运行命令 → TUI 出现 → 步骤依次成功 → 输出保存。
+> 暗色背景 + 高亮字体，录制脚本见 [docs/demo.tape](docs/demo.tape)，可使用 [vhs](https://github.com/charmbracelet/vhs) 本地重新生成 `demo.gif`：
+> ```bash
+> vhs docs/demo.tape
+> ```
 
 ---
 
@@ -26,29 +33,53 @@
 
 ## 🚀 Quick Start
 
-### 一键安装
+### 一键体验（60 秒跑通）
 
 ```bash
+# 1. 安装（Linux/macOS）
 curl -sL https://raw.githubusercontent.com/alib8b8/HKAIC/main/install.sh | bash
+
+# 2. 前置：安装并启动 Ollama，然后拉取模型
+#    https://ollama.com/
+ollama pull llama3
+
+# 3. 运行示例
+llm-box run examples/basic_summary.yaml
 ```
 
-### 前置要求
+### 其它平台
 
-1. 安装 [Ollama](https://ollama.com/)
-2. 启动 Ollama 服务
-3. 拉取一个模型（如 `ollama pull llama3`）
+```bash
+# Windows（PowerShell）
+irm https://raw.githubusercontent.com/alib8b8/HKAIC/main/install.sh | bash
+
+# 手动下载
+# https://github.com/alib8b8/HKAIC/releases/latest
+```
+
+### 本地编译
+
+```bash
+git clone https://github.com/alib8b8/HKAIC.git
+cd HKAIC
+go build -o llm-box ./cmd/llm-box
+./llm-box run examples/basic_summary.yaml
+```
 
 ### 运行示例
 
 ```bash
-# 基础总结示例
-llm-box examples/basic_summary.yaml
+# 基础总结：抓网页 → Ollama 总结 → 保存
+llm-box run examples/basic_summary.yaml
 
-# 多步骤工作流
-llm-box examples/multi_step.yaml
+# 多步骤：抓网页 → 总结 → 翻译 → 保存
+llm-box run examples/multi_step.yaml
 
 # 完整示例
-llm-box examples/complete_workflow.yaml
+llm-box run examples/complete_workflow.yaml
+
+# 调试用
+llm-box run examples/test_workflow.yaml
 ```
 
 ---
@@ -79,7 +110,7 @@ steps:
 运行：
 
 ```bash
-llm-box workflow.yaml
+llm-box run workflow.yaml
 ```
 
 ---
@@ -122,6 +153,7 @@ llm-box/
 │   └── tui/                 # 终端界面
 ├── nodes/                   # 社区贡献节点
 ├── examples/                # 示例工作流
+├── docs/                    # 演示素材
 ├── go.mod
 └── LICENSE
 ```
