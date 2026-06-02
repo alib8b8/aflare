@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00d4ff"/>
+      <stop offset="100%" style="stop-color:#7b2cbf"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="256" height="256" rx="32" fill="url(#bgGrad)"/>
+
+  <!-- Terminal window chrome -->
+  <rect x="24" y="32" width="208" height="192" rx="12" fill="#0f0f23" stroke="#2d2d44" stroke-width="2"/>
+
+  <!-- Terminal dots -->
+  <circle cx="44" cy="48" r="6" fill="#ff5f56"/>
+  <circle cx="64" cy="48" r="6" fill="#ffbd2e"/>
+  <circle cx="84" cy="48" r="6" fill="#27c93f"/>
+
+  <!-- Workflow lines (representing pipeline) -->
+  <path d="M44 80 L44 100 L120 100 L120 80" stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="44" cy="90" r="4" fill="#00d4ff"/>
+
+  <path d="M120 100 L120 120 L196 120 L196 100" stroke="#7b2cbf" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="120" cy="110" r="4" fill="#7b2cbf"/>
+
+  <path d="M196 120 L196 140 L44 140 L44 160" stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="8 4"/>
+  <circle cx="196" cy="130" r="4" fill="#7b2cbf"/>
+  <circle cx="44" cy="150" r="4" fill="#00d4ff"/>
+
+  <!-- Text "box" stylized -->
+  <text x="128" y="196" font-family="monospace" font-size="20" font-weight="bold" fill="url(#textGrad)" text-anchor="middle">llm-box</text>
+
+  <!-- Cursor blink -->
+  <rect x="180" y="184" width="10" height="16" fill="#00d4ff" opacity="0.8">
+    <animate attributeName="opacity" values="0.8;0;0.8" dur="1s" repeatCount="indefinite"/>
+  </rect>
+
+  <!-- Decorative nodes -->
+  <circle cx="44" cy="90" r="3" fill="#fff" opacity="0.6"/>
+  <circle cx="120" cy="110" r="3" fill="#fff" opacity="0.6"/>
+  <circle cx="196" cy="130" r="3" fill="#fff" opacity="0.6"/>
+  <circle cx="44" cy="150" r="3" fill="#fff" opacity="0.6"/>
+</svg>

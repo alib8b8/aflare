@@ -1,219 +1,609 @@
 # llm-box
 
-> **零代码，终端里搭 AI 流水线，完全离线。**
+<p align="center">
+  <img src="docs/logo.svg" alt="llm-box" width="200"/>
+</p>
 
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8.svg?style=flat-square)](https://golang.org)
-[![License](https://img.shields.io/github/license/alib8b8/llm-box.svg?style=flat-square)](LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/alib8b8/llm-box.svg?style=flat-square&label=Stars)](https://github.com/alib8b8/llm-box/stargazers)
-[![Community Nodes](https://img.shields.io/badge/Community%20Nodes-5+-purple.svg?style=flat-square)](nodes/)
-[![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg?style=flat-square)](#-quick-start)
+<p align="center">
+  <strong>Build terminal workflows using plain English.</strong>
+</p>
 
----
-
-## 🎬 Demo
-
-![llm-box demo](https://raw.githubusercontent.com/alib8b8/llm-box/main/docs/demo.svg)
-
-> 📹 录制约 20 秒的终端操作展示：运行命令 → TUI 出现 → 步骤依次成功 → 输出保存。
-> 暗色背景 + 高亮字体，录制脚本见 [docs/demo.tape](docs/demo.tape)，可使用 [vhs](https://github.com/charmbracelet/vhs) 本地重新生成 `demo.gif`：
-> ```bash
-> vhs docs/demo.tape
-> ```
-
----
-
-## ✨ Why llm-box?
-
-- **零代码**: 用简单的 YAML 定义工作流，无需编程
-- **全本地**: 数据不出本地，隐私安全
-- **永久免费**: MIT 开源协议，完全免费使用
-- **社区生态**: 丰富的社区节点，轻松扩展功能
+<p align="center">
+  <a href="https://github.com/alib8b8/llm-box/releases">
+    <img src="https://img.shields.io/github/v/release/alib8b8/llm-box?style=flat-square" alt="release"/>
+  </a>
+  <a href="https://golang.org/">
+    <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square" alt="go"/>
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/github/license/alib8b8/llm-box?style=flat-square" alt="license"/>
+  </a>
+  <a href="https://github.com/alib8b8/llm-box/stargazers">
+    <img src="https://img.shields.io/github/stars/alib8b8/llm-box?style=flat-square" alt="stars"/>
+  </a>
+</p>
 
 ---
 
-## 🚀 Quick Start
+No YAML. No drag-and-drop builders. No boilerplate.
 
-### 一键体验（60 秒跑通）
+Turn repetitive terminal tasks into reusable workflows directly from your terminal.
 
+---
+
+## Demo
+
+![llm-box demo](docs/demo.gif)
+
+> **30 seconds to see it in action:** Run `vhs docs/demo.tape` to generate the demo GIF locally.
+
+---
+
+## Why llm-box
+
+Most workflow tools force developers to choose between:
+
+| Approach | Problem |
+|----------|---------|
+| Complex shell scripts | Hard to read, maintain, or share |
+| Heavy visual builders | Slow, opaque, require GUI |
+| Endless configuration files | Steep learning curve, verbose syntax |
+
+**llm-box provides a lightweight terminal-first approach.**
+
+- Describe a workflow naturally
+- Execute it instantly
+- Keep everything transparent and scriptable
+
+---
+
+## Features
+
+- **Terminal First** — Native command-line experience, no GUI required
+- **Natural Language Workflow Creation** — Define workflows in plain English
+- **Lightweight Runtime** — Single static binary, zero dependencies
+- **Workflow Reusability** — Save, share, and version control your workflows
+- **Fast Setup** — 60 seconds from zero to running workflow
+- **Extensible Architecture** — Build custom nodes in any language
+- **Open Source** — MIT licensed, community-driven
+
+---
+
+## Quick Start
+
+### Installation (60 seconds)
+
+**Linux / macOS:**
 ```bash
-# 1. 安装（Linux/macOS）
 curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
-
-# 2. 前置：安装并启动 Ollama（必须步骤！）
-#    下载地址：https://ollama.com/
-#    安装后启动服务（不同系统启动方式可能不同）：
-#    - macOS/Linux: 运行 ollama serve（或自动后台运行）
-#    - Windows: 安装后自动启动服务
-ollama pull llama3
-
-# 3. 运行示例（确保 Ollama 服务已启动）
-llm-box run examples/basic_summary.yaml
 ```
 
-### 其它平台
-
+**Windows:**
 ```powershell
-# Windows（PowerShell）
-# 方案1：手动下载（推荐）
-# 访问 https://github.com/alib8b8/llm-box/releases/latest
-# 下载 llm-box-windows-amd64.exe，重命名为 llm-box.exe
-# 放入系统 PATH 目录或当前目录运行
-
-# 方案2：PowerShell 命令下载
-$url = "https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-windows-amd64.exe"
-Invoke-WebRequest -Uri $url -OutFile llm-box.exe
-.\llm-box.exe run examples/basic_summary.yaml
+# Download from releases page
+# https://github.com/alib8b8/llm-box/releases/latest
+Invoke-WebRequest -Uri "https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-windows-amd64.exe" -OutFile llm-box.exe
 ```
 
-### 本地编译
-
+**Build from source:**
 ```bash
 git clone https://github.com/alib8b8/llm-box.git
 cd llm-box
-go build -o llm-box ./cmd/llm-box
-./llm-box run examples/basic_summary.yaml
+go install ./cmd/llm-box
 ```
 
-### 运行示例
+### Create Your First Workflow
 
 ```bash
-# 基础总结：抓网页 → Ollama 总结 → 保存
-llm-box run examples/basic_summary.yaml
+llm-box create "Fetch the top 5 Hacker News stories and save to file"
+```
 
-# 多步骤：抓网页 → 总结 → 翻译 → 保存
-llm-box run examples/multi_step.yaml
+### Run It
 
-# 完整示例
-llm-box run examples/complete_workflow.yaml
+```bash
+llm-box run my_workflow.yaml
+```
 
-# 调试用
-llm-box run examples/test_workflow.yaml
+### See Results
+
+```
+✅ Fetched HN stories
+✅ Saved to hn_stories.txt
+
+Workflow completed in 3.2s
 ```
 
 ---
 
-## 📋 Minimal Example
+## Examples
 
-创建一个极简工作流 `workflow.yaml`：
+Here are 10 practical workflows you can build with llm-box:
 
+### 1. Daily GitHub Summary
+
+**Goal:** Get an overview of your GitHub activity
+
+**Input:** GitHub username
+
+**Workflow:**
 ```yaml
-name: "网页总结工作流"
-description: "抓取网页 → AI 总结 → 保存结果"
-
+name: "GitHub Daily Summary"
 steps:
   - node: fetch_url
     params:
-      url: "https://example.com"
-  
-  - node: ollama
+      url: "https://github.com/{username}"
+  - node: transform
     params:
-      model: "llama3"
-      prompt: "请用中文总结以下内容：{{input}}"
-  
+      operation: "extract_repos"
   - node: file_write
     params:
-      path: "summary.txt"
+      path: "daily_summary.txt"
 ```
 
-运行：
+**Output:** List of recent repositories with star counts
+
+---
+
+### 2. Research Assistant
+
+**Goal:** Collect and summarize research materials
+
+**Input:** List of URLs
+
+**Workflow:**
+```yaml
+name: "Research Summary"
+steps:
+  - node: fetch_url
+    params:
+      url: "{{input}}"
+  - node: transform
+    params:
+      operation: "extract_key_points"
+  - node: file_write
+    params:
+      path: "research_notes.md"
+```
+
+**Output:** Structured markdown notes from web sources
+
+---
+
+### 3. Documentation Generator
+
+**Goal:** Auto-generate README from code structure
+
+**Input:** Repository path
+
+**Workflow:**
+```yaml
+name: "Docs Generator"
+steps:
+  - node: execute
+    params:
+      command: "find . -name '*.go' | head -20"
+  - node: transform
+    params:
+      operation: "extract_functions"
+  - node: file_write
+    params:
+      path: "API.md"
+```
+
+**Output:** Markdown documentation of code structure
+
+---
+
+### 4. Log Monitoring
+
+**Goal:** Real-time monitoring with alerts
+
+**Input:** Log file path and pattern
+
+**Workflow:**
+```yaml
+name: "Log Monitor"
+steps:
+  - node: execute
+    params:
+      command: "tail -f {{input}}"
+  - node: transform
+    params:
+      operation: "filter_errors"
+  - node: notify
+    params:
+      channel: "stdout"
+```
+
+**Output:** Filtered log stream with error highlights
+
+---
+
+### 5. Release Notes Creation
+
+**Goal:** Generate changelog from git commits
+
+**Input:** Git repository path
+
+**Workflow:**
+```yaml
+name: "Release Notes"
+steps:
+  - node: execute
+    params:
+      command: "git log --oneline -20"
+  - node: transform
+    params:
+      operation: "group_by_type"
+  - node: file_write
+    params:
+      path: "RELEASE_NOTES.md"
+```
+
+**Output:** Structured release notes grouped by commit type
+
+---
+
+### 6. Data Collection
+
+**Goal:** Aggregate data from multiple sources
+
+**Input:** List of API endpoints
+
+**Workflow:**
+```yaml
+name: "Data Aggregator"
+steps:
+  - node: fetch_url
+    params:
+      url: "{{item}}"
+  - node: transform
+    params:
+      operation: "extract_json"
+  - node: combine
+    params:
+      format: "csv"
+  - node: file_write
+    params:
+      path: "data.csv"
+```
+
+**Output:** Combined CSV file from multiple sources
+
+---
+
+### 7. File Organization
+
+**Goal:** Auto-organize downloads folder
+
+**Input:** Downloads directory path
+
+**Workflow:**
+```yaml
+name: "File Organizer"
+steps:
+  - node: execute
+    params:
+      command: "ls -la {{input}}"
+  - node: transform
+    params:
+      operation: "group_by_extension"
+  - node: execute
+    params:
+      command: "mkdir -p images documents archives && mv *.jpg *.png images/ 2>/dev/null; true"
+```
+
+**Output:** Organized folder structure
+
+---
+
+### 8. Content Workflow
+
+**Goal:** Process markdown files for publishing
+
+**Input:** Markdown file path
+
+**Workflow:**
+```yaml
+name: "Content Processor"
+steps:
+  - node: fetch_url
+    params:
+      url: "file://{{input}}"
+  - node: transform
+    params:
+      operation: "add_frontmatter"
+  - node: transform
+    params:
+      operation: "optimize_images"
+  - node: file_write
+    params:
+      path: "_site/{{basename}}.html"
+```
+
+**Output:** HTML file ready for publishing
+
+---
+
+### 9. DevOps Automation
+
+**Goal:** Deploy with zero downtime
+
+**Input:** Service name and environment
+
+**Workflow:**
+```yaml
+name: "Zero Downtime Deploy"
+steps:
+  - node: execute
+    params:
+      command: "docker build -t {{service}} ."
+  - node: execute
+    params:
+      command: "docker-compose up -d --no-deps {{service}}"
+  - node: execute
+    params:
+      command: "sleep 5 && curl -f http://localhost/health"
+  - node: notify
+    params:
+      channel: "slack"
+```
+
+**Output:** Deployed service with health verification
+
+---
+
+### 10. Team Reporting
+
+**Goal:** Generate weekly team metrics
+
+**Input:** Date range and team members
+
+**Workflow:**
+```yaml
+name: "Team Report"
+steps:
+  - node: execute
+    params:
+      command: "gh issue list --assignee @me --since '{{start}}' --state all"
+  - node: transform
+    params:
+      operation: "count_by_label"
+  - node: execute
+    params:
+      command: "git log --author '{{author}}' --since '{{start}}' --oneline"
+  - node: file_write
+    params:
+      path: "weekly_report.md"
+```
+
+**Output:** Markdown report with issues and commits
+
+---
+
+## Why Not Alternatives
+
+| Tool | Learning Curve | Configuration | Visual Builder | Terminal Native |
+|------|----------------|---------------|----------------|-----------------|
+| Bash | Medium | Scripts | No | Yes |
+| Makefile | High | Makefiles | No | Yes |
+| Zapier | Low | GUI | Yes | No |
+| n8n | Medium | GUI + YAML | Yes | No |
+| Airflow | High | Python | Yes | No |
+| **llm-box** | **Low** | **Plain Text** | **No** | **Yes** |
+
+**llm-box wins on:** Learning curve, configuration simplicity, and terminal-native experience.
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         User                                │
+│                    (Terminal Input)                         │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Natural Language Parser                   │
+│            "Fetch HN stories and summarize"                │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Task Planner                            │
+│           Converts intent to executable steps               │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Execution Engine                         │
+│  ┌─────────┐  ┌──────────┐  ┌───────────┐  ┌──────────┐  │
+│  │ fetch   │  │ transform │  │ execute   │  │ file     │  │
+│  │  _url   │  │          │  │           │  │ _write   │  │
+│  └─────────┘  └──────────┘  └───────────┘  └──────────┘  │
+│                                                              │
+│  ┌─────────┐  ┌──────────┐  ┌───────────┐  ┌──────────┐  │
+│  │ ollama  │  │  notify  │  │ combine   │  │  custom  │  │
+│  │         │  │          │  │           │  │  nodes   │  │
+│  └─────────┘  └──────────┘  └───────────┘  └──────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       Output                               │
+│              (Terminal / File / Notification)               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Components:**
+
+1. **Natural Language Parser** — Interprets plain English commands
+2. **Task Planner** — Breaks down workflows into executable steps
+3. **Execution Engine** — Runs nodes sequentially with dependency management
+4. **Node System** — Extensible set of built-in and custom nodes
+5. **Output Handler** — Formats and delivers results
+
+---
+
+## Built-in Nodes
+
+### fetch_url
+Fetch content from web pages.
+```yaml
+- node: fetch_url
+  params:
+    url: "https://example.com"
+```
+
+### ollama
+Call local LLM models for processing.
+```yaml
+- node: ollama
+  params:
+    model: "llama3"
+    prompt: "Summarize: {{input}}"
+```
+
+### file_write
+Save output to files.
+```yaml
+- node: file_write
+  params:
+    path: "output.txt"
+```
+
+### execute
+Run shell commands.
+```yaml
+- node: execute
+  params:
+    command: "git status"
+```
+
+### notify
+Send notifications.
+```yaml
+- node: notify
+  params:
+    channel: "slack"
+    message: "Deployment complete!"
+```
+
+---
+
+## Roadmap
+
+### v0.1 — Initial Release ✓
+- [x] Basic workflow creation
+- [x] Workflow execution engine
+- [x] Built-in nodes (fetch_url, file_write, ollama)
+- [x] Terminal UI
+
+### v0.2 — Community Features
+- [ ] Plugin system for custom nodes
+- [ ] Workflow templates marketplace
+- [ ] Workflow sharing via URL
+
+### v0.3 — Collaboration
+- [ ] Team workflow library
+- [ ] Workflow versioning
+- [ ] Cloud sync
+
+### v0.4 — Enterprise
+- [ ] Team collaboration features
+- [ ] Access control
+- [ ] Audit logging
+
+### v1.0 — Stable Release
+- [ ] Production-ready
+- [ ] Comprehensive documentation
+- [ ] Long-term support
+
+---
+
+## Contributing
+
+We welcome contributions from developers of all skill levels!
+
+### Ways to Contribute
+
+- **Go Developers** — Build new nodes, improve the core engine
+- **Documentation Contributors** — Improve docs, write tutorials
+- **Workflow Designers** — Share your workflows, create templates
+- **Community Builders** — Help others, report bugs, suggest features
+
+### Quick Start
+
+1. Fork the repository
+2. Create your branch: `git checkout -b feature/amazing-feature`
+3. Make your changes
+4. Run tests: `go test ./...`
+5. Commit: `git commit -m 'feat: add amazing feature'`
+6. Push: `git push origin feature/amazing-feature`
+7. Open a Pull Request
+
+### Development Setup
 
 ```bash
-llm-box run workflow.yaml
+# Clone the repository
+git clone https://github.com/alib8b8/llm-box.git
+cd llm-box
+
+# Install dependencies
+go mod download
+
+# Run tests
+go test ./...
+
+# Build locally
+go build -o llm-box ./cmd/llm-box
 ```
 
 ---
 
-## 🧩 Built-in Nodes
-
-### `ollama`
-调用本地 Ollama 模型进行 AI 推理
-
-**参数:**
-- `model`: 模型名称（默认: `llama3`）
-- `endpoint`: Ollama API 地址（默认: `http://localhost:11434`）
-- `prompt`: 提示词模板，可用 `{{input}}` 引用输入
-
-### `fetch_url`
-抓取网页内容
-
-**参数:**
-- `url`: 目标 URL（或通过 input 传入）
-
-**注意事项:**
-- 仅抓取服务端渲染的 HTML 内容，不支持 JavaScript 动态渲染（SPA）
-- 部分网站有反爬机制或需要登录，可能返回空内容或 4xx/5xx 错误
-- 如果抓取结果不符合预期，先用 `curl <url>` 或浏览器"查看网页源代码"确认内容
-
-### `file_write`
-将内容写入文件
-
-**参数:**
-- `path`: 输出文件路径
-
-### `echo`
-输出输入内容（调试用）
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 llm-box/
-├── cmd/llm-box/main.go      # 入口程序
+├── cmd/
+│   └── llm-box/
+│       └── main.go           # Entry point
 ├── internal/
-│   ├── workflow/            # 工作流解析与执行
-│   ├── nodes/               # 内置节点实现
-│   └── tui/                 # 终端界面
-├── nodes/                   # 社区贡献节点
-├── examples/                # 示例工作流
-├── docs/                    # 演示素材
-├── go.mod
-└── LICENSE
+│   ├── workflow/             # Workflow parsing & execution
+│   │   ├── parser.go
+│   │   ├── executor.go
+│   │   └── types.go
+│   ├── nodes/                # Built-in nodes
+│   │   ├── fetch_url.go
+│   │   ├── file_write.go
+│   │   ├── ollama.go
+│   │   └── node.go
+│   └── tui/                  # Terminal UI
+│       └── model.go
+├── nodes/                    # Community nodes
+├── examples/                 # Example workflows
+├── docs/                     # Documentation
+├── CONTRIBUTING.md
+├── LICENSE
+└── README.md
 ```
 
 ---
 
-## 🤝 Contributing
+## License
 
-欢迎贡献代码和节点！请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
-
-### 贡献节点
-
-1. 在 `nodes/` 创建新目录（如 `nodes/my_node/`）
-2. 添加 `metadata.yaml`：
-   ```yaml
-   name: "my_node"
-   description: "我的自定义节点"
-   entry: "main.py"
-   ```
-3. 编写入口脚本（支持任何语言）
-4. 提交 PR！
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-## ⚠️ 已知限制与注意事项
+## Star History
 
-### 项目状态
-- **尚处于早期开发阶段**：当前 Star 数较少，提交记录集中在最近几天
-- **社区测试有限**：可能存在未预料的 bug
-- **建议**：先快速体验 `basic_summary.yaml`，生产或关键用途请谨慎使用
-
-### Ollama 依赖
-- 所有使用 `ollama` 节点的工作流需要本地安装并运行 Ollama
-- 首次使用需执行 `ollama pull llama3`（或其他模型）
-- 如果报连接错误，请检查 Ollama 服务是否正在运行
-
-### 网页抓取限制
-- `fetch_url` 节点仅支持服务端渲染的网页
-- 不支持 JavaScript 动态渲染（SPA）、需要登录或有反爬机制的网站
-- 抓取前建议先用 `curl <url>` 确认内容
+[![Star History Chart](https://api.star-history.com/svg?repos=alib8b8/llm-box&type=Timeline)](https://star-history.com/#alib8b8/llm-box&Timeline)
 
 ---
 
-## 📄 License
-
-MIT License - 详见 [LICENSE](LICENSE)
-
----
-
-⭐ 如果喜欢这个项目，请给个 Star！
+<p align="center">
+  <strong>If this project helps you, please give it a ⭐</strong>
+</p>
