@@ -31,10 +31,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v5
         with:
           go-version: '1.24'
           cache: false
@@ -45,11 +45,8 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
         run: |
-          echo "::group::Env"
           go version
           go env GOOS GOARCH CGO_ENABLED
-          ls -la
-          echo "::endgroup::"
           if [ "$GOOS" = "windows" ]; then
             EXT=".exe"
           else
@@ -63,7 +60,7 @@ jobs:
           sha256sum "$BIN_NAME" > "$BIN_NAME.sha256"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.BIN_NAME }}
           path: |
@@ -76,10 +73,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v4
         with:
           path: artifacts/
 
@@ -95,7 +92,7 @@ jobs:
           cat checksums.txt
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2.2
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: "llm-box ${{ github.ref_name }}"
