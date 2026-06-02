@@ -1,0 +1,3 @@
+name: "echo"
+description: "A simple echo node that returns input"
+entry: "main.py"

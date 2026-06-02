@@ -99,6 +99,35 @@ llm-box/
 - **Lipgloss** - Terminal styling
 - **Ollama** - Local LLM inference
 
+## Contributing Nodes
+
+Want to add a new node? It's easy!
+
+1. **Create a node directory** in `nodes/` (e.g., `nodes/your_node_name/`)
+2. **Add metadata.yaml**:
+   ```yaml
+   name: "your_node_name"
+   description: "Your node's description"
+   entry: "main.py"
+   ```
+3. **Write your entry script** - Python, Bash, Go, Rust, any language!
+4. **Test it** - run `llm-box` to see your node loaded
+5. **Submit a PR** - share it with the community!
+
+### Node Protocol
+
+Your node receives JSON via stdin:
+```json
+{
+  "input": "text from previous node",
+  "params": {"key": "value"}
+}
+```
+
+Your node writes output to stdout (plain text).
+
+See `nodes/README.md` for more details and examples!
+
 ## License
 
 MIT
