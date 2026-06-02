@@ -1,0 +1,22 @@
+name: Test Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24'
+          cache: false
+      - name: Show env
+        run: go version && go env GOOS GOARCH
+      - name: Build
+        run: |
+          go build -v -o llm-box-test ./cmd/llm-box
+          ls -la llm-box-test
