@@ -1,133 +1,155 @@
 # llm-box
 
-A zero-code AI workflow engine that runs in your terminal.
+> 终端里的零代码 AI 工作流引擎
 
-## Features
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8.svg?style=flat-square)](https://golang.org)
+[![License](https://img.shields.io/github/license/alib8b8/HKAIC.svg?style=flat-square)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/alib8b8/HKAIC.svg?style=flat-square&label=Stars)](https://github.com/alib8b8/HKAIC/stargazers)
+[![Community Nodes](https://img.shields.io/badge/Community%20Nodes-5+-purple.svg?style=flat-square)](nodes/)
 
-- 📝 Define workflows with simple YAML
-- 🔄 Chain nodes together to process text data
-- 📟 Beautiful real-time TUI for monitoring execution
-- 🔌 Extensible - community can add new nodes easily
-- 💻 Completely offline, powered by Ollama
+---
 
-## Quick Start
+## 🎬 Demo
+
+![llm-box demo](https://raw.githubusercontent.com/alib8b8/HKAIC/main/docs/demo.gif)
+
+---
+
+## ✨ Why llm-box?
+
+- **零代码**: 用简单的 YAML 定义工作流，无需编程
+- **全本地**: 数据不出本地，隐私安全
+- **永久免费**: MIT 开源协议，完全免费使用
+- **社区生态**: 丰富的社区节点，轻松扩展功能
+
+---
+
+## 🚀 Quick Start
+
+### 一键安装
 
 ```bash
-# Run an example workflow (uses TUI if terminal is interactive)
-llm-box examples/test_workflow.yaml
+curl -sL https://raw.githubusercontent.com/alib8b8/HKAIC/main/install.sh | bash
+```
 
-# Run with Ollama (requires local Ollama)
-llm-box examples/ollama_chat.yaml
+### 前置要求
 
-# Complete example: fetch URL → summarize with Ollama → save to file
+1. 安装 [Ollama](https://ollama.com/)
+2. 启动 Ollama 服务
+3. 拉取一个模型（如 `ollama pull llama3`）
+
+### 运行示例
+
+```bash
+# 基础总结示例
+llm-box examples/basic_summary.yaml
+
+# 多步骤工作流
+llm-box examples/multi_step.yaml
+
+# 完整示例
 llm-box examples/complete_workflow.yaml
 ```
 
-## Built-in Nodes
+---
+
+## 📋 Minimal Example
+
+创建一个极简工作流 `workflow.yaml`：
+
+```yaml
+name: "网页总结工作流"
+description: "抓取网页 → AI 总结 → 保存结果"
+
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  
+  - node: ollama
+    params:
+      model: "llama3"
+      prompt: "请用中文总结以下内容：{{input}}"
+  
+  - node: file_write
+    params:
+      path: "summary.txt"
+```
+
+运行：
+
+```bash
+llm-box workflow.yaml
+```
+
+---
+
+## 🧩 Built-in Nodes
 
 ### `ollama`
-Calls your local Ollama models.
+调用本地 Ollama 模型进行 AI 推理
 
-**Parameters:**
-- `model`: Model name (default: `llama3`)
-- `endpoint`: Ollama API endpoint (default: `http://localhost:11434`)
-
-**Example:**
-```yaml
-- node: ollama
-  params:
-    model: "llama3"
-```
+**参数:**
+- `model`: 模型名称（默认: `llama3`）
+- `endpoint`: Ollama API 地址（默认: `http://localhost:11434`）
+- `prompt`: 提示词模板，可用 `{{input}}` 引用输入
 
 ### `fetch_url`
-Fetches content from a URL.
+抓取网页内容
 
-**Parameters:**
-- `url`: URL to fetch (or pass URL as input)
-
-**Example:**
-```yaml
-- node: fetch_url
-  params:
-    url: "https://example.com"
-```
+**参数:**
+- `url`: 目标 URL（或通过 input 传入）
 
 ### `file_write`
-Writes content to a file.
+将内容写入文件
 
-**Parameters:**
-- `path`: Output file path (required)
+**参数:**
+- `path`: 输出文件路径
 
-**Example:**
-```yaml
-- node: file_write
-  params:
-    path: "output.txt"
-```
+### `echo`
+输出输入内容（调试用）
 
-## Project Structure
+---
+
+## 📁 Project Structure
 
 ```
 llm-box/
-├── cmd/
-│   └── llm-box/
-│       └── main.go          # Entry point
+├── cmd/llm-box/main.go      # 入口程序
 ├── internal/
-│   ├── workflow/            # Workflow parsing & execution
-│   │   ├── types.go         # Core data structures
-│   │   ├── parser.go        # YAML parser
-│   │   └── executor.go      # Workflow execution engine
-│   ├── nodes/               # Built-in node implementations
-│   │   ├── node.go          # Node interface & registry
-│   │   ├── test_node.go     # Test node
-│   │   ├── ollama.go        # Ollama node
-│   │   ├── fetch_url.go     # URL fetch node
-│   │   └── file_write.go    # File write node
-│   └── tui/                 # Terminal user interface
-│       └── model.go         # Bubbletea TUI model
-├── nodes/                   # Community-contributed nodes
-├── examples/                # Example workflow files
+│   ├── workflow/            # 工作流解析与执行
+│   ├── nodes/               # 内置节点实现
+│   └── tui/                 # 终端界面
+├── nodes/                   # 社区贡献节点
+├── examples/                # 示例工作流
 ├── go.mod
-├── go.sum
-└── README.md
+└── LICENSE
 ```
 
-## Technologies
+---
 
-- **Go** - Static binaries, easy distribution
-- **Bubbletea** - Terminal UI framework
-- **Lipgloss** - Terminal styling
-- **Ollama** - Local LLM inference
+## 🤝 Contributing
 
-## Contributing Nodes
+欢迎贡献代码和节点！请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-Want to add a new node? It's easy!
+### 贡献节点
 
-1. **Create a node directory** in `nodes/` (e.g., `nodes/your_node_name/`)
-2. **Add metadata.yaml**:
+1. 在 `nodes/` 创建新目录（如 `nodes/my_node/`）
+2. 添加 `metadata.yaml`：
    ```yaml
-   name: "your_node_name"
-   description: "Your node's description"
+   name: "my_node"
+   description: "我的自定义节点"
    entry: "main.py"
    ```
-3. **Write your entry script** - Python, Bash, Go, Rust, any language!
-4. **Test it** - run `llm-box` to see your node loaded
-5. **Submit a PR** - share it with the community!
+3. 编写入口脚本（支持任何语言）
+4. 提交 PR！
 
-### Node Protocol
+---
 
-Your node receives JSON via stdin:
-```json
-{
-  "input": "text from previous node",
-  "params": {"key": "value"}
-}
-```
+## 📄 License
 
-Your node writes output to stdout (plain text).
+MIT License - 详见 [LICENSE](LICENSE)
 
-See `nodes/README.md` for more details and examples!
+---
 
-## License
-
-MIT
+⭐ 如果喜欢这个项目，请给个 Star！

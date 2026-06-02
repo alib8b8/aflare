@@ -3,16 +3,17 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*.*.*'
 
 permissions:
   contents: write
 
 jobs:
   build:
-    name: Build and Release
+    name: Build ${{ matrix.os }}/${{ matrix.arch }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: linux
@@ -25,6 +26,8 @@ jobs:
             arch: arm64
           - os: windows
             arch: amd64
+          - os: windows
+            arch: arm64
 
     steps:
       - name: Checkout code
@@ -35,23 +38,35 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Build
+      - name: Build (Unix)
+        if: matrix.os != 'windows'
         env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
           BIN_NAME="llm-box-${{ matrix.os }}-${{ matrix.arch }}"
-          if [ "${{ matrix.os }}" = "windows" ]; then
-            BIN_NAME="${BIN_NAME}.exe"
-          fi
-          go build -o "${BIN_NAME}" ./cmd/llm-box
+          go build -ldflags "-s -w" -o "${BIN_NAME}" ./cmd/llm-box
+          sha256sum "${BIN_NAME}" > "${BIN_NAME}.sha256"
           echo "BIN_NAME=${BIN_NAME}" >> $GITHUB_ENV
+
+      - name: Build (Windows)
+        if: matrix.os == 'windows'
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          $BIN_NAME = "llm-box-${{ matrix.os }}-${{ matrix.arch }}.exe"
+          go build -ldflags "-s -w" -o $BIN_NAME ./cmd/llm-box
+          Get-FileHash -Path $BIN_NAME -Algorithm SHA256 | Format-List | Out-File -FilePath "${BIN_NAME}.sha256"
+          echo "BIN_NAME=$BIN_NAME" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.BIN_NAME }}
-          path: ${{ env.BIN_NAME }}
+          path: |
+            ${{ env.BIN_NAME }}
+            ${{ env.BIN_NAME }}.sha256
 
   release:
     name: Create Release
@@ -66,9 +81,43 @@ jobs:
         with:
           path: artifacts/
 
+      - name: List artifacts
+        run: find artifacts -type f -name "llm-box-*" | sort
+
+      - name: Generate checksums.txt
+        run: |
+          cd artifacts
+          sha256sum llm-box-* | grep -v ".sha256" > checksums.txt
+          cat checksums.txt
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          files: |
+            artifacts/llm-box-*
+            artifacts/checksums.txt
+          body: |
+            ## 🚀 Release ${{ github.ref_name }}
+
+            ### Changes
+            - Cross-platform binaries for Linux, macOS, and Windows
+            - ARM64 support for Linux and macOS
+
+            ### Downloads
+            - `llm-box-linux-amd64` - Linux x86_64
+            - `llm-box-linux-arm64` - Linux ARM64
+            - `llm-box-darwin-amd64` - macOS Intel
+            - `llm-box-darwin-arm64` - macOS Apple Silicon
+            - `llm-box-windows-amd64.exe` - Windows x86_64
+            - `llm-box-windows-arm64.exe` - Windows ARM64
+
+            ### Installation
+            ```bash
+            # Linux/macOS
+            curl -sL https://raw.githubusercontent.com/alib8b8/HKAIC/main/install.sh | bash
+            ```
+
+            ### Verify
+            Check SHA256 checksums in `checksums.txt`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

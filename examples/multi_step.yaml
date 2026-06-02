@@ -1,0 +1,21 @@
+name: "多步骤工作流演示"
+description: "展示 fetch_url → ollama → file_write 的完整流程"
+
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  
+  - node: ollama
+    params:
+      model: "llama3"
+      prompt: "请用3-5句话总结以下网页内容：\n\n{{input}}"
+  
+  - node: ollama
+    params:
+      model: "llama3"
+      prompt: "请将以下内容翻译成英文：\n\n{{input}}"
+  
+  - node: file_write
+    params:
+      path: "multi_step_result.txt"
