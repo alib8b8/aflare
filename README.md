@@ -6,15 +6,21 @@ A zero-code AI workflow engine that runs in your terminal.
 
 - 📝 Define workflows with simple YAML
 - 🔄 Chain nodes together to process text data
-- 📟 Real-time TUI for monitoring execution
+- 📟 Beautiful real-time TUI for monitoring execution
 - 🔌 Extensible - community can add new nodes easily
 - 💻 Completely offline, powered by Ollama
 
 ## Quick Start
 
 ```bash
-# Run an example Ollama workflow (requires local Ollama)
+# Run an example workflow (uses TUI if terminal is interactive)
+llm-box examples/test_workflow.yaml
+
+# Run with Ollama (requires local Ollama)
 llm-box examples/ollama_chat.yaml
+
+# Complete example: fetch URL → summarize with Ollama → save to file
+llm-box examples/complete_workflow.yaml
 ```
 
 ## Built-in Nodes
@@ -69,13 +75,29 @@ llm-box/
 ├── internal/
 │   ├── workflow/            # Workflow parsing & execution
 │   │   ├── types.go         # Core data structures
-│   │   └── parser.go        # YAML parser
+│   │   ├── parser.go        # YAML parser
+│   │   └── executor.go      # Workflow execution engine
 │   ├── nodes/               # Built-in node implementations
+│   │   ├── node.go          # Node interface & registry
+│   │   ├── test_node.go     # Test node
+│   │   ├── ollama.go        # Ollama node
+│   │   ├── fetch_url.go     # URL fetch node
+│   │   └── file_write.go    # File write node
 │   └── tui/                 # Terminal user interface
+│       └── model.go         # Bubbletea TUI model
 ├── nodes/                   # Community-contributed nodes
 ├── examples/                # Example workflow files
-└── go.mod
+├── go.mod
+├── go.sum
+└── README.md
 ```
+
+## Technologies
+
+- **Go** - Static binaries, easy distribution
+- **Bubbletea** - Terminal UI framework
+- **Lipgloss** - Terminal styling
+- **Ollama** - Local LLM inference
 
 ## License
 
