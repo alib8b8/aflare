@@ -45,12 +45,22 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
         run: |
-          if [ "$GOOS" = "windows" ]; then EXT=".exe"; else EXT=""; fi
+          echo "::group::Env"
+          go version
+          go env GOOS GOARCH CGO_ENABLED
+          ls -la
+          echo "::endgroup::"
+          if [ "$GOOS" = "windows" ]; then
+            EXT=".exe"
+          else
+            EXT=""
+          fi
           BIN_NAME="llm-box-${GOOS}-${GOARCH}${EXT}"
+          echo "BIN_NAME=$BIN_NAME" >> "$GITHUB_ENV"
           echo "Building $BIN_NAME ..."
           go build -ldflags "-s -w" -o "$BIN_NAME" ./cmd/llm-box
+          echo "Build OK, generating checksum"
           sha256sum "$BIN_NAME" > "$BIN_NAME.sha256"
-          echo "BIN_NAME=$BIN_NAME" >> "$GITHUB_ENV"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v5
