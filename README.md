@@ -39,22 +39,30 @@
 # 1. 安装（Linux/macOS）
 curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
 
-# 2. 前置：安装并启动 Ollama，然后拉取模型
-#    https://ollama.com/
+# 2. 前置：安装并启动 Ollama（必须步骤！）
+#    下载地址：https://ollama.com/
+#    安装后启动服务（不同系统启动方式可能不同）：
+#    - macOS/Linux: 运行 ollama serve（或自动后台运行）
+#    - Windows: 安装后自动启动服务
 ollama pull llama3
 
-# 3. 运行示例
+# 3. 运行示例（确保 Ollama 服务已启动）
 llm-box run examples/basic_summary.yaml
 ```
 
 ### 其它平台
 
-```bash
+```powershell
 # Windows（PowerShell）
-irm https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
+# 方案1：手动下载（推荐）
+# 访问 https://github.com/alib8b8/llm-box/releases/latest
+# 下载 llm-box-windows-amd64.exe，重命名为 llm-box.exe
+# 放入系统 PATH 目录或当前目录运行
 
-# 手动下载
-# https://github.com/alib8b8/llm-box/releases/latest
+# 方案2：PowerShell 命令下载
+$url = "https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-windows-amd64.exe"
+Invoke-WebRequest -Uri $url -OutFile llm-box.exe
+.\llm-box.exe run examples/basic_summary.yaml
 ```
 
 ### 本地编译
@@ -131,6 +139,11 @@ llm-box run workflow.yaml
 **参数:**
 - `url`: 目标 URL（或通过 input 传入）
 
+**注意事项:**
+- 仅抓取服务端渲染的 HTML 内容，不支持 JavaScript 动态渲染（SPA）
+- 部分网站有反爬机制或需要登录，可能返回空内容或 4xx/5xx 错误
+- 如果抓取结果不符合预期，先用 `curl <url>` 或浏览器"查看网页源代码"确认内容
+
 ### `file_write`
 将内容写入文件
 
@@ -175,6 +188,25 @@ llm-box/
    ```
 3. 编写入口脚本（支持任何语言）
 4. 提交 PR！
+
+---
+
+## ⚠️ 已知限制与注意事项
+
+### 项目状态
+- **尚处于早期开发阶段**：当前 Star 数较少，提交记录集中在最近几天
+- **社区测试有限**：可能存在未预料的 bug
+- **建议**：先快速体验 `basic_summary.yaml`，生产或关键用途请谨慎使用
+
+### Ollama 依赖
+- 所有使用 `ollama` 节点的工作流需要本地安装并运行 Ollama
+- 首次使用需执行 `ollama pull llama3`（或其他模型）
+- 如果报连接错误，请检查 Ollama 服务是否正在运行
+
+### 网页抓取限制
+- `fetch_url` 节点仅支持服务端渲染的网页
+- 不支持 JavaScript 动态渲染（SPA）、需要登录或有反爬机制的网站
+- 抓取前建议先用 `curl <url>` 确认内容
 
 ---
 
