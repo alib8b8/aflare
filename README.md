@@ -3,8 +3,8 @@
 > **零代码，终端里搭 AI 流水线，完全离线。**
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8.svg?style=flat-square)](https://golang.org)
-[![License](https://img.shields.io/github/license/alib8b8/HKAIC.svg?style=flat-square)](LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/alib8b8/HKAIC.svg?style=flat-square&label=Stars)](https://github.com/alib8b8/HKAIC/stargazers)
+[![License](https://img.shields.io/github/license/alib8b8/llm-box.svg?style=flat-square)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/alib8b8/llm-box.svg?style=flat-square&label=Stars)](https://github.com/alib8b8/llm-box/stargazers)
 [![Community Nodes](https://img.shields.io/badge/Community%20Nodes-5+-purple.svg?style=flat-square)](nodes/)
 [![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg?style=flat-square)](#-quick-start)
 
@@ -12,7 +12,7 @@
 
 ## 🎬 Demo
 
-![llm-box demo](https://raw.githubusercontent.com/alib8b8/HKAIC/main/docs/demo.svg)
+![llm-box demo](https://raw.githubusercontent.com/alib8b8/llm-box/main/docs/demo.svg)
 
 > 📹 录制约 20 秒的终端操作展示：运行命令 → TUI 出现 → 步骤依次成功 → 输出保存。
 > 暗色背景 + 高亮字体，录制脚本见 [docs/demo.tape](docs/demo.tape)，可使用 [vhs](https://github.com/charmbracelet/vhs) 本地重新生成 `demo.gif`：
@@ -37,7 +37,7 @@
 
 ```bash
 # 1. 安装（Linux/macOS）
-curl -sL https://raw.githubusercontent.com/alib8b8/HKAIC/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
 
 # 2. 前置：安装并启动 Ollama，然后拉取模型
 #    https://ollama.com/
@@ -51,17 +51,17 @@ llm-box run examples/basic_summary.yaml
 
 ```bash
 # Windows（PowerShell）
-irm https://raw.githubusercontent.com/alib8b8/HKAIC/main/install.sh | bash
+irm https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
 
 # 手动下载
-# https://github.com/alib8b8/HKAIC/releases/latest
+# https://github.com/alib8b8/llm-box/releases/latest
 ```
 
 ### 本地编译
 
 ```bash
-git clone https://github.com/alib8b8/HKAIC.git
-cd HKAIC
+git clone https://github.com/alib8b8/llm-box.git
+cd llm-box
 go build -o llm-box ./cmd/llm-box
 ./llm-box run examples/basic_summary.yaml
 ```

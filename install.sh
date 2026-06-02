@@ -4,7 +4,7 @@ set -e
 
 # llm-box installation script
 
-REPO="alib8b8/HKAIC"
+REPO="alib8b8/llm-box"
 BINARY_NAME="llm-box"
 INSTALL_DIR="/usr/local/bin"
 

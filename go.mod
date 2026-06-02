@@ -1,4 +1,4 @@
-module github.com/yourusername/llm-box
+module github.com/alib8b8/llm-box
 
 go 1.24.0
 
