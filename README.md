@@ -53,7 +53,9 @@ llm-box run hn_workflow.yaml
 
 ---
 
-## 💡 Why This Exists
+## 💡 Why Choose llm-box?
+
+**Not Another AI Chatbot**
 
 Most workflow tools force developers to choose between:
 
@@ -63,12 +65,14 @@ Most workflow tools force developers to choose between:
 | Heavy visual builders | Slow, opaque, require GUI |
 | Endless config files | Steep learning curve, verbose syntax |
 
-**llm-box provides a lightweight, terminal-first alternative.**
+**llm-box is not an AI assistant — it's a deterministic execution engine.**
 
-- Describe what you want naturally
-- Execute it instantly
-- Keep everything transparent and scriptable
-- No lock-in, no vendor lock
+- ✅ **Predictable & Auditable** — Workflow steps are deterministic
+- ✅ **Local-First** — Your data never leaves your terminal
+- ✅ **Transparent & Reproducible** — Same workflow produces same results
+- ✅ **MIT Open Source** — No vendor lock-in, no hidden barriers
+
+> 💡 We use AI to understand your intent, but core execution runs on deterministic code.
 
 ---
 
