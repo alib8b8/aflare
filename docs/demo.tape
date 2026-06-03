@@ -19,30 +19,34 @@ Set BorderRadius 8
 
 # === START RECORDING ===
 
-Type "# Watch llm-box run a workflow with a beautiful TUI"
+Type "# Build workflows with plain English"
 Sleep 1s
 Enter
 
-Type "llm-box run examples/basic_summary.yaml"
+Type ./llm-box create "fetch example.com and save to output.txt"
 Sleep 500ms
 Enter
 
-Sleep 3s
-
-# Capture TUI showing steps
-Type "# See the steps progress in real-time"
-Sleep 1s
-
-# Wait for steps to complete
-Sleep 8s
-
-# Show final output
-Type "# The summarized content was saved to ai_summary.txt"
 Sleep 2s
+
+Type "# Now run the workflow!"
+Sleep 1s
 Enter
 
-Type "cat ai_summary.txt"
+Type "./llm-box run example.com_output.txt.yaml"
+Sleep 500ms
+Enter
+
+Sleep 5s
+
+# Show final output
+Type "# Check what we saved"
+Sleep 1s
+Enter
+
+Type "cat output.txt"
 Sleep 500ms
 Enter
 
 Sleep 4s
+
