@@ -6,8 +6,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/yourusername/llm-box/internal/nodes"
-	"github.com/yourusername/llm-box/internal/tui"
+	"github.com/alib8b8/llm-box/internal/nodes"
+	"github.com/alib8b8/llm-box/internal/tui"
 )
 
 // StepResult stores the result of executing a single step
