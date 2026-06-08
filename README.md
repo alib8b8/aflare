@@ -89,6 +89,23 @@ Most workflow tools force developers to choose between:
 
 ---
 
+## 🔄 llm-box vs Alternatives
+
+| Feature | llm-box | Dify/n8n | Claude Code | CrewAI |
+|---------|---------|----------|-------------|--------|
+| **Interface** | Terminal + YAML | Visual GUI | Chat | Code |
+| **Execution** | Deterministic | AI-driven | AI autonomous | AI orchestration |
+| **Setup** | 60 seconds | Hours | Minutes | Hours |
+| **Transparency** | 100% | Medium | Low | Medium |
+| **Reproducibility** | 100% | Variable | Variable | Variable |
+| **Best For** | Automation | Enterprise apps | Coding | Research |
+
+**Choose llm-box when you need:** repeatable, auditable workflows with AI assistance without losing control.
+
+> 📖 [Full comparison →](docs/comparison.md)
+
+---
+
 ## 🎬 Demo
 
 ![llm-box demo](docs/demo.svg)
