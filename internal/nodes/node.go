@@ -143,6 +143,11 @@ func (r *Registry) LoadExternalNodes(dir string) error {
 			continue // Skip files, only look at directories
 		}
 
+		// Skip directories starting with underscore (e.g. _template)
+		if strings.HasPrefix(entry.Name(), "_") {
+			continue
+		}
+
 		nodeDir := filepath.Join(dir, entry.Name())
 		metadataPath := filepath.Join(nodeDir, "metadata.yaml")
 

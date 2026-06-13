@@ -99,7 +99,7 @@ jobs:
           body: |
             ## 🚀 Release ${{ github.ref_name }}
 
-            Cross-platform binaries for **llm-box** — 终端里的零代码 AI 工作流引擎。
+            Cross-platform binaries for **llm-box** — Terminal-first AI workflow engine.
 
             ### Downloads
 

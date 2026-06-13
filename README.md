@@ -2,14 +2,14 @@
   <img src="docs/logo.svg" alt="llm-box" width="200" />
   <h1>llm-box</h1>
   <p><strong>Build terminal workflows using plain English</strong></p>
-  <p>No YAML. No drag-and-drop builders. No boilerplate.</p>
+<p>Describe what you want. llm-box generates the YAML and executes it.</p>
 
   <p>
     <a href="https://github.com/alib8b8/llm-box/releases">
       <img src="https://img.shields.io/github/v/release/alib8b8/llm-box?style=flat-square" alt="release" />
     </a>
     <a href="https://golang.org/">
-      <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square" alt="Go" />
+      <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat-square" alt="Go" />
     </a>
     <a href="LICENSE">
       <img src="https://img.shields.io/github/license/alib8b8/llm-box?style=flat-square" alt="license" />

@@ -13,9 +13,18 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	desc := strings.ToLower(description)
 	wf := &Workflow{}
 
-	// Try to extract URL
+	// Try to extract URL (with or without protocol)
+	var urlMatch string
 	urlRegex := regexp.MustCompile(`(https?://[^\s]+)`)
-	urlMatch := urlRegex.FindString(description)
+	if m := urlRegex.FindString(description); m != "" {
+		urlMatch = m
+	} else {
+		// Try to match a plain domain like example.com, github.com, etc.
+		domainRegex := regexp.MustCompile(`\b([a-zA-Z0-9][-a-zA-Z0-9]*\.(?:com|org|net|io|edu|gov|me|dev|ai|app|xyz|co|info)\S*)\b`)
+		if m := domainRegex.FindString(description); m != "" {
+			urlMatch = "https://" + m
+		}
+	}
 	if urlMatch != "" {
 		step := Step{Node: "fetch_url", Params: map[string]string{"url": urlMatch}}
 		wf.Steps = append(wf.Steps, step)
@@ -146,13 +155,16 @@ func GetSuggestedFilename(description string) string {
 func generateWorkflowName(description string) string {
 	desc := strings.ToLower(description)
 
-	// Try to extract meaningful words
 	words := strings.Fields(desc)
 	var nameParts []string
 	for _, word := range words {
 		word = strings.Trim(word, ".,!?\"'")
 		if len(word) > 3 && !strings.Contains("the a an to and or fetch save write run from with", word) {
-			nameParts = append(nameParts, strings.Title(word))
+			// Simple title case: capitalize first letter
+			if len(word) > 0 {
+				word = strings.ToUpper(word[:1]) + word[1:]
+			}
+			nameParts = append(nameParts, word)
 		}
 		if len(nameParts) >= 3 {
 			break
