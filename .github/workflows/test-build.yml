@@ -39,6 +39,12 @@ jobs:
           } > /tmp/build.log 2>&1
 
           cat /tmp/build.log
-
-          # Always fail so we can see the output
+          cp /tmp/build.log build-debug.log
           exit 1
+
+      - name: Upload debug log
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: build-debug-log
+          path: build-debug.log
