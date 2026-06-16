@@ -18,16 +18,10 @@ jobs:
         include:
           - os: linux
             arch: amd64
-          - os: linux
-            arch: arm64
           - os: darwin
             arch: amd64
-          - os: darwin
-            arch: arm64
           - os: windows
             arch: amd64
-          - os: windows
-            arch: arm64
 
     steps:
       - name: Checkout code
@@ -47,8 +41,10 @@ jobs:
         run: |
           set -x
           go version
-          go env GOOS GOARCH CGO_ENABLED
-          go build -ldflags "-s -w" -v -o "llm-box-${GOOS}-${GOARCH}$([ "$GOOS" = "windows" ] && echo .exe || echo)" ./cmd/llm-box
+          go env
+          go build -ldflags "-s -w" -v -o "llm-box-${GOOS}-${GOARCH}$([ "$GOOS" = "windows" ] && echo .exe || echo)" ./cmd/llm-box 2>&1
+          echo "Exit code: $?"
+          ls -la llm-box-*
           sha256sum "llm-box-${GOOS}-${GOARCH}$([ "$GOOS" = "windows" ] && echo .exe || echo)" > "llm-box-${GOOS}-${GOARCH}$([ "$GOOS" = "windows" ] && echo .exe || echo).sha256"
 
       - name: Upload artifact
