@@ -30,14 +30,8 @@ jobs:
             arch: arm64
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v5
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: '1.25'
-          cache: false
 
       - name: Build
         env:
@@ -45,84 +39,20 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
         run: |
+          set -eux
+          # Install Go
+          curl -fsSL https://go.dev/dl/go1.25.1.linux-amd64.tar.gz -o /tmp/go.tgz
+          tar -C /usr/local -xzf /tmp/go.tgz
+          export PATH=$PATH:/usr/local/go/bin
           go version
-          go env GOOS GOARCH CGO_ENABLED
-          if [ "$GOOS" = "windows" ]; then
-            EXT=".exe"
-          else
-            EXT=""
-          fi
-          BIN_NAME="llm-box-${GOOS}-${GOARCH}${EXT}"
-          echo "BIN_NAME=$BIN_NAME" >> "$GITHUB_ENV"
-          echo "Building $BIN_NAME ..."
-          go build -ldflags "-s -w" -o "$BIN_NAME" ./cmd/llm-box
-          echo "Build OK, generating checksum"
-          sha256sum "$BIN_NAME" > "$BIN_NAME.sha256"
+          if [ "$GOOS" = "windows" ]; then EXT=".exe"; else EXT=""; fi
+          BIN="llm-box-${GOOS}-${GOARCH}${EXT}"
+          go build -ldflags "-s -w" -o "$BIN" ./cmd/llm-box
+          sha256sum "$BIN" > "$BIN.sha256"
 
-      - name: Upload artifact
+      - name: Upload
         uses: actions/upload-artifact@v5
         with:
-          name: ${{ env.BIN_NAME }}
+          name: ${{ matrix.os }}-${{ matrix.arch }}
           path: |
-            ${{ env.BIN_NAME }}
-            ${{ env.BIN_NAME }}.sha256
-
-  release:
-    name: Create Release
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v6
-        with:
-          path: artifacts/
-
-      - name: List artifacts
-        run: find artifacts -type f -name "llm-box-*" | sort
-
-      - name: Generate checksums.txt
-        run: |
-          cd artifacts
-          for f in $(find . -type f -name "llm-box-*" ! -name "*.sha256"); do
-            sha256sum "$f"
-          done > checksums.txt
-          cat checksums.txt
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: "llm-box ${{ github.ref_name }}"
-          body: |
-            ## Release ${{ github.ref_name }}
-
-            Cross-platform binaries for **llm-box** - Terminal-first AI workflow engine.
-
-            ### Downloads
-
-            | File | Platform |
-            | --- | --- |
-            | `llm-box-linux-amd64` | Linux x86_64 |
-            | `llm-box-linux-arm64` | Linux ARM64 |
-            | `llm-box-darwin-amd64` | macOS Intel |
-            | `llm-box-darwin-arm64` | macOS Apple Silicon |
-            | `llm-box-windows-amd64.exe` | Windows x86_64 |
-            | `llm-box-windows-arm64.exe` | Windows ARM64 |
-
-            ### Install (Linux / macOS)
-
-            ```bash
-            curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
-            ```
-
-            ### Verify
-
-            Check SHA256 checksums in `checksums.txt`.
-          files: |
-            artifacts/llm-box-*
-            artifacts/checksums.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            llm-box-*
