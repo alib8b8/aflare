@@ -1,28 +1,26 @@
 name: Test Build
 
-on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/release.yml', 'cmd/llm-box/**', 'go.mod']
+on: push
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-          cache: false
-      - name: Build linux/amd64
+      - uses: actions/checkout@v5
+
+      - name: Build Linux
         env:
           GOOS: linux
           GOARCH: amd64
           CGO_ENABLED: 0
         run: |
+          set -e
+          wget -q https://go.dev/dl/go1.25.1.linux-amd64.tar.gz -O /tmp/go.tgz
+          tar -C /usr/local -xzf /tmp/go.tgz
+          export PATH=/usr/local/go/bin:$PATH
           go version
-          go env GOOS GOARCH
-          go build -v -o llm-box-test ./cmd/llm-box
-          ls -la llm-box-test
+          go env GOOS GOARCH CGO_ENABLED
+          go build -ldflags "-s -w" -o test-binary ./cmd/llm-box
+          ls -la test-binary
+          ./test-binary --help 2>&1 | head -20 || true
+          echo "---SUCCESS---"
