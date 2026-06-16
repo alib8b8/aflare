@@ -6,22 +6,19 @@
 
   <p>
     <a href="https://github.com/alib8b8/llm-box/releases">
-      <img src="https://img.shields.io/github/v/release/alib8b8/llm-box?style=flat-square" alt="release" />
+      <img src="https://img.shields.io/github/v/release/alib8b8/llm-box?display_name=tag&include_prereleases&style=flat-square" alt="release" />
     </a>
     <a href="https://golang.org/">
       <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat-square" alt="Go" />
     </a>
     <a href="LICENSE">
-      <img src="https://img.shields.io/github/license/alib8b8/llm-box?style=flat-square" alt="license" />
-    </a>
-    <a href="https://github.com/alib8b8/llm-box/stargazers">
-      <img src="https://img.shields.io/github/stars/alib8b8/llm-box?style=flat-square" alt="stars" />
-    </a>
-    <a href="https://github.com/alib8b8/llm-box/commits">
-      <img src="https://img.shields.io/github/last-commit/alib8b8/llm-box?style=flat-square" alt="last commit" />
+      <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="license" />
     </a>
     <a href="https://github.com/alib8b8/llm-box/actions/workflows/release.yml">
-      <img src="https://img.shields.io/github/actions/workflow/status/alib8b8/llm-box/release.yml?branch=main&style=flat-square" alt="CI status" />
+      <img src="https://github.com/alib8b8/llm-box/actions/workflows/release.yml/badge.svg" alt="CI status" />
+    </a>
+    <a href="https://goreportcard.com/report/github.com/alib8b8/llm-box">
+      <img src="https://goreportcard.com/badge/github.com/alib8b8/llm-box" alt="Go Report Card" />
     </a>
   </p>
 </div>
