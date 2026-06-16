@@ -8,19 +8,37 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Build Linux
+      - name: Build with debug
         env:
           GOOS: linux
           GOARCH: amd64
           CGO_ENABLED: 0
         run: |
-          set -e
-          wget -q https://go.dev/dl/go1.25.1.linux-amd64.tar.gz -O /tmp/go.tgz
-          tar -C /usr/local -xzf /tmp/go.tgz
-          export PATH=/usr/local/go/bin:$PATH
-          go version
-          go env GOOS GOARCH CGO_ENABLED
-          go build -ldflags "-s -w" -o test-binary ./cmd/llm-box
-          ls -la test-binary
-          ./test-binary --help 2>&1 | head -20 || true
-          echo "---SUCCESS---"
+          set +e
+          {
+            echo "=== ENV ==="
+            uname -a
+            which go || echo "no go in PATH"
+            ls /usr/local/go 2>/dev/null || echo "no /usr/local/go"
+            echo "=== Download Go ==="
+            wget -q https://go.dev/dl/go1.25.1.linux-amd64.tar.gz -O /tmp/go.tgz 2>&1
+            echo "wget exit: $?"
+            ls -la /tmp/go.tgz
+            echo "=== Extract ==="
+            tar -C /usr/local -xzf /tmp/go.tgz 2>&1
+            echo "tar exit: $?"
+            ls /usr/local/go/bin/
+            export PATH=/usr/local/go/bin:$PATH
+            go version 2>&1
+            echo "=== Build ==="
+            go env GOOS GOARCH CGO_ENABLED 2>&1
+            go build -ldflags "-s -w" -o test-binary ./cmd/llm-box 2>&1
+            echo "build exit: $?"
+            ls -la test-binary 2>&1
+            echo "=== End ==="
+          } > /tmp/build.log 2>&1
+
+          cat /tmp/build.log
+
+          # Always fail so we can see the output
+          exit 1
