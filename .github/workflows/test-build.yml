@@ -7,6 +7,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build with debug
         env:
@@ -39,12 +42,12 @@ jobs:
           } > /tmp/build.log 2>&1
 
           cat /tmp/build.log
-          cp /tmp/build.log build-debug.log
-          exit 1
 
-      - name: Upload debug log
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: build-debug-log
-          path: build-debug.log
+      - name: Push build log back
+        run: |
+          cp /tmp/build.log build-debug.log
+          git config user.email "actions@github.com"
+          git config user.name "github-actions"
+          git add build-debug.log
+          git commit -m "debug: build log ${{ github.run_id }}" || echo "nothing to commit"
+          git push
