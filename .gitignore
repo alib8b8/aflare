@@ -1,6 +1,6 @@
 # Binaries
-llm-box
-llm-box-*
+/llm-box
+/llm-box-*
 *.exe
 
 # Go
