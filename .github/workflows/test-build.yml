@@ -8,25 +8,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Show what's checked out
+      - name: Show working directory
         run: |
-          echo "=== PWD ==="
-          pwd
-          echo "=== LS ==="
+          echo "PWD: $(pwd)"
+          echo "GitHub workspace: $GITHUB_WORKSPACE"
+          echo "Runner workspace: $RUNNER_WORKSPACE"
+          echo "Home: $HOME"
+          echo "=== find cmd dir ==="
+          find /home -name "main.go" -path "*llm-box*" 2>/dev/null | head -5
+          echo "=== ls /home/runner ==="
+          ls -la /home/runner 2>/dev/null
+          echo "=== ls /home/runner/work ==="
+          ls -la /home/runner/work 2>/dev/null
+          echo "=== ls -la ==="
           ls -la
-          echo "=== go module ==="
-          cat go.mod | head -5
-          echo "=== ls cmd ==="
-          ls -la cmd/llm-box || echo "no cmd/llm-box"
+          echo "=== git rev-parse ==="
+          git rev-parse --show-toplevel
 
-      - name: Build with system Go
+      - name: Try building at discovered location
         env:
           GOOS: linux
           GOARCH: amd64
           CGO_ENABLED: 0
         run: |
-          go version
-          go env
+          TOP=$(git rev-parse --show-toplevel)
+          echo "Building at: $TOP"
+          cd "$TOP"
+          pwd
+          ls -la cmd/llm-box/
           go build -ldflags "-s -w" -o test-binary ./cmd/llm-box
           ls -la test-binary
-          echo "Build SUCCESS"
