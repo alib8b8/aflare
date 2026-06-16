@@ -18,20 +18,20 @@ jobs:
         include:
           - os: linux
             arch: amd64
+          - os: linux
+            arch: arm64
           - os: darwin
             arch: amd64
+          - os: darwin
+            arch: arm64
           - os: windows
             arch: amd64
+          - os: windows
+            arch: arm64
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v5
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: '1.25'
-          cache: false
 
       - name: Build
         env:
@@ -39,15 +39,18 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
         run: |
-          set -x
+          set -e
+          # Download Go directly
+          wget -q https://go.dev/dl/go1.25.1.linux-amd64.tar.gz -O /tmp/go.tgz
+          tar -C /usr/local -xzf /tmp/go.tgz
+          export PATH=/usr/local/go/bin:$PATH
           go version
-          go env
-          go build -ldflags "-s -w" -v -o "llm-box-${GOOS}-${GOARCH}$([ "$GOOS" = "windows" ] && echo .exe || echo)" ./cmd/llm-box 2>&1
-          echo "Exit code: $?"
-          ls -la llm-box-*
-          sha256sum "llm-box-${GOOS}-${GOARCH}$([ "$GOOS" = "windows" ] && echo .exe || echo)" > "llm-box-${GOOS}-${GOARCH}$([ "$GOOS" = "windows" ] && echo .exe || echo).sha256"
+          if [ "$GOOS" = "windows" ]; then EXT=".exe"; else EXT=""; fi
+          go build -ldflags "-s -w" -o "llm-box-${GOOS}-${GOARCH}${EXT}" ./cmd/llm-box
+          sha256sum "llm-box-${GOOS}-${GOARCH}${EXT}" > "llm-box-${GOOS}-${GOARCH}${EXT}.sha256"
+          ls -la
 
-      - name: Upload artifact
+      - name: Upload
         uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.os }}-${{ matrix.arch }}
