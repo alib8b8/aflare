@@ -14,15 +14,12 @@ jobs:
           pwd
           echo "=== LS ==="
           ls -la
-          echo "=== git ==="
-          git log --oneline -3
           echo "=== go module ==="
           cat go.mod | head -5
           echo "=== ls cmd ==="
-          ls -la cmd/ || echo "no cmd"
           ls -la cmd/llm-box || echo "no cmd/llm-box"
 
-      - name: Build
+      - name: Build with system Go
         env:
           GOOS: linux
           GOARCH: amd64
@@ -32,3 +29,4 @@ jobs:
           go env
           go build -ldflags "-s -w" -o test-binary ./cmd/llm-box
           ls -la test-binary
+          echo "Build SUCCESS"
