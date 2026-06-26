@@ -79,6 +79,7 @@ Most workflow tools force developers to choose between:
 - **Plain English Workflows** - Define what you want, not how to do it
 - **Single Binary** - Zero dependencies, install and run
 - **Workflow Reusability** - Save, version, and share your workflows
+- **Multi-LLM Support** - Ollama (local), DeepSeek API (cloud), and more
 - **Extensible Node System** - Build custom nodes in any language
 - **MIT Licensed** - Open source, use freely
 - **Cross Platform** - Linux, macOS, Windows supported
@@ -138,7 +139,10 @@ Most workflow tools force developers to choose between:
 │  │fetch_url │ │transform  │ │execute_cmd │ │file_write│ │
 │  └──────────┘ └───────────┘ └────────────┘ └───────────┘ │
 │  ┌──────────┐ ┌───────────┐ ┌────────────┐ ┌───────────┐ │
-│  │ollama    │ │notify     │ │combine     │ │custom node│ │
+│  │ollama    │ │deepseek   │ │notify     │ │combine     │ │
+│  └──────────┘ └───────────┘ └────────────┘ └───────────┘ │
+│  ┌──────────┐ ┌───────────┐ ┌────────────┐ ┌───────────┐ │
+│  │transform │ │execute    │ │file_write  │ │custom node│ │
 │  └──────────┘ └───────────┘ └────────────┘ └───────────┘ │
 └─────────────────────────────────────────────────────────────┘
                              │
@@ -460,6 +464,55 @@ Open a [GitHub Discussion](https://github.com/alib8b8/llm-box/discussions) or fi
 
 ---
 
+## 🤖 Supported LLMs
+
+llm-box supports multiple LLM providers out of the box:
+
+### DeepSeek (Cloud API)
+
+The `deepseek` node calls DeepSeek's official API. Perfect when you don't want to run models locally.
+
+**Setup:**
+```bash
+export DEEPSEEK_API_KEY="your-api-key"
+```
+
+**Example workflow:**
+```yaml
+name: DeepSeek Summary
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  - node: deepseek
+    params:
+      model: "deepseek-chat"
+      system: "You are a helpful assistant that summarizes text concisely."
+  - node: file_write
+    params:
+      path: "summary.txt"
+```
+
+**Available models:**
+- `deepseek-chat` - General purpose chat model
+- `deepseek-coder` - Code generation model
+- `deepseek-reasoner` - Reasoning model (R1)
+
+### Ollama (Local)
+
+The `ollama` node runs models locally via Ollama. Great for privacy and offline use.
+
+**Setup:**
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull a model
+ollama pull llama3
+```
+
+---
+
 ## 🗺️ Roadmap
 
 ### v0.1 - Initial Release ✓
@@ -468,7 +521,8 @@ Open a [GitHub Discussion](https://github.com/alib8b8/llm-box/discussions) or fi
 - [x] Built-in nodes (fetch_url, file_write, ollama)
 - [x] Terminal UI
 
-### v0.2 - Plugin System
+### v0.2 - Multi-LLM & Plugin System
+- [x] DeepSeek API node support
 - [ ] Plugin system for custom nodes
 - [ ] Workflow template library
 - [ ] Workflow sharing via URL

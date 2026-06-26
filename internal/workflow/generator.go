@@ -13,6 +13,17 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	desc := strings.ToLower(description)
 	wf := &Workflow{}
 
+	useDeepSeek := strings.Contains(desc, "deepseek")
+	var llmNode string
+	var llmModel string
+	if useDeepSeek {
+		llmNode = "deepseek"
+		llmModel = "deepseek-chat"
+	} else {
+		llmNode = "ollama"
+		llmModel = "llama3"
+	}
+
 	// Try to extract URL (with or without protocol)
 	var urlMatch string
 	urlRegex := regexp.MustCompile(`(https?://[^\s]+)`)
@@ -49,14 +60,16 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 
 	if strings.Contains(desc, "summarize") || strings.Contains(desc, "总结") {
 		step := Step{
-			Node:   "ollama",
-			Params: map[string]string{"model": "llama3", "prompt": "Summarize the following content:\n\n{{input}}"},
+			Node:   llmNode,
+			Params: map[string]string{"model": llmModel, "system": "You are a helpful assistant that summarizes text concisely."},
 		}
 		// Insert before file_write if exists
 		if len(wf.Steps) > 0 && wf.Steps[len(wf.Steps)-1].Node == "file_write" {
-			steps := wf.Steps[:len(wf.Steps)-1]
+			lastStep := wf.Steps[len(wf.Steps)-1]
+			steps := make([]Step, len(wf.Steps)-1)
+			copy(steps, wf.Steps[:len(wf.Steps)-1])
 			steps = append(steps, step)
-			steps = append(steps, wf.Steps[len(wf.Steps)-1])
+			steps = append(steps, lastStep)
 			wf.Steps = steps
 		} else {
 			wf.Steps = append(wf.Steps, step)
@@ -65,8 +78,8 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 
 	if strings.Contains(desc, "translate") || strings.Contains(desc, "翻译") {
 		step := Step{
-			Node:   "ollama",
-			Params: map[string]string{"model": "llama3", "prompt": "Translate to English:\n\n{{input}}"},
+			Node:   llmNode,
+			Params: map[string]string{"model": llmModel, "system": "You are a translator. Translate the following text to English."},
 		}
 		wf.Steps = append(wf.Steps, step)
 	}
