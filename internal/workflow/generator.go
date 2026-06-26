@@ -14,12 +14,21 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	wf := &Workflow{}
 
 	useDeepSeek := strings.Contains(desc, "deepseek")
+	useCoze := strings.Contains(desc, "coze")
+	useGLM := strings.Contains(desc, "glm") || strings.Contains(desc, "智谱") || strings.Contains(desc, "zhipu")
 	var llmNode string
 	var llmModel string
-	if useDeepSeek {
+	switch {
+	case useDeepSeek:
 		llmNode = "deepseek"
 		llmModel = "deepseek-chat"
-	} else {
+	case useCoze:
+		llmNode = "coze"
+		llmModel = "glm-4"
+	case useGLM:
+		llmNode = "glm"
+		llmModel = "glm-4"
+	default:
 		llmNode = "ollama"
 		llmModel = "llama3"
 	}

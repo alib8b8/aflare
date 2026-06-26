@@ -498,6 +498,67 @@ steps:
 - `deepseek-coder` - Code generation model
 - `deepseek-reasoner` - Reasoning model (R1)
 
+### Coze (Cloud API)
+
+The `coze` node calls ByteDance's Coze API (OpenAI compatible). Great for Chinese language tasks.
+
+**Setup:**
+```bash
+export COZE_API_KEY="your-api-key"
+```
+
+**Example workflow:**
+```yaml
+name: Coze Summary
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  - node: coze
+    params:
+      model: "glm-4"
+      system: "You are a helpful assistant that summarizes text concisely."
+  - node: file_write
+    params:
+      path: "summary.txt"
+```
+
+**Available models:**
+- `glm-4` - General purpose high-performance model
+- `glm-4v` - Vision-capable model
+- `glm-3-turbo` - Fast and cost-effective model
+
+### Zhipu GLM (Cloud API)
+
+The `glm` node calls Zhipu AI's GLM API (OpenAI compatible). Native Chinese language support.
+
+**Setup:**
+```bash
+export GLM_API_KEY="your-api-key"
+```
+
+**Example workflow:**
+```yaml
+name: GLM Summary
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  - node: glm
+    params:
+      model: "glm-4"
+      system: "You are a helpful assistant that summarizes text concisely."
+  - node: file_write
+    params:
+      path: "summary.txt"
+```
+
+**Available models:**
+- `glm-4` - Flagship model with strong reasoning
+- `glm-4v` - Vision language model
+- `glm-3-turbo` - Fast, cost-effective option
+- `glm-4-plus` - High intelligence, longer context
+
 ### Ollama (Local)
 
 The `ollama` node runs models locally via Ollama. Great for privacy and offline use.
@@ -523,6 +584,8 @@ ollama pull llama3
 
 ### v0.2 - Multi-LLM & Plugin System
 - [x] DeepSeek API node support
+- [x] Coze API node support
+- [x] Zhipu GLM API node support
 - [ ] Plugin system for custom nodes
 - [ ] Workflow template library
 - [ ] Workflow sharing via URL
