@@ -19,6 +19,7 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	useKimi := strings.Contains(desc, "kimi") || strings.Contains(desc, "moonshot") || strings.Contains(desc, "月之暗面")
 	useMiniMax := strings.Contains(desc, "minimax") || strings.Contains(desc, "abab")
 	useQwen := strings.Contains(desc, "qwen") || strings.Contains(desc, "通义") || strings.Contains(desc, "千问") || strings.Contains(desc, "tongyi")
+	useIMA := strings.Contains(desc, "ima") || strings.Contains(desc, "ima.copilot") || strings.Contains(desc, "ima copilot")
 	var llmNode string
 	var llmModel string
 	switch {
@@ -28,6 +29,9 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	case useQwen:
 		llmNode = "qwen"
 		llmModel = "qwen-turbo"
+	case useIMA:
+		llmNode = "ima"
+		llmModel = "gpt-4o"
 	case useKimi:
 		llmNode = "kimi"
 		llmModel = "moonshot-v1-8k"

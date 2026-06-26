@@ -663,6 +663,38 @@ steps:
 - `qwen-long` - Long context (10M tokens)
 - `qwen-vl-max` - Vision language model
 
+### IMA Copilot (Cloud API)
+
+The `ima` node connects to IMA Copilot's OpenAI-compatible API endpoint.
+
+**Setup:**
+```bash
+export IMA_API_KEY="your-api-key"
+export IMA_API_BASE="https://your-ima-endpoint/v1"
+```
+
+**Example workflow:**
+```yaml
+name: IMA Copilot Summary
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  - node: ima
+    params:
+      model: "gpt-4o"
+      system: "You are a helpful assistant that summarizes text concisely."
+  - node: file_write
+    params:
+      path: "summary.txt"
+```
+
+**Supported models:**
+- `gpt-4o` - High capability
+- `gpt-4o-mini` - Fast & cost-effective
+- `gpt-4.1` - Latest generation
+- `gpt-5` - Most capable
+
 ### Ollama (Local)
 
 The `ollama` node runs models locally via Ollama. Great for privacy and offline use.
@@ -727,6 +759,7 @@ steps:
 - [x] Kimi (Moonshot) API node support
 - [x] MiniMax API node support
 - [x] Qwen (Tongyi Qianwen) API node support
+- [x] IMA Copilot API node support
 - [x] Universal OpenAI-compatible node (any provider)
 - [ ] Plugin system for custom nodes
 - [ ] Workflow template library
