@@ -721,6 +721,67 @@ export INTERNLM_API_KEY="your-api-key"
 - `internlm2-latest` - v2 series
 - `internlm-xcomposer` - Vision-language
 
+### Mistral AI (Cloud API)
+
+The `mistral` node calls Mistral AI's API (OpenAI compatible).
+
+**Setup:**
+```bash
+export MISTRAL_API_KEY="your-api-key"
+```
+
+**Example workflow:**
+```yaml
+name: Mistral Summary
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  - node: mistral
+    params:
+      model: "mistral-large-latest"
+      system: "You are a helpful assistant that summarizes text concisely."
+  - node: file_write
+    params:
+      path: "mistral_summary.txt"
+```
+
+**Available models:**
+- `mistral-large-latest` - Latest flagship model
+- `mistral-medium-latest` - Balanced performance
+- `mistral-small-latest` - Fast & cost-effective
+- `open-mistral-nemo` - Open source model
+
+### Xiaomi MiMo (Cloud API)
+
+The `mimo` node calls Xiaomi MiMo's API (OpenAI compatible).
+
+**Setup:**
+```bash
+export MIMO_API_KEY="your-api-key"
+```
+
+**Example workflow:**
+```yaml
+name: MiMo Summary
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  - node: mimo
+    params:
+      model: "mimo-v2.5-pro"
+      system: "You are a helpful assistant that summarizes text concisely."
+  - node: file_write
+    params:
+      path: "mimo_summary.txt"
+```
+
+**Available models:**
+- `mimo-v2.5-pro` - Latest flagship model
+- `mimo-v2.5-plus` - Enhanced version
+- `mimo-v2.5-lite` - Lightweight version
+
 ### IMA Copilot (Cloud API)
 
 The `ima` node connects to IMA Copilot's OpenAI-compatible API endpoint.
@@ -821,6 +882,8 @@ steps:
 - [x] Yi (Lingyiwanwu) API node support
 - [x] Baichuan API node support
 - [x] InternLM (Shanghai AI Lab) API node support
+- [x] Mistral AI API node support
+- [x] Xiaomi MiMo API node support
 - [x] IMA Copilot API node support
 - [x] Universal OpenAI-compatible node (any provider)
 - [ ] Plugin system for custom nodes

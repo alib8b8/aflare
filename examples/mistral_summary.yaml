@@ -1,0 +1,16 @@
+name: "Mistral Summary"
+description: "Fetch a webpage, summarize it using Mistral AI, and save the result"
+
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  
+  - node: mistral
+    params:
+      model: "mistral-large-latest"
+      system: "You are a helpful assistant that summarizes text concisely."
+  
+  - node: file_write
+    params:
+      path: "mistral_summary.txt"

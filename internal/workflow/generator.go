@@ -24,6 +24,8 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	useYi := strings.Contains(desc, "yi") || strings.Contains(desc, "零一万物") || strings.Contains(desc, "lingyiwanwu")
 	useBaichuan := strings.Contains(desc, "baichuan") || strings.Contains(desc, "百川")
 	useInternLM := strings.Contains(desc, "internlm") || strings.Contains(desc, "书生") || strings.Contains(desc, "浦语")
+	useMistral := strings.Contains(desc, "mistral")
+	useMiMo := strings.Contains(desc, "mimo") || strings.Contains(desc, "xiaomi") || strings.Contains(desc, "xiaomimimo")
 	var llmNode string
 	var llmModel string
 	switch {
@@ -45,6 +47,12 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	case useInternLM:
 		llmNode = "internlm"
 		llmModel = "internlm3-latest"
+	case useMistral:
+		llmNode = "mistral"
+		llmModel = "mistral-large-latest"
+	case useMiMo:
+		llmNode = "mimo"
+		llmModel = "mimo-v2.5-pro"
 	case useIMA:
 		llmNode = "ima"
 		llmModel = "gpt-4o"
