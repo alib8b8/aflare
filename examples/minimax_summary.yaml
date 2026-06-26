@@ -1,0 +1,16 @@
+name: "MiniMax Summary"
+description: "Fetch a webpage, summarize it using MiniMax API, and save the result"
+
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+
+  - node: minimax
+    params:
+      model: "abab6.5s-chat"
+      system: "You are a helpful assistant that summarizes text concisely."
+
+  - node: file_write
+    params:
+      path: "minimax_summary.txt"

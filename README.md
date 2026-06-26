@@ -559,6 +559,66 @@ steps:
 - `glm-3-turbo` - Fast, cost-effective option
 - `glm-4-plus` - High intelligence, longer context
 
+### Kimi (Cloud API)
+
+The `kimi` node calls Moonshot AI's Kimi API (OpenAI compatible). Known for long context windows.
+
+**Setup:**
+```bash
+export KIMI_API_KEY="your-api-key"
+```
+
+**Example workflow:**
+```yaml
+name: Kimi Summary
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  - node: kimi
+    params:
+      model: "moonshot-v1-8k"
+      system: "You are a helpful assistant that summarizes text concisely."
+  - node: file_write
+    params:
+      path: "summary.txt"
+```
+
+**Available models:**
+- `moonshot-v1-8k` - 8K context, standard
+- `moonshot-v1-32k` - 32K context, long documents
+- `moonshot-v1-128k` - 128K context, massive files
+
+### MiniMax (Cloud API)
+
+The `minimax` node calls MiniMax's API (OpenAI compatible). Strong Chinese language understanding.
+
+**Setup:**
+```bash
+export MINIMAX_API_KEY="your-api-key"
+```
+
+**Example workflow:**
+```yaml
+name: MiniMax Summary
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  - node: minimax
+    params:
+      model: "abab6.5s-chat"
+      system: "You are a helpful assistant that summarizes text concisely."
+  - node: file_write
+    params:
+      path: "summary.txt"
+```
+
+**Available models:**
+- `abab6.5s-chat` - Fast & balanced
+- `abab6.5t-chat` - Text focused
+- `abab7-chat` - Latest generation
+
 ### Ollama (Local)
 
 The `ollama` node runs models locally via Ollama. Great for privacy and offline use.
@@ -571,6 +631,40 @@ curl -fsSL https://ollama.com/install.sh | sh
 # Pull a model
 ollama pull llama3
 ```
+
+### OpenAI Compatible (Any Provider)
+
+The `openai` node works with **any** API that follows the OpenAI format — SiliconFlow, Together AI, 腾讯混元, and hundreds more.
+
+**Setup:**
+```bash
+export OPENAI_API_KEY="your-api-key"
+export OPENAI_API_BASE="https://api.siliconflow.cn/v1"
+```
+
+**Example — SiliconFlow (30+ models):**
+```yaml
+name: SiliconFlow Summary
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  - node: openai
+    params:
+      model: "deepseek-ai/DeepSeek-V3"
+      endpoint: "https://api.siliconflow.cn/v1"
+      system: "You are a helpful assistant that summarizes text concisely."
+  - node: file_write
+    params:
+      path: "summary.txt"
+```
+
+**Works with:**
+- SiliconFlow (硅基流动) - 30+ models, 0.5元/百万token起
+- 腾讯混元 (Hunyuan)
+- Together AI
+- Anyscale
+- Any OpenAI-compatible endpoint
 
 ---
 
@@ -586,6 +680,9 @@ ollama pull llama3
 - [x] DeepSeek API node support
 - [x] Coze API node support
 - [x] Zhipu GLM API node support
+- [x] Kimi (Moonshot) API node support
+- [x] MiniMax API node support
+- [x] Universal OpenAI-compatible node (any provider)
 - [ ] Plugin system for custom nodes
 - [ ] Workflow template library
 - [ ] Workflow sharing via URL
