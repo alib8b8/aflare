@@ -18,12 +18,16 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	useGLM := strings.Contains(desc, "glm") || strings.Contains(desc, "智谱") || strings.Contains(desc, "zhipu")
 	useKimi := strings.Contains(desc, "kimi") || strings.Contains(desc, "moonshot") || strings.Contains(desc, "月之暗面")
 	useMiniMax := strings.Contains(desc, "minimax") || strings.Contains(desc, "abab")
+	useQwen := strings.Contains(desc, "qwen") || strings.Contains(desc, "通义") || strings.Contains(desc, "千问") || strings.Contains(desc, "tongyi")
 	var llmNode string
 	var llmModel string
 	switch {
 	case useDeepSeek:
 		llmNode = "deepseek"
 		llmModel = "deepseek-chat"
+	case useQwen:
+		llmNode = "qwen"
+		llmModel = "qwen-turbo"
 	case useKimi:
 		llmNode = "kimi"
 		llmModel = "moonshot-v1-8k"

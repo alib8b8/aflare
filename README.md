@@ -619,6 +619,38 @@ steps:
 - `abab6.5t-chat` - Text focused
 - `abab7-chat` - Latest generation
 
+### Qwen (Cloud API)
+
+The `qwen` node calls Alibaba's Tongyi Qianwen API (OpenAI compatible). Strong ecosystem integration with Alibaba Cloud.
+
+**Setup:**
+```bash
+export QWEN_API_KEY="your-api-key"
+```
+
+**Example workflow:**
+```yaml
+name: Qwen Summary
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  - node: qwen
+    params:
+      model: "qwen-turbo"
+      system: "You are a helpful assistant that summarizes text concisely."
+  - node: file_write
+    params:
+      path: "summary.txt"
+```
+
+**Available models:**
+- `qwen-turbo` - Fast & cost-effective
+- `qwen-plus` - Balanced performance
+- `qwen-max` - Maximum capability
+- `qwen-long` - Long context (10M tokens)
+- `qwen-vl-max` - Vision language model
+
 ### Ollama (Local)
 
 The `ollama` node runs models locally via Ollama. Great for privacy and offline use.
@@ -682,6 +714,7 @@ steps:
 - [x] Zhipu GLM API node support
 - [x] Kimi (Moonshot) API node support
 - [x] MiniMax API node support
+- [x] Qwen (Tongyi Qianwen) API node support
 - [x] Universal OpenAI-compatible node (any provider)
 - [ ] Plugin system for custom nodes
 - [ ] Workflow template library

@@ -1,0 +1,16 @@
+name: "Qwen Summary"
+description: "Fetch a webpage, summarize it using Alibaba Qwen API, and save the result"
+
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+
+  - node: qwen
+    params:
+      model: "qwen-turbo"
+      system: "You are a helpful assistant that summarizes text concisely."
+
+  - node: file_write
+    params:
+      path: "qwen_summary.txt"
