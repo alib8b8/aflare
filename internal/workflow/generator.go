@@ -20,6 +20,10 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	useMiniMax := strings.Contains(desc, "minimax") || strings.Contains(desc, "abab")
 	useQwen := strings.Contains(desc, "qwen") || strings.Contains(desc, "通义") || strings.Contains(desc, "千问") || strings.Contains(desc, "tongyi")
 	useIMA := strings.Contains(desc, "ima") || strings.Contains(desc, "ima.copilot") || strings.Contains(desc, "ima copilot")
+	useXVERSE := strings.Contains(desc, "xverse") || strings.Contains(desc, "x-verse")
+	useYi := strings.Contains(desc, "yi") || strings.Contains(desc, "零一万物") || strings.Contains(desc, "lingyiwanwu")
+	useBaichuan := strings.Contains(desc, "baichuan") || strings.Contains(desc, "百川")
+	useInternLM := strings.Contains(desc, "internlm") || strings.Contains(desc, "书生") || strings.Contains(desc, "浦语")
 	var llmNode string
 	var llmModel string
 	switch {
@@ -29,6 +33,18 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	case useQwen:
 		llmNode = "qwen"
 		llmModel = "qwen-turbo"
+	case useXVERSE:
+		llmNode = "xverse"
+		llmModel = "XVERSE-7B-Chat"
+	case useYi:
+		llmNode = "yi"
+		llmModel = "yi-lightning"
+	case useBaichuan:
+		llmNode = "baichuan"
+		llmModel = "Baichuan4"
+	case useInternLM:
+		llmNode = "internlm"
+		llmModel = "internlm3-latest"
 	case useIMA:
 		llmNode = "ima"
 		llmModel = "gpt-4o"

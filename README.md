@@ -663,6 +663,64 @@ steps:
 - `qwen-long` - Long context (10M tokens)
 - `qwen-vl-max` - Vision language model
 
+### XVERSE (Cloud API)
+
+The `xverse` node calls XVERSE's API (OpenAI compatible).
+
+**Setup:**
+```bash
+export XVERSE_API_KEY="your-api-key"
+```
+
+**Available models:**
+- `XVERSE-7B-Chat` - Lightweight fast model
+- `XVERSE-13B-Chat` - Balanced performance
+- `XVERSE-65B-Chat` - High capability
+
+### Yi (Lingyiwanwu) (Cloud API)
+
+The `yi` node calls Lingyiwanwu's Yi API (OpenAI compatible).
+
+**Setup:**
+```bash
+export YI_API_KEY="your-api-key"
+```
+
+**Available models:**
+- `yi-lightning` - Lightning fast
+- `yi-large` - Large high-quality model
+- `yi-medium` - Balanced
+- `yi-vision` - Vision capability
+
+### Baichuan (Cloud API)
+
+The `baichuan` node calls Baichuan's API (OpenAI compatible).
+
+**Setup:**
+```bash
+export BAICHUAN_API_KEY="your-api-key"
+```
+
+**Available models:**
+- `Baichuan4` - Latest flagship model
+- `Baichuan3-Turbo` - Fast & cost-effective
+- `Baichuan2` - Previous generation
+
+### InternLM (Open-Source) (Cloud API)
+
+The `internlm` node calls Shanghai AI Lab's InternLM API (OpenAI compatible).
+
+**Setup:**
+```bash
+export INTERNLM_API_KEY="your-api-key"
+```
+
+**Available models:**
+- `internlm3-latest` - Latest generation
+- `internlm2.5-latest` - v2.5 series
+- `internlm2-latest` - v2 series
+- `internlm-xcomposer` - Vision-language
+
 ### IMA Copilot (Cloud API)
 
 The `ima` node connects to IMA Copilot's OpenAI-compatible API endpoint.
@@ -759,6 +817,10 @@ steps:
 - [x] Kimi (Moonshot) API node support
 - [x] MiniMax API node support
 - [x] Qwen (Tongyi Qianwen) API node support
+- [x] XVERSE API node support
+- [x] Yi (Lingyiwanwu) API node support
+- [x] Baichuan API node support
+- [x] InternLM (Shanghai AI Lab) API node support
 - [x] IMA Copilot API node support
 - [x] Universal OpenAI-compatible node (any provider)
 - [ ] Plugin system for custom nodes
