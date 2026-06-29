@@ -23,17 +23,17 @@ This document outlines the planned features and timeline for llm-box.
 ## v0.2 - Plugin System (Q3 2026)
 
 **Planned features**:
+- [x] More built-in nodes
+  - [x] `file_read`
+  - [ ] `http_request` (more flexible than fetch_url)
+  - [ ] `git` (clone, pull, commit, etc.)
+  - [x] `json_parse`
+  - [ ] `csv_parse`
+  - [x] `template_render`
 - [ ] Plugin system for easy custom node installation
 - [ ] Workflow template library (15+ templates)
 - [ ] Workflow sharing via URL
 - [ ] Workflow validation and linting
-- [ ] More built-in nodes
-  - [ ] `file_read`
-  - [ ] `http_request` (more flexible than fetch_url)
-  - [ ] `git` (clone, pull, commit, etc.)
-  - [ ] `json_parse`
-  - [ ] `csv_parse`
-  - [ ] `template_render`
 
 ---
 

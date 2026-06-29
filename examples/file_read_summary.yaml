@@ -1,0 +1,16 @@
+name: "File Read and Summarize"
+description: "Read a local file and summarize its contents using an LLM"
+
+steps:
+  - node: file_read
+    params:
+      path: "README.md"
+  
+  - node: ollama
+    params:
+      model: "llama3"
+      system: "You are a helpful assistant that summarizes text concisely. Provide a brief summary of the following content."
+  
+  - node: file_write
+    params:
+      path: "summary.txt"

@@ -1,0 +1,15 @@
+name: "JSON API Extract"
+description: "Fetch JSON from an API and extract specific fields"
+
+steps:
+  - node: fetch_url
+    params:
+      url: "https://api.github.com/users/octocat"
+  
+  - node: json_parse
+    params:
+      path: "name"
+  
+  - node: file_write
+    params:
+      path: "output.txt"

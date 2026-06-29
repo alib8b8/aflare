@@ -476,6 +476,117 @@ Open a [GitHub Discussion](https://github.com/alib8b8/llm-box/discussions) or fi
 
 ---
 
+## 🔧 Built-in Utility Nodes
+
+llm-box includes many utility nodes for common tasks:
+
+### file_read
+Reads content from a local file.
+
+**Parameters:**
+- `path` (required) - Path to the file to read
+
+**Example:**
+```yaml
+- node: file_read
+  params:
+    path: "input.txt"
+```
+
+### file_write
+Writes input content to a file.
+
+**Parameters:**
+- `path` (required) - Path to the output file
+
+**Example:**
+```yaml
+- node: file_write
+  params:
+    path: "output.txt"
+```
+
+### fetch_url
+Fetches content from a URL.
+
+**Parameters:**
+- `url` (required) - URL to fetch
+
+**Example:**
+```yaml
+- node: fetch_url
+  params:
+    url: "https://example.com"
+```
+
+### execute
+Executes a shell command.
+
+**Parameters:**
+- `command` (required) - Command to execute
+
+**Example:**
+```yaml
+- node: execute
+  params:
+    command: "ls -la"
+```
+
+### transform
+Transforms input text (simple text operations).
+
+**Parameters:**
+- `operation` - Operation to perform (upper, lower, trim, etc.)
+
+**Example:**
+```yaml
+- node: transform
+  params:
+    operation: "upper"
+```
+
+### combine
+Combines multiple inputs.
+
+### notify
+Sends a desktop notification.
+
+### json_parse
+Parses JSON and extracts specific fields using dot notation.
+
+**Parameters:**
+- `path` (optional) - JSON path to extract (e.g., `user.name`, `items[0].title`). If omitted, returns formatted JSON.
+
+**Example:**
+```yaml
+- node: json_parse
+  params:
+    path: "name"
+```
+
+### template_render
+Renders a Go template with input data and parameters.
+
+**Parameters:**
+- `template` or `template_file` (required) - Template string or path to template file
+- Additional params are available as template variables
+
+**Available template functions:** `upper`, `lower`, `title`, `trim`, `split`, `join`, `len`, `replace`
+
+**Example:**
+```yaml
+- node: template_render
+  params:
+    template: |
+      # Report
+      Name: {{ .name }}
+      Date: {{ .date }}
+    name: "My Report"
+    date: "2026-06-29"
+```
+
+---
+
 ## 🤖 Supported LLMs
 
 llm-box supports multiple LLM providers out of the box:
@@ -886,6 +997,7 @@ steps:
 - [x] Xiaomi MiMo API node support
 - [x] IMA Copilot API node support
 - [x] Universal OpenAI-compatible node (any provider)
+- [x] More utility nodes: file_read, json_parse, template_render
 - [ ] Plugin system for custom nodes
 - [ ] Workflow template library
 - [ ] Workflow sharing via URL
