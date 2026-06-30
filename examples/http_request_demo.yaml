@@ -1,0 +1,16 @@
+name: "HTTP API Request Demo"
+description: "Make HTTP requests to any API endpoint"
+
+steps:
+  - node: http_request
+    params:
+      url: "https://api.github.com/users/octocat"
+      method: "GET"
+  
+  - node: json_parse
+    params:
+      path: "name"
+  
+  - node: file_write
+    params:
+      path: "result.txt"

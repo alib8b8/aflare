@@ -1,0 +1,19 @@
+name: "FastGPT Batch Import"
+description: "Read local files and import them into FastGPT knowledge base via API"
+
+steps:
+  - node: file_read
+    params:
+      path: "document.txt"
+  
+  - node: http_request
+    params:
+      url: "https://your-fastgpt-domain.com/api/core/dataset/data/pushData"
+      method: "POST"
+      content_type: "application/json"
+      headers: |
+        Authorization: Bearer your-api-key
+  
+  - node: file_write
+    params:
+      path: "import_result.json"

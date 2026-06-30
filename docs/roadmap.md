@@ -25,11 +25,12 @@ This document outlines the planned features and timeline for llm-box.
 **Planned features**:
 - [x] More built-in nodes
   - [x] `file_read`
-  - [ ] `http_request` (more flexible than fetch_url)
+  - [x] `http_request` (more flexible than fetch_url)
   - [ ] `git` (clone, pull, commit, etc.)
   - [x] `json_parse`
   - [ ] `csv_parse`
   - [x] `template_render`
+- [x] FastGPT knowledge base platform integration
 - [ ] Plugin system for easy custom node installation
 - [ ] Workflow template library (15+ templates)
 - [ ] Workflow sharing via URL

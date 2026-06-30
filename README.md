@@ -564,6 +564,29 @@ Parses JSON and extracts specific fields using dot notation.
     path: "name"
 ```
 
+### http_request
+Makes HTTP requests to any API endpoint. More flexible than `fetch_url`.
+
+**Parameters:**
+- `url` (required) - URL to request
+- `method` (optional) - HTTP method (GET, POST, PUT, DELETE, etc.). Default: GET
+- `body` (optional) - Request body. Uses step input if not provided
+- `content_type` (optional) - Content-Type header. Default: application/json for POST/PUT
+- `headers` (optional) - Additional headers, one per line, format: `Key: Value`
+- `timeout` (optional) - Request timeout (e.g., `30s`, `2m`). Default: 60s
+
+**Example:**
+```yaml
+- node: http_request
+  params:
+    url: "https://api.example.com/data"
+    method: "POST"
+    content_type: "application/json"
+    headers: |
+      Authorization: Bearer token123
+      X-Custom-Header: value
+```
+
 ### template_render
 Renders a Go template with input data and parameters.
 
@@ -925,6 +948,43 @@ steps:
 - `gpt-4.1` - Latest generation
 - `gpt-5` - Most capable
 
+### FastGPT (Knowledge Base Platform)
+
+The `fastgpt` node connects to [FastGPT](https://github.com/labring/FastGPT) knowledge base applications. Perfect for querying enterprise knowledge bases, documentation, and custom datasets.
+
+**Setup:**
+```bash
+export FASTGPT_API_KEY="your-api-key"
+export FASTGPT_BASE_URL="https://your-fastgpt-domain.com/api/v1"
+```
+
+**Example workflow:**
+```yaml
+name: FastGPT Knowledge Query
+steps:
+  - node: fastgpt
+    params:
+      app_id: "your-app-id"
+      api_key: "your-api-key"
+      endpoint: "https://your-fastgpt-domain.com/api/v1"
+  - node: file_write
+    params:
+      path: "answer.txt"
+```
+
+**Parameters:**
+- `app_id` - FastGPT application ID (required)
+- `api_key` - API key (or set `FASTGPT_API_KEY` env var)
+- `endpoint` - FastGPT API base URL (or set `FASTGPT_BASE_URL` env var)
+- `chat_id` - Conversation ID for context persistence (optional)
+- `system` - System prompt (optional)
+
+**💡 Use cases:**
+- Query enterprise documentation from the terminal
+- Batch process knowledge base queries
+- Build automated QA pipelines
+- Combine with `file_read` to import local docs into FastGPT via API
+
 ### Ollama (Local)
 
 The `ollama` node runs models locally via Ollama. Great for privacy and offline use.
@@ -997,7 +1057,8 @@ steps:
 - [x] Xiaomi MiMo API node support
 - [x] IMA Copilot API node support
 - [x] Universal OpenAI-compatible node (any provider)
-- [x] More utility nodes: file_read, json_parse, template_render
+- [x] More utility nodes: file_read, json_parse, template_render, http_request
+- [x] FastGPT knowledge base platform integration
 - [ ] Plugin system for custom nodes
 - [ ] Workflow template library
 - [ ] Workflow sharing via URL
