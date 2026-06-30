@@ -1,0 +1,29 @@
+{
+  "id": "openclaw-llmbox",
+  "name": "llm-box Workflow Integration",
+  "version": "1.0.0",
+  "description": "Invoke llm-box workflows as tools in OpenClaw conversations",
+  "main": "./dist/index.js",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "workflowDir": {
+        "type": "string",
+        "description": "Directory containing llm-box workflow YAML files (default: ./workflows)",
+        "default": "./workflows"
+      },
+      "llmboxPath": {
+        "type": "string",
+        "description": "Path to llm-box binary (default: llm-box)",
+        "default": "llm-box"
+      },
+      "enableAutoDiscovery": {
+        "type": "boolean",
+        "description": "Auto-discover workflows in the configured directory",
+        "default": true
+      }
+    }
+  },
+  "permissions": ["network", "exec"]
+}

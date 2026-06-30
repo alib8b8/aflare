@@ -1,0 +1,37 @@
+name: OpenClaw Plugin CI
+
+on:
+  push:
+    branches: [main, 'feature/*']
+    paths:
+      - 'contrib/openclaw/**'
+      - '.github/workflows/openclaw-*.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'contrib/openclaw/**'
+      - '.github/workflows/openclaw-*.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contrib/openclaw
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Type check
+        run: npx tsc --noEmit
