@@ -1025,7 +1025,31 @@ steps:
       path: "summary.txt"
 ```
 
+**Example — OpenRouter (200+ models):**
+```yaml
+name: OpenRouter Summary
+steps:
+  - node: fetch_url
+    params:
+      url: "https://example.com"
+  - node: openai
+    params:
+      model: "openai/gpt-4o"
+      endpoint: "https://openrouter.ai/api/v1"
+      system: "You are a helpful assistant that summarizes text concisely."
+  - node: file_write
+    params:
+      path: "summary.txt"
+```
+
+**Setup for OpenRouter:**
+```bash
+export OPENAI_API_KEY="your-openrouter-api-key"
+export OPENAI_API_BASE="https://openrouter.ai/api/v1"
+```
+
 **Works with:**
+- [OpenRouter](https://openrouter.ai) - 200+ models from top providers
 - SiliconFlow (硅基流动) - 30+ models, 0.5元/百万token起
 - 腾讯混元 (Hunyuan)
 - Together AI
