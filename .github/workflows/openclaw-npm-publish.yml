@@ -32,6 +32,14 @@ jobs:
         run: npm run build
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "⏭️  NPM_TOKEN not configured, skipping npm publish"
+            echo "To enable npm publishing, add NPM_TOKEN secret in repository settings"
+            echo "https://github.com/alib8b8/llm-box/settings/secrets/actions"
+          else
+            npm publish --access public
+            echo "✅ Published to npm successfully"
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -23,23 +23,24 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Install ClawHub CLI
-        run: npm install -g clawhub
-
-      - name: Login to ClawHub
-        run: clawhub login --token ${{ secrets.CLAWHUB_TOKEN }}
-        env:
-          CLAWHUB_DISABLE_TELEMETRY: '1'
-
       - name: Build
         run: npm run build
 
-      - name: Publish to ClawHub (dry run)
-        run: clawhub package publish alib8b8/llm-box --dry-run
-        env:
-          CLAWHUB_DISABLE_TELEMETRY: '1'
-
       - name: Publish to ClawHub
-        run: clawhub package publish alib8b8/llm-box
+        run: |
+          if [ -z "${CLAWHUB_TOKEN}" ]; then
+            echo "⏭️  CLAWHUB_TOKEN not configured, skipping ClawHub publish"
+            echo "To enable ClawHub publishing, add CLAWHUB_TOKEN secret in repository settings"
+            echo "https://github.com/alib8b8/llm-box/settings/secrets/actions"
+          else
+            npm install -g clawhub 2>/dev/null || {
+              echo "⚠️  clawhub CLI not available, skipping publish"
+              exit 0
+            }
+            clawhub login --token "${CLAWHUB_TOKEN}" && \
+            clawhub package publish alib8b8/llm-box && \
+            echo "✅ Published to ClawHub successfully"
+          fi
         env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
           CLAWHUB_DISABLE_TELEMETRY: '1'
