@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/alib8b8/llm-box/internal/i18n"
 	"github.com/alib8b8/llm-box/internal/logger"
@@ -173,6 +174,7 @@ func (e *ExternalNode) Execute(ctx context.Context, input string, params map[str
 type Registry struct {
 	nodes    map[string]Node
 	safeMode bool
+	mu       sync.RWMutex
 }
 
 // NewRegistry creates a new registry
@@ -184,17 +186,23 @@ func NewRegistry() *Registry {
 
 // Register adds a node to the registry
 func (r *Registry) Register(node Node) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.nodes[node.Name()] = node
 }
 
 // Get retrieves a node from the registry by name
 func (r *Registry) Get(name string) (Node, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	node, ok := r.nodes[name]
 	return node, ok
 }
 
 // List returns all registered node names
 func (r *Registry) List() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	names := make([]string, 0, len(r.nodes))
 	for name := range r.nodes {
 		names = append(names, name)
@@ -210,6 +218,8 @@ type NodeInfo struct {
 
 // ListNodes returns all registered nodes with their descriptions
 func (r *Registry) ListNodes() []NodeInfo {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	infos := make([]NodeInfo, 0, len(r.nodes))
 	for _, node := range r.nodes {
 		name := node.Name()
@@ -227,17 +237,25 @@ func (r *Registry) ListNodes() []NodeInfo {
 
 // SetSafeMode enables or disables safe mode
 func (r *Registry) SetSafeMode(enabled bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.safeMode = enabled
 }
 
 // IsSafeMode returns whether safe mode is enabled
 func (r *Registry) IsSafeMode() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.safeMode
 }
 
 // LoadExternalNodes scans a directory and loads all external nodes
 func (r *Registry) LoadExternalNodes(dir string) error {
-	if r.safeMode {
+	r.mu.RLock()
+	safeMode := r.safeMode
+	r.mu.RUnlock()
+
+	if safeMode {
 		return nil
 	}
 
@@ -254,7 +272,6 @@ func (r *Registry) LoadExternalNodes(dir string) error {
 			continue // Skip files, only look at directories
 		}
 
-		// Skip directories starting with underscore (e.g. _template)
 		if strings.HasPrefix(entry.Name(), "_") {
 			continue
 		}
@@ -272,13 +289,15 @@ func (r *Registry) LoadExternalNodes(dir string) error {
 			continue // Skip if invalid YAML
 		}
 
-		// Check for name collision
-		if _, exists := r.nodes[metadata.Name]; exists {
+		r.mu.RLock()
+		_, exists := r.nodes[metadata.Name]
+		r.mu.RUnlock()
+
+		if exists {
 			logger.Warn("external node skipped: name collision", "node", metadata.Name)
 			continue
 		}
 
-		// Create external node and register
 		externalNode := NewExternalNode(metadata, nodeDir)
 		r.Register(externalNode)
 		logger.Info("loaded external node", "node", metadata.Name, "path", nodeDir)

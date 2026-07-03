@@ -52,7 +52,6 @@ func (n *NotifyNode) Execute(ctx context.Context, input string, params map[strin
 		fmt.Fprintln(os.Stderr, "[notify]", message)
 		return message, nil
 	default:
-		fmt.Println("[notify]", message)
-		return message, nil
+		return "", fmt.Errorf("invalid notification channel: %s (supported: stdout, stderr)", channel)
 	}
 }

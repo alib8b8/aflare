@@ -39,15 +39,28 @@ download_binary() {
 
     echo "Downloading $filename..."
     
-    # Get latest release
     LATEST_RELEASE=$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
     echo "Latest release: $LATEST_RELEASE"
 
     URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/$filename"
+    CHECKSUM_URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/SHA256SUMS"
     
     if ! curl -sL -o "$filename" "$URL"; then
         echo "Failed to download $URL"
         exit 1
+    fi
+
+    if curl -sL -o SHA256SUMS "$CHECKSUM_URL"; then
+        echo "Verifying checksum..."
+        if ! sha256sum --check --ignore-missing SHA256SUMS; then
+            echo "❌ Checksum verification failed!"
+            rm -f "$filename" SHA256SUMS
+            exit 1
+        fi
+        rm -f SHA256SUMS
+        echo "✅ Checksum verified"
+    else
+        echo "⚠️  Checksum file not found, skipping verification"
     fi
 
     chmod +x "$filename"
