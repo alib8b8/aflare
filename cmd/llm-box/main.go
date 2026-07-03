@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
+	"github.com/alib8b8/llm-box/internal/cli"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/tui"
 	"github.com/alib8b8/llm-box/internal/workflow"
@@ -17,31 +16,44 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		printUsage()
+		fmt.Println(cli.PrintUsage())
 		os.Exit(1)
 	}
 
-	// Handle commands
-	command := os.Args[1]
+	command, args, safeMode := cli.ParseArgs(os.Args[1:])
+
+	if safeMode {
+		nodes.SetSafeMode(true)
+		fmt.Println("🔒 Safe mode enabled - execute node and external nodes are disabled")
+	}
+
+	if command == "" {
+		fmt.Println(cli.PrintUsage())
+		os.Exit(1)
+	}
+
+	if err := cli.ValidateCommand(command); err != nil {
+		fmt.Println(cli.PrintUsage())
+		os.Exit(1)
+	}
 
 	switch command {
 	case "create":
-		handleCreate()
+		handleCreate(args)
 		return
 	case "run":
-		handleRun()
+		handleRun(args)
 		return
 	case "-h", "--help", "help":
-		printUsage()
+		fmt.Println(cli.PrintUsage())
 		return
 	default:
-		// If not a known command, assume it's a workflow file
 		handleRunFile(command)
 	}
 }
 
-func handleCreate() {
-	if len(os.Args) < 3 {
+func handleCreate(args []string) {
+	if len(args) < 1 {
 		fmt.Println("Usage: llm-box create \"your workflow description\"")
 		fmt.Println("\nExamples:")
 		fmt.Println("  llm-box create \"fetch example.com and save to file\"")
@@ -50,7 +62,7 @@ func handleCreate() {
 		os.Exit(1)
 	}
 
-	description := strings.Join(os.Args[2:], " ")
+	description := cli.SummarizeCommand("", args)
 	fmt.Printf("Creating workflow from: \"%s\"\n", description)
 
 	filename, err := workflow.CreateWorkflowFromDescription(description)
@@ -64,36 +76,21 @@ func handleCreate() {
 	fmt.Printf("  llm-box run %s\n", filename)
 }
 
-func handleRun() {
-	if len(os.Args) < 3 {
+func handleRun(args []string) {
+	if len(args) < 1 {
 		fmt.Println("Usage: llm-box run <workflow-file.yaml>")
 		os.Exit(1)
 	}
-	handleRunFile(os.Args[2])
+	handleRunFile(args[0])
 }
 
 func handleRunFile(wfPath string) {
-	wf, err := workflow.ParseWorkflow(wfPath)
+	wf, reg, err := cli.PrepareWorkflow(wfPath)
 	if err != nil {
-		fmt.Printf("Error parsing workflow: %v\n", err)
+		fmt.Printf("Error preparing workflow: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Get the global registry (nodes register themselves on init)
-	reg := nodes.GetGlobalRegistry()
-
-	// Load external nodes from ./nodes directory
-	wd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Warning: failed to get working directory: %v\n", err)
-	} else {
-		nodesDir := filepath.Join(wd, "nodes")
-		if err := reg.LoadExternalNodes(nodesDir); err != nil {
-			fmt.Printf("Warning: failed to load external nodes: %v\n", err)
-		}
-	}
-
-	// Check if we're in a TTY (interactive terminal)
 	if isatty.IsTerminal(os.Stdout.Fd()) {
 		runTUI(wfPath, wf, reg)
 	} else {
@@ -101,42 +98,22 @@ func handleRunFile(wfPath string) {
 	}
 }
 
-func printUsage() {
-	fmt.Println(`llm-box - Terminal-first AI workflow engine
-
-Usage:
-  llm-box create "workflow description"   Create a new workflow from natural language
-  llm-box run <workflow-file.yaml>         Run a YAML workflow
-  llm-box help                            Show this help message
-
-Examples:
-  llm-box create "fetch example.com and save to file"
-  llm-box run examples/basic_summary.yaml
-  llm-box run examples/multi_step.yaml`)
-}
-
-// runTUI runs the workflow with the TUI interface
 func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry) {
 	model := tui.NewModel(wf.Name, wfPath, len(wf.Steps))
 	program := tea.NewProgram(model, tea.WithAltScreen())
 
-	// Run the workflow in a goroutine
 	go func() {
 		ctx := context.Background()
 		workflow.ExecuteWorkflowWithTUI(ctx, wf, reg, program)
-		// Give the TUI a moment to show final state
-		// then send quit
 		program.Send(tea.QuitMsg{})
 	}()
 
-	// Start the TUI
 	if _, err := program.Run(); err != nil {
 		fmt.Printf("Error running TUI: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-// runCLI runs the workflow in command-line mode
 func runCLI(wf *workflow.Workflow, reg *nodes.Registry) {
 	if wf.Name != "" {
 		fmt.Printf("Workflow: %s\n", wf.Name)
@@ -154,8 +131,7 @@ func runCLI(wf *workflow.Workflow, reg *nodes.Registry) {
 
 	fmt.Println("\n=== Executing workflow ===")
 
-	ctx := context.Background()
-	finalOutput, stepResults, err := workflow.ExecuteWorkflow(ctx, wf, reg)
+	finalOutput, stepResults, err := cli.RunWorkflow(wf, reg)
 
 	for _, result := range stepResults {
 		status := "✅"

@@ -1,190 +1,158 @@
 # Contributing to llm-box
 
-感谢你对 llm-box 的兴趣！🎉
-llm-box 之所以强大，是因为它有一个充满活力的社区节点生态系统。
-任何人，无需是 Go 开发者，都可以贡献节点。
+Welcome to llm-box! We appreciate your interest in contributing. This guide will help you get started.
 
-## 📋 目录
+## 📋 Getting Started
 
-- [贡献节点（最简单）](#贡献节点最简单)
-- [贡献代码](#贡献代码)
-- [贡献文档](#贡献文档)
-- [报告 Bug](#报告-bug)
-- [提交建议](#提交建议)
-- [代码规范](#代码规范)
+1. **Fork the repository**
+2. **Clone your fork**: `git clone https://github.com/your-username/llm-box.git`
+3. **Create a branch**: `git checkout -b feature/your-feature-name`
+4. **Make changes**
+5. **Test your changes**: Run `go test ./...`
+6. **Submit a PR**
 
----
+## 🎯 How to Contribute
 
-## 🧩 贡献节点（最简单）
+### Bug Fixes
+- Create a branch named `fix/issue-XX` where XX is the issue number
+- Include a test that reproduces the bug
+- Fix the bug
 
-贡献一个自定义节点 = 创建一个新文件夹，写个 `metadata.yaml` 和一个脚本（任何语言！）。
-不需要懂 Go，不需要写 PR 改主程序。
+### New Features
+- Create a branch named `feature/feature-name`
+- Document your feature in the README
+- Add tests
+- Update any relevant documentation
 
-### 步骤 1: 复制模板
+### Documentation
+- Create a branch named `docs/topic-name`
+- Improve clarity and accuracy
+- Ensure consistency with existing documentation
 
-```bash
-cp -r nodes/_template nodes/my_node
-cd nodes/my_node
-```
+## 📝 Code Guidelines
 
-模板中包含：
+### Go Code Style
 
-```
-nodes/_template/
-├── metadata.yaml     # 节点元数据
-└── main.py           # 入口脚本（任何语言都行）
-```
+1. **Formatting**: Run `gofmt -w .` before submitting
+2. **Linting**: Run `go vet ./...` before submitting
+3. **Testing**: All code should have unit tests
+4. **Error Handling**: Always handle errors properly
+5. **Comments**: Document public functions and types
+6. **Naming**: Use descriptive names, follow Go conventions
 
-### 步骤 2: 编辑 `metadata.yaml`
+### Security Guidelines
 
-```yaml
-name: "my_node"
-description: "我的第一个节点：提取数字"
-entry: "main.py"
-```
+See [SECURITY.md](SECURITY.md) for detailed security requirements:
 
-字段说明：
-- `name`（必填）：节点在 YAML 中引用的名字，全局唯一
-- `description`（必填）：一句话描述，做什么用
-- `entry`（必填）：入口脚本名（`main.py`、`main.go`、`script.sh` 等）
+- No hardcoded secrets or credentials
+- No shell injection vulnerabilities
+- No path traversal vulnerabilities
+- All inputs must be validated
+- Error messages must not leak sensitive information
 
-### 步骤 3: 实现入口脚本
+### Prohibited Changes
 
-节点协议非常简单：stdin 进 JSON，stdout 出纯文本。
+The following changes will be **rejected**:
 
-**输入（stdin 上的 JSON）：**
-```json
-{
-  "input": "上一个节点的输出文本",
-  "params": {"key": "value", ...}
-}
-```
+- Code that executes arbitrary commands
+- Code that reads/writes sensitive system files
+- Code that makes unauthorized network requests
+- Code that logs sensitive information
+- Unnecessary dependency additions
 
-**输出（stdout 上的纯文本）：**
-直接输出结果文本，不需要 JSON 包裹。
+## 🧪 Testing
 
-Python 示例（`main.py`）：
-
-```python
-#!/usr/bin/env python3
-import json
-import sys
-import re
-
-def main():
-    payload = json.load(sys.stdin)
-    text = payload.get("input", "")
-    nums = re.findall(r"\d+", text)
-    print(" ".join(nums))
-
-if __name__ == "__main__":
-    main()
-```
-
-Bash 示例（`script.sh`）：
+### Running Tests
 
 ```bash
-#!/usr/bin/env bash
-INPUT=$(cat)
-echo "$INPUT" | tr '[:upper:]' '[:lower:]'
+# Run all tests
+go test ./...
+
+# Run specific tests
+go test ./internal/nodes/...
+
+# Run with verbose output
+go test -v ./...
 ```
 
-> 完整示例可以参考 [nodes/echo/](../nodes/echo/)。
+### Writing Tests
 
-### 步骤 4: 本地测试
+- All new code must have tests
+- Tests should be deterministic
+- Avoid network calls in unit tests
+- Use table-driven tests when appropriate
 
-创建一个临时工作流来测试你的节点：
+## 🔄 Pull Request Process
 
-```yaml
-# test_my_node.yaml
-name: "Test my_node"
-steps:
-  - node: "echo"     # 任何节点来提供初始数据
-    params: {}
-  - node: "my_node"  # 你的节点
-    params: {}
+1. **Create a PR** from your branch to `main`
+2. **CI Checks**: Wait for CI to pass (lint, test, security, build)
+3. **Review**: A CODEOWNER will review your PR
+4. **Approval**: Need at least 1 approval
+5. **Merge**: PR will be merged after approval
+
+### PR Checklist
+
+Before submitting your PR:
+
+- [ ] All tests pass
+- [ ] Code follows Go style guidelines
+- [ ] Security checks pass
+- [ ] Documentation is updated
+- [ ] No hardcoded secrets
+- [ ] No debug print statements
+
+### PR Template
+
+Your PR description should include:
+
+```
+## What
+
+Describe what you changed.
+
+## Why
+
+Explain why this change is needed.
+
+## Changes
+
+List the changes made:
+1. Changed X
+2. Added Y
+3. Fixed Z
+
+## Testing
+
+How to test:
+- Run `go test ./...`
+- Test case 1
+- Test case 2
+
+## Checklist
+
+- [ ] Tests pass
+- [ ] Documentation updated
+- [ ] Security checks pass
 ```
 
-然后运行：
+## 🚫 Code of Conduct
 
-```bash
-llm-box run test_my_node.yaml
-```
+All contributors must follow our code of conduct:
 
-测试 OK 后删除临时文件。
+- Be respectful and inclusive
+- Use welcoming language
+- Focus on constructive feedback
+- Avoid personal attacks
+- Be collaborative
 
-### 步骤 5: 添加一个示例
+## 📞 Getting Help
 
-在 `examples/` 中放一个 `my_node_demo.yaml`，让其他人看到用法。
+If you need help:
 
-### 步骤 6: 提交 PR
+1. Check existing issues and PRs
+2. Open a new issue
+3. Ask in discussions
 
-```bash
-git checkout -b feature/my-node
-git add nodes/my_node examples/my_node_demo.yaml
-git commit -m "feat(nodes): add my_node for extracting numbers"
-git push origin feature/my-node
-```
+## 📜 License
 
-打开 GitHub → 发起 Pull Request。
-按 PR 模板填写说明，maintainer 会 Review 并合并。
-
----
-
-## 💻 贡献代码
-
-修复 bug、改进 TUI、新增内置节点等，需要改 Go 代码。
-
-1. Fork 本仓库
-2. 创建特性分支：`git checkout -b feature/awesome-feature`
-3. 编写代码并补测试：`go test ./...`
-4. 确保 CI 通过：`go build ./... && go vet ./...`
-5. 提交：`git commit -m "feat: do something"`
-6. 推送并创建 PR
-
----
-
-## 📖 贡献文档
-
-- 改进 README、添加教程
-- 给示例工作流写说明
-- 翻译文档
-
-直接改 `*.md` 文件，PR 即可。
-
----
-
-## 🐛 报告 Bug
-
-请使用 [Bug Report 模板](../../issues/new?template=bug_report.md)，
-包含：复现步骤、预期行为、实际行为、版本、环境、日志。
-
----
-
-## 💡 提交建议
-
-使用 [Feature Request 模板](../../issues/new?template=feature_request.md)，
-描述清楚：动机、提议方案、备选方案。
-
----
-
-## 📝 代码规范
-
-- Go 官方风格：`gofmt`、`go vet`
-- 写单元测试，新代码覆盖率不低于 80%
-- 提交信息用 [Conventional Commits](https://www.conventionalcommits.org/)
-  - `feat:` 新功能
-  - `fix:` 修 bug
-  - `docs:` 文档
-  - `chore:` 杂项
-
----
-
-## 📜 行为准则
-
-请友善、包容、专注技术。
-我们欢迎所有技能水平的贡献者，从第一个 PR 开始。
-
----
-
-🎉 感谢你的贡献！
+By contributing, you agree that your contributions will be licensed under the MIT License.

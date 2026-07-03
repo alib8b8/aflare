@@ -39,6 +39,39 @@ jobs:
           go vet ./...
           echo "✅ go vet passed"
 
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Run gosec
+        run: |
+          echo "Running gosec security scan..."
+          gosec -severity medium -confidence medium ./...
+          echo "✅ gosec passed"
+
+      - name: Run go mod verify
+        run: |
+          echo "Verifying dependencies..."
+          go mod verify
+          echo "✅ go mod verify passed"
+
+      - name: Run security scan script
+        run: |
+          echo "Running security scan..."
+          ./scripts/security-scan.sh
+
   test:
     name: Test
     runs-on: ubuntu-latest

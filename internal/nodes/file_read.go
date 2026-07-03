@@ -22,7 +22,12 @@ func (n *FileReadNode) Execute(ctx context.Context, input string, params map[str
 		return "", fmt.Errorf("path parameter is required")
 	}
 
-	data, err := os.ReadFile(path)
+	safePath, err := validateReadPath(path)
+	if err != nil {
+		return "", fmt.Errorf("path validation failed: %w", err)
+	}
+
+	data, err := os.ReadFile(safePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/alib8b8/llm-box/internal/logger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -98,7 +99,8 @@ func (e *ExternalNode) Execute(ctx context.Context, input string, params map[str
 
 // Registry keeps track of all available nodes
 type Registry struct {
-	nodes map[string]Node
+	nodes    map[string]Node
+	safeMode bool
 }
 
 // NewRegistry creates a new registry
@@ -128,8 +130,22 @@ func (r *Registry) List() []string {
 	return names
 }
 
+// SetSafeMode enables or disables safe mode
+func (r *Registry) SetSafeMode(enabled bool) {
+	r.safeMode = enabled
+}
+
+// IsSafeMode returns whether safe mode is enabled
+func (r *Registry) IsSafeMode() bool {
+	return r.safeMode
+}
+
 // LoadExternalNodes scans a directory and loads all external nodes
 func (r *Registry) LoadExternalNodes(dir string) error {
+	if r.safeMode {
+		return nil
+	}
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -163,14 +179,14 @@ func (r *Registry) LoadExternalNodes(dir string) error {
 
 		// Check for name collision
 		if _, exists := r.nodes[metadata.Name]; exists {
-			fmt.Printf("Warning: node '%s' already exists, skipping external node\n", metadata.Name)
+			logger.Warn("external node skipped: name collision", "node", metadata.Name)
 			continue
 		}
 
 		// Create external node and register
 		externalNode := NewExternalNode(metadata, nodeDir)
 		r.Register(externalNode)
-		fmt.Printf("Loaded external node: %s from %s\n", metadata.Name, nodeDir)
+		logger.Info("loaded external node", "node", metadata.Name, "path", nodeDir)
 	}
 
 	return nil
@@ -192,6 +208,16 @@ func Get(name string) (Node, bool) {
 // List returns all registered node names from the global registry
 func List() []string {
 	return globalRegistry.List()
+}
+
+// SetSafeMode sets safe mode on the global registry
+func SetSafeMode(enabled bool) {
+	globalRegistry.SetSafeMode(enabled)
+}
+
+// IsSafeMode returns whether safe mode is enabled on the global registry
+func IsSafeMode() bool {
+	return globalRegistry.IsSafeMode()
 }
 
 // GetGlobalRegistry returns the global registry
