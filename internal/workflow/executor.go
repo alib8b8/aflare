@@ -3,6 +3,8 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/alib8b8/llm-box/internal/logger"
@@ -14,12 +16,13 @@ import (
 
 // Security limits
 const (
-	MaxSteps        = 1000  // Maximum number of steps in a workflow
-	MaxParallel     = 50    // Maximum parallel steps in a single step
-	MaxRetry        = 10    // Maximum retry count per step
-	MaxFileSize     = 10 * 1024 * 1024 // 10MB max workflow file size
-	MaxStepTimeout  = 30 * time.Minute // Maximum per-step timeout
-	MaxRetryDelay   = 5 * time.Minute  // Maximum retry delay
+	MaxSteps           = 1000  // Maximum number of steps in a workflow
+	MaxParallel        = 50    // Maximum parallel steps in a single step
+	MaxRetry           = 10    // Maximum retry count per step
+	MaxFileSize        = 10 * 1024 * 1024 // 10MB max workflow file size
+	MaxStepTimeout     = 30 * time.Minute // Maximum per-step timeout
+	MaxRetryDelay      = 5 * time.Minute  // Maximum retry delay
+	DefaultWorkflowTimeout = 5 * time.Minute  // Default overall workflow timeout
 )
 
 // StepResult stores the result of executing a single step
@@ -78,12 +81,19 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 
 	logger.Info("workflow execution started", "name", wf.Name, "steps", len(wf.Steps))
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	timeoutCtx, cancel := context.WithTimeout(ctx, DefaultWorkflowTimeout)
 	defer cancel()
 
 	var results []StepResult
 	data := ""
 	engine := NewExpressionEngine()
+
+	// Load workflow-level vars into expression engine
+	if wf.Vars != nil {
+		for k, v := range wf.Vars {
+			engine.SetVariable(k, v)
+		}
+	}
 
 	if program != nil {
 		program.Send(tui.WorkflowStartMsg{
@@ -94,6 +104,58 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 	}
 
 	for i, wStep := range wf.Steps {
+		// Check condition - skip step if condition evaluates to false
+		if wStep.Condition != "" {
+			pass, err := evaluateCondition(wStep.Condition, data, engine)
+			if err != nil {
+				logger.Error("condition evaluation failed", "index", i, "error", err)
+				result := StepResult{
+					StepIndex: i,
+					NodeName:  wStep.Node,
+					Input:     data,
+					Error:     fmt.Errorf("condition evaluation failed: %w", err),
+					Duration:  0,
+				}
+				results = append(results, result)
+				if program != nil {
+					program.Send(tui.StepEndMsg{
+						Index: i,
+						Name:  wStep.Node,
+						Error: err,
+					})
+					program.Send(tui.WorkflowEndMsg{Success: false})
+				}
+				return "", results, err
+			}
+			if !pass {
+				logger.Info("step skipped by condition", "index", i, "node", wStep.Node)
+				// Register step output as empty so later step refs still work
+				engine.SetStepOutput(i, wStep.Node, "")
+				result := StepResult{
+					StepIndex: i,
+					NodeName:  wStep.Node,
+					Input:     data,
+					Output:    "",
+					Error:     nil,
+					Duration:  0,
+				}
+				results = append(results, result)
+				if program != nil {
+					program.Send(tui.StepStartMsg{
+						Index: i,
+						Name:  wStep.Node,
+					})
+					program.Send(tui.StepEndMsg{
+						Index:    i,
+						Name:     wStep.Node,
+						Output:   "",
+						Duration: 0,
+					})
+				}
+				continue
+			}
+		}
+
 		if wStep.IsParallel() {
 			parallelResults, output, err := executeParallelStep(timeoutCtx, i, wStep, data, engine, reg, program)
 			if err != nil {
@@ -304,6 +366,41 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 			start := time.Now()
 			nodeName := step.Node
 
+			// Check condition for parallel step
+			if step.Condition != "" {
+				pass, condErr := evaluateCondition(step.Condition, input, engine)
+				if condErr != nil {
+					resultsChan <- parallelResult{
+						stepIndex: stepIndex*100 + j,
+						nodeName:  nodeName,
+						err:       fmt.Errorf("condition evaluation failed: %w", condErr),
+						duration:  time.Since(start),
+					}
+					return
+				}
+				if !pass {
+					if program != nil {
+						program.Send(tui.StepStartMsg{
+							Index: stepIndex*100 + j,
+							Name:  nodeName,
+						})
+						program.Send(tui.StepEndMsg{
+							Index:    stepIndex*100 + j,
+							Name:     nodeName,
+							Output:   "",
+							Duration: 0,
+						})
+					}
+					resultsChan <- parallelResult{
+						stepIndex: stepIndex*100 + j,
+						nodeName:  nodeName,
+						output:    "",
+						duration:  0,
+					}
+					return
+				}
+			}
+
 			if program != nil {
 				program.Send(tui.StepStartMsg{
 					Index: stepIndex*100 + j,
@@ -432,4 +529,74 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 	}
 
 	return stepResults, finalOutput, nil
+}
+
+// evaluateCondition evaluates a condition expression against the current input.
+// Syntax is the same as the condition node, but the comparison value is evaluated
+// through the expression engine so {{step.0}}, {{var.name}} etc. work.
+//
+// Examples:
+//   contains:hello          - input contains "hello"
+//   equals:{{var.target}}   - input equals the value of var.target
+//   empty                   - input is empty
+//   not_empty               - input is not empty
+//   regex:\d+               - input matches regex
+//   starts_with:https       - input starts with "https"
+//   ends_with:.json         - input ends with ".json"
+//   not contains:skip       - input does NOT contain "skip"
+func evaluateCondition(cond string, input string, engine *ExpressionEngine) (bool, error) {
+	if cond == "" {
+		return true, nil
+	}
+
+	// Evaluate any {{...}} expressions in the condition's comparison value
+	evaluated, err := engine.Evaluate(cond, input)
+	if err != nil {
+		return false, fmt.Errorf("failed to evaluate condition expression: %w", err)
+	}
+
+	negate := false
+	if strings.HasPrefix(evaluated, "not ") {
+		negate = true
+		evaluated = strings.TrimPrefix(evaluated, "not ")
+	}
+
+	result := false
+	var op, value string
+
+	if strings.Contains(evaluated, ":") {
+		parts := strings.SplitN(evaluated, ":", 2)
+		op = strings.TrimSpace(parts[0])
+		value = strings.TrimSpace(parts[1])
+	} else {
+		op = strings.TrimSpace(evaluated)
+	}
+
+	switch op {
+	case "contains":
+		result = strings.Contains(input, value)
+	case "equals":
+		result = input == value
+	case "starts_with":
+		result = strings.HasPrefix(input, value)
+	case "ends_with":
+		result = strings.HasSuffix(input, value)
+	case "regex":
+		re, err := regexp.Compile(value)
+		if err != nil {
+			return false, fmt.Errorf("invalid regex in condition: %w", err)
+		}
+		result = re.MatchString(input)
+	case "empty":
+		result = input == ""
+	case "not_empty":
+		result = input != ""
+	default:
+		return false, fmt.Errorf("unknown condition operator: %s", op)
+	}
+
+	if negate {
+		result = !result
+	}
+	return result, nil
 }

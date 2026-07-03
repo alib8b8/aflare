@@ -3,24 +3,27 @@ package workflow
 import "time"
 
 type Workflow struct {
-	Name        string         `yaml:"name,omitempty"`
-	Description string         `yaml:"description,omitempty"`
-	Steps       []WorkflowStep `yaml:"steps"`
+	Name        string            `yaml:"name,omitempty"`
+	Description string            `yaml:"description,omitempty"`
+	Vars        map[string]string `yaml:"vars,omitempty"`
+	Steps       []WorkflowStep    `yaml:"steps"`
 }
 
 type WorkflowStep struct {
-	Node     string            `yaml:"node,omitempty"`
-	Params   map[string]string `yaml:"params,omitempty"`
-	Retry    int               `yaml:"retry,omitempty"`
-	Delay    string            `yaml:"delay,omitempty"`
-	Parallel []Step            `yaml:"parallel,omitempty"`
+	Node      string            `yaml:"node,omitempty"`
+	Params    map[string]string `yaml:"params,omitempty"`
+	Condition string            `yaml:"condition,omitempty"`
+	Retry     int               `yaml:"retry,omitempty"`
+	Delay     string            `yaml:"delay,omitempty"`
+	Parallel  []Step            `yaml:"parallel,omitempty"`
 }
 
 type Step struct {
-	Node   string            `yaml:"node"`
-	Params map[string]string `yaml:"params,omitempty"`
-	Retry  int               `yaml:"retry,omitempty"`
-	Delay  string            `yaml:"delay,omitempty"`
+	Node      string            `yaml:"node"`
+	Params    map[string]string `yaml:"params,omitempty"`
+	Condition string            `yaml:"condition,omitempty"`
+	Retry     int               `yaml:"retry,omitempty"`
+	Delay     string            `yaml:"delay,omitempty"`
 }
 
 func (s *WorkflowStep) IsParallel() bool {
