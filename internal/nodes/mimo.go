@@ -26,11 +26,11 @@ type mimoMessage struct {
 }
 
 type mimoRequest struct {
-	Model       string       `json:"model"`
+	Model       string        `json:"model"`
 	Messages    []mimoMessage `json:"messages"`
-	Temperature float64      `json:"temperature,omitempty"`
-	MaxTokens   int          `json:"max_completion_tokens,omitempty"`
-	Stream      bool         `json:"stream"`
+	Temperature float64       `json:"temperature,omitempty"`
+	MaxTokens   int           `json:"max_completion_tokens,omitempty"`
+	Stream      bool          `json:"stream"`
 }
 
 type mimoChoice struct {

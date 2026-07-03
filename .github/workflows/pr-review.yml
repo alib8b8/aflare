@@ -1,0 +1,109 @@
+name: PR Review
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Run gofmt
+        run: |
+          echo "Running gofmt..."
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Files with formatting issues:"
+            gofmt -l .
+            exit 1
+          fi
+          echo "✅ gofmt passed"
+
+      - name: Run go vet
+        run: |
+          echo "Running go vet..."
+          go vet ./...
+          echo "✅ go vet passed"
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Run tests
+        run: |
+          echo "Running tests..."
+          go test ./... -v
+          echo "✅ Tests passed"
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Build
+        run: |
+          echo "Building llm-box..."
+          go build -ldflags "-s -w" -o llm-box ./cmd/llm-box
+          echo "✅ Build successful"
+
+      - name: Verify binary
+        run: |
+          ./llm-box --help
+          echo "✅ Binary works"
+
+  openclaw-ci:
+    name: OpenClaw CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: contrib/openclaw/package-lock.json
+
+      - name: Install dependencies
+        working-directory: contrib/openclaw
+        run: npm ci
+
+      - name: Build
+        working-directory: contrib/openclaw
+        run: npm run build
+
+      - name: Type check
+        working-directory: contrib/openclaw
+        run: npx tsc --noEmit

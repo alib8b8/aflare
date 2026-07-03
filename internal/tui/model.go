@@ -46,8 +46,8 @@ type StepEndMsg struct {
 
 // WorkflowStartMsg is sent when the workflow starts
 type WorkflowStartMsg struct {
-	Name string
-	Path string
+	Name  string
+	Path  string
 	Steps int
 }
 
@@ -59,11 +59,11 @@ type WorkflowEndMsg struct {
 // Styles using lipgloss
 var (
 	titleStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Background(lipgloss.Color("#7D56F4")).
-		Padding(0, 2).
-		MarginBottom(1)
+			Bold(true).
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(lipgloss.Color("#7D56F4")).
+			Padding(0, 2).
+			MarginBottom(1)
 
 	headerStyle = lipgloss.NewStyle().
 			Bold(true).

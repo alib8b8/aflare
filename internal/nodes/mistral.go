@@ -26,11 +26,11 @@ type mistralMessage struct {
 }
 
 type mistralRequest struct {
-	Model       string            `json:"model"`
-	Messages    []mistralMessage  `json:"messages"`
-	Temperature float64           `json:"temperature,omitempty"`
-	MaxTokens   int               `json:"max_tokens,omitempty"`
-	Stream      bool              `json:"stream"`
+	Model       string           `json:"model"`
+	Messages    []mistralMessage `json:"messages"`
+	Temperature float64          `json:"temperature,omitempty"`
+	MaxTokens   int              `json:"max_tokens,omitempty"`
+	Stream      bool             `json:"stream"`
 }
 
 type mistralChoice struct {
