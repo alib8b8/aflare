@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 )
 
 type FastGPTNode struct{}
@@ -134,7 +133,7 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	client := &http.Client{
-		Timeout:       120 * time.Second,
+		Timeout:       DefaultLLMTimeout,
 		CheckRedirect: httpRedirectValidator(validateLMLEndpoint),
 	}
 

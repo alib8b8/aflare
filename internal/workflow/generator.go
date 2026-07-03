@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // GenerateWorkflow creates a workflow from a description using rule-based
@@ -81,8 +83,8 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 		wf.Steps = append(wf.Steps, step)
 	}
 
-	// Try to extract file path
-	fileRegex := regexp.MustCompile(`(save|write|to)\s+([^\s]+\.(txt|md|yaml|json|html|csv|xml))`)
+	// Try to extract file path (only allow simple filenames, not paths)
+	fileRegex := regexp.MustCompile(`(save|write|to)\s+([a-zA-Z0-9_-]+\.(txt|md|yaml|json|html|csv|xml))`)
 	fileMatch := fileRegex.FindStringSubmatch(desc)
 	if len(fileMatch) >= 3 {
 		path := fileMatch[2]
@@ -139,13 +141,7 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 		wf.Steps = append(wf.Steps, step)
 	}
 
-	if containsActionKeyword(desc, "log") {
-		step := WorkflowStep{
-			Node:   "execute",
-			Params: map[string]string{"command": "tail -n 100 /var/log/syslog"},
-		}
-		wf.Steps = append(wf.Steps, step)
-	}
+
 
 	// Generate workflow name
 	wf.Name = generateWorkflowName(description)
@@ -154,8 +150,8 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	// If no steps were generated, add a default execute step
 	if len(wf.Steps) == 0 {
 		wf.Steps = append(wf.Steps, WorkflowStep{
-			Node:   "execute",
-			Params: map[string]string{"command": "echo 'Custom workflow: " + description + "'"},
+			Node:   "combine",
+			Params: map[string]string{"format": "text"},
 		})
 	}
 
@@ -192,8 +188,8 @@ func GetSuggestedFilename(description string) string {
 		if strings.Contains("the a an to and or fetch save write run from", word) {
 			continue
 		}
-		// Clean word
-		word = strings.Trim(word, ".,!?\"'")
+		// Clean word - keep alphanumeric, dots, hyphens, underscores
+		word = regexp.MustCompile(`[^a-z0-9._-]`).ReplaceAllString(word, "")
 		if len(word) > 2 {
 			keywords = append(keywords, word)
 		}
@@ -218,7 +214,8 @@ func generateWorkflowName(description string) string {
 	words := strings.Fields(desc)
 	var nameParts []string
 	for _, word := range words {
-		word = strings.Trim(word, ".,!?\"'")
+		// Remove all non-alphanumeric characters except spaces and dots
+		word = regexp.MustCompile(`[^a-z0-9 .]`).ReplaceAllString(word, "")
 		if len(word) > 3 && !strings.Contains("the a an to and or fetch save write run from with", word) {
 			// Simple title case: capitalize first letter
 			if len(word) > 0 {
@@ -238,29 +235,14 @@ func generateWorkflowName(description string) string {
 	return strings.Join(nameParts, " ")
 }
 
-// ToYAML converts the workflow to YAML string
+// ToYAML converts the workflow to YAML string using the standard yaml library
+// which properly handles all special characters including newlines, tabs, and quotes
 func (wf *Workflow) ToYAML() string {
-	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf("name: \"%s\"\n", wf.Name))
-	if wf.Description != "" {
-		sb.WriteString(fmt.Sprintf("description: \"%s\"\n", wf.Description))
+	data, err := yaml.Marshal(wf)
+	if err != nil {
+		return fmt.Sprintf("# Error: failed to marshal workflow: %v\n", err)
 	}
-	sb.WriteString("\nsteps:\n")
-
-	for _, step := range wf.Steps {
-		sb.WriteString(fmt.Sprintf("  - node: %s\n", step.Node))
-		if len(step.Params) > 0 {
-			sb.WriteString("    params:\n")
-			for key, value := range step.Params {
-				// Escape quotes in strings
-				escaped := strings.ReplaceAll(value, "\"", "\\\"")
-				sb.WriteString(fmt.Sprintf("      %s: \"%s\"\n", key, escaped))
-			}
-		}
-	}
-
-	return sb.String()
+	return string(data)
 }
 
 // GetWorkflowFilename returns the filename for a workflow

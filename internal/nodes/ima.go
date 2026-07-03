@@ -13,7 +13,7 @@ func init() {
 	Register(&IMANode{
 		compat: NewOpenAICompatibleNode(LLMNodeConfig{
 			Name:            "ima",
-			DefaultModel:    "gpt-4o",
+			DefaultModel:    "",
 			DefaultEndpoint: "",
 			EnvAPIKey:       "IMA_API_KEY",
 			ProviderName:    "IMA Copilot",
@@ -36,9 +36,9 @@ func (n *IMANode) Schema() NodeSchema {
 		Input:       "string - user message content",
 		Output:      "string - AI response content",
 		Params: []ParamSchema{
-			{Name: "model", Type: "string", Description: "Model name (default: gpt-4o)", Required: false, Default: "gpt-4o"},
+			{Name: "model", Type: "string", Description: "Model name (required)", Required: true},
 			{Name: "api_key", Type: "string", Description: "IMA API key (or set IMA_API_KEY env var)", Required: false},
-			{Name: "endpoint", Type: "string", Description: "API base URL (or set IMA_API_BASE env var)", Required: false},
+			{Name: "endpoint", Type: "string", Description: "API base URL (or set IMA_API_BASE env var)", Required: true},
 			{Name: "system", Type: "string", Description: "System prompt", Required: false},
 		},
 	}

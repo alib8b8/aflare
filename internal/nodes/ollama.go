@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 )
 
 type OllamaNode struct{}
@@ -93,7 +92,7 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{
-		Timeout:       120 * time.Second,
+		Timeout:       DefaultLLMTimeout,
 		CheckRedirect: httpRedirectValidator(validateLMLEndpoint),
 	}
 
