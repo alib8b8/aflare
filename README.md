@@ -17,9 +17,6 @@
     <a href="https://github.com/alib8b8/llm-box/actions/workflows/release.yml">
       <img src="https://github.com/alib8b8/llm-box/actions/workflows/release.yml/badge.svg" alt="CI status" />
     </a>
-    <a href="https://goreportcard.com/report/github.com/alib8b8/llm-box">
-      <img src="https://goreportcard.com/badge/github.com/alib8b8/llm-box" alt="Go Report Card" />
-    </a>
   </p>
 
 <p>
