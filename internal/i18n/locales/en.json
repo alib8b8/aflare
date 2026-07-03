@@ -1,0 +1,89 @@
+{
+  "app.name": "llm-box",
+  "app.description": "Terminal-first AI workflow engine",
+
+  "usage.title": "llm-box - Terminal-first AI workflow engine",
+  "usage.create": "Create a new workflow from natural language",
+  "usage.run": "Run a YAML workflow",
+  "usage.install": "Install a community node",
+  "usage.uninstall": "Uninstall a community node",
+  "usage.registry_sync": "Sync node registry from server",
+  "usage.registry_list": "List available nodes in registry",
+  "usage.registry_search": "Search for nodes in registry",
+  "usage.help": "Show this help message",
+  "usage.safe_mode": "Run in safe mode (disables execute and external nodes)",
+
+  "safe_mode.enabled": "Safe mode enabled - execute node and external nodes are disabled",
+  "dry_run.enabled": "Dry run mode - workflow will be validated but not executed",
+
+  "error.no_command": "no command provided",
+  "error.workflow_not_found": "workflow file not found: %s",
+  "error.node_not_found": "node '%s' not found in registry",
+  "error.workflow_parse": "failed to parse workflow: %v",
+  "error.workflow_execute": "workflow execution failed: %v",
+
+  "create.start": "Creating workflow from: \"%s\"",
+  "create.success": "Workflow created: %s",
+  "create.run_hint": "To run it:",
+  "create.usage": "Usage: llm-box create \"your workflow description\"",
+
+  "run.usage": "Usage: llm-box run <workflow-file.yaml>",
+  "run.dry_run_complete": "Dry run completed - workflow is valid",
+
+  "install.usage": "Usage: llm-box install <node-name>",
+  "install.success": "Node '%s' installed successfully!",
+  "install.failed": "Failed to install node '%s': %v",
+  "install.use_list": "Use 'llm-box registry list' to see available nodes",
+  "install.usage_hint": "To use this node, add it to your workflow:",
+
+  "uninstall.usage": "Usage: llm-box uninstall <node-name>",
+  "uninstall.success": "Node '%s' uninstalled successfully!",
+  "uninstall.failed": "Failed to uninstall node '%s': %v",
+
+  "registry.usage": "Usage: llm-box registry <command>",
+  "registry.sync_success": "Registry synced successfully!",
+  "registry.sync_failed": "Failed to sync registry: %v",
+  "registry.list_title": "Available nodes in registry:",
+  "registry.empty": "No nodes available in registry",
+  "registry.search_usage": "Usage: llm-box registry search <query>",
+  "registry.search_result": "Found %d node(s) matching '%s':",
+  "registry.no_match": "No nodes found matching '%s'",
+  "registry.list_failed": "Failed to list nodes: %v",
+  "registry.sync_hint": "Try running 'llm-box registry sync' first",
+  "registry.unknown_cmd": "Unknown registry command: %s",
+
+  "list.title": "Available nodes:",
+  "list.empty": "No nodes registered",
+  "list.installed": "Installed community nodes:",
+
+  "validate.usage": "Usage: llm-box validate <workflow-file.yaml>",
+  "validate.valid": "Workflow is valid!",
+  "validate.warnings": "Validation warnings:",
+  "validate.error": "Error loading workflow: %v",
+
+  "workflow.name": "Workflow: %s",
+  "workflow.description": "Description: %s",
+  "workflow.steps": "Steps (%d):",
+  "workflow.executing": "Executing workflow",
+  "workflow.completed": "Workflow completed!",
+  "workflow.failed": "Workflow failed: %v",
+  "workflow.final_output": "Final Output",
+
+  "step.status_pass": "PASS",
+  "step.status_fail": "FAIL",
+  "step.duration": "took %v",
+
+  "tui.title": "Workflow",
+  "tui.steps": "Steps",
+  "tui.output_preview": "Output Preview",
+  "tui.no_output": "(no output yet)",
+  "tui.press_q": "Press 'q' to quit, 'r' to re-run",
+  "tui.completed": "Completed",
+  "tui.failed": "Failed",
+  "tui.running": "Running",
+  "tui.pending": "Pending",
+
+  "options": "Options",
+  "options.lang": "Set interface language",
+  "examples": "Examples"
+}

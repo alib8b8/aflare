@@ -2,10 +2,12 @@ package cli
 
 import (
 	"testing"
+
+	"github.com/alib8b8/llm-box/internal/i18n"
 )
 
 func TestParseArgs_BasicCommand(t *testing.T) {
-	cmd, args, safeMode, dryRun := ParseArgs([]string{"run", "workflow.yaml"})
+	cmd, args, safeMode, dryRun, _ := ParseArgs([]string{"run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -22,7 +24,7 @@ func TestParseArgs_BasicCommand(t *testing.T) {
 }
 
 func TestParseArgs_WithSafeMode(t *testing.T) {
-	cmd, args, safeMode, _ := ParseArgs([]string{"--safe-mode", "run", "workflow.yaml"})
+	cmd, args, safeMode, _, _ := ParseArgs([]string{"--safe-mode", "run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -36,7 +38,7 @@ func TestParseArgs_WithSafeMode(t *testing.T) {
 }
 
 func TestParseArgs_SafeModeInMiddle(t *testing.T) {
-	_, args, safeMode, _ := ParseArgs([]string{"run", "--safe-mode", "workflow.yaml"})
+	_, args, safeMode, _, _ := ParseArgs([]string{"run", "--safe-mode", "workflow.yaml"})
 
 	if len(args) != 1 || args[0] != "workflow.yaml" {
 		t.Errorf("expected args ['workflow.yaml'], got %v", args)
@@ -47,7 +49,7 @@ func TestParseArgs_SafeModeInMiddle(t *testing.T) {
 }
 
 func TestParseArgs_Empty(t *testing.T) {
-	cmd, args, safeMode, _ := ParseArgs([]string{})
+	cmd, args, safeMode, _, _ := ParseArgs([]string{})
 
 	if cmd != "" {
 		t.Errorf("expected empty command, got %q", cmd)
@@ -61,7 +63,7 @@ func TestParseArgs_Empty(t *testing.T) {
 }
 
 func TestParseArgs_OnlySafeMode(t *testing.T) {
-	cmd, _, safeMode, _ := ParseArgs([]string{"--safe-mode"})
+	cmd, _, safeMode, _, _ := ParseArgs([]string{"--safe-mode"})
 
 	if cmd != "" {
 		t.Errorf("expected empty command, got %q", cmd)
@@ -72,7 +74,7 @@ func TestParseArgs_OnlySafeMode(t *testing.T) {
 }
 
 func TestParseArgs_WithDryRun(t *testing.T) {
-	cmd, args, _, dryRun := ParseArgs([]string{"--dry-run", "run", "workflow.yaml"})
+	cmd, args, _, dryRun, _ := ParseArgs([]string{"--dry-run", "run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -82,6 +84,31 @@ func TestParseArgs_WithDryRun(t *testing.T) {
 	}
 	if !dryRun {
 		t.Error("expected dryRun to be true")
+	}
+}
+
+func TestParseArgs_WithLang(t *testing.T) {
+	cmd, args, _, _, lang := ParseArgs([]string{"--lang", "zh", "run", "workflow.yaml"})
+
+	if cmd != "run" {
+		t.Errorf("expected command 'run', got %q", cmd)
+	}
+	if len(args) != 1 || args[0] != "workflow.yaml" {
+		t.Errorf("expected args ['workflow.yaml'], got %v", args)
+	}
+	if lang != "zh" {
+		t.Errorf("expected lang 'zh', got %q", lang)
+	}
+}
+
+func TestParseArgs_WithLangEquals(t *testing.T) {
+	cmd, _, _, _, lang := ParseArgs([]string{"--lang=en", "run", "workflow.yaml"})
+
+	if cmd != "run" {
+		t.Errorf("expected command 'run', got %q", cmd)
+	}
+	if lang != "en" {
+		t.Errorf("expected lang 'en', got %q", lang)
 	}
 }
 
@@ -102,6 +129,7 @@ func TestValidateCommand_Empty(t *testing.T) {
 }
 
 func TestPrintUsage(t *testing.T) {
+	i18n.Init("en")
 	usage := PrintUsage()
 	if usage == "" {
 		t.Error("expected non-empty usage")
