@@ -24,7 +24,11 @@ func (n *TemplateRenderNode) Execute(ctx context.Context, input string, params m
 
 	templateFile, ok := params["template_file"]
 	if ok && templateFile != "" {
-		data, err := os.ReadFile(templateFile)
+		safePath, err := validateReadPath(templateFile)
+		if err != nil {
+			return "", fmt.Errorf("template file path validation failed: %w", err)
+		}
+		data, err := os.ReadFile(safePath)
 		if err != nil {
 			return "", fmt.Errorf("failed to read template file: %w", err)
 		}

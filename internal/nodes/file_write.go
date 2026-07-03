@@ -20,14 +20,17 @@ func (n *FileWriteNode) Name() string {
 
 // Execute implements the Node interface
 func (n *FileWriteNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
-	// Get output path from params
 	path, ok := params["path"]
 	if !ok || path == "" {
 		return "", fmt.Errorf("path parameter is required")
 	}
 
-	// Write the file (overwrite if exists)
-	err := os.WriteFile(path, []byte(input), 0644)
+	safePath, err := validateWritePath(path)
+	if err != nil {
+		return "", fmt.Errorf("path validation failed: %w", err)
+	}
+
+	err = os.WriteFile(safePath, []byte(input), 0644)
 	if err != nil {
 		return "", fmt.Errorf("failed to write file: %w", err)
 	}

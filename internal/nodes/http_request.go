@@ -26,6 +26,10 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 		return "", fmt.Errorf("url parameter is required")
 	}
 
+	if err := validateURL(url); err != nil {
+		return "", fmt.Errorf("URL validation failed: %w", err)
+	}
+
 	method, ok := params["method"]
 	if !ok || method == "" {
 		method = "GET"

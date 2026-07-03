@@ -41,6 +41,10 @@ func (n *FetchURLNode) Execute(ctx context.Context, input string, params map[str
 		return "", fmt.Errorf("url parameter is required, or pass a URL as input")
 	}
 
+	if err := validateURL(url); err != nil {
+		return "", fmt.Errorf("URL validation failed: %w", err)
+	}
+
 	// Create HTTP request
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
