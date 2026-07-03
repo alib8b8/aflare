@@ -1,0 +1,172 @@
+package i18n
+
+import (
+	"embed"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+	"sync"
+)
+
+//go:embed locales/*.json
+var localeFS embed.FS
+
+type Translator struct {
+	mu       sync.RWMutex
+	lang     string
+	messages map[string]string
+	fallback map[string]string
+}
+
+var (
+	instance    *Translator
+	initOnce    sync.Once
+)
+
+func Init(lang string) {
+	initOnce.Do(func() {
+		instance = &Translator{}
+		instance.load("en") // fallback always English
+	})
+	instance.SetLanguage(lang)
+}
+
+func T(key string, args ...interface{}) string {
+	if instance == nil {
+		Init("")
+	}
+	return instance.Translate(key, args...)
+}
+
+func GetLanguage() string {
+	if instance == nil {
+		return "en"
+	}
+	return instance.lang
+}
+
+func (t *Translator) SetLanguage(lang string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if lang == "" {
+		lang = detectLanguage()
+	}
+
+	t.lang = lang
+	messages, err := loadLocale(lang)
+	if err != nil {
+		t.messages = t.fallback
+		return
+	}
+	t.messages = messages
+}
+
+func (t *Translator) Translate(key string, args ...interface{}) string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	msg, ok := t.messages[key]
+	if !ok {
+		msg, ok = t.fallback[key]
+		if !ok {
+			return key
+		}
+	}
+
+	if len(args) > 0 {
+		return fmt.Sprintf(msg, args...)
+	}
+	return msg
+}
+
+func (t *Translator) load(lang string) {
+	messages, err := loadLocale(lang)
+	if err == nil {
+		t.fallback = messages
+	} else {
+		t.fallback = make(map[string]string)
+	}
+}
+
+func loadLocale(lang string) (map[string]string, error) {
+	path := fmt.Sprintf("locales/%s.json", lang)
+	data, err := localeFS.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var messages map[string]string
+	if err := json.Unmarshal(data, &messages); err != nil {
+		return nil, err
+	}
+
+	return messages, nil
+}
+
+func detectLanguage() string {
+	// 1. Check LLM_BOX_LANG env var
+	if lang := os.Getenv("LLM_BOX_LANG"); lang != "" {
+		return normalizeLang(lang)
+	}
+
+	// 2. Check LANG env var
+	if lang := os.Getenv("LANG"); lang != "" {
+		return normalizeLang(lang)
+	}
+
+	// 3. Check LANGUAGE env var
+	if lang := os.Getenv("LANGUAGE"); lang != "" {
+		parts := strings.Split(lang, ":")
+		if len(parts) > 0 && parts[0] != "" {
+			return normalizeLang(parts[0])
+		}
+	}
+
+	return "en"
+}
+
+func normalizeLang(lang string) string {
+	lang = strings.ToLower(strings.TrimSpace(lang))
+
+	// Handle formats like "en_US.UTF-8", "zh_CN.UTF-8"
+	if idx := strings.Index(lang, "."); idx > 0 {
+		lang = lang[:idx]
+	}
+
+	// Handle formats like "en_US", "zh_CN"
+	if idx := strings.Index(lang, "_"); idx > 0 {
+		lang = lang[:idx]
+	}
+
+	switch lang {
+	case "zh", "chinese", "cn":
+		return "zh"
+	case "en", "english":
+		return "en"
+	default:
+		return "en"
+	}
+}
+
+func AvailableLanguages() []string {
+	entries, err := localeFS.ReadDir("locales")
+	if err != nil {
+		return []string{"en"}
+	}
+
+	var langs []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
+			name := entry.Name()[:len(entry.Name())-5]
+			langs = append(langs, name)
+		}
+	}
+
+	if len(langs) == 0 {
+		langs = []string{"en"}
+	}
+
+	return langs
+}

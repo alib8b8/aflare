@@ -1,0 +1,89 @@
+{
+  "app.name": "llm-box",
+  "app.description": "终端优先的 AI 工作流引擎",
+
+  "usage.title": "llm-box - 终端优先的 AI 工作流引擎",
+  "usage.create": "从自然语言创建新工作流",
+  "usage.run": "运行 YAML 工作流",
+  "usage.install": "安装社区节点",
+  "usage.uninstall": "卸载社区节点",
+  "usage.registry_sync": "从服务器同步节点注册表",
+  "usage.registry_list": "列出注册表中的可用节点",
+  "usage.registry_search": "搜索注册表中的节点",
+  "usage.help": "显示此帮助信息",
+  "usage.safe_mode": "安全模式运行（禁用 execute 节点和外部节点）",
+
+  "safe_mode.enabled": "安全模式已启用 - execute 节点和外部节点已禁用",
+  "dry_run.enabled": "试运行模式 - 工作流将被验证但不会执行",
+
+  "error.no_command": "未提供命令",
+  "error.workflow_not_found": "未找到工作流文件: %s",
+  "error.node_not_found": "在注册表中未找到节点 '%s'",
+  "error.workflow_parse": "解析工作流失败: %v",
+  "error.workflow_execute": "工作流执行失败: %v",
+
+  "create.start": "正在从以下描述创建工作流: \"%s\"",
+  "create.success": "工作流已创建: %s",
+  "create.run_hint": "运行方式:",
+  "create.usage": "用法: llm-box create \"你的工作流描述\"",
+
+  "run.usage": "用法: llm-box run <工作流文件.yaml>",
+  "run.dry_run_complete": "试运行完成 - 工作流有效",
+
+  "install.usage": "用法: llm-box install <节点名称>",
+  "install.success": "节点 '%s' 安装成功！",
+  "install.failed": "安装节点 '%s' 失败: %v",
+  "install.use_list": "使用 'llm-box registry list' 查看可用节点",
+  "install.usage_hint": "要使用此节点，请将其添加到工作流中:",
+
+  "uninstall.usage": "用法: llm-box uninstall <节点名称>",
+  "uninstall.success": "节点 '%s' 卸载成功！",
+  "uninstall.failed": "卸载节点 '%s' 失败: %v",
+
+  "registry.usage": "用法: llm-box registry <命令>",
+  "registry.sync_success": "注册表同步成功！",
+  "registry.sync_failed": "同步注册表失败: %v",
+  "registry.list_title": "注册表中的可用节点:",
+  "registry.empty": "注册表中没有可用节点",
+  "registry.search_usage": "用法: llm-box registry search <关键词>",
+  "registry.search_result": "找到 %d 个匹配 '%s' 的节点:",
+  "registry.no_match": "未找到匹配 '%s' 的节点",
+  "registry.list_failed": "列出节点失败: %v",
+  "registry.sync_hint": "请先运行 'llm-box registry sync'",
+  "registry.unknown_cmd": "未知的 registry 命令: %s",
+
+  "list.title": "可用节点:",
+  "list.empty": "没有已注册的节点",
+  "list.installed": "已安装的社区节点:",
+
+  "validate.usage": "用法: llm-box validate <工作流文件.yaml>",
+  "validate.valid": "工作流有效！",
+  "validate.warnings": "验证警告:",
+  "validate.error": "加载工作流出错: %v",
+
+  "workflow.name": "工作流: %s",
+  "workflow.description": "描述: %s",
+  "workflow.steps": "步骤 (%d):",
+  "workflow.executing": "正在执行工作流",
+  "workflow.completed": "工作流执行完成！",
+  "workflow.failed": "工作流执行失败: %v",
+  "workflow.final_output": "最终输出",
+
+  "step.status_pass": "通过",
+  "step.status_fail": "失败",
+  "step.duration": "耗时 %v",
+
+  "tui.title": "工作流",
+  "tui.steps": "步骤",
+  "tui.output_preview": "输出预览",
+  "tui.no_output": "（暂无输出）",
+  "tui.press_q": "按 'q' 退出，'r' 重新运行",
+  "tui.completed": "已完成",
+  "tui.failed": "已失败",
+  "tui.running": "运行中",
+  "tui.pending": "等待中",
+
+  "options": "选项",
+  "options.lang": "设置界面语言",
+  "examples": "示例"
+}

@@ -7,29 +7,43 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/alib8b8/llm-box/internal/i18n"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/registry"
 	"github.com/alib8b8/llm-box/internal/workflow"
 )
 
 // ParseArgs parses the command-line arguments and returns the command and its arguments.
-// It also detects the --safe-mode and --dry-run flags.
-func ParseArgs(args []string) (command string, commandArgs []string, safeMode bool, dryRun bool) {
+// It also detects the --safe-mode, --dry-run, and --lang flags.
+func ParseArgs(args []string) (command string, commandArgs []string, safeMode bool, dryRun bool, lang string) {
 	safeMode = false
 	dryRun = false
+	lang = ""
 	var filtered []string
-	for _, arg := range args {
+	skipNext := false
+	for i, arg := range args {
+		if skipNext {
+			skipNext = false
+			continue
+		}
 		if arg == "--safe-mode" {
 			safeMode = true
 		} else if arg == "--dry-run" || arg == "--dry" {
 			dryRun = true
+		} else if arg == "--lang" {
+			if i+1 < len(args) {
+				lang = args[i+1]
+				skipNext = true
+			}
+		} else if strings.HasPrefix(arg, "--lang=") {
+			lang = strings.TrimPrefix(arg, "--lang=")
 		} else {
 			filtered = append(filtered, arg)
 		}
 	}
 
 	if len(filtered) == 0 {
-		return "", nil, safeMode, dryRun
+		return "", nil, safeMode, dryRun, lang
 	}
 
 	command = filtered[0]
@@ -73,28 +87,45 @@ func PrepareWorkflow(wfPath string) (*workflow.Workflow, *nodes.Registry, error)
 
 // PrintUsage prints the program usage information
 func PrintUsage() string {
-	return `llm-box - Terminal-first AI workflow engine
+	return fmt.Sprintf(`%s
 
-Usage:
-  llm-box create "workflow description"   Create a new workflow from natural language
-  llm-box run <workflow-file.yaml>         Run a YAML workflow
-  llm-box install <node-name>              Install a community node
-  llm-box uninstall <node-name>            Uninstall a community node
-  llm-box registry sync                    Sync node registry from server
-  llm-box registry list                    List available nodes in registry
-  llm-box registry search <query>          Search for nodes in registry
-  llm-box help                            Show this help message
+%s:
+  llm-box create "workflow description"   %s
+  llm-box run <workflow-file.yaml>         %s
+  llm-box install <node-name>              %s
+  llm-box uninstall <node-name>            %s
+  llm-box registry sync                    %s
+  llm-box registry list                    %s
+  llm-box registry search <query>          %s
+  llm-box help                            %s
 
-Options:
-  --safe-mode   Run in safe mode (disables execute and external nodes)
+%s:
+  --safe-mode   %s
+  --lang <lang>  %s (en, zh)
 
-Examples:
+%s:
   llm-box create "fetch example.com and save to file"
   llm-box run examples/basic_summary.yaml
   llm-box --safe-mode run examples/multi_step.yaml
+  llm-box --lang zh run examples/basic_summary.yaml
   llm-box registry sync
   llm-box registry search weather
-  llm-box install weather_api`
+  llm-box install weather_api`,
+		i18n.T("usage.title"),
+		i18n.T("usage.help"),
+		i18n.T("usage.create"),
+		i18n.T("usage.run"),
+		i18n.T("usage.install"),
+		i18n.T("usage.uninstall"),
+		i18n.T("usage.registry_sync"),
+		i18n.T("usage.registry_list"),
+		i18n.T("usage.registry_search"),
+		i18n.T("usage.help"),
+		i18n.T("options"),
+		i18n.T("usage.safe_mode"),
+		i18n.T("options.lang"),
+		i18n.T("examples"),
+	)
 }
 
 // RunWorkflow executes a workflow and returns the final output and results.
