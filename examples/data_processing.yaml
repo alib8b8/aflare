@@ -1,0 +1,19 @@
+name: "Data Processing Workflow"
+description: "Fetch, parse and transform data"
+
+steps:
+  - node: fetch_url
+    params:
+      url: "https://jsonplaceholder.typicode.com/posts"
+  
+  - node: json_parse
+    params:
+      path: "[0].title"
+  
+  - node: transform
+    params:
+      operation: "upper"
+  
+  - node: file_write
+    params:
+      path: "data_output.txt"

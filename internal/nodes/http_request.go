@@ -20,6 +20,26 @@ func (n *HTTPRequestNode) Name() string {
 	return "http_request"
 }
 
+func (n *HTTPRequestNode) Description() string {
+	return "Make HTTP requests with custom method, headers, and body"
+}
+
+func (n *HTTPRequestNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "http_request",
+		Description: "Make HTTP requests with custom method, headers, and body",
+		Input:       "string - request body (overrides body param)",
+		Output:      "string - response body",
+		Params: []ParamSchema{
+			{Name: "url", Type: "string", Description: "Target URL", Required: true},
+			{Name: "method", Type: "string", Description: "HTTP method: GET, POST, PUT, DELETE, PATCH", Required: false, Default: "GET"},
+			{Name: "headers", Type: "string", Description: "JSON-encoded headers", Required: false},
+			{Name: "body", Type: "string", Description: "Request body", Required: false},
+			{Name: "timeout", Type: "int", Description: "Request timeout in seconds", Required: false, Default: "30"},
+		},
+	}
+}
+
 func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	url, ok := params["url"]
 	if !ok || url == "" {

@@ -1,0 +1,28 @@
+name: "System Monitoring"
+description: "Check system status and send alerts"
+
+steps:
+  - node: execute
+    params:
+      command: "echo '=== System Monitoring ==='"
+  
+  - node: execute
+    params:
+      command: "uptime"
+  
+  - node: execute
+    params:
+      command: "free -h"
+  
+  - node: execute
+    params:
+      command: "df -h | head -5"
+  
+  - node: execute
+    params:
+      command: "echo '=== Monitoring Completed ==='"
+  
+  - node: notify
+    params:
+      channel: stdout
+      message: "System check completed successfully"

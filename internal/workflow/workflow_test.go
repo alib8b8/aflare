@@ -15,6 +15,22 @@ func (n *testNode) Name() string {
 	return n.name
 }
 
+func (n *testNode) Description() string {
+	return "test node"
+}
+
+func (n *testNode) Schema() nodes.NodeSchema {
+	return nodes.NodeSchema{
+		Name:        n.name,
+		Description: "test node",
+		Input:       "string",
+		Output:      "string",
+		Params: []nodes.ParamSchema{
+			{Name: "prefix", Type: "string", Description: "Prefix for output", Required: false},
+		},
+	}
+}
+
 func (n *testNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	if msg, ok := params["prefix"]; ok {
 		return msg + " " + input, nil
@@ -28,7 +44,7 @@ func TestExecuteWorkflow_Simple(t *testing.T) {
 
 	wf := &Workflow{
 		Name: "test workflow",
-		Steps: []Step{
+		Steps: []WorkflowStep{
 			{Node: "test", Params: map[string]string{"prefix": "first"}},
 			{Node: "test", Params: map[string]string{"prefix": "second"}},
 		},
@@ -57,7 +73,7 @@ func TestExecuteWorkflow_NodeNotFound(t *testing.T) {
 	reg := nodes.NewRegistry()
 
 	wf := &Workflow{
-		Steps: []Step{
+		Steps: []WorkflowStep{
 			{Node: "nonexistent"},
 		},
 	}
@@ -73,7 +89,7 @@ func TestExecuteWorkflow_StepError(t *testing.T) {
 	reg.Register(&errorNode{name: "err"})
 
 	wf := &Workflow{
-		Steps: []Step{
+		Steps: []WorkflowStep{
 			{Node: "err"},
 		},
 	}
@@ -100,6 +116,20 @@ func (n *errorNode) Name() string {
 	return n.name
 }
 
+func (n *errorNode) Description() string {
+	return "error node"
+}
+
+func (n *errorNode) Schema() nodes.NodeSchema {
+	return nodes.NodeSchema{
+		Name:        n.name,
+		Description: "error node",
+		Input:       "string",
+		Output:      "string",
+		Params:      nil,
+	}
+}
+
 func (n *errorNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	return "", &testError{msg: "test error"}
 }
@@ -116,7 +146,7 @@ func TestExecuteWorkflow_EmptyWorkflow(t *testing.T) {
 	reg := nodes.NewRegistry()
 
 	wf := &Workflow{
-		Steps: []Step{},
+		Steps: []WorkflowStep{},
 	}
 
 	output, results, err := ExecuteWorkflow(context.Background(), wf, reg)

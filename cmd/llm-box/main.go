@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/alib8b8/llm-box/internal/cli"
 	"github.com/alib8b8/llm-box/internal/nodes"
@@ -20,11 +21,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	command, args, safeMode := cli.ParseArgs(os.Args[1:])
+	command, args, safeMode, dryRun := cli.ParseArgs(os.Args[1:])
 
 	if safeMode {
 		nodes.SetSafeMode(true)
 		fmt.Println("🔒 Safe mode enabled - execute node and external nodes are disabled")
+	}
+
+	if dryRun {
+		fmt.Println("📋 Dry run mode - workflow will be validated but not executed")
 	}
 
 	if command == "" {
@@ -42,14 +47,199 @@ func main() {
 		handleCreate(args)
 		return
 	case "run":
-		handleRun(args)
+		handleRun(args, dryRun)
+		return
+	case "install":
+		handleInstall(args)
+		return
+	case "uninstall":
+		handleUninstall(args)
+		return
+	case "registry":
+		handleRegistry(args)
+		return
+	case "list":
+		handleList()
+		return
+	case "validate":
+		handleValidate(args)
 		return
 	case "-h", "--help", "help":
 		fmt.Println(cli.PrintUsage())
 		return
 	default:
-		handleRunFile(command)
+		handleRunFile(command, dryRun)
 	}
+}
+
+func handleList() {
+	reg := nodes.NewRegistry()
+	nodes.RegisterBuiltins(reg)
+
+	nodeList := reg.ListNodes()
+	if len(nodeList) == 0 {
+		fmt.Println("No nodes registered")
+		return
+	}
+
+	fmt.Println("Available nodes:")
+	fmt.Println("-" + strings.Repeat("-", 78))
+	fmt.Printf("  %-20s %s\n", "NAME", "DESCRIPTION")
+	fmt.Println("-" + strings.Repeat("-", 78))
+	for _, info := range nodeList {
+		fmt.Printf("  %-20s %s\n", info.Name, info.Description)
+	}
+
+	installed, err := cli.ListInstalledNodes()
+	if err == nil && len(installed) > 0 {
+		fmt.Println("\nInstalled community nodes:")
+		for _, name := range installed {
+			fmt.Printf("  - %s\n", name)
+		}
+	}
+}
+
+func handleValidate(args []string) {
+	if len(args) < 1 {
+		fmt.Println("Usage: llm-box validate <workflow-file.yaml>")
+		os.Exit(1)
+	}
+
+	wf, reg, err := cli.PrepareWorkflow(args[0])
+	if err != nil {
+		fmt.Printf("❌ Error loading workflow: %v\n", err)
+		os.Exit(1)
+	}
+
+	warnings := workflow.ValidateWorkflow(wf)
+
+	for i, step := range wf.Steps {
+		if _, ok := reg.Get(step.Node); !ok {
+			warnings = append(warnings, fmt.Sprintf("Step %d: unknown node '%s'", i+1, step.Node))
+		}
+	}
+
+	if len(warnings) == 0 {
+		fmt.Println("✅ Workflow is valid!")
+	} else {
+		fmt.Println("⚠️ Validation warnings:")
+		for _, warning := range warnings {
+			fmt.Printf("  - %s\n", warning)
+		}
+		os.Exit(1)
+	}
+}
+
+func handleInstall(args []string) {
+	if len(args) < 1 {
+		fmt.Println("Usage: llm-box install <node-name>")
+		fmt.Println("\nUse 'llm-box registry list' to see available nodes")
+		os.Exit(1)
+	}
+
+	nodeName := args[0]
+	if err := cli.InstallNode(nodeName); err != nil {
+		fmt.Printf("❌ Failed to install node '%s': %v\n", nodeName, err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✅ Node '%s' installed successfully!\n", nodeName)
+	fmt.Println("\nTo use this node, add it to your workflow:")
+	fmt.Printf("  steps:\n    - node: %s\n", nodeName)
+}
+
+func handleUninstall(args []string) {
+	if len(args) < 1 {
+		fmt.Println("Usage: llm-box uninstall <node-name>")
+		os.Exit(1)
+	}
+
+	nodeName := args[0]
+	if err := cli.UninstallNode(nodeName); err != nil {
+		fmt.Printf("❌ Failed to uninstall node '%s': %v\n", nodeName, err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✅ Node '%s' uninstalled successfully!\n", nodeName)
+}
+
+func handleRegistry(args []string) {
+	if len(args) < 1 {
+		fmt.Println("Usage: llm-box registry <command>")
+		fmt.Println("\nCommands:")
+		fmt.Println("  sync     - Sync node registry from server")
+		fmt.Println("  list     - List available nodes")
+		fmt.Println("  search   - Search for nodes by name, description, or tag")
+		os.Exit(1)
+	}
+
+	subCmd := args[0]
+	switch subCmd {
+	case "sync":
+		if err := cli.SyncRegistry(); err != nil {
+			fmt.Printf("❌ Failed to sync registry: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("✅ Registry synced successfully!")
+
+	case "list":
+		nodes, err := cli.ListRegistryNodes()
+		if err != nil {
+			fmt.Printf("❌ Failed to list nodes: %v\n", err)
+			fmt.Println("\nTry running 'llm-box registry sync' first")
+			os.Exit(1)
+		}
+
+		if len(nodes) == 0 {
+			fmt.Println("No nodes available in registry")
+			return
+		}
+
+		fmt.Println("Available nodes in registry:")
+		fmt.Println("-" + strings.Repeat("-", 78))
+		fmt.Printf("  %-15s %-40s %-10s %s\n", "NAME", "DESCRIPTION", "VERSION", "CATEGORY")
+		fmt.Println("-" + strings.Repeat("-", 78))
+		for _, node := range nodes {
+			fmt.Printf("  %-15s %-40s %-10s %s\n", node.Name, truncate(node.Description, 38), node.Version, node.Category)
+		}
+
+	case "search":
+		if len(args) < 2 {
+			fmt.Println("Usage: llm-box registry search <query>")
+			os.Exit(1)
+		}
+
+		query := strings.Join(args[1:], " ")
+		nodes, err := cli.SearchRegistryNodes(query)
+		if err != nil {
+			fmt.Printf("❌ Failed to search nodes: %v\n", err)
+			os.Exit(1)
+		}
+
+		if len(nodes) == 0 {
+			fmt.Printf("No nodes found matching '%s'\n", query)
+			return
+		}
+
+		fmt.Printf("Found %d node(s) matching '%s':\n", len(nodes), query)
+		fmt.Println("-" + strings.Repeat("-", 78))
+		fmt.Printf("  %-15s %-40s %-10s %s\n", "NAME", "DESCRIPTION", "VERSION", "CATEGORY")
+		fmt.Println("-" + strings.Repeat("-", 78))
+		for _, node := range nodes {
+			fmt.Printf("  %-15s %-40s %-10s %s\n", node.Name, truncate(node.Description, 38), node.Version, node.Category)
+		}
+
+	default:
+		fmt.Printf("Unknown registry command: %s\n", subCmd)
+		os.Exit(1)
+	}
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-2] + ".."
 }
 
 func handleCreate(args []string) {
@@ -76,19 +266,31 @@ func handleCreate(args []string) {
 	fmt.Printf("  llm-box run %s\n", filename)
 }
 
-func handleRun(args []string) {
+func handleRun(args []string, dryRun bool) {
 	if len(args) < 1 {
 		fmt.Println("Usage: llm-box run <workflow-file.yaml>")
 		os.Exit(1)
 	}
-	handleRunFile(args[0])
+	handleRunFile(args[0], dryRun)
 }
 
-func handleRunFile(wfPath string) {
+func handleRunFile(wfPath string, dryRun bool) {
 	wf, reg, err := cli.PrepareWorkflow(wfPath)
 	if err != nil {
 		fmt.Printf("Error preparing workflow: %v\n", err)
 		os.Exit(1)
+	}
+
+	if suggestions := workflow.ValidateWorkflow(wf); len(suggestions) > 0 {
+		fmt.Println("⚠️ Workflow validation warnings:")
+		for _, suggestion := range suggestions {
+			fmt.Printf("  - %s\n", suggestion)
+		}
+	}
+
+	if dryRun {
+		fmt.Println("\n✅ Dry run completed - workflow is valid")
+		return
 	}
 
 	if isatty.IsTerminal(os.Stdout.Fd()) {
@@ -105,7 +307,6 @@ func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry) {
 	go func() {
 		ctx := context.Background()
 		workflow.ExecuteWorkflowWithTUI(ctx, wf, reg, program)
-		program.Send(tea.QuitMsg{})
 	}()
 
 	if _, err := program.Run(); err != nil {

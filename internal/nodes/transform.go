@@ -16,6 +16,22 @@ func (n *TransformNode) Name() string {
 	return "transform"
 }
 
+func (n *TransformNode) Description() string {
+	return "Transform text using regex or string operations"
+}
+
+func (n *TransformNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "transform",
+		Description: "Transform text using string operations",
+		Input:       "string - text to transform",
+		Output:      "string - transformed text",
+		Params: []ParamSchema{
+			{Name: "operation", Type: "string", Description: "Transformation: upper, lower, trim, lines, words, chars, first_line, first_500, first_1000, summary", Required: false},
+		},
+	}
+}
+
 func (n *TransformNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	operation, ok := params["operation"]
 	if !ok || operation == "" {

@@ -9,6 +9,7 @@ import (
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
+	"gopkg.in/yaml.v3"
 )
 
 // StepResult stores the result of executing a single step
@@ -21,6 +22,35 @@ type StepResult struct {
 	Duration  time.Duration
 }
 
+func init() {
+	nodes.ExecuteWorkflowFunc = func(ctx context.Context, wf interface{}, reg *nodes.Registry) (string, []interface{}, error) {
+		var workflow *Workflow
+		var err error
+
+		switch v := wf.(type) {
+		case *Workflow:
+			workflow = v
+		case string:
+			if err := yaml.Unmarshal([]byte(v), &workflow); err != nil {
+				return "", nil, fmt.Errorf("failed to parse workflow YAML: %w", err)
+			}
+		default:
+			return "", nil, fmt.Errorf("unsupported workflow type")
+		}
+
+		result, stepResults, err := ExecuteWorkflow(ctx, workflow, reg)
+		if err != nil {
+			return "", nil, err
+		}
+
+		results := make([]interface{}, len(stepResults))
+		for i, sr := range stepResults {
+			results[i] = sr
+		}
+		return result, results, nil
+	}
+}
+
 // ExecuteWorkflow executes a workflow step by step
 func ExecuteWorkflow(ctx context.Context, wf *Workflow, reg *nodes.Registry) (string, []StepResult, error) {
 	return ExecuteWorkflowWithTUI(ctx, wf, reg, nil)
@@ -30,7 +60,6 @@ func ExecuteWorkflow(ctx context.Context, wf *Workflow, reg *nodes.Registry) (st
 func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, error) {
 	logger.Info("workflow execution started", "name", wf.Name, "steps", len(wf.Steps))
 
-	// Set default timeout: 5 minutes
 	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
@@ -38,7 +67,6 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 	data := ""
 	engine := NewExpressionEngine()
 
-	// Send workflow start message
 	if program != nil {
 		program.Send(tui.WorkflowStartMsg{
 			Name:  wf.Name,
@@ -47,25 +75,37 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 		})
 	}
 
-	for i, step := range wf.Steps {
-		stepStart := time.Now()
-		logger.Info("step started", "index", i, "node", step.Node)
+	for i, wStep := range wf.Steps {
+		if wStep.IsParallel() {
+			parallelResults, output, err := executeParallelStep(timeoutCtx, i, wStep, data, engine, reg, program)
+			if err != nil {
+				results = append(results, parallelResults...)
+				if program != nil {
+					program.Send(tui.WorkflowEndMsg{Success: false})
+				}
+				return "", results, err
+			}
+			results = append(results, parallelResults...)
+			data = output
+			continue
+		}
 
-		// Send step start message
+		stepStart := time.Now()
+		logger.Info("step started", "index", i, "node", wStep.Node)
+
 		if program != nil {
 			program.Send(tui.StepStartMsg{
 				Index: i,
-				Name:  step.Node,
+				Name:  wStep.Node,
 			})
 		}
 
-		// Evaluate param expressions ({{step.0}}, {{var.name}}, etc.)
-		evaluatedParams, err := engine.EvaluateParams(step.Params, data)
+		evaluatedParams, err := engine.EvaluateParams(wStep.Params, data)
 		if err != nil {
 			logger.Error("expression evaluation failed", "index", i, "error", err)
 			result := StepResult{
 				StepIndex: i,
-				NodeName:  step.Node,
+				NodeName:  wStep.Node,
 				Input:     data,
 				Error:     err,
 				Duration:  time.Since(stepStart),
@@ -74,7 +114,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 			if program != nil {
 				program.Send(tui.StepEndMsg{
 					Index:    i,
-					Name:     step.Node,
+					Name:     wStep.Node,
 					Error:    err,
 					Duration: time.Since(stepStart),
 				})
@@ -83,14 +123,13 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 			return "", results, err
 		}
 
-		// Find node in registry
-		node, ok := reg.Get(step.Node)
+		node, ok := reg.Get(wStep.Node)
 		if !ok {
-			err := fmt.Errorf("node '%s' not found in registry", step.Node)
-			logger.Error("node not found", "node", step.Node, "error", err)
+			err := fmt.Errorf("node '%s' not found in registry", wStep.Node)
+			logger.Error("node not found", "node", wStep.Node, "error", err)
 			result := StepResult{
 				StepIndex: i,
-				NodeName:  step.Node,
+				NodeName:  wStep.Node,
 				Input:     data,
 				Error:     err,
 				Duration:  time.Since(stepStart),
@@ -100,7 +139,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 			if program != nil {
 				program.Send(tui.StepEndMsg{
 					Index:    i,
-					Name:     step.Node,
+					Name:     wStep.Node,
 					Error:    err,
 					Duration: time.Since(stepStart),
 				})
@@ -110,58 +149,235 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 			return "", results, err
 		}
 
-		// Execute the node
-		output, err := node.Execute(timeoutCtx, data, evaluatedParams)
-		duration := time.Since(stepStart)
+		retryCount := wStep.GetRetryCount()
+		retryDelay := wStep.GetRetryDelay()
+		stepTimeout := wStep.GetTimeout()
 
-		// Store output for future expression references
-		engine.SetStepOutput(i, step.Node, output)
+		var output string
+		var execErr error
+		var duration time.Duration
+		maxAttempts := retryCount + 1
+
+		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			attemptStart := time.Now()
+
+			var stepCtx context.Context
+			var stepCancel context.CancelFunc
+			if stepTimeout > 0 {
+				stepCtx, stepCancel = context.WithTimeout(timeoutCtx, stepTimeout)
+			} else {
+				stepCtx, stepCancel = context.WithCancel(timeoutCtx)
+			}
+			defer stepCancel()
+
+			if program != nil {
+				if streamingNode, ok := node.(nodes.StreamingNode); ok {
+					onChunk := func(chunk string) {
+						program.Send(tui.StepStreamMsg{
+							Index: i,
+							Name:  wStep.Node,
+							Chunk: chunk,
+						})
+					}
+					output, execErr = streamingNode.ExecuteStream(stepCtx, data, evaluatedParams, onChunk)
+				} else {
+					output, execErr = node.Execute(stepCtx, data, evaluatedParams)
+				}
+			} else {
+				output, execErr = node.Execute(stepCtx, data, evaluatedParams)
+			}
+			duration = time.Since(attemptStart)
+
+			if execErr == nil {
+				break
+			}
+
+			logger.Warn("step failed, retrying", "index", i, "node", wStep.Node, "attempt", attempt, "max", maxAttempts, "error", execErr)
+
+			if attempt < maxAttempts {
+				time.Sleep(retryDelay)
+			}
+		}
+
+		engine.SetStepOutput(i, wStep.Node, output)
 
 		result := StepResult{
 			StepIndex: i,
-			NodeName:  step.Node,
+			NodeName:  wStep.Node,
 			Input:     data,
 			Output:    output,
-			Error:     err,
+			Error:     execErr,
 			Duration:  duration,
 		}
 		results = append(results, result)
 
-		if err != nil {
-			logger.Error("step failed", "index", i, "node", step.Node, "duration", duration, "error", err)
+		if execErr != nil {
+			logger.Error("step failed", "index", i, "node", wStep.Node, "duration", duration, "error", execErr)
 		} else {
-			logger.Info("step completed", "index", i, "node", step.Node, "duration", duration)
+			logger.Info("step completed", "index", i, "node", wStep.Node, "duration", duration)
 		}
 
-		// Send step end message
 		if program != nil {
 			program.Send(tui.StepEndMsg{
 				Index:    i,
-				Name:     step.Node,
+				Name:     wStep.Node,
 				Output:   output,
-				Error:    err,
+				Error:    execErr,
 				Duration: duration,
 			})
 		}
 
-		// Check for errors
-		if err != nil {
+		if execErr != nil {
 			if program != nil {
 				program.Send(tui.WorkflowEndMsg{Success: false})
 			}
-			logger.Error("workflow failed", "name", wf.Name, "failed_step", i, "node", step.Node, "error", err)
-			return "", results, fmt.Errorf("step %d (%s) failed: %w", i+1, step.Node, err)
+			logger.Error("workflow failed", "name", wf.Name, "failed_step", i, "node", wStep.Node, "error", execErr)
+			return "", results, fmt.Errorf("step %d (%s) failed: %w", i+1, wStep.Node, execErr)
 		}
 
-		// Pass output to next step
 		data = output
 	}
 
-	// Send workflow end message
 	if program != nil {
 		program.Send(tui.WorkflowEndMsg{Success: true})
 	}
 
 	logger.Info("workflow completed", "name", wf.Name, "steps", len(wf.Steps))
 	return data, results, nil
+}
+
+func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep, input string, engine *ExpressionEngine, reg *nodes.Registry, program *tea.Program) ([]StepResult, string, error) {
+	logger.Info("parallel step started", "index", stepIndex, "parallel_count", len(wStep.Parallel))
+
+	type parallelResult struct {
+		stepIndex int
+		nodeName  string
+		output    string
+		err       error
+		duration  time.Duration
+	}
+
+	resultsChan := make(chan parallelResult, len(wStep.Parallel))
+
+	for j, step := range wStep.Parallel {
+		go func(j int, step Step) {
+			start := time.Now()
+			nodeName := step.Node
+
+			if program != nil {
+				program.Send(tui.StepStartMsg{
+					Index: stepIndex*100 + j,
+					Name:  nodeName,
+				})
+			}
+
+			evaluatedParams, err := engine.EvaluateParams(step.Params, input)
+			if err != nil {
+				resultsChan <- parallelResult{
+					stepIndex: stepIndex*100 + j,
+					nodeName:  nodeName,
+					err:       err,
+					duration:  time.Since(start),
+				}
+				return
+			}
+
+			node, ok := reg.Get(nodeName)
+			if !ok {
+				resultsChan <- parallelResult{
+					stepIndex: stepIndex*100 + j,
+					nodeName:  nodeName,
+					err:       fmt.Errorf("node '%s' not found in registry", nodeName),
+					duration:  time.Since(start),
+				}
+				return
+			}
+
+			var output string
+			var execErr error
+			stepTimeout := step.GetTimeout()
+
+			var stepCtx context.Context
+			var stepCancel context.CancelFunc
+			if stepTimeout > 0 {
+				stepCtx, stepCancel = context.WithTimeout(ctx, stepTimeout)
+			} else {
+				stepCtx, stepCancel = context.WithCancel(ctx)
+			}
+			defer stepCancel()
+
+			retryCount := step.GetRetryCount()
+			retryDelay := step.GetRetryDelay()
+			maxAttempts := retryCount + 1
+
+			for attempt := 1; attempt <= maxAttempts; attempt++ {
+				output, execErr = node.Execute(stepCtx, input, evaluatedParams)
+				if execErr == nil {
+					break
+				}
+				if attempt < maxAttempts {
+					time.Sleep(retryDelay)
+				}
+			}
+
+			resultsChan <- parallelResult{
+				stepIndex: stepIndex*100 + j,
+				nodeName:  nodeName,
+				output:    output,
+				err:       execErr,
+				duration:  time.Since(start),
+			}
+		}(j, step)
+	}
+
+	var stepResults []StepResult
+	var outputs []string
+	var firstErr error
+
+	for i := 0; i < len(wStep.Parallel); i++ {
+		res := <-resultsChan
+		sr := StepResult{
+			StepIndex: res.stepIndex,
+			NodeName:  res.nodeName,
+			Input:     input,
+			Output:    res.output,
+			Error:     res.err,
+			Duration:  res.duration,
+		}
+		stepResults = append(stepResults, sr)
+
+		if program != nil {
+			program.Send(tui.StepEndMsg{
+				Index:    res.stepIndex,
+				Name:     res.nodeName,
+				Output:   res.output,
+				Error:    res.err,
+				Duration: res.duration,
+			})
+		}
+
+		if res.err != nil {
+			if firstErr == nil {
+				firstErr = res.err
+			}
+			logger.Error("parallel step failed", "index", res.stepIndex, "node", res.nodeName, "error", res.err)
+		} else {
+			outputs = append(outputs, res.output)
+			logger.Info("parallel step completed", "index", res.stepIndex, "node", res.nodeName, "duration", res.duration)
+		}
+	}
+
+	if firstErr != nil {
+		return stepResults, "", firstErr
+	}
+
+	finalOutput := ""
+	for _, out := range outputs {
+		if finalOutput != "" {
+			finalOutput += "\n---\n"
+		}
+		finalOutput += out
+	}
+
+	return stepResults, finalOutput, nil
 }

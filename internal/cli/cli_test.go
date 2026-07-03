@@ -5,7 +5,7 @@ import (
 )
 
 func TestParseArgs_BasicCommand(t *testing.T) {
-	cmd, args, safeMode := ParseArgs([]string{"run", "workflow.yaml"})
+	cmd, args, safeMode, dryRun := ParseArgs([]string{"run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -16,10 +16,13 @@ func TestParseArgs_BasicCommand(t *testing.T) {
 	if safeMode {
 		t.Error("expected safeMode to be false")
 	}
+	if dryRun {
+		t.Error("expected dryRun to be false")
+	}
 }
 
 func TestParseArgs_WithSafeMode(t *testing.T) {
-	cmd, args, safeMode := ParseArgs([]string{"--safe-mode", "run", "workflow.yaml"})
+	cmd, args, safeMode, _ := ParseArgs([]string{"--safe-mode", "run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -33,7 +36,7 @@ func TestParseArgs_WithSafeMode(t *testing.T) {
 }
 
 func TestParseArgs_SafeModeInMiddle(t *testing.T) {
-	_, args, safeMode := ParseArgs([]string{"run", "--safe-mode", "workflow.yaml"})
+	_, args, safeMode, _ := ParseArgs([]string{"run", "--safe-mode", "workflow.yaml"})
 
 	if len(args) != 1 || args[0] != "workflow.yaml" {
 		t.Errorf("expected args ['workflow.yaml'], got %v", args)
@@ -44,7 +47,7 @@ func TestParseArgs_SafeModeInMiddle(t *testing.T) {
 }
 
 func TestParseArgs_Empty(t *testing.T) {
-	cmd, args, safeMode := ParseArgs([]string{})
+	cmd, args, safeMode, _ := ParseArgs([]string{})
 
 	if cmd != "" {
 		t.Errorf("expected empty command, got %q", cmd)
@@ -58,13 +61,27 @@ func TestParseArgs_Empty(t *testing.T) {
 }
 
 func TestParseArgs_OnlySafeMode(t *testing.T) {
-	cmd, _, safeMode := ParseArgs([]string{"--safe-mode"})
+	cmd, _, safeMode, _ := ParseArgs([]string{"--safe-mode"})
 
 	if cmd != "" {
 		t.Errorf("expected empty command, got %q", cmd)
 	}
 	if !safeMode {
 		t.Error("expected safeMode to be true")
+	}
+}
+
+func TestParseArgs_WithDryRun(t *testing.T) {
+	cmd, args, _, dryRun := ParseArgs([]string{"--dry-run", "run", "workflow.yaml"})
+
+	if cmd != "run" {
+		t.Errorf("expected command 'run', got %q", cmd)
+	}
+	if len(args) != 1 || args[0] != "workflow.yaml" {
+		t.Errorf("expected args ['workflow.yaml'], got %v", args)
+	}
+	if !dryRun {
+		t.Error("expected dryRun to be true")
 	}
 }
 

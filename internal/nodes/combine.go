@@ -16,6 +16,22 @@ func (n *CombineNode) Name() string {
 	return "combine"
 }
 
+func (n *CombineNode) Description() string {
+	return "Combine multiple inputs into one"
+}
+
+func (n *CombineNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "combine",
+		Description: "Combine multiple inputs into one",
+		Input:       "string - input text to format",
+		Output:      "string - formatted output",
+		Params: []ParamSchema{
+			{Name: "format", Type: "string", Description: "Output format: text, markdown, csv, json (default: text)", Required: false, Default: "text"},
+		},
+	}
+}
+
 func (n *CombineNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	format, ok := params["format"]
 	if !ok || format == "" {
