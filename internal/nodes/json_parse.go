@@ -34,6 +34,11 @@ func (n *JSONParseNode) Schema() NodeSchema {
 }
 
 func (n *JSONParseNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	// Limit input size to prevent OOM
+	if len(input) > maxHTTPResponseSize {
+		return "", fmt.Errorf("input too large for JSON parsing (max %d bytes)", maxHTTPResponseSize)
+	}
+
 	var data interface{}
 	if err := json.Unmarshal([]byte(input), &data); err != nil {
 		return "", fmt.Errorf("failed to parse JSON: %w", err)

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -20,6 +21,9 @@ var allowedCommands = map[string]bool{
 	"npm": true, "npx": true, "yarn": true, "pnpm": true,
 	"docker": true, "kubectl": true, "kubectx": true,
 }
+
+// shellMetachars detects shell metacharacters that can be used for command injection
+var shellMetachars = regexp.MustCompile("[;|&$`(){ }]")
 
 var allowListEnabled = false
 var auditLogFile string
@@ -67,7 +71,11 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 		return "", fmt.Errorf("command parameter is required")
 	}
 
+	// When allowlist is enabled, block shell metacharacters to prevent injection
 	if allowListEnabled {
+		if shellMetachars.MatchString(command) {
+			return "", fmt.Errorf("shell metacharacters (;|&$`{} etc.) are not allowed when allowlist is enabled")
+		}
 		firstWord := strings.Fields(command)
 		if len(firstWord) > 0 {
 			cmdName := filepath.Base(firstWord[0])
@@ -89,6 +97,20 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 	return strings.TrimSpace(string(output)), nil
 }
 
+// redactCommandForLog removes potential secrets from command before logging
+func redactCommandForLog(command string) string {
+	// Redact common patterns: Bearer tokens, API keys, passwords
+	tokenPattern := regexp.MustCompile(`(?i)(bearer\s+|api[_-]?key=|password=|token=|secret=)([^\s]+)`)
+	return tokenPattern.ReplaceAllString(command, "${1}****")
+}
+
+// escapeLogContent prevents log injection by escaping control characters
+func escapeLogContent(s string) string {
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	s = strings.ReplaceAll(s, "\r", "\\r")
+	return s
+}
+
 func auditLog(command string) {
 	if auditLogFile == "" {
 		return
@@ -97,11 +119,14 @@ func auditLog(command string) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return
 	}
-	f, err := os.OpenFile(auditLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// Use 0600 to prevent other users from reading potentially sensitive commands
+	f, err := os.OpenFile(auditLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return
 	}
 	defer f.Close()
 	timestamp := time.Now().Format(time.RFC3339)
-	fmt.Fprintf(f, "[%s] %s\n", timestamp, command)
+	redacted := redactCommandForLog(command)
+	escaped := escapeLogContent(redacted)
+	fmt.Fprintf(f, "[%s] %s\n", timestamp, escaped)
 }

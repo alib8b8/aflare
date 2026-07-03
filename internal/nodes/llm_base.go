@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -109,6 +110,11 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		endpoint = config.GetEndpoint(n.config.Name, n.config.EnvAPIKey+"_ENDPOINT", n.config.DefaultEndpoint)
 	}
 
+	// Validate endpoint URL to prevent SSRF + API key leakage
+	if err := validateLMLEndpoint(endpoint); err != nil {
+		return "", fmt.Errorf("endpoint URL validation failed: %w", err)
+	}
+
 	generateURL := fmt.Sprintf("%s/chat/completions", endpoint)
 
 	systemPrompt, _ := params["system"]
@@ -137,7 +143,8 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	client := &http.Client{
-		Timeout: 120 * time.Second,
+		Timeout:       120 * time.Second,
+		CheckRedirect: httpRedirectValidator(validateLMLEndpoint),
 	}
 
 	resp, err := client.Do(req)
@@ -148,7 +155,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 
 	if resp.StatusCode != http.StatusOK {
 		var errResp LLMResponse
-		json.NewDecoder(resp.Body).Decode(&errResp)
+		json.NewDecoder(io.LimitReader(resp.Body, maxHTTPResponseSize)).Decode(&errResp)
 		if errResp.Error != nil && errResp.Error.Message != "" {
 			return "", fmt.Errorf("%s API error (%d): %s", n.config.ProviderName, resp.StatusCode, errResp.Error.Message)
 		}

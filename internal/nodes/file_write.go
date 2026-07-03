@@ -46,7 +46,7 @@ func (n *FileWriteNode) Execute(ctx context.Context, input string, params map[st
 		return "", fmt.Errorf("path validation failed: %w", err)
 	}
 
-	err = os.WriteFile(safePath, []byte(input), 0644)
+	err = os.WriteFile(safePath, []byte(input), 0600)
 	if err != nil {
 		return "", fmt.Errorf("failed to write file: %w", err)
 	}

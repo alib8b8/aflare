@@ -3,6 +3,7 @@ package nodes
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -20,13 +21,22 @@ func init() {
 	}
 }
 
+// httpRedirectValidator returns an http.Client CheckRedirect function that
+// validates each redirect target with the given validator (validateURL for
+// general HTTP, validateLMLEndpoint for LLM endpoints). It also caps the
+// number of redirects to prevent redirect loops.
+func httpRedirectValidator(validator func(string) error) func(*http.Request, []*http.Request) error {
+	return func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return fmt.Errorf("too many redirects")
+		}
+		return validator(req.URL.String())
+	}
+}
+
 func safeJoinPath(baseDir, userPath string) (string, error) {
 	if userPath == "" {
 		return "", fmt.Errorf("path is empty")
-	}
-
-	if strings.Contains(userPath, "..") {
-		return "", fmt.Errorf("path traversal detected: '..' is not allowed in path")
 	}
 
 	cleanPath := filepath.Clean(userPath)
@@ -49,8 +59,18 @@ func safeJoinPath(baseDir, userPath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("path validation failed: %w", err)
 	}
-	if strings.HasPrefix(relPath, "..") {
+	if strings.HasPrefix(relPath, "..") || relPath == ".." {
 		return "", fmt.Errorf("path escapes the allowed directory")
+	}
+
+	// Resolve symlinks to prevent symlink-based bypass
+	resolvedPath, err := filepath.EvalSymlinks(absFullPath)
+	if err == nil {
+		resolvedRel, err := filepath.Rel(absBase, resolvedPath)
+		if err != nil || strings.HasPrefix(resolvedRel, "..") {
+			return "", fmt.Errorf("path escapes the allowed directory (symlink)")
+		}
+		return resolvedPath, nil
 	}
 
 	return absFullPath, nil
@@ -72,6 +92,12 @@ func validateWritePath(path string) (string, error) {
 		return "", err
 	}
 
+	// Reject dotfiles (e.g. .bashrc, .ssh/authorized_keys)
+	baseName := filepath.Base(safePath)
+	if strings.HasPrefix(baseName, ".") {
+		return "", fmt.Errorf("dotfiles are not allowed for writing")
+	}
+
 	ext := strings.ToLower(filepath.Ext(safePath))
 	allowedExts := map[string]bool{
 		".txt":  true,
@@ -79,17 +105,10 @@ func validateWritePath(path string) (string, error) {
 		".yaml": true,
 		".yml":  true,
 		".json": true,
-		".html": true,
 		".csv":  true,
 		".xml":  true,
 		".log":  true,
-		".py":   true,
-		".sh":   true,
-		".go":   true,
-		".js":   true,
-		".ts":   true,
 		".css":  true,
-		".svg":  true,
 		".png":  true,
 		".jpg":  true,
 		".jpeg": true,
@@ -122,56 +141,187 @@ func validateURL(rawURL string) error {
 		return fmt.Errorf("only http and https URLs are allowed, got: %s", u.Scheme)
 	}
 
-	host := u.Hostname()
+	// Block userinfo to prevent credential injection
+	if u.User != nil {
+		return fmt.Errorf("URLs with userinfo (credentials) are not allowed")
+	}
 
+	host := u.Hostname()
 	if host == "" {
 		return fmt.Errorf("URL has no host")
 	}
 
 	// Block localhost variants
 	lowerHost := strings.ToLower(host)
-	if lowerHost == "localhost" || lowerHost == "localhost.localdomain" {
+	localhostVariants := map[string]bool{
+		"localhost":           true,
+		"localhost.localdomain": true,
+		"ip6-localhost":       true,
+		"ip6-loopback":        true,
+	}
+	if localhostVariants[lowerHost] {
 		return fmt.Errorf("access to localhost is not allowed")
 	}
 
-	// Try to parse as IP
+	// Try to parse as IP first
 	ip := net.ParseIP(host)
 	if ip != nil {
-		if ip.IsLoopback() {
-			return fmt.Errorf("access to loopback address %s is not allowed", host)
+		if err := validateIP(ip, host); err != nil {
+			return err
 		}
-		if ip.IsPrivate() {
-			return fmt.Errorf("access to private address %s is not allowed", host)
+	} else {
+		// DNS-resolve the hostname to prevent domain-based SSRF
+		ips, err := net.LookupIP(host)
+		if err != nil {
+			return fmt.Errorf("failed to resolve host %s: %w", host, err)
 		}
-		if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-			return fmt.Errorf("access to link-local address %s is not allowed", host)
-		}
-		if isReservedIP(ip) {
-			return fmt.Errorf("access to reserved address %s is not allowed", host)
+		for _, resolvedIP := range ips {
+			if err := validateIP(resolvedIP, host); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
+func validateIP(ip net.IP, displayHost string) error {
+	if ip.IsLoopback() {
+		return fmt.Errorf("access to loopback address %s is not allowed", displayHost)
+	}
+	if ip.IsPrivate() {
+		return fmt.Errorf("access to private address %s is not allowed", displayHost)
+	}
+	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return fmt.Errorf("access to link-local address %s is not allowed", displayHost)
+	}
+	if ip.IsUnspecified() {
+		return fmt.Errorf("access to unspecified address %s is not allowed", displayHost)
+	}
+	if ip.IsMulticast() {
+		return fmt.Errorf("access to multicast address %s is not allowed", displayHost)
+	}
+	if isReservedIP(ip) {
+		return fmt.Errorf("access to reserved address %s is not allowed", displayHost)
+	}
+	return nil
+}
+
+// validateLMLEndpoint validates an LLM API endpoint URL. It is similar to
+// validateURL but allows loopback/localhost addresses, because LLM servers
+// (e.g. Ollama, llama.cpp) commonly run on http://localhost:11434.
+// Non-loopback private addresses and other dangerous ranges remain blocked.
+func validateLMLEndpoint(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("only http and https URLs are allowed, got: %s", u.Scheme)
+	}
+
+	// Block userinfo to prevent credential leakage
+	if u.User != nil {
+		return fmt.Errorf("URLs with userinfo (credentials) are not allowed")
+	}
+
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("URL has no host")
+	}
+
+	// Allow loopback and localhost variants for LLM endpoints
+	lowerHost := strings.ToLower(host)
+	localhostVariants := map[string]bool{
+		"localhost":             true,
+		"localhost.localdomain": true,
+		"ip6-localhost":         true,
+		"ip6-loopback":          true,
+	}
+	if localhostVariants[lowerHost] {
+		return nil
+	}
+
+	// Try to parse as IP first
+	ip := net.ParseIP(host)
+	if ip != nil {
+		return validateLMLEndpointIP(ip, host)
+	}
+
+	// DNS-resolve the hostname to prevent domain-based SSRF
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return fmt.Errorf("failed to resolve host %s: %w", host, err)
+	}
+	for _, resolvedIP := range ips {
+		if err := validateLMLEndpointIP(resolvedIP, host); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateLMLEndpointIP validates an IP for LLM endpoints. Loopback is allowed,
+// but other private/reserved ranges are still blocked.
+func validateLMLEndpointIP(ip net.IP, displayHost string) error {
+	if ip.IsLoopback() {
+		return nil
+	}
+	if ip.IsPrivate() {
+		return fmt.Errorf("access to private address %s is not allowed", displayHost)
+	}
+	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return fmt.Errorf("access to link-local address %s is not allowed", displayHost)
+	}
+	if ip.IsUnspecified() {
+		return fmt.Errorf("access to unspecified address %s is not allowed", displayHost)
+	}
+	if ip.IsMulticast() {
+		return fmt.Errorf("access to multicast address %s is not allowed", displayHost)
+	}
+	if isReservedIP(ip) {
+		return fmt.Errorf("access to reserved address %s is not allowed", displayHost)
+	}
+	return nil
+}
+
 func isReservedIP(ip net.IP) bool {
+	// Use To4() to handle both IPv4 and IPv4-mapped IPv6 addresses
+	ip4 := ip.To4()
+	if ip4 == nil {
+		// Pure IPv6 - block ULA (fc00::/7)
+		if len(ip) == 16 && ip[0]&0xfe == 0xfc {
+			return true
+		}
+		return false
+	}
+
 	// 0.0.0.0/8
-	if len(ip) == 4 && ip[0] == 0 {
+	if ip4[0] == 0 {
 		return true
 	}
-	// 169.254.0.0/16 (already handled by IsLinkLocalUnicast but double-check)
-	if len(ip) == 4 && ip[0] == 169 && ip[1] == 254 {
+	// 169.254.0.0/16 (link-local, also caught by IsLinkLocalUnicast but double-check)
+	if ip4[0] == 169 && ip4[1] == 254 {
 		return true
 	}
-	// 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24 (TEST-NET)
-	if len(ip) == 4 && ip[0] == 192 && ip[1] == 0 && ip[2] == 2 {
+	// 192.0.2.0/24 (TEST-NET-1)
+	if ip4[0] == 192 && ip4[1] == 0 && ip4[2] == 2 {
 		return true
 	}
-	if len(ip) == 4 && ip[0] == 198 && ip[1] == 51 && ip[2] == 100 {
+	// 198.51.100.0/24 (TEST-NET-2)
+	if ip4[0] == 198 && ip4[1] == 51 && ip4[2] == 100 {
 		return true
 	}
-	if len(ip) == 4 && ip[0] == 203 && ip[1] == 0 && ip[2] == 113 {
+	// 203.0.113.0/24 (TEST-NET-3)
+	if ip4[0] == 203 && ip4[1] == 0 && ip4[2] == 113 {
 		return true
 	}
+	// 100.64.0.0/10 (CGNAT)
+	if ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 {
+		return true
+	}
+
 	return false
 }

@@ -68,6 +68,11 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 		endpoint = "http://localhost:11434"
 	}
 
+	// Validate endpoint URL to prevent SSRF (localhost is allowed for Ollama)
+	if err := validateLMLEndpoint(endpoint); err != nil {
+		return "", fmt.Errorf("endpoint URL validation failed: %w", err)
+	}
+
 	generateURL := fmt.Sprintf("%s/api/generate", endpoint)
 
 	reqBody := ollamaRequest{
@@ -88,7 +93,8 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{
-		Timeout: 120 * time.Second,
+		Timeout:       120 * time.Second,
+		CheckRedirect: httpRedirectValidator(validateLMLEndpoint),
 	}
 
 	resp, err := client.Do(req)

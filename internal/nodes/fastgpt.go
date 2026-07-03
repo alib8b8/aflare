@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -99,6 +100,11 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 		endpoint = "https://fastgpt.in/api/v1"
 	}
 
+	// Validate endpoint URL to prevent SSRF + API key leakage
+	if err := validateLMLEndpoint(endpoint); err != nil {
+		return "", fmt.Errorf("endpoint URL validation failed: %w", err)
+	}
+
 	generateURL := fmt.Sprintf("%s/chat/completions", endpoint)
 
 	systemPrompt, _ := params["system"]
@@ -128,7 +134,8 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	client := &http.Client{
-		Timeout: 120 * time.Second,
+		Timeout:       120 * time.Second,
+		CheckRedirect: httpRedirectValidator(validateLMLEndpoint),
 	}
 
 	resp, err := client.Do(req)
@@ -139,7 +146,7 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 
 	if resp.StatusCode != http.StatusOK {
 		var errResp fastGPTResponse
-		json.NewDecoder(resp.Body).Decode(&errResp)
+		json.NewDecoder(io.LimitReader(resp.Body, maxHTTPResponseSize)).Decode(&errResp)
 		if errResp.Error != nil && errResp.Error.Message != "" {
 			return "", fmt.Errorf("FastGPT API error (%d): %s", resp.StatusCode, errResp.Error.Message)
 		}

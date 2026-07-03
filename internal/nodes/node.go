@@ -1,6 +1,7 @@
 package nodes
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -100,13 +101,23 @@ func (e *ExternalNode) Schema() NodeSchema {
 
 // Execute implements the Node interface
 func (e *ExternalNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
-	// Create input payload
+	// Create input payload (filter out sensitive keys)
+	safeParams := make(map[string]string)
+	for k, v := range params {
+		// Don't pass API keys to external scripts
+		lowerKey := strings.ToLower(k)
+		if strings.Contains(lowerKey, "api_key") || strings.Contains(lowerKey, "token") || strings.Contains(lowerKey, "secret") || strings.Contains(lowerKey, "password") {
+			continue
+		}
+		safeParams[k] = v
+	}
+
 	payload := struct {
 		Input  string            `json:"input"`
 		Params map[string]string `json:"params"`
 	}{
 		Input:  input,
-		Params: params,
+		Params: safeParams,
 	}
 
 	payloadJSON, err := json.Marshal(payload)
@@ -114,29 +125,40 @@ func (e *ExternalNode) Execute(ctx context.Context, input string, params map[str
 		return "", fmt.Errorf("failed to serialize input: %w", err)
 	}
 
-	// Build command
+	// Validate entry path to prevent path traversal
 	entryPath := filepath.Join(e.nodePath, e.metadata.Entry)
+	absEntryPath, err := filepath.Abs(entryPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve entry path: %w", err)
+	}
+	// Ensure entry path is within nodePath
+	relPath, err := filepath.Rel(e.nodePath, absEntryPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		return "", fmt.Errorf("entry path escapes node directory")
+	}
+	entryPath = absEntryPath
+
+	// Verify file exists and is not a symlink
+	info, err := os.Lstat(entryPath)
+	if err != nil {
+		return "", fmt.Errorf("entry file not found: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("symlink entry files are not allowed")
+	}
+
 	var cmd *exec.Cmd
 
 	if strings.HasSuffix(entryPath, ".py") {
-		cmd = exec.CommandContext(ctx, "python", entryPath)
+		cmd = exec.CommandContext(ctx, "python3", entryPath)
 	} else if strings.HasSuffix(entryPath, ".sh") {
 		cmd = exec.CommandContext(ctx, "bash", entryPath)
 	} else {
-		// Assume binary or executable script
-		cmd = exec.CommandContext(ctx, entryPath)
+		return "", fmt.Errorf("only .py and .sh entry files are allowed")
 	}
 
-	// Set stdin to payload
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return "", fmt.Errorf("failed to create stdin pipe: %w", err)
-	}
-
-	go func() {
-		defer stdin.Close()
-		stdin.Write(payloadJSON)
-	}()
+	// Set stdin via reader instead of pipe to avoid goroutine
+	cmd.Stdin = bytes.NewReader(payloadJSON)
 
 	// Capture stdout
 	stdout, err := cmd.Output()
