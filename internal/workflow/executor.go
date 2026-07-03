@@ -12,6 +12,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Security limits
+const (
+	MaxSteps        = 1000  // Maximum number of steps in a workflow
+	MaxParallel     = 50    // Maximum parallel steps in a single step
+	MaxRetry        = 10    // Maximum retry count per step
+	MaxFileSize     = 10 * 1024 * 1024 // 10MB max workflow file size
+	MaxStepTimeout  = 30 * time.Minute // Maximum per-step timeout
+	MaxRetryDelay   = 5 * time.Minute  // Maximum retry delay
+)
+
 // StepResult stores the result of executing a single step
 type StepResult struct {
 	StepIndex int
@@ -31,6 +41,9 @@ func init() {
 		case *Workflow:
 			workflow = v
 		case string:
+			if len(v) > MaxFileSize {
+				return "", nil, fmt.Errorf("workflow content too large (max %d bytes)", MaxFileSize)
+			}
 			if err := yaml.Unmarshal([]byte(v), &workflow); err != nil {
 				return "", nil, fmt.Errorf("failed to parse workflow YAML: %w", err)
 			}
@@ -58,6 +71,11 @@ func ExecuteWorkflow(ctx context.Context, wf *Workflow, reg *nodes.Registry) (st
 
 // ExecuteWorkflowWithTUI executes the workflow and sends messages to a TUI program
 func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, error) {
+	// Validate step count
+	if len(wf.Steps) > MaxSteps {
+		return "", nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
+	}
+
 	logger.Info("workflow execution started", "name", wf.Name, "steps", len(wf.Steps))
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
@@ -87,6 +105,8 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 			}
 			results = append(results, parallelResults...)
 			data = output
+			// Register parallel output for expression reference
+			engine.SetStepOutput(i, "parallel", output)
 			continue
 		}
 
@@ -150,8 +170,17 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 		}
 
 		retryCount := wStep.GetRetryCount()
+		if retryCount > MaxRetry {
+			retryCount = MaxRetry
+		}
 		retryDelay := wStep.GetRetryDelay()
+		if retryDelay > MaxRetryDelay {
+			retryDelay = MaxRetryDelay
+		}
 		stepTimeout := wStep.GetTimeout()
+		if stepTimeout > MaxStepTimeout {
+			stepTimeout = MaxStepTimeout
+		}
 
 		var output string
 		var execErr error
@@ -168,7 +197,6 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 			} else {
 				stepCtx, stepCancel = context.WithCancel(timeoutCtx)
 			}
-			defer stepCancel()
 
 			if program != nil {
 				if streamingNode, ok := node.(nodes.StreamingNode); ok {
@@ -188,6 +216,8 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 			}
 			duration = time.Since(attemptStart)
 
+			stepCancel()
+
 			if execErr == nil {
 				break
 			}
@@ -195,7 +225,12 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 			logger.Warn("step failed, retrying", "index", i, "node", wStep.Node, "attempt", attempt, "max", maxAttempts, "error", execErr)
 
 			if attempt < maxAttempts {
-				time.Sleep(retryDelay)
+				// Use context-aware sleep instead of time.Sleep
+				select {
+				case <-time.After(retryDelay):
+				case <-timeoutCtx.Done():
+					return "", results, fmt.Errorf("workflow timed out during retry delay")
+				}
 			}
 		}
 
@@ -247,6 +282,11 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 }
 
 func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep, input string, engine *ExpressionEngine, reg *nodes.Registry, program *tea.Program) ([]StepResult, string, error) {
+	// Limit parallel step count
+	if len(wStep.Parallel) > MaxParallel {
+		return nil, "", fmt.Errorf("too many parallel steps (%d, max %d)", len(wStep.Parallel), MaxParallel)
+	}
+
 	logger.Info("parallel step started", "index", stepIndex, "parallel_count", len(wStep.Parallel))
 
 	type parallelResult struct {
@@ -293,30 +333,42 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 				return
 			}
 
+			retryCount := step.GetRetryCount()
+			if retryCount > MaxRetry {
+				retryCount = MaxRetry
+			}
+			retryDelay := step.GetRetryDelay()
+			if retryDelay > MaxRetryDelay {
+				retryDelay = MaxRetryDelay
+			}
+
 			var output string
 			var execErr error
-			stepTimeout := step.GetTimeout()
-
-			var stepCtx context.Context
-			var stepCancel context.CancelFunc
-			if stepTimeout > 0 {
-				stepCtx, stepCancel = context.WithTimeout(ctx, stepTimeout)
-			} else {
-				stepCtx, stepCancel = context.WithCancel(ctx)
-			}
-			defer stepCancel()
-
-			retryCount := step.GetRetryCount()
-			retryDelay := step.GetRetryDelay()
 			maxAttempts := retryCount + 1
 
 			for attempt := 1; attempt <= maxAttempts; attempt++ {
+				var stepCtx context.Context
+				var stepCancel context.CancelFunc
+				stepTimeout := step.GetTimeout()
+				if stepTimeout > 0 {
+					stepCtx, stepCancel = context.WithTimeout(ctx, stepTimeout)
+				} else {
+					stepCtx, stepCancel = context.WithCancel(ctx)
+				}
+
 				output, execErr = node.Execute(stepCtx, input, evaluatedParams)
+				stepCancel()
+
 				if execErr == nil {
 					break
 				}
 				if attempt < maxAttempts {
-					time.Sleep(retryDelay)
+					select {
+					case <-time.After(retryDelay):
+					case <-ctx.Done():
+						execErr = ctx.Err()
+						break
+					}
 				}
 			}
 

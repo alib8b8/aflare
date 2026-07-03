@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const maxHTTPResponseSize = 10 * 1024 * 1024 // 10MB max response body
+
 type HTTPRequestNode struct{}
 
 func init() {
@@ -40,6 +42,14 @@ func (n *HTTPRequestNode) Schema() NodeSchema {
 	}
 }
 
+// sensitiveHeaders that should not be set by workflow params
+var sensitiveHeaders = map[string]bool{
+	"host":           true,
+	"authorization":  true,
+	"cookie":         true,
+	"set-cookie":     true,
+}
+
 func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	url, ok := params["url"]
 	if !ok || url == "" {
@@ -55,6 +65,15 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 		method = "GET"
 	}
 	method = strings.ToUpper(method)
+
+	// Validate HTTP method
+	allowedMethods := map[string]bool{
+		"GET": true, "POST": true, "PUT": true,
+		"DELETE": true, "PATCH": true, "HEAD": true,
+	}
+	if !allowedMethods[method] {
+		return "", fmt.Errorf("HTTP method %q is not allowed", method)
+	}
 
 	body := input
 	if customBody, ok := params["body"]; ok && customBody != "" {
@@ -89,20 +108,30 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 			if len(parts) == 2 {
 				key := strings.TrimSpace(parts[0])
 				value := strings.TrimSpace(parts[1])
+				// Reject CRLF injection and sensitive headers
+				if strings.ContainsAny(key, "\r\n") || strings.ContainsAny(value, "\r\n") {
+					return "", fmt.Errorf("CRLF characters are not allowed in headers")
+				}
+				if sensitiveHeaders[strings.ToLower(key)] {
+					return "", fmt.Errorf("setting sensitive header %q is not allowed", key)
+				}
 				req.Header.Set(key, value)
 			}
 		}
 	}
 
-	timeout := 60 * time.Second
+	// Parse timeout: accept both "30" (seconds) and "30s" (duration)
+	timeout := 30 * time.Second
 	if timeoutStr, ok := params["timeout"]; ok && timeoutStr != "" {
-		if t, err := time.ParseDuration(timeoutStr); err == nil {
+		if t, err := time.ParseDuration(timeoutStr); err == nil && t > 0 && t <= 5*time.Minute {
 			timeout = t
 		}
 	}
 
+	// Custom redirect policy: validate each redirect target for SSRF
 	client := &http.Client{
-		Timeout: timeout,
+		Timeout:       timeout,
+		CheckRedirect: httpRedirectValidator(validateURL),
 	}
 
 	resp, err := client.Do(req)
@@ -111,7 +140,8 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	// Limit response body size to prevent OOM
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxHTTPResponseSize))
 	if err != nil {
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}

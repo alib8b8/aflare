@@ -54,7 +54,9 @@ func TestValidateWritePath_AllowedExtensions(t *testing.T) {
 	workDir = tmpDir
 	defer func() { workDir = oldWorkDir }()
 
-	allowedExts := []string{".txt", ".md", ".yaml", ".json", ".py", ".sh", ".go"}
+	// Note: .py/.sh/.go are intentionally NOT allowed for file_write to prevent
+	// writing executable/script files; only data/document extensions are allowed.
+	allowedExts := []string{".txt", ".md", ".yaml", ".yml", ".json", ".csv", ".xml", ".log"}
 	for _, ext := range allowedExts {
 		path := "test" + ext
 		_, err := validateWritePath(path)
@@ -258,11 +260,13 @@ func TestRegistry_SafeMode(t *testing.T) {
 }
 
 func TestValidateURL_Valid(t *testing.T) {
+	// Note: URLs with userinfo (user:pass@host) are blocked to prevent
+	// credential injection. LLM endpoints that need loopback should use
+	// validateLMLEndpoint instead.
 	validURLs := []string{
 		"https://example.com",
 		"http://example.com/path",
 		"https://api.openai.com/v1/chat/completions",
-		"https://user:pass@example.com",
 	}
 	for _, u := range validURLs {
 		err := validateURL(u)
@@ -316,6 +320,78 @@ func TestValidateURL_InvalidScheme(t *testing.T) {
 		if err == nil {
 			t.Errorf("expected error for %s", u)
 		}
+	}
+}
+
+func TestValidateURL_UserInfoBlocked(t *testing.T) {
+	// URLs with userinfo (user:pass@host) must be blocked to prevent
+	// credential injection.
+	blocked := []string{
+		"https://user:pass@example.com",
+		"http://admin:secret@127.0.0.1/",
+	}
+	for _, u := range blocked {
+		err := validateURL(u)
+		if err == nil {
+			t.Errorf("expected error for userinfo URL %s", u)
+		}
+	}
+}
+
+func TestValidateLMLEndpoint_AllowsLoopback(t *testing.T) {
+	// LLM endpoints (e.g. Ollama) commonly run on localhost/loopback and
+	// must be allowed by validateLMLEndpoint.
+	allowed := []string{
+		"http://localhost:11434",
+		"http://127.0.0.1:11434",
+		"https://localhost:8080",
+		"http://[::1]:11434",
+	}
+	for _, u := range allowed {
+		err := validateLMLEndpoint(u)
+		if err != nil {
+			t.Errorf("expected no error for LLM endpoint %s, got: %v", u, err)
+		}
+	}
+}
+
+func TestValidateLMLEndpoint_BlocksPrivate(t *testing.T) {
+	// Non-loopback private/reserved ranges must still be blocked to prevent
+	// SSRF via the LLM endpoint parameter.
+	blocked := []string{
+		"http://192.168.1.1:11434",
+		"http://10.0.0.1:11434",
+		"http://172.16.0.1:11434",
+		"http://169.254.1.1:11434",
+		"http://0.0.0.0:11434",
+	}
+	for _, u := range blocked {
+		err := validateLMLEndpoint(u)
+		if err == nil {
+			t.Errorf("expected error for private LLM endpoint %s", u)
+		}
+	}
+}
+
+func TestValidateLMLEndpoint_BlocksBadScheme(t *testing.T) {
+	blocked := []string{
+		"file:///etc/passwd",
+		"ftp://localhost:11434",
+		"gopher://localhost",
+	}
+	for _, u := range blocked {
+		err := validateLMLEndpoint(u)
+		if err == nil {
+			t.Errorf("expected error for %s", u)
+		}
+	}
+}
+
+func TestValidateLMLEndpoint_BlocksUserinfo(t *testing.T) {
+	// Even for LLM endpoints, userinfo must be blocked to avoid credential
+	// leakage.
+	if err := validateLMLEndpoint("http://user:pass@localhost:11434"); err == nil {
+		t.Error("expected error for userinfo in LLM endpoint")
 	}
 }
 

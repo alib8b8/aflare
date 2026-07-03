@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/alib8b8/llm-box/internal/nodes"
@@ -189,7 +188,9 @@ func TestE2E_ChainedWorkflow(t *testing.T) {
 	reg := nodes.NewRegistry()
 	nodes.RegisterBuiltins(reg)
 
-	subWorkflowPath := filepath.Join(os.TempDir(), "e2e_sub_workflow.yaml")
+	// Use a relative path so the call node's path validation (which rejects
+	// absolute paths to prevent arbitrary file reads) accepts it.
+	subWorkflowPath := "e2e_sub_workflow.yaml"
 	defer os.Remove(subWorkflowPath)
 
 	subWorkflowContent := `

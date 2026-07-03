@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/alib8b8/llm-box/internal/logger"
 )
@@ -176,6 +177,16 @@ func InstallNode(name string) error {
 }
 
 func downloadNode(node *NodeInfo) error {
+	// Validate node name to prevent path traversal
+	if !isValidNodeName(node.Name) {
+		return fmt.Errorf("invalid node name: %q (only alphanumeric, hyphens, underscores allowed)", node.Name)
+	}
+
+	// Validate URL scheme
+	if !strings.HasPrefix(node.URL, "https://") && !strings.HasPrefix(node.URL, "http://") {
+		return fmt.Errorf("invalid node URL: must be http or https")
+	}
+
 	logger.Info("installing node", "name", node.Name, "url", node.URL)
 
 	resp, err := http.Get(node.URL)
@@ -188,7 +199,8 @@ func downloadNode(node *NodeInfo) error {
 		return fmt.Errorf("download failed with status %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	// Limit download size to prevent OOM
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1*1024*1024)) // 1MB max node file
 	if err != nil {
 		return fmt.Errorf("failed to read node data: %w", err)
 	}
@@ -199,12 +211,25 @@ func downloadNode(node *NodeInfo) error {
 	}
 
 	filePath := filepath.Join(nodesDir, node.Name+".yaml")
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
+	if err := os.WriteFile(filePath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write node file: %w", err)
 	}
 
 	logger.Info("node installed", "name", node.Name, "path", filePath)
 	return nil
+}
+
+// isValidNodeName checks if a node name is safe for filesystem use
+func isValidNodeName(name string) bool {
+	if name == "" || len(name) > 100 {
+		return false
+	}
+	for _, c := range name {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 func GetNodesDir() (string, error) {

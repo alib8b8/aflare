@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const maxFetchURLSize = 10 * 1024 * 1024 // 10MB max response body for fetch_url
+
 // FetchURLNode fetches content from a URL
 type FetchURLNode struct{}
 
@@ -52,7 +54,7 @@ func (n *FetchURLNode) Execute(ctx context.Context, input string, params map[str
 	if input != "" && looksLikeURL(input) {
 		url = input
 	} else {
-		url, _ = params["url"]
+		url = params["url"]
 	}
 
 	if url == "" {
@@ -72,9 +74,18 @@ func (n *FetchURLNode) Execute(ctx context.Context, input string, params map[str
 	// Set user agent
 	req.Header.Set("User-Agent", "llm-box/1.0")
 
-	// Set up HTTP client with timeout
+	// Parse timeout from params
+	timeout := 30 * time.Second
+	if timeoutStr, ok := params["timeout"]; ok && timeoutStr != "" {
+		if t, err := time.ParseDuration(timeoutStr); err == nil && t > 0 && t <= 5*time.Minute {
+			timeout = t
+		}
+	}
+
+	// Custom redirect policy: validate each redirect target for SSRF
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout:       timeout,
+		CheckRedirect: httpRedirectValidator(validateURL),
 	}
 
 	// Send request
@@ -89,8 +100,8 @@ func (n *FetchURLNode) Execute(ctx context.Context, input string, params map[str
 		return "", fmt.Errorf("received status %d from URL", resp.StatusCode)
 	}
 
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
+	// Read response body with size limit
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxFetchURLSize))
 	if err != nil {
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
