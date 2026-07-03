@@ -1,0 +1,21 @@
+*       @alib8b8
+
+# Core components
+/internal/           @alib8b8
+/cmd/                @alib8b8
+
+# Documentation
+/docs/               @alib8b8
+/README*.md          @alib8b8
+
+# Examples
+/examples/           @alib8b8
+
+# OpenClaw adapter
+/contrib/openclaw/   @alib8b8
+
+# CI/CD workflows
+/.github/workflows/  @alib8b8
+
+# External nodes
+/nodes/              @alib8b8
