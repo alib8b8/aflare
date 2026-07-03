@@ -26,11 +26,11 @@ type cozeMessage struct {
 }
 
 type cozeRequest struct {
-	Model       string         `json:"model"`
-	Messages    []cozeMessage  `json:"messages"`
-	Temperature float64        `json:"temperature,omitempty"`
-	MaxTokens   int            `json:"max_tokens,omitempty"`
-	Stream      bool           `json:"stream"`
+	Model       string        `json:"model"`
+	Messages    []cozeMessage `json:"messages"`
+	Temperature float64       `json:"temperature,omitempty"`
+	MaxTokens   int           `json:"max_tokens,omitempty"`
+	Stream      bool          `json:"stream"`
 }
 
 type cozeChoice struct {

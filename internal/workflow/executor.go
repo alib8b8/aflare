@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/tui"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // StepResult stores the result of executing a single step

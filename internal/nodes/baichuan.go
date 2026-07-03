@@ -26,11 +26,11 @@ type baichuanMessage struct {
 }
 
 type baichuanRequest struct {
-	Model       string           `json:"model"`
+	Model       string            `json:"model"`
 	Messages    []baichuanMessage `json:"messages"`
-	Temperature float64          `json:"temperature,omitempty"`
-	MaxTokens   int              `json:"max_tokens,omitempty"`
-	Stream      bool             `json:"stream"`
+	Temperature float64           `json:"temperature,omitempty"`
+	MaxTokens   int               `json:"max_tokens,omitempty"`
+	Stream      bool              `json:"stream"`
 }
 
 type baichuanChoice struct {
