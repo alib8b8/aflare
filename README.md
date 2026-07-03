@@ -2,7 +2,7 @@
   <img src="docs/logo.svg" alt="llm-box" width="200" />
   <h1>llm-box</h1>
   <p><strong>Build terminal workflows using plain English</strong></p>
-<p>Describe what you want. llm-box generates the YAML and executes it.</p>
+<p>Describe what you want. llm-box generates YAML from patterns and executes it.</p>
 
   <p>
     <a href="https://github.com/alib8b8/llm-box/releases">
@@ -50,7 +50,7 @@ Invoke-WebRequest -Uri "https://github.com/alib8b8/llm-box/releases/latest/downl
 Create and run your first workflow:
 
 ```bash
-# Create
+# Create (pattern-based workflow scaffolding)
 llm-box create "fetch Hacker News top stories and save to stories.txt"
 
 # Run

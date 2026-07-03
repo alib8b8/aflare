@@ -86,7 +86,7 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 		}
 	}
 	if urlMatch != "" {
-		step := Step{Node: "fetch_url", Params: map[string]string{"url": urlMatch}}
+		step := WorkflowStep{Node: "fetch_url", Params: map[string]string{"url": urlMatch}}
 		wf.Steps = append(wf.Steps, step)
 	}
 
@@ -95,27 +95,26 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	fileMatch := fileRegex.FindStringSubmatch(desc)
 	if len(fileMatch) >= 3 {
 		path := fileMatch[2]
-		step := Step{Node: "file_write", Params: map[string]string{"path": path}}
+		step := WorkflowStep{Node: "file_write", Params: map[string]string{"path": path}}
 		wf.Steps = append(wf.Steps, step)
 	}
 
 	// Check for common patterns
 	if strings.Contains(desc, "github") {
 		if urlMatch == "" {
-			step := Step{Node: "fetch_url", Params: map[string]string{"url": "https://github.com/"}}
+			step := WorkflowStep{Node: "fetch_url", Params: map[string]string{"url": "https://github.com/"}}
 			wf.Steps = append(wf.Steps, step)
 		}
 	}
 
 	if strings.Contains(desc, "summarize") || strings.Contains(desc, "总结") {
-		step := Step{
+		step := WorkflowStep{
 			Node:   llmNode,
 			Params: map[string]string{"model": llmModel, "system": "You are a helpful assistant that summarizes text concisely."},
 		}
-		// Insert before file_write if exists
 		if len(wf.Steps) > 0 && wf.Steps[len(wf.Steps)-1].Node == "file_write" {
 			lastStep := wf.Steps[len(wf.Steps)-1]
-			steps := make([]Step, len(wf.Steps)-1)
+			steps := make([]WorkflowStep, len(wf.Steps)-1)
 			copy(steps, wf.Steps[:len(wf.Steps)-1])
 			steps = append(steps, step)
 			steps = append(steps, lastStep)
@@ -126,7 +125,7 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	}
 
 	if strings.Contains(desc, "translate") || strings.Contains(desc, "翻译") {
-		step := Step{
+		step := WorkflowStep{
 			Node:   llmNode,
 			Params: map[string]string{"model": llmModel, "system": "You are a translator. Translate the following text to English."},
 		}
@@ -134,7 +133,7 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	}
 
 	if strings.Contains(desc, "git") || strings.Contains(desc, "commit") || strings.Contains(desc, "release") {
-		step := Step{
+		step := WorkflowStep{
 			Node:   "execute",
 			Params: map[string]string{"command": "git log --oneline -10"},
 		}
@@ -142,7 +141,7 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	}
 
 	if strings.Contains(desc, "log") || strings.Contains(desc, "monitor") {
-		step := Step{
+		step := WorkflowStep{
 			Node:   "execute",
 			Params: map[string]string{"command": "tail -n 100 /var/log/syslog"},
 		}
@@ -155,7 +154,7 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 
 	// If no steps were generated, add a default execute step
 	if len(wf.Steps) == 0 {
-		wf.Steps = append(wf.Steps, Step{
+		wf.Steps = append(wf.Steps, WorkflowStep{
 			Node:   "execute",
 			Params: map[string]string{"command": "echo 'Custom workflow: " + description + "'"},
 		})

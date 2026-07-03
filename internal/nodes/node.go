@@ -13,13 +13,46 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ParamSchema describes a single parameter of a node
+type ParamSchema struct {
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+	Default     string `json:"default,omitempty"`
+}
+
+// NodeSchema describes the input/output schema of a node
+type NodeSchema struct {
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
+	Input       string        `json:"input"`
+	Output      string        `json:"output"`
+	Params      []ParamSchema `json:"params"`
+}
+
 // Node defines the interface that all workflow nodes must implement
 type Node interface {
 	// Name returns the unique identifier of this node
 	Name() string
 
+	// Description returns a brief description of this node
+	Description() string
+
+	// Schema returns the parameter and I/O schema of this node
+	Schema() NodeSchema
+
 	// Execute runs the node with the given input and parameters
 	Execute(ctx context.Context, input string, params map[string]string) (string, error)
+}
+
+// StreamingNode is an optional interface for nodes that support streaming output
+type StreamingNode interface {
+	Node
+	// ExecuteStream runs the node with streaming output.
+	// The onChunk callback is called for each chunk of output.
+	// Returns the full output when complete.
+	ExecuteStream(ctx context.Context, input string, params map[string]string, onChunk func(chunk string)) (string, error)
 }
 
 // NodeMetadata represents the metadata.yaml file for external nodes
@@ -46,6 +79,22 @@ func NewExternalNode(metadata NodeMetadata, nodePath string) *ExternalNode {
 // Name implements the Node interface
 func (e *ExternalNode) Name() string {
 	return e.metadata.Name
+}
+
+// Description implements the Node interface
+func (e *ExternalNode) Description() string {
+	return e.metadata.Description
+}
+
+// Schema implements the Node interface
+func (e *ExternalNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        e.metadata.Name,
+		Description: e.metadata.Description,
+		Input:       "string",
+		Output:      "string",
+		Params:      nil,
+	}
 }
 
 // Execute implements the Node interface
@@ -130,6 +179,24 @@ func (r *Registry) List() []string {
 	return names
 }
 
+// NodeInfo contains node name and description
+type NodeInfo struct {
+	Name        string
+	Description string
+}
+
+// ListNodes returns all registered nodes with their descriptions
+func (r *Registry) ListNodes() []NodeInfo {
+	infos := make([]NodeInfo, 0, len(r.nodes))
+	for _, node := range r.nodes {
+		infos = append(infos, NodeInfo{
+			Name:        node.Name(),
+			Description: node.Description(),
+		})
+	}
+	return infos
+}
+
 // SetSafeMode enables or disables safe mode
 func (r *Registry) SetSafeMode(enabled bool) {
 	r.safeMode = enabled
@@ -198,6 +265,28 @@ var globalRegistry = NewRegistry()
 // Register adds a node to the global registry
 func Register(node Node) {
 	globalRegistry.Register(node)
+}
+
+// RegisterBuiltins registers all built-in nodes to a registry
+func RegisterBuiltins(reg *Registry) {
+	reg.Register(&ConditionNode{})
+	reg.Register(&FetchURLNode{})
+	reg.Register(&HTTPRequestNode{})
+	reg.Register(&ExecuteNode{})
+	reg.Register(&TemplateRenderNode{})
+	reg.Register(&FileWriteNode{})
+	reg.Register(&FileReadNode{})
+	reg.Register(&OpenAINode{})
+	reg.Register(&CozeNode{})
+	reg.Register(&FastGPTNode{})
+	reg.Register(&JSONParseNode{})
+	reg.Register(&IMANode{})
+	reg.Register(&CombineNode{})
+	reg.Register(&TransformNode{})
+	reg.Register(&NotifyNode{})
+	reg.Register(&OllamaNode{})
+	reg.Register(&OpenAICompatibleNode{})
+	reg.Register(&CallNode{})
 }
 
 // Get retrieves a node from the global registry by name

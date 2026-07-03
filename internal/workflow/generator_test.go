@@ -293,7 +293,7 @@ func TestToYAML(t *testing.T) {
 	wf := &Workflow{
 		Name:        "Test Workflow",
 		Description: "A test workflow",
-		Steps: []Step{
+		Steps: []WorkflowStep{
 			{Node: "fetch_url", Params: map[string]string{"url": "https://example.com"}},
 		},
 	}
@@ -313,7 +313,7 @@ func TestToYAML(t *testing.T) {
 
 func TestValidateWorkflow(t *testing.T) {
 	wf := &Workflow{
-		Steps: []Step{
+		Steps: []WorkflowStep{
 			{Node: "fetch_url", Params: map[string]string{"url": "https://example.com"}},
 		},
 	}

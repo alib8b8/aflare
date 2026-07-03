@@ -1,127 +1,81 @@
 package nodes
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
 	"os"
-	"time"
 )
 
-type OpenAINode struct{}
+type OpenAINode struct {
+	compat *OpenAICompatibleNode
+}
 
 func init() {
-	Register(&OpenAINode{})
+	Register(&OpenAINode{
+		compat: NewOpenAICompatibleNode(LLMNodeConfig{
+			Name:            "openai",
+			DefaultModel:    "gpt-3.5-turbo",
+			DefaultEndpoint: "https://api.openai.com/v1",
+			EnvAPIKey:       "OPENAI_API_KEY",
+			ProviderName:    "OpenAI",
+		}),
+	})
 }
 
 func (n *OpenAINode) Name() string {
 	return "openai"
 }
 
-type openaiMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+func (n *OpenAINode) Description() string {
+	return "Call OpenAI API"
 }
 
-type openaiRequest struct {
-	Model       string          `json:"model"`
-	Messages    []openaiMessage `json:"messages"`
-	Temperature float64         `json:"temperature,omitempty"`
-	MaxTokens   int             `json:"max_tokens,omitempty"`
-	Stream      bool            `json:"stream"`
-}
-
-type openaiChoice struct {
-	Message struct {
-		Content string `json:"content"`
-	} `json:"message"`
-}
-
-type openaiResponse struct {
-	Choices []openaiChoice `json:"choices"`
-	Error   *struct {
-		Message string `json:"message"`
-	} `json:"error,omitempty"`
+func (n *OpenAINode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "openai",
+		Description: "Call OpenAI API",
+		Input:       "string - user message content",
+		Output:      "string - AI response content",
+		Params: []ParamSchema{
+			{Name: "model", Type: "string", Description: "Model name (default: gpt-3.5-turbo)", Required: false, Default: "gpt-3.5-turbo"},
+			{Name: "api_key", Type: "string", Description: "OpenAI API key (or set OPENAI_API_KEY env var)", Required: false},
+			{Name: "endpoint", Type: "string", Description: "API base URL (or set OPENAI_API_BASE env var)", Required: false, Default: "https://api.openai.com/v1"},
+			{Name: "system", Type: "string", Description: "System prompt", Required: false},
+		},
+	}
 }
 
 func (n *OpenAINode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
-	model, ok := params["model"]
-	if !ok || model == "" {
-		model = "gpt-3.5-turbo"
-	}
-
 	apiKey, ok := params["api_key"]
 	if !ok || apiKey == "" {
 		apiKey = os.Getenv("OPENAI_API_KEY")
+		if apiKey != "" {
+			params["api_key"] = apiKey
+		}
 	}
-	if apiKey == "" {
-		return "", fmt.Errorf("API key required. Set OPENAI_API_KEY env var or pass api_key param")
-	}
-
 	endpoint, ok := params["endpoint"]
 	if !ok || endpoint == "" {
 		endpoint = os.Getenv("OPENAI_API_BASE")
-	}
-	if endpoint == "" {
-		endpoint = "https://api.openai.com/v1"
-	}
-
-	generateURL := fmt.Sprintf("%s/chat/completions", endpoint)
-
-	systemPrompt, _ := params["system"]
-	messages := []openaiMessage{}
-	if systemPrompt != "" {
-		messages = append(messages, openaiMessage{Role: "system", Content: systemPrompt})
-	}
-	messages = append(messages, openaiMessage{Role: "user", Content: input})
-
-	reqBody := openaiRequest{
-		Model:    model,
-		Messages: messages,
-		Stream:   false,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", generateURL, bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-
-	client := &http.Client{
-		Timeout: 120 * time.Second,
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to call API: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		var errResp openaiResponse
-		json.NewDecoder(resp.Body).Decode(&errResp)
-		if errResp.Error != nil && errResp.Error.Message != "" {
-			return "", fmt.Errorf("API error (%d): %s", resp.StatusCode, errResp.Error.Message)
+		if endpoint != "" {
+			params["endpoint"] = endpoint
 		}
-		return "", fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
+	return n.compat.Execute(ctx, input, params)
+}
 
-	var oaiResp openaiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&oaiResp); err != nil {
-		return "", fmt.Errorf("failed to parse response: %w", err)
+func (n *OpenAINode) ExecuteStream(ctx context.Context, input string, params map[string]string, onChunk func(chunk string)) (string, error) {
+	apiKey, ok := params["api_key"]
+	if !ok || apiKey == "" {
+		apiKey = os.Getenv("OPENAI_API_KEY")
+		if apiKey != "" {
+			params["api_key"] = apiKey
+		}
 	}
-
-	if len(oaiResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
+	endpoint, ok := params["endpoint"]
+	if !ok || endpoint == "" {
+		endpoint = os.Getenv("OPENAI_API_BASE")
+		if endpoint != "" {
+			params["endpoint"] = endpoint
+		}
 	}
-
-	return oaiResp.Choices[0].Message.Content, nil
+	return n.compat.ExecuteStream(ctx, input, params, onChunk)
 }

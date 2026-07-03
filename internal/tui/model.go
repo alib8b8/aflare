@@ -21,18 +21,27 @@ const (
 
 // Step represents a single workflow step in the TUI
 type Step struct {
-	Name     string
-	Params   map[string]string
-	Status   StepStatus
-	Output   string
-	Error    string
-	Duration time.Duration
+	Name         string
+	Params       map[string]string
+	Status       StepStatus
+	Output       string
+	StreamOutput string
+	Error        string
+	Duration     time.Duration
+	Streaming    bool
 }
 
 // StepStartMsg is sent when a step starts executing
 type StepStartMsg struct {
 	Index int
 	Name  string
+}
+
+// StepStreamMsg is sent when a streaming step produces a chunk of output
+type StepStreamMsg struct {
+	Index int
+	Name  string
+	Chunk string
 }
 
 // StepEndMsg is sent when a step finishes executing
@@ -162,6 +171,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Index >= 0 && msg.Index < len(m.steps) {
 			m.steps[msg.Index].Name = msg.Name
 			m.steps[msg.Index].Status = StatusRunning
+			m.steps[msg.Index].Streaming = false
+			m.steps[msg.Index].StreamOutput = ""
+		}
+		return m, nil
+
+	case StepStreamMsg:
+		if msg.Index >= 0 && msg.Index < len(m.steps) {
+			m.steps[msg.Index].Name = msg.Name
+			m.steps[msg.Index].Streaming = true
+			m.steps[msg.Index].StreamOutput += msg.Chunk
 		}
 		return m, nil
 
@@ -218,11 +237,17 @@ func (m *Model) View() string {
 
 	// Data preview section
 	sb.WriteString("\n")
-	sb.WriteString(headerStyle.Render("📄 Output Preview (last step):"))
+	sb.WriteString(headerStyle.Render("📄 Output Preview:"))
 	sb.WriteString("\n")
 
 	preview := ""
+	streaming := false
 	for i := len(m.steps) - 1; i >= 0; i-- {
+		if m.steps[i].Status == StatusRunning && m.steps[i].Streaming && m.steps[i].StreamOutput != "" {
+			preview = m.steps[i].StreamOutput
+			streaming = true
+			break
+		}
 		if m.steps[i].Status == StatusDone && m.steps[i].Output != "" {
 			preview = m.steps[i].Output
 			break
@@ -231,8 +256,12 @@ func (m *Model) View() string {
 
 	if preview == "" {
 		preview = "(no output yet)"
-	} else if len(preview) > 500 {
-		preview = preview[:500] + "\n... (truncated)"
+	} else if len(preview) > 1000 {
+		preview = preview[len(preview)-1000:] + "\n... (showing last 1000 chars)"
+	}
+
+	if streaming {
+		preview += " ▊"
 	}
 
 	sb.WriteString(previewStyle.Render(preview))

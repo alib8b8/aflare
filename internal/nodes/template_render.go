@@ -19,6 +19,23 @@ func (n *TemplateRenderNode) Name() string {
 	return "template_render"
 }
 
+func (n *TemplateRenderNode) Description() string {
+	return "Render Go templates with input data"
+}
+
+func (n *TemplateRenderNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "template_render",
+		Description: "Render Go templates with input data",
+		Input:       "string - input data available as .input in template",
+		Output:      "string - rendered template output",
+		Params: []ParamSchema{
+			{Name: "template", Type: "string", Description: "Inline template string", Required: false},
+			{Name: "template_file", Type: "string", Description: "Path to template file (takes precedence over template)", Required: false},
+		},
+	}
+}
+
 func (n *TemplateRenderNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	var templateStr string
 

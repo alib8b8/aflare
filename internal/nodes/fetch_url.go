@@ -21,6 +21,24 @@ func (n *FetchURLNode) Name() string {
 	return "fetch_url"
 }
 
+func (n *FetchURLNode) Description() string {
+	return "Fetch content from a URL"
+}
+
+func (n *FetchURLNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "fetch_url",
+		Description: "Fetch content from a URL",
+		Input:       "string - optional URL (overrides url param)",
+		Output:      "string - content of the URL",
+		Params: []ParamSchema{
+			{Name: "url", Type: "string", Description: "URL to fetch", Required: false},
+			{Name: "mode", Type: "string", Description: "Extraction mode: text, markdown, html, main_content", Required: false, Default: "text"},
+			{Name: "timeout", Type: "int", Description: "Request timeout in seconds", Required: false, Default: "30"},
+		},
+	}
+}
+
 // looksLikeURL checks if a string looks like a URL
 func looksLikeURL(s string) bool {
 	s = strings.TrimSpace(s)

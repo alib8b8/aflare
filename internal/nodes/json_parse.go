@@ -17,6 +17,22 @@ func (n *JSONParseNode) Name() string {
 	return "json_parse"
 }
 
+func (n *JSONParseNode) Description() string {
+	return "Parse and extract JSON data"
+}
+
+func (n *JSONParseNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "json_parse",
+		Description: "Parse and extract JSON data",
+		Input:       "string - JSON string to parse",
+		Output:      "string - extracted value or pretty-printed JSON",
+		Params: []ParamSchema{
+			{Name: "path", Type: "string", Description: "Dot-notation path to extract (e.g. data.items[0].name). If omitted, pretty-prints entire JSON.", Required: false},
+		},
+	}
+}
+
 func (n *JSONParseNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	var data interface{}
 	if err := json.Unmarshal([]byte(input), &data); err != nil {

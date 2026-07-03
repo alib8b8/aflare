@@ -17,6 +17,23 @@ func (n *ConditionNode) Name() string {
 	return "condition"
 }
 
+func (n *ConditionNode) Description() string {
+	return "Evaluate conditional expressions (contains, equals, regex, empty)"
+}
+
+func (n *ConditionNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "condition",
+		Description: "Evaluate conditional expressions (contains, equals, regex, empty)",
+		Input:       "string - the text to evaluate against",
+		Output:      "string - 'true' or 'false'",
+		Params: []ParamSchema{
+			{Name: "expr", Type: "string", Description: "Condition expression (e.g. contains:foo, equals:bar, regex:^test, empty, not_empty)", Required: true},
+			{Name: "condition", Type: "string", Description: "Alias for expr", Required: false},
+		},
+	}
+}
+
 // Execute evaluates a condition expression against the input.
 // Supports simple patterns:
 //   - "contains:keyword"  - true if input contains keyword
