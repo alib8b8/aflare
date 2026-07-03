@@ -39,6 +39,13 @@ func T(key string, args ...interface{}) string {
 	return instance.Translate(key, args...)
 }
 
+func HasKey(key string) bool {
+	if instance == nil {
+		Init("")
+	}
+	return instance.HasKey(key)
+}
+
 func GetLanguage() string {
 	if instance == nil {
 		return "en"
@@ -79,6 +86,18 @@ func (t *Translator) Translate(key string, args ...interface{}) string {
 		return fmt.Sprintf(msg, args...)
 	}
 	return msg
+}
+
+func (t *Translator) HasKey(key string) bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	_, ok := t.messages[key]
+	if ok {
+		return true
+	}
+	_, ok = t.fallback[key]
+	return ok
 }
 
 func (t *Translator) load(lang string) {
@@ -130,21 +149,33 @@ func detectLanguage() string {
 func normalizeLang(lang string) string {
 	lang = strings.ToLower(strings.TrimSpace(lang))
 
-	// Handle formats like "en_US.UTF-8", "zh_CN.UTF-8"
 	if idx := strings.Index(lang, "."); idx > 0 {
 		lang = lang[:idx]
 	}
 
-	// Handle formats like "en_US", "zh_CN"
 	if idx := strings.Index(lang, "_"); idx > 0 {
 		lang = lang[:idx]
 	}
 
 	switch lang {
-	case "zh", "chinese", "cn":
+	case "zh", "chinese", "cn", "zh-cn", "zh_cn":
 		return "zh"
 	case "en", "english":
 		return "en"
+	case "ru", "russian", "rus", "русский":
+		return "ru"
+	case "fr", "french", "français", "francais":
+		return "fr"
+	case "ja", "japanese", "日本語", "nihongo":
+		return "ja"
+	case "ko", "korean", "한국어", "hangul":
+		return "ko"
+	case "es", "spanish", "español", "espanol":
+		return "es"
+	case "ar", "arabic", "عربي", "arab":
+		return "ar"
+	case "hi", "hindi", "हिन्दी":
+		return "hi"
 	default:
 		return "en"
 	}

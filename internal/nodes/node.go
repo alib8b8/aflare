@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/alib8b8/llm-box/internal/i18n"
 	"github.com/alib8b8/llm-box/internal/logger"
 	"gopkg.in/yaml.v3"
 )
@@ -189,9 +190,14 @@ type NodeInfo struct {
 func (r *Registry) ListNodes() []NodeInfo {
 	infos := make([]NodeInfo, 0, len(r.nodes))
 	for _, node := range r.nodes {
+		name := node.Name()
+		desc := node.Description()
+		if i18n.HasKey("node." + name + ".description") {
+			desc = i18n.T("node." + name + ".description")
+		}
 		infos = append(infos, NodeInfo{
-			Name:        node.Name(),
-			Description: node.Description(),
+			Name:        name,
+			Description: desc,
 		})
 	}
 	return infos
