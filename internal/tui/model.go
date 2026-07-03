@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alib8b8/llm-box/internal/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -212,21 +213,21 @@ func (m *Model) View() string {
 	var sb strings.Builder
 
 	// Title
-	title := fmt.Sprintf("🚀 llm-box - %s", m.workflowName)
+	title := fmt.Sprintf("🚀 %s", i18n.T("tui.title", m.workflowName))
 	sb.WriteString(titleStyle.Render(title))
 	sb.WriteString("\n")
 	sb.WriteString(headerStyle.Render("📁 " + m.workflowPath))
 	sb.WriteString("\n")
 
 	// Steps section
-	sb.WriteString(headerStyle.Render("📋 Steps:"))
+	sb.WriteString(headerStyle.Render("📋 " + i18n.T("tui.steps")))
 	sb.WriteString("\n")
 
 	for i, step := range m.steps {
 		status := m.renderStepStatus(step)
-		line := fmt.Sprintf("  %d. %s %s", i+1, step.Name, status)
+		line := fmt.Sprintf("  "+i18n.T("tui.step_index"), i+1, step.Name, status)
 		if step.Status == StatusDone {
-			line += fmt.Sprintf("  (%s)", step.Duration)
+			line += fmt.Sprintf("  "+i18n.T("tui.step_duration"), step.Duration)
 		}
 		if step.Status == StatusError {
 			line += fmt.Sprintf("  %s", step.Error)
@@ -237,7 +238,7 @@ func (m *Model) View() string {
 
 	// Data preview section
 	sb.WriteString("\n")
-	sb.WriteString(headerStyle.Render("📄 Output Preview:"))
+	sb.WriteString(headerStyle.Render("📄 " + i18n.T("tui.output_preview")))
 	sb.WriteString("\n")
 
 	preview := ""
@@ -255,9 +256,9 @@ func (m *Model) View() string {
 	}
 
 	if preview == "" {
-		preview = "(no output yet)"
+		preview = i18n.T("tui.no_output")
 	} else if len(preview) > 1000 {
-		preview = preview[len(preview)-1000:] + "\n... (showing last 1000 chars)"
+		preview = preview[len(preview)-1000:] + "\n" + i18n.T("tui.showing_last", 1000)
 	}
 
 	if streaming {
@@ -271,12 +272,12 @@ func (m *Model) View() string {
 	sb.WriteString("\n")
 	if m.finished {
 		if m.success {
-			sb.WriteString(doneStyle.Render("✅ Finished - press q to quit"))
+			sb.WriteString(doneStyle.Render("✅ " + i18n.T("tui.finished_quit")))
 		} else {
-			sb.WriteString(errorStyle.Render("❌ Failed - press q to quit"))
+			sb.WriteString(errorStyle.Render("❌ " + i18n.T("tui.failed_quit")))
 		}
 	} else {
-		sb.WriteString(runningStyle.Render("⏳ Running... (press q to quit)"))
+		sb.WriteString(runningStyle.Render("⏳ " + i18n.T("tui.running")))
 	}
 
 	return sb.String()
@@ -286,13 +287,13 @@ func (m *Model) View() string {
 func (m *Model) renderStepStatus(step Step) string {
 	switch step.Status {
 	case StatusPending:
-		return pendingStyle.Render("⏳ pending")
+		return pendingStyle.Render("⏳ " + i18n.T("tui.status_pending"))
 	case StatusRunning:
-		return runningStyle.Render("🔄 running")
+		return runningStyle.Render("🔄 " + i18n.T("tui.status_running"))
 	case StatusDone:
-		return doneStyle.Render("✅ done")
+		return doneStyle.Render("✅ " + i18n.T("tui.status_done"))
 	case StatusError:
-		return errorStyle.Render("❌ error")
+		return errorStyle.Render("❌ " + i18n.T("tui.status_error"))
 	default:
 		return "?"
 	}

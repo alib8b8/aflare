@@ -89,7 +89,7 @@ func handleList() {
 
 	fmt.Println(i18n.T("list.title"))
 	fmt.Println("-" + strings.Repeat("-", 78))
-	fmt.Printf("  %-20s %s\n", "NAME", "DESCRIPTION")
+	fmt.Printf("  %-20s %s\n", i18n.T("table.name"), i18n.T("table.description"))
 	fmt.Println("-" + strings.Repeat("-", 78))
 	for _, info := range nodeList {
 		fmt.Printf("  %-20s %s\n", info.Name, info.Description)
@@ -202,7 +202,7 @@ func handleRegistry(args []string) {
 
 		fmt.Println(i18n.T("registry.list_title"))
 		fmt.Println("-" + strings.Repeat("-", 78))
-		fmt.Printf("  %-15s %-40s %-10s %s\n", "NAME", "DESCRIPTION", "VERSION", "CATEGORY")
+		fmt.Printf("  %-15s %-40s %-10s %s\n", i18n.T("table.name"), i18n.T("table.description"), i18n.T("table.version"), i18n.T("table.category"))
 		fmt.Println("-" + strings.Repeat("-", 78))
 		for _, node := range nodes {
 			fmt.Printf("  %-15s %-40s %-10s %s\n", node.Name, truncate(node.Description, 38), node.Version, node.Category)
@@ -228,7 +228,7 @@ func handleRegistry(args []string) {
 
 		fmt.Println(i18n.T("registry.search_result", len(nodes), query))
 		fmt.Println("-" + strings.Repeat("-", 78))
-		fmt.Printf("  %-15s %-40s %-10s %s\n", "NAME", "DESCRIPTION", "VERSION", "CATEGORY")
+		fmt.Printf("  %-15s %-40s %-10s %s\n", i18n.T("table.name"), i18n.T("table.description"), i18n.T("table.version"), i18n.T("table.category"))
 		fmt.Println("-" + strings.Repeat("-", 78))
 		for _, node := range nodes {
 			fmt.Printf("  %-15s %-40s %-10s %s\n", node.Name, truncate(node.Description, 38), node.Version, node.Category)

@@ -13,59 +13,46 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	desc := strings.ToLower(description)
 	wf := &Workflow{}
 
-	useDeepSeek := strings.Contains(desc, "deepseek")
-	useCoze := strings.Contains(desc, "coze")
-	useGLM := strings.Contains(desc, "glm") || strings.Contains(desc, "智谱") || strings.Contains(desc, "zhipu")
-	useKimi := strings.Contains(desc, "kimi") || strings.Contains(desc, "moonshot") || strings.Contains(desc, "月之暗面")
-	useMiniMax := strings.Contains(desc, "minimax") || strings.Contains(desc, "abab")
-	useQwen := strings.Contains(desc, "qwen") || strings.Contains(desc, "通义") || strings.Contains(desc, "千问") || strings.Contains(desc, "tongyi")
-	useIMA := strings.Contains(desc, "ima") || strings.Contains(desc, "ima.copilot") || strings.Contains(desc, "ima copilot")
-	useXVERSE := strings.Contains(desc, "xverse") || strings.Contains(desc, "x-verse")
-	useYi := strings.Contains(desc, "yi") || strings.Contains(desc, "零一万物") || strings.Contains(desc, "lingyiwanwu")
-	useBaichuan := strings.Contains(desc, "baichuan") || strings.Contains(desc, "百川")
-	useInternLM := strings.Contains(desc, "internlm") || strings.Contains(desc, "书生") || strings.Contains(desc, "浦语")
-	useMistral := strings.Contains(desc, "mistral")
-	useMiMo := strings.Contains(desc, "mimo") || strings.Contains(desc, "xiaomi") || strings.Contains(desc, "xiaomimimo")
 	var llmNode string
 	var llmModel string
 	switch {
-	case useDeepSeek:
+	case containsLLMKeyword(desc, "deepseek"):
 		llmNode = "deepseek"
 		llmModel = "deepseek-chat"
-	case useQwen:
+	case containsLLMKeyword(desc, "qwen"):
 		llmNode = "qwen"
 		llmModel = "qwen-turbo"
-	case useXVERSE:
+	case containsLLMKeyword(desc, "xverse"):
 		llmNode = "xverse"
 		llmModel = "XVERSE-7B-Chat"
-	case useYi:
+	case containsLLMKeyword(desc, "yi"):
 		llmNode = "yi"
 		llmModel = "yi-lightning"
-	case useBaichuan:
+	case containsLLMKeyword(desc, "baichuan"):
 		llmNode = "baichuan"
 		llmModel = "Baichuan4"
-	case useInternLM:
+	case containsLLMKeyword(desc, "internlm"):
 		llmNode = "internlm"
 		llmModel = "internlm3-latest"
-	case useMistral:
+	case containsLLMKeyword(desc, "mistral"):
 		llmNode = "mistral"
 		llmModel = "mistral-large-latest"
-	case useMiMo:
+	case containsLLMKeyword(desc, "mimo"):
 		llmNode = "mimo"
 		llmModel = "mimo-v2.5-pro"
-	case useIMA:
+	case containsLLMKeyword(desc, "ima"):
 		llmNode = "ima"
 		llmModel = "gpt-4o"
-	case useKimi:
+	case containsLLMKeyword(desc, "kimi"):
 		llmNode = "kimi"
 		llmModel = "moonshot-v1-8k"
-	case useMiniMax:
+	case containsLLMKeyword(desc, "minimax"):
 		llmNode = "minimax"
 		llmModel = "abab6.5s-chat"
-	case useCoze:
+	case containsLLMKeyword(desc, "coze"):
 		llmNode = "coze"
 		llmModel = "glm-4"
-	case useGLM:
+	case containsLLMKeyword(desc, "glm"):
 		llmNode = "glm"
 		llmModel = "glm-4"
 	default:
@@ -100,17 +87,21 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	}
 
 	// Check for common patterns
-	if strings.Contains(desc, "github") {
+	if containsActionKeyword(desc, "github") {
 		if urlMatch == "" {
 			step := WorkflowStep{Node: "fetch_url", Params: map[string]string{"url": "https://github.com/"}}
 			wf.Steps = append(wf.Steps, step)
 		}
 	}
 
-	if strings.Contains(desc, "summarize") || strings.Contains(desc, "总结") {
+	if containsActionKeyword(desc, "summarize") {
+		systemPrompt := getSystemPrompt("summarize")
+		if systemPrompt == "" {
+			systemPrompt = "You are a helpful assistant that summarizes text concisely."
+		}
 		step := WorkflowStep{
 			Node:   llmNode,
-			Params: map[string]string{"model": llmModel, "system": "You are a helpful assistant that summarizes text concisely."},
+			Params: map[string]string{"model": llmModel, "system": systemPrompt},
 		}
 		if len(wf.Steps) > 0 && wf.Steps[len(wf.Steps)-1].Node == "file_write" {
 			lastStep := wf.Steps[len(wf.Steps)-1]
@@ -124,15 +115,19 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 		}
 	}
 
-	if strings.Contains(desc, "translate") || strings.Contains(desc, "翻译") {
+	if containsActionKeyword(desc, "translate") {
+		systemPrompt := getSystemPrompt("translate")
+		if systemPrompt == "" {
+			systemPrompt = "You are a translator. Translate the following text to English."
+		}
 		step := WorkflowStep{
 			Node:   llmNode,
-			Params: map[string]string{"model": llmModel, "system": "You are a translator. Translate the following text to English."},
+			Params: map[string]string{"model": llmModel, "system": systemPrompt},
 		}
 		wf.Steps = append(wf.Steps, step)
 	}
 
-	if strings.Contains(desc, "git") || strings.Contains(desc, "commit") || strings.Contains(desc, "release") {
+	if containsActionKeyword(desc, "git") {
 		step := WorkflowStep{
 			Node:   "execute",
 			Params: map[string]string{"command": "git log --oneline -10"},
@@ -140,7 +135,7 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 		wf.Steps = append(wf.Steps, step)
 	}
 
-	if strings.Contains(desc, "log") || strings.Contains(desc, "monitor") {
+	if containsActionKeyword(desc, "log") {
 		step := WorkflowStep{
 			Node:   "execute",
 			Params: map[string]string{"command": "tail -n 100 /var/log/syslog"},
