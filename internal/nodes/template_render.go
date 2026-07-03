@@ -67,14 +67,11 @@ func (n *TemplateRenderNode) Execute(ctx context.Context, input string, params m
 	}
 
 	funcMap := template.FuncMap{
-		"upper":   strings.ToUpper,
-		"lower":   strings.ToLower,
-		"title":   strings.Title,
-		"trim":    strings.TrimSpace,
-		"split":   strings.Split,
-		"join":    strings.Join,
-		"len":     func(s string) int { return len(s) },
-		"replace": func(old, new, s string) string { return strings.ReplaceAll(s, old, new) },
+		"upper": strings.ToUpper,
+		"lower": strings.ToLower,
+		"title": strings.Title,
+		"trim":  strings.TrimSpace,
+		"len":   func(s string) int { return len(s) },
 	}
 
 	tmpl, err := template.New("template").Funcs(funcMap).Parse(templateStr)

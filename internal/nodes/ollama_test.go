@@ -112,3 +112,40 @@ func TestOllamaDefaultParams(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 }
+
+func TestOllamaPromptParamPriority(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req ollamaRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if req.Prompt != "Prompt from params" {
+			t.Errorf("expected prompt from params 'Prompt from params', got '%s'", req.Prompt)
+		}
+
+		resp := ollamaResponse{Response: "OK"}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer mockServer.Close()
+
+	node, ok := Get("ollama")
+	if !ok {
+		t.Fatal("ollama node not found")
+	}
+
+	ctx := context.Background()
+	input := "Input value"
+	params := map[string]string{
+		"endpoint": mockServer.URL,
+		"prompt":   "Prompt from params",
+	}
+
+	_, err := node.Execute(ctx, input, params)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+}

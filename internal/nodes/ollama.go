@@ -28,11 +28,12 @@ func (n *OllamaNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "ollama",
 		Description: "Call Ollama local LLM server",
-		Input:       "string - user prompt content",
+		Input:       "string - user prompt content (used when prompt param is not provided)",
 		Output:      "string - model response content",
 		Params: []ParamSchema{
 			{Name: "model", Type: "string", Description: "Model name (default: llama3)", Required: false, Default: "llama3"},
 			{Name: "endpoint", Type: "string", Description: "Ollama server URL (default: http://localhost:11434)", Required: false, Default: "http://localhost:11434"},
+			{Name: "prompt", Type: "string", Description: "Prompt to send to Ollama (if not provided, uses input)", Required: false},
 		},
 	}
 }
@@ -67,6 +68,11 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 		endpoint = "http://localhost:11434"
 	}
 
+	prompt, ok := params["prompt"]
+	if !ok || prompt == "" {
+		prompt = input
+	}
+
 	// Validate endpoint URL to prevent SSRF (localhost is allowed for Ollama)
 	if err := validateLMLEndpoint(endpoint); err != nil {
 		return "", fmt.Errorf("endpoint URL validation failed: %w", err)
@@ -76,7 +82,7 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 
 	reqBody := ollamaRequest{
 		Model:  model,
-		Prompt: input,
+		Prompt: prompt,
 		Stream: stream,
 	}
 
