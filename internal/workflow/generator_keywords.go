@@ -32,11 +32,80 @@ var actionKeywords = map[string][]string{
 
 func containsAny(desc string, keywords []string) bool {
 	for _, kw := range keywords {
-		if strings.Contains(desc, kw) {
+		if containsWord(desc, kw) {
 			return true
 		}
 	}
 	return false
+}
+
+// containsWord checks if a keyword appears as a whole word in the description
+// (not as a substring of another word). This prevents "git" from matching "digital".
+// Supports both English (space-separated) and Chinese (no spaces) text.
+// For Chinese keywords (non-ASCII), uses simple substring matching since
+// Chinese has no word boundaries. For English keywords, uses word boundary checks.
+func containsWord(desc, kw string) bool {
+	if desc == kw {
+		return true
+	}
+
+	if containsNonASCII(kw) {
+		return stringsContainsIgnoreCase(desc, kw)
+	}
+
+	descRunes := []rune(desc)
+	kwRunes := []rune(kw)
+
+	if len(descRunes) < len(kwRunes) {
+		return false
+	}
+
+	for i := 0; i <= len(descRunes)-len(kwRunes); i++ {
+		match := true
+		for j := 0; j < len(kwRunes); j++ {
+			dc := descRunes[i+j]
+			kc := kwRunes[j]
+			if dc != kc {
+				if dc >= 'A' && dc <= 'Z' {
+					dc += 32
+				}
+				if kc >= 'A' && kc <= 'Z' {
+					kc += 32
+				}
+				if dc != kc {
+					match = false
+					break
+				}
+			}
+		}
+		if match {
+			beforeOK := i == 0 || !isLetterOrDigitRune(descRunes[i-1])
+			afterOK := i+len(kwRunes) == len(descRunes) || !isLetterOrDigitRune(descRunes[i+len(kwRunes)])
+			if beforeOK && afterOK {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func containsNonASCII(s string) bool {
+	for _, c := range s {
+		if c > 127 {
+			return true
+		}
+	}
+	return false
+}
+
+func stringsContainsIgnoreCase(s, substr string) bool {
+	sLower := strings.ToLower(s)
+	subLower := strings.ToLower(substr)
+	return strings.Contains(sLower, subLower)
+}
+
+func isLetterOrDigitRune(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
 }
 
 func containsLLMKeyword(desc, provider string) bool {

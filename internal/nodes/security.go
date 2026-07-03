@@ -8,10 +8,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var (
 	workDir string
+)
+
+const (
+	DefaultLLMTimeout = 120 * time.Second
 )
 
 func init() {

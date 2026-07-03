@@ -226,8 +226,8 @@ func TestGenerateWorkflow_DefaultStep(t *testing.T) {
 		t.Fatal("expected at least one default step")
 	}
 
-	if wf.Steps[0].Node != "execute" {
-		t.Errorf("expected default execute step, got %s", wf.Steps[0].Node)
+	if wf.Steps[0].Node != "combine" {
+		t.Errorf("expected default combine step, got %s", wf.Steps[0].Node)
 	}
 }
 
@@ -300,10 +300,10 @@ func TestToYAML(t *testing.T) {
 
 	yaml := wf.ToYAML()
 
-	if !strings.Contains(yaml, "name: \"Test Workflow\"") {
+	if !strings.Contains(yaml, "name: Test Workflow") {
 		t.Error("YAML missing name")
 	}
-	if !strings.Contains(yaml, "description: \"A test workflow\"") {
+	if !strings.Contains(yaml, "description: A test workflow") {
 		t.Error("YAML missing description")
 	}
 	if !strings.Contains(yaml, "node: fetch_url") {

@@ -13,7 +13,7 @@ func init() {
 	Register(&CozeNode{
 		compat: NewOpenAICompatibleNode(LLMNodeConfig{
 			Name:            "coze",
-			DefaultModel:    "glm-4",
+			DefaultModel:    "",
 			DefaultEndpoint: "https://api.coze.cn/v1",
 			EnvAPIKey:       "COZE_API_KEY",
 			ProviderName:    "Coze",
@@ -36,7 +36,7 @@ func (n *CozeNode) Schema() NodeSchema {
 		Input:       "string - user message content",
 		Output:      "string - AI response content",
 		Params: []ParamSchema{
-			{Name: "model", Type: "string", Description: "Model name (default: glm-4)", Required: false, Default: "glm-4"},
+			{Name: "model", Type: "string", Description: "Model name (required)", Required: true},
 			{Name: "api_key", Type: "string", Description: "Coze API key (or set COZE_API_KEY env var)", Required: false},
 			{Name: "endpoint", Type: "string", Description: "API base URL (default: https://api.coze.cn/v1)", Required: false, Default: "https://api.coze.cn/v1"},
 			{Name: "system", Type: "string", Description: "System prompt", Required: false},

@@ -60,18 +60,21 @@ func (n *TransformNode) Execute(ctx context.Context, input string, params map[st
 		}
 		return "", nil
 	case "first_500":
-		if len(input) > 500 {
-			return input[:500] + "...", nil
+		runes := []rune(input)
+		if len(runes) > 500 {
+			return string(runes[:500]) + "...", nil
 		}
 		return input, nil
 	case "first_1000":
-		if len(input) > 1000 {
-			return input[:1000] + "...", nil
+		runes := []rune(input)
+		if len(runes) > 1000 {
+			return string(runes[:1000]) + "...", nil
 		}
 		return input, nil
 	case "summary":
-		if len(input) > 200 {
-			return input[:200] + "...", nil
+		runes := []rune(input)
+		if len(runes) > 200 {
+			return string(runes[:200]) + "...", nil
 		}
 		return input, nil
 	default:

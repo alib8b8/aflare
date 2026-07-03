@@ -62,7 +62,12 @@ func (n *CombineNode) Execute(ctx context.Context, input string, params map[stri
 		}
 		return csv, nil
 	case "json":
-		return fmt.Sprintf("{\n  \"data\": %q\n}", input), nil
+		escaped := strings.ReplaceAll(input, "\\", "\\\\")
+		escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
+		escaped = strings.ReplaceAll(escaped, "\n", "\\n")
+		escaped = strings.ReplaceAll(escaped, "\r", "\\r")
+		escaped = strings.ReplaceAll(escaped, "\t", "\\t")
+		return fmt.Sprintf("{\n  \"data\": \"%s\"\n}", escaped), nil
 	case "text":
 		return input, nil
 	default:

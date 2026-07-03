@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/alib8b8/llm-box/internal/config"
 )
@@ -143,7 +142,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	client := &http.Client{
-		Timeout:       120 * time.Second,
+		Timeout:       DefaultLLMTimeout,
 		CheckRedirect: httpRedirectValidator(validateLMLEndpoint),
 	}
 

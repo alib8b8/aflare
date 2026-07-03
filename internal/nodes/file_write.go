@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // FileWriteNode writes content to a file
@@ -46,10 +47,54 @@ func (n *FileWriteNode) Execute(ctx context.Context, input string, params map[st
 		return "", fmt.Errorf("path validation failed: %w", err)
 	}
 
-	err = os.WriteFile(safePath, []byte(input), 0600)
-	if err != nil {
+	if err := atomicWriteFile(safePath, []byte(input), 0600); err != nil {
 		return "", fmt.Errorf("failed to write file: %w", err)
 	}
 
 	return fmt.Sprintf("written to %s", path), nil
+}
+
+// atomicWriteFile writes content to a file atomically by first writing to a
+// temporary file in the same directory, then renaming to the target path.
+// This ensures the target file is either fully written or unchanged.
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	if dir == "" {
+		dir = "."
+	}
+
+	tmpFile, err := os.CreateTemp(dir, ".tmp-*-"+filepath.Base(path))
+	if err != nil {
+		return err
+	}
+	tmpPath := tmpFile.Name()
+	defer func() {
+		if tmpFile != nil {
+			tmpFile.Close()
+		}
+		os.Remove(tmpPath)
+	}()
+
+	if err := os.Chmod(tmpPath, perm); err != nil {
+		return err
+	}
+
+	if _, err := tmpFile.Write(data); err != nil {
+		return err
+	}
+
+	if err := tmpFile.Sync(); err != nil {
+		return err
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return err
+	}
+	tmpFile = nil
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+
+	return nil
 }
