@@ -8,7 +8,11 @@ import (
 	"strings"
 )
 
-// GenerateWorkflow creates a workflow from a natural language description
+// GenerateWorkflow creates a workflow from a description using rule-based
+// keyword matching. It is NOT an AI / LLM-based generator — it recognizes a
+// fixed set of keywords (e.g. "summarize", "translate", "github") and maps
+// them to built-in node steps. For complex or dynamic workflows, define the
+// YAML directly.
 func GenerateWorkflow(description string) (*Workflow, error) {
 	desc := strings.ToLower(description)
 	wf := &Workflow{}
