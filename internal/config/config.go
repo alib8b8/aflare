@@ -17,7 +17,7 @@ type LLMProviderConfig struct {
 
 type Config struct {
 	Providers map[string]LLMProviderConfig `yaml:"providers,omitempty"`
-	SafeMode  bool                        `yaml:"safe_mode,omitempty"`
+	SafeMode  bool                         `yaml:"safe_mode,omitempty"`
 }
 
 var globalConfig *Config

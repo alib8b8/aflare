@@ -20,8 +20,8 @@ type Translator struct {
 }
 
 var (
-	instance    *Translator
-	initOnce    sync.Once
+	instance *Translator
+	initOnce sync.Once
 )
 
 func Init(lang string) {

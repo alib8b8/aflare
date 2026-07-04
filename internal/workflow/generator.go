@@ -141,8 +141,6 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 		wf.Steps = append(wf.Steps, step)
 	}
 
-
-
 	// Generate workflow name
 	wf.Name = generateWorkflowName(description)
 	wf.Description = description

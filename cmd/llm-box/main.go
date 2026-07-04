@@ -356,5 +356,5 @@ func runCLI(wf *workflow.Workflow, reg *nodes.Registry) {
 
 	fmt.Printf("\n=== %s ===\n", i18n.T("workflow.final_output"))
 	fmt.Println(finalOutput)
-	fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Render("✅ " + i18n.T("workflow.completed")))
+	fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Render("✅ "+i18n.T("workflow.completed")))
 }

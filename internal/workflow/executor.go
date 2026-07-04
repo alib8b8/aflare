@@ -16,12 +16,12 @@ import (
 
 // Security limits
 const (
-	MaxSteps           = 1000  // Maximum number of steps in a workflow
-	MaxParallel        = 50    // Maximum parallel steps in a single step
-	MaxRetry           = 10    // Maximum retry count per step
-	MaxFileSize        = 10 * 1024 * 1024 // 10MB max workflow file size
-	MaxStepTimeout     = 30 * time.Minute // Maximum per-step timeout
-	MaxRetryDelay      = 5 * time.Minute  // Maximum retry delay
+	MaxSteps               = 1000             // Maximum number of steps in a workflow
+	MaxParallel            = 50               // Maximum parallel steps in a single step
+	MaxRetry               = 10               // Maximum retry count per step
+	MaxFileSize            = 10 * 1024 * 1024 // 10MB max workflow file size
+	MaxStepTimeout         = 30 * time.Minute // Maximum per-step timeout
+	MaxRetryDelay          = 5 * time.Minute  // Maximum retry delay
 	DefaultWorkflowTimeout = 5 * time.Minute  // Default overall workflow timeout
 )
 
@@ -536,14 +536,15 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 // through the expression engine so {{step.0}}, {{var.name}} etc. work.
 //
 // Examples:
-//   contains:hello          - input contains "hello"
-//   equals:{{var.target}}   - input equals the value of var.target
-//   empty                   - input is empty
-//   not_empty               - input is not empty
-//   regex:\d+               - input matches regex
-//   starts_with:https       - input starts with "https"
-//   ends_with:.json         - input ends with ".json"
-//   not contains:skip       - input does NOT contain "skip"
+//
+//	contains:hello          - input contains "hello"
+//	equals:{{var.target}}   - input equals the value of var.target
+//	empty                   - input is empty
+//	not_empty               - input is not empty
+//	regex:\d+               - input matches regex
+//	starts_with:https       - input starts with "https"
+//	ends_with:.json         - input ends with ".json"
+//	not contains:skip       - input does NOT contain "skip"
 func evaluateCondition(cond string, input string, engine *ExpressionEngine) (bool, error) {
 	if cond == "" {
 		return true, nil

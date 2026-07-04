@@ -44,10 +44,10 @@ func (n *HTTPRequestNode) Schema() NodeSchema {
 
 // sensitiveHeaders that should not be set by workflow params
 var sensitiveHeaders = map[string]bool{
-	"host":           true,
-	"authorization":  true,
-	"cookie":         true,
-	"set-cookie":     true,
+	"host":          true,
+	"authorization": true,
+	"cookie":        true,
+	"set-cookie":    true,
 }
 
 func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
