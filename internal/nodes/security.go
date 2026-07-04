@@ -135,6 +135,17 @@ func redactAPIKey(key string) string {
 	return key[:4] + "****" + key[len(key)-4:]
 }
 
+func isSensitiveKey(key string) bool {
+	lower := strings.ToLower(key)
+	sensitivePrefixes := []string{"api", "token", "bearer", "password", "passwd", "secret", "auth"}
+	for _, prefix := range sensitivePrefixes {
+		if strings.HasPrefix(lower, prefix) || strings.Contains(lower, "_"+prefix) || strings.Contains(lower, "-"+prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // validateURL checks if a URL is safe to request (SSRF protection)
 func validateURL(rawURL string) error {
 	u, err := url.Parse(rawURL)

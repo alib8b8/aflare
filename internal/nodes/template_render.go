@@ -61,7 +61,7 @@ func (n *TemplateRenderNode) Execute(ctx context.Context, input string, params m
 		"input": input,
 	}
 	for k, v := range params {
-		if k != "template" && k != "template_file" {
+		if k != "template" && k != "template_file" && !isSensitiveKey(k) {
 			data[k] = v
 		}
 	}
