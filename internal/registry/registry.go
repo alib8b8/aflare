@@ -74,11 +74,11 @@ func SyncRegistry() error {
 
 	path := GetRegistryPath()
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create registry directory: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("failed to write registry: %w", err)
 	}
 
@@ -132,11 +132,12 @@ func contains(s, substr string) bool {
 
 func lowercase(s string) string {
 	result := make([]byte, len(s))
-	for i, c := range s {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
 		if c >= 'A' && c <= 'Z' {
-			result[i] = byte(c + 32)
+			result[i] = c + 32
 		} else {
-			result[i] = byte(c)
+			result[i] = c
 		}
 	}
 	return string(result)
@@ -238,7 +239,7 @@ func GetNodesDir() (string, error) {
 		return "", fmt.Errorf("failed to get config dir: %w", err)
 	}
 	nodesDir := filepath.Join(configDir, "llm-box", "nodes")
-	if err := os.MkdirAll(nodesDir, 0755); err != nil {
+	if err := os.MkdirAll(nodesDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to create nodes directory: %w", err)
 	}
 	return nodesDir, nil

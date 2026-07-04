@@ -167,7 +167,7 @@ func SaveWorkflow(wf *Workflow, filename string) error {
 	content := wf.ToYAML()
 
 	// Write to file
-	if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filename, []byte(content), 0600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 

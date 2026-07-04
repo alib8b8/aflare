@@ -122,7 +122,7 @@ func auditLog(command string) {
 		return
 	}
 	dir := filepath.Dir(auditLogFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return
 	}
 	// Use 0600 to prevent other users from reading potentially sensitive commands

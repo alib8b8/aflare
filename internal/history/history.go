@@ -50,7 +50,7 @@ func SaveRecord(record Record) error {
 		return fmt.Errorf("history directory not available")
 	}
 
-	if err := os.MkdirAll(historyDir, 0755); err != nil {
+	if err := os.MkdirAll(historyDir, 0750); err != nil {
 		return fmt.Errorf("failed to create history directory: %w", err)
 	}
 
@@ -64,7 +64,7 @@ func SaveRecord(record Record) error {
 		return fmt.Errorf("failed to marshal record: %w", err)
 	}
 
-	if err := os.WriteFile(filename, data, 0644); err != nil {
+	if err := os.WriteFile(filename, data, 0600); err != nil {
 		return fmt.Errorf("failed to write history file: %w", err)
 	}
 
