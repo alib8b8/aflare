@@ -10,15 +10,15 @@ import (
 
 // Record represents a single workflow execution record
 type Record struct {
-	ID        string              `json:"id"`
-	Name      string              `json:"name"`
-	Path      string              `json:"path,omitempty"`
-	StartedAt time.Time           `json:"started_at"`
-	EndedAt   time.Time           `json:"ended_at,omitempty"`
-	Success   bool                `json:"success"`
-	Steps     []StepRecord        `json:"steps,omitempty"`
-	FinalOutput string            `json:"final_output,omitempty"`
-	Error     string              `json:"error,omitempty"`
+	ID          string       `json:"id"`
+	Name        string       `json:"name"`
+	Path        string       `json:"path,omitempty"`
+	StartedAt   time.Time    `json:"started_at"`
+	EndedAt     time.Time    `json:"ended_at,omitempty"`
+	Success     bool         `json:"success"`
+	Steps       []StepRecord `json:"steps,omitempty"`
+	FinalOutput string       `json:"final_output,omitempty"`
+	Error       string       `json:"error,omitempty"`
 }
 
 // StepRecord represents a single step execution record
@@ -159,5 +159,3 @@ func ClearHistory() error {
 
 	return nil
 }
-
-

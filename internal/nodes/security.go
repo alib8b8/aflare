@@ -159,10 +159,10 @@ func validateURL(rawURL string) error {
 	// Block localhost variants
 	lowerHost := strings.ToLower(host)
 	localhostVariants := map[string]bool{
-		"localhost":           true,
+		"localhost":             true,
 		"localhost.localdomain": true,
-		"ip6-localhost":       true,
-		"ip6-loopback":        true,
+		"ip6-localhost":         true,
+		"ip6-loopback":          true,
 	}
 	if localhostVariants[lowerHost] {
 		return fmt.Errorf("access to localhost is not allowed")

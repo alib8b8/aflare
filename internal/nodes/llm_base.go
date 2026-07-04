@@ -43,11 +43,11 @@ type LLMResponse struct {
 }
 
 type LLMNodeConfig struct {
-	Name           string
-	DefaultModel   string
+	Name            string
+	DefaultModel    string
 	DefaultEndpoint string
-	EnvAPIKey      string
-	ProviderName   string
+	EnvAPIKey       string
+	ProviderName    string
 }
 
 type OpenAICompatibleNode struct {

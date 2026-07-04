@@ -23,7 +23,7 @@ var llmKeywords = map[string][]string{
 }
 
 var actionKeywords = map[string][]string{
-	"github":   {"github"},
+	"github":    {"github"},
 	"summarize": {"summarize", "总结", "摘要", "summarise"},
 	"translate": {"translate", "翻译", "translator"},
 	"git":       {"git", "commit", "release", "push", "pull"},

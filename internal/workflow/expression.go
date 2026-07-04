@@ -49,12 +49,13 @@ var varPattern = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
 // Evaluate evaluates an expression and returns the result
 // Supports:
-//   {{input}}       - the workflow's initial input
-//   {{step.N}}      - output of step N (0-indexed)
-//   {{step.name}}   - output of step by name
-//   {{var.NAME}}    - workflow variable
-//   {{env.NAME}}    - environment variable
-//   {{file.PATH}}   - file contents (handled by executor)
+//
+//	{{input}}       - the workflow's initial input
+//	{{step.N}}      - output of step N (0-indexed)
+//	{{step.name}}   - output of step by name
+//	{{var.NAME}}    - workflow variable
+//	{{env.NAME}}    - environment variable
+//	{{file.PATH}}   - file contents (handled by executor)
 func (e *ExpressionEngine) Evaluate(expr string, input string) (string, error) {
 	if expr == "" {
 		return "", nil
