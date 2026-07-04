@@ -28,7 +28,7 @@ func (n *JSONParseNode) Schema() NodeSchema {
 		Input:       "string - JSON string to parse",
 		Output:      "string - extracted value or pretty-printed JSON",
 		Params: []ParamSchema{
-			{Name: "path", Type: "string", Description: "Dot-notation path to extract (e.g. data.items[0].name). If omitted, pretty-prints entire JSON.", Required: false},
+			{Name: "path", Type: "string", Description: "Dot-notation path to extract (e.g. data.items.[0].name). If omitted, pretty-prints entire JSON.", Required: false},
 		},
 	}
 }

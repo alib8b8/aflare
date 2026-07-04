@@ -552,7 +552,7 @@ Sends a desktop notification.
 Parses JSON and extracts specific fields using dot notation.
 
 **Parameters:**
-- `path` (optional) - JSON path to extract (e.g., `user.name`, `items[0].title`). If omitted, returns formatted JSON.
+- `path` (optional) - JSON path to extract (e.g., `user.name`, `items.[0].title`). If omitted, returns formatted JSON.
 
 **Example:**
 ```yaml
