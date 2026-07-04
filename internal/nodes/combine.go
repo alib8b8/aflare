@@ -2,6 +2,7 @@ package nodes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -62,12 +63,15 @@ func (n *CombineNode) Execute(ctx context.Context, input string, params map[stri
 		}
 		return csv, nil
 	case "json":
-		escaped := strings.ReplaceAll(input, "\\", "\\\\")
-		escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
-		escaped = strings.ReplaceAll(escaped, "\n", "\\n")
-		escaped = strings.ReplaceAll(escaped, "\r", "\\r")
-		escaped = strings.ReplaceAll(escaped, "\t", "\\t")
-		return fmt.Sprintf("{\n  \"data\": \"%s\"\n}", escaped), nil
+		// Use encoding/json for correct, complete escaping of all control
+		// characters and special sequences (manual ReplaceAll is incomplete).
+		out, err := json.Marshal(struct {
+			Data string `json:"data"`
+		}{input})
+		if err != nil {
+			return "", fmt.Errorf("failed to encode json: %w", err)
+		}
+		return string(out), nil
 	case "text":
 		return input, nil
 	default:

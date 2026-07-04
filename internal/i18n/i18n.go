@@ -50,6 +50,8 @@ func GetLanguage() string {
 	if instance == nil {
 		return "en"
 	}
+	instance.mu.RLock()
+	defer instance.mu.RUnlock()
 	return instance.lang
 }
 

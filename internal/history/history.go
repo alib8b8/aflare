@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -30,7 +31,10 @@ type StepRecord struct {
 	Error    string        `json:"error,omitempty"`
 }
 
-var historyDir string
+var (
+	historyDir   string
+	historyDirMu sync.RWMutex
+)
 
 func init() {
 	home, err := os.UserHomeDir()
@@ -41,16 +45,26 @@ func init() {
 
 // SetHistoryDir sets a custom history directory (useful for tests)
 func SetHistoryDir(dir string) {
+	historyDirMu.Lock()
+	defer historyDirMu.Unlock()
 	historyDir = dir
+}
+
+// getHistoryDir returns the current history directory under a read lock.
+func getHistoryDir() string {
+	historyDirMu.RLock()
+	defer historyDirMu.RUnlock()
+	return historyDir
 }
 
 // SaveRecord saves a workflow execution record to the history directory
 func SaveRecord(record Record) error {
-	if historyDir == "" {
+	dir := getHistoryDir()
+	if dir == "" {
 		return fmt.Errorf("history directory not available")
 	}
 
-	if err := os.MkdirAll(historyDir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create history directory: %w", err)
 	}
 
@@ -58,7 +72,7 @@ func SaveRecord(record Record) error {
 		record.ID = fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 
-	filename := filepath.Join(historyDir, record.ID+".json")
+	filename := filepath.Join(dir, record.ID+".json")
 	data, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal record: %w", err)
@@ -73,11 +87,12 @@ func SaveRecord(record Record) error {
 
 // ListRecords returns all history records, sorted by time (newest first)
 func ListRecords() ([]Record, error) {
-	if historyDir == "" {
+	dir := getHistoryDir()
+	if dir == "" {
 		return nil, fmt.Errorf("history directory not available")
 	}
 
-	entries, err := os.ReadDir(historyDir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []Record{}, nil
@@ -91,7 +106,7 @@ func ListRecords() ([]Record, error) {
 			continue
 		}
 
-		path := filepath.Join(historyDir, entry.Name())
+		path := filepath.Join(dir, entry.Name())
 		data, err := os.ReadFile(path)
 		if err != nil {
 			continue
@@ -118,11 +133,17 @@ func ListRecords() ([]Record, error) {
 
 // GetRecord retrieves a single history record by ID
 func GetRecord(id string) (*Record, error) {
-	if historyDir == "" {
+	dir := getHistoryDir()
+	if dir == "" {
 		return nil, fmt.Errorf("history directory not available")
 	}
 
-	path := filepath.Join(historyDir, id+".json")
+	// Validate ID to prevent path traversal (e.g. id="../config")
+	if !isValidRecordID(id) {
+		return nil, fmt.Errorf("invalid record ID: %q", id)
+	}
+
+	path := filepath.Join(dir, id+".json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read record: %w", err)
@@ -136,13 +157,28 @@ func GetRecord(id string) (*Record, error) {
 	return &record, nil
 }
 
+// isValidRecordID ensures the ID is safe to use as a filename component.
+// It rejects empty IDs, path separators, and dot-segments like "..".
+func isValidRecordID(id string) bool {
+	if id == "" || len(id) > 100 {
+		return false
+	}
+	for _, c := range id {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 // ClearHistory removes all history records
 func ClearHistory() error {
-	if historyDir == "" {
+	dir := getHistoryDir()
+	if dir == "" {
 		return fmt.Errorf("history directory not available")
 	}
 
-	entries, err := os.ReadDir(historyDir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -154,7 +190,7 @@ func ClearHistory() error {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
-		os.Remove(filepath.Join(historyDir, entry.Name()))
+		os.Remove(filepath.Join(dir, entry.Name()))
 	}
 
 	return nil

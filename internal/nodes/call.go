@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 )
 
 // MaxCallDepth limits recursive workflow calls to prevent stack overflow
 const MaxCallDepth = 10
 
-// callDepth tracks the current recursion depth per context
+// callDepthKey is used to propagate the recursion depth through the context
+// chain. Unlike a per-ctx map, this survives context derivation
+// (WithTimeout/WithCancel) because derived contexts inherit parent values.
 var callDepthKey = struct{}{}
-var callDepthMu sync.Mutex
-var callDepthMap = make(map[interface{}]int)
 
 var ExecuteWorkflowFunc func(ctx context.Context, wf interface{}, reg *Registry) (string, []interface{}, error)
 
@@ -65,21 +64,19 @@ func (n *CallNode) Execute(ctx context.Context, input string, params map[string]
 	}
 	workflowPath = safePath
 
-	// Check recursion depth to prevent stack overflow from circular calls
-	callDepthMu.Lock()
-	depth := callDepthMap[ctx]
+	// Check recursion depth to prevent stack overflow from circular calls.
+	// The depth is propagated via context.Value, which is inherited by derived
+	// contexts (WithTimeout/WithCancel) created downstream by the executor,
+	// so nested calls correctly accumulate depth.
+	depth := 0
+	if v, ok := ctx.Value(callDepthKey).(int); ok {
+		depth = v
+	}
 	if depth >= MaxCallDepth {
-		callDepthMu.Unlock()
 		return "", fmt.Errorf("maximum workflow call depth (%d) exceeded - possible circular call detected", MaxCallDepth)
 	}
-	callDepthMap[ctx] = depth + 1
-	callDepthMu.Unlock()
-
-	defer func() {
-		callDepthMu.Lock()
-		callDepthMap[ctx] = depth
-		callDepthMu.Unlock()
-	}()
+	// Propagate incremented depth to the called workflow via a child context.
+	childCtx := context.WithValue(ctx, callDepthKey, depth+1)
 
 	data, err := os.ReadFile(workflowPath)
 	if err != nil {
@@ -91,7 +88,7 @@ func (n *CallNode) Execute(ctx context.Context, input string, params map[string]
 		return "", fmt.Errorf("workflow file too large (max 10MB)")
 	}
 
-	result, _, err := ExecuteWorkflowFunc(ctx, string(data), GetGlobalRegistry())
+	result, _, err := ExecuteWorkflowFunc(childCtx, string(data), GetGlobalRegistry())
 	if err != nil {
 		return "", fmt.Errorf("failed to execute workflow %q: %w", workflowPath, err)
 	}

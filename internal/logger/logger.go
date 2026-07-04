@@ -4,10 +4,11 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"sync/atomic"
 )
 
 var (
-	defaultLogger *slog.Logger
+	defaultLogger atomic.Pointer[slog.Logger]
 	once          sync.Once
 )
 
@@ -17,7 +18,7 @@ func init() {
 			Level: slog.LevelInfo,
 		}
 		handler := slog.NewTextHandler(os.Stderr, opts)
-		defaultLogger = slog.New(handler)
+		defaultLogger.Store(slog.New(handler))
 	})
 }
 
@@ -25,30 +26,42 @@ func init() {
 func SetLevel(level slog.Level) {
 	opts := &slog.HandlerOptions{Level: level}
 	handler := slog.NewTextHandler(os.Stderr, opts)
-	defaultLogger = slog.New(handler)
+	defaultLogger.Store(slog.New(handler))
+}
+
+func logger() *slog.Logger {
+	l := defaultLogger.Load()
+	if l == nil {
+		// Defensive fallback if SetLevel/once haven't run yet
+		opts := &slog.HandlerOptions{Level: slog.LevelInfo}
+		handler := slog.NewTextHandler(os.Stderr, opts)
+		l = slog.New(handler)
+		defaultLogger.Store(l)
+	}
+	return l
 }
 
 // Debug logs a debug message
 func Debug(msg string, args ...any) {
-	defaultLogger.Debug(msg, args...)
+	logger().Debug(msg, args...)
 }
 
 // Info logs an info message
 func Info(msg string, args ...any) {
-	defaultLogger.Info(msg, args...)
+	logger().Info(msg, args...)
 }
 
 // Warn logs a warning message
 func Warn(msg string, args ...any) {
-	defaultLogger.Warn(msg, args...)
+	logger().Warn(msg, args...)
 }
 
 // Error logs an error message
 func Error(msg string, args ...any) {
-	defaultLogger.Error(msg, args...)
+	logger().Error(msg, args...)
 }
 
 // With returns a logger with the given attributes
 func With(args ...any) *slog.Logger {
-	return defaultLogger.With(args...)
+	return logger().With(args...)
 }

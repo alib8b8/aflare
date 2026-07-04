@@ -122,17 +122,8 @@ func (e *ExpressionEngine) evalSingle(expr string, input string) (string, error)
 
 // evalStepRef resolves a step reference by index or name
 func (e *ExpressionEngine) evalStepRef(name string) (string, error) {
-	// Try as numeric index first
-	if output, ok := e.stepOutputs[name]; ok {
-		return output, nil
-	}
-
-	// Try to find by step name
-	for _, output := range e.stepOutputs {
-		if output != "" {
-			// This branch is hit when name is a step name key
-		}
-	}
+	// stepOutputs is keyed by step index (and optionally by step name when
+	// the executor populates both). A single lookup suffices.
 	if output, ok := e.stepOutputs[name]; ok {
 		return output, nil
 	}

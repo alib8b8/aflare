@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -20,12 +21,19 @@ type Config struct {
 	SafeMode  bool                         `yaml:"safe_mode,omitempty"`
 }
 
-var globalConfig *Config
+var (
+	globalConfig *Config
+	configMu     sync.RWMutex
+)
 
 func LoadConfig() (*Config, error) {
+	configMu.RLock()
 	if globalConfig != nil {
-		return globalConfig, nil
+		cfg := globalConfig
+		configMu.RUnlock()
+		return cfg, nil
 	}
+	configMu.RUnlock()
 
 	cfg := &Config{
 		Providers: make(map[string]LLMProviderConfig),
@@ -45,7 +53,9 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
+	configMu.Lock()
 	globalConfig = cfg
+	configMu.Unlock()
 	return cfg, nil
 }
 
@@ -138,5 +148,7 @@ func IsSafeMode() bool {
 }
 
 func SetConfig(cfg *Config) {
+	configMu.Lock()
+	defer configMu.Unlock()
 	globalConfig = cfg
 }

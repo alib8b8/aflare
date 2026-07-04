@@ -23,8 +23,10 @@ var allowedCommands = map[string]bool{
 	"docker": true, "kubectl": true, "kubectx": true,
 }
 
-// shellMetachars detects shell metacharacters that can be used for command injection
-var shellMetachars = regexp.MustCompile("[;|&$`(){ }]")
+// shellMetachars detects shell metacharacters that can be used for command
+// injection. Note: space is intentionally NOT included here so that commands
+// with arguments (e.g. "ls -la", "echo hello") still work under allowlist mode.
+var shellMetachars = regexp.MustCompile("[;|&$`(){}<>\\\\*?!~='\"]")
 
 var allowListEnabled = false
 var auditLogFile string
@@ -86,7 +88,11 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 		}
 	}
 
-	auditLog(command)
+	if err := auditLog(command); err != nil {
+		// If audit logging fails, refuse to execute the command so that
+		// commands cannot run without an audit trail (fail-closed).
+		return "", fmt.Errorf("failed to write audit log: %w", err)
+	}
 
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
@@ -103,11 +109,16 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 	return strings.TrimSpace(string(output)), nil
 }
 
-// redactCommandForLog removes potential secrets from command before logging
+// redactCommandForLog removes potential secrets from command before logging.
+// It covers Bearer tokens, api_key/password/token/secret assignments,
+// Authorization headers, and URL-embedded credentials.
 func redactCommandForLog(command string) string {
-	// Redact common patterns: Bearer tokens, API keys, passwords
-	tokenPattern := regexp.MustCompile(`(?i)(bearer\s+|api[_-]?key=|password=|token=|secret=)([^\s]+)`)
-	return tokenPattern.ReplaceAllString(command, "${1}****")
+	redacted := command
+	redacted = regexp.MustCompile(`(?i)(bearer\s+)([^\s]+)`).ReplaceAllString(redacted, "${1}****")
+	redacted = regexp.MustCompile(`(?i)(authorization[:\s]+)([^\s'"]+)`).ReplaceAllString(redacted, "${1}****")
+	redacted = regexp.MustCompile(`(?i)(api[_-]?key=|password=|passwd=|token=|secret=)([^\s]+)`).ReplaceAllString(redacted, "${1}****")
+	redacted = regexp.MustCompile(`(https?://[^/\s:@]+:)[^@\s/@]+(@)`).ReplaceAllString(redacted, "${1}****${2}")
+	return redacted
 }
 
 // escapeLogContent prevents log injection by escaping control characters
@@ -117,22 +128,25 @@ func escapeLogContent(s string) string {
 	return s
 }
 
-func auditLog(command string) {
+func auditLog(command string) error {
 	if auditLogFile == "" {
-		return
+		return nil
 	}
 	dir := filepath.Dir(auditLogFile)
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		return
+		return fmt.Errorf("failed to create audit log directory: %w", err)
 	}
 	// Use 0600 to prevent other users from reading potentially sensitive commands
 	f, err := os.OpenFile(auditLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
-		return
+		return fmt.Errorf("failed to open audit log: %w", err)
 	}
 	defer f.Close()
 	timestamp := time.Now().Format(time.RFC3339)
 	redacted := redactCommandForLog(command)
 	escaped := escapeLogContent(redacted)
-	fmt.Fprintf(f, "[%s] %s\n", timestamp, escaped)
+	if _, err := fmt.Fprintf(f, "[%s] %s\n", timestamp, escaped); err != nil {
+		return fmt.Errorf("failed to write audit log: %w", err)
+	}
+	return nil
 }

@@ -4,13 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
+	"time"
 
 	"github.com/alib8b8/llm-box/internal/logger"
 )
+
+// safeHTTPClient is a shared HTTP client with a timeout to prevent
+// slowloris-style hangs against the registry sync / node download endpoints.
+var safeHTTPClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
 
 type NodeInfo struct {
 	Name        string   `json:"name"`
@@ -57,7 +65,11 @@ func LoadRegistry() (*Registry, error) {
 func SyncRegistry() error {
 	logger.Info("syncing node registry")
 
-	resp, err := http.Get(defaultRegistryURL)
+	if err := validateRegistryURL(defaultRegistryURL); err != nil {
+		return fmt.Errorf("invalid registry URL: %w", err)
+	}
+
+	resp, err := safeHTTPClient.Get(defaultRegistryURL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch registry: %w", err)
 	}
@@ -67,7 +79,8 @@ func SyncRegistry() error {
 		return fmt.Errorf("registry returned status %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	// Limit registry size to 5MB to prevent OOM
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
 	if err != nil {
 		return fmt.Errorf("failed to read registry data: %w", err)
 	}
@@ -183,14 +196,14 @@ func downloadNode(node *NodeInfo) error {
 		return fmt.Errorf("invalid node name: %q (only alphanumeric, hyphens, underscores allowed)", node.Name)
 	}
 
-	// Validate URL scheme
-	if !strings.HasPrefix(node.URL, "https://") && !strings.HasPrefix(node.URL, "http://") {
-		return fmt.Errorf("invalid node URL: must be http or https")
+	// Validate URL: enforce HTTPS and SSRF protection
+	if err := validateRegistryURL(node.URL); err != nil {
+		return fmt.Errorf("invalid node URL: %w", err)
 	}
 
 	logger.Info("installing node", "name", node.Name, "url", node.URL)
 
-	resp, err := http.Get(node.URL)
+	resp, err := safeHTTPClient.Get(node.URL)
 	if err != nil {
 		return fmt.Errorf("failed to download node: %w", err)
 	}
@@ -231,6 +244,85 @@ func isValidNodeName(name string) bool {
 		}
 	}
 	return true
+}
+
+// validateRegistryURL enforces HTTPS and SSRF protection for any URL used to
+// sync the registry or download node files. Plain HTTP is rejected to prevent
+// man-in-the-middle tampering of downloaded workflow definitions.
+func validateRegistryURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+
+	// Enforce HTTPS only - registry/node downloads are trusted code, so plain
+	// HTTP is not acceptable.
+	if u.Scheme != "https" {
+		return fmt.Errorf("only https URLs are allowed, got: %s", u.Scheme)
+	}
+
+	// Block userinfo to prevent credential leakage
+	if u.User != nil {
+		return fmt.Errorf("URLs with userinfo (credentials) are not allowed")
+	}
+
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("URL has no host")
+	}
+
+	// Block localhost variants
+	if isLocalhost(host) {
+		return fmt.Errorf("access to localhost is not allowed")
+	}
+
+	// Validate resolved IPs to prevent SSRF
+	if ip := net.ParseIP(host); ip != nil {
+		if err := validatePublicIP(ip, host); err != nil {
+			return err
+		}
+	} else {
+		ips, err := net.LookupIP(host)
+		if err != nil {
+			return fmt.Errorf("failed to resolve host %s: %w", host, err)
+		}
+		for _, resolvedIP := range ips {
+			if err := validatePublicIP(resolvedIP, host); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func isLocalhost(host string) bool {
+	switch host {
+	case "localhost", "localhost.localdomain", "ip6-localhost", "ip6-loopback":
+		return true
+	}
+	return false
+}
+
+// validatePublicIP rejects loopback / private / link-local / unspecified /
+// multicast / reserved IPs to prevent SSRF against internal services.
+func validatePublicIP(ip net.IP, displayHost string) error {
+	if ip.IsLoopback() {
+		return fmt.Errorf("access to loopback address %s is not allowed", displayHost)
+	}
+	if ip.IsPrivate() {
+		return fmt.Errorf("access to private address %s is not allowed", displayHost)
+	}
+	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return fmt.Errorf("access to link-local address %s is not allowed", displayHost)
+	}
+	if ip.IsUnspecified() {
+		return fmt.Errorf("access to unspecified address %s is not allowed", displayHost)
+	}
+	if ip.IsMulticast() {
+		return fmt.Errorf("access to multicast address %s is not allowed", displayHost)
+	}
+	return nil
 }
 
 func GetNodesDir() (string, error) {
