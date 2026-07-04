@@ -58,7 +58,7 @@ jobs:
       - name: Run gosec
         run: |
           echo "Running gosec security scan..."
-          gosec -severity medium -confidence medium -conf .gosec.toml ./...
+          gosec -severity medium -confidence medium -conf .gosec.json ./...
           echo "✅ gosec passed"
 
       - name: Run go mod verify
