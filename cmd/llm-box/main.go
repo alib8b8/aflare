@@ -16,6 +16,30 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
+var sensitiveKeyPrefixes = []string{"api", "token", "bearer", "password", "passwd", "secret", "auth"}
+
+func isSensitiveKey(key string) bool {
+	lower := strings.ToLower(key)
+	for _, prefix := range sensitiveKeyPrefixes {
+		if strings.HasPrefix(lower, prefix) || strings.Contains(lower, "_"+prefix) || strings.Contains(lower, "-"+prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func redactParams(params map[string]string) map[string]string {
+	redacted := make(map[string]string)
+	for k, v := range params {
+		if isSensitiveKey(k) {
+			redacted[k] = "***"
+		} else {
+			redacted[k] = v
+		}
+	}
+	return redacted
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		i18n.Init("")
@@ -331,7 +355,7 @@ func runCLI(wf *workflow.Workflow, reg *nodes.Registry) {
 	for i, step := range wf.Steps {
 		fmt.Printf("  %d. Node: %s\n", i+1, step.Node)
 		if len(step.Params) > 0 {
-			fmt.Printf("     Params: %v\n", step.Params)
+			fmt.Printf("     Params: %v\n", redactParams(step.Params))
 		}
 	}
 

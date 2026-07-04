@@ -69,7 +69,7 @@ func (n *TemplateRenderNode) Execute(ctx context.Context, input string, params m
 	funcMap := template.FuncMap{
 		"upper": strings.ToUpper,
 		"lower": strings.ToLower,
-		"title": strings.Title,
+		"title": strings.ToTitle,
 		"trim":  strings.TrimSpace,
 		"len":   func(s string) int { return len(s) },
 	}
