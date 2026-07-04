@@ -1,7 +1,6 @@
 {
   "app.name": "llm-box",
   "app.description": "Двигатель AI-воркфлоу с первым классом для терминала",
-
   "usage.title": "llm-box - Двигатель AI-воркфлоу с первым классом для терминала",
   "usage.create": "Создать новый воркфлоу из естественного языка",
   "usage.run": "Запустить YAML-воркфлоу",
@@ -12,34 +11,27 @@
   "usage.registry_search": "Поиск узлов в реестре",
   "usage.help": "Показать это сообщение помощи",
   "usage.safe_mode": "Запустить в безопасном режиме (отключает execute и внешние узлы)",
-
   "safe_mode.enabled": "Безопасный режим включен - узел execute и внешние узлы отключены",
   "dry_run.enabled": "Режим dry run - воркфлоу будет проверен, но не выполнен",
-
   "error.no_command": "команда не предоставлена",
   "error.workflow_not_found": "воркфлоу не найден: %s",
   "error.node_not_found": "узел '%s' не найден в реестре",
   "error.workflow_parse": "не удалось разобрать воркфлоу: %v",
   "error.workflow_execute": "выполнение воркфлоу не удалось: %v",
-
   "create.start": "Создание воркфлоу из: \"%s\"",
   "create.success": "Воркфлоу создан: %s",
   "create.run_hint": "Чтобы запустить:",
   "create.usage": "Использование: llm-box create \"описание вашего воркфлоу\"",
-
   "run.usage": "Использование: llm-box run <workflow-file.yaml>",
   "run.dry_run_complete": "Проверка завершена - воркфлоу валиден",
-
   "install.usage": "Использование: llm-box install <node-name>",
   "install.success": "Узел '%s' установлен успешно!",
   "install.failed": "Не удалось установить узел '%s': %v",
   "install.use_list": "Используйте 'llm-box registry list' для просмотра доступных узлов",
   "install.usage_hint": "Чтобы использовать этот узел, добавьте его в ваш воркфлоу:",
-
   "uninstall.usage": "Использование: llm-box uninstall <node-name>",
   "uninstall.success": "Узел '%s' удален успешно!",
   "uninstall.failed": "Не удалось удалить узел '%s': %v",
-
   "registry.usage": "Использование: llm-box registry <command>",
   "registry.sync_success": "Реестр синхронизирован успешно!",
   "registry.sync_failed": "Не удалось синхронизировать реестр: %v",
@@ -51,16 +43,13 @@
   "registry.list_failed": "Не удалось получить список узлов: %v",
   "registry.sync_hint": "Сначала попробуйте запустить 'llm-box registry sync'",
   "registry.unknown_cmd": "Неизвестная команда реестра: %s",
-
   "list.title": "Доступные узлы:",
   "list.empty": "Нет зарегистрированных узлов",
   "list.installed": "Установленные узлы из сообщества:",
-
   "validate.usage": "Использование: llm-box validate <workflow-file.yaml>",
   "validate.valid": "Воркфлоу валиден!",
   "validate.warnings": "Предупреждения валидации:",
   "validate.error": "Ошибка загрузки воркфлоу: %v",
-
   "workflow.name": "Воркфлоу: %s",
   "workflow.description": "Описание: %s",
   "workflow.steps": "Шаги (%d):",
@@ -68,11 +57,9 @@
   "workflow.completed": "Воркфлоу завершен!",
   "workflow.failed": "Воркфлоу не удался: %v",
   "workflow.final_output": "Итоговый вывод",
-
   "step.status_pass": "УСПЕХ",
   "step.status_fail": "ПРОВАЛ",
   "step.duration": "затрачено %v",
-
   "tui.title": "llm-box - %s",
   "tui.steps": "Шаги:",
   "tui.output_preview": "Предпросмотр вывода:",
@@ -87,21 +74,17 @@
   "tui.status_error": "ошибка",
   "tui.step_index": "%d. %s %s",
   "tui.step_duration": "(%s)",
-
   "options": "Опции",
   "options.lang": "Установить язык интерфейса",
   "examples": "Примеры",
-
   "table.name": "НАЗВАНИЕ",
   "table.description": "ОПИСАНИЕ",
   "table.version": "ВЕРСИЯ",
   "table.category": "КАТЕГОРИЯ",
-
   "node.categories.llm": "LLM",
   "node.categories.tools": "Инструменты",
   "node.categories.utility": "Полезные",
   "node.categories.workflow": "Воркфлоу",
-
   "node.execute.name": "execute",
   "node.execute.description": "Выполнить shell-команду",
   "node.transform.name": "transform",
@@ -139,5 +122,8 @@
   "node.ollama.name": "ollama",
   "node.ollama.description": "Вызвать локальный LLM-сервер Ollama",
   "node.openai_compatible.name": "openai_compatible",
-  "node.openai_compatible.description": "Вызвать API, совместимое с OpenAI"
+  "node.openai_compatible.description": "Вызвать API, совместимое с OpenAI",
+  "tui.completed": "Completed",
+  "tui.press_q": "Press Q to quit",
+  "tui.failed": "Failed"
 }

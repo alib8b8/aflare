@@ -1,7 +1,6 @@
 {
   "app.name": "llm-box",
   "app.description": "터미널 우선 AI 워크플로우 엔진",
-
   "usage.title": "llm-box - 터미널 우선 AI 워크플로우 엔진",
   "usage.create": "자연어로 새로운 워크플로우 생성",
   "usage.run": "YAML 워크플로우 실행",
@@ -12,34 +11,27 @@
   "usage.registry_search": "레지스트리에서 노드 검색",
   "usage.help": "이 도움말 메시지 보기",
   "usage.safe_mode": "안전 모드로 실행 (execute 노드 및 외부 노드 비활성화)",
-
   "safe_mode.enabled": "안전 모드가 활성화되었습니다 - execute 노드 및 외부 노드가 비활성화되었습니다",
   "dry_run.enabled": "드라이 런 모드 - 워크플로우가 유효성 검사되지만 실행되지 않습니다",
-
   "error.no_command": "명령이 제공되지 않았습니다",
   "error.workflow_not_found": "워크플로우 파일을 찾을 수 없습니다: %s",
   "error.node_not_found": "노드 '%s'가 레지스트리에 없습니다",
   "error.workflow_parse": "워크플로우 파싱에 실패했습니다: %v",
   "error.workflow_execute": "워크플로우 실행에 실패했습니다: %v",
-
   "create.start": "워크플로우 생성 중: \"%s\"",
   "create.success": "워크플로우가 생성되었습니다: %s",
   "create.run_hint": "실행하려면:",
   "create.usage": "사용법: llm-box create \"워크플로우 설명\"",
-
   "run.usage": "사용법: llm-box run <workflow-file.yaml>",
   "run.dry_run_complete": "드라이 런이 완료되었습니다 - 워크플로우가 유효합니다",
-
   "install.usage": "사용법: llm-box install <node-name>",
   "install.success": "노드 '%s'가 성공적으로 설치되었습니다!",
   "install.failed": "노드 '%s' 설치에 실패했습니다: %v",
   "install.use_list": "사용 가능한 노드를 보려면 'llm-box registry list'를 사용하세요",
   "install.usage_hint": "이 노드를 사용하려면 워크플로우에 추가하세요:",
-
   "uninstall.usage": "사용법: llm-box uninstall <node-name>",
   "uninstall.success": "노드 '%s'가 성공적으로 제거되었습니다!",
   "uninstall.failed": "노드 '%s' 제거에 실패했습니다: %v",
-
   "registry.usage": "사용법: llm-box registry <command>",
   "registry.sync_success": "레지스트리가 성공적으로 동기화되었습니다!",
   "registry.sync_failed": "레지스트리 동기화에 실패했습니다: %v",
@@ -51,16 +43,13 @@
   "registry.list_failed": "노드 목록을 가져오는 데 실패했습니다: %v",
   "registry.sync_hint": "먼저 'llm-box registry sync'를 실행해보세요",
   "registry.unknown_cmd": "알 수 없는 레지스트리 명령: %s",
-
   "list.title": "사용 가능한 노드:",
   "list.empty": "등록된 노드가 없습니다",
   "list.installed": "설치된 커뮤니티 노드:",
-
   "validate.usage": "사용법: llm-box validate <workflow-file.yaml>",
   "validate.valid": "워크플로우가 유효합니다!",
   "validate.warnings": "유효성 검사 경고:",
   "validate.error": "워크플로우 로드 오류: %v",
-
   "workflow.name": "워크플로우: %s",
   "workflow.description": "설명: %s",
   "workflow.steps": "단계 (%d):",
@@ -68,11 +57,9 @@
   "workflow.completed": "워크플로우가 완료되었습니다!",
   "workflow.failed": "워크플로우 실패: %v",
   "workflow.final_output": "최종 출력",
-
   "step.status_pass": "성공",
   "step.status_fail": "실패",
   "step.duration": "%v 소요",
-
   "tui.title": "llm-box - %s",
   "tui.steps": "단계:",
   "tui.output_preview": "출력 미리보기:",
@@ -87,21 +74,17 @@
   "tui.status_error": "오류",
   "tui.step_index": "%d. %s %s",
   "tui.step_duration": "(%s)",
-
   "options": "옵션",
   "options.lang": "인터페이스 언어 설정",
   "examples": "예시",
-
   "table.name": "이름",
   "table.description": "설명",
   "table.version": "버전",
   "table.category": "카테고리",
-
   "node.categories.llm": "LLM",
   "node.categories.tools": "도구",
   "node.categories.utility": "유틸리티",
   "node.categories.workflow": "워크플로우",
-
   "node.execute.name": "execute",
   "node.execute.description": "쉘 명령 실행",
   "node.transform.name": "transform",
@@ -139,5 +122,8 @@
   "node.ollama.name": "ollama",
   "node.ollama.description": "Ollama 로컬 LLM 서버 호출",
   "node.openai_compatible.name": "openai_compatible",
-  "node.openai_compatible.description": "OpenAI 호환 API 호출"
+  "node.openai_compatible.description": "OpenAI 호환 API 호출",
+  "tui.completed": "Completed",
+  "tui.press_q": "Press Q to quit",
+  "tui.failed": "Failed"
 }

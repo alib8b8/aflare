@@ -1,7 +1,6 @@
 {
   "app.name": "llm-box",
   "app.description": "محرك تسلسل العمليات AI الموجه للطرفية",
-
   "usage.title": "llm-box - محرك تسلسل العمليات AI الموجه للطرفية",
   "usage.create": "إنشاء تسلسل عمليات جديد من اللغة الطبيعية",
   "usage.run": "تشغيل تسلسل عمليات YAML",
@@ -12,34 +11,27 @@
   "usage.registry_search": "بحث عن عقد في السجل",
   "usage.help": "عرض رسالة المساعدة هذه",
   "usage.safe_mode": "تشغيل في الوضع الآمن (تعطيل عقد execute والعقد الخارجية)",
-
   "safe_mode.enabled": "الوضع الآمن مفعل - عقد execute والعقد الخارجية معطلة",
   "dry_run.enabled": "وضع التشغيل التجريبي - سيتم التحقق من صحة تسلسل العمليات ولكن لن يتم تنفيذه",
-
   "error.no_command": "لم يتم توفير أي أمر",
   "error.workflow_not_found": "ملف تسلسل العمليات غير موجود: %s",
   "error.node_not_found": "العقدة '%s' غير موجودة في السجل",
   "error.workflow_parse": "فشل في تحليل تسلسل العمليات: %v",
   "error.workflow_execute": "فشل في تنفيذ تسلسل العمليات: %v",
-
   "create.start": "إنشاء تسلسل العمليات من: \"%s\"",
   "create.success": "تم إنشاء تسلسل العمليات: %s",
   "create.run_hint": "للتشغيل:",
   "create.usage": "الاستخدام: llm-box create \"وصف تسلسل العمليات الخاص بك\"",
-
   "run.usage": "الاستخدام: llm-box run <workflow-file.yaml>",
   "run.dry_run_complete": "اكتمل التشغيل التجريبي - تسلسل العمليات صالح",
-
   "install.usage": "الاستخدام: llm-box install <node-name>",
   "install.success": "تم تثبيت العقدة '%s' بنجاح!",
   "install.failed": "فشل في تثبيت العقدة '%s': %v",
   "install.use_list": "استخدم 'llm-box registry list' لرؤية العقد المتاحة",
   "install.usage_hint": "للاستخدام هذه العقدة، أضفها إلى تسلسل العمليات الخاص بك:",
-
   "uninstall.usage": "الاستخدام: llm-box uninstall <node-name>",
   "uninstall.success": "تم إلغاء تثبيت العقدة '%s' بنجاح!",
   "uninstall.failed": "فشل في إلغاء تثبيت العقدة '%s': %v",
-
   "registry.usage": "الاستخدام: llm-box registry <command>",
   "registry.sync_success": "تم مزامنة السجل بنجاح!",
   "registry.sync_failed": "فشل في مزامنة السجل: %v",
@@ -51,16 +43,13 @@
   "registry.list_failed": "فشل في الحصول على قائمة العقد: %v",
   "registry.sync_hint": "حاول تشغيل 'llm-box registry sync' أولاً",
   "registry.unknown_cmd": "أمر السجل غير المعروف: %s",
-
   "list.title": "العقد المتاحة:",
   "list.empty": "لا توجد عقد مسجلة",
   "list.installed": "العقد المجتمعية المثبتة:",
-
   "validate.usage": "الاستخدام: llm-box validate <workflow-file.yaml>",
   "validate.valid": "تسلسل العمليات صالح!",
   "validate.warnings": "تحذيرات التحقق:",
   "validate.error": "خطأ في تحميل تسلسل العمليات: %v",
-
   "workflow.name": "تسلسل العمليات: %s",
   "workflow.description": "الوصف: %s",
   "workflow.steps": "الخطوات (%d):",
@@ -68,11 +57,9 @@
   "workflow.completed": "اكتمل تسلسل العمليات!",
   "workflow.failed": "فشل تسلسل العمليات: %v",
   "workflow.final_output": "المخرجات النهائية",
-
   "step.status_pass": "نجاح",
   "step.status_fail": "فشل",
   "step.duration": "استغرق %v",
-
   "tui.title": "llm-box - %s",
   "tui.steps": "الخطوات:",
   "tui.output_preview": "معاينة المخرجات:",
@@ -87,21 +74,17 @@
   "tui.status_error": "خطأ",
   "tui.step_index": "%d. %s %s",
   "tui.step_duration": "(%s)",
-
   "options": "الخيارات",
   "options.lang": "تحديد لغة الواجهة",
   "examples": "الأمثلة",
-
   "table.name": "الاسم",
   "table.description": "الوصف",
   "table.version": "النسخة",
   "table.category": "الفئة",
-
   "node.categories.llm": "LLM",
   "node.categories.tools": "الأدوات",
   "node.categories.utility": "الأدوات المساعدة",
   "node.categories.workflow": "تسلسل العمليات",
-
   "node.execute.name": "execute",
   "node.execute.description": "تنفيذ أمر shell",
   "node.transform.name": "transform",
@@ -139,5 +122,8 @@
   "node.ollama.name": "ollama",
   "node.ollama.description": "استدعاء خادم LLM المحلي Ollama",
   "node.openai_compatible.name": "openai_compatible",
-  "node.openai_compatible.description": "استدعاء API متوافقة مع OpenAI"
+  "node.openai_compatible.description": "استدعاء API متوافقة مع OpenAI",
+  "tui.completed": "Completed",
+  "tui.press_q": "Press Q to quit",
+  "tui.failed": "Failed"
 }

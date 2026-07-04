@@ -1,7 +1,6 @@
 {
   "app.name": "llm-box",
   "app.description": "Motor de flujo de trabajo AI terminal-first",
-
   "usage.title": "llm-box - Motor de flujo de trabajo AI terminal-first",
   "usage.create": "Crear un nuevo flujo de trabajo a partir de lenguaje natural",
   "usage.run": "Ejecutar un flujo de trabajo YAML",
@@ -12,34 +11,27 @@
   "usage.registry_search": "Buscar nodos en el registro",
   "usage.help": "Mostrar este mensaje de ayuda",
   "usage.safe_mode": "Ejecutar en modo seguro (desactiva nodos execute y externos)",
-
   "safe_mode.enabled": "Modo seguro activado - nodo execute y nodos externos están desactivados",
   "dry_run.enabled": "Modo de prueba - el flujo de trabajo se validará pero no se ejecutará",
-
   "error.no_command": "no se proporcionó comando",
   "error.workflow_not_found": "archivo de flujo de trabajo no encontrado: %s",
   "error.node_not_found": "nodo '%s' no encontrado en el registro",
   "error.workflow_parse": "error al analizar flujo de trabajo: %v",
   "error.workflow_execute": "error al ejecutar flujo de trabajo: %v",
-
   "create.start": "Creando flujo de trabajo a partir de: \"%s\"",
   "create.success": "Flujo de trabajo creado: %s",
   "create.run_hint": "Para ejecutarlo:",
   "create.usage": "Uso: llm-box create \"descripción de tu flujo de trabajo\"",
-
   "run.usage": "Uso: llm-box run <workflow-file.yaml>",
   "run.dry_run_complete": "Prueba completada - el flujo de trabajo es válido",
-
   "install.usage": "Uso: llm-box install <node-name>",
   "install.success": "Nodo '%s' instalado exitosamente!",
   "install.failed": "Error al instalar nodo '%s': %v",
   "install.use_list": "Usa 'llm-box registry list' para ver los nodos disponibles",
   "install.usage_hint": "Para usar este nodo, agrégalo a tu flujo de trabajo:",
-
   "uninstall.usage": "Uso: llm-box uninstall <node-name>",
   "uninstall.success": "Nodo '%s' desinstalado exitosamente!",
   "uninstall.failed": "Error al desinstalar nodo '%s': %v",
-
   "registry.usage": "Uso: llm-box registry <command>",
   "registry.sync_success": "Registro sincronizado exitosamente!",
   "registry.sync_failed": "Error al sincronizar registro: %v",
@@ -51,16 +43,13 @@
   "registry.list_failed": "Error al listar nodos: %v",
   "registry.sync_hint": "Intenta ejecutar 'llm-box registry sync' primero",
   "registry.unknown_cmd": "Comando de registro desconocido: %s",
-
   "list.title": "Nodos disponibles:",
   "list.empty": "No hay nodos registrados",
   "list.installed": "Nodos comunitarios instalados:",
-
   "validate.usage": "Uso: llm-box validate <workflow-file.yaml>",
   "validate.valid": "El flujo de trabajo es válido!",
   "validate.warnings": "Advertencias de validación:",
   "validate.error": "Error al cargar flujo de trabajo: %v",
-
   "workflow.name": "Flujo de trabajo: %s",
   "workflow.description": "Descripción: %s",
   "workflow.steps": "Pasos (%d):",
@@ -68,11 +57,9 @@
   "workflow.completed": "Flujo de trabajo completado!",
   "workflow.failed": "Flujo de trabajo fallido: %v",
   "workflow.final_output": "Salida final",
-
   "step.status_pass": "ÉXITO",
   "step.status_fail": "FALLO",
   "step.duration": "duró %v",
-
   "tui.title": "llm-box - %s",
   "tui.steps": "Pasos:",
   "tui.output_preview": "Vista previa de salida:",
@@ -87,21 +74,17 @@
   "tui.status_error": "error",
   "tui.step_index": "%d. %s %s",
   "tui.step_duration": "(%s)",
-
   "options": "Opciones",
   "options.lang": "Establecer idioma de la interfaz",
   "examples": "Ejemplos",
-
   "table.name": "NOMBRE",
   "table.description": "DESCRIPCIÓN",
   "table.version": "VERSIÓN",
   "table.category": "CATEGORÍA",
-
   "node.categories.llm": "LLM",
   "node.categories.tools": "Herramientas",
   "node.categories.utility": "Utilidades",
   "node.categories.workflow": "Flujo de trabajo",
-
   "node.execute.name": "execute",
   "node.execute.description": "Ejecutar un comando shell",
   "node.transform.name": "transform",
@@ -139,5 +122,8 @@
   "node.ollama.name": "ollama",
   "node.ollama.description": "Llamar a servidor LLM local Ollama",
   "node.openai_compatible.name": "openai_compatible",
-  "node.openai_compatible.description": "Llamar a API compatible con OpenAI"
+  "node.openai_compatible.description": "Llamar a API compatible con OpenAI",
+  "tui.completed": "Completed",
+  "tui.press_q": "Press Q to quit",
+  "tui.failed": "Failed"
 }
