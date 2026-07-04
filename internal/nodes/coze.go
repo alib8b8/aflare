@@ -26,13 +26,13 @@ func (n *CozeNode) Name() string {
 }
 
 func (n *CozeNode) Description() string {
-	return "Call ByteDance Coze API"
+	return "WIP - Call ByteDance Coze API (not functional, API compatibility issues)"
 }
 
 func (n *CozeNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "coze",
-		Description: "Call ByteDance Coze API",
+		Description: "WIP - Call ByteDance Coze API (not functional, API compatibility issues)",
 		Input:       "string - user message content",
 		Output:      "string - AI response content",
 		Params: []ParamSchema{
