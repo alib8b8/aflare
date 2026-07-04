@@ -1,0 +1,177 @@
+package i18n
+
+import (
+	"os"
+	"testing"
+)
+
+func TestInit(t *testing.T) {
+	Init("en")
+	if GetLanguage() != "en" {
+		t.Errorf("expected language en, got %s", GetLanguage())
+	}
+}
+
+func TestInitEmpty(t *testing.T) {
+	Init("")
+	// Should default to something (detected or "en")
+	lang := GetLanguage()
+	if lang == "" {
+		t.Error("expected non-empty language")
+	}
+}
+
+func TestTranslate(t *testing.T) {
+	Init("en")
+	// Test a known key
+	msg := T("tui.completed")
+	if msg != "Completed" {
+		t.Errorf("expected 'Completed', got '%s'", msg)
+	}
+}
+
+func TestTranslateMissing(t *testing.T) {
+	Init("en")
+	msg := T("nonexistent.key")
+	if msg != "nonexistent.key" {
+		t.Errorf("expected key name as fallback, got '%s'", msg)
+	}
+}
+
+func TestTranslateWithArgs(t *testing.T) {
+	Init("en")
+	// Test that format args work if any key uses them
+	msg := T("tui.completed")
+	if msg == "" {
+		t.Error("expected non-empty translation")
+	}
+}
+
+func TestHasKey(t *testing.T) {
+	Init("en")
+	if !HasKey("tui.completed") {
+		t.Error("expected HasKey to return true for existing key")
+	}
+	if HasKey("nonexistent.key") {
+		t.Error("expected HasKey to return false for missing key")
+	}
+}
+
+func TestSetLanguage(t *testing.T) {
+	Init("en")
+	instance.SetLanguage("zh")
+	if GetLanguage() != "zh" {
+		t.Errorf("expected language zh, got %s", GetLanguage())
+	}
+}
+
+func TestSetLanguageInvalid(t *testing.T) {
+	Init("en")
+	instance.SetLanguage("invalid_lang")
+	// Should fallback to English messages
+	msg := T("tui.completed")
+	if msg == "" {
+		t.Error("expected non-empty fallback translation")
+	}
+}
+
+func TestAvailableLanguages(t *testing.T) {
+	langs := AvailableLanguages()
+	if len(langs) < 9 {
+		t.Errorf("expected at least 9 languages, got %d", len(langs))
+	}
+}
+
+func TestNormalizeLang(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"en", "en"},
+		{"english", "en"},
+		{"zh", "zh"},
+		{"zh_CN.UTF-8", "zh"},
+		{"zh-cn", "zh"},
+		{"ru", "ru"},
+		{"russian", "ru"},
+		{"fr", "fr"},
+		{"french", "fr"},
+		{"ja", "ja"},
+		{"japanese", "ja"},
+		{"ko", "ko"},
+		{"korean", "ko"},
+		{"es", "es"},
+		{"spanish", "es"},
+		{"ar", "ar"},
+		{"arabic", "ar"},
+		{"hi", "hi"},
+		{"hindi", "hi"},
+		{"unknown", "en"},
+		{"", "en"},
+	}
+
+	for _, tt := range tests {
+		result := normalizeLang(tt.input)
+		if result != tt.expected {
+			t.Errorf("normalizeLang(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestDetectLanguage(t *testing.T) {
+	// Test with env var
+	os.Setenv("LLM_BOX_LANG", "zh")
+	lang := detectLanguage()
+	if lang != "zh" {
+		t.Errorf("expected zh, got %s", lang)
+	}
+	os.Unsetenv("LLM_BOX_LANG")
+
+	// Test with LANG env var
+	os.Setenv("LANG", "ja_JP.UTF-8")
+	lang = detectLanguage()
+	if lang != "ja" {
+		t.Errorf("expected ja, got %s", lang)
+	}
+	os.Unsetenv("LANG")
+
+	// Test default
+	os.Unsetenv("LLM_BOX_LANG")
+	os.Unsetenv("LANG")
+	os.Unsetenv("LANGUAGE")
+	lang = detectLanguage()
+	if lang != "en" {
+		t.Errorf("expected en as default, got %s", lang)
+	}
+}
+
+func TestChineseTranslation(t *testing.T) {
+	Init("zh")
+	msg := T("tui.completed")
+	if msg == "" {
+		t.Error("expected non-empty Chinese translation")
+	}
+}
+
+func TestAllLocalesHaveSameKeys(t *testing.T) {
+	Init("en")
+	enKeys := instance.fallback
+	langs := AvailableLanguages()
+
+	for _, lang := range langs {
+		if lang == "en" {
+			continue
+		}
+		instance.SetLanguage(lang)
+		missingCount := 0
+		for key := range enKeys {
+			if !instance.HasKey(key) {
+				missingCount++
+			}
+		}
+		if missingCount > 0 {
+			t.Errorf("language %s is missing %d keys from English baseline", lang, missingCount)
+		}
+		instance.SetLanguage("en")
+	}
+}

@@ -1,0 +1,90 @@
+version: 2
+
+project_name: llm-box
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: llm-box
+    main: ./cmd/llm-box
+    binary: llm-box
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: default
+    name_template: >-
+      {{ .ProjectName }}-
+      {{- .Os }}-
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - install.sh
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "merge conflict"
+
+release:
+  github:
+    owner: alib8b8
+    name: llm-box
+  name_template: "llm-box {{ .Tag }}"
+  footer: |
+    ### Install (Linux / macOS)
+    ```bash
+    curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
+    ```
+
+nfpms:
+  - id: packages
+    package_name: llm-box
+    description: Terminal-first AI workflow engine
+    maintainer: alib8b8
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    contents:
+      - src: install.sh
+        dst: /usr/share/llm-box/install.sh
+
+brews:
+  - name: llm-box
+    repository:
+      owner: alib8b8
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/alib8b8/llm-box
+    description: Terminal-first AI workflow engine
+    test: |
+      system "#{bin}/llm-box --version"
+    install: |
+      bin.install "llm-box"
