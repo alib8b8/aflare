@@ -30,6 +30,7 @@ archives:
       {{ .ProjectName }}-
       {{- .Os }}-
       {{- .Arch }}
+    format: tar.gz
     format_overrides:
       - goos: windows
         format: zip
@@ -75,16 +76,3 @@ nfpms:
     contents:
       - src: install.sh
         dst: /usr/share/llm-box/install.sh
-
-brews:
-  - name: llm-box
-    repository:
-      owner: alib8b8
-      name: homebrew-tap
-    directory: Formula
-    homepage: https://github.com/alib8b8/llm-box
-    description: Terminal-first AI workflow engine
-    test: |
-      system "#{bin}/llm-box --version"
-    install: |
-      bin.install "llm-box"
