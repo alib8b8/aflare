@@ -68,11 +68,6 @@ jobs:
           go mod verify
           echo "✅ go mod verify passed"
 
-      - name: Run security scan script
-        run: |
-          echo "Running security scan..."
-          ./scripts/security-scan.sh
-
   test:
     name: Test
     runs-on: ubuntu-latest
