@@ -8,6 +8,7 @@ import (
 
 	"github.com/alib8b8/llm-box/internal/cli"
 	"github.com/alib8b8/llm-box/internal/i18n"
+	"github.com/alib8b8/llm-box/internal/mcp"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/tui"
 	"github.com/alib8b8/llm-box/internal/workflow"
@@ -47,10 +48,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	command, args, safeMode, dryRun, lang := cli.ParseArgs(os.Args[1:])
+	command, args, safeMode, dryRun, mcpServer, lang := cli.ParseArgs(os.Args[1:])
 
 	// Initialize i18n with detected or specified language
 	i18n.Init(lang)
+
+	// MCP server mode: start JSON-RPC server over stdio
+	if mcpServer {
+		server := mcp.NewServer()
+		if err := server.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	if safeMode {
 		nodes.SetSafeMode(true)

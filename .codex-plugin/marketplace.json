@@ -1,0 +1,28 @@
+{
+  "name": "llm-box",
+  "displayName": "llm-box - Terminal Workflow Engine",
+  "description": "Terminal-first workflow automation engine. Generate and execute YAML workflows from plain English. 20+ built-in nodes, 15+ LLM providers, MCP server mode.",
+  "version": "1.0.0",
+  "author": "alib8b8",
+  "repository": "https://github.com/alib8b8/llm-box",
+  "license": "MIT",
+  "homepage": "https://github.com/alib8b8/llm-box",
+  "tags": [
+    "workflow",
+    "automation",
+    "terminal",
+    "cli",
+    "devops",
+    "llm",
+    "yaml"
+  ],
+  "categories": [
+    "Development",
+    "Productivity",
+    "DevOps"
+  ],
+  "installation": {
+    "type": "binary",
+    "instructions": "Install llm-box first: curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash"
+  }
+}

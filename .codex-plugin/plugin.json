@@ -1,0 +1,36 @@
+{
+  "name": "llm-box",
+  "version": "1.0.0",
+  "description": "Terminal-first workflow automation engine. Generate and execute YAML workflows from plain English descriptions. 20+ built-in nodes including fetch_url, execute, file I/O, HTTP requests, JSON parsing, template rendering, and 15+ LLM providers (Ollama, DeepSeek, OpenAI-compatible).",
+  "author": {
+    "name": "alib8b8",
+    "url": "https://github.com/alib8b8"
+  },
+  "repository": "https://github.com/alib8b8/llm-box",
+  "license": "MIT",
+  "homepage": "https://github.com/alib8b8/llm-box",
+  "keywords": [
+    "workflow",
+    "automation",
+    "terminal",
+    "cli",
+    "yaml",
+    "llm",
+    "devops"
+  ],
+  "categories": [
+    "Development",
+    "Productivity",
+    "DevOps"
+  ],
+  "skills": [
+    "skills/SKILL.md"
+  ],
+  "mcpServers": {
+    "llm-box": {
+      "type": "stdio",
+      "command": "llm-box",
+      "args": ["--mcp-server"]
+    }
+  }
+}
