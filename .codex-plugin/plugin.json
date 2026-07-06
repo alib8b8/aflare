@@ -18,19 +18,16 @@
     "llm",
     "devops"
   ],
-  "categories": [
-    "Development",
-    "Productivity",
-    "DevOps"
-  ],
-  "skills": [
-    "skills/SKILL.md"
-  ],
-  "mcpServers": {
-    "llm-box": {
-      "type": "stdio",
-      "command": "llm-box",
-      "args": ["--mcp-server"]
-    }
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "llm-box",
+    "shortDescription": "Terminal-first workflow engine: plain English to YAML to execution",
+    "longDescription": "llm-box is a terminal-first workflow automation tool. Describe what you want in plain English, and it generates executable YAML workflows. Features 20+ built-in nodes (fetch_url, execute, file I/O, HTTP, JSON parsing, template rendering), 15+ LLM providers (Ollama, DeepSeek, OpenAI-compatible), and an MCP server mode for integration with Codex.",
+    "developerName": "alib8b8",
+    "category": "Development",
+    "capabilities": ["Read", "Write", "Execute"],
+    "websiteURL": "https://github.com/alib8b8/llm-box",
+    "defaultPrompt": ["Use llm-box to create a workflow", "Use llm-box to run a workflow"]
   }
 }
