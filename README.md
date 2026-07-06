@@ -40,7 +40,8 @@ Install in 60 seconds:
 
 ```bash
 # Linux/macOS
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
+bash install.sh
 
 # Windows
 # Download from releases: https://github.com/alib8b8/llm-box/releases/latest
@@ -989,7 +990,8 @@ The `ollama` node runs models locally via Ollama. Great for privacy and offline 
 **Setup:**
 ```bash
 # Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
+curl -fsSL https://ollama.com/install.sh -o ollama-install.sh
+sh ollama-install.sh
 
 # Pull a model
 ollama pull llama3

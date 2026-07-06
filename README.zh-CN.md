@@ -43,7 +43,8 @@
 
 ```bash
 # Linux/macOS
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
+bash install.sh
 
 # Windows
 # 从 releases 下载: https://github.com/alib8b8/llm-box/releases/latest
@@ -265,7 +266,8 @@ export QWEN_API_KEY="your-api-key"
 **设置：**
 ```bash
 # 安装 Ollama
-curl -fsSL https://ollama.com/install.sh | sh
+curl -fsSL https://ollama.com/install.sh -o ollama-install.sh
+sh ollama-install.sh
 
 # 拉取模型
 ollama pull llama3

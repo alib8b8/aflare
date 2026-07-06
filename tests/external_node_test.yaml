@@ -1,8 +1,0 @@
-name: "External Node Test"
-description: "Test the external echo node"
-
-steps:
-  - node: "echo"
-    params:
-      prefix: "You said: "
-      input: "Hello from external node!"

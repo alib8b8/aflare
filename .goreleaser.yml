@@ -60,9 +60,8 @@ release:
   name_template: "llm-box {{ .Tag }}"
   footer: |
     ### Install (Linux / macOS)
-    ```bash
-    curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
-    ```
+    Download the install script from the repository and run it locally:
+    https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh
 
 nfpms:
   - id: packages
