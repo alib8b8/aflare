@@ -1,0 +1,47 @@
+# Build artifacts
+dist/
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go artifacts
+vendor/
+*.test
+*.out
+go.sum
+
+# Documentation files (large, not part of plugin code)
+docs/
+*.md
+!README.md
+!SKILL.md
+
+# Config files
+.goreleaser.yml
+.golangci.yml
+.gosec.json
+.dockerignore
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Test data
+tests/
+testdata/
+*_test.go
+
+# Examples
+examples/
+
+# Assets
+assets/
+images/
+screenshots/
+
+# i18n (large, not security-sensitive)
+internal/i18n/translations/

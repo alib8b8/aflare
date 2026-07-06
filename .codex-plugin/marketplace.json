@@ -23,6 +23,6 @@
   ],
   "installation": {
     "type": "binary",
-    "instructions": "Install llm-box first: curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash"
+    "instructions": "Install llm-box first by downloading the install script from the repository and running it locally."
   }
 }
