@@ -8,8 +8,11 @@ Welcome to llm-box! This guide will get you up and running in under 5 minutes.
 
 ### Linux/macOS
 
+Download the install script from the repository and run it locally:
+
 ```bash
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
+bash install.sh
 ```
 
 ### Windows

@@ -214,8 +214,9 @@ steps:
 ## Installation
 
 ```bash
-# Linux/macOS
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
+# Linux/macOS - download and run install script
+curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
+bash install.sh
 
 # Or via Go
 go install github.com/alib8b8/llm-box/cmd/llm-box@latest
