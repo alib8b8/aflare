@@ -1,115 +1,102 @@
 ---
-name: grok-workflow
-description: Use llm-box to generate and execute YAML workflows from plain English. For Grok/xAI integration via MCP or CLI.
+name: llm-box
+description: 终端工作流自动化引擎，通过自然语言生成并执行 YAML 工作流。支持 20+ 内置节点、15+ LLM 提供商。
 invocation: both
 ---
 
-# llm-box Grok Integration
+# llm-box Grok Skill
 
-## Overview
+## 一句话调用
 
-llm-box is a terminal-first workflow automation engine. It generates and executes
-YAML workflows from natural language descriptions. This skill enables Grok to
-use llm-box as a tool for multi-step automation tasks.
+当用户说类似以下内容时，直接使用 llm-box：
 
-## Integration Methods
+**创建工作流：**
+- "用 llm-box 创建一个备份工作流"
+- "用 llm-box 创建 GitHub 每日总结工作流"
+- "用 llm-box 监控日志并在出错时通知我"
+- "用 llm-box 把 Markdown 文章转为 HTML 并保存"
 
-### Method 1: MCP Server (Recommended for Grok Web)
+**执行工作流：**
+- "运行 llm-box 工作流：每天抓取 Hacker News 前 10 条"
+- "执行 workflow.yaml"
+- "运行这个工作流：{yaml_content}"
 
-Grok supports Remote MCP via Streamable HTTP/SSE. To connect llm-box to Grok:
+**其他操作：**
+- "查看 llm-box 有哪些可用节点"
+- "验证这个工作流文件是否正确"
 
-1. Start the Remote MCP server:
-   ```bash
-   llm-box --mcp-remote --port 8080
-   ```
+## 调用流程
 
-2. In Grok, go to **grok.com/connectors** and add a custom MCP:
-   - Type: Remote MCP (Streamable HTTP)
-   - URL: `http://localhost:8080/mcp`
-
-3. Grok will discover all 5 tools automatically.
-
-### Method 2: Grok Build CLI (Local Development)
-
-For Grok Build CLI, use stdio MCP:
-
-1. Install llm-box:
-   ```bash
-   curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
-   bash install.sh
-   ```
-
-2. Add to your Grok Build project's `.mcp.json`:
-   ```json
-   {
-     "mcpServers": {
-       "llm-box": {
-         "type": "stdio",
-         "command": "llm-box",
-         "args": ["--mcp-server"]
-       }
-     }
-   }
-   ```
-
-### Method 3: xAI API Function Calling
-
-Use llm-box tools as xAI API function definitions. See `grok-mcp-server/tools.json`
-for the complete tool schema compatible with xAI's function-calling API.
-
-## Available MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `create_workflow` | Generate a YAML workflow from a plain English description |
-| `run_workflow` | Execute a workflow from a YAML file path |
-| `run_workflow_yaml` | Execute a workflow from raw YAML content |
-| `list_nodes` | List all available llm-box nodes |
-| `validate_workflow` | Validate a workflow YAML without executing |
-
-## Quick CLI Reference
-
-```bash
-# Generate workflow from description
-llm-box create "fetch Hacker News top stories and save to file"
-
-# Run a workflow
-llm-box run workflow.yaml
-
-# List available nodes
-llm-box list
-
-# Validate without running
-llm-box validate workflow.yaml
-
-# Safe mode (disables execute node)
-llm-box --safe-mode run workflow.yaml
+```
+用户输入 → create_workflow(描述) → 获取 YAML → run_workflow_yaml(YAML) → 返回结果
 ```
 
-## Available Nodes
+1. **第一步**：调用 `create_workflow` 工具，传入用户描述
+2. **第二步**：将返回的 YAML 内容传入 `run_workflow_yaml` 工具
+3. **第三步**：将执行结果返回给用户
 
-**Utility:** fetch_url, http_request, file_read, file_write, execute, json_parse,
-template_render, transform, combine, notify
+## 可用工具
 
-**LLM:** ollama, deepseek, openai, qwen, glm, kimi, mistral, yi
+| 工具 | 参数 | 说明 |
+|------|------|------|
+| `create_workflow` | `description: string` | 从自然语言生成 YAML 工作流 |
+| `run_workflow` | `file: string` | 执行指定路径的工作流文件 |
+| `run_workflow_yaml` | `yaml: string` | 直接执行 YAML 内容 |
+| `list_nodes` | 无 | 列出所有可用节点 |
+| `validate_workflow` | `file: string` | 验证工作流文件（不执行） |
 
-**Control:** condition, call
+## 核心节点
 
-## Example: Grok-Triggered Workflow
+**工具类：** fetch_url, http_request, file_read, file_write, execute, json_parse, template_render, transform, combine, notify
 
-When a user asks Grok to automate something, Grok can call the `create_workflow`
-tool, then `run_workflow_yaml` to execute it immediately:
+**LLM 类：** ollama, deepseek, openai, qwen, glm, kimi, mistral, yi
 
-1. User: "Fetch the weather for Beijing and save it to a file"
-2. Grok calls `create_workflow` with description "fetch weather for Beijing and save to file"
-3. llm-box returns the YAML workflow
-4. Grok calls `run_workflow_yaml` with the generated YAML
-5. Result is returned to the user
+**控制类：** condition, call
 
-## Security
+## 安全说明
 
-- SSRF protection on URL fetching
-- Path traversal protection on file operations
-- Command injection prevention on execute node
-- Safe mode available to disable execute node entirely
-- Resource limits (file size, response body, step count, timeouts)
+- URL 抓取有 SSRF 防护
+- 文件操作有路径遍历防护
+- 命令执行有注入防护
+- 支持 safe mode 禁用 execute 节点
+
+## 安装与连接
+
+### 安装 llm-box
+
+```bash
+curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
+bash install.sh
+```
+
+### 启动 MCP 服务
+
+```bash
+llm-box --mcp-server
+```
+
+### Grok Web 连接
+
+在 grok.com/connectors 添加自定义 MCP：
+- 类型：Remote MCP (Streamable HTTP)
+- URL：http://localhost:8080/mcp
+
+## 使用示例
+
+### 示例 1：创建并执行工作流
+
+用户："用 llm-box 创建一个抓取 Hacker News 前 5 条并保存的工作流"
+
+执行步骤：
+1. 调用 `create_workflow("fetch top 5 Hacker News stories and save to file")`
+2. 获取生成的 YAML
+3. 调用 `run_workflow_yaml(YAML内容)`
+4. 返回执行结果
+
+### 示例 2：验证工作流
+
+用户："帮我检查 workflow.yaml 是否正确"
+
+执行步骤：
+1. 调用 `validate_workflow("workflow.yaml")`
+2. 返回验证结果
