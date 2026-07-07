@@ -32,47 +32,58 @@ detect_platform() {
 }
 
 download_binary() {
-    local filename="$BINARY_NAME-$OS-$ARCH"
+    local archive_ext="tar.gz"
+    local archive_name="$BINARY_NAME-$OS-$ARCH.$archive_ext"
     if [ "$OS" = "windows" ]; then
-        filename="$filename.exe"
+        archive_ext="zip"
+        archive_name="$BINARY_NAME-$OS-$ARCH.$archive_ext"
     fi
 
-    echo "Downloading $filename..."
-    
+    echo "Downloading $archive_name..."
+
     LATEST_RELEASE=$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
     echo "Latest release: $LATEST_RELEASE"
 
-    URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/$filename"
-    CHECKSUM_URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/SHA256SUMS"
-    
-    if ! curl -sL -o "$filename" "$URL"; then
+    URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/$archive_name"
+    CHECKSUM_URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/checksums.txt"
+
+    if ! curl -sL -o "$archive_name" "$URL"; then
         echo "Failed to download $URL"
         exit 1
     fi
 
-    if curl -sL -o SHA256SUMS "$CHECKSUM_URL"; then
+    if curl -sL -o checksums.txt "$CHECKSUM_URL"; then
         echo "Verifying checksum..."
-        if ! sha256sum --check --ignore-missing SHA256SUMS; then
+        if ! grep "$archive_name" checksums.txt | sha256sum --check --status; then
             echo "❌ Checksum verification failed!"
-            rm -f "$filename" SHA256SUMS
+            rm -f "$archive_name" checksums.txt
             exit 1
         fi
-        rm -f SHA256SUMS
+        rm -f checksums.txt
         echo "✅ Checksum verified"
     else
         echo "⚠️  Checksum file not found, skipping verification"
     fi
 
-    chmod +x "$filename"
-    
+    local binary_name="$BINARY_NAME"
+    if [ "$OS" = "windows" ]; then
+        binary_name="$BINARY_NAME.exe"
+        unzip -o "$archive_name" "$binary_name"
+    else
+        tar -xzf "$archive_name" "$binary_name"
+    fi
+    rm -f "$archive_name"
+
+    chmod +x "$binary_name"
+
     if [ -w "$INSTALL_DIR" ]; then
         echo "Installing to $INSTALL_DIR..."
-        mv "$filename" "$INSTALL_DIR/$BINARY_NAME"
+        mv "$binary_name" "$INSTALL_DIR/$BINARY_NAME"
         echo "✅ $BINARY_NAME installed successfully!"
         echo "Run 'llm-box' to get started."
     else
         echo "🔒 Need sudo to install to $INSTALL_DIR"
-        echo "Please run: sudo mv $filename $INSTALL_DIR/$BINARY_NAME"
+        echo "Please run: sudo mv $binary_name $INSTALL_DIR/$BINARY_NAME"
     fi
 }
 
