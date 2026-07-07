@@ -1,6 +1,7 @@
 ---
-name: llm-box-workflow
+name: workflow
 description: Generate and execute terminal workflows using llm-box. Use when the user wants to automate multi-step terminal tasks, chain commands, fetch URLs, process data, create reusable pipelines, or build CI/CD-like automation locally.
+invocation: both
 ---
 
 # llm-box Workflow Skill
