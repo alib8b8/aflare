@@ -1,0 +1,9 @@
+{
+  "name": "llm-box",
+  "version": "0.3.0",
+  "description": "Terminal-first workflow automation engine. Generate and execute YAML workflows from plain English descriptions.",
+  "author": "alib8b8 <https://github.com/alib8b8>",
+  "license": "MIT",
+  "capabilities": ["workflow_generation", "workflow_execution", "terminal_automation", "llm_integration"],
+  "schema_version": "1.0"
+}

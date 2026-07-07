@@ -1,0 +1,12 @@
+{
+  "name": "llm-box",
+  "description": "Terminal-first workflow automation engine. Generate and execute YAML workflows from plain English. 20+ built-in nodes, 15+ LLM providers (Ollama, DeepSeek, OpenAI-compatible), and MCP server mode.",
+  "category": "development",
+  "source": {
+    "type": "url",
+    "url": "https://github.com/alib8b8/llm-box.git",
+    "sha": "d2e61eaa04946345ea9058d72bf16624cba54e2b"
+  },
+  "homepage": "https://github.com/alib8b8/llm-box",
+  "keywords": ["workflow", "automation", "terminal", "cli", "yaml", "llm", "mcp"]
+}
