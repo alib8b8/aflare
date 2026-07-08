@@ -3,13 +3,15 @@
 // making it accessible from grok.com/connectors as a Remote MCP.
 //
 // Usage:
-//   go run ./grok-mcp-server [--port 8080]
-//   llm-box --mcp-remote --port 8080
+//
+//	go run ./grok-mcp-server [--port 8080]
+//	llm-box --mcp-remote --port 8080
 package main
 
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -55,7 +57,15 @@ func main() {
 	log.Printf("Streamable HTTP:   http://localhost%s/mcp", addr)
 	log.Printf("Health check:      http://localhost%s/health", addr)
 
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      mux,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }
@@ -74,11 +84,12 @@ func handleSSE(w http.ResponseWriter, r *http.Request) {
 }
 
 type sseSession struct {
-	id       string
-	events   chan string
-	created  time.Time
-	cmd      *exec.Cmd
-	cmdMu    sync.Mutex
+	id      string
+	events  chan string
+	created time.Time
+	cmd     *exec.Cmd
+	stdin   io.WriteCloser
+	cmdMu   sync.Mutex
 }
 
 var (
@@ -139,6 +150,7 @@ func handleSSEConnect(w http.ResponseWriter, r *http.Request) {
 
 	session.cmdMu.Lock()
 	session.cmd = cmd
+	session.stdin = stdin
 	session.cmdMu.Unlock()
 
 	// Read stdout from llm-box and forward as SSE events
@@ -199,18 +211,11 @@ func handleSSEMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	session.cmdMu.Lock()
-	cmd := session.cmd
+	stdin := session.stdin
 	session.cmdMu.Unlock()
 
-	if cmd == nil || cmd.Process == nil {
+	if stdin == nil {
 		http.Error(w, "MCP server not running", http.StatusInternalServerError)
-		return
-	}
-
-	// Get stdin pipe from the stored command
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get stdin: %v", err), http.StatusInternalServerError)
 		return
 	}
 
