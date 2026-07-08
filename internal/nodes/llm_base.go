@@ -154,7 +154,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 
 	if resp.StatusCode != http.StatusOK {
 		var errResp LLMResponse
-		json.NewDecoder(io.LimitReader(resp.Body, maxHTTPResponseSize)).Decode(&errResp)
+		_ = json.NewDecoder(io.LimitReader(resp.Body, maxHTTPResponseSize)).Decode(&errResp)
 		if errResp.Error != nil && errResp.Error.Message != "" {
 			return "", fmt.Errorf("%s API error (%d): %s", n.config.ProviderName, resp.StatusCode, errResp.Error.Message)
 		}

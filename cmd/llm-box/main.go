@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -346,7 +347,9 @@ func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry) {
 
 	go func() {
 		ctx := context.Background()
-		workflow.ExecuteWorkflowWithTUI(ctx, wf, reg, program)
+		if _, _, err := workflow.ExecuteWorkflowWithTUI(ctx, wf, reg, program); err != nil {
+			log.Printf("Workflow execution error: %v", err)
+		}
 	}()
 
 	if _, err := program.Run(); err != nil {

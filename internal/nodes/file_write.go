@@ -70,9 +70,9 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	tmpPath := tmpFile.Name()
 	defer func() {
 		if tmpFile != nil {
-			tmpFile.Close()
+			_ = tmpFile.Close()
 		}
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 	}()
 
 	if err := os.Chmod(tmpPath, perm); err != nil {

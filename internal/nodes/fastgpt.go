@@ -106,6 +106,11 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 
 	generateURL := fmt.Sprintf("%s/chat/completions", endpoint)
 
+	// Validate the full URL to prevent SSRF
+	if err := validateLMLEndpoint(generateURL); err != nil {
+		return "", fmt.Errorf("URL validation failed: %w", err)
+	}
+
 	systemPrompt, _ := params["system"]
 	messages := []fastGPTMessage{}
 	if systemPrompt != "" {
@@ -145,7 +150,7 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 
 	if resp.StatusCode != http.StatusOK {
 		var errResp fastGPTResponse
-		json.NewDecoder(io.LimitReader(resp.Body, maxHTTPResponseSize)).Decode(&errResp)
+		_ = json.NewDecoder(io.LimitReader(resp.Body, maxHTTPResponseSize)).Decode(&errResp)
 		if errResp.Error != nil && errResp.Error.Message != "" {
 			return "", fmt.Errorf("FastGPT API error (%d): %s", resp.StatusCode, errResp.Error.Message)
 		}

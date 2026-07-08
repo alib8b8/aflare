@@ -277,9 +277,13 @@ func (r *Registry) LoadExternalNodes(dir string) error {
 		}
 
 		nodeDir := filepath.Join(dir, entry.Name())
-		metadataPath := filepath.Join(nodeDir, "metadata.yaml")
 
-		metadataBytes, err := os.ReadFile(metadataPath)
+		// Validate path to prevent directory traversal
+		safePath, err := safeJoinPath(dir, filepath.Join(entry.Name(), "metadata.yaml"))
+		if err != nil {
+			continue
+		}
+		metadataBytes, err := os.ReadFile(safePath)
 		if err != nil {
 			continue // Skip if no metadata.yaml
 		}

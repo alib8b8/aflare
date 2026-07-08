@@ -47,8 +47,11 @@ func main() {
 
 	// Health check
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+			log.Printf("Error encoding health response: %v", err)
+		}
 	})
 
 	addr := fmt.Sprintf(":%d", port)
@@ -124,7 +127,9 @@ func handleSSEConnect(w http.ResponseWriter, r *http.Request) {
 		sessionsMu.Unlock()
 		session.cmdMu.Lock()
 		if session.cmd != nil && session.cmd.Process != nil {
-			session.cmd.Process.Kill()
+			if err := session.cmd.Process.Kill(); err != nil {
+				log.Printf("Error killing MCP process: %v", err)
+			}
 		}
 		session.cmdMu.Unlock()
 	}()
@@ -247,10 +252,12 @@ func handleStreamableHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"jsonrpc": "2.0",
 			"error":   map[string]interface{}{"code": -32700, "message": "Parse error"},
-		})
+		}); err != nil {
+			log.Printf("Error encoding error response: %v", err)
+		}
 		return
 	}
 
@@ -281,10 +288,12 @@ func handleStreamableHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(strings.TrimSpace(reqStr), "[") {
 		if err := json.Unmarshal(req, &messages); err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{
 				"jsonrpc": "2.0",
 				"error":   map[string]interface{}{"code": -32600, "message": "Invalid request"},
-			})
+			}); err != nil {
+				log.Printf("Error encoding error response: %v", err)
+			}
 			return
 		}
 	} else {
@@ -303,7 +312,9 @@ func handleStreamableHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Close stdin to signal we're done sending
-	stdin.Close()
+	if err := stdin.Close(); err != nil {
+		log.Printf("Error closing stdin: %v", err)
+	}
 
 	// Read all responses
 	decoder := json.NewDecoder(stdout)
@@ -320,10 +331,14 @@ func handleStreamableHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if len(responses) == 1 {
-		w.Write(responses[0])
+		if _, err := w.Write(responses[0]); err != nil {
+			log.Printf("Error writing response: %v", err)
+		}
 	} else if len(responses) > 1 {
 		batch, _ := json.Marshal(responses)
-		w.Write(batch)
+		if _, err := w.Write(batch); err != nil {
+			log.Printf("Error writing batch response: %v", err)
+		}
 	} else {
 		w.WriteHeader(http.StatusNoContent)
 	}

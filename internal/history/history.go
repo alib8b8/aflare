@@ -190,7 +190,7 @@ func ClearHistory() error {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
-		os.Remove(filepath.Join(dir, entry.Name()))
+		_ = os.Remove(filepath.Join(dir, entry.Name()))
 	}
 
 	return nil
