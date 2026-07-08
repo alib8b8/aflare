@@ -1,0 +1,23 @@
+{
+  "name": "llm-box",
+  "version": "0.3.0",
+  "description": "Terminal-first workflow automation engine. Generate and execute YAML workflows from plain English descriptions. Features 20+ built-in nodes, 15+ LLM providers, and MCP server mode.",
+  "repository": "https://github.com/alib8b8/llm-box",
+  "license": "MIT",
+  "keywords": [
+    "workflow",
+    "automation",
+    "yaml",
+    "llm",
+    "mcp",
+    "cli",
+    "terminal"
+  ],
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "llm-box": {
+      "command": "llm-box",
+      "args": ["--mcp-server"]
+    }
+  }
+}
