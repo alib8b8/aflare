@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -56,30 +57,22 @@ var varPattern = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 //	{{var.NAME}}    - workflow variable
 //	{{env.NAME}}    - environment variable
 //	{{file.PATH}}   - file contents (handled by executor)
+//
+// Unknown expressions (e.g. Go template syntax {{.foo}}) are left unchanged.
 func (e *ExpressionEngine) Evaluate(expr string, input string) (string, error) {
 	if expr == "" {
 		return "", nil
 	}
 
-	var evalErr error
 	result := varPattern.ReplaceAllStringFunc(expr, func(match string) string {
-		if evalErr != nil {
-			return match
-		}
-
-		// Extract inner expression
 		inner := strings.TrimSpace(match[2 : len(match)-2])
 		value, err := e.evalSingle(inner, input)
 		if err != nil {
-			evalErr = err
 			return match
 		}
 		return value
 	})
 
-	if evalErr != nil {
-		return "", evalErr
-	}
 	return result, nil
 }
 
@@ -87,15 +80,13 @@ func (e *ExpressionEngine) Evaluate(expr string, input string) (string, error) {
 func (e *ExpressionEngine) evalSingle(expr string, input string) (string, error) {
 	parts := strings.SplitN(expr, ".", 2)
 	if len(parts) < 2 {
-		// No prefix, treat as plain variable name
 		if v, ok := e.variables[expr]; ok {
 			return v, nil
 		}
-		// Could be "input" shorthand
 		if expr == "input" {
 			return input, nil
 		}
-		return "", fmt.Errorf("unknown variable: %s", expr)
+		return "", fmt.Errorf("unknown expression: %s", expr)
 	}
 
 	prefix := strings.TrimSpace(parts[0])
@@ -112,11 +103,14 @@ func (e *ExpressionEngine) evalSingle(expr string, input string) (string, error)
 		}
 		return "", fmt.Errorf("variable not found: %s", name)
 	case "env":
-		// Note: we don't import os here to keep this package pure;
-		// environment lookup is handled by the caller via ResolveEnv
-		return "", fmt.Errorf("env access requires ResolveEnv")
+		if v, ok := os.LookupEnv(name); ok {
+			return v, nil
+		}
+		return "", fmt.Errorf("environment variable not found: %s", name)
+	case "file":
+		return "", fmt.Errorf("file expression: %s", expr)
 	default:
-		return "", fmt.Errorf("unknown prefix: %s", prefix)
+		return "", fmt.Errorf("unknown expression: %s", expr)
 	}
 }
 

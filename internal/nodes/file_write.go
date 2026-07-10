@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // FileWriteNode writes content to a file
@@ -31,6 +32,7 @@ func (n *FileWriteNode) Schema() NodeSchema {
 		Output:      "string - confirmation message",
 		Params: []ParamSchema{
 			{Name: "path", Type: "string", Description: "File path to write to", Required: true},
+			{Name: "mode", Type: "string", Description: "Write mode: write (default) or append", Required: false, Default: "write"},
 		},
 	}
 }
@@ -42,16 +44,46 @@ func (n *FileWriteNode) Execute(ctx context.Context, input string, params map[st
 		return "", fmt.Errorf("path parameter is required")
 	}
 
+	mode, ok := params["mode"]
+	if !ok || mode == "" {
+		mode = "write"
+	}
+
 	safePath, err := validateWritePath(path)
 	if err != nil {
 		return "", fmt.Errorf("path validation failed: %w", err)
 	}
 
-	if err := atomicWriteFile(safePath, []byte(input), 0600); err != nil {
-		return "", fmt.Errorf("failed to write file: %w", err)
+	switch strings.ToLower(mode) {
+	case "append":
+		if err := appendToFile(safePath, []byte(input)); err != nil {
+			return "", fmt.Errorf("failed to append to file: %w", err)
+		}
+		return fmt.Sprintf("appended to %s", path), nil
+	case "write", "":
+		if err := atomicWriteFile(safePath, []byte(input), 0600); err != nil {
+			return "", fmt.Errorf("failed to write file: %w", err)
+		}
+		return fmt.Sprintf("written to %s", path), nil
+	default:
+		return "", fmt.Errorf("invalid mode: %s (supported: write, append)", mode)
+	}
+}
+
+func appendToFile(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Ensure data ends with newline for clean appending
+	if len(data) > 0 && data[len(data)-1] != '\n' {
+		data = append(data, '\n')
 	}
 
-	return fmt.Sprintf("written to %s", path), nil
+	_, err = f.Write(data)
+	return err
 }
 
 // atomicWriteFile writes content to a file atomically by first writing to a

@@ -101,36 +101,44 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	}
 
 	if containsActionKeyword(desc, "summarize") {
-		systemPrompt := getSystemPrompt("summarize")
-		if systemPrompt == "" {
-			systemPrompt = "You are a helpful assistant that summarizes text concisely."
-		}
-		step := WorkflowStep{
-			Node:   llmNode,
-			Params: map[string]string{"model": llmModel, "system": systemPrompt},
-		}
-		if len(wf.Steps) > 0 && wf.Steps[len(wf.Steps)-1].Node == "file_write" {
-			lastStep := wf.Steps[len(wf.Steps)-1]
-			steps := make([]WorkflowStep, len(wf.Steps)-1)
-			copy(steps, wf.Steps[:len(wf.Steps)-1])
-			steps = append(steps, step)
-			steps = append(steps, lastStep)
-			wf.Steps = steps
-		} else {
-			wf.Steps = append(wf.Steps, step)
-		}
+		addLLMStep(wf, llmNode, llmModel, "summarize")
 	}
 
 	if containsActionKeyword(desc, "translate") {
-		systemPrompt := getSystemPrompt("translate")
-		if systemPrompt == "" {
-			systemPrompt = "You are a translator. Translate the following text to English."
-		}
-		step := WorkflowStep{
-			Node:   llmNode,
-			Params: map[string]string{"model": llmModel, "system": systemPrompt},
-		}
-		wf.Steps = append(wf.Steps, step)
+		addLLMStep(wf, llmNode, llmModel, "translate")
+	}
+
+	if containsActionKeyword(desc, "explain") {
+		addLLMStep(wf, llmNode, llmModel, "explain")
+	}
+
+	if containsActionKeyword(desc, "rewrite") {
+		addLLMStep(wf, llmNode, llmModel, "rewrite")
+	}
+
+	if containsActionKeyword(desc, "code") {
+		addLLMStep(wf, llmNode, llmModel, "code")
+	}
+
+	if containsActionKeyword(desc, "email") {
+		addLLMStep(wf, llmNode, llmModel, "email")
+	}
+
+	if containsActionKeyword(desc, "report") {
+		addLLMStep(wf, llmNode, llmModel, "report")
+	}
+
+	if containsActionKeyword(desc, "doc") {
+		addLLMStep(wf, llmNode, llmModel, "doc")
+	}
+
+	if containsActionKeyword(desc, "test") {
+		addLLMStep(wf, llmNode, llmModel, "test")
+	}
+
+	if containsActionKeyword(desc, "json") {
+			step := WorkflowStep{Node: "json_parse", Params: map[string]string{}}
+			wf.Steps = append(wf.Steps, step)
 	}
 
 	if containsActionKeyword(desc, "git") {
@@ -154,6 +162,27 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	}
 
 	return wf, nil
+}
+
+func addLLMStep(wf *Workflow, llmNode, llmModel, action string) {
+	systemPrompt := getSystemPrompt(action)
+	if systemPrompt == "" {
+		systemPrompt = "You are a helpful assistant."
+	}
+	step := WorkflowStep{
+		Node:   llmNode,
+		Params: map[string]string{"model": llmModel, "system": systemPrompt},
+	}
+	if len(wf.Steps) > 0 && wf.Steps[len(wf.Steps)-1].Node == "file_write" {
+		lastStep := wf.Steps[len(wf.Steps)-1]
+		steps := make([]WorkflowStep, len(wf.Steps)-1)
+		copy(steps, wf.Steps[:len(wf.Steps)-1])
+		steps = append(steps, step)
+		steps = append(steps, lastStep)
+		wf.Steps = steps
+	} else {
+		wf.Steps = append(wf.Steps, step)
+	}
 }
 
 // SaveWorkflow saves a workflow to a YAML file

@@ -57,7 +57,7 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 // ValidateCommand checks if the command is recognized.
 func ValidateCommand(command string) error {
 	switch command {
-	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry":
+	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate":
 		return nil
 	}
 	if command == "" {

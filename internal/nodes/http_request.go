@@ -42,12 +42,12 @@ func (n *HTTPRequestNode) Schema() NodeSchema {
 	}
 }
 
-// sensitiveHeaders that should not be set by workflow params
+// sensitiveHeaders that should not be set by workflow params for security reasons.
+// Host header is blocked to prevent Host header attacks.
+// Authorization and other auth headers are allowed because users need to call
+// authenticated APIs (GitHub, OpenAI, etc.) - it's their own workflow.
 var sensitiveHeaders = map[string]bool{
-	"host":          true,
-	"authorization": true,
-	"cookie":        true,
-	"set-cookie":    true,
+	"host": true,
 }
 
 func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
@@ -146,5 +146,5 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
-	return string(respBody), nil
+	return fmt.Sprintf("HTTP %d\n%s", resp.StatusCode, string(respBody)), nil
 }

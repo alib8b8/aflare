@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -106,5 +107,122 @@ func (n *FetchURLNode) Execute(ctx context.Context, input string, params map[str
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
-	return string(body), nil
+	content := string(body)
+
+	mode, _ := params["mode"]
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	if mode == "" {
+		mode = "text"
+	}
+
+	switch mode {
+	case "html":
+		return content, nil
+	case "text":
+		return extractTextFromHTML(content), nil
+	case "markdown":
+		return htmlToMarkdown(content), nil
+	case "main_content":
+		return extractMainContent(content), nil
+	default:
+		return extractTextFromHTML(content), nil
+	}
+}
+
+func extractTextFromHTML(html string) string {
+	re := regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	html = re.ReplaceAllString(html, "")
+	re = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
+	html = re.ReplaceAllString(html, "")
+	re = regexp.MustCompile(`(?is)<nav[^>]*>.*?</nav>`)
+	html = re.ReplaceAllString(html, "")
+	re = regexp.MustCompile(`(?is)<footer[^>]*>.*?</footer>`)
+	html = re.ReplaceAllString(html, "")
+	re = regexp.MustCompile(`(?is)<header[^>]*>.*?</header>`)
+	html = re.ReplaceAllString(html, "")
+
+	re = regexp.MustCompile(`<[^>]+>`)
+	text := re.ReplaceAllString(html, " ")
+
+	re = regexp.MustCompile(`&nbsp;`)
+	text = re.ReplaceAllString(text, " ")
+	re = regexp.MustCompile(`&amp;`)
+	text = re.ReplaceAllString(text, "&")
+	re = regexp.MustCompile(`&lt;`)
+	text = re.ReplaceAllString(text, "<")
+	re = regexp.MustCompile(`&gt;`)
+	text = re.ReplaceAllString(text, ">")
+	re = regexp.MustCompile(`&quot;`)
+	text = re.ReplaceAllString(text, "\"")
+	re = regexp.MustCompile(`&#39;`)
+	text = re.ReplaceAllString(text, "'")
+
+	re = regexp.MustCompile(`\n\s*\n\s*\n+`)
+	text = re.ReplaceAllString(text, "\n\n")
+	re = regexp.MustCompile(`[ \t]+`)
+	text = re.ReplaceAllString(text, " ")
+	text = strings.TrimSpace(text)
+
+	return text
+}
+
+func extractMainContent(html string) string {
+	content := ""
+
+	patterns := []string{
+		`(?is)<main[^>]*>(.*?)</main>`,
+		`(?is)<article[^>]*>(.*?)</article>`,
+		`(?is)<div[^>]*id=["']content["'][^>]*>(.*?)</div>`,
+		`(?is)<div[^>]*class=["'].*?content.*?["'][^>]*>(.*?)</div>`,
+		`(?is)<div[^>]*id=["']main["'][^>]*>(.*?)</div>`,
+		`(?is)<div[^>]*class=["'].*?main.*?["'][^>]*>(.*?)</div>`,
+	}
+
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(html)
+		if len(matches) > 1 && len(strings.TrimSpace(matches[1])) > 100 {
+			content = matches[1]
+			break
+		}
+	}
+
+	if content == "" {
+		content = html
+	}
+
+	return extractTextFromHTML(content)
+}
+
+func htmlToMarkdown(html string) string {
+	text := html
+
+	text = regexp.MustCompile(`(?is)<h1[^>]*>(.*?)</h1>`).ReplaceAllString(text, "# $1\n\n")
+	text = regexp.MustCompile(`(?is)<h2[^>]*>(.*?)</h2>`).ReplaceAllString(text, "## $1\n\n")
+	text = regexp.MustCompile(`(?is)<h3[^>]*>(.*?)</h3>`).ReplaceAllString(text, "### $1\n\n")
+	text = regexp.MustCompile(`(?is)<h4[^>]*>(.*?)</h4>`).ReplaceAllString(text, "#### $1\n\n")
+	text = regexp.MustCompile(`(?is)<h5[^>]*>(.*?)</h5>`).ReplaceAllString(text, "##### $1\n\n")
+	text = regexp.MustCompile(`(?is)<h6[^>]*>(.*?)</h6>`).ReplaceAllString(text, "###### $1\n\n")
+
+	text = regexp.MustCompile(`(?is)<strong[^>]*>(.*?)</strong>`).ReplaceAllString(text, "**$1**")
+	text = regexp.MustCompile(`(?is)<b[^>]*>(.*?)</b>`).ReplaceAllString(text, "**$1**")
+	text = regexp.MustCompile(`(?is)<em[^>]*>(.*?)</em>`).ReplaceAllString(text, "*$1*")
+	text = regexp.MustCompile(`(?is)<i[^>]*>(.*?)</i>`).ReplaceAllString(text, "*$1*")
+	text = regexp.MustCompile(`(?is)<code[^>]*>(.*?)</code>`).ReplaceAllString(text, "`$1`")
+
+	text = regexp.MustCompile(`(?is)<a[^>]*href=["']([^"']+)["'][^>]*>(.*?)</a>`).ReplaceAllString(text, "[$2]($1)")
+
+	text = regexp.MustCompile(`(?is)<li[^>]*>(.*?)</li>`).ReplaceAllString(text, "- $1\n")
+	text = regexp.MustCompile(`(?is)<ul[^>]*>.*?</ul>`).ReplaceAllStringFunc(text, func(m string) string {
+		return m + "\n"
+	})
+
+	text = regexp.MustCompile(`(?is)<p[^>]*>(.*?)</p>`).ReplaceAllString(text, "$1\n\n")
+	text = regexp.MustCompile(`(?is)<br\s*/?>`).ReplaceAllString(text, "\n")
+	text = regexp.MustCompile(`(?is)<hr\s*/?>`).ReplaceAllString(text, "\n---\n\n")
+
+	text = regexp.MustCompile(`(?is)<pre[^>]*><code[^>]*>(.*?)</code></pre>`).ReplaceAllString(text, "```\n$1\n```\n\n")
+	text = regexp.MustCompile(`(?is)<pre[^>]*>(.*?)</pre>`).ReplaceAllString(text, "```\n$1\n```\n\n")
+
+	return extractTextFromHTML(text)
 }

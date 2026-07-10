@@ -23,11 +23,24 @@ var llmKeywords = map[string][]string{
 }
 
 var actionKeywords = map[string][]string{
-	"github":    {"github"},
-	"summarize": {"summarize", "总结", "摘要", "summarise"},
-	"translate": {"translate", "翻译", "translator"},
-	"git":       {"git", "commit", "release", "push", "pull"},
-	"log":       {"log", "monitor", "日志", "监控"},
+	"github":    {"github", "pull request", "pr", "issue", "仓库", "repo", "repository"},
+	"summarize": {"summarize", "总结", "摘要", "summarise", "summary", "概括"},
+	"translate": {"translate", "翻译", "translator", "translation", "译成"},
+	"git":       {"git", "commit", "release", "push", "pull", "提交"},
+	"log":       {"log", "monitor", "日志", "监控", "monitoring"},
+	"weather":   {"weather", "天气", "气温", "temperature"},
+	"news":      {"news", "新闻", "头条", "headline"},
+	"search":    {"search", "搜索", "查找", "find", "lookup"},
+	"code":      {"code", "代码", "编程", "program", "script", "脚本"},
+	"explain":   {"explain", "解释", "说明", "分析", "analyze", "analyse"},
+	"rewrite":   {"rewrite", "重写", "改写", "refactor", "重构", "优化", "optimize"},
+	"json":      {"json", "parse json", "解析json", "格式化", "format"},
+	"email":     {"email", "邮件", "e-mail", "写信", "draft"},
+	"report":    {"report", "报告", "报表", "生成报告"},
+	"download":  {"download", "下载", "fetch", "抓取", "爬取"},
+	"api":       {"api", "接口", "rest", "http request", "调用"},
+	"test":      {"test", "测试", "单元测试", "unittest"},
+	"doc":       {"doc", "文档", "documentation", "readme", "注释"},
 }
 
 func containsAny(desc string, keywords []string) bool {
@@ -128,10 +141,24 @@ var systemPrompts = map[string]map[string]string{
 	"en": {
 		"summarize": "You are a helpful assistant that summarizes text concisely.",
 		"translate": "You are a translator. Translate the following text to English.",
+		"explain":   "You are an expert educator. Explain the following content clearly and thoroughly.",
+		"rewrite":   "You are a skilled writer. Rewrite and improve the following text to make it clearer and more engaging.",
+		"code":      "You are a senior software engineer. Write clean, efficient, well-documented code.",
+		"email":     "You are a professional writer. Draft a clear, polite, and effective email.",
+		"report":    "You are a research analyst. Create a well-structured, comprehensive report.",
+		"doc":       "You are a technical writer. Create clear and comprehensive documentation.",
+		"test":      "You are a QA engineer. Write comprehensive test cases for the given code.",
 	},
 	"zh": {
 		"summarize": "你是一个帮助性助手，能够简明扼要地总结文本。",
 		"translate": "你是一个翻译器。请将以下文本翻译成中文。",
+		"explain":   "你是一位专家级讲师。请清晰、深入地解释以下内容。",
+		"rewrite":   "你是一位资深作家。请重写并改进以下文本，使其更清晰、更有吸引力。",
+		"code":      "你是一位高级软件工程师。请编写简洁、高效、有良好文档的代码。",
+		"email":     "你是一位专业文案。请撰写一封清晰、礼貌、高效的邮件。",
+		"report":    "你是一位研究分析师。请创建一份结构清晰、内容全面的报告。",
+		"doc":       "你是一位技术写作人员。请创建清晰、全面的文档。",
+		"test":      "你是一位质量保证工程师。请为给定的代码编写全面的测试用例。",
 	},
 	"ru": {
 		"summarize": "Вы - помощник, который кратко суммирует текст.",

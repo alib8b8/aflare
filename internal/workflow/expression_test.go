@@ -97,27 +97,49 @@ func TestExpressionEngine_EmptyExpr(t *testing.T) {
 func TestExpressionEngine_VariableNotFound(t *testing.T) {
 	engine := NewExpressionEngine()
 
-	_, err := engine.Evaluate("{{var.missing}}", "")
-	if err == nil {
-		t.Error("expected error for missing variable")
+	result, err := engine.Evaluate("{{var.missing}}", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "{{var.missing}}" {
+		t.Errorf("expected unchanged expression for missing variable, got %q", result)
 	}
 }
 
 func TestExpressionEngine_StepNotFound(t *testing.T) {
 	engine := NewExpressionEngine()
 
-	_, err := engine.Evaluate("{{step.99}}", "")
-	if err == nil {
-		t.Error("expected error for missing step")
+	result, err := engine.Evaluate("{{step.99}}", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "{{step.99}}" {
+		t.Errorf("expected unchanged expression for missing step, got %q", result)
 	}
 }
 
 func TestExpressionEngine_UnknownPrefix(t *testing.T) {
 	engine := NewExpressionEngine()
 
-	_, err := engine.Evaluate("{{unknown.value}}", "")
-	if err == nil {
-		t.Error("expected error for unknown prefix")
+	result, err := engine.Evaluate("{{unknown.value}}", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "{{unknown.value}}" {
+		t.Errorf("expected unchanged expression for unknown prefix, got %q", result)
+	}
+}
+
+func TestExpressionEngine_GoTemplateSyntax(t *testing.T) {
+	engine := NewExpressionEngine()
+
+	result, err := engine.Evaluate("Hello {{.input}} - {{.Name}}", "world")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expected := "Hello {{.input}} - {{.Name}}"
+	if result != expected {
+		t.Errorf("expected Go template syntax preserved, got %q", result)
 	}
 }
 

@@ -1,0 +1,67 @@
+{
+  "nodes": [
+    {
+      "name": "weather-api",
+      "description": "Fetch weather information from Open-Meteo API",
+      "version": "1.0.0",
+      "author": "llm-box",
+      "url": "https://raw.githubusercontent.com/alib8b8/llm-box/main/nodes/weather-api/metadata.yaml",
+      "tags": ["weather", "api", "open-meteo"],
+      "category": "data"
+    },
+    {
+      "name": "rss-reader",
+      "description": "Read and parse RSS/Atom feeds",
+      "version": "1.0.0",
+      "author": "llm-box",
+      "url": "https://raw.githubusercontent.com/alib8b8/llm-box/main/nodes/rss-reader/metadata.yaml",
+      "tags": ["rss", "feed", "news"],
+      "category": "data"
+    },
+    {
+      "name": "github-issues",
+      "description": "Fetch and filter GitHub issues from a repository",
+      "version": "1.0.0",
+      "author": "llm-box",
+      "url": "https://raw.githubusercontent.com/alib8b8/llm-box/main/nodes/github-issues/metadata.yaml",
+      "tags": ["github", "issues", "api"],
+      "category": "devops"
+    },
+    {
+      "name": "crypto-price",
+      "description": "Fetch cryptocurrency prices from CoinGecko API",
+      "version": "1.0.0",
+      "author": "llm-box",
+      "url": "https://raw.githubusercontent.com/alib8b8/llm-box/main/nodes/crypto-price/metadata.yaml",
+      "tags": ["crypto", "price", "coingecko", "finance"],
+      "category": "finance"
+    },
+    {
+      "name": "ip-info",
+      "description": "Lookup IP address geolocation and details",
+      "version": "1.0.0",
+      "author": "llm-box",
+      "url": "https://raw.githubusercontent.com/alib8b8/llm-box/main/nodes/ip-info/metadata.yaml",
+      "tags": ["ip", "geolocation", "network"],
+      "category": "network"
+    },
+    {
+      "name": "uuid-generator",
+      "description": "Generate UUIDs in various formats",
+      "version": "1.0.0",
+      "author": "llm-box",
+      "url": "https://raw.githubusercontent.com/alib8b8/llm-box/main/nodes/uuid-generator/metadata.yaml",
+      "tags": ["uuid", "generator", "utility"],
+      "category": "utility"
+    },
+    {
+      "name": "qr-code",
+      "description": "Generate QR codes from text or URLs",
+      "version": "1.0.0",
+      "author": "llm-box",
+      "url": "https://raw.githubusercontent.com/alib8b8/llm-box/main/nodes/qr-code/metadata.yaml",
+      "tags": ["qr", "code", "image"],
+      "category": "utility"
+    }
+  ]
+}
