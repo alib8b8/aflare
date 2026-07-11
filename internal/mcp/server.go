@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/alib8b8/llm-box/internal/config"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/workflow"
 	"gopkg.in/yaml.v3"
@@ -303,8 +304,10 @@ func (s *Server) runWorkflow(args map[string]interface{}) (*toolCallResult, erro
 		return nil, fmt.Errorf("failed to parse workflow: %w", err)
 	}
 
-	reg := nodes.NewRegistry()
-	nodes.RegisterBuiltins(reg)
+	reg := nodes.GetGlobalRegistry()
+	if config.IsSafeMode() {
+		reg.SetSafeMode(true)
+	}
 
 	result, _, err := workflow.ExecuteWorkflow(context.Background(), wf, reg)
 	if err != nil {
@@ -324,13 +327,19 @@ func (s *Server) runWorkflowYAML(args map[string]interface{}) (*toolCallResult, 
 		return nil, fmt.Errorf("yaml parameter is required")
 	}
 
+	if len(yamlStr) > workflow.MaxFileSize {
+		return nil, fmt.Errorf("workflow YAML too large (max %d bytes)", workflow.MaxFileSize)
+	}
+
 	var wf workflow.Workflow
 	if err := yaml.Unmarshal([]byte(yamlStr), &wf); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
-	reg := nodes.NewRegistry()
-	nodes.RegisterBuiltins(reg)
+	reg := nodes.GetGlobalRegistry()
+	if config.IsSafeMode() {
+		reg.SetSafeMode(true)
+	}
 
 	result, _, err := workflow.ExecuteWorkflow(context.Background(), &wf, reg)
 	if err != nil {
@@ -345,7 +354,7 @@ func (s *Server) runWorkflowYAML(args map[string]interface{}) (*toolCallResult, 
 }
 
 func (s *Server) listNodes() (*toolCallResult, error) {
-	reg := nodes.NewRegistry()
+	reg := nodes.GetGlobalRegistry()
 	nodes.RegisterBuiltins(reg)
 
 	nodeList := reg.ListNodes()
@@ -379,7 +388,7 @@ func (s *Server) validateWorkflow(args map[string]interface{}) (*toolCallResult,
 
 	warnings := workflow.ValidateWorkflow(wf)
 
-	reg := nodes.NewRegistry()
+	reg := nodes.GetGlobalRegistry()
 	nodes.RegisterBuiltins(reg)
 
 	for i, step := range wf.Steps {

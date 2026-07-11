@@ -3,7 +3,6 @@ package workflow
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -284,7 +283,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 				break
 			}
 
-			logger.Warn("step failed, retrying", "index", i, "node", wStep.Node, "attempt", attempt, "max", maxAttempts, "error", execErr)
+			logger.Warn("step failed, retrying", "index", i, "node", wStep.Node, "attempt", attempt, "max", maxAttempts, "error", nodes.RedactSensitive(execErr.Error()))
 
 			if attempt < maxAttempts {
 				// Use context-aware sleep instead of time.Sleep
@@ -309,7 +308,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 		results = append(results, result)
 
 		if execErr != nil {
-			logger.Error("step failed", "index", i, "node", wStep.Node, "duration", duration, "error", execErr)
+			logger.Error("step failed", "index", i, "node", wStep.Node, "duration", duration, "error", nodes.RedactSensitive(execErr.Error()))
 		} else {
 			logger.Info("step completed", "index", i, "node", wStep.Node, "duration", duration)
 		}
@@ -509,7 +508,7 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 			if firstErr == nil {
 				firstErr = res.err
 			}
-			logger.Error("parallel step failed", "index", res.stepIndex, "node", res.nodeName, "error", res.err)
+			logger.Error("parallel step failed", "index", res.stepIndex, "node", res.nodeName, "error", nodes.RedactSensitive(res.err.Error()))
 		} else {
 			outputs = append(outputs, res.output)
 			logger.Info("parallel step completed", "index", res.stepIndex, "node", res.nodeName, "duration", res.duration)
@@ -583,11 +582,11 @@ func evaluateCondition(cond string, input string, engine *ExpressionEngine) (boo
 	case "ends_with":
 		result = strings.HasSuffix(input, value)
 	case "regex":
-		re, err := regexp.Compile(value)
+		matched, err := nodes.SafeRegexMatch(value, input)
 		if err != nil {
-			return false, fmt.Errorf("invalid regex in condition: %w", err)
+			return false, fmt.Errorf("regex evaluation failed: %w", err)
 		}
-		result = re.MatchString(input)
+		result = matched
 	case "empty":
 		result = input == ""
 	case "not_empty":

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -185,6 +186,37 @@ func isSensitiveKey(key string) bool {
 		}
 	}
 	return false
+}
+
+var sensitivePatterns = []struct {
+	pattern *regexp.Regexp
+	replace string
+}{
+	{regexp.MustCompile(`(?i)(bearer\s+)([^\s"']+)`), "${1}****"},
+	{regexp.MustCompile(`(?i)(authorization[:\s]+)([^\s"']+)`), "${1}****"},
+	{regexp.MustCompile(`(?i)(api[_-]?key=)([^\s&"']+)`), "${1}****"},
+	{regexp.MustCompile(`(?i)(password=)([^\s&"']+)`), "${1}****"},
+	{regexp.MustCompile(`(?i)(passwd=)([^\s&"']+)`), "${1}****"},
+	{regexp.MustCompile(`(?i)(token=)([^\s&"']+)`), "${1}****"},
+	{regexp.MustCompile(`(?i)(secret=)([^\s&"']+)`), "${1}****"},
+	{regexp.MustCompile(`(https?://[^/\s:@]+:)([^@\s/@]+)(@)`), "${1}****${3}"},
+	{regexp.MustCompile(`(?i)ghp_[A-Za-z0-9]{20,}`), "ghp_****"},
+	{regexp.MustCompile(`(?i)sk-[A-Za-z0-9]{20,}`), "sk-****"},
+	{regexp.MustCompile(`(?i)xox[baprs]-[A-Za-z0-9-]{10,}`), "xoxb-****"},
+}
+
+func RedactSensitive(s string) string {
+	if s == "" {
+		return s
+	}
+	result := s
+	for _, sp := range sensitivePatterns {
+		result = sp.pattern.ReplaceAllString(result, sp.replace)
+	}
+	if len(result) > 1000 {
+		result = result[:1000] + "... (truncated)"
+	}
+	return result
 }
 
 // validateURL checks if a URL is safe to request (SSRF protection)

@@ -100,31 +100,34 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 		return err
 	}
 	tmpPath := tmpFile.Name()
-	defer func() {
-		if tmpFile != nil {
-			_ = tmpFile.Close()
-		}
-		_ = os.Remove(tmpPath)
-	}()
 
-	if err := os.Chmod(tmpPath, perm); err != nil {
-		return err
+	cleanup := func() {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
 	}
 
 	if _, err := tmpFile.Write(data); err != nil {
+		cleanup()
 		return err
 	}
 
 	if err := tmpFile.Sync(); err != nil {
+		cleanup()
+		return err
+	}
+
+	if err := tmpFile.Chmod(perm); err != nil {
+		cleanup()
 		return err
 	}
 
 	if err := tmpFile.Close(); err != nil {
+		_ = os.Remove(tmpPath)
 		return err
 	}
-	tmpFile = nil
 
 	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
 		return err
 	}
 

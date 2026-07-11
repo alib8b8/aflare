@@ -5,7 +5,59 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 )
+
+const (
+	maxRegexPatternLength = 512
+	maxRegexInputLength   = 1024 * 1024 // 1MB
+)
+
+var (
+	regexCache   = make(map[string]*regexp.Regexp)
+	regexCacheMu sync.RWMutex
+)
+
+func SafeRegexMatch(pattern, input string) (bool, error) {
+	if len(pattern) > maxRegexPatternLength {
+		return false, fmt.Errorf("regex pattern too long (max %d characters)", maxRegexPatternLength)
+	}
+	if len(input) > maxRegexInputLength {
+		return false, fmt.Errorf("regex input too long (max %d bytes)", maxRegexInputLength)
+	}
+
+	regexCacheMu.RLock()
+	re, ok := regexCache[pattern]
+	regexCacheMu.RUnlock()
+
+	if !ok {
+		var err error
+		re, err = regexp.Compile(pattern)
+		if err != nil {
+			return false, fmt.Errorf("invalid regex: %w", err)
+		}
+		regexCacheMu.Lock()
+		if len(regexCache) < 1000 {
+			regexCache[pattern] = re
+		}
+		regexCacheMu.Unlock()
+	}
+
+	done := make(chan bool, 1)
+	var matched bool
+	go func() {
+		matched = re.MatchString(input)
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		return matched, nil
+	case <-time.After(2 * time.Second):
+		return false, fmt.Errorf("regex execution timed out")
+	}
+}
 
 type ConditionNode struct{}
 
@@ -122,9 +174,9 @@ func evalPositive(expr, input string) (bool, error) {
 	case "ends_with":
 		return strings.HasSuffix(input, value), nil
 	case "regex":
-		matched, err := regexp.MatchString(value, input)
+		matched, err := SafeRegexMatch(value, input)
 		if err != nil {
-			return false, fmt.Errorf("invalid regex %q: %w", value, err)
+			return false, fmt.Errorf("regex evaluation failed: %w", err)
 		}
 		return matched, nil
 	default:
