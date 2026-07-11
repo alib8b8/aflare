@@ -137,8 +137,8 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	}
 
 	if containsActionKeyword(desc, "json") {
-			step := WorkflowStep{Node: "json_parse", Params: map[string]string{}}
-			wf.Steps = append(wf.Steps, step)
+		step := WorkflowStep{Node: "json_parse", Params: map[string]string{}}
+		wf.Steps = append(wf.Steps, step)
 	}
 
 	if containsActionKeyword(desc, "git") {
