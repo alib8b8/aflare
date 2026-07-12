@@ -21,28 +21,28 @@ const (
 )
 
 type UpgradeConfig struct {
-	Mode              UpgradeMode `yaml:"mode,omitempty"`
-	AutoUpdateEnabled bool        `yaml:"auto_update_enabled,omitempty"`
-	AutoMergeEnabled  bool        `yaml:"auto_merge_enabled,omitempty"`
-	CheckInterval     string      `yaml:"check_interval,omitempty"`
-	BackupBeforeUpgrade bool     `yaml:"backup_before_upgrade,omitempty"`
-	RollbackOnFailure   bool     `yaml:"rollback_on_failure,omitempty"`
-	RepositoryURL      string      `yaml:"repository_url,omitempty"`
+	Mode                UpgradeMode `yaml:"mode,omitempty"`
+	AutoUpdateEnabled   bool        `yaml:"auto_update_enabled,omitempty"`
+	AutoMergeEnabled    bool        `yaml:"auto_merge_enabled,omitempty"`
+	CheckInterval       string      `yaml:"check_interval,omitempty"`
+	BackupBeforeUpgrade bool        `yaml:"backup_before_upgrade,omitempty"`
+	RollbackOnFailure   bool        `yaml:"rollback_on_failure,omitempty"`
+	RepositoryURL       string      `yaml:"repository_url,omitempty"`
 }
 
 type UpgradeState struct {
-	LastCheck        time.Time `yaml:"last_check"`
-	LastUpgrade      time.Time `yaml:"last_upgrade"`
-	CurrentVersion   string    `yaml:"current_version"`
-	LatestVersion    string    `yaml:"latest_version"`
-	UpgradeInProgress bool     `yaml:"upgrade_in_progress"`
-	UpgradeStatus    string    `yaml:"upgrade_status"`
+	LastCheck         time.Time `yaml:"last_check"`
+	LastUpgrade       time.Time `yaml:"last_upgrade"`
+	CurrentVersion    string    `yaml:"current_version"`
+	LatestVersion     string    `yaml:"latest_version"`
+	UpgradeInProgress bool      `yaml:"upgrade_in_progress"`
+	UpgradeStatus     string    `yaml:"upgrade_status"`
 }
 
 type UpgradeEngine struct {
-	config    *UpgradeConfig
-	state     *UpgradeState
-	stopChan  chan struct{}
+	config   *UpgradeConfig
+	state    *UpgradeState
+	stopChan chan struct{}
 }
 
 func NewUpgradeEngine(config *UpgradeConfig) *UpgradeEngine {
