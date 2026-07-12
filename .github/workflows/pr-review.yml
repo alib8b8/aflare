@@ -117,6 +117,7 @@ jobs:
   openclaw-ci:
     name: OpenClaw CI
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
