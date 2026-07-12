@@ -3,26 +3,26 @@ package workflow
 import "time"
 
 type Workflow struct {
-	Name        string            `yaml:"name,omitempty"`
-	Description string            `yaml:"description,omitempty"`
-	Vars        map[string]string `yaml:"vars,omitempty"`
-	Steps       []WorkflowStep    `yaml:"steps"`
-	Output      string            `yaml:"output,omitempty"`     // expression for final output (default: last step output)
-	InputSchema []InputField      `yaml:"input_schema,omitempty"` // optional input validation
-	MaxConcurrency int            `yaml:"max_concurrency,omitempty"` // global concurrency limit (default: 0=unlimited)
+	Name           string            `yaml:"name,omitempty"`
+	Description    string            `yaml:"description,omitempty"`
+	Vars           map[string]string `yaml:"vars,omitempty"`
+	Steps          []WorkflowStep    `yaml:"steps"`
+	Output         string            `yaml:"output,omitempty"`          // expression for final output (default: last step output)
+	InputSchema    []InputField      `yaml:"input_schema,omitempty"`    // optional input validation
+	MaxConcurrency int               `yaml:"max_concurrency,omitempty"` // global concurrency limit (default: 0=unlimited)
 }
 
 // InputField defines an expected input parameter for schema validation.
 type InputField struct {
 	Name     string `yaml:"name"`
-	Type     string `yaml:"type"`              // string, int, bool, json
+	Type     string `yaml:"type"` // string, int, bool, json
 	Required bool   `yaml:"required,omitempty"`
 	Default  string `yaml:"default,omitempty"`
 }
 
 type WorkflowStep struct {
 	Node            string            `yaml:"node,omitempty"`
-	Name            string            `yaml:"name,omitempty"`  // optional step name for {{step.name}} reference
+	Name            string            `yaml:"name,omitempty"` // optional step name for {{step.name}} reference
 	Params          map[string]string `yaml:"params,omitempty"`
 	Condition       string            `yaml:"condition,omitempty"`
 	Retry           int               `yaml:"retry,omitempty"`

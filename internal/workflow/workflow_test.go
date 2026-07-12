@@ -345,7 +345,7 @@ func TestLoopWithParams(t *testing.T) {
 	wf := &Workflow{
 		Steps: []WorkflowStep{
 			{
-				Node: "echo",
+				Node:   "echo",
 				Params: map[string]string{"prefix": "item:"},
 				Loop: &LoopConfig{
 					Items: "one\ntwo",
@@ -511,7 +511,7 @@ func TestLoopVariableAccess(t *testing.T) {
 	wf := &Workflow{
 		Steps: []WorkflowStep{
 			{
-				Node: "echo",
+				Node:   "echo",
 				Params: map[string]string{"prefix": "[{{loop.index}}]"},
 				Loop: &LoopConfig{
 					Items: "x\ny\nz",
@@ -540,7 +540,7 @@ func TestLoopCustomVar(t *testing.T) {
 	wf := &Workflow{
 		Steps: []WorkflowStep{
 			{
-				Node: "echo",
+				Node:   "echo",
 				Params: map[string]string{"prefix": "val:"},
 				Loop: &LoopConfig{
 					Items: "one\ntwo",
@@ -567,7 +567,7 @@ type failOnNode struct {
 	name string
 }
 
-func (n *failOnNode) Name() string       { return n.name }
+func (n *failOnNode) Name() string        { return n.name }
 func (n *failOnNode) Description() string { return "fails on 'fail' input" }
 func (n *failOnNode) Schema() nodes.NodeSchema {
 	return nodes.NodeSchema{Name: n.name, Description: "fails on 'fail'", Input: "string", Output: "string"}
