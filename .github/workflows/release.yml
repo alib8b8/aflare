@@ -22,8 +22,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.24'
           cache: true
+
+      - name: Run go mod tidy
+        run: |
+          echo "Running go mod tidy..."
+          go mod tidy
+          echo "✅ go mod tidy passed"
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6

@@ -21,8 +21,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.24'
           cache: true
+
+      - name: Run go mod tidy
+        run: |
+          echo "Running go mod tidy..."
+          go mod tidy
+          echo "✅ go mod tidy passed"
 
       - name: Run gofmt
         run: |
@@ -51,8 +57,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.24'
           cache: true
+
+      - name: Run go mod tidy
+        run: |
+          echo "Running go mod tidy..."
+          go mod tidy
+          echo "✅ go mod tidy passed"
 
       - name: Run go mod verify
         run: |
@@ -81,8 +93,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.24'
           cache: true
+
+      - name: Run go mod tidy
+        run: |
+          echo "Running go mod tidy..."
+          go mod tidy
+          echo "✅ go mod tidy passed"
 
       - name: Run tests
         run: |
@@ -100,8 +118,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.24'
           cache: true
+
+      - name: Run go mod tidy
+        run: |
+          echo "Running go mod tidy..."
+          go mod tidy
+          echo "✅ go mod tidy passed"
 
       - name: Build
         run: |
