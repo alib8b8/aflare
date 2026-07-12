@@ -77,8 +77,8 @@ func TestSetLanguageInvalid(t *testing.T) {
 
 func TestAvailableLanguages(t *testing.T) {
 	langs := AvailableLanguages()
-	if len(langs) < 9 {
-		t.Errorf("expected at least 9 languages, got %d", len(langs))
+	if len(langs) != 3 {
+		t.Errorf("expected 3 languages, got %d", len(langs))
 	}
 }
 
@@ -94,18 +94,19 @@ func TestNormalizeLang(t *testing.T) {
 		{"zh-cn", "zh"},
 		{"ru", "ru"},
 		{"russian", "ru"},
-		{"fr", "fr"},
-		{"french", "fr"},
-		{"ja", "ja"},
-		{"japanese", "ja"},
-		{"ko", "ko"},
-		{"korean", "ko"},
-		{"es", "es"},
-		{"spanish", "es"},
-		{"ar", "ar"},
-		{"arabic", "ar"},
-		{"hi", "hi"},
-		{"hindi", "hi"},
+		// Removed languages should default to "en"
+		{"fr", "en"},
+		{"french", "en"},
+		{"ja", "en"},
+		{"japanese", "en"},
+		{"ko", "en"},
+		{"korean", "en"},
+		{"es", "en"},
+		{"spanish", "en"},
+		{"ar", "en"},
+		{"arabic", "en"},
+		{"hi", "en"},
+		{"hindi", "en"},
 		{"unknown", "en"},
 		{"", "en"},
 	}
@@ -127,11 +128,11 @@ func TestDetectLanguage(t *testing.T) {
 	}
 	os.Unsetenv("LLM_BOX_LANG")
 
-	// Test with LANG env var
-	os.Setenv("LANG", "ja_JP.UTF-8")
+	// Test with LANG env var (ru now supported)
+	os.Setenv("LANG", "ru_RU.UTF-8")
 	lang = detectLanguage()
-	if lang != "ja" {
-		t.Errorf("expected ja, got %s", lang)
+	if lang != "ru" {
+		t.Errorf("expected ru, got %s", lang)
 	}
 	os.Unsetenv("LANG")
 

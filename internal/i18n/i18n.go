@@ -166,18 +166,6 @@ func normalizeLang(lang string) string {
 		return "en"
 	case "ru", "russian", "rus", "русский":
 		return "ru"
-	case "fr", "french", "français", "francais":
-		return "fr"
-	case "ja", "japanese", "日本語", "nihongo":
-		return "ja"
-	case "ko", "korean", "한국어", "hangul":
-		return "ko"
-	case "es", "spanish", "español", "espanol":
-		return "es"
-	case "ar", "arabic", "عربي", "arab":
-		return "ar"
-	case "hi", "hindi", "हिन्दी":
-		return "hi"
 	default:
 		return "en"
 	}
