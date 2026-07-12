@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -38,26 +39,6 @@ func TestIsValidNodeName(t *testing.T) {
 	}
 }
 
-func TestLowercase(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"HELLO", "hello"},
-		{"Hello World", "hello world"},
-		{"hello", "hello"},
-		{"ABC123", "abc123"},
-		{"", ""},
-	}
-
-	for _, tt := range tests {
-		result := lowercase(tt.input)
-		if result != tt.expected {
-			t.Errorf("lowercase(%q) = %q, want %q", tt.input, result, tt.expected)
-		}
-	}
-}
-
 func TestContainsIgnoreCase(t *testing.T) {
 	if !containsIgnoreCase("Hello World", "hello") {
 		t.Error("expected case-insensitive match")
@@ -70,6 +51,17 @@ func TestContainsIgnoreCase(t *testing.T) {
 	}
 	if containsIgnoreCase("test", "") {
 		t.Error("expected false for empty substring")
+	}
+	// Unicode support (was broken with old ASCII-only lowercase)
+	if !containsIgnoreCase("ÉMoji Café", "émoji") {
+		t.Error("expected Unicode case-insensitive match")
+	}
+}
+
+func TestStringsToLower(t *testing.T) {
+	// Verify standard library handles Unicode correctly
+	if strings.ToLower("HÉLLO") != "héllo" {
+		t.Error("strings.ToLower should handle Unicode")
 	}
 }
 

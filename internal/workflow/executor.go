@@ -24,6 +24,11 @@ const (
 	DefaultWorkflowTimeout = 5 * time.Minute  // Default overall workflow timeout
 )
 
+// WorkflowTimeout is the overall workflow timeout. It defaults to
+// DefaultWorkflowTimeout but can be overridden by callers to configure a
+// different workflow timeout without modifying types.go.
+var WorkflowTimeout = DefaultWorkflowTimeout
+
 // StepResult stores the result of executing a single step
 type StepResult struct {
 	StepIndex int
@@ -80,7 +85,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 
 	logger.Info("workflow execution started", "name", wf.Name, "steps", len(wf.Steps))
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, DefaultWorkflowTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, WorkflowTimeout)
 	defer cancel()
 
 	var results []StepResult
@@ -117,6 +122,10 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 				}
 				results = append(results, result)
 				if program != nil {
+					program.Send(tui.StepStartMsg{
+						Index: i,
+						Name:  wStep.Node,
+					})
 					program.Send(tui.StepEndMsg{
 						Index: i,
 						Name:  wStep.Node,
@@ -358,40 +367,69 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 		duration  time.Duration
 	}
 
+	// Pre-evaluate conditions and params in the main goroutine before spawning
+	// goroutines. The ExpressionEngine reads its internal maps (stepOutputs,
+	// variables, etc.) without synchronization, so concurrent access from
+	// parallel goroutines would cause a data race.
+	type preEval struct {
+		nodeName        string
+		evaluatedParams map[string]string
+		paramsErr       error
+		condPass        bool // valid only when hasCond && condErr == nil
+		condErr         error
+		hasCond         bool
+	}
+
+	preEvals := make([]preEval, len(wStep.Parallel))
+	for j, step := range wStep.Parallel {
+		pe := preEval{nodeName: step.Node}
+		if step.Condition != "" {
+			pe.hasCond = true
+			pe.condPass, pe.condErr = evaluateCondition(step.Condition, input, engine)
+		}
+		// Only evaluate params when the condition allows execution
+		if pe.condErr == nil && (!pe.hasCond || pe.condPass) {
+			pe.evaluatedParams, pe.paramsErr = engine.EvaluateParams(step.Params, input)
+		}
+		preEvals[j] = pe
+	}
+
 	resultsChan := make(chan parallelResult, len(wStep.Parallel))
 
 	for j, step := range wStep.Parallel {
-		go func(j int, step Step) {
+		pe := preEvals[j]
+		go func(j int, step Step, pe preEval) {
 			start := time.Now()
-			nodeName := step.Node
+			nodeName := pe.nodeName
+			// Use compound index (stepIndex*MaxParallel+j) to distinguish
+			// parallel sub-steps from main steps in the TUI display.
 
-			// Check condition for parallel step
-			if step.Condition != "" {
-				pass, condErr := evaluateCondition(step.Condition, input, engine)
-				if condErr != nil {
+			// Handle pre-evaluated condition
+			if pe.hasCond {
+				if pe.condErr != nil {
 					resultsChan <- parallelResult{
-						stepIndex: stepIndex*100 + j,
+						stepIndex: stepIndex*MaxParallel + j,
 						nodeName:  nodeName,
-						err:       fmt.Errorf("condition evaluation failed: %w", condErr),
+						err:       fmt.Errorf("condition evaluation failed: %w", pe.condErr),
 						duration:  time.Since(start),
 					}
 					return
 				}
-				if !pass {
+				if !pe.condPass {
 					if program != nil {
 						program.Send(tui.StepStartMsg{
-							Index: stepIndex*100 + j,
+							Index: stepIndex*MaxParallel + j,
 							Name:  nodeName,
 						})
 						program.Send(tui.StepEndMsg{
-							Index:    stepIndex*100 + j,
+							Index:    stepIndex*MaxParallel + j,
 							Name:     nodeName,
 							Output:   "",
 							Duration: 0,
 						})
 					}
 					resultsChan <- parallelResult{
-						stepIndex: stepIndex*100 + j,
+						stepIndex: stepIndex*MaxParallel + j,
 						nodeName:  nodeName,
 						output:    "",
 						duration:  0,
@@ -402,17 +440,17 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 
 			if program != nil {
 				program.Send(tui.StepStartMsg{
-					Index: stepIndex*100 + j,
+					Index: stepIndex*MaxParallel + j,
 					Name:  nodeName,
 				})
 			}
 
-			evaluatedParams, err := engine.EvaluateParams(step.Params, input)
-			if err != nil {
+			// Handle pre-evaluated params
+			if pe.paramsErr != nil {
 				resultsChan <- parallelResult{
-					stepIndex: stepIndex*100 + j,
+					stepIndex: stepIndex*MaxParallel + j,
 					nodeName:  nodeName,
-					err:       err,
+					err:       pe.paramsErr,
 					duration:  time.Since(start),
 				}
 				return
@@ -421,7 +459,7 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 			node, ok := reg.Get(nodeName)
 			if !ok {
 				resultsChan <- parallelResult{
-					stepIndex: stepIndex*100 + j,
+					stepIndex: stepIndex*MaxParallel + j,
 					nodeName:  nodeName,
 					err:       fmt.Errorf("node '%s' not found in registry", nodeName),
 					duration:  time.Since(start),
@@ -442,6 +480,7 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 			var execErr error
 			maxAttempts := retryCount + 1
 
+		retryLoop:
 			for attempt := 1; attempt <= maxAttempts; attempt++ {
 				var stepCtx context.Context
 				var stepCancel context.CancelFunc
@@ -452,7 +491,11 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 					stepCtx, stepCancel = context.WithCancel(ctx)
 				}
 
-				output, execErr = node.Execute(stepCtx, input, evaluatedParams)
+				// Note: parallel steps do not support streaming output.
+				// Interleaving chunks from multiple concurrent streams in the
+				// TUI would be confusing, so we always use the non-streaming
+				// Execute API here.
+				output, execErr = node.Execute(stepCtx, input, pe.evaluatedParams)
 				stepCancel()
 
 				if execErr == nil {
@@ -463,19 +506,19 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 					case <-time.After(retryDelay):
 					case <-ctx.Done():
 						execErr = ctx.Err()
-						break
+						break retryLoop
 					}
 				}
 			}
 
 			resultsChan <- parallelResult{
-				stepIndex: stepIndex*100 + j,
+				stepIndex: stepIndex*MaxParallel + j,
 				nodeName:  nodeName,
 				output:    output,
 				err:       execErr,
 				duration:  time.Since(start),
 			}
-		}(j, step)
+		}(j, step, pe)
 	}
 
 	var stepResults []StepResult
@@ -573,6 +616,10 @@ func evaluateCondition(cond string, input string, engine *ExpressionEngine) (boo
 	}
 
 	switch op {
+	case "true":
+		result = true
+	case "false":
+		result = false
 	case "contains":
 		result = strings.Contains(input, value)
 	case "equals":

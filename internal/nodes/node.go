@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -106,8 +108,7 @@ func (e *ExternalNode) Execute(ctx context.Context, input string, params map[str
 	safeParams := make(map[string]string)
 	for k, v := range params {
 		// Don't pass API keys to external scripts
-		lowerKey := strings.ToLower(k)
-		if strings.Contains(lowerKey, "api_key") || strings.Contains(lowerKey, "token") || strings.Contains(lowerKey, "secret") || strings.Contains(lowerKey, "password") {
+		if isSensitiveKey(k) {
 			continue
 		}
 		safeParams[k] = v
@@ -161,13 +162,15 @@ func (e *ExternalNode) Execute(ctx context.Context, input string, params map[str
 	// Set stdin via reader instead of pipe to avoid goroutine
 	cmd.Stdin = bytes.NewReader(payloadJSON)
 
-	// Capture stdout
-	stdout, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("node execution failed: %w", err)
+	// Capture stdout and stderr separately
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("node execution failed: %w\nstderr: %s", err, stderr.String())
 	}
 
-	return string(stdout), nil
+	return stdout.String(), nil
 }
 
 // Registry keeps track of all available nodes
@@ -207,6 +210,7 @@ func (r *Registry) List() []string {
 	for name := range r.nodes {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }
 
@@ -232,6 +236,9 @@ func (r *Registry) ListNodes() []NodeInfo {
 			Description: desc,
 		})
 	}
+	sort.Slice(infos, func(i, j int) bool {
+		return infos[i].Name < infos[j].Name
+	})
 	return infos
 }
 
@@ -283,9 +290,25 @@ func (r *Registry) LoadExternalNodes(dir string) error {
 		if err != nil {
 			continue
 		}
-		metadataBytes, err := os.ReadFile(safePath)
+		// Open the file and fstat the fd to avoid TOCTOU race (symlink swap
+		// between path validation and read).
+		f, err := os.Open(safePath)
 		if err != nil {
 			continue // Skip if no metadata.yaml
+		}
+		info, err := f.Stat()
+		if err != nil {
+			f.Close()
+			continue
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			f.Close()
+			continue
+		}
+		metadataBytes, err := io.ReadAll(f)
+		f.Close()
+		if err != nil {
+			continue
 		}
 
 		var metadata NodeMetadata
@@ -294,11 +317,15 @@ func (r *Registry) LoadExternalNodes(dir string) error {
 		}
 
 		r.mu.RLock()
-		_, exists := r.nodes[metadata.Name]
+		exists := r.nodes[metadata.Name] != nil
+		safeModeNow := r.safeMode
 		r.mu.RUnlock()
 
 		if exists {
 			logger.Warn("external node skipped: name collision", "node", metadata.Name)
+			continue
+		}
+		if safeModeNow {
 			continue
 		}
 
@@ -336,7 +363,6 @@ func RegisterBuiltins(reg *Registry) {
 	reg.Register(&TransformNode{})
 	reg.Register(&NotifyNode{})
 	reg.Register(&OllamaNode{})
-	reg.Register(&OpenAICompatibleNode{})
 	reg.Register(&CallNode{})
 }
 

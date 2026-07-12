@@ -13,6 +13,8 @@ import (
 	"github.com/alib8b8/llm-box/internal/config"
 )
 
+const maxStreamResponseSize = 10 * 1024 * 1024 // 10MB max stream content
+
 type LLMMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -166,7 +168,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 	}
 
 	var llmResp LLMResponse
-	if err := json.NewDecoder(resp.Body).Decode(&llmResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxHTTPResponseSize)).Decode(&llmResp); err != nil {
 		return "", fmt.Errorf("failed to parse %s response: %w", n.config.ProviderName, err)
 	}
 
@@ -179,7 +181,10 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 
 func (n *OpenAICompatibleNode) readStreamResponse(resp *http.Response, onChunk func(chunk string)) (string, error) {
 	scanner := bufio.NewScanner(resp.Body)
+	buf := make([]byte, 0, 256*1024) // 256KB initial buffer
+	scanner.Buffer(buf, 1024*1024)   // 1MB max buffer
 	var fullContent strings.Builder
+	var parseErrors int
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -194,12 +199,19 @@ func (n *OpenAICompatibleNode) readStreamResponse(resp *http.Response, onChunk f
 
 		var streamResp LLMResponse
 		if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
+			parseErrors++
+			if parseErrors > 10 {
+				return fullContent.String(), fmt.Errorf("too many stream JSON parse errors (last error: %w)", err)
+			}
 			continue
 		}
 
 		if len(streamResp.Choices) > 0 {
 			chunk := streamResp.Choices[0].Delta.Content
 			if chunk != "" {
+				if fullContent.Len()+len(chunk) > maxStreamResponseSize {
+					return fullContent.String(), fmt.Errorf("stream response exceeded max size %d bytes", maxStreamResponseSize)
+				}
 				fullContent.WriteString(chunk)
 				if onChunk != nil {
 					onChunk(chunk)

@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/alib8b8/llm-box/internal/logger"
@@ -16,8 +19,33 @@ import (
 
 // safeHTTPClient is a shared HTTP client with a timeout to prevent
 // slowloris-style hangs against the registry sync / node download endpoints.
+// It uses a custom DialContext that re-validates the resolved IP at connect
+// time to close the TOCTOU window (DNS rebinding) that exists when validation
+// is done before the request and the dial happens later.
 var safeHTTPClient = &http.Client{
 	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+			if err != nil {
+				return nil, err
+			}
+			for _, ip := range ips {
+				if err := validatePublicIP(ip.IP, host); err != nil {
+					return nil, err
+				}
+			}
+			// Use the first resolved IP to dial
+			if len(ips) > 0 {
+				addr = net.JoinHostPort(ips[0].IP.String(), port)
+			}
+			return (&net.Dialer{}).DialContext(ctx, network, addr)
+		},
+	},
 }
 
 type NodeInfo struct {
@@ -129,37 +157,13 @@ func containsIgnoreCase(s, substr string) bool {
 	if s == "" || substr == "" {
 		return false
 	}
-	s = lowercase(s)
-	substr = lowercase(substr)
-	return contains(s, substr)
-}
-
-func contains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
-func lowercase(s string) string {
-	result := make([]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			result[i] = c + 32
-		} else {
-			result[i] = c
-		}
-	}
-	return string(result)
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
 
 func containsTag(tags []string, query string) bool {
-	q := lowercase(query)
+	q := strings.ToLower(query)
 	for _, tag := range tags {
-		if lowercase(tag) == q {
+		if strings.ToLower(tag) == q {
 			return true
 		}
 	}
@@ -276,20 +280,12 @@ func validateRegistryURL(rawURL string) error {
 		return fmt.Errorf("access to localhost is not allowed")
 	}
 
-	// Validate resolved IPs to prevent SSRF
+	// If the host is already an IP literal, validate it now. Hostname-based
+	// resolution is deferred to the custom DialContext on safeHTTPClient so
+	// that there is no TOCTOU window for DNS rebinding attacks.
 	if ip := net.ParseIP(host); ip != nil {
 		if err := validatePublicIP(ip, host); err != nil {
 			return err
-		}
-	} else {
-		ips, err := net.LookupIP(host)
-		if err != nil {
-			return fmt.Errorf("failed to resolve host %s: %w", host, err)
-		}
-		for _, resolvedIP := range ips {
-			if err := validatePublicIP(resolvedIP, host); err != nil {
-				return err
-			}
 		}
 	}
 
@@ -343,22 +339,32 @@ func ListInstalledNodes() ([]string, error) {
 		return nil, err
 	}
 
-	files, err := filepath.Glob(filepath.Join(nodesDir, "*.yaml"))
+	yamlFiles, err := filepath.Glob(filepath.Join(nodesDir, "*.yaml"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list nodes: %w", err)
 	}
+	ymlFiles, err := filepath.Glob(filepath.Join(nodesDir, "*.yml"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to list nodes: %w", err)
+	}
+	files := append(yamlFiles, ymlFiles...)
 
 	var nodeNames []string
 	for _, file := range files {
-		name := filepath.Base(file)
-		name = name[:len(name)-5]
+		name := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 		nodeNames = append(nodeNames, name)
 	}
+
+	sort.Strings(nodeNames)
 
 	return nodeNames, nil
 }
 
 func UninstallNode(name string) error {
+	if !isValidNodeName(name) {
+		return fmt.Errorf("invalid node name: %q", name)
+	}
+
 	nodesDir, err := GetNodesDir()
 	if err != nil {
 		return err

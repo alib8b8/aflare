@@ -9,11 +9,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const maxWorkflowFileSize = 10 * 1024 * 1024 // 10MB max workflow file size
-
 // safeWorkflowPath validates that a workflow file path is safe to read.
 // It prevents path traversal and ensures the file is within the working directory
 // or an absolute path that has been explicitly provided.
+//
+// Note: path is not restricted to the current working directory because users may
+// legitimately run workflow files outside it (e.g. /tmp/test.yaml). Security is
+// enforced by validating the file extension (.yaml/.yml only) and rejecting
+// symlinks that cannot be resolved; YAML parsing failures do not leak sensitive
+// information from arbitrary files.
 func safeWorkflowPath(path string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("path is empty")
@@ -63,8 +67,11 @@ func ParseWorkflow(path string) (*Workflow, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat workflow file: %w", err)
 	}
-	if info.Size() > maxWorkflowFileSize {
-		return nil, fmt.Errorf("workflow file too large (%d bytes, max %d bytes)", info.Size(), maxWorkflowFileSize)
+	if info.IsDir() {
+		return nil, fmt.Errorf("workflow path is a directory, not a file")
+	}
+	if info.Size() > MaxFileSize {
+		return nil, fmt.Errorf("workflow file too large (%d bytes, max %d bytes)", info.Size(), MaxFileSize)
 	}
 
 	data := make([]byte, info.Size())

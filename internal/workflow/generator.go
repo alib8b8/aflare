@@ -10,6 +10,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Pre-compiled regexes for workflow generation (avoid recompiling on each call)
+var (
+	urlRegex       = regexp.MustCompile(`(https?://[^\s]+)`)
+	domainRegex    = regexp.MustCompile(`\b([a-zA-Z0-9][-a-zA-Z0-9]*\.(?:com|org|net|io|edu|gov|me|dev|ai|app|xyz|co|info)\S*)\b`)
+	fileRegex      = regexp.MustCompile(`(save|write|to)\s+([a-zA-Z0-9_-]+\.(txt|md|yaml|json|html|csv|xml))`)
+	cleanCharRegex = regexp.MustCompile(`[^a-z0-9._-]`)
+	cleanNameRegex = regexp.MustCompile(`[^a-z0-9 .]`)
+	cleanFileRegex = regexp.MustCompile(`[^a-z0-9_]`)
+)
+
 // GenerateWorkflow creates a workflow from a description using rule-based
 // keyword matching. It is NOT an AI / LLM-based generator — it recognizes a
 // fixed set of keywords (e.g. "summarize", "translate", "github") and maps
@@ -68,12 +78,10 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 
 	// Try to extract URL (with or without protocol)
 	var urlMatch string
-	urlRegex := regexp.MustCompile(`(https?://[^\s]+)`)
 	if m := urlRegex.FindString(description); m != "" {
 		urlMatch = m
 	} else {
 		// Try to match a plain domain like example.com, github.com, etc.
-		domainRegex := regexp.MustCompile(`\b([a-zA-Z0-9][-a-zA-Z0-9]*\.(?:com|org|net|io|edu|gov|me|dev|ai|app|xyz|co|info)\S*)\b`)
 		if m := domainRegex.FindString(description); m != "" {
 			urlMatch = "https://" + m
 		}
@@ -84,7 +92,6 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	}
 
 	// Try to extract file path (only allow simple filenames, not paths)
-	fileRegex := regexp.MustCompile(`(save|write|to)\s+([a-zA-Z0-9_-]+\.(txt|md|yaml|json|html|csv|xml))`)
 	fileMatch := fileRegex.FindStringSubmatch(desc)
 	if len(fileMatch) >= 3 {
 		path := fileMatch[2]
@@ -192,6 +199,13 @@ func SaveWorkflow(wf *Workflow, filename string) error {
 		filename += ".yaml"
 	}
 
+	// Sanitize filename to prevent path traversal
+	cleanPath := filepath.Base(filename)
+	if cleanPath == "." || cleanPath == "/" || cleanPath == string(filepath.Separator) {
+		return fmt.Errorf("invalid filename: %s", filename)
+	}
+	filename = cleanPath
+
 	// Generate YAML content
 	content := wf.ToYAML()
 
@@ -216,7 +230,7 @@ func GetSuggestedFilename(description string) string {
 			continue
 		}
 		// Clean word - keep alphanumeric, dots, hyphens, underscores
-		word = regexp.MustCompile(`[^a-z0-9._-]`).ReplaceAllString(word, "")
+		word = cleanCharRegex.ReplaceAllString(word, "")
 		if len(word) > 2 {
 			keywords = append(keywords, word)
 		}
@@ -242,7 +256,7 @@ func generateWorkflowName(description string) string {
 	var nameParts []string
 	for _, word := range words {
 		// Remove all non-alphanumeric characters except spaces and dots
-		word = regexp.MustCompile(`[^a-z0-9 .]`).ReplaceAllString(word, "")
+		word = cleanNameRegex.ReplaceAllString(word, "")
 		if len(word) > 3 && !strings.Contains("the a an to and or fetch save write run from with", word) {
 			// Simple title case: capitalize first letter
 			if len(word) > 0 {
@@ -276,7 +290,7 @@ func (wf *Workflow) ToYAML() string {
 func GetWorkflowFilename(wf *Workflow) string {
 	name := strings.ToLower(wf.Name)
 	name = strings.ReplaceAll(name, " ", "_")
-	name = regexp.MustCompile(`[^a-z0-9_]`).ReplaceAllString(name, "")
+	name = cleanFileRegex.ReplaceAllString(name, "")
 	if name == "" {
 		name = "workflow"
 	}

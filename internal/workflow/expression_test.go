@@ -98,8 +98,8 @@ func TestExpressionEngine_VariableNotFound(t *testing.T) {
 	engine := NewExpressionEngine()
 
 	result, err := engine.Evaluate("{{var.missing}}", "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatalf("expected error for missing variable, got nil")
 	}
 	if result != "{{var.missing}}" {
 		t.Errorf("expected unchanged expression for missing variable, got %q", result)
@@ -110,8 +110,8 @@ func TestExpressionEngine_StepNotFound(t *testing.T) {
 	engine := NewExpressionEngine()
 
 	result, err := engine.Evaluate("{{step.99}}", "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatalf("expected error for missing step, got nil")
 	}
 	if result != "{{step.99}}" {
 		t.Errorf("expected unchanged expression for missing step, got %q", result)

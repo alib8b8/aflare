@@ -124,10 +124,19 @@ func TestParseArgs_WithMcpServer(t *testing.T) {
 }
 
 func TestValidateCommand_Valid(t *testing.T) {
-	commands := []string{"create", "run", "help", "-h", "--help", "workflow.yaml"}
+	commands := []string{"create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate"}
 	for _, cmd := range commands {
 		if err := ValidateCommand(cmd); err != nil {
 			t.Errorf("expected command %q to be valid, got error: %v", cmd, err)
+		}
+	}
+}
+
+func TestValidateCommand_Invalid(t *testing.T) {
+	commands := []string{"foobar", "workflow.yaml", "unknown"}
+	for _, cmd := range commands {
+		if err := ValidateCommand(cmd); err == nil {
+			t.Errorf("expected command %q to be invalid, got nil error", cmd)
 		}
 	}
 }

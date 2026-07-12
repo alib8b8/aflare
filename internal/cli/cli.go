@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/alib8b8/llm-box/internal/i18n"
+	"github.com/alib8b8/llm-box/internal/logger"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/registry"
 	"github.com/alib8b8/llm-box/internal/workflow"
@@ -45,6 +46,21 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 		}
 	}
 
+	// Validate --lang against supported languages (warning only)
+	if lang != "" {
+		supported := i18n.AvailableLanguages()
+		valid := false
+		for _, l := range supported {
+			if l == lang {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			fmt.Fprintf(os.Stderr, "Warning: unsupported language '%s', supported: %s\n", lang, strings.Join(supported, ", "))
+		}
+	}
+
 	if len(filtered) == 0 {
 		return "", nil, safeMode, dryRun, mcpServer, lang
 	}
@@ -56,14 +72,14 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 
 // ValidateCommand checks if the command is recognized.
 func ValidateCommand(command string) error {
+	if command == "" {
+		return fmt.Errorf("no command provided")
+	}
 	switch command {
 	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate":
 		return nil
 	}
-	if command == "" {
-		return fmt.Errorf("no command provided")
-	}
-	return nil
+	return fmt.Errorf("unknown command: %s", command)
 }
 
 // PrepareWorkflow loads a workflow file and returns the parsed workflow with the registry.
@@ -80,8 +96,8 @@ func PrepareWorkflow(wfPath string) (*workflow.Workflow, *nodes.Registry, error)
 	if err == nil {
 		nodesDir := filepath.Join(wd, "nodes")
 		if loadErr := reg.LoadExternalNodes(nodesDir); loadErr != nil {
-			// Non-fatal: just log via error chain
-			return wf, reg, nil
+			// Non-fatal: log the error and continue
+			logger.Warn("failed to load external nodes", "dir", nodesDir, "error", loadErr)
 		}
 	}
 

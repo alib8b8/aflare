@@ -23,6 +23,8 @@ type Config struct {
 
 var (
 	globalConfig *Config
+	configOnce   sync.Once
+	configErr    error
 	configMu     sync.RWMutex
 )
 
@@ -35,28 +37,36 @@ func LoadConfig() (*Config, error) {
 	}
 	configMu.RUnlock()
 
-	cfg := &Config{
-		Providers: make(map[string]LLMProviderConfig),
-	}
-
-	configPaths := getConfigPaths()
-	for _, path := range configPaths {
-		if _, err := os.Stat(path); err == nil {
-			data, err := os.ReadFile(path)
-			if err != nil {
-				continue
-			}
-			if err := yaml.Unmarshal(data, cfg); err != nil {
-				return nil, fmt.Errorf("failed to parse config file %s: %w", path, err)
-			}
-			break
+	configOnce.Do(func() {
+		cfg := &Config{
+			Providers: make(map[string]LLMProviderConfig),
 		}
+		configPaths := getConfigPaths()
+		for _, path := range configPaths {
+			if _, err := os.Stat(path); err == nil {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					// File exists but is not readable (e.g. permission denied);
+					// skip it and try the next path. Only format errors abort loading.
+					continue
+				}
+				if err := yaml.Unmarshal(data, cfg); err != nil {
+					configErr = fmt.Errorf("failed to parse config file %s: %w", path, err)
+					return
+				}
+				break
+			}
+		}
+		configMu.Lock()
+		globalConfig = cfg
+		configMu.Unlock()
+	})
+	if configErr != nil {
+		return nil, configErr
 	}
-
-	configMu.Lock()
-	globalConfig = cfg
-	configMu.Unlock()
-	return cfg, nil
+	configMu.RLock()
+	defer configMu.RUnlock()
+	return globalConfig, nil
 }
 
 func getConfigPaths() []string {
@@ -135,7 +145,13 @@ func GetDefaultModel(provider, envVar, defaultModel string) string {
 }
 
 func IsSafeMode() bool {
-	if os.Getenv("LLM_BOX_SAFE_MODE") != "" {
+	if envVal := os.Getenv("LLM_BOX_SAFE_MODE"); envVal != "" {
+		// Treat explicit false values as disabled
+		lower := strings.ToLower(strings.TrimSpace(envVal))
+		switch lower {
+		case "false", "0", "no", "off", "disable", "disabled":
+			return false
+		}
 		return true
 	}
 
@@ -151,4 +167,14 @@ func SetConfig(cfg *Config) {
 	configMu.Lock()
 	defer configMu.Unlock()
 	globalConfig = cfg
+}
+
+// resetForTesting resets the config state for unit tests.
+// This is only safe to call in single-threaded test setup.
+func resetForTesting() {
+	configMu.Lock()
+	defer configMu.Unlock()
+	globalConfig = nil
+	configOnce = sync.Once{}
+	configErr = nil
 }

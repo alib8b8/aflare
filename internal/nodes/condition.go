@@ -12,11 +12,14 @@ import (
 const (
 	maxRegexPatternLength = 512
 	maxRegexInputLength   = 1024 * 1024 // 1MB
+	maxRegexCacheSize     = 1000
+	maxConcurrentRegex    = 100
 )
 
 var (
-	regexCache   = make(map[string]*regexp.Regexp)
-	regexCacheMu sync.RWMutex
+	regexCache     = make(map[string]*regexp.Regexp)
+	regexCacheMu   sync.RWMutex
+	regexSemaphore = make(chan struct{}, maxConcurrentRegex)
 )
 
 func SafeRegexMatch(pattern, input string) (bool, error) {
@@ -38,10 +41,23 @@ func SafeRegexMatch(pattern, input string) (bool, error) {
 			return false, fmt.Errorf("invalid regex: %w", err)
 		}
 		regexCacheMu.Lock()
-		if len(regexCache) < 1000 {
-			regexCache[pattern] = re
+		if len(regexCache) >= maxRegexCacheSize {
+			// Evict one random entry to prevent unbounded growth
+			for k := range regexCache {
+				delete(regexCache, k)
+				break
+			}
 		}
+		regexCache[pattern] = re
 		regexCacheMu.Unlock()
+	}
+
+	// Limit concurrent regex goroutines to prevent goroutine leak under ReDoS
+	select {
+	case regexSemaphore <- struct{}{}:
+		defer func() { <-regexSemaphore }()
+	case <-time.After(3 * time.Second):
+		return false, fmt.Errorf("regex concurrency limit reached, try again later")
 	}
 
 	done := make(chan bool, 1)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -28,10 +29,16 @@ func NewExpressionEngine() *ExpressionEngine {
 
 // SetStepOutput stores the output of a step for later reference
 func (e *ExpressionEngine) SetStepOutput(stepIndex int, stepName, output string) {
-	key := fmt.Sprintf("%d", stepIndex)
+	key := fmt.Sprintf("idx:%d", stepIndex)
 	e.stepNames[stepIndex] = stepName
 	e.stepOutputs[key] = output
-	e.stepOutputs[stepName] = output
+	// Only store by name if non-empty and not purely numeric (to avoid index collision)
+	if stepName != "" {
+		_, err := strconv.Atoi(stepName)
+		if err != nil {
+			e.stepOutputs["name:"+stepName] = output
+		}
+	}
 }
 
 // SetVariable sets a workflow-level variable
@@ -64,16 +71,38 @@ func (e *ExpressionEngine) Evaluate(expr string, input string) (string, error) {
 		return "", nil
 	}
 
+	var firstErr error
 	result := varPattern.ReplaceAllStringFunc(expr, func(match string) string {
 		inner := strings.TrimSpace(match[2 : len(match)-2])
 		value, err := e.evalSingle(inner, input)
 		if err != nil {
+			if isKnownExpressionPrefix(inner) {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("expression '{{%s}}': %w", inner, err)
+				}
+			}
 			return match
 		}
 		return value
 	})
 
+	if firstErr != nil {
+		return result, firstErr
+	}
 	return result, nil
+}
+
+func isKnownExpressionPrefix(expr string) bool {
+	parts := strings.SplitN(expr, ".", 2)
+	if len(parts) < 2 {
+		return expr == "input"
+	}
+	prefix := strings.TrimSpace(parts[0])
+	switch prefix {
+	case "step", "var", "env", "file", "input":
+		return true
+	}
+	return false
 }
 
 // evalSingle evaluates a single expression like "step.0" or "var.name"
@@ -108,7 +137,11 @@ func (e *ExpressionEngine) evalSingle(expr string, input string) (string, error)
 		}
 		return "", fmt.Errorf("environment variable not found: %s", name)
 	case "file":
-		return "", fmt.Errorf("file expression: %s", expr)
+		content, err := os.ReadFile(name)
+		if err != nil {
+			return "", fmt.Errorf("failed to read file '%s': %w", name, err)
+		}
+		return string(content), nil
 	default:
 		return "", fmt.Errorf("unknown expression: %s", expr)
 	}
@@ -116,8 +149,15 @@ func (e *ExpressionEngine) evalSingle(expr string, input string) (string, error)
 
 // evalStepRef resolves a step reference by index or name
 func (e *ExpressionEngine) evalStepRef(name string) (string, error) {
-	// stepOutputs is keyed by step index (and optionally by step name when
-	// the executor populates both). A single lookup suffices.
+	// Try as index first
+	if output, ok := e.stepOutputs["idx:"+name]; ok {
+		return output, nil
+	}
+	// Try as name
+	if output, ok := e.stepOutputs["name:"+name]; ok {
+		return output, nil
+	}
+	// Backward compat: try raw key (for any old-format entries)
 	if output, ok := e.stepOutputs[name]; ok {
 		return output, nil
 	}

@@ -34,7 +34,7 @@ providers:
 	os.Setenv("LLM_BOX_CONFIG", configPath)
 	defer os.Unsetenv("LLM_BOX_CONFIG")
 
-	globalConfig = nil
+	resetForTesting()
 
 	apiKey := GetAPIKey("testprovider", "TESTPROVIDER_API_KEY")
 	if apiKey != "config-key-456" {
@@ -59,7 +59,7 @@ providers:
 	os.Setenv("LLM_BOX_CONFIG", configPath)
 	defer os.Unsetenv("LLM_BOX_CONFIG")
 
-	globalConfig = nil
+	resetForTesting()
 
 	model := GetDefaultModel("myprovider", "MYPROVIDER_MODEL", "default-model")
 	if model != "my-custom-model" {
@@ -68,7 +68,7 @@ providers:
 }
 
 func TestGetDefaultModel_Default(t *testing.T) {
-	globalConfig = nil
+	resetForTesting()
 
 	model := GetDefaultModel("nonexistent", "NONEXISTENT_MODEL", "default-model")
 	if model != "default-model" {
@@ -88,7 +88,7 @@ func TestLoadConfig_InvalidYAML(t *testing.T) {
 	os.Setenv("LLM_BOX_CONFIG", configPath)
 	defer os.Unsetenv("LLM_BOX_CONFIG")
 
-	globalConfig = nil
+	resetForTesting()
 
 	_, err = LoadConfig()
 	if err == nil {
@@ -100,7 +100,7 @@ func TestIsSafeMode(t *testing.T) {
 	os.Setenv("LLM_BOX_SAFE_MODE", "1")
 	defer os.Unsetenv("LLM_BOX_SAFE_MODE")
 
-	globalConfig = nil
+	resetForTesting()
 
 	if !IsSafeMode() {
 		t.Error("expected safe mode to be enabled")
@@ -108,6 +108,8 @@ func TestIsSafeMode(t *testing.T) {
 }
 
 func TestSetConfig(t *testing.T) {
+	resetForTesting()
+
 	cfg := &Config{
 		SafeMode: true,
 		Providers: map[string]LLMProviderConfig{
