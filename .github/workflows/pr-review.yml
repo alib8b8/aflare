@@ -21,10 +21,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.24'
-
-      - name: Fix go.mod version for CI
-        run: sed -i 's/go 1\.[0-9]\+\.[0-9]\+/go 1.24/' go.mod
+          go-version: '1.25'
 
       - name: Run go mod tidy
         run: go mod tidy
