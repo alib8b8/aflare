@@ -16,6 +16,8 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
+      - -X github.com/alib8b8/llm-box/internal/version.Version={{.Tag}}
+      - -X github.com/alib8b8/llm-box/internal/version.BuildDate={{.Date}}
     goos:
       - linux
       - darwin

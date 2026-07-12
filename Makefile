@@ -1,11 +1,17 @@
-.PHONY: build test lint fmt vet security clean install release
+.PHONY: build test lint fmt vet security clean install release version
 
 BINARY=llm-box
 CMD=./cmd/llm-box
-LDFLAGS=-ldflags "-s -w"
+VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+LDFLAGS=-ldflags "-s -w -X github.com/alib8b8/llm-box/internal/version.Version=$(VERSION) -X github.com/alib8b8/llm-box/internal/version.BuildDate=$(BUILD_DATE)"
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) $(CMD)
+
+version:
+	@echo "Version: $(VERSION)"
+	@echo "Build Date: $(BUILD_DATE)"
 
 test:
 	go test ./... -v -count=1

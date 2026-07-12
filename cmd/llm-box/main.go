@@ -105,6 +105,12 @@ func main() {
 	case "validate":
 		handleValidate(args)
 		return
+	case "version", "--version", "-v":
+		fmt.Println(cli.PrintVersion())
+		return
+	case "self-update", "update":
+		handleSelfUpdate()
+		return
 	case "-h", "--help", "help":
 		fmt.Println(cli.PrintUsage())
 		return
@@ -395,4 +401,15 @@ func runCLI(wf *workflow.Workflow, reg *nodes.Registry) {
 	fmt.Printf("\n=== %s ===\n", i18n.T("workflow.final_output"))
 	fmt.Println(finalOutput)
 	fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Render("✅ "+i18n.T("workflow.completed")))
+}
+
+func handleSelfUpdate() {
+	repo := "alib8b8/llm-box"
+	fmt.Println("Checking for updates...")
+	result, err := cli.SelfUpdate(repo)
+	if err != nil {
+		fmt.Printf("❌ Update failed: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("✅ %s\n", result)
 }

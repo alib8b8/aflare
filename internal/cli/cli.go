@@ -11,6 +11,7 @@ import (
 	"github.com/alib8b8/llm-box/internal/logger"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/registry"
+	"github.com/alib8b8/llm-box/internal/version"
 	"github.com/alib8b8/llm-box/internal/workflow"
 )
 
@@ -76,7 +77,7 @@ func ValidateCommand(command string) error {
 		return fmt.Errorf("no command provided")
 	}
 	switch command {
-	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate":
+	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "version", "--version", "-v", "self-update", "update":
 		return nil
 	}
 	return fmt.Errorf("unknown command: %s", command)
@@ -176,6 +177,23 @@ func SearchRegistryNodes(query string) ([]registry.NodeInfo, error) {
 
 func ListInstalledNodes() ([]string, error) {
 	return registry.ListInstalledNodes()
+}
+
+func PrintVersion() string {
+	return version.GetBuildInfo()
+}
+
+func SelfUpdate(repo string) (string, error) {
+	return version.SelfUpdate(repo)
+}
+
+func CheckUpdate(repo string) (string, bool, error) {
+	release, err := version.CheckLatestRelease(repo)
+	if err != nil {
+		return "", false, err
+	}
+	hasUpdate := version.HasUpdate(version.GetVersion(), release)
+	return release.TagName, hasUpdate, nil
 }
 
 // SummarizeCommand returns a summary of the command, useful for error messages.
