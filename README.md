@@ -19,11 +19,7 @@
     </a>
   </p>
 
-<p>
-  <strong>English</strong> |
-  <a href="README.zh-CN.md">中文</a> |
-  <a href="README.ru.md">Русский</a>
-</p>
+
 </div>
 
 ---
