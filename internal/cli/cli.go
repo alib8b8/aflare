@@ -77,7 +77,7 @@ func ValidateCommand(command string) error {
 		return fmt.Errorf("no command provided")
 	}
 	switch command {
-	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "version", "--version", "-v", "self-update", "update":
+	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "version", "--version", "-v", "self-update", "update", "autoupgrade", "au":
 		return nil
 	}
 	return fmt.Errorf("unknown command: %s", command)
@@ -117,6 +117,9 @@ func PrintUsage() string {
   llm-box registry sync                    %s
   llm-box registry list                    %s
   llm-box registry search <query>          %s
+  llm-box version                         %s
+  llm-box self-update                     %s
+  llm-box autoupgrade <cmd>               %s
   llm-box help                            %s
 
 %s:
@@ -140,6 +143,9 @@ func PrintUsage() string {
 		i18n.T("usage.registry_sync"),
 		i18n.T("usage.registry_list"),
 		i18n.T("usage.registry_search"),
+		i18n.T("usage.version"),
+		i18n.T("usage.self_update"),
+		i18n.T("usage.autoupgrade"),
 		i18n.T("usage.help"),
 		i18n.T("options"),
 		i18n.T("usage.safe_mode"),
