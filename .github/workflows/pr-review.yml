@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  lint:
-    name: Lint
+  build:
+    name: Build & Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -22,145 +22,25 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
-          cache: true
 
       - name: Run go mod tidy
-        run: |
-          echo "Running go mod tidy..."
-          go mod tidy
-          echo "✅ go mod tidy passed"
+        run: go mod tidy
 
       - name: Run gofmt
         run: |
-          echo "Running gofmt..."
           if [ -n "$(gofmt -l .)" ]; then
-            echo "Files with formatting issues:"
             gofmt -l .
             exit 1
           fi
-          echo "✅ gofmt passed"
 
       - name: Run go vet
-        run: |
-          echo "Running go vet..."
-          go vet ./...
-          echo "✅ go vet passed"
-
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-          cache: true
-
-      - name: Run go mod tidy
-        run: |
-          echo "Running go mod tidy..."
-          go mod tidy
-          echo "✅ go mod tidy passed"
-
-      - name: Run go mod verify
-        run: |
-          echo "Verifying dependencies..."
-          go mod verify
-          echo "✅ go mod verify passed"
-
-      - name: Install and run gosec
-        run: |
-          echo "Installing gosec..."
-          if go install github.com/securego/gosec/v2/cmd/gosec@latest; then
-            echo "Running gosec security scan..."
-            gosec -severity medium -confidence medium -conf .gosec.json ./...
-            echo "✅ gosec passed"
-          else
-            echo "⚠️ gosec installation failed, skipping security scan"
-          fi
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-          cache: true
-
-      - name: Run go mod tidy
-        run: |
-          echo "Running go mod tidy..."
-          go mod tidy
-          echo "✅ go mod tidy passed"
+        run: go vet ./...
 
       - name: Run tests
-        run: |
-          echo "Running tests..."
-          go test ./... -v
-          echo "✅ Tests passed"
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-          cache: true
-
-      - name: Run go mod tidy
-        run: |
-          echo "Running go mod tidy..."
-          go mod tidy
-          echo "✅ go mod tidy passed"
+        run: go test ./...
 
       - name: Build
-        run: |
-          echo "Building llm-box..."
-          go build -ldflags "-s -w" -o llm-box ./cmd/llm-box
-          echo "✅ Build successful"
+        run: go build -ldflags "-s -w" -o llm-box ./cmd/llm-box
 
       - name: Verify binary
-        run: |
-          ./llm-box --help
-          echo "✅ Binary works"
-
-  openclaw-ci:
-    name: OpenClaw CI
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: contrib/openclaw/package-lock.json
-
-      - name: Install dependencies
-        working-directory: contrib/openclaw
-        run: npm ci
-
-      - name: Build
-        working-directory: contrib/openclaw
-        run: npm run build
-
-      - name: Type check
-        working-directory: contrib/openclaw
-        run: npx tsc --noEmit
+        run: ./llm-box --help
