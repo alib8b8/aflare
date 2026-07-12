@@ -1,6 +1,7 @@
 package version
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -41,7 +42,10 @@ func CheckLatestRelease(repo string) (*GitHubRelease, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	req, err := http.NewRequest("GET", url, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -113,8 +117,11 @@ func SelfUpdate(repo string) (string, error) {
 
 	tmpPath := exePath + ".tmp"
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*60*time.Second)
+	defer cancel()
+
 	client := &http.Client{Timeout: 5 * 60 * time.Second}
-	req, err := http.NewRequest("GET", downloadURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create download request: %w", err)
 	}
@@ -129,7 +136,7 @@ func SelfUpdate(repo string) (string, error) {
 		return "", fmt.Errorf("download returned %d", resp.StatusCode)
 	}
 
-	out, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	out, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0700)
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
