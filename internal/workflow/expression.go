@@ -202,6 +202,9 @@ func (e *ExpressionEngine) evalSingle(expr string, input string) (string, error)
 		}
 		return "", fmt.Errorf("variable not found: %s", name)
 	case "env":
+		if !isAllowedEnvVar(name) {
+			return "", fmt.Errorf("access to environment variable %q is not allowed", name)
+		}
 		if v, ok := os.LookupEnv(name); ok {
 			return v, nil
 		}
@@ -525,4 +528,25 @@ func (e *ExpressionEngine) EvaluateParams(params map[string]string, input string
 // ContainsExpression reports whether a string contains any {{ ... }} expressions
 func ContainsExpression(s string) bool {
 	return varPattern.MatchString(s)
+}
+
+var allowedEnvVars = map[string]bool{
+	"PATH":           true,
+	"HOME":           true,
+	"USER":           true,
+	"LOGNAME":        true,
+	"SHELL":          true,
+	"LANG":           true,
+	"LC_ALL":         true,
+	"TERM":           true,
+	"PWD":            true,
+	"LLM_BOX_LANG":   true,
+	"LLM_BOX_SAFE_MODE": true,
+}
+
+func isAllowedEnvVar(name string) bool {
+	if allowedEnvVars[strings.ToUpper(name)] {
+		return true
+	}
+	return strings.HasPrefix(strings.ToUpper(name), "LLM_BOX_")
 }

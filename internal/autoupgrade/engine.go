@@ -246,11 +246,24 @@ func getLocalBranches() ([]string, error) {
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	var branches []string
 	for _, line := range lines {
-		if line != "" {
+		line = strings.TrimSpace(line)
+		if line != "" && isValidBranchName(line) {
 			branches = append(branches, line)
 		}
 	}
 	return branches, nil
+}
+
+func isValidBranchName(name string) bool {
+	if len(name) > 255 {
+		return false
+	}
+	for _, ch := range name {
+		if ch == '\000' || ch == '\n' || ch == '\r' {
+			return false
+		}
+	}
+	return true
 }
 
 func attemptAutoMerge(branch string) error {

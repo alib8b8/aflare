@@ -125,6 +125,14 @@ func redactCommandForLog(command string) string {
 func escapeLogContent(s string) string {
 	s = strings.ReplaceAll(s, "\n", "\\n")
 	s = strings.ReplaceAll(s, "\r", "\\r")
+	s = strings.ReplaceAll(s, "\t", "\\t")
+	s = strings.ReplaceAll(s, "\x00", "\\0")
+	for i := 1; i < 32; i++ {
+		s = strings.ReplaceAll(s, string(rune(i)), fmt.Sprintf("\\x%02x", i))
+	}
+	for i := 127; i < 160; i++ {
+		s = strings.ReplaceAll(s, string(rune(i)), fmt.Sprintf("\\x%02x", i))
+	}
 	return s
 }
 
