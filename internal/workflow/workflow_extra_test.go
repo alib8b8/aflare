@@ -1,0 +1,1017 @@
+package workflow
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes"
+)
+
+// ── evaluateCondition tests ──
+
+func TestEvaluateCondition_EmptyCond(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition("", "input", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected true for empty condition")
+	}
+}
+
+func TestEvaluateCondition_TrueOp(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition("true", "anything", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected true")
+	}
+}
+
+func TestEvaluateCondition_FalseOp(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition("false", "anything", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pass {
+		t.Error("expected false")
+	}
+}
+
+func TestEvaluateCondition_Contains(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition("contains:world", "hello world", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected true for contains")
+	}
+}
+
+func TestEvaluateCondition_NotContains(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition("not contains:xyz", "hello world", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected true for not contains")
+	}
+}
+
+func TestEvaluateCondition_Equals(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition("equals:hello", "hello", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected true for equals")
+	}
+}
+
+func TestEvaluateCondition_StartsWith(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition("starts_with:hel", "hello", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected true for starts_with")
+	}
+}
+
+func TestEvaluateCondition_EndsWith(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition("ends_with:llo", "hello", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected true for ends_with")
+	}
+}
+
+func TestEvaluateCondition_Regex(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition(`regex:\d+`, "abc123", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected true for regex")
+	}
+}
+
+func TestEvaluateCondition_RegexInvalid(t *testing.T) {
+	engine := NewExpressionEngine()
+	_, err := evaluateCondition("regex:[invalid", "input", engine)
+	if err == nil {
+		t.Error("expected error for invalid regex")
+	}
+}
+
+func TestEvaluateCondition_EmptyOp(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition("empty", "", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected true for empty")
+	}
+}
+
+func TestEvaluateCondition_NotEmptyOp(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition("not_empty", "hello", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected true for not_empty")
+	}
+}
+
+func TestEvaluateCondition_UnknownOp(t *testing.T) {
+	engine := NewExpressionEngine()
+	_, err := evaluateCondition("unknown:val", "input", engine)
+	if err == nil {
+		t.Error("expected error for unknown operator")
+	}
+}
+
+func TestEvaluateCondition_WithExpression(t *testing.T) {
+	engine := NewExpressionEngine()
+	engine.SetVariable("target", "hello")
+	pass, err := evaluateCondition("equals:{{var.target}}", "hello", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected true when expression matches")
+	}
+}
+
+func TestEvaluateCondition_NotPrefix(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition("not equals:hello", "world", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected true for not equals")
+	}
+}
+
+// ── executeIfBranch tests ──
+
+func TestExecuteIfBranch_ThenBranch(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	wfStep := WorkflowStep{
+		If: &IfConfig{
+			Condition: "equals:yes",
+			Then: []WorkflowStep{
+				{Node: "test", Params: map[string]string{"prefix": "then"}},
+			},
+			Else: []WorkflowStep{
+				{Node: "test", Params: map[string]string{"prefix": "else"}},
+			},
+		},
+	}
+
+	engine := NewExpressionEngine()
+	results, output, err := executeIfBranch(context.Background(), 0, wfStep.If, "yes", engine, reg, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// sub-workflow starts with empty data, so test node output is prefix + " " + ""
+	if output != "then " {
+		t.Errorf("expected 'then ', got '%s'", output)
+	}
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
+	}
+}
+
+func TestExecuteIfBranch_ElseBranch(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	wfStep := WorkflowStep{
+		If: &IfConfig{
+			Condition: "equals:yes",
+			Then: []WorkflowStep{
+				{Node: "test", Params: map[string]string{"prefix": "then"}},
+			},
+			Else: []WorkflowStep{
+				{Node: "test", Params: map[string]string{"prefix": "else"}},
+			},
+		},
+	}
+
+	engine := NewExpressionEngine()
+	results, output, err := executeIfBranch(context.Background(), 0, wfStep.If, "no", engine, reg, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if output != "else " {
+		t.Errorf("expected 'else ', got '%s'", output)
+	}
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
+	}
+}
+
+func TestExecuteIfBranch_NestedDepthLimit(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	var buildNested func(depth int) *IfConfig
+	buildNested = func(depth int) *IfConfig {
+		if depth == 0 {
+			return &IfConfig{
+				Condition: "true",
+				Then: []WorkflowStep{
+					{Node: "test"},
+				},
+			}
+		}
+		return &IfConfig{
+			Condition: "true",
+			Then: []WorkflowStep{
+				{If: buildNested(depth - 1)},
+			},
+		}
+	}
+
+	wfStep := WorkflowStep{
+		If: buildNested(MaxIfDepth),
+	}
+
+	engine := NewExpressionEngine()
+	ctx := context.WithValue(context.Background(), ifDepthKey, 0)
+	_, _, err := executeIfBranch(ctx, 0, wfStep.If, "input", engine, reg, nil, nil)
+	if err == nil {
+		t.Error("expected error for exceeding max if depth")
+	}
+}
+
+// ── applyOutputStrategy tests ──
+
+func TestApplyOutputStrategy_First(t *testing.T) {
+	output := "a\n---\nb\n---\nc"
+	result := applyOutputStrategy(output, "first")
+	if result != "a" {
+		t.Errorf("expected 'a', got '%s'", result)
+	}
+}
+
+func TestApplyOutputStrategy_Last(t *testing.T) {
+	output := "a\n---\nb\n---\nc"
+	result := applyOutputStrategy(output, "last")
+	if result != "c" {
+		t.Errorf("expected 'c', got '%s'", result)
+	}
+}
+
+func TestApplyOutputStrategy_Longest(t *testing.T) {
+	output := "a\n---\nbbb\n---\ncc"
+	result := applyOutputStrategy(output, "longest")
+	if result != "bbb" {
+		t.Errorf("expected 'bbb', got '%s'", result)
+	}
+}
+
+func TestApplyOutputStrategy_Shortest(t *testing.T) {
+	output := "aaa\n---\nb\n---\ncc"
+	result := applyOutputStrategy(output, "shortest")
+	if result != "b" {
+		t.Errorf("expected 'b', got '%s'", result)
+	}
+}
+
+func TestApplyOutputStrategy_JSONArray(t *testing.T) {
+	output := "hello\n---\n{\"key\":\"val\"}"
+	result := applyOutputStrategy(output, "json_array")
+	if !strings.Contains(result, "[") || !strings.Contains(result, "]") {
+		t.Errorf("expected JSON array, got '%s'", result)
+	}
+}
+
+func TestApplyOutputStrategy_JSONArrayWithJSON(t *testing.T) {
+	output := "{\"a\":1}\n---\n{\"b\":2}"
+	result := applyOutputStrategy(output, "json_array")
+	expected := `[{"a":1},{"b":2}]`
+	if result != expected {
+		t.Errorf("expected %s, got %s", expected, result)
+	}
+}
+
+func TestApplyOutputStrategy_Default(t *testing.T) {
+	output := "a\n---\nb"
+	result := applyOutputStrategy(output, "")
+	if result != output {
+		t.Errorf("expected unchanged output, got '%s'", result)
+	}
+}
+
+func TestApplyOutputStrategy_Join(t *testing.T) {
+	output := "a\n---\nb"
+	result := applyOutputStrategy(output, "join")
+	if result != output {
+		t.Errorf("expected unchanged output, got '%s'", result)
+	}
+}
+
+func TestApplyOutputStrategy_Empty(t *testing.T) {
+	if applyOutputStrategy("", "first") != "" {
+		t.Error("expected empty for first on empty input")
+	}
+	if applyOutputStrategy("", "last") != "" {
+		t.Error("expected empty for last on empty input")
+	}
+	if applyOutputStrategy("", "longest") != "" {
+		t.Error("expected empty for longest on empty input")
+	}
+	if applyOutputStrategy("", "shortest") != "" {
+		t.Error("expected empty for shortest on empty input")
+	}
+}
+
+// ── State management tests ──
+
+func TestSaveStateAndLoadState(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	// validateStatePath requires the file to exist, so create it first
+	os.WriteFile("state.json", []byte{}, 0600)
+
+	state := &WorkflowState{
+		WorkflowName: "test",
+		StepIndex:    2,
+		Data:         "output",
+		StepOutputs:  map[int]string{0: "a", 1: "b"},
+		Variables:    map[string]string{"x": "1"},
+		SavedAt:      time.Now(),
+	}
+
+	err := SaveState("state.json", state)
+	if err != nil {
+		t.Fatalf("unexpected error saving state: %v", err)
+	}
+
+	loaded, err := LoadState("state.json")
+	if err != nil {
+		t.Fatalf("unexpected error loading state: %v", err)
+	}
+	if loaded.WorkflowName != state.WorkflowName {
+		t.Errorf("expected name %s, got %s", state.WorkflowName, loaded.WorkflowName)
+	}
+	if loaded.StepIndex != state.StepIndex {
+		t.Errorf("expected step index %d, got %d", state.StepIndex, loaded.StepIndex)
+	}
+}
+
+func TestSaveState_EmptyPath(t *testing.T) {
+	err := SaveState("", &WorkflowState{})
+	if err != nil {
+		t.Error("expected nil error for empty path")
+	}
+}
+
+func TestLoadState_EmptyPath(t *testing.T) {
+	loaded, err := LoadState("")
+	if err != nil {
+		t.Error("expected nil error for empty path")
+	}
+	if loaded != nil {
+		t.Error("expected nil state for empty path")
+	}
+}
+
+func TestSaveState_InvalidPath(t *testing.T) {
+	err := SaveState("/absolute/path.json", &WorkflowState{})
+	if err == nil {
+		t.Error("expected error for absolute path")
+	}
+}
+
+func TestLoadState_InvalidPath(t *testing.T) {
+	_, err := LoadState("/absolute/path.json")
+	if err == nil {
+		t.Error("expected error for absolute path")
+	}
+}
+
+func TestLoadState_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	_, err := LoadState("missing.json")
+	if err == nil {
+		t.Error("expected error for missing file")
+	}
+}
+
+func TestLoadState_TooLarge(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	huge := make([]byte, MaxFileSize+1)
+	os.WriteFile("huge.json", huge, 0600)
+
+	_, err := LoadState("huge.json")
+	if err == nil {
+		t.Error("expected error for too large file")
+	}
+}
+
+func TestLoadState_InvalidJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	os.WriteFile("bad.json", []byte("not json"), 0600)
+	_, err := LoadState("bad.json")
+	if err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestValidateStatePath_Empty(t *testing.T) {
+	_, err := validateStatePath("")
+	if err == nil {
+		t.Error("expected error for empty path")
+	}
+}
+
+func TestValidateStatePath_Absolute(t *testing.T) {
+	_, err := validateStatePath("/etc/passwd")
+	if err == nil {
+		t.Error("expected error for absolute path")
+	}
+}
+
+func TestValidateStatePath_Traversal(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	_, err := validateStatePath("../escape")
+	if err == nil {
+		t.Error("expected error for path traversal")
+	}
+}
+
+func TestValidateStatePath_Valid(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	// validateStatePath requires the file to exist
+	os.WriteFile("state.json", []byte{}, 0600)
+
+	path, err := validateStatePath("state.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(path, "state.json") {
+		t.Errorf("expected path to contain state.json, got %s", path)
+	}
+}
+
+func TestSaveCurrentStateAndRestoreState(t *testing.T) {
+	engine := NewExpressionEngine()
+	engine.SetStepOutput(0, "fetch", "fetched")
+	engine.SetVariable("api_key", "secret")
+
+	wf := &Workflow{Name: "test"}
+	state := SaveCurrentState(wf, 1, "data", engine)
+	if state == nil {
+		t.Fatal("expected non-nil state")
+	}
+	if state.StepOutputs[0] != "fetched" {
+		t.Errorf("expected step output 'fetched', got %s", state.StepOutputs[0])
+	}
+	if state.Variables["api_key"] != "secret" {
+		t.Errorf("expected variable 'secret', got %s", state.Variables["api_key"])
+	}
+
+	newEngine := NewExpressionEngine()
+	data := RestoreState(state, newEngine)
+	if data != "data" {
+		t.Errorf("expected data 'data', got %s", data)
+	}
+	val, ok := newEngine.GetVariable("api_key")
+	if !ok || val != "secret" {
+		t.Error("expected restored variable")
+	}
+}
+
+// ── ConcurrencyLimiter tests ──
+
+func TestConcurrencyLimiter_AcquireRelease(t *testing.T) {
+	limiter := NewConcurrencyLimiter(1)
+	ctx := context.Background()
+
+	err := limiter.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	limiter.Release()
+}
+
+func TestConcurrencyLimiter_Nil(t *testing.T) {
+	var limiter *ConcurrencyLimiter
+	err := limiter.Acquire(context.Background())
+	if err != nil {
+		t.Error("expected nil limiter to not error")
+	}
+	limiter.Release() // should not panic
+}
+
+func TestConcurrencyLimiter_ContextCancel(t *testing.T) {
+	limiter := NewConcurrencyLimiter(1)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	limiter.Acquire(ctx)
+	cancel()
+
+	err := limiter.Acquire(ctx)
+	if err != context.Canceled {
+		t.Errorf("expected context.Canceled, got %v", err)
+	}
+	limiter.Release()
+}
+
+func TestConcurrencyLimiter_ZeroMax(t *testing.T) {
+	limiter := NewConcurrencyLimiter(0)
+	if limiter != nil {
+		t.Error("expected nil limiter for max <= 0")
+	}
+}
+
+// ── WorkflowTimeout test ──
+
+type slowNode struct{}
+
+func (n *slowNode) Name() string        { return "slow" }
+func (n *slowNode) Description() string { return "slow node" }
+func (n *slowNode) Schema() nodes.NodeSchema {
+	return nodes.NodeSchema{Name: "slow", Input: "string", Output: "string"}
+}
+func (n *slowNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	select {
+	case <-time.After(500 * time.Millisecond):
+		return "done", nil
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+}
+
+func TestWorkflowTimeout(t *testing.T) {
+	origTimeout := WorkflowTimeout
+	WorkflowTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { WorkflowTimeout = origTimeout })
+
+	reg := nodes.NewRegistry()
+	reg.Register(&slowNode{})
+
+	wf := &Workflow{
+		Steps: []WorkflowStep{
+			{Node: "slow"},
+		},
+	}
+
+	_, _, err := ExecuteWorkflow(context.Background(), wf, reg)
+	if err == nil {
+		t.Error("expected timeout error")
+	}
+}
+
+// ── MaxSteps test ──
+
+func TestMaxStepsExceeded(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	steps := make([]WorkflowStep, MaxSteps+1)
+	for i := range steps {
+		steps[i] = WorkflowStep{Node: "test"}
+	}
+	wf := &Workflow{Steps: steps}
+
+	_, _, err := ExecuteWorkflow(context.Background(), wf, reg)
+	if err == nil {
+		t.Error("expected error for max steps exceeded")
+	}
+}
+
+// ── validateInputSchema test ──
+
+func TestValidateInputSchema(t *testing.T) {
+	wf := &Workflow{
+		InputSchema: []InputField{
+			{Name: "query", Type: "string", Required: true},
+		},
+	}
+	err := validateInputSchema(wf)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	wf2 := &Workflow{}
+	err = validateInputSchema(wf2)
+	if err != nil {
+		t.Errorf("expected no error for empty schema, got %v", err)
+	}
+}
+
+// ── Parser tests ──
+
+func TestParseWorkflow_Valid(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "workflow.yaml")
+	content := `name: test workflow
+steps:
+  - node: test
+    params:
+      prefix: hello
+`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	wf, err := ParseWorkflow(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wf.Name != "test workflow" {
+		t.Errorf("expected name 'test workflow', got %s", wf.Name)
+	}
+	if len(wf.Steps) != 1 {
+		t.Errorf("expected 1 step, got %d", len(wf.Steps))
+	}
+}
+
+func TestParseWorkflow_InvalidYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "bad.yaml")
+	if err := os.WriteFile(path, []byte("not: [ valid yaml :::"), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	_, err := ParseWorkflow(path)
+	if err == nil {
+		t.Error("expected error for invalid YAML")
+	}
+}
+
+func TestParseWorkflow_Directory(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "dir.yaml")
+	if err := os.Mkdir(path, 0755); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+
+	_, err := ParseWorkflow(path)
+	if err == nil {
+		t.Error("expected error for directory")
+	}
+}
+
+func TestParseWorkflow_TooLarge(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "huge.yaml")
+	huge := make([]byte, MaxFileSize+1)
+	for i := range huge {
+		huge[i] = ' '
+	}
+	content := append([]byte("name: x\nsteps:\n"), huge...)
+	if err := os.WriteFile(path, content, 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	_, err := ParseWorkflow(path)
+	if err == nil {
+		t.Error("expected error for too large file")
+	}
+}
+
+func TestSafeWorkflowPath_Empty(t *testing.T) {
+	_, err := safeWorkflowPath("")
+	if err == nil {
+		t.Error("expected error for empty path")
+	}
+}
+
+func TestSafeWorkflowPath_InvalidExt(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "workflow.txt")
+	if err := os.WriteFile(path, []byte("x"), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+	_, err := safeWorkflowPath(path)
+	if err == nil {
+		t.Error("expected error for non-yaml extension")
+	}
+}
+
+func TestSafeWorkflowPath_Symlink(t *testing.T) {
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "real.yaml")
+	link := filepath.Join(tmpDir, "link.yaml")
+	os.WriteFile(target, []byte("x"), 0644)
+	os.Symlink(target, link)
+
+	result, err := safeWorkflowPath(link)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(result, "real.yaml") {
+		t.Errorf("expected resolved path, got %s", result)
+	}
+}
+
+func TestSafeWorkflowPath_SymlinkToNonYaml(t *testing.T) {
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "real.txt")
+	link := filepath.Join(tmpDir, "link.yaml")
+	os.WriteFile(target, []byte("x"), 0644)
+	os.Symlink(target, link)
+
+	_, err := safeWorkflowPath(link)
+	if err == nil {
+		t.Error("expected error for symlink to non-yaml")
+	}
+}
+
+// ── util.go test ──
+
+func TestPseudoRand(t *testing.T) {
+	r1 := pseudoRand()
+	r2 := pseudoRand()
+	if r1 < 0 || r1 >= 1 {
+		t.Errorf("expected r1 in [0,1), got %f", r1)
+	}
+	if r2 < 0 || r2 >= 1 {
+		t.Errorf("expected r2 in [0,1), got %f", r2)
+	}
+}
+
+// ── types.go tests ──
+
+func TestGetBackoffDelay(t *testing.T) {
+	step := &WorkflowStep{
+		Delay: "1s",
+		Backoff: &BackoffConfig{
+			Exponential: true,
+			Base:        "100ms",
+			MaxDelay:    "500ms",
+		},
+	}
+
+	// attempt 1 returns base retry delay (1s), custom base only used for attempt > 1
+	d1 := step.GetBackoffDelay(1)
+	if d1 != 1*time.Second {
+		t.Errorf("expected 1s for attempt 1, got %v", d1)
+	}
+
+	d2 := step.GetBackoffDelay(2)
+	if d2 != 200*time.Millisecond {
+		t.Errorf("expected 200ms for attempt 2, got %v", d2)
+	}
+
+	d3 := step.GetBackoffDelay(3)
+	if d3 != 400*time.Millisecond {
+		t.Errorf("expected 400ms for attempt 3, got %v", d3)
+	}
+}
+
+func TestGetBackoffDelay_Jitter(t *testing.T) {
+	step := &WorkflowStep{
+		Delay: "1s",
+		Backoff: &BackoffConfig{
+			Exponential: true,
+			Base:        "100ms",
+			Jitter:      true,
+		},
+	}
+
+	// attempt 2 with jitter: base 100ms * 2 = 200ms, then * (0.75 .. 1.0)
+	d := step.GetBackoffDelay(2)
+	if d < 150*time.Millisecond || d > 200*time.Millisecond {
+		t.Errorf("expected jitter in (150ms, 200ms], got %v", d)
+	}
+}
+
+func TestGetBackoffDelay_NoExponential(t *testing.T) {
+	step := &WorkflowStep{
+		Delay: "2s",
+	}
+	d := step.GetBackoffDelay(2)
+	if d != 2*time.Second {
+		t.Errorf("expected 2s, got %v", d)
+	}
+}
+
+func TestGetBackoffDelay_OverflowCap(t *testing.T) {
+	step := &WorkflowStep{
+		Delay: "1s",
+		Backoff: &BackoffConfig{
+			Exponential: true,
+			MaxDelay:    "2s",
+		},
+	}
+	d := step.GetBackoffDelay(10)
+	if d != 2*time.Second {
+		t.Errorf("expected 2s cap, got %v", d)
+	}
+}
+
+func TestGetRetryDelay_Invalid(t *testing.T) {
+	step := &WorkflowStep{Delay: "invalid"}
+	d := step.GetRetryDelay()
+	if d != 1*time.Second {
+		t.Errorf("expected 1s default, got %v", d)
+	}
+}
+
+func TestGetRetryDelay_StepInvalid(t *testing.T) {
+	s := &Step{Delay: "invalid"}
+	d := s.GetRetryDelay()
+	if d != 1*time.Second {
+		t.Errorf("expected 1s default, got %v", d)
+	}
+}
+
+func TestGetTimeout_Invalid(t *testing.T) {
+	step := &WorkflowStep{
+		Params: map[string]string{"_timeout": "invalid"},
+	}
+	d := step.GetTimeout()
+	if d != 0 {
+		t.Errorf("expected 0 for invalid timeout, got %v", d)
+	}
+}
+
+func TestStepGetTimeout(t *testing.T) {
+	s := &Step{
+		Params: map[string]string{"_timeout": "5s"},
+	}
+	if s.GetTimeout() != 5*time.Second {
+		t.Errorf("expected 5s, got %v", s.GetTimeout())
+	}
+}
+
+func TestStepGetTimeout_Invalid(t *testing.T) {
+	s := &Step{
+		Params: map[string]string{"_timeout": "bad"},
+	}
+	if s.GetTimeout() != 0 {
+		t.Errorf("expected 0, got %v", s.GetTimeout())
+	}
+}
+
+func TestStepGetRetryCount_Negative(t *testing.T) {
+	s := &Step{Retry: -1}
+	if s.GetRetryCount() != 0 {
+		t.Errorf("expected 0, got %d", s.GetRetryCount())
+	}
+}
+
+func TestWorkflowStepGetRetryCount_Negative(t *testing.T) {
+	step := &WorkflowStep{Retry: -1}
+	if step.GetRetryCount() != 0 {
+		t.Errorf("expected 0, got %d", step.GetRetryCount())
+	}
+}
+
+// ── init() / ExecuteWorkflowFunc tests ──
+
+func TestExecuteWorkflowFunc_WithWorkflow(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	wf := &Workflow{
+		Steps: []WorkflowStep{{Node: "test"}},
+	}
+
+	result, stepResults, err := nodes.ExecuteWorkflowFunc(context.Background(), wf, reg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "processed: " {
+		t.Errorf("unexpected result: %s", result)
+	}
+	if len(stepResults) != 1 {
+		t.Errorf("expected 1 result, got %d", len(stepResults))
+	}
+}
+
+func TestExecuteWorkflowFunc_WithString(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	yamlStr := "name: test\nsteps:\n  - node: test\n"
+	result, _, err := nodes.ExecuteWorkflowFunc(context.Background(), yamlStr, reg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "processed: " {
+		t.Errorf("unexpected result: %s", result)
+	}
+}
+
+func TestExecuteWorkflowFunc_StringInvalidYAML(t *testing.T) {
+	reg := nodes.NewRegistry()
+	_, _, err := nodes.ExecuteWorkflowFunc(context.Background(), "not: [ valid", reg)
+	if err == nil {
+		t.Error("expected error for invalid YAML string")
+	}
+}
+
+func TestExecuteWorkflowFunc_StringTooLarge(t *testing.T) {
+	reg := nodes.NewRegistry()
+	huge := make([]byte, MaxFileSize+1)
+	_, _, err := nodes.ExecuteWorkflowFunc(context.Background(), string(huge), reg)
+	if err == nil {
+		t.Error("expected error for too large string")
+	}
+}
+
+func TestExecuteWorkflowFunc_UnsupportedType(t *testing.T) {
+	reg := nodes.NewRegistry()
+	_, _, err := nodes.ExecuteWorkflowFunc(context.Background(), 123, reg)
+	if err == nil {
+		t.Error("expected error for unsupported type")
+	}
+}
+
+// ── executeWithRetry limit tests (via types) ──
+
+func TestBackoffConfig_MaxDelayCap(t *testing.T) {
+	step := &WorkflowStep{
+		Delay: "1s",
+		Backoff: &BackoffConfig{
+			Exponential: true,
+			Base:        "1s",
+			MaxDelay:    "3s",
+		},
+	}
+	// attempt 3: 1s -> 2s -> 4s, but capped at 3s
+	d := step.GetBackoffDelay(3)
+	if d != 3*time.Second {
+		t.Errorf("expected 3s cap, got %v", d)
+	}
+}
+
+func TestBackoffConfig_InvalidBase(t *testing.T) {
+	step := &WorkflowStep{
+		Delay: "1s",
+		Backoff: &BackoffConfig{
+			Exponential: true,
+			Base:        "invalid",
+		},
+	}
+	d := step.GetBackoffDelay(2)
+	if d != 2*time.Second {
+		t.Errorf("expected 2s (from delay), got %v", d)
+	}
+}
+
+func TestBackoffConfig_InvalidMaxDelay(t *testing.T) {
+	step := &WorkflowStep{
+		Delay: "1s",
+		Backoff: &BackoffConfig{
+			Exponential: true,
+			MaxDelay:    "invalid",
+		},
+	}
+	d := step.GetBackoffDelay(100)
+	if d != MaxRetryDelay {
+		t.Errorf("expected MaxRetryDelay, got %v", d)
+	}
+}

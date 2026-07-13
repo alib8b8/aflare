@@ -1,0 +1,640 @@
+package webhook
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes"
+)
+
+type echoNode struct {
+	name string
+}
+
+func (n *echoNode) Name() string        { return n.name }
+func (n *echoNode) Description() string { return "echo node" }
+func (n *echoNode) Schema() nodes.NodeSchema {
+	return nodes.NodeSchema{
+		Name:        n.name,
+		Description: "echo node",
+		Input:       "string",
+		Output:      "string",
+		Params: []nodes.ParamSchema{
+			{Name: "prefix", Type: "string", Description: "prefix", Required: false},
+		},
+	}
+}
+
+func (n *echoNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	if prefix, ok := params["prefix"]; ok {
+		return prefix + " " + input, nil
+	}
+	return "echo: " + input, nil
+}
+
+type failNode struct {
+	name string
+}
+
+func (n *failNode) Name() string        { return n.name }
+func (n *failNode) Description() string { return "fail node" }
+func (n *failNode) Schema() nodes.NodeSchema {
+	return nodes.NodeSchema{Name: n.name, Description: "fail node", Input: "string", Output: "string"}
+}
+
+func (n *failNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	return "", fmt.Errorf("intentional failure")
+}
+
+func setupTestServer(t *testing.T) (*WebhookServer, string, func()) {
+	t.Helper()
+
+	tmpDir, err := os.MkdirTemp("", "webhook-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+
+	reg := nodes.NewRegistry()
+	reg.Register(&echoNode{name: "echo"})
+	reg.Register(&failNode{name: "fail"})
+
+	srv := NewWebhookServer("", "", reg)
+	srv.SetWorkflowsDir(tmpDir)
+
+	cleanup := func() {
+		_ = srv.Stop()
+		os.RemoveAll(tmpDir)
+	}
+
+	return srv, tmpDir, cleanup
+}
+
+func createWorkflowFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	path := filepath.Join(dir, name+".yaml")
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		t.Fatalf("failed to write workflow file: %v", err)
+	}
+}
+
+func waitForTask(t *testing.T, srv *WebhookServer, taskID string, timeout time.Duration) *Task {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if task, ok := srv.getTask(taskID); ok && (task.Status == TaskCompleted || task.Status == TaskFailed) {
+			return task
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("task %s did not complete in time", taskID)
+	return nil
+}
+
+func TestWebhookServer_Health(t *testing.T) {
+	srv, _, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/webhook/health")
+	if err != nil {
+		t.Fatalf("health check request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var result map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode health response: %v", err)
+	}
+	if result["status"] != "healthy" {
+		t.Errorf("expected healthy status, got %v", result)
+	}
+}
+
+func TestWebhookServer_TriggerAndQueryStatus(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	wfContent := `name: test-workflow
+steps:
+  - node: echo
+    params:
+      prefix: "{{var.input}}"
+`
+	createWorkflowFile(t, tmpDir, "test", wfContent)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	body := []byte("hello")
+	resp, err := http.Post(ts.URL+"/webhook/test", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		t.Errorf("expected status 202, got %d", resp.StatusCode)
+	}
+
+	var triggerResp map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&triggerResp); err != nil {
+		t.Fatalf("failed to decode trigger response: %v", err)
+	}
+	taskID := triggerResp["task_id"]
+	if taskID == "" {
+		t.Fatal("expected task_id in response")
+	}
+
+	task := waitForTask(t, srv, taskID, 5*time.Second)
+	if task.Status != TaskCompleted {
+		t.Errorf("expected task completed, got %s", task.Status)
+	}
+	if task.Output != "hello " {
+		t.Errorf("expected output 'hello ', got %q", task.Output)
+	}
+	if task.Error != "" {
+		t.Errorf("expected no error, got %q", task.Error)
+	}
+
+	// Query status endpoint
+	statusResp, err := http.Get(ts.URL + "/webhook/status/" + taskID)
+	if err != nil {
+		t.Fatalf("status request failed: %v", err)
+	}
+	defer statusResp.Body.Close()
+
+	if statusResp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", statusResp.StatusCode)
+	}
+
+	var statusTask Task
+	if err := json.NewDecoder(statusResp.Body).Decode(&statusTask); err != nil {
+		t.Fatalf("failed to decode status response: %v", err)
+	}
+	if statusTask.ID != taskID {
+		t.Errorf("expected task id %s, got %s", taskID, statusTask.ID)
+	}
+}
+
+func TestWebhookServer_WorkflowNotFound(t *testing.T) {
+	srv, _, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	resp, err := http.Post(ts.URL+"/webhook/missing", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		t.Errorf("expected status 202, got %d", resp.StatusCode)
+	}
+
+	var triggerResp map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&triggerResp); err != nil {
+		t.Fatalf("failed to decode trigger response: %v", err)
+	}
+	taskID := triggerResp["task_id"]
+
+	task := waitForTask(t, srv, taskID, 5*time.Second)
+	if task.Status != TaskFailed {
+		t.Errorf("expected task failed, got %s", task.Status)
+	}
+	if task.Error == "" {
+		t.Error("expected error message for missing workflow")
+	}
+}
+
+func TestWebhookServer_InvalidWorkflowName(t *testing.T) {
+	srv, _, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	resp, err := http.Post(ts.URL+"/webhook/invalid.name", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestWebhookServer_SecretAuth(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	srv.secret = "my-secret"
+
+	wfContent := `name: secret-workflow
+steps:
+  - node: echo
+`
+	createWorkflowFile(t, tmpDir, "secret", wfContent)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	// Missing secret
+	resp, err := http.Post(ts.URL+"/webhook/secret", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected status 401 for missing secret, got %d", resp.StatusCode)
+	}
+
+	// Wrong secret
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/webhook/secret", strings.NewReader("{}"))
+	req.Header.Set("X-Webhook-Secret", "wrong-secret")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected status 401 for wrong secret, got %d", resp.StatusCode)
+	}
+
+	// Correct secret
+	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/webhook/secret", strings.NewReader("{}"))
+	req.Header.Set("X-Webhook-Secret", "my-secret")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Errorf("expected status 202 for correct secret, got %d", resp.StatusCode)
+	}
+}
+
+func TestWebhookServer_BodyTooLarge(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	wfContent := `name: large-workflow
+steps:
+  - node: echo
+`
+	createWorkflowFile(t, tmpDir, "large", wfContent)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	largeBody := make([]byte, maxBodySize+1)
+	resp, err := http.Post(ts.URL+"/webhook/large", "application/octet-stream", bytes.NewReader(largeBody))
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Errorf("expected status 413, got %d", resp.StatusCode)
+	}
+}
+
+func TestWebhookServer_QueryParamsAsVars(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	wfContent := `name: query-workflow
+steps:
+  - node: echo
+    params:
+      prefix: "{{var.greeting}}"
+`
+	createWorkflowFile(t, tmpDir, "query", wfContent)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	resp, err := http.Post(ts.URL+"/webhook/query?greeting=hi", "application/json", strings.NewReader("world"))
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		t.Errorf("expected status 202, got %d", resp.StatusCode)
+	}
+
+	var triggerResp map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&triggerResp); err != nil {
+		t.Fatalf("failed to decode trigger response: %v", err)
+	}
+	taskID := triggerResp["task_id"]
+
+	task := waitForTask(t, srv, taskID, 5*time.Second)
+	if task.Status != TaskCompleted {
+		t.Errorf("expected task completed, got %s", task.Status)
+	}
+	if task.Output != "hi " {
+		t.Errorf("expected output 'hi ', got %q", task.Output)
+	}
+}
+
+func TestWebhookServer_RateLimit(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	// Use a tight rate limit for testing
+	srv.rateLimiter = NewRateLimiter(3, time.Second)
+
+	wfContent := `name: rate-workflow
+steps:
+  - node: echo
+`
+	createWorkflowFile(t, tmpDir, "rate", wfContent)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	var accepted int
+	var limited int
+	for i := 0; i < 5; i++ {
+		resp, err := http.Post(ts.URL+"/webhook/rate", "application/json", strings.NewReader("{}"))
+		if err != nil {
+			t.Fatalf("webhook request failed: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusAccepted {
+			accepted++
+		} else if resp.StatusCode == http.StatusTooManyRequests {
+			limited++
+		}
+	}
+
+	if accepted != 3 {
+		t.Errorf("expected 3 accepted requests, got %d", accepted)
+	}
+	if limited != 2 {
+		t.Errorf("expected 2 limited requests, got %d", limited)
+	}
+}
+
+func TestWebhookServer_MethodNotAllowed(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	wfContent := `name: method-workflow
+steps:
+  - node: echo
+`
+	createWorkflowFile(t, tmpDir, "method", wfContent)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	// GET on webhook trigger path
+	resp, err := http.Get(ts.URL + "/webhook/method")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("expected status 405, got %d", resp.StatusCode)
+	}
+
+	// POST on status path
+	resp, err = http.Post(ts.URL+"/webhook/status/abc", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("expected status 405, got %d", resp.StatusCode)
+	}
+
+	// POST on health path
+	resp, err = http.Post(ts.URL+"/webhook/health", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("expected status 405, got %d", resp.StatusCode)
+	}
+}
+
+func TestWebhookServer_TaskCleanup(t *testing.T) {
+	srv, _, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	oldTime := time.Now().Add(-2 * time.Hour)
+	recentTime := time.Now().Add(-30 * time.Minute)
+
+	srv.mu.Lock()
+	srv.tasks["old"] = &Task{ID: "old", Status: TaskCompleted, CompletedAt: &oldTime}
+	srv.tasks["recent"] = &Task{ID: "recent", Status: TaskCompleted, CompletedAt: &recentTime}
+	srv.tasks["pending"] = &Task{ID: "pending", Status: TaskPending}
+	srv.mu.Unlock()
+
+	// Simulate cleanup logic inline
+	srv.mu.Lock()
+	now := time.Now()
+	for id, task := range srv.tasks {
+		if task.Status == TaskCompleted || task.Status == TaskFailed {
+			if task.CompletedAt != nil && now.Sub(*task.CompletedAt) > taskMaxAge {
+				delete(srv.tasks, id)
+			}
+		}
+	}
+	srv.mu.Unlock()
+
+	if _, ok := srv.tasks["old"]; ok {
+		t.Error("old completed task should be cleaned up")
+	}
+	if _, ok := srv.tasks["recent"]; !ok {
+		t.Error("recent completed task should remain")
+	}
+	if _, ok := srv.tasks["pending"]; !ok {
+		t.Error("pending task should remain")
+	}
+}
+
+func TestWebhookServer_FailingWorkflow(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	wfContent := `name: fail-workflow
+steps:
+  - node: fail
+`
+	createWorkflowFile(t, tmpDir, "failwf", wfContent)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	resp, err := http.Post(ts.URL+"/webhook/failwf", "application/json", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var triggerResp map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&triggerResp); err != nil {
+		t.Fatalf("failed to decode trigger response: %v", err)
+	}
+	taskID := triggerResp["task_id"]
+
+	task := waitForTask(t, srv, taskID, 5*time.Second)
+	if task.Status != TaskFailed {
+		t.Errorf("expected task failed, got %s", task.Status)
+	}
+	if task.Error == "" {
+		t.Error("expected error message")
+	}
+}
+
+func TestWebhookServer_ConcurrentExecutions(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	wfContent := `name: concurrent-workflow
+steps:
+  - node: echo
+    params:
+      prefix: "{{var.input}}"
+`
+	createWorkflowFile(t, tmpDir, "concurrent", wfContent)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	var completed atomic.Int32
+	for i := 0; i < 10; i++ {
+		go func(idx int) {
+			body := fmt.Sprintf("req-%d", idx)
+			resp, err := http.Post(ts.URL+"/webhook/concurrent", "application/json", strings.NewReader(body))
+			if err != nil {
+				return
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusAccepted {
+				completed.Add(1)
+			}
+		}(i)
+	}
+
+	time.Sleep(2 * time.Second)
+	if completed.Load() != 10 {
+		t.Errorf("expected 10 accepted requests, got %d", completed.Load())
+	}
+
+	// Wait for all tasks to complete
+	srv.mu.RLock()
+	count := len(srv.tasks)
+	srv.mu.RUnlock()
+
+	if count != 10 {
+		t.Errorf("expected 10 tasks, got %d", count)
+	}
+}
+
+func TestWebhookServer_StopWaitsForTasks(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	wfContent := `name: stop-workflow
+steps:
+  - node: echo
+`
+	createWorkflowFile(t, tmpDir, "stopwf", wfContent)
+
+	go func() {
+		_ = srv.Start()
+	}()
+
+	// Give server time to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Trigger a task
+	go func() {
+		_, _ = http.Post("http://localhost:"+srv.port+"/webhook/stopwf", "application/json", strings.NewReader("test"))
+	}()
+
+	// Give task time to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Stop should wait for task to complete
+	done := make(chan error, 1)
+	go func() {
+		done <- srv.Stop()
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("stop failed: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop() did not complete in time")
+	}
+}
+
+func TestRateLimiter(t *testing.T) {
+	// Test with a 1-second window and 2 requests max
+	limiter := NewRateLimiter(2, time.Second)
+
+	if !limiter.Allow("192.168.1.1") {
+		t.Error("first request should be allowed")
+	}
+	if !limiter.Allow("192.168.1.1") {
+		t.Error("second request should be allowed")
+	}
+	if limiter.Allow("192.168.1.1") {
+		t.Error("third request should be denied")
+	}
+
+	// Different IP should be allowed
+	if !limiter.Allow("192.168.1.2") {
+		t.Error("request from different IP should be allowed")
+	}
+}
+
+func TestIsValidWorkflowName(t *testing.T) {
+	tests := []struct {
+		name  string
+		valid bool
+	}{
+		{"hello", true},
+		{"hello-world", true},
+		{"hello_world", true},
+		{"hello123", true},
+		{"", false},
+		{"hello/world", false},
+		{"../secret", false},
+		{"hello.world", false},
+		{strings.Repeat("a", 101), false},
+	}
+
+	for _, tt := range tests {
+		if got := isValidWorkflowName(tt.name); got != tt.valid {
+			t.Errorf("isValidWorkflowName(%q) = %v, want %v", tt.name, got, tt.valid)
+		}
+	}
+}

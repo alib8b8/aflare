@@ -160,12 +160,8 @@ func normalizeLang(lang string) string {
 	}
 
 	switch lang {
-	case "zh", "chinese", "cn", "zh-cn", "zh_cn":
-		return "zh"
 	case "en", "english":
 		return "en"
-	case "ru", "russian", "rus", "русский":
-		return "ru"
 	default:
 		return "en"
 	}

@@ -59,9 +59,9 @@ func TestHasKey(t *testing.T) {
 
 func TestSetLanguage(t *testing.T) {
 	Init("en")
-	instance.SetLanguage("zh")
-	if GetLanguage() != "zh" {
-		t.Errorf("expected language zh, got %s", GetLanguage())
+	instance.SetLanguage("en")
+	if GetLanguage() != "en" {
+		t.Errorf("expected language en, got %s", GetLanguage())
 	}
 }
 
@@ -77,8 +77,8 @@ func TestSetLanguageInvalid(t *testing.T) {
 
 func TestAvailableLanguages(t *testing.T) {
 	langs := AvailableLanguages()
-	if len(langs) != 3 {
-		t.Errorf("expected 3 languages, got %d", len(langs))
+	if len(langs) != 1 {
+		t.Errorf("expected 1 language, got %d", len(langs))
 	}
 }
 
@@ -89,11 +89,11 @@ func TestNormalizeLang(t *testing.T) {
 	}{
 		{"en", "en"},
 		{"english", "en"},
-		{"zh", "zh"},
-		{"zh_CN.UTF-8", "zh"},
-		{"zh-cn", "zh"},
-		{"ru", "ru"},
-		{"russian", "ru"},
+		{"zh", "en"},
+		{"zh_CN.UTF-8", "en"},
+		{"zh-cn", "en"},
+		{"ru", "en"},
+		{"russian", "en"},
 		// Removed languages should default to "en"
 		{"fr", "en"},
 		{"french", "en"},
@@ -120,19 +120,19 @@ func TestNormalizeLang(t *testing.T) {
 }
 
 func TestDetectLanguage(t *testing.T) {
-	// Test with env var
+	// Test with env var (all fallback to en now)
 	os.Setenv("LLM_BOX_LANG", "zh")
 	lang := detectLanguage()
-	if lang != "zh" {
-		t.Errorf("expected zh, got %s", lang)
+	if lang != "en" {
+		t.Errorf("expected en, got %s", lang)
 	}
 	os.Unsetenv("LLM_BOX_LANG")
 
-	// Test with LANG env var (ru now supported)
+	// Test with LANG env var (all fallback to en now)
 	os.Setenv("LANG", "ru_RU.UTF-8")
 	lang = detectLanguage()
-	if lang != "ru" {
-		t.Errorf("expected ru, got %s", lang)
+	if lang != "en" {
+		t.Errorf("expected en, got %s", lang)
 	}
 	os.Unsetenv("LANG")
 
@@ -143,14 +143,6 @@ func TestDetectLanguage(t *testing.T) {
 	lang = detectLanguage()
 	if lang != "en" {
 		t.Errorf("expected en as default, got %s", lang)
-	}
-}
-
-func TestChineseTranslation(t *testing.T) {
-	Init("zh")
-	msg := T("tui.completed")
-	if msg == "" {
-		t.Error("expected non-empty Chinese translation")
 	}
 }
 

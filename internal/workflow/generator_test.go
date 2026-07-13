@@ -1,8 +1,11 @@
 package workflow
 
 import (
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/alib8b8/llm-box/internal/i18n"
 )
 
 func TestGenerateWorkflow_DefaultModel(t *testing.T) {
@@ -364,5 +367,189 @@ func TestGetWorkflowFilename(t *testing.T) {
 	result := GetWorkflowFilename(wf)
 	if result != "my_test_workflow.yaml" {
 		t.Errorf("expected my_test_workflow.yaml, got %s", result)
+	}
+}
+
+// ── More model tests ──
+
+func TestGenerateWorkflow_MoreModels(t *testing.T) {
+	tests := []struct {
+		desc     string
+		expected string
+	}{
+		{"use coze to summarize", "coze"},
+		{"use minimax to summarize", "minimax"},
+		{"use ima to summarize", "ima"},
+		{"use xverse to summarize", "xverse"},
+		{"use yi to summarize", "yi"},
+		{"use baichuan to summarize", "baichuan"},
+		{"use internlm to summarize", "internlm"},
+		{"use mistral to summarize", "mistral"},
+		{"use mimo to summarize", "mimo"},
+		{"use qwen to summarize", "qwen"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			wf, err := GenerateWorkflow(tt.desc)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			found := false
+			for _, step := range wf.Steps {
+				if step.Node == tt.expected {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected %s step", tt.expected)
+			}
+		})
+	}
+}
+
+// ── More action tests ──
+
+func TestGenerateWorkflow_MoreActions(t *testing.T) {
+	tests := []struct {
+		desc         string
+		expectedNode string
+		checkKey     string
+		checkValue   string
+	}{
+		{"explain this code", "ollama", "system", "expert educator"},
+		{"rewrite text", "ollama", "system", "skilled writer"},
+		{"write code", "ollama", "system", "senior software engineer"},
+		{"send email", "ollama", "system", "professional writer"},
+		{"generate report", "ollama", "system", "research analyst"},
+		{"create doc", "ollama", "system", "technical writer"},
+		{"write test", "ollama", "system", "QA engineer"},
+		{"parse json", "json_parse", "", ""},
+		{"show git log", "execute", "command", "git"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expectedNode, func(t *testing.T) {
+			wf, err := GenerateWorkflow(tt.desc)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			found := false
+			for _, step := range wf.Steps {
+				if step.Node == tt.expectedNode {
+					if tt.checkKey != "" && !strings.Contains(step.Params[tt.checkKey], tt.checkValue) {
+						t.Errorf("expected %s containing %q, got %s", tt.checkKey, tt.checkValue, step.Params[tt.checkKey])
+					}
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected %s step", tt.expectedNode)
+			}
+		})
+	}
+}
+
+// ── SaveWorkflow and CreateWorkflowFromDescription tests ──
+
+func TestSaveWorkflow(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	wf := &Workflow{
+		Name: "Test",
+		Steps: []WorkflowStep{
+			{Node: "fetch_url", Params: map[string]string{"url": "https://example.com"}},
+		},
+	}
+
+	err := SaveWorkflow(wf, "my_workflow")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	content, err := os.ReadFile("my_workflow.yaml")
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if !strings.Contains(string(content), "fetch_url") {
+		t.Error("expected YAML to contain fetch_url")
+	}
+}
+
+func TestCreateWorkflowFromDescription(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	path, err := CreateWorkflowFromDescription("summarize this article")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("expected file to exist at %s", path)
+	}
+}
+
+// ── getSystemPrompt tests ──
+
+func TestGetSystemPrompt_Zh(t *testing.T) {
+	i18n.Init("zh")
+	defer i18n.Init("en")
+
+	prompt := getSystemPrompt("summarize")
+	if !strings.Contains(prompt, "总结") {
+		t.Errorf("expected Chinese prompt, got %s", prompt)
+	}
+}
+
+func TestGetSystemPrompt_UnknownLang(t *testing.T) {
+	i18n.Init("xx")
+	defer i18n.Init("en")
+
+	prompt := getSystemPrompt("summarize")
+	if !strings.Contains(prompt, "summariz") {
+		t.Errorf("expected English fallback, got %s", prompt)
+	}
+}
+
+func TestGetSystemPrompt_UnknownAction(t *testing.T) {
+	prompt := getSystemPrompt("nonexistent")
+	if prompt != "" {
+		t.Errorf("expected empty prompt, got %s", prompt)
+	}
+}
+
+// ── Direct keyword helper tests ──
+
+func TestContainsWord_Boundary(t *testing.T) {
+	if containsWord("digital", "git") {
+		t.Error("git should not match digital")
+	}
+	if !containsWord("git push", "git") {
+		t.Error("git should match 'git push'")
+	}
+}
+
+func TestContainsWord_Chinese(t *testing.T) {
+	if !containsWord("请翻译这段文字", "翻译") {
+		t.Error("翻译 should match Chinese text")
+	}
+}
+
+func TestContainsLLMKeyword_UnknownProvider(t *testing.T) {
+	if containsLLMKeyword("anything", "unknown") {
+		t.Error("unknown provider should not match")
+	}
+}
+
+func TestContainsActionKeyword_UnknownAction(t *testing.T) {
+	if containsActionKeyword("anything", "unknown") {
+		t.Error("unknown action should not match")
 	}
 }

@@ -1,6 +1,8 @@
 package workflow
 
 import (
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -198,5 +200,303 @@ func TestContainsExpression(t *testing.T) {
 		if result != tt.expected {
 			t.Errorf("ContainsExpression(%q) = %v, expected %v", tt.input, result, tt.expected)
 		}
+	}
+}
+
+// ── New tests for uncovered expression functionality ──
+
+func TestExpressionEngine_GetVariable(t *testing.T) {
+	engine := NewExpressionEngine()
+	engine.SetVariable("key", "val")
+	v, ok := engine.GetVariable("key")
+	if !ok || v != "val" {
+		t.Error("expected to get variable")
+	}
+	_, ok = engine.GetVariable("missing")
+	if ok {
+		t.Error("expected missing variable to not be found")
+	}
+}
+
+func TestExpressionEngine_EnvVar(t *testing.T) {
+	os.Setenv("LLM_BOX_TEST_VAR", "hello")
+	defer os.Unsetenv("LLM_BOX_TEST_VAR")
+
+	engine := NewExpressionEngine()
+	result, err := engine.Evaluate("{{env.LLM_BOX_TEST_VAR}}", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "hello" {
+		t.Errorf("expected 'hello', got %s", result)
+	}
+}
+
+func TestExpressionEngine_EnvVar_Disallowed(t *testing.T) {
+	engine := NewExpressionEngine()
+	_, err := engine.Evaluate("{{env.SECRET}}", "")
+	if err == nil {
+		t.Error("expected error for disallowed env var")
+	}
+}
+
+func TestExpressionEngine_EnvVar_NotFound(t *testing.T) {
+	engine := NewExpressionEngine()
+	_, err := engine.Evaluate("{{env.LLM_BOX_NONEXISTENT_VAR_XYZ}}", "")
+	if err == nil {
+		t.Error("expected error for missing env var")
+	}
+}
+
+func TestExpressionEngine_FileExpr(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	if err := os.WriteFile("test.txt", []byte("file content"), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	engine := NewExpressionEngine()
+	result, err := engine.Evaluate("{{file.test.txt}}", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "file content" {
+		t.Errorf("expected 'file content', got %s", result)
+	}
+}
+
+func TestExpressionEngine_FileExpr_TooLarge(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	huge := make([]byte, maxExprFileSize+1)
+	os.WriteFile("huge.txt", huge, 0644)
+
+	engine := NewExpressionEngine()
+	_, err := engine.Evaluate("{{file.huge.txt}}", "")
+	if err == nil {
+		t.Error("expected error for too large file")
+	}
+}
+
+func TestExpressionEngine_LoopVars(t *testing.T) {
+	engine := NewExpressionEngine()
+	engine.SetLoopVars("apple", 2, 5)
+
+	result, err := engine.Evaluate("item={{loop.item}},index={{loop.index}},count={{loop.count}}", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expected := "item=apple,index=2,count=5"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+
+	engine.ClearLoopVars()
+	_, err = engine.Evaluate("{{loop.item}}", "")
+	if err == nil {
+		t.Error("expected error after clearing loop vars")
+	}
+}
+
+func TestExpressionEngine_JSONPath(t *testing.T) {
+	engine := NewExpressionEngine()
+	engine.SetStepOutput(0, "data", `{"users":[{"name":"Alice"},{"name":"Bob"}]}`)
+
+	result, err := engine.Evaluate("{{step.0.jsonpath:$.users[0].name}}", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "Alice" {
+		t.Errorf("expected 'Alice', got %s", result)
+	}
+}
+
+func TestExpressionEngine_JSONPath_Wildcard(t *testing.T) {
+	engine := NewExpressionEngine()
+	engine.SetStepOutput(0, "data", `{"items":[{"name":"a"},{"name":"b"}]}`)
+
+	result, err := engine.Evaluate("{{step.0.jsonpath:$.items[*]}}", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(result, "name") || !strings.Contains(result, "a") || !strings.Contains(result, "b") {
+		t.Errorf("expected JSON array items, got %s", result)
+	}
+}
+
+func TestValidateExprFilePath_Absolute(t *testing.T) {
+	_, err := validateExprFilePath("/etc/passwd")
+	if err == nil {
+		t.Error("expected error for absolute path")
+	}
+}
+
+func TestValidateExprFilePath_Traversal(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	_, err := validateExprFilePath("../escape")
+	if err == nil {
+		t.Error("expected error for path traversal")
+	}
+}
+
+func TestValidateExprFilePath_Valid(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	// validateExprFilePath requires the file to exist
+	os.WriteFile("file.txt", []byte{}, 0644)
+
+	path, err := validateExprFilePath("file.txt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(path, "file.txt") {
+		t.Errorf("expected path to contain file.txt, got %s", path)
+	}
+}
+
+func TestExtractJSONPath_TooLarge(t *testing.T) {
+	jsonStr := strings.Repeat(" ", maxExprFileSize+1)
+	_, err := extractJSONPath(jsonStr, "$.a")
+	if err == nil {
+		t.Error("expected error for too large JSON")
+	}
+}
+
+func TestExtractJSONPath_PathTooLong(t *testing.T) {
+	jsonStr := `{"a":1}`
+	path := strings.Repeat("a", 1025)
+	_, err := extractJSONPath(jsonStr, path)
+	if err == nil {
+		t.Error("expected error for too long path")
+	}
+}
+
+func TestExtractJSONPath_Recursive(t *testing.T) {
+	jsonStr := `{"a": {"name": "x"}, "b": {"name": "y"}}`
+	result, err := extractJSONPath(jsonStr, "$..name")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(result, "x") || !strings.Contains(result, "y") {
+		t.Errorf("expected x and y, got %s", result)
+	}
+}
+
+func TestExtractJSONPath_InvalidJSON(t *testing.T) {
+	_, err := extractJSONPath("not json", "$.a")
+	if err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestEvalJSONPathDepth_ExceedsMax(t *testing.T) {
+	data := map[string]interface{}{"a": map[string]interface{}{}}
+	_, err := evalJSONPathDepth(data, "$.a", maxJSONPathDepth+1)
+	if err == nil {
+		t.Error("expected error for exceeding max depth")
+	}
+}
+
+func TestEvalJSONPathDepth_MultipleRecursive(t *testing.T) {
+	data := map[string]interface{}{
+		"a": map[string]interface{}{
+			"b": map[string]interface{}{
+				"c": "x",
+			},
+		},
+	}
+	_, err := evalJSONPath(data, "$..a..b..c")
+	if err == nil {
+		t.Error("expected error for multiple recursive descent segments")
+	}
+}
+
+func TestEvalJSONPathDepth_Root(t *testing.T) {
+	data := map[string]interface{}{"a": 1}
+	result, err := evalJSONPathDepth(data, "$", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Error("expected non-nil result")
+	}
+}
+
+func TestParsePathSegments_Malformed(t *testing.T) {
+	_, err := parsePathSegments("foo[]")
+	if err == nil {
+		t.Error("expected error for empty array index")
+	}
+
+	_, err = parsePathSegments("foo[abc]")
+	if err == nil {
+		t.Error("expected error for invalid array index")
+	}
+}
+
+func TestRecursiveFind_MaxDepth(t *testing.T) {
+	data := map[string]interface{}{"a": map[string]interface{}{}}
+	results := recursiveFind(data, "x", maxRecursiveDepth+1)
+	if results != nil {
+		t.Error("expected nil for exceeding max depth")
+	}
+}
+
+func TestJSONPathResultToString(t *testing.T) {
+	tests := []struct {
+		input    interface{}
+		expected string
+	}{
+		{"str", "str"},
+		{float64(42), "42"},
+		{float64(3.14), "3.14"},
+		{true, "true"},
+		{false, "false"},
+		{nil, ""},
+		{[]interface{}{"a", "b"}, "a\nb"},
+	}
+	for _, tt := range tests {
+		result, err := jsonPathResultToString(tt.input)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != tt.expected {
+			t.Errorf("expected %q, got %q", tt.expected, result)
+		}
+	}
+}
+
+func TestJSONPathResultToString_Object(t *testing.T) {
+	result, err := jsonPathResultToString(map[string]interface{}{"a": 1})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(result, "a") {
+		t.Errorf("expected JSON object string, got %s", result)
+	}
+}
+
+func TestIsAllowedEnvVar(t *testing.T) {
+	if !isAllowedEnvVar("PATH") {
+		t.Error("PATH should be allowed")
+	}
+	if !isAllowedEnvVar("llm_box_custom") {
+		t.Error("LLM_BOX_ prefix should be allowed")
+	}
+	if isAllowedEnvVar("SECRET") {
+		t.Error("SECRET should not be allowed")
 	}
 }
