@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 //go:embed locales/*.json
@@ -20,39 +21,57 @@ type Translator struct {
 }
 
 var (
-	instance *Translator
+	instance atomic.Pointer[Translator]
 	initOnce sync.Once
+	initMu   sync.Mutex
 )
 
 func Init(lang string) {
 	initOnce.Do(func() {
-		instance = &Translator{}
-		instance.load("en") // fallback always English
+		t := &Translator{}
+		t.load("en") // fallback always English
+		instance.Store(t)
 	})
-	instance.SetLanguage(lang)
+	initMu.Lock()
+	defer initMu.Unlock()
+	t := instance.Load()
+	if t != nil {
+		t.SetLanguage(lang)
+	}
 }
 
 func T(key string, args ...interface{}) string {
-	if instance == nil {
+	t := instance.Load()
+	if t == nil {
 		Init("")
+		t = instance.Load()
 	}
-	return instance.Translate(key, args...)
+	if t == nil {
+		return key
+	}
+	return t.Translate(key, args...)
 }
 
 func HasKey(key string) bool {
-	if instance == nil {
+	t := instance.Load()
+	if t == nil {
 		Init("")
+		t = instance.Load()
 	}
-	return instance.HasKey(key)
+	if t == nil {
+		return false
+	}
+	return t.HasKey(key)
 }
 
 func GetLanguage() string {
-	if instance == nil {
+	t := instance.Load()
+	if t == nil {
 		return "en"
 	}
-	instance.mu.RLock()
-	defer instance.mu.RUnlock()
-	return instance.lang
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.lang
 }
 
 func (t *Translator) SetLanguage(lang string) {

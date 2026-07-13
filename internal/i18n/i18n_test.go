@@ -59,7 +59,7 @@ func TestHasKey(t *testing.T) {
 
 func TestSetLanguage(t *testing.T) {
 	Init("en")
-	instance.SetLanguage("en")
+	instance.Load().SetLanguage("en")
 	if GetLanguage() != "en" {
 		t.Errorf("expected language en, got %s", GetLanguage())
 	}
@@ -67,7 +67,7 @@ func TestSetLanguage(t *testing.T) {
 
 func TestSetLanguageInvalid(t *testing.T) {
 	Init("en")
-	instance.SetLanguage("invalid_lang")
+	instance.Load().SetLanguage("invalid_lang")
 	// Should fallback to English messages
 	msg := T("tui.completed")
 	if msg == "" {
@@ -148,23 +148,23 @@ func TestDetectLanguage(t *testing.T) {
 
 func TestAllLocalesHaveSameKeys(t *testing.T) {
 	Init("en")
-	enKeys := instance.fallback
+	enKeys := instance.Load().fallback
 	langs := AvailableLanguages()
 
 	for _, lang := range langs {
 		if lang == "en" {
 			continue
 		}
-		instance.SetLanguage(lang)
+		instance.Load().SetLanguage(lang)
 		missingCount := 0
 		for key := range enKeys {
-			if !instance.HasKey(key) {
+			if !instance.Load().HasKey(key) {
 				missingCount++
 			}
 		}
 		if missingCount > 0 {
 			t.Errorf("language %s is missing %d keys from English baseline", lang, missingCount)
 		}
-		instance.SetLanguage("en")
+		instance.Load().SetLanguage("en")
 	}
 }

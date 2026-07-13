@@ -141,16 +141,20 @@ func (s *WebhookServer) SetWorkflowsDir(dir string) {
 
 // Start starts the HTTP server.
 func (s *WebhookServer) Start() error {
-	s.server = &http.Server{
+	srv := &http.Server{
 		Addr:         ":" + s.port,
 		Handler:      s.handler(),
 		ReadTimeout:  serverReadTimeout,
 		WriteTimeout: serverWriteTimeout,
 	}
 
+	s.mu.Lock()
+	s.server = srv
+	s.mu.Unlock()
+
 	go s.cleanupTasks()
 
-	return s.server.ListenAndServe()
+	return srv.ListenAndServe()
 }
 
 // Stop gracefully shuts down the server.
@@ -158,10 +162,13 @@ func (s *WebhookServer) Stop() error {
 	s.stopOnce.Do(func() {
 		close(s.stopCh)
 	})
-	if s.server != nil {
+	s.mu.RLock()
+	srv := s.server
+	s.mu.RUnlock()
+	if srv != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
 		defer cancel()
-		if err := s.server.Shutdown(ctx); err != nil {
+		if err := srv.Shutdown(ctx); err != nil {
 			return err
 		}
 	}
