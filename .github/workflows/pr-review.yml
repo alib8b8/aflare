@@ -47,7 +47,7 @@ jobs:
         run: go test -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage.out
@@ -79,7 +79,7 @@ jobs:
           output: gosec-results.sarif
 
       - name: Upload gosec results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gosec-results
           path: gosec-results.sarif
@@ -132,7 +132,7 @@ jobs:
           echo "BINARY_NAME=$BINARY_NAME" >> $GITHUB_ENV
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: llm-box-${{ matrix.os }}-${{ matrix.arch }}
           path: llm-box-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
