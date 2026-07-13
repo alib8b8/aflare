@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -236,8 +237,22 @@ func (e *UpgradeEngine) RunAutoMerge() (string, error) {
 	return "Auto-merge completed", nil
 }
 
+func getRepoDir() (string, error) {
+	exePath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("failed to get executable path: %w", err)
+	}
+	return filepath.Dir(exePath), nil
+}
+
 func getLocalBranches() ([]string, error) {
+	repoDir, err := getRepoDir()
+	if err != nil {
+		return nil, err
+	}
+
 	cmd := exec.Command("git", "branch", "--format=%(refname:short)")
+	cmd.Dir = repoDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("git branch failed: %w", err)
@@ -267,39 +282,52 @@ func isValidBranchName(name string) bool {
 }
 
 func attemptAutoMerge(branch string) error {
+	repoDir, err := getRepoDir()
+	if err != nil {
+		return err
+	}
+
 	cmd := exec.Command("git", "checkout", "main")
+	cmd.Dir = repoDir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to checkout main: %w", err)
 	}
 
 	cmd = exec.Command("git", "pull", "--rebase")
+	cmd.Dir = repoDir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to pull main: %w", err)
 	}
 
 	cmd = exec.Command("git", "checkout", branch)
+	cmd.Dir = repoDir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to checkout branch: %w", err)
 	}
 
 	cmd = exec.Command("git", "rebase", "main")
+	cmd.Dir = repoDir
 	if err := cmd.Run(); err != nil {
 		cmd := exec.Command("git", "rebase", "--abort")
+		cmd.Dir = repoDir
 		cmd.Run()
 		return fmt.Errorf("rebase failed: %w", err)
 	}
 
 	cmd = exec.Command("git", "checkout", "main")
+	cmd.Dir = repoDir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to checkout main after rebase: %w", err)
 	}
 
 	cmd = exec.Command("git", "merge", "--no-ff", branch)
+	cmd.Dir = repoDir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("merge failed: %w", err)
 	}
 
 	cmd = exec.Command("git", "push")
+	cmd.Dir = repoDir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("push failed: %w", err)
 	}

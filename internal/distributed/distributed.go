@@ -511,6 +511,7 @@ type Worker struct {
 	mu             sync.Mutex
 	httpServer     *http.Server
 	stopCh         chan struct{}
+	stopOnce       sync.Once
 }
 
 func NewWorker(port, coordinatorURL string, capacity int) (*Worker, error) {
@@ -548,13 +549,7 @@ func isValidPort(port string) bool {
 }
 
 func isValidCoordinatorURL(url string) bool {
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		return false
-	}
-	if strings.Contains(url, "localhost") || strings.Contains(url, "127.0.0.1") || strings.Contains(url, "0.0.0.0") {
-		return true
-	}
-	return true
+	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
 }
 
 func (w *Worker) Start() error {
@@ -577,7 +572,9 @@ func (w *Worker) Start() error {
 }
 
 func (w *Worker) Stop() error {
-	close(w.stopCh)
+	w.stopOnce.Do(func() {
+		close(w.stopCh)
+	})
 	if w.httpServer != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()

@@ -106,7 +106,7 @@ func (s *WebUIServer) handleVisualize(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Workflow string `json:"workflow"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.NewDecoder(io.LimitReader(r.Body, maxWorkflowFileSize)).Decode(&req); err != nil {
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
 			return
 		}
@@ -219,7 +219,7 @@ func (s *WebUIServer) handleSaveWorkflow(w http.ResponseWriter, r *http.Request)
 		Name    string `json:"name"`
 		Content string `json:"content"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxWorkflowFileSize)).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
