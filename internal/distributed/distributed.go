@@ -72,32 +72,41 @@ type ExecutionResult struct {
 
 type Coordinator struct {
 	port          string
+	authToken     string
 	nodes         map[string]*NodeInfo
 	tasks         map[string]*Task
 	mu            sync.RWMutex
 	httpServer    *http.Server
 	nodeIDCounter int
+	stopCh        chan struct{}
+	stopOnce      sync.Once
 }
 
-func NewCoordinator(port string) *Coordinator {
+func NewCoordinator(port, authToken string) *Coordinator {
 	if port == "" {
 		port = defaultCoordinatorPort
 	}
 	return &Coordinator{
-		port:  port,
-		nodes: make(map[string]*NodeInfo),
-		tasks: make(map[string]*Task),
+		port:      port,
+		authToken: authToken,
+		nodes:     make(map[string]*NodeInfo),
+		tasks:     make(map[string]*Task),
+		stopCh:    make(chan struct{}),
 	}
 }
 
 func (c *Coordinator) Start() error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/register", c.handleRegister)
-	mux.HandleFunc("/api/heartbeat", c.handleHeartbeat)
-	mux.HandleFunc("/api/nodes", c.handleListNodes)
-	mux.HandleFunc("/api/task", c.handleTask)
-	mux.HandleFunc("/api/tasks", c.handleListTasks)
-	mux.HandleFunc("/api/execute", c.handleExecute)
+	mux.HandleFunc("/api/register", c.authMiddleware(c.handleRegister))
+	mux.HandleFunc("/api/heartbeat", c.authMiddleware(c.handleHeartbeat))
+	mux.HandleFunc("/api/nodes", c.authMiddleware(c.handleListNodes))
+	mux.HandleFunc("/api/task", c.authMiddleware(c.handleTask))
+	mux.HandleFunc("/api/tasks", c.authMiddleware(c.handleListTasks))
+	mux.HandleFunc("/api/execute", c.authMiddleware(c.handleExecute))
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	})
 
 	c.httpServer = &http.Server{
 		Addr:    ":" + c.port,
@@ -111,6 +120,9 @@ func (c *Coordinator) Start() error {
 }
 
 func (c *Coordinator) Stop() error {
+	c.stopOnce.Do(func() {
+		close(c.stopCh)
+	})
 	if c.httpServer != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -498,6 +510,8 @@ func (c *Coordinator) cleanupOfflineNodes() {
 				}
 			}
 			c.mu.Unlock()
+		case <-c.stopCh:
+			return
 		}
 	}
 }
@@ -505,6 +519,7 @@ func (c *Coordinator) cleanupOfflineNodes() {
 type Worker struct {
 	port           string
 	coordinatorURL string
+	authToken      string
 	nodeID         string
 	capacity       int
 	currentLoad    int
@@ -514,7 +529,7 @@ type Worker struct {
 	stopOnce       sync.Once
 }
 
-func NewWorker(port, coordinatorURL string, capacity int) (*Worker, error) {
+func NewWorker(port, coordinatorURL, authToken string, capacity int) (*Worker, error) {
 	if port == "" {
 		port = defaultWorkerPort
 	}
@@ -530,6 +545,7 @@ func NewWorker(port, coordinatorURL string, capacity int) (*Worker, error) {
 	return &Worker{
 		port:           port,
 		coordinatorURL: coordinatorURL,
+		authToken:      authToken,
 		capacity:       capacity,
 		currentLoad:    0,
 		stopCh:         make(chan struct{}),
@@ -552,9 +568,45 @@ func isValidCoordinatorURL(url string) bool {
 	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
 }
 
+func (c *Coordinator) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if c.authToken != "" {
+			token := r.Header.Get("X-Auth-Token")
+			if token == "" {
+				token = r.URL.Query().Get("token")
+			}
+			if token != c.authToken {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+		}
+		next(w, r)
+	}
+}
+
+func (w *Worker) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(writer http.ResponseWriter, r *http.Request) {
+		if w.authToken != "" {
+			token := r.Header.Get("X-Auth-Token")
+			if token == "" {
+				token = r.URL.Query().Get("token")
+			}
+			if token != w.authToken {
+				http.Error(writer, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+		}
+		next(writer, r)
+	}
+}
+
 func (w *Worker) Start() error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/execute-step", w.handleExecuteStep)
+	mux.HandleFunc("/api/execute-step", w.authMiddleware(w.handleExecuteStep))
+	mux.HandleFunc("/health", func(writer http.ResponseWriter, r *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		json.NewEncoder(writer).Encode(map[string]string{"status": "ok"})
+	})
 
 	w.httpServer = &http.Server{
 		Addr:    ":" + w.port,
@@ -583,6 +635,32 @@ func (w *Worker) Stop() error {
 	return nil
 }
 
+func (w *Worker) httpPost(path string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPost, w.coordinatorURL+path, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if w.authToken != "" {
+		req.Header.Set("X-Auth-Token", w.authToken)
+	}
+	client := &http.Client{Timeout: 30 * time.Second}
+	return client.Do(req)
+}
+
+func (w *Worker) httpPut(path string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPut, w.coordinatorURL+path, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if w.authToken != "" {
+		req.Header.Set("X-Auth-Token", w.authToken)
+	}
+	client := &http.Client{Timeout: 30 * time.Second}
+	return client.Do(req)
+}
+
 func (w *Worker) registerWithCoordinator() error {
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -595,7 +673,7 @@ func (w *Worker) registerWithCoordinator() error {
 		"capacity": w.capacity,
 	})
 
-	resp, err := http.Post(w.coordinatorURL+"/api/register", "application/json", bytes.NewBuffer(reqBody))
+	resp, err := w.httpPost("/api/register", reqBody)
 	if err != nil {
 		return err
 	}
@@ -631,7 +709,7 @@ func (w *Worker) sendHeartbeats() {
 				"current_load": load,
 			})
 
-			http.Post(w.coordinatorURL+"/api/heartbeat", "application/json", bytes.NewBuffer(reqBody))
+			w.httpPost("/api/heartbeat", reqBody)
 		case <-w.stopCh:
 			return
 		}
@@ -688,9 +766,7 @@ func (w *Worker) updateTaskStatus(taskID string, status TaskStatus) {
 		"task_id": taskID,
 		"status":  status,
 	})
-	req, _ := http.NewRequest(http.MethodPut, w.coordinatorURL+"/api/task", bytes.NewBuffer(reqBody))
-	req.Header.Set("Content-Type", "application/json")
-	http.DefaultClient.Do(req)
+	w.httpPut("/api/task", reqBody)
 }
 
 func (w *Worker) updateTaskResult(taskID, output, errorStr string) {
@@ -700,9 +776,7 @@ func (w *Worker) updateTaskResult(taskID, output, errorStr string) {
 		"output":  output,
 		"error":   errorStr,
 	})
-	req, _ := http.NewRequest(http.MethodPut, w.coordinatorURL+"/api/task", bytes.NewBuffer(reqBody))
-	req.Header.Set("Content-Type", "application/json")
-	http.DefaultClient.Do(req)
+	w.httpPut("/api/task", reqBody)
 }
 
 func executeStepLocally(step workflow.WorkflowStep) (string, error) {

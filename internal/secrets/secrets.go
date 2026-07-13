@@ -14,11 +14,16 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/pbkdf2"
 )
 
 const (
 	SecretTypeNormal = "normal"
 	SecretTypeSecret = "secret"
+	pbkdf2Iterations  = 100000
+	pbkdf2SaltSize   = 16
+	pbkdf2KeySize    = 32
 )
 
 type Secret struct {
@@ -39,19 +44,23 @@ type SecretManager struct {
 	mu     sync.RWMutex
 	groups map[string]*SecretGroup
 	aead   cipher.AEAD
+	salt   []byte
 }
 
-type storedData struct {
-	Groups map[string]*SecretGroup `json:"groups"`
+func deriveKey(masterPassword string, salt []byte) []byte {
+	return pbkdf2.Key([]byte(masterPassword), salt, pbkdf2Iterations, pbkdf2KeySize, sha256.New)
 }
 
-func deriveKey(masterPassword string) []byte {
-	hash := sha256.Sum256([]byte(masterPassword))
-	return hash[:]
+func generateSalt() ([]byte, error) {
+	salt := make([]byte, pbkdf2SaltSize)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return nil, err
+	}
+	return salt, nil
 }
 
-func NewSecretManager(masterPassword string) (*SecretManager, error) {
-	key := deriveKey(masterPassword)
+func newSecretManagerWithSalt(masterPassword string, salt []byte) (*SecretManager, error) {
+	key := deriveKey(masterPassword, salt)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -66,29 +75,47 @@ func NewSecretManager(masterPassword string) (*SecretManager, error) {
 	return &SecretManager{
 		groups: make(map[string]*SecretGroup),
 		aead:   aead,
+		salt:   salt,
 	}, nil
 }
 
-func LoadFromFile(path, masterPassword string) (*SecretManager, error) {
-	sm, err := NewSecretManager(masterPassword)
+func NewSecretManager(masterPassword string) (*SecretManager, error) {
+	salt, err := generateSalt()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to generate salt: %w", err)
 	}
+	return newSecretManagerWithSalt(masterPassword, salt)
+}
 
+func LoadFromFile(path, masterPassword string) (*SecretManager, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return sm, nil
+			return NewSecretManager(masterPassword)
 		}
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	plaintext, err := sm.decrypt(data)
+	if len(data) < pbkdf2SaltSize {
+		return nil, fmt.Errorf("file too short: invalid format")
+	}
+
+	salt := data[:pbkdf2SaltSize]
+	ciphertext := data[pbkdf2SaltSize:]
+
+	sm, err := newSecretManagerWithSalt(masterPassword, salt)
+	if err != nil {
+		return nil, err
+	}
+
+	plaintext, err := sm.decrypt(ciphertext)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt data: %w", err)
 	}
 
-	var stored storedData
+	var stored struct {
+		Groups map[string]*SecretGroup `json:"groups"`
+	}
 	if err := json.Unmarshal(plaintext, &stored); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal data: %w", err)
 	}
@@ -104,7 +131,9 @@ func (sm *SecretManager) SaveToFile(path string) error {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
-	stored := storedData{
+	stored := struct {
+		Groups map[string]*SecretGroup `json:"groups"`
+	}{
 		Groups: sm.groups,
 	}
 
@@ -118,7 +147,11 @@ func (sm *SecretManager) SaveToFile(path string) error {
 		return fmt.Errorf("failed to encrypt data: %w", err)
 	}
 
-	if err := os.WriteFile(path, ciphertext, 0600); err != nil {
+	output := make([]byte, 0, len(sm.salt)+len(ciphertext))
+	output = append(output, sm.salt...)
+	output = append(output, ciphertext...)
+
+	if err := os.WriteFile(path, output, 0600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 

@@ -553,11 +553,17 @@ func printAutoUpgradeUsage() {
 }
 
 func handleWebUI(args []string) {
+	host := ""
 	port := ""
 	workflowsDir := ""
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--host", "-H":
+			if i+1 < len(args) {
+				host = args[i+1]
+				i++
+			}
 		case "--port", "-p":
 			if i+1 < len(args) {
 				port = args[i+1]
@@ -578,7 +584,7 @@ func handleWebUI(args []string) {
 		}
 	}
 
-	server := webui.NewWebUIServer(port)
+	server := webui.NewWebUIServer(host, port)
 	if workflowsDir != "" {
 		server.SetWorkflowsDir(workflowsDir)
 	}

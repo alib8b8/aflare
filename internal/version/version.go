@@ -2,6 +2,8 @@ package version
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -95,6 +97,70 @@ func FindAsset(release *GitHubRelease, goos, goarch string) (string, string) {
 	return "", ""
 }
 
+func findChecksumsURL(release *GitHubRelease) string {
+	for _, asset := range release.Assets {
+		if strings.Contains(asset.Name, "checksums") || strings.Contains(asset.Name, "sha256") {
+			return asset.BrowserDownloadURL
+		}
+	}
+	return ""
+}
+
+func verifyChecksum(filePath, expectedChecksum string) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file for checksum: %w", err)
+	}
+	hash := sha256.Sum256(data)
+	actual := hex.EncodeToString(hash[:])
+	if actual != expectedChecksum {
+		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actual)
+	}
+	return nil
+}
+
+func downloadChecksums(url string) (map[string]string, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("checksums download returned %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	checksums := make(map[string]string)
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			checksums[strings.TrimSpace(parts[1])] = strings.TrimSpace(parts[0])
+		}
+	}
+	return checksums, nil
+}
+
 func SelfUpdate(repo string) (string, error) {
 	release, err := CheckLatestRelease(repo)
 	if err != nil {
@@ -105,7 +171,7 @@ func SelfUpdate(repo string) (string, error) {
 		return "Already up to date (" + Version + ")", nil
 	}
 
-	downloadURL, _ := FindAsset(release, runtime.GOOS, runtime.GOARCH)
+	downloadURL, assetName := FindAsset(release, runtime.GOOS, runtime.GOARCH)
 	if downloadURL == "" {
 		return "", fmt.Errorf("no binary found for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
@@ -147,6 +213,18 @@ func SelfUpdate(repo string) (string, error) {
 		return "", fmt.Errorf("failed to write temp file: %w", err)
 	}
 	out.Close()
+
+	if checksumsURL := findChecksumsURL(release); checksumsURL != "" {
+		checksums, err := downloadChecksums(checksumsURL)
+		if err == nil && len(checksums) > 0 {
+			if expected, ok := checksums[assetName]; ok {
+				if err := verifyChecksum(tmpPath, expected); err != nil {
+					os.Remove(tmpPath)
+					return "", fmt.Errorf("checksum verification failed: %w", err)
+				}
+			}
+		}
+	}
 
 	backupPath := exePath + ".bak"
 	os.Rename(exePath, backupPath)

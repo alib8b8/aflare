@@ -3,7 +3,6 @@ package webui
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -18,6 +17,7 @@ import (
 )
 
 const (
+	defaultHost           = "127.0.0.1"
 	defaultPort           = "8081"
 	serverReadTimeout     = 30 * time.Second
 	serverWriteTimeout    = 30 * time.Second
@@ -26,6 +26,7 @@ const (
 )
 
 type WebUIServer struct {
+	host         string
 	port         string
 	workflowsDir string
 
@@ -34,11 +35,15 @@ type WebUIServer struct {
 	stopCh chan struct{}
 }
 
-func NewWebUIServer(port string) *WebUIServer {
+func NewWebUIServer(host, port string) *WebUIServer {
+	if host == "" {
+		host = defaultHost
+	}
 	if port == "" {
 		port = defaultPort
 	}
 	return &WebUIServer{
+		host:   host,
 		port:   port,
 		stopCh: make(chan struct{}),
 	}
@@ -58,7 +63,7 @@ func (s *WebUIServer) Start() error {
 	mux.HandleFunc("/api/validate", s.handleValidate)
 
 	srv := &http.Server{
-		Addr:         ":" + s.port,
+		Addr:         s.host + ":" + s.port,
 		Handler:      mux,
 		ReadTimeout:  serverReadTimeout,
 		WriteTimeout: serverWriteTimeout,
@@ -157,7 +162,7 @@ func (s *WebUIServer) handleListWorkflows(w http.ResponseWriter, r *http.Request
 	dir := s.getWorkflowsDir()
 	files, err := os.ReadDir(dir)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to read workflows directory: %v", err), http.StatusInternalServerError)
+		http.Error(w, "failed to read workflows directory", http.StatusInternalServerError)
 		return
 	}
 
@@ -206,7 +211,7 @@ func (s *WebUIServer) handleGetWorkflow(w http.ResponseWriter, r *http.Request) 
 	path := s.getWorkflowPath(name)
 	data, err := os.ReadFile(path)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("workflow not found: %v", err), http.StatusNotFound)
+		http.Error(w, "workflow not found", http.StatusNotFound)
 		return
 	}
 
@@ -241,13 +246,13 @@ func (s *WebUIServer) handleSaveWorkflow(w http.ResponseWriter, r *http.Request)
 
 	dir := s.getWorkflowsDir()
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		http.Error(w, fmt.Sprintf("failed to create directory: %v", err), http.StatusInternalServerError)
+		http.Error(w, "failed to create directory", http.StatusInternalServerError)
 		return
 	}
 
 	path := filepath.Join(dir, req.Name+".yaml")
 	if err := os.WriteFile(path, []byte(req.Content), 0644); err != nil {
-		http.Error(w, fmt.Sprintf("failed to save workflow: %v", err), http.StatusInternalServerError)
+		http.Error(w, "failed to save workflow", http.StatusInternalServerError)
 		return
 	}
 
@@ -270,7 +275,7 @@ func (s *WebUIServer) handleDeleteWorkflow(w http.ResponseWriter, r *http.Reques
 
 	path := s.getWorkflowPath(name)
 	if err := os.Remove(path); err != nil {
-		http.Error(w, fmt.Sprintf("failed to delete workflow: %v", err), http.StatusInternalServerError)
+		http.Error(w, "failed to delete workflow", http.StatusInternalServerError)
 		return
 	}
 
@@ -600,7 +605,8 @@ var indexHTML = `<!DOCTYPE html>
                 const result = await response.text();
 
                 if (format === 'mermaid') {
-                    preview.innerHTML = '<div class="mermaid-container"><div class="mermaid">' + result + '</div></div>';
+                    preview.innerHTML = '<div class="mermaid-container"><div class="mermaid"></div></div>';
+                    preview.querySelector('.mermaid').textContent = result;
                     mermaid.init(undefined, '.mermaid');
                 } else if (format === 'json') {
                     preview.innerHTML = '<div class="preview">' + syntaxHighlight(result) + '</div>';
