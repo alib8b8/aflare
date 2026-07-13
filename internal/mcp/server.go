@@ -180,94 +180,11 @@ func (s *Server) handleRequest(req *rpcRequest) *rpcResponse {
 }
 
 func (s *Server) getTools() []tool {
-	return []tool{
-		{
-			Name:        "create_workflow",
-			Description: "Generate a YAML workflow from a plain English description. Returns the workflow YAML content.",
-			InputSchema: inputSchema{
-				Type: "object",
-				Properties: map[string]interface{}{
-					"description": map[string]interface{}{
-						"type":        "string",
-						"description": "Plain English description of the workflow to generate (e.g., 'fetch Hacker News and save to file')",
-					},
-				},
-				Required: []string{"description"},
-			},
-		},
-		{
-			Name:        "run_workflow",
-			Description: "Execute a llm-box workflow from a YAML file path. Returns the final output of the workflow.",
-			InputSchema: inputSchema{
-				Type: "object",
-				Properties: map[string]interface{}{
-					"file": map[string]interface{}{
-						"type":        "string",
-						"description": "Path to the YAML workflow file to execute",
-					},
-				},
-				Required: []string{"file"},
-			},
-		},
-		{
-			Name:        "run_workflow_yaml",
-			Description: "Execute a llm-box workflow from raw YAML content. Returns the final output of the workflow.",
-			InputSchema: inputSchema{
-				Type: "object",
-				Properties: map[string]interface{}{
-					"yaml": map[string]interface{}{
-						"type":        "string",
-						"description": "Raw YAML content of the workflow to execute",
-					},
-				},
-				Required: []string{"yaml"},
-			},
-		},
-		{
-			Name:        "list_nodes",
-			Description: "List all available llm-box nodes with their descriptions. Call this to discover what nodes can be used in workflows.",
-			InputSchema: inputSchema{
-				Type:       "object",
-				Properties: map[string]interface{}{},
-			},
-		},
-		{
-			Name:        "validate_workflow",
-			Description: "Validate a llm-box workflow YAML file without executing it. Returns validation warnings if any.",
-			InputSchema: inputSchema{
-				Type: "object",
-				Properties: map[string]interface{}{
-					"file": map[string]interface{}{
-						"type":        "string",
-						"description": "Path to the YAML workflow file to validate",
-					},
-				},
-				Required: []string{"file"},
-			},
-		},
-	}
+	return s.getExtendedTools()
 }
 
 func (s *Server) callTool(params *toolCallParams) (*toolCallResult, error) {
-	switch params.Name {
-	case "create_workflow":
-		return s.createWorkflow(params.Arguments)
-
-	case "run_workflow":
-		return s.runWorkflow(params.Arguments)
-
-	case "run_workflow_yaml":
-		return s.runWorkflowYAML(params.Arguments)
-
-	case "list_nodes":
-		return s.listNodes()
-
-	case "validate_workflow":
-		return s.validateWorkflow(params.Arguments)
-
-	default:
-		return nil, fmt.Errorf("unknown tool: %s", params.Name)
-	}
+	return s.callExtendedTool(params)
 }
 
 func (s *Server) createWorkflow(args map[string]interface{}) (*toolCallResult, error) {

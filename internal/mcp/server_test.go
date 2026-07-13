@@ -450,8 +450,8 @@ func TestHandleRequest_ToolsCall_UnknownTool(t *testing.T) {
 func TestGetTools(t *testing.T) {
 	s := NewServer()
 	tools := s.getTools()
-	if len(tools) != 5 {
-		t.Errorf("expected 5 tools, got %d", len(tools))
+	if len(tools) != 14 {
+		t.Errorf("expected 14 tools, got %d", len(tools))
 	}
 	expectedNames := map[string]bool{
 		"create_workflow":   true,
@@ -459,6 +459,15 @@ func TestGetTools(t *testing.T) {
 		"run_workflow_yaml": true,
 		"list_nodes":        true,
 		"validate_workflow": true,
+		"workflow_run":      true,
+		"workflow_create":   true,
+		"workflow_list":     true,
+		"workflow_validate": true,
+		"node_list":         true,
+		"node_info":         true,
+		"history_list":      true,
+		"template_list":     true,
+		"template_render":   true,
 	}
 	for _, tool := range tools {
 		if !expectedNames[tool.Name] {

@@ -1,0 +1,548 @@
+package mcp
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/alib8b8/llm-box/internal/history"
+	"github.com/alib8b8/llm-box/internal/workflow"
+	"gopkg.in/yaml.v3"
+)
+
+// ------------------------------------------------------------------
+// Tool tests
+// ------------------------------------------------------------------
+
+func TestToolWorkflowRun_MissingFile(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolWorkflowRun(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for missing file")
+	}
+	if !strings.Contains(err.Error(), "file") {
+		t.Errorf("expected file parameter error, got: %v", err)
+	}
+}
+
+func TestToolWorkflowRun_InvalidFile(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolWorkflowRun(map[string]interface{}{"file": "/nonexistent/path.yaml"})
+	if err == nil {
+		t.Fatal("expected error for invalid file")
+	}
+}
+
+func TestToolWorkflowCreate_MissingDescription(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolWorkflowCreate(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for missing description")
+	}
+}
+
+func TestToolWorkflowCreate_WithName(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolWorkflowCreate(map[string]interface{}{
+		"description": "a simple test workflow",
+		"name":        "my-test-workflow",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	if !strings.Contains(result.Content[0].Text, "my-test-workflow") {
+		t.Errorf("expected workflow name in output, got: %s", result.Content[0].Text)
+	}
+}
+
+func TestToolWorkflowList_EmptyDir(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	result, err := s.toolWorkflowList(map[string]interface{}{"directory": tmpDir})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	if !strings.Contains(result.Content[0].Text, "No workflow files found") {
+		t.Errorf("expected empty dir message, got: %s", result.Content[0].Text)
+	}
+}
+
+func TestToolWorkflowList_WithFiles(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(tmpDir, "a.yaml"), []byte("name: a"), 0644)
+	_ = os.WriteFile(filepath.Join(tmpDir, "b.yml"), []byte("name: b"), 0644)
+	_ = os.WriteFile(filepath.Join(tmpDir, "c.txt"), []byte("not a workflow"), 0644)
+
+	result, err := s.toolWorkflowList(map[string]interface{}{"directory": tmpDir})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "a.yaml") || !strings.Contains(text, "b.yml") {
+		t.Errorf("expected yaml files in output, got: %s", text)
+	}
+	if strings.Contains(text, "c.txt") {
+		t.Errorf("unexpected txt file in output: %s", text)
+	}
+}
+
+func TestToolWorkflowValidate_MissingParams(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolWorkflowValidate(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error when both file and yaml are missing")
+	}
+}
+
+func TestToolWorkflowValidate_WithYAML(t *testing.T) {
+	s := NewServer()
+	wf := &workflow.Workflow{
+		Name: "test",
+		Steps: []workflow.WorkflowStep{
+			{Node: "test", Params: map[string]string{"message": "hello"}},
+		},
+	}
+	data, _ := yaml.Marshal(wf)
+	result, err := s.toolWorkflowValidate(map[string]interface{}{"yaml": string(data)})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestToolNodeList(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolNodeList()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "Available nodes") {
+		t.Errorf("expected header in output, got: %s", text)
+	}
+}
+
+func TestToolNodeInfo_MissingName(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolNodeInfo(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for missing name")
+	}
+}
+
+func TestToolNodeInfo_UnknownNode(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolNodeInfo(map[string]interface{}{"name": "nonexistent_node_xyz"})
+	if err == nil {
+		t.Fatal("expected error for unknown node")
+	}
+}
+
+func TestToolNodeInfo_ValidNode(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolNodeInfo(map[string]interface{}{"name": "file_read"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "file_read") {
+		t.Errorf("expected node name in output, got: %s", text)
+	}
+}
+
+func TestToolHistoryList_Empty(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	history.SetHistoryDir(tmpDir)
+	defer history.SetHistoryDir("")
+
+	result, err := s.toolHistoryList(map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	if !strings.Contains(result.Content[0].Text, "No history records found") {
+		t.Errorf("expected empty history message, got: %s", result.Content[0].Text)
+	}
+}
+
+func TestToolHistoryList_WithRecords(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	history.SetHistoryDir(tmpDir)
+	defer history.SetHistoryDir("")
+
+	rec := history.Record{
+		ID:        "test-record-1",
+		Name:      "test-workflow",
+		Trigger:   history.TriggerCLI,
+		Success:   true,
+		StartedAt: time.Now().Add(-time.Hour),
+		Duration:  5 * time.Second,
+	}
+	if err := history.SaveRecord(rec); err != nil {
+		t.Fatalf("failed to save record: %v", err)
+	}
+
+	result, err := s.toolHistoryList(map[string]interface{}{"limit": 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "test-workflow") {
+		t.Errorf("expected workflow name in output, got: %s", text)
+	}
+}
+
+func TestToolTemplateList(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolTemplateList(map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "simple-llm") {
+		t.Errorf("expected simple-llm template in output, got: %s", text)
+	}
+}
+
+func TestToolTemplateList_ByCategory(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolTemplateList(map[string]interface{}{"category": "llm"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "simple-llm") && !strings.Contains(text, "translation") {
+		t.Errorf("expected llm templates in output, got: %s", text)
+	}
+}
+
+func TestToolTemplateRender_MissingName(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolTemplateRender(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for missing name")
+	}
+}
+
+func TestToolTemplateRender_Valid(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolTemplateRender(map[string]interface{}{
+		"name": "simple-llm",
+		"vars": map[string]interface{}{
+			"workflow_name": "my-llm",
+			"prompt":        "Say hello",
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "my-llm") {
+		t.Errorf("expected rendered workflow name, got: %s", text)
+	}
+}
+
+func TestSanitizeError(t *testing.T) {
+	// Should redact sensitive keywords
+	err := sanitizeError(fmt.Errorf("invalid api key: secret123"))
+	if !strings.Contains(err.Error(), "redacted") {
+		t.Errorf("expected redacted error, got: %v", err)
+	}
+
+	// Should keep normal errors
+	err2 := sanitizeError(fmt.Errorf("file not found"))
+	if err2.Error() != "file not found" {
+		t.Errorf("expected unchanged error, got: %v", err2)
+	}
+}
+
+func TestRequireString(t *testing.T) {
+	_, err := requireString(map[string]interface{}{}, "foo")
+	if err == nil {
+		t.Fatal("expected error for missing key")
+	}
+	_, err = requireString(map[string]interface{}{"foo": ""}, "foo")
+	if err == nil {
+		t.Fatal("expected error for empty string")
+	}
+	v, err := requireString(map[string]interface{}{"foo": "bar"}, "foo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v != "bar" {
+		t.Errorf("expected bar, got %s", v)
+	}
+}
+
+func TestOptionalInt(t *testing.T) {
+	if optionalInt(map[string]interface{}{"n": 42}, "n", 0) != 42 {
+		t.Error("expected 42")
+	}
+	if optionalInt(map[string]interface{}{"n": 3.14}, "n", 0) != 3 {
+		t.Error("expected 3")
+	}
+	if optionalInt(map[string]interface{}{"n": "99"}, "n", 0) != 99 {
+		t.Error("expected 99")
+	}
+	if optionalInt(map[string]interface{}{}, "n", 7) != 7 {
+		t.Error("expected default 7")
+	}
+}
+
+func TestOptionalBool(t *testing.T) {
+	if !optionalBool(map[string]interface{}{"b": true}, "b", false) {
+		t.Error("expected true")
+	}
+	if optionalBool(map[string]interface{}{"b": "true"}, "b", false) != true {
+		t.Error("expected true from string")
+	}
+	if optionalBool(map[string]interface{}{"b": "false"}, "b", true) != false {
+		t.Error("expected false from string")
+	}
+	if optionalBool(map[string]interface{}{}, "b", true) != true {
+		t.Error("expected default true")
+	}
+}
+
+func TestTruncate(t *testing.T) {
+	if truncate("hello", 10) != "hello" {
+		t.Error("expected no truncation")
+	}
+	if truncate("hello world", 8) != "hello..." {
+		t.Errorf("expected truncation, got %s", truncate("hello world", 8))
+	}
+}
+
+// ------------------------------------------------------------------
+// Client tests
+// ------------------------------------------------------------------
+
+func TestClient_Connect_StreamableHTTP(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+
+		var req rpcRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var resp rpcResponse
+		resp.JSONRPC = "2.0"
+		resp.ID = req.ID
+
+		switch req.Method {
+		case "initialize":
+			resp.Result = initializeResult{
+				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
+				ServerInfo:   serverInfo{Name: "test-server", Version: "1.0.0"},
+			}
+		case "notifications/initialized":
+			w.WriteHeader(http.StatusAccepted)
+			return
+		case "tools/list":
+			resp.Result = toolsListResult{Tools: []tool{{Name: "test_tool", Description: "A test tool", InputSchema: inputSchema{Type: "object", Properties: map[string]interface{}{}}}}}
+		case "tools/call":
+			resp.Result = toolCallResult{Content: []content{{Type: "text", Text: "ok"}}}
+		default:
+			resp.Error = &rpcError{Code: -32601, Message: "Method not found"}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := Connect(server.URL)
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer client.Close()
+
+	if !client.isInitialized {
+		t.Error("expected client to be initialized")
+	}
+
+	tools, err := client.ListTools()
+	if err != nil {
+		t.Fatalf("failed to list tools: %v", err)
+	}
+	if len(tools) != 1 || tools[0].Name != "test_tool" {
+		t.Errorf("unexpected tools: %+v", tools)
+	}
+
+	result, err := client.CallTool("test_tool", map[string]interface{}{"arg": "value"})
+	if err != nil {
+		t.Fatalf("failed to call tool: %v", err)
+	}
+	if len(result.Content) == 0 || result.Content[0].Text != "ok" {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestClient_CallTool_Validation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req rpcRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
+		if req.Method == "initialize" {
+			resp.Result = initializeResult{
+				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
+				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
+			}
+		} else if req.Method == "notifications/initialized" {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		} else if req.Method == "tools/call" {
+			resp.Result = toolCallResult{Content: []content{{Type: "text", Text: "done"}}}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := Connect(server.URL)
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer client.Close()
+
+	_, err = client.CallTool("", map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for empty tool name")
+	}
+}
+
+func TestClient_CallTool_ServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req rpcRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
+		if req.Method == "initialize" {
+			resp.Result = initializeResult{
+				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
+				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
+			}
+		} else if req.Method == "notifications/initialized" {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		} else if req.Method == "tools/call" {
+			resp.Error = &rpcError{Code: -32603, Message: "internal error containing secret token"}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := Connect(server.URL)
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer client.Close()
+
+	_, err = client.CallTool("some_tool", map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "redacted") {
+		t.Errorf("expected sanitized error, got: %v", err)
+	}
+}
+
+func TestClient_SanitizeErrorString(t *testing.T) {
+	if sanitizeErrorString("normal error") != "normal error" {
+		t.Error("expected normal error to be unchanged")
+	}
+	if sanitizeErrorString("invalid password") != "tool execution failed (sensitive details redacted)" {
+		t.Error("expected sensitive error to be redacted")
+	}
+}
+
+func TestResolveURL(t *testing.T) {
+	cases := []struct {
+		base string
+		ref  string
+		want string
+	}{
+		{"http://localhost:8080/sse", "/mcp", "http://localhost:8080/mcp"},
+		{"http://localhost:8080", "path", "http://localhost:8080/path"},
+		{"http://localhost:8080/", "/path", "http://localhost:8080/path"},
+	}
+	for _, c := range cases {
+		got := resolveURL(c.base, c.ref)
+		if got != c.want {
+			t.Errorf("resolveURL(%q, %q) = %q, want %q", c.base, c.ref, got, c.want)
+		}
+	}
+}
+
+func TestCallExtendedTool_Timeout(t *testing.T) {
+	s := NewServer()
+	// workflow_run with a very short timeout should fail quickly
+	_, err := s.callExtendedTool(&toolCallParams{
+		Name:      "workflow_run",
+		Arguments: map[string]interface{}{"file": "/nonexistent.yaml", "timeout_seconds": 1},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestToolWorkflowRun_TimeoutOverride(t *testing.T) {
+	s := NewServer()
+	// Invalid file but timeout should be clamped
+	_, err := s.toolWorkflowRun(map[string]interface{}{"file": "/nonexistent.yaml", "timeout_seconds": 999})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	// Ensure timeout clamping doesn't panic
+	_, _ = s.toolWorkflowRun(map[string]interface{}{"file": "/nonexistent.yaml", "timeout_seconds": -5})
+}
+
+func TestToolHistoryList_LimitClamp(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	history.SetHistoryDir(tmpDir)
+	defer history.SetHistoryDir("")
+
+	// limit should be clamped to valid range
+	_, err := s.toolHistoryList(map[string]interface{}{"limit": -5})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = s.toolHistoryList(map[string]interface{}{"limit": 999})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
