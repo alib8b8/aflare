@@ -1,0 +1,433 @@
+package templates
+
+import (
+	"bytes"
+	"fmt"
+	"sort"
+	"strings"
+	"text/template"
+)
+
+type TemplateVar struct {
+	Name        string
+	Description string
+	Default     string
+	Required    bool
+}
+
+type Template struct {
+	Name        string
+	Description string
+	Category    string
+	Tags        []string
+	Version     string
+	Variables   []TemplateVar
+	Content     string
+}
+
+type TemplateManager struct {
+	templates map[string]*Template
+}
+
+func NewTemplateManager() *TemplateManager {
+	tm := &TemplateManager{
+		templates: make(map[string]*Template),
+	}
+	tm.registerBuiltins()
+	return tm
+}
+
+func (tm *TemplateManager) registerBuiltins() {
+	builtins := []*Template{
+		buildSimpleLLMTemplate(),
+		buildCodeReviewTemplate(),
+		buildDataProcessingTemplate(),
+		buildWebScraperTemplate(),
+		buildTranslationTemplate(),
+		buildBatchProcessorTemplate(),
+	}
+	for _, t := range builtins {
+		tm.templates[t.Name] = t
+	}
+}
+
+func (tm *TemplateManager) List() []*Template {
+	result := make([]*Template, 0, len(tm.templates))
+	for _, t := range tm.templates {
+		result = append(result, t)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+	return result
+}
+
+func (tm *TemplateManager) Get(name string) (*Template, error) {
+	t, ok := tm.templates[name]
+	if !ok {
+		return nil, fmt.Errorf("template not found: %s", name)
+	}
+	return t, nil
+}
+
+func (tm *TemplateManager) Search(keyword string) []*Template {
+	keyword = strings.ToLower(keyword)
+	var result []*Template
+	for _, t := range tm.templates {
+		if strings.Contains(strings.ToLower(t.Name), keyword) ||
+			strings.Contains(strings.ToLower(t.Description), keyword) ||
+			strings.Contains(strings.ToLower(t.Category), keyword) {
+			result = append(result, t)
+			continue
+		}
+		for _, tag := range t.Tags {
+			if strings.Contains(strings.ToLower(tag), keyword) {
+				result = append(result, t)
+				break
+			}
+		}
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+	return result
+}
+
+func (tm *TemplateManager) Categories() []string {
+	catSet := make(map[string]struct{})
+	for _, t := range tm.templates {
+		catSet[t.Category] = struct{}{}
+	}
+	result := make([]string, 0, len(catSet))
+	for cat := range catSet {
+		result = append(result, cat)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func (tm *TemplateManager) ListByCategory(category string) []*Template {
+	var result []*Template
+	for _, t := range tm.templates {
+		if t.Category == category {
+			result = append(result, t)
+		}
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+	return result
+}
+
+func (tm *TemplateManager) Render(name string, vars map[string]string) (string, error) {
+	t, err := tm.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	renderVars := make(map[string]string)
+	for _, v := range t.Variables {
+		if v.Default != "" {
+			renderVars[v.Name] = v.Default
+		}
+	}
+	for k, v := range vars {
+		renderVars[k] = v
+	}
+
+	for _, v := range t.Variables {
+		if v.Required {
+			if _, ok := renderVars[v.Name]; !ok || renderVars[v.Name] == "" {
+				return "", fmt.Errorf("required variable missing: %s", v.Name)
+			}
+		}
+	}
+
+	tmpl, err := template.New(name).Parse(t.Content)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, renderVars); err != nil {
+		return "", fmt.Errorf("failed to render template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+func buildSimpleLLMTemplate() *Template {
+	return &Template{
+		Name:        "simple-llm",
+		Description: "简单的 LLM 调用工作流，使用指定模型处理用户输入",
+		Category:    "llm",
+		Tags:        []string{"llm", "ai", "chat"},
+		Version:     "1.0.0",
+		Variables: []TemplateVar{
+			{Name: "workflow_name", Description: "工作流名称", Default: "simple-llm-workflow", Required: false},
+			{Name: "model", Description: "LLM 模型名称", Default: "llama3", Required: false},
+			{Name: "prompt", Description: "提示词", Default: "Hello, how are you?", Required: true},
+			{Name: "temperature", Description: "采样温度", Default: "0.7", Required: false},
+			{Name: "output_file", Description: "输出文件路径", Default: "", Required: false},
+		},
+		Content: `name: {{.workflow_name}}
+description: Simple LLM call workflow
+vars:
+  model: "{{.model}}"
+  prompt: "{{.prompt}}"
+  temperature: "{{.temperature}}"
+steps:
+  - node: ollama
+    params:
+      model: "{{.vars.model}}"
+      prompt: "{{.vars.prompt}}"
+      temperature: "{{.vars.temperature}}"
+{{- if .output_file}}
+  - node: file_write
+    params:
+      path: "{{.output_file}}"
+{{- end}}
+`,
+	}
+}
+
+func buildCodeReviewTemplate() *Template {
+	return &Template{
+		Name:        "code-review",
+		Description: "代码审查工作流，自动分析代码质量并生成审查报告",
+		Category:    "development",
+		Tags:        []string{"code-review", "development", "quality"},
+		Version:     "1.0.0",
+		Variables: []TemplateVar{
+			{Name: "workflow_name", Description: "工作流名称", Default: "code-review-workflow", Required: false},
+			{Name: "file_path", Description: "要审查的代码文件路径", Default: "main.go", Required: true},
+			{Name: "model", Description: "LLM 模型名称", Default: "llama3", Required: false},
+			{Name: "review_language", Description: "审查报告语言", Default: "Chinese", Required: false},
+			{Name: "output_file", Description: "输出报告文件路径", Default: "code-review-report.md", Required: false},
+		},
+		Content: `name: {{.workflow_name}}
+description: Automated code review workflow
+vars:
+  file_path: "{{.file_path}}"
+  model: "{{.model}}"
+  review_language: "{{.review_language}}"
+  output_file: "{{.output_file}}"
+steps:
+  - node: file_read
+    params:
+      path: "{{.vars.file_path}}"
+  - node: ollama
+    params:
+      model: "{{.vars.model}}"
+      prompt: |
+        Please review the following code and provide a detailed code review report in {{.vars.review_language}}.
+        Focus on:
+        1. Code quality and readability
+        2. Potential bugs or issues
+        3. Performance considerations
+        4. Security vulnerabilities
+        5. Suggestions for improvement
+
+        Code:
+        {{ "{{" }}.steps[0].output{{ "}}" }}
+  - node: file_write
+    params:
+      path: "{{.vars.output_file}}"
+  - node: notify
+    params:
+      channel: stdout
+      message: "Code review completed. Report saved to {{.vars.output_file}}"
+`,
+	}
+}
+
+func buildDataProcessingTemplate() *Template {
+	return &Template{
+		Name:        "data-processing",
+		Description: "数据处理工作流，读取、转换并保存数据",
+		Category:    "data",
+		Tags:        []string{"data", "processing", "transform"},
+		Version:     "1.0.0",
+		Variables: []TemplateVar{
+			{Name: "workflow_name", Description: "工作流名称", Default: "data-processing-workflow", Required: false},
+			{Name: "input_file", Description: "输入文件路径", Default: "input.txt", Required: true},
+			{Name: "output_file", Description: "输出文件路径", Default: "output.txt", Required: true},
+			{Name: "operation", Description: "转换操作 (uppercase, lowercase, trim, base64_encode, base64_decode)", Default: "trim", Required: false},
+			{Name: "find", Description: "查找字符串（用于 replace 操作）", Default: "", Required: false},
+			{Name: "replace", Description: "替换字符串（用于 replace 操作）", Default: "", Required: false},
+		},
+		Content: `name: {{.workflow_name}}
+description: Data processing workflow
+vars:
+  input_file: "{{.input_file}}"
+  output_file: "{{.output_file}}"
+  operation: "{{.operation}}"
+steps:
+  - node: file_read
+    params:
+      path: "{{.vars.input_file}}"
+{{- if eq .operation "replace"}}
+  - node: transform
+    params:
+      operation: replace
+      find: "{{.find}}"
+      replace: "{{.replace}}"
+{{- else}}
+  - node: transform
+    params:
+      operation: "{{.vars.operation}}"
+{{- end}}
+  - node: file_write
+    params:
+      path: "{{.vars.output_file}}"
+  - node: notify
+    params:
+      channel: stdout
+      message: "Data processing completed. Output saved to {{.vars.output_file}}"
+`,
+	}
+}
+
+func buildWebScraperTemplate() *Template {
+	return &Template{
+		Name:        "web-scraper",
+		Description: "网页抓取工作流，抓取网页内容并提取信息",
+		Category:    "web",
+		Tags:        []string{"web", "scraper", "fetch"},
+		Version:     "1.0.0",
+		Variables: []TemplateVar{
+			{Name: "workflow_name", Description: "工作流名称", Default: "web-scraper-workflow", Required: false},
+			{Name: "url", Description: "要抓取的网页 URL", Default: "https://example.com", Required: true},
+			{Name: "mode", Description: "抓取模式 (text, raw)", Default: "text", Required: false},
+			{Name: "output_file", Description: "输出文件路径", Default: "scraped-content.txt", Required: false},
+			{Name: "extract_pattern", Description: "正则提取模式（可选）", Default: "", Required: false},
+		},
+		Content: `name: {{.workflow_name}}
+description: Web scraping workflow
+vars:
+  url: "{{.url}}"
+  mode: "{{.mode}}"
+  output_file: "{{.output_file}}"
+steps:
+  - node: fetch_url
+    params:
+      url: "{{.vars.url}}"
+      mode: "{{.vars.mode}}"
+{{- if .extract_pattern}}
+  - node: transform
+    params:
+      operation: regex
+      pattern: "{{.extract_pattern}}"
+{{- end}}
+{{- if .output_file}}
+  - node: file_write
+    params:
+      path: "{{.vars.output_file}}"
+{{- end}}
+  - node: notify
+    params:
+      channel: stdout
+      message: "Web scraping completed for {{.vars.url}}"
+`,
+	}
+}
+
+func buildTranslationTemplate() *Template {
+	return &Template{
+		Name:        "translation",
+		Description: "翻译工作流，将文本从一种语言翻译成另一种语言",
+		Category:    "llm",
+		Tags:        []string{"translation", "llm", "language"},
+		Version:     "1.0.0",
+		Variables: []TemplateVar{
+			{Name: "workflow_name", Description: "工作流名称", Default: "translation-workflow", Required: false},
+			{Name: "input_file", Description: "输入文件路径", Default: "input.txt", Required: true},
+			{Name: "output_file", Description: "输出文件路径", Default: "translated.txt", Required: true},
+			{Name: "source_language", Description: "源语言", Default: "English", Required: false},
+			{Name: "target_language", Description: "目标语言", Default: "Chinese", Required: true},
+			{Name: "model", Description: "LLM 模型名称", Default: "llama3", Required: false},
+		},
+		Content: `name: {{.workflow_name}}
+description: Translation workflow
+vars:
+  input_file: "{{.input_file}}"
+  output_file: "{{.output_file}}"
+  source_language: "{{.source_language}}"
+  target_language: "{{.target_language}}"
+  model: "{{.model}}"
+steps:
+  - node: file_read
+    params:
+      path: "{{.vars.input_file}}"
+  - node: ollama
+    params:
+      model: "{{.vars.model}}"
+      prompt: |
+        Translate the following text from {{.vars.source_language}} to {{.vars.target_language}}.
+        Only provide the translation, no additional explanation.
+
+        Text:
+        {{ "{{" }}.steps[0].output{{ "}}" }}
+  - node: file_write
+    params:
+      path: "{{.vars.output_file}}"
+  - node: notify
+    params:
+      channel: stdout
+      message: "Translation completed from {{.vars.source_language}} to {{.vars.target_language}}"
+`,
+	}
+}
+
+func buildBatchProcessorTemplate() *Template {
+	return &Template{
+		Name:        "batch-processor",
+		Description: "批量处理工作流，使用循环批量处理多个项目",
+		Category:    "data",
+		Tags:        []string{"batch", "processing", "loop"},
+		Version:     "1.0.0",
+		Variables: []TemplateVar{
+			{Name: "workflow_name", Description: "工作流名称", Default: "batch-processor-workflow", Required: false},
+			{Name: "items", Description: "要处理的项目列表（每行一个）", Default: "item1\nitem2\nitem3", Required: true},
+			{Name: "model", Description: "LLM 模型名称", Default: "llama3", Required: false},
+			{Name: "processing_type", Description: "处理类型 (summarize, classify, analyze)", Default: "summarize", Required: false},
+			{Name: "output_file", Description: "输出文件路径", Default: "batch-results.txt", Required: false},
+			{Name: "concurrency", Description: "并发数", Default: "2", Required: false},
+		},
+		Content: `name: {{.workflow_name}}
+description: Batch processing workflow
+vars:
+  items: "{{.items}}"
+  model: "{{.model}}"
+  processing_type: "{{.processing_type}}"
+  output_file: "{{.output_file}}"
+  concurrency: "{{.concurrency}}"
+steps:
+  - name: process-items
+    node: ollama
+    loop:
+      items: "{{.vars.items}}"
+      var: item
+      concurrency: {{.concurrency}}
+    params:
+      model: "{{.vars.model}}"
+      prompt: |
+        {{- if eq .processing_type "summarize"}}
+        Summarize the following item in one sentence: {{ "{{" }}.item{{ "}}" }}
+        {{- else if eq .processing_type "classify"}}
+        Classify the following item into one category (tech, business, sports, entertainment, other): {{ "{{" }}.item{{ "}}" }}
+        {{- else}}
+        Analyze the following item and provide key insights: {{ "{{" }}.item{{ "}}" }}
+        {{- end}}
+{{- if .output_file}}
+  - node: file_write
+    params:
+      path: "{{.vars.output_file}}"
+{{- end}}
+  - node: notify
+    params:
+      channel: stdout
+      message: "Batch processing completed"
+`,
+	}
+}

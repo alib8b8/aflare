@@ -1,8 +1,12 @@
 package logger
 
 import (
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -10,29 +14,136 @@ import (
 var (
 	defaultLogger atomic.Pointer[slog.Logger]
 	once          sync.Once
+	currentLevel  = slog.LevelInfo
+	currentFormat = "text"
+	logFile       *os.File
 )
 
 func init() {
 	once.Do(func() {
-		opts := &slog.HandlerOptions{
-			Level: slog.LevelInfo,
-		}
-		handler := slog.NewTextHandler(os.Stderr, opts)
-		defaultLogger.Store(slog.New(handler))
+		level := getLevelFromEnv()
+		format := getFormatFromEnv()
+		output := getOutputFromEnv()
+		initLogger(level, format, output)
 	})
 }
 
-// SetLevel sets the minimum log level
-func SetLevel(level slog.Level) {
-	opts := &slog.HandlerOptions{Level: level}
-	handler := slog.NewTextHandler(os.Stderr, opts)
+func getLevelFromEnv() slog.Level {
+	envLevel := strings.ToLower(strings.TrimSpace(os.Getenv("LLM_BOX_LOG_LEVEL")))
+	switch envLevel {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
+func getFormatFromEnv() string {
+	format := strings.ToLower(strings.TrimSpace(os.Getenv("LLM_BOX_LOG_FORMAT")))
+	if format == "json" || format == "text" {
+		return format
+	}
+	return "text"
+}
+
+func getOutputFromEnv() string {
+	output := strings.TrimSpace(os.Getenv("LLM_BOX_LOG_FILE"))
+	if output != "" {
+		return output
+	}
+	return "stderr"
+}
+
+func initLogger(level slog.Level, format string, output string) {
+	currentLevel = level
+	currentFormat = format
+
+	var writer io.Writer
+	if output == "stderr" || output == "" {
+		writer = os.Stderr
+	} else {
+		dir := filepath.Dir(output)
+		if dir != "" && dir != "." {
+			_ = os.MkdirAll(dir, 0750)
+		}
+		f, err := os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to open log file %s: %v, falling back to stderr\n", output, err)
+			writer = os.Stderr
+		} else {
+			logFile = f
+			writer = io.MultiWriter(os.Stderr, f)
+		}
+	}
+
+	opts := &slog.HandlerOptions{
+		Level:       level,
+		AddSource:   false,
+		ReplaceAttr: replaceAttr,
+	}
+
+	var handler slog.Handler
+	if format == "json" {
+		handler = slog.NewJSONHandler(writer, opts)
+	} else {
+		handler = slog.NewTextHandler(writer, opts)
+	}
+
 	defaultLogger.Store(slog.New(handler))
+}
+
+func replaceAttr(groups []string, a slog.Attr) slog.Attr {
+	if a.Key == slog.TimeKey {
+		return a
+	}
+	return a
+}
+
+func SetLevel(level slog.Level) {
+	currentLevel = level
+	reinitLogger()
+}
+
+func SetFormat(format string) {
+	if format == "json" || format == "text" {
+		currentFormat = format
+		reinitLogger()
+	}
+}
+
+func SetOutput(output string) {
+	if logFile != nil {
+		_ = logFile.Close()
+		logFile = nil
+	}
+	initLogger(currentLevel, currentFormat, output)
+}
+
+func reinitLogger() {
+	output := "stderr"
+	if logFile != nil {
+		output = logFile.Name()
+	}
+	if logFile != nil {
+		_ = logFile.Close()
+		logFile = nil
+	}
+	initLogger(currentLevel, currentFormat, output)
+}
+
+func GetLevel() slog.Level {
+	return currentLevel
 }
 
 func logger() *slog.Logger {
 	l := defaultLogger.Load()
 	if l == nil {
-		// Defensive fallback if SetLevel/once haven't run yet
 		opts := &slog.HandlerOptions{Level: slog.LevelInfo}
 		handler := slog.NewTextHandler(os.Stderr, opts)
 		l = slog.New(handler)
@@ -41,27 +152,29 @@ func logger() *slog.Logger {
 	return l
 }
 
-// Debug logs a debug message
 func Debug(msg string, args ...any) {
 	logger().Debug(msg, args...)
 }
 
-// Info logs an info message
 func Info(msg string, args ...any) {
 	logger().Info(msg, args...)
 }
 
-// Warn logs a warning message
 func Warn(msg string, args ...any) {
 	logger().Warn(msg, args...)
 }
 
-// Error logs an error message
 func Error(msg string, args ...any) {
 	logger().Error(msg, args...)
 }
 
-// With returns a logger with the given attributes
 func With(args ...any) *slog.Logger {
 	return logger().With(args...)
+}
+
+func Close() {
+	if logFile != nil {
+		_ = logFile.Close()
+		logFile = nil
+	}
 }

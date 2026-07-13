@@ -1,6 +1,7 @@
 package history
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -145,7 +146,6 @@ func TestListRecords_Sorted(t *testing.T) {
 		t.Fatalf("expected 3 records, got %d", len(records))
 	}
 
-	// Should be sorted newest first
 	if records[0].Name != "New" {
 		t.Errorf("expected first record 'New', got '%s'", records[0].Name)
 	}
@@ -174,5 +174,461 @@ func TestSaveRecord_GeneratesID(t *testing.T) {
 
 	if records[0].ID == "" {
 		t.Error("expected auto-generated ID")
+	}
+}
+
+func TestRecordNewFields(t *testing.T) {
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	started := time.Now().Add(-5 * time.Second)
+	ended := time.Now()
+	record := Record{
+		ID:        "test-new-fields",
+		Name:      "New Fields Test",
+		Trigger:   TriggerCLI,
+		User:      "alice",
+		Version:   "v1.2.3",
+		Duration:  5 * time.Second,
+		StartedAt: started,
+		EndedAt:   ended,
+		Success:   true,
+		Steps: []StepRecord{
+			{
+				Index:      0,
+				Node:       "step1",
+				Params:     `{"url":"http://example.com"}`,
+				RetryCount: 2,
+				InputSize:  1024,
+				OutputSize: 2048,
+				Duration:   2 * time.Second,
+				Success:    true,
+			},
+		},
+	}
+
+	err := SaveRecord(record)
+	if err != nil {
+		t.Fatalf("failed to save record: %v", err)
+	}
+
+	retrieved, err := GetRecord("test-new-fields")
+	if err != nil {
+		t.Fatalf("failed to get record: %v", err)
+	}
+
+	if retrieved.Trigger != TriggerCLI {
+		t.Errorf("expected trigger 'cli', got '%s'", retrieved.Trigger)
+	}
+	if retrieved.User != "alice" {
+		t.Errorf("expected user 'alice', got '%s'", retrieved.User)
+	}
+	if retrieved.Version != "v1.2.3" {
+		t.Errorf("expected version 'v1.2.3', got '%s'", retrieved.Version)
+	}
+	if retrieved.Duration != 5*time.Second {
+		t.Errorf("expected duration 5s, got %v", retrieved.Duration)
+	}
+	if len(retrieved.Steps) != 1 {
+		t.Fatalf("expected 1 step, got %d", len(retrieved.Steps))
+	}
+	if retrieved.Steps[0].RetryCount != 2 {
+		t.Errorf("expected retry count 2, got %d", retrieved.Steps[0].RetryCount)
+	}
+	if retrieved.Steps[0].InputSize != 1024 {
+		t.Errorf("expected input size 1024, got %d", retrieved.Steps[0].InputSize)
+	}
+	if retrieved.Steps[0].OutputSize != 2048 {
+		t.Errorf("expected output size 2048, got %d", retrieved.Steps[0].OutputSize)
+	}
+}
+
+func TestSanitizeParams(t *testing.T) {
+	params := map[string]interface{}{
+		"name":      "test",
+		"api_key":   "secret123",
+		"token":     "abc456",
+		"password":  "mypassword",
+		"SecretKey": "hidden",
+		"nested": map[string]interface{}{
+			"inner_token": "inner_secret",
+			"safe_field":  "ok",
+		},
+	}
+
+	sanitized := SanitizeParams(params)
+
+	if sanitized["name"] != "test" {
+		t.Errorf("expected name to be 'test', got '%v'", sanitized["name"])
+	}
+	if sanitized["api_key"] != "***" {
+		t.Errorf("expected api_key to be '***', got '%v'", sanitized["api_key"])
+	}
+	if sanitized["token"] != "***" {
+		t.Errorf("expected token to be '***', got '%v'", sanitized["token"])
+	}
+	if sanitized["password"] != "***" {
+		t.Errorf("expected password to be '***', got '%v'", sanitized["password"])
+	}
+	if sanitized["SecretKey"] != "***" {
+		t.Errorf("expected SecretKey to be '***', got '%v'", sanitized["SecretKey"])
+	}
+
+	nested, ok := sanitized["nested"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected nested to be a map")
+	}
+	if nested["inner_token"] != "***" {
+		t.Errorf("expected inner_token to be '***', got '%v'", nested["inner_token"])
+	}
+	if nested["safe_field"] != "ok" {
+		t.Errorf("expected safe_field to be 'ok', got '%v'", nested["safe_field"])
+	}
+}
+
+func TestSanitizeParams_Nil(t *testing.T) {
+	var result = SanitizeParams(nil)
+	if result != nil {
+		t.Error("expected nil for nil input")
+	}
+}
+
+func TestSummarizeParams(t *testing.T) {
+	params := map[string]interface{}{
+		"name":    "test",
+		"api_key": "secret123",
+		"value":   123,
+	}
+
+	summary := SummarizeParams(params, 0)
+	if summary == "" {
+		t.Error("expected non-empty summary")
+	}
+	if len(summary) > 203 {
+		t.Errorf("expected summary <= 203 chars, got %d", len(summary))
+	}
+	if containsSensitiveValue(summary, "secret123") {
+		t.Error("summary should not contain sensitive value 'secret123'")
+	}
+}
+
+func TestSummarizeParams_Truncation(t *testing.T) {
+	params := make(map[string]interface{})
+	for i := 0; i < 100; i++ {
+		params[fmt.Sprintf("field_%d", i)] = "value"
+	}
+
+	summary := SummarizeParams(params, 50)
+	if len(summary) > 53 {
+		t.Errorf("expected summary <= 53 chars, got %d", len(summary))
+	}
+}
+
+func containsSensitiveValue(s, val string) bool {
+	return len(s) > 0 && len(val) > 0 && searchString(s, val)
+}
+
+func searchString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func TestAppendAuditLog(t *testing.T) {
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	log := AuditLog{
+		Action:   AuditActionLogin,
+		User:     "alice",
+		Resource: "system",
+		Success:  true,
+		IP:       "192.168.1.1",
+	}
+
+	err := AppendAuditLog(log)
+	if err != nil {
+		t.Fatalf("failed to append audit log: %v", err)
+	}
+
+	logs, err := ReadAuditLogs()
+	if err != nil {
+		t.Fatalf("failed to read audit logs: %v", err)
+	}
+
+	if len(logs) != 1 {
+		t.Fatalf("expected 1 audit log, got %d", len(logs))
+	}
+
+	if logs[0].Action != AuditActionLogin {
+		t.Errorf("expected action 'login', got '%s'", logs[0].Action)
+	}
+	if logs[0].User != "alice" {
+		t.Errorf("expected user 'alice', got '%s'", logs[0].User)
+	}
+	if logs[0].ID == "" {
+		t.Error("expected auto-generated ID")
+	}
+	if logs[0].Timestamp.IsZero() {
+		t.Error("expected non-zero timestamp")
+	}
+}
+
+func TestAppendAuditLog_Multiple(t *testing.T) {
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	for i := 0; i < 3; i++ {
+		log := AuditLog{
+			Action:  AuditActionConfigChange,
+			User:    "bob",
+			Success: i%2 == 0,
+		}
+		err := AppendAuditLog(log)
+		if err != nil {
+			t.Fatalf("failed to append audit log %d: %v", i, err)
+		}
+	}
+
+	logs, err := ReadAuditLogs()
+	if err != nil {
+		t.Fatalf("failed to read audit logs: %v", err)
+	}
+
+	if len(logs) != 3 {
+		t.Fatalf("expected 3 audit logs, got %d", len(logs))
+	}
+}
+
+func TestReadAuditLogs_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	logs, err := ReadAuditLogs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(logs) != 0 {
+		t.Errorf("expected 0 audit logs, got %d", len(logs))
+	}
+}
+
+func TestListRecordsWithFilter_BySuccess(t *testing.T) {
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	now := time.Now()
+	SaveRecord(Record{ID: "s1", Name: "Success 1", Success: true, StartedAt: now})
+	SaveRecord(Record{ID: "f1", Name: "Fail 1", Success: false, StartedAt: now.Add(-time.Hour)})
+	SaveRecord(Record{ID: "s2", Name: "Success 2", Success: true, StartedAt: now.Add(-2 * time.Hour)})
+
+	success := true
+	filtered, err := ListRecordsWithFilter(RecordFilter{Success: &success})
+	if err != nil {
+		t.Fatalf("failed to filter records: %v", err)
+	}
+	if len(filtered) != 2 {
+		t.Errorf("expected 2 success records, got %d", len(filtered))
+	}
+
+	failure := false
+	filtered, err = ListRecordsWithFilter(RecordFilter{Success: &failure})
+	if err != nil {
+		t.Fatalf("failed to filter records: %v", err)
+	}
+	if len(filtered) != 1 {
+		t.Errorf("expected 1 failure record, got %d", len(filtered))
+	}
+}
+
+func TestListRecordsWithFilter_ByTime(t *testing.T) {
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	now := time.Now()
+	SaveRecord(Record{ID: "r1", Name: "Recent", StartedAt: now.Add(-time.Hour)})
+	SaveRecord(Record{ID: "r2", Name: "Old", StartedAt: now.Add(-48 * time.Hour)})
+	SaveRecord(Record{ID: "r3", Name: "Medium", StartedAt: now.Add(-12 * time.Hour)})
+
+	startTime := now.Add(-24 * time.Hour)
+	filtered, err := ListRecordsWithFilter(RecordFilter{StartTime: &startTime})
+	if err != nil {
+		t.Fatalf("failed to filter records: %v", err)
+	}
+	if len(filtered) != 2 {
+		t.Errorf("expected 2 records in last 24h, got %d", len(filtered))
+	}
+
+	endTime := now.Add(-6 * time.Hour)
+	filtered, err = ListRecordsWithFilter(RecordFilter{EndTime: &endTime})
+	if err != nil {
+		t.Fatalf("failed to filter records: %v", err)
+	}
+	if len(filtered) != 2 {
+		t.Errorf("expected 2 records older than 6h, got %d", len(filtered))
+	}
+}
+
+func TestListRecordsWithFilter_ByWorkflow(t *testing.T) {
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	now := time.Now()
+	SaveRecord(Record{ID: "w1", Name: "Data Pipeline", StartedAt: now})
+	SaveRecord(Record{ID: "w2", Name: "Email Sender", StartedAt: now.Add(-time.Hour)})
+	SaveRecord(Record{ID: "w3", Name: "data backup", StartedAt: now.Add(-2 * time.Hour)})
+
+	filtered, err := ListRecordsWithFilter(RecordFilter{Workflow: "data"})
+	if err != nil {
+		t.Fatalf("failed to filter records: %v", err)
+	}
+	if len(filtered) != 2 {
+		t.Errorf("expected 2 records matching 'data', got %d", len(filtered))
+	}
+}
+
+func TestGetStats(t *testing.T) {
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	now := time.Now()
+	SaveRecord(Record{
+		ID:        "stat1",
+		Name:      "Success 1",
+		Success:   true,
+		Duration:  10 * time.Second,
+		StartedAt: now.Add(-time.Hour),
+		EndedAt:   now.Add(-time.Hour).Add(10 * time.Second),
+	})
+	SaveRecord(Record{
+		ID:        "stat2",
+		Name:      "Fail 1",
+		Success:   false,
+		Duration:  5 * time.Second,
+		StartedAt: now.Add(-2 * time.Hour),
+		EndedAt:   now.Add(-2 * time.Hour).Add(5 * time.Second),
+	})
+	SaveRecord(Record{
+		ID:        "stat3",
+		Name:      "Success 2",
+		Success:   true,
+		Duration:  20 * time.Second,
+		StartedAt: now.Add(-3 * time.Hour),
+		EndedAt:   now.Add(-3 * time.Hour).Add(20 * time.Second),
+	})
+	SaveRecord(Record{
+		ID:        "stat-old",
+		Name:      "Old",
+		Success:   true,
+		Duration:  15 * time.Second,
+		StartedAt: now.Add(-48 * time.Hour),
+		EndedAt:   now.Add(-48 * time.Hour).Add(15 * time.Second),
+	})
+
+	stats, err := GetStats()
+	if err != nil {
+		t.Fatalf("failed to get stats: %v", err)
+	}
+
+	if stats.TotalCount != 4 {
+		t.Errorf("expected total count 4, got %d", stats.TotalCount)
+	}
+	if stats.SuccessCount != 3 {
+		t.Errorf("expected success count 3, got %d", stats.SuccessCount)
+	}
+	if stats.FailureCount != 1 {
+		t.Errorf("expected failure count 1, got %d", stats.FailureCount)
+	}
+	expectedRate := 3.0 / 4.0
+	if stats.SuccessRate != expectedRate {
+		t.Errorf("expected success rate %f, got %f", expectedRate, stats.SuccessRate)
+	}
+	expectedAvg := (10*time.Second + 5*time.Second + 20*time.Second + 15*time.Second) / 4
+	if stats.AverageDuration != expectedAvg {
+		t.Errorf("expected average duration %v, got %v", expectedAvg, stats.AverageDuration)
+	}
+	if stats.Last24hCount != 3 {
+		t.Errorf("expected last 24h count 3, got %d", stats.Last24hCount)
+	}
+}
+
+func TestGetStats_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	stats, err := GetStats()
+	if err != nil {
+		t.Fatalf("failed to get stats: %v", err)
+	}
+
+	if stats.TotalCount != 0 {
+		t.Errorf("expected total count 0, got %d", stats.TotalCount)
+	}
+	if stats.SuccessRate != 0 {
+		t.Errorf("expected success rate 0, got %f", stats.SuccessRate)
+	}
+}
+
+func TestGetStats_FallbackDuration(t *testing.T) {
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	started := time.Now().Add(-10 * time.Second)
+	ended := time.Now()
+	SaveRecord(Record{
+		ID:        "fallback",
+		Name:      "Fallback Test",
+		Success:   true,
+		StartedAt: started,
+		EndedAt:   ended,
+	})
+
+	stats, err := GetStats()
+	if err != nil {
+		t.Fatalf("failed to get stats: %v", err)
+	}
+
+	if stats.AverageDuration <= 0 {
+		t.Errorf("expected positive average duration from fallback, got %v", stats.AverageDuration)
+	}
+}
+
+func TestTriggerTypes(t *testing.T) {
+	triggers := []TriggerType{TriggerManual, TriggerCLI, TriggerAPI, TriggerSchedule}
+	expected := []string{"manual", "cli", "api", "schedule"}
+
+	for i, tr := range triggers {
+		if string(tr) != expected[i] {
+			t.Errorf("trigger %d: expected '%s', got '%s'", i, expected[i], tr)
+		}
+	}
+}
+
+func TestAuditActions(t *testing.T) {
+	actions := []AuditAction{
+		AuditActionLogin,
+		AuditActionLogout,
+		AuditActionConfigChange,
+		AuditActionSensitiveOp,
+		AuditActionWorkflowStart,
+		AuditActionWorkflowEnd,
+	}
+	expected := []string{
+		"login",
+		"logout",
+		"config_change",
+		"sensitive_operation",
+		"workflow_start",
+		"workflow_end",
+	}
+
+	for i, a := range actions {
+		if string(a) != expected[i] {
+			t.Errorf("action %d: expected '%s', got '%s'", i, expected[i], a)
+		}
 	}
 }
