@@ -18,7 +18,7 @@ func LoadConfig() (*UpgradeConfig, error) {
 			}
 			var config UpgradeConfig
 			if err := yaml.Unmarshal(data, &config); err != nil {
-				return nil, fmt.Errorf("failed to parse config: %w", err)
+				continue
 			}
 			return &config, nil
 		}

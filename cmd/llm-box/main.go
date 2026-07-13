@@ -13,6 +13,7 @@ import (
 	"github.com/alib8b8/llm-box/internal/mcp"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/tui"
+	"github.com/alib8b8/llm-box/internal/webui"
 	"github.com/alib8b8/llm-box/internal/workflow"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -117,6 +118,9 @@ func main() {
 		return
 	case "-h", "--help", "help":
 		fmt.Println(cli.PrintUsage())
+		return
+	case "webui":
+		handleWebUI(args)
 		return
 	default:
 		handleRunFile(command, dryRun)
@@ -546,6 +550,58 @@ func printAutoUpgradeUsage() {
 	fmt.Println("  llm-box autoupgrade enable")
 	fmt.Println("  llm-box autoupgrade config mode=auto interval=6h")
 	fmt.Println("  llm-box autoupgrade run")
+}
+
+func handleWebUI(args []string) {
+	port := ""
+	workflowsDir := ""
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--port", "-p":
+			if i+1 < len(args) {
+				port = args[i+1]
+				i++
+			}
+		case "--dir", "-d":
+			if i+1 < len(args) {
+				workflowsDir = args[i+1]
+				i++
+			}
+		case "--help", "-h":
+			printWebUIUsage()
+			return
+		default:
+			fmt.Printf("Unknown argument: %s\n", args[i])
+			printWebUIUsage()
+			os.Exit(1)
+		}
+	}
+
+	server := webui.NewWebUIServer(port)
+	if workflowsDir != "" {
+		server.SetWorkflowsDir(workflowsDir)
+	}
+
+	fmt.Printf("Starting WebUI server on http://localhost:%s\n", port)
+	fmt.Println("Press Ctrl+C to stop")
+
+	if err := server.Start(); err != nil {
+		fmt.Printf("WebUI server error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func printWebUIUsage() {
+	fmt.Println("Usage: llm-box webui [options]")
+	fmt.Println("\nOptions:")
+	fmt.Println("  --port, -p <port>    - WebUI server port (default: 8081)")
+	fmt.Println("  --dir, -d <dir>      - Workflows directory")
+	fmt.Println("  --help, -h           - Show this help")
+	fmt.Println("\nExamples:")
+	fmt.Println("  llm-box webui")
+	fmt.Println("  llm-box webui --port 8080")
+	fmt.Println("  llm-box webui --dir /path/to/workflows")
 }
 
 func updateConfigKey(config *autoupgrade.UpgradeConfig, key, value string) {

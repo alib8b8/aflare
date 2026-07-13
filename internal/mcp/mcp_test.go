@@ -3,11 +3,13 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -544,5 +546,606 @@ func TestToolHistoryList_LimitClamp(t *testing.T) {
 	_, err = s.toolHistoryList(map[string]interface{}{"limit": 999})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// ------------------------------------------------------------------
+// SSE Client tests
+// ------------------------------------------------------------------
+
+func TestClient_Connect_SSE_Failure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "server error", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	_, err := Connect(server.URL + "/sse")
+	if err == nil {
+		t.Fatal("expected error for SSE connection failure")
+	}
+}
+
+func TestClient_Connect_SSE_NoEndpoint(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprintf(w, "data: hello\n\n")
+	}))
+	defer server.Close()
+
+	_, err := Connect(server.URL + "/sse")
+	if err == nil {
+		t.Fatal("expected error for missing endpoint event")
+	}
+}
+
+func TestClient_Connect_Failure(t *testing.T) {
+	_, err := Connect("http://nonexistent-server-12345.invalid/mcp")
+	if err == nil {
+		t.Fatal("expected error for connection failure")
+	}
+}
+
+func TestClient_HandleSSEEvent(t *testing.T) {
+	c := &Client{
+		pending: make(map[int]chan *rpcResponse),
+	}
+
+	id := 123
+	ch := make(chan *rpcResponse, 1)
+	c.pending[id] = ch
+
+	respData := `{"jsonrpc":"2.0","id":123,"result":"test"}`
+	c.handleSSEEvent(respData)
+
+	select {
+	case resp := <-ch:
+		if resp == nil {
+			t.Error("expected non-nil response")
+		}
+	case <-time.After(time.Millisecond * 100):
+		t.Error("timeout waiting for response")
+	}
+}
+
+func TestClient_HandleSSEEvent_InvalidJSON(t *testing.T) {
+	c := &Client{
+		pending: make(map[int]chan *rpcResponse),
+	}
+
+	c.handleSSEEvent("invalid json")
+}
+
+func TestClient_HandleSSEEvent_NoPending(t *testing.T) {
+	c := &Client{
+		pending: make(map[int]chan *rpcResponse),
+	}
+
+	respData := `{"jsonrpc":"2.0","id":999,"result":"test"}`
+	c.handleSSEEvent(respData)
+}
+
+func TestClient_HandleSSEEvent_InvalidID(t *testing.T) {
+	c := &Client{
+		pending: make(map[int]chan *rpcResponse),
+	}
+
+	respData := `{"jsonrpc":"2.0","id":"invalid","result":"test"}`
+	c.handleSSEEvent(respData)
+}
+
+func TestClient_SSEReaderLoop_Stop(t *testing.T) {
+	c := &Client{
+		sseDone: make(chan struct{}),
+		pending: make(map[int]chan *rpcResponse),
+	}
+
+	c.sseWg.Add(1)
+	close(c.sseDone)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.sseReaderLoop()
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Millisecond * 100):
+		t.Error("timeout waiting for sseReaderLoop to stop")
+	}
+}
+
+func TestClient_PostSSE_Failure(t *testing.T) {
+	c := &Client{
+		httpClient:  &http.Client{Timeout: 1 * time.Second},
+		sseEndpoint: "http://nonexistent-server.invalid/mcp",
+	}
+
+	req := &rpcRequest{JSONRPC: "2.0", Method: "test"}
+	err := c.postSSE(req)
+	if err == nil {
+		t.Fatal("expected error for SSE post failure")
+	}
+}
+
+func TestClient_Close_WithSSE(t *testing.T) {
+	c := &Client{
+		sseDone:   make(chan struct{}),
+		sseReader: io.NopCloser(strings.NewReader("")),
+	}
+
+	c.sseWg.Add(1)
+	go func() {
+		defer c.sseWg.Done()
+		time.Sleep(time.Millisecond * 50)
+	}()
+
+	err := c.Close()
+	if err != nil {
+		t.Errorf("unexpected close error: %v", err)
+	}
+}
+
+func TestClient_Close_NilSSEReader(t *testing.T) {
+	c := &Client{}
+	err := c.Close()
+	if err != nil {
+		t.Errorf("unexpected close error: %v", err)
+	}
+}
+
+func TestClient_ResolveURL_BaseNoSlash(t *testing.T) {
+	result := resolveURL("http://example.com", "/path")
+	if result != "http://example.com/path" {
+		t.Errorf("expected http://example.com/path, got %s", result)
+	}
+}
+
+func TestClient_ResolveURL_Relative(t *testing.T) {
+	result := resolveURL("http://example.com/base", "relative")
+	if result != "http://example.com/base/relative" {
+		t.Errorf("expected http://example.com/base/relative, got %s", result)
+	}
+}
+
+func TestClient_ResolveURL_NoProtocol(t *testing.T) {
+	result := resolveURL("example.com", "/path")
+	if result != "/path" {
+		t.Errorf("expected /path, got %s", result)
+	}
+}
+
+func TestClient_Close_WithoutSSE(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req rpcRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
+		if req.Method == "initialize" {
+			resp.Result = initializeResult{
+				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
+				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
+			}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := Connect(server.URL)
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+
+	err = client.Close()
+	if err != nil {
+		t.Errorf("unexpected close error: %v", err)
+	}
+}
+
+func TestClient_SendRequest_Timeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req rpcRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if req.Method == "initialize" {
+			resp := rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: initializeResult{
+				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
+				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
+			}}
+			_ = json.NewEncoder(w).Encode(resp)
+		} else if req.Method == "notifications/initialized" {
+			w.WriteHeader(http.StatusAccepted)
+		} else {
+			time.Sleep(time.Second * 35)
+		}
+	}))
+	defer server.Close()
+
+	client, err := Connect(server.URL)
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer client.Close()
+
+	_, err = client.ListTools()
+	if err == nil {
+		t.Fatal("expected timeout error")
+	}
+}
+
+// ------------------------------------------------------------------
+// Server handleRequest tests for all tools
+// ------------------------------------------------------------------
+
+func TestHandleRequest_ToolsCall_WorkflowRun(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	wfPath := filepath.Join(tmpDir, "test.yaml")
+	wf := &workflow.Workflow{
+		Name: "test",
+		Steps: []workflow.WorkflowStep{
+			{Node: "test", Params: map[string]string{"message": "hello"}},
+		},
+	}
+	data, _ := yaml.Marshal(wf)
+	if err := os.WriteFile(wfPath, data, 0644); err != nil {
+		t.Fatalf("failed to write workflow: %v", err)
+	}
+
+	params, _ := json.Marshal(map[string]interface{}{"name": "workflow_run", "arguments": map[string]interface{}{"file": wfPath}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+}
+
+func TestHandleRequest_ToolsCall_WorkflowCreate(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "workflow_create", "arguments": map[string]interface{}{"description": "test workflow"}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+
+	done := make(chan *rpcResponse)
+	go func() {
+		done <- s.handleRequest(req)
+	}()
+	select {
+	case resp := <-done:
+		if resp == nil {
+			t.Fatal("expected non-nil response")
+		}
+	case <-time.After(time.Second * 10):
+		t.Fatal("timeout")
+	}
+}
+
+func TestHandleRequest_ToolsCall_WorkflowList(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(tmpDir, "test.yaml"), []byte("name: test"), 0644)
+
+	params, _ := json.Marshal(map[string]interface{}{"name": "workflow_list", "arguments": map[string]interface{}{"directory": tmpDir}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+func TestHandleRequest_ToolsCall_WorkflowValidate(t *testing.T) {
+	s := NewServer()
+	wf := &workflow.Workflow{
+		Name: "test",
+		Steps: []workflow.WorkflowStep{
+			{Node: "test", Params: map[string]string{"message": "hello"}},
+		},
+	}
+	data, _ := yaml.Marshal(wf)
+
+	params, _ := json.Marshal(map[string]interface{}{"name": "workflow_validate", "arguments": map[string]interface{}{"yaml": string(data)}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+func TestHandleRequest_ToolsCall_NodeList(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "node_list", "arguments": map[string]interface{}{}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+func TestHandleRequest_ToolsCall_NodeInfo(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "node_info", "arguments": map[string]interface{}{"name": "file_read"}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+}
+
+func TestHandleRequest_ToolsCall_HistoryList(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	history.SetHistoryDir(tmpDir)
+	defer history.SetHistoryDir("")
+
+	params, _ := json.Marshal(map[string]interface{}{"name": "history_list", "arguments": map[string]interface{}{}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+func TestHandleRequest_ToolsCall_TemplateList(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "template_list", "arguments": map[string]interface{}{}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+func TestHandleRequest_ToolsCall_TemplateRender(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "template_render", "arguments": map[string]interface{}{"name": "simple-llm"}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+}
+
+// ------------------------------------------------------------------
+// Concurrency tests
+// ------------------------------------------------------------------
+
+func TestClient_SequentialToolCalls(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req rpcRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var resp rpcResponse
+		resp.JSONRPC = "2.0"
+		resp.ID = req.ID
+
+		switch req.Method {
+		case "initialize":
+			resp.Result = initializeResult{
+				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
+				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
+			}
+		case "notifications/initialized":
+			w.WriteHeader(http.StatusAccepted)
+			return
+		case "tools/list":
+			resp.Result = toolsListResult{Tools: []tool{{Name: "seq_tool", Description: "Sequential test", InputSchema: inputSchema{Type: "object"}}}}
+		case "tools/call":
+			resp.Result = toolCallResult{Content: []content{{Type: "text", Text: "ok"}}}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := Connect(server.URL)
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer client.Close()
+
+	for i := 0; i < 3; i++ {
+		_, err := client.CallTool("seq_tool", map[string]interface{}{})
+		if err != nil {
+			t.Errorf("sequential call %d error: %v", i, err)
+		}
+	}
+}
+
+func TestServer_ConcurrentRequests(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	wfPath := filepath.Join(tmpDir, "test.yaml")
+	wf := &workflow.Workflow{
+		Name: "test",
+		Steps: []workflow.WorkflowStep{
+			{Node: "test", Params: map[string]string{"message": "hello"}},
+		},
+	}
+	data, _ := yaml.Marshal(wf)
+	if err := os.WriteFile(wfPath, data, 0644); err != nil {
+		t.Fatalf("failed to write workflow: %v", err)
+	}
+
+	const numGoroutines = 10
+	var wg sync.WaitGroup
+	errCount := 0
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			params, _ := json.Marshal(map[string]interface{}{"name": "list_nodes", "arguments": map[string]interface{}{}})
+			req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+			resp := s.handleRequest(req)
+			if resp == nil || resp.Error != nil {
+				errCount++
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	if errCount > 0 {
+		t.Errorf("got %d errors in concurrent requests", errCount)
+	}
+}
+
+// ------------------------------------------------------------------
+// Additional tools coverage tests
+// ------------------------------------------------------------------
+
+func TestToolWorkflowList_DefaultDir(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolWorkflowList(map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestToolWorkflowList_InvalidDir(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolWorkflowList(map[string]interface{}{"directory": "/nonexistent/dir/path/xyz123"})
+	if err == nil {
+		t.Fatal("expected error for invalid directory")
+	}
+}
+
+func TestToolWorkflowValidate_WithFile(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	wfPath := filepath.Join(tmpDir, "test.yaml")
+	wf := &workflow.Workflow{
+		Name: "test",
+		Steps: []workflow.WorkflowStep{
+			{Node: "test", Params: map[string]string{"message": "hello"}},
+		},
+	}
+	data, _ := yaml.Marshal(wf)
+	if err := os.WriteFile(wfPath, data, 0644); err != nil {
+		t.Fatalf("failed to write workflow: %v", err)
+	}
+
+	result, err := s.toolWorkflowValidate(map[string]interface{}{"file": wfPath})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestToolWorkflowValidate_InvalidYAML(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolWorkflowValidate(map[string]interface{}{"yaml": "invalid: ["})
+	if err == nil {
+		t.Fatal("expected error for invalid yaml")
+	}
+}
+
+func TestToolHistoryList_WithFilters(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	history.SetHistoryDir(tmpDir)
+	defer history.SetHistoryDir("")
+
+	rec := history.Record{
+		ID:        "test-filter-1",
+		Name:      "test-workflow",
+		Trigger:   history.TriggerCLI,
+		Success:   true,
+		StartedAt: time.Now().Add(-time.Hour),
+		Duration:  5 * time.Second,
+	}
+	if err := history.SaveRecord(rec); err != nil {
+		t.Fatalf("failed to save record: %v", err)
+	}
+
+	_, err := s.toolHistoryList(map[string]interface{}{"success_only": true, "workflow": "test"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestToolTemplateList_ByKeyword(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolTemplateList(map[string]interface{}{"keyword": "llm"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestCallExtendedTool_AllTools(t *testing.T) {
+	s := NewServer()
+	tools := []string{
+		"create_workflow",
+		"run_workflow",
+		"run_workflow_yaml",
+		"list_nodes",
+		"validate_workflow",
+		"workflow_run",
+		"workflow_create",
+		"workflow_list",
+		"workflow_validate",
+		"node_list",
+		"node_info",
+		"history_list",
+		"template_list",
+		"template_render",
+	}
+
+	for _, toolName := range tools {
+		t.Run(toolName, func(t *testing.T) {
+			var args map[string]interface{}
+			switch toolName {
+			case "create_workflow", "workflow_create":
+				args = map[string]interface{}{"description": "test"}
+			case "run_workflow", "workflow_run":
+				args = map[string]interface{}{"file": "/nonexistent.yaml"}
+			case "run_workflow_yaml":
+				args = map[string]interface{}{"yaml": "name: test"}
+			case "validate_workflow":
+				args = map[string]interface{}{"file": "/nonexistent.yaml"}
+			case "node_info":
+				args = map[string]interface{}{"name": "file_read"}
+			case "template_render":
+				args = map[string]interface{}{"name": "simple-llm"}
+			default:
+				args = map[string]interface{}{}
+			}
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				_, _ = s.callExtendedTool(&toolCallParams{Name: toolName, Arguments: args})
+			}()
+
+			select {
+			case <-done:
+			case <-time.After(time.Second * 15):
+				t.Fatal("timeout")
+			}
+		})
 	}
 }

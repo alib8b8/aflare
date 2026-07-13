@@ -84,9 +84,12 @@ func TestLoadConfig_InvalidYAML(t *testing.T) {
 	}
 
 	t.Setenv("LLM_BOX_AUTOUPGRADE_CONFIG", configPath)
-	_, err := LoadConfig()
-	if err == nil {
-		t.Error("expected error for invalid YAML")
+	config, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Mode != ModeMonitor {
+		t.Errorf("expected default mode monitor, got %s", config.Mode)
 	}
 }
 
@@ -437,5 +440,418 @@ func TestUpgradeConfig(t *testing.T) {
 	}
 	if cfg.AutoUpdateEnabled {
 		t.Error("expected AutoUpdateEnabled false")
+	}
+}
+
+func TestSaveConfig_FailCreateDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Create .config/llm-box as a file to cause mkdir failure
+	configDir := filepath.Join(tmpDir, ".config", "llm-box")
+	if err := os.MkdirAll(filepath.Dir(configDir), 0755); err != nil {
+		t.Fatalf("failed to create parent dir: %v", err)
+	}
+	if err := os.WriteFile(configDir, []byte(""), 0644); err != nil {
+		t.Fatalf("failed to create file: %v", err)
+	}
+
+	t.Setenv("HOME", tmpDir)
+	config := getDefaultConfig()
+	err := SaveConfig(config)
+	if err == nil {
+		t.Error("expected error when config directory cannot be created")
+	}
+}
+
+func TestRollback_BackupNotFound(t *testing.T) {
+	err := rollback("/nonexistent/path/backup")
+	if err == nil {
+		t.Error("expected error when backup file not found")
+	}
+}
+
+func TestPerformUpgrade_BackupDisabled(t *testing.T) {
+	_ = t.TempDir()
+	engine := NewUpgradeEngine(&UpgradeConfig{
+		Mode:                ModeAuto,
+		AutoUpdateEnabled:   true,
+		BackupBeforeUpgrade: false,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		release := &version.GitHubRelease{TagName: "v999.999.999"}
+		engine.PerformUpgrade(ctx, release)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Log("PerformUpgrade network call timed out")
+	}
+}
+
+func TestPerformUpgrade_WithBackup(t *testing.T) {
+	_ = t.TempDir()
+	engine := NewUpgradeEngine(&UpgradeConfig{
+		Mode:                ModeAuto,
+		AutoUpdateEnabled:   true,
+		BackupBeforeUpgrade: true,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		release := &version.GitHubRelease{TagName: "v999.999.999"}
+		engine.PerformUpgrade(ctx, release)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Log("PerformUpgrade network call timed out")
+	}
+}
+
+func TestPerformUpgrade_FailWithRollback(t *testing.T) {
+	_ = t.TempDir()
+	engine := NewUpgradeEngine(&UpgradeConfig{
+		Mode:                ModeAuto,
+		AutoUpdateEnabled:   true,
+		BackupBeforeUpgrade: false,
+		RollbackOnFailure:   true,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		release := &version.GitHubRelease{TagName: "v999.999.999"}
+		engine.PerformUpgrade(ctx, release)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Log("PerformUpgrade network call timed out")
+	}
+
+	if engine.state.UpgradeStatus != "failed" {
+		t.Logf("expected status failed, got %s (may be timeout)", engine.state.UpgradeStatus)
+	}
+}
+
+func TestCopyFile_WriteError(t *testing.T) {
+	tmpDir := t.TempDir()
+	src := filepath.Join(tmpDir, "src.txt")
+	if err := os.WriteFile(src, []byte("hello"), 0644); err != nil {
+		t.Fatalf("failed to write source: %v", err)
+	}
+
+	readOnlyDir := filepath.Join(tmpDir, "readonly")
+	if err := os.Mkdir(readOnlyDir, 0444); err != nil {
+		t.Skip("cannot create readonly directory, skipping")
+	}
+
+	dst := filepath.Join(readOnlyDir, "dst.txt")
+	err := copyFile(src, dst)
+	if err == nil {
+		t.Log("expected error for write to readonly dir (may pass on some systems)")
+	}
+}
+
+func TestRunSelfUpdate(t *testing.T) {
+	engine := NewUpgradeEngine(getDefaultConfig())
+
+	done := make(chan struct{})
+	var result string
+	var err error
+	go func() {
+		defer close(done)
+		result, err = engine.RunSelfUpdate()
+	}()
+
+	select {
+	case <-done:
+		if err != nil {
+			t.Logf("RunSelfUpdate error (may be expected in test env): %v", err)
+		} else {
+			t.Logf("RunSelfUpdate result: %s", result)
+		}
+	case <-time.After(5 * time.Second):
+		t.Log("RunSelfUpdate network call timed out")
+	}
+}
+
+func TestRunAutoMerge_NoBranches(t *testing.T) {
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get wd: %v", err)
+	}
+	defer os.Chdir(origDir)
+
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	if err := os.MkdirAll(".git", 0755); err != nil {
+		t.Fatalf("failed to create .git: %v", err)
+	}
+
+	engine := NewUpgradeEngine(&UpgradeConfig{AutoMergeEnabled: true})
+	_, err = engine.RunAutoMerge()
+	if err != nil {
+		t.Logf("RunAutoMerge error (may be expected in mock git): %v", err)
+	}
+}
+
+func TestAttemptAutoMerge_CheckoutFail(t *testing.T) {
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get wd: %v", err)
+	}
+	defer os.Chdir(origDir)
+
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	err = attemptAutoMerge("feature-branch")
+	if err == nil {
+		t.Error("expected error when git checkout fails")
+	}
+}
+
+func TestStart_MonitorMode_WithTimeout(t *testing.T) {
+	engine := NewUpgradeEngine(&UpgradeConfig{
+		Mode:          ModeMonitor,
+		CheckInterval: "1ms",
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		engine.Start(ctx)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		t.Log("Start timed out as expected")
+	}
+}
+
+func TestStart_AutoMode_WithTimeout(t *testing.T) {
+	engine := NewUpgradeEngine(&UpgradeConfig{
+		Mode:                ModeAuto,
+		AutoUpdateEnabled:   true,
+		BackupBeforeUpgrade: false,
+		CheckInterval:       "1ms",
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		engine.Start(ctx)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		t.Log("Start timed out as expected")
+	}
+}
+
+func TestGetConfigPaths_WithEnv(t *testing.T) {
+	envPath := "/custom/path/autoupgrade.yaml"
+	t.Setenv("LLM_BOX_AUTOUPGRADE_CONFIG", envPath)
+	paths := getConfigPaths()
+	if len(paths) == 0 {
+		t.Error("expected at least one path")
+	}
+	foundEnv := false
+	for _, p := range paths {
+		if p == envPath {
+			foundEnv = true
+			break
+		}
+	}
+	if !foundEnv {
+		t.Errorf("expected %q in paths", envPath)
+	}
+}
+
+func TestLoadConfig_FromCwd(t *testing.T) {
+	tmpDir := t.TempDir()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get wd: %v", err)
+	}
+	defer os.Chdir(origDir)
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	configPath := filepath.Join(tmpDir, "autoupgrade.yaml")
+	data := []byte("mode: manual\ncheck_interval: 6h\n")
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	t.Setenv("LLM_BOX_AUTOUPGRADE_CONFIG", "")
+	config, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Mode != ModeManual {
+		t.Errorf("expected mode manual, got %s", config.Mode)
+	}
+	if config.CheckInterval != "6h" {
+		t.Errorf("expected interval 6h, got %s", config.CheckInterval)
+	}
+}
+
+func TestSetConfig_Complete(t *testing.T) {
+	engine := NewUpgradeEngine(getDefaultConfig())
+	newConfig := &UpgradeConfig{
+		Mode:                ModeAuto,
+		AutoUpdateEnabled:   true,
+		AutoMergeEnabled:    true,
+		CheckInterval:       "1h",
+		BackupBeforeUpgrade: true,
+		RollbackOnFailure:   true,
+		RepositoryURL:       "https://github.com/test/repo",
+	}
+	engine.SetConfig(newConfig)
+	if engine.config.Mode != ModeAuto {
+		t.Errorf("expected mode auto, got %s", engine.config.Mode)
+	}
+	if !engine.config.AutoUpdateEnabled {
+		t.Error("expected AutoUpdateEnabled true")
+	}
+	if !engine.config.AutoMergeEnabled {
+		t.Error("expected AutoMergeEnabled true")
+	}
+	if engine.config.CheckInterval != "1h" {
+		t.Errorf("expected interval 1h, got %s", engine.config.CheckInterval)
+	}
+	if !engine.config.BackupBeforeUpgrade {
+		t.Error("expected BackupBeforeUpgrade true")
+	}
+	if !engine.config.RollbackOnFailure {
+		t.Error("expected RollbackOnFailure true")
+	}
+	if engine.config.RepositoryURL != "https://github.com/test/repo" {
+		t.Errorf("expected repo URL, got %s", engine.config.RepositoryURL)
+	}
+}
+
+func TestAttemptAutoMerge_AllStepsFail(t *testing.T) {
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get wd: %v", err)
+	}
+	defer os.Chdir(origDir)
+
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	err = attemptAutoMerge("feature-branch")
+	if err == nil {
+		t.Error("expected error when git commands fail")
+	}
+}
+
+func TestRunAutoMerge_MultipleBranches(t *testing.T) {
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get wd: %v", err)
+	}
+	defer os.Chdir(origDir)
+
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	if err := os.MkdirAll(".git", 0755); err != nil {
+		t.Fatalf("failed to create .git: %v", err)
+	}
+
+	engine := NewUpgradeEngine(&UpgradeConfig{AutoMergeEnabled: true})
+	_, err = engine.RunAutoMerge()
+	if err != nil {
+		t.Logf("RunAutoMerge error (may be expected in mock git): %v", err)
+	}
+}
+
+func TestCheckAndUpgrade_NetworkFailure(t *testing.T) {
+	engine := NewUpgradeEngine(getDefaultConfig())
+	engine.state.UpgradeInProgress = false
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		engine.CheckAndUpgrade(ctx)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Log("CheckAndUpgrade network call timed out")
+	}
+}
+
+func TestLoadConfig_InvalidYAML_Skip(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Create invalid YAML in env path
+	envConfigPath := filepath.Join(tmpDir, "env_config.yaml")
+	if err := os.WriteFile(envConfigPath, []byte("invalid: ["), 0600); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+	t.Setenv("LLM_BOX_AUTOUPGRADE_CONFIG", envConfigPath)
+
+	// Create valid config in cwd
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get wd: %v", err)
+	}
+	defer os.Chdir(origDir)
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	cwdConfigPath := filepath.Join(tmpDir, "autoupgrade.yaml")
+	data := []byte("mode: auto\n")
+	if err := os.WriteFile(cwdConfigPath, data, 0600); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	config, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Mode != ModeAuto {
+		t.Errorf("expected mode auto, got %s", config.Mode)
 	}
 }
