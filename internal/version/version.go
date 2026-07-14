@@ -238,4 +238,5 @@ func SelfUpdate(repo string) (string, error) {
 
 	return fmt.Sprintf("Updated to %s (was %s)", release.TagName, Version), nil
 }
+
 // Small change for PR
