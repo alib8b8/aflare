@@ -68,7 +68,7 @@ Most workflow tools force developers to choose between:
 **llm-box is not just another workflow tool — it's a deterministic execution engine with agentic superpowers.**
 
 - ✅ **Predictable & Auditable** — Workflow steps are deterministic, agent behavior is constrained
-- ✅ **Agentic Nodes** — 5+ AI agent nodes: `agent` (ReAct), `planner`, `researcher`, `code_review`, `router`
+- ✅ **Agentic Nodes** — 10+ AI agent nodes: `agent` (ReAct), `planner`, `researcher`, `critic`, `evaluator`, `reflector`, `supervisor`, `code_review`, `router`, `human_in_loop`
 - ✅ **Local-First** — Your data never leaves your terminal
 - ✅ **Transparent & Reproducible** — Same workflow produces same results
 - ✅ **MIT Open Source** — No vendor lock-in, no hidden barriers
@@ -81,7 +81,7 @@ Most workflow tools force developers to choose between:
 
 - **Terminal First** - Native CLI, works anywhere you have a terminal
 - **Plain English Workflows** - Define what you want, not how to do it
-- **Agentic Nodes** - 5 AI agent nodes with ReAct reasoning, planning, research, code review, and routing
+- **Agentic Nodes** - 10 AI agent nodes with ReAct reasoning, planning, research, criticism, evaluation, reflection, supervision, code review, routing, and human-in-the-loop
 - **Single Binary** - Zero dependencies, install and run
 - **Workflow Reusability** - Save, version, and share your workflows
 - **Multi-LLM Support** - Ollama (local), DeepSeek API (cloud), and 15+ providers
@@ -106,7 +106,7 @@ Most workflow tools force developers to choose between:
 |---------|---------|----------|-------------|--------|
 | **Interface** | Terminal + YAML | Visual GUI | Chat | Code |
 | **Execution** | Deterministic + Agentic | AI-driven | AI autonomous | AI orchestration |
-| **Agent Nodes** | 5 built-in (ReAct, planner, researcher, code_review, router) | Limited | Custom | Full framework |
+| **Agent Nodes** | 10 built-in (ReAct, planner, researcher, critic, evaluator, reflector, supervisor, code_review, router, human_in_loop) | Limited | Custom | Full framework |
 | **Setup** | 60 seconds | Hours | Minutes | Hours |
 | **Transparency** | 100% | Medium | Low | Medium |
 | **Reproducibility** | 100% | Variable | Variable | Variable |
@@ -120,15 +120,32 @@ Most workflow tools force developers to choose between:
 
 ## 🤖 Agent Nodes
 
-llm-box includes 5 specialized AI agent nodes that bring autonomous reasoning to your workflows:
+llm-box includes **10 specialized AI agent nodes** that bring autonomous reasoning to your workflows:
+
+### Core Agents
 
 | Node | Description | Use Case |
 |------|-------------|----------|
 | `agent` | General-purpose ReAct agent with tool use | Autonomous task completion |
+| `supervisor` | Supervisor agent that decomposes tasks and delegates to specialists | Orchestrating multi-agent workflows |
+
+### Specialist Agents
+
+| Node | Description | Use Case |
+|------|-------------|----------|
 | `planner` | Task decomposition agent | Break complex goals into steps |
 | `researcher` | Research agent with web sources | Information gathering & synthesis |
+| `critic` | Quality review agent that critiques and suggests improvements | Output quality control |
+| `evaluator` | Scoring agent with rubrics and pass/fail thresholds | Quality gates & assessment |
+| `reflector` | Self-reflection agent that iteratively improves output | Self-correction & refinement |
 | `code_review` | Code review specialist agent | Automated code quality checks |
 | `router` | Classification & routing agent | Smart workflow branching |
+
+### Control Nodes
+
+| Node | Description | Use Case |
+|------|-------------|----------|
+| `human_in_loop` | Human approval gate for workflow steps | Human review & sign-off |
 
 ### Example: Autonomous Research Workflow
 
@@ -144,6 +161,42 @@ steps:
     input: |
       Research the latest trends in agentic workflow engines.
       Fetch information from 2 sources and summarize key findings.
+```
+
+### Example: Multi-Agent Quality Pipeline
+
+```yaml
+name: Content Quality Pipeline
+steps:
+  - node: file_read
+    params:
+      path: draft.md
+  - node: critic
+    params:
+      provider: ollama
+      model: llama3
+      role: writing
+      suggest_improvements: "true"
+  - node: evaluator
+    params:
+      provider: ollama
+      model: llama3
+      rubric: quality
+      scale: "1-10"
+      threshold: "7"
+  - node: reflector
+    params:
+      provider: ollama
+      model: llama3
+      iterations: "2"
+      reflection_focus: all
+  - node: human_in_loop
+    params:
+      mode: file
+      approval_file: .content-approved
+  - node: file_write
+    params:
+      path: final.md
 ```
 
 ---
@@ -191,10 +244,14 @@ steps:
 │  ┌──────────┐ ┌───────────┐ ┌────────────┐ ┌───────────┐ ┌────────┐ │
 │  │http_req  │ │json_parse │ │template    │ │secrets    │ │plugins│ │
 │  └──────────┘ └───────────┘ └────────────┘ └───────────┘ └────────┘ │
-│  ┌──────────┐ ┌───────────┐ ┌────────────┐ ┌───────────┐          │
-│  │  agent   │ │ planner   │ │ researcher │ │code_review│  router  │
-│  │ (ReAct)  │ │           │ │            │ │           │          │
-│  └──────────┘ └───────────┘ └────────────┘ └───────────┘          │
+│  ┌──────────┐ ┌───────────┐ ┌────────────┐ ┌───────────┐ ┌────────┐ │
+│  │  agent   │ │ planner   │ │ researcher │ │  critic   │ │evaluator│
+│  │ (ReAct)  │ │           │ │            │ │           │ │        │
+│  └──────────┘ └───────────┘ └────────────┘ └───────────┘ └────────┘ │
+│  ┌──────────┐ ┌───────────┐ ┌────────────┐ ┌───────────┐ ┌────────┐ │
+│  │reflector │ │supervisor │ │code_review │ │  router   │ │human_in│
+│  │          │ │           │ │            │ │           │ │_loop   │
+│  └──────────┘ └───────────┘ └────────────┘ └───────────┘ └────────┘ │
 └─────────────────────────────────────────────────────────────────────┘
                              │
                              ▼
