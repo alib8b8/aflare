@@ -31,7 +31,6 @@ func (n *HumanInLoopNode) Schema() NodeSchema {
 			{Name: "approval_file", Type: "string", Description: "Path to approval flag file (mode=file)", Required: false, Default: ".llm-box-approval"},
 			{Name: "approval_env", Type: "string", Description: "Environment variable to check for approval (mode=env)", Required: false, Default: "LLM_BOX_APPROVED"},
 			{Name: "prompt", Type: "string", Description: "Custom prompt message for the human reviewer", Required: false},
-			{Name: "timeout", Type: "string", Description: "Timeout in seconds before failing (default: 3600)", Required: false, Default: "3600"},
 			{Name: "on_approve", Type: "string", Description: "What to output on approve: original, modified, passthrough (default: original)", Required: false, Default: "original"},
 		},
 	}
@@ -66,7 +65,7 @@ func (n *HumanInLoopNode) Execute(ctx context.Context, input string, params map[
 			reviewContent = customPrompt + "\n\n" + input
 		}
 		reviewFile := approvalFile + ".review"
-		if writeErr := os.WriteFile(reviewFile, []byte(reviewContent), 0644); writeErr != nil {
+		if writeErr := os.WriteFile(reviewFile, []byte(reviewContent), 0600); writeErr != nil {
 			return "", fmt.Errorf("failed to write review file: %w", writeErr)
 		}
 		return "", fmt.Errorf("human approval required: review %s, then create %s to approve", reviewFile, approvalFile)

@@ -3,6 +3,7 @@ package nodes
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 type EvaluatorNode struct{}
@@ -61,10 +62,13 @@ func (n *EvaluatorNode) Execute(ctx context.Context, input string, params map[st
 	}
 	if criteria != "" {
 		dims := []string{}
-		for _, c := range []string{criteria} {
-			dims = append(dims, c)
+		for _, c := range strings.Split(criteria, ",") {
+			c = strings.TrimSpace(c)
+			if c != "" {
+				dims = append(dims, c)
+			}
 		}
-		if len(dims) > 0 && dims[0] != "" {
+		if len(dims) > 0 {
 			dimensions = dims
 		}
 	}

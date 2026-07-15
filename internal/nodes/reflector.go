@@ -23,10 +23,9 @@ func (n *ReflectorNode) Description() string {
 func (n *ReflectorNode) Schema() NodeSchema {
 	params := baseAgentParams()
 	params = append(params,
-		ParamSchema{Name: "iterations", Type: "string", Description: "Number of reflection iterations (default: 2)", Required: false, Default: "2"},
+		ParamSchema{Name: "iterations", Type: "string", Description: "Number of reflection iterations (1-5, default: 2)", Required: false, Default: "2"},
 		ParamSchema{Name: "goal", Type: "string", Description: "The original goal/task the output was trying to achieve", Required: false},
 		ParamSchema{Name: "reflection_focus", Type: "string", Description: "What to reflect on: accuracy, completeness, quality, all (default: all)", Required: false, Default: "all"},
-		ParamSchema{Name: "max_iterations", Type: "string", Description: "Max iterations to prevent infinite loops (default: 5)", Required: false, Default: "5"},
 	)
 	return NodeSchema{
 		Name:        "reflector",

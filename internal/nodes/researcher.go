@@ -86,21 +86,7 @@ Key requirements:
 		userPrompt = fmt.Sprintf("Topic: %s\n\nCollected information:\n%s\n\nPlease synthesize this into a %s.", input, collectedContent, outputFormat)
 	}
 
-	compatNode := NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            provider,
-		DefaultModel:    model,
-		DefaultEndpoint: endpoint,
-		EnvAPIKey:       fmt.Sprintf("%s_API_KEY", provider),
-		ProviderName:    provider,
-	})
-	llmParams := map[string]string{
-		"model":    model,
-		"api_key":  apiKey,
-		"endpoint": endpoint,
-		"system":   systemPrompt,
-	}
-
-	result, err := compatNode.Execute(ctx, userPrompt, llmParams)
+	result, err := runAgentLLM(ctx, provider, model, apiKey, endpoint, systemPrompt, userPrompt)
 	if err != nil {
 		return "", fmt.Errorf("researcher agent failed: %w", err)
 	}
