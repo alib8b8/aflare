@@ -1,8 +1,8 @@
 <div align="center">
   <img src="docs/logo.svg" alt="llm-box" width="200" />
   <h1>llm-box</h1>
-  <p><strong>Build terminal workflows using plain English</strong></p>
-<p>Describe what you want. llm-box generates YAML from patterns and executes it.</p>
+  <p><strong>Agentic Workflow Engine for the Terminal</strong></p>
+<p>Deterministic execution meets AI agents. Build self-driving workflows with autonomous agent nodes, tool use, and multi-step reasoning — all in plain YAML.</p>
 
   <p>
     <a href="https://github.com/alib8b8/llm-box/releases">
@@ -16,6 +16,9 @@
     </a>
     <a href="https://github.com/alib8b8/llm-box/actions/workflows/release.yml">
       <img src="https://github.com/alib8b8/llm-box/actions/workflows/release.yml/badge.svg" alt="CI status" />
+    </a>
+    <a href="https://cobusgreyling.github.io/loop-engineering/">
+      <img src="https://img.shields.io/badge/Loop_Ready-L2_(100%2F100)-58a6ff?style=flat-square" alt="Loop Ready L2 (100/100)" />
     </a>
   </p>
 
@@ -62,14 +65,15 @@ Most workflow tools force developers to choose between:
 | Heavy visual builders | Slow, opaque, require GUI |
 | Endless config files | Steep learning curve, verbose syntax |
 
-**llm-box is not an AI assistant — it's a deterministic execution engine.**
+**llm-box is not just another workflow tool — it's a deterministic execution engine with agentic superpowers.**
 
-- ✅ **Predictable & Auditable** — Workflow steps are deterministic
+- ✅ **Predictable & Auditable** — Workflow steps are deterministic, agent behavior is constrained
+- ✅ **Agentic Nodes** — 5+ AI agent nodes: `agent` (ReAct), `planner`, `researcher`, `code_review`, `router`
 - ✅ **Local-First** — Your data never leaves your terminal
 - ✅ **Transparent & Reproducible** — Same workflow produces same results
 - ✅ **MIT Open Source** — No vendor lock-in, no hidden barriers
 
-> 💡 We use AI to understand your intent, but core execution runs on deterministic code.
+> 💡 AI agents plan and reason, but llm-box's deterministic code execution keeps everything reliable.
 
 ---
 
@@ -77,6 +81,7 @@ Most workflow tools force developers to choose between:
 
 - **Terminal First** - Native CLI, works anywhere you have a terminal
 - **Plain English Workflows** - Define what you want, not how to do it
+- **Agentic Nodes** - 5 AI agent nodes with ReAct reasoning, planning, research, code review, and routing
 - **Single Binary** - Zero dependencies, install and run
 - **Workflow Reusability** - Save, version, and share your workflows
 - **Multi-LLM Support** - Ollama (local), DeepSeek API (cloud), and 15+ providers
@@ -100,15 +105,46 @@ Most workflow tools force developers to choose between:
 | Feature | llm-box | Dify/n8n | Claude Code | CrewAI |
 |---------|---------|----------|-------------|--------|
 | **Interface** | Terminal + YAML | Visual GUI | Chat | Code |
-| **Execution** | Deterministic | AI-driven | AI autonomous | AI orchestration |
+| **Execution** | Deterministic + Agentic | AI-driven | AI autonomous | AI orchestration |
+| **Agent Nodes** | 5 built-in (ReAct, planner, researcher, code_review, router) | Limited | Custom | Full framework |
 | **Setup** | 60 seconds | Hours | Minutes | Hours |
 | **Transparency** | 100% | Medium | Low | Medium |
 | **Reproducibility** | 100% | Variable | Variable | Variable |
-| **Best For** | Automation | Enterprise apps | Coding | Research |
+| **Best For** | Automation + AI agents | Enterprise apps | Coding | Research |
 
 **Choose llm-box when you need:** repeatable, auditable workflows with AI assistance without losing control.
 
 > 📖 [Full comparison →](docs/comparison.md)
+
+---
+
+## 🤖 Agent Nodes
+
+llm-box includes 5 specialized AI agent nodes that bring autonomous reasoning to your workflows:
+
+| Node | Description | Use Case |
+|------|-------------|----------|
+| `agent` | General-purpose ReAct agent with tool use | Autonomous task completion |
+| `planner` | Task decomposition agent | Break complex goals into steps |
+| `researcher` | Research agent with web sources | Information gathering & synthesis |
+| `code_review` | Code review specialist agent | Automated code quality checks |
+| `router` | Classification & routing agent | Smart workflow branching |
+
+### Example: Autonomous Research Workflow
+
+```yaml
+name: AI Research Agent
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: fetch_url,json_parse
+      max_iterations: 5
+    input: |
+      Research the latest trends in agentic workflow engines.
+      Fetch information from 2 sources and summarize key findings.
+```
 
 ---
 
@@ -148,13 +184,17 @@ Most workflow tools force developers to choose between:
           └──────────────────┼──────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     Distributed Worker Nodes                       │
+│                     Distributed Worker Nodes                        │
 │  ┌──────────┐ ┌───────────┐ ┌────────────┐ ┌───────────┐ ┌────────┐ │
 │  │fetch_url │ │transform  │ │execute_cmd │ │file_write │ │  LLM   │ │
 │  └──────────┘ └───────────┘ └────────────┘ └───────────┘ └────────┘ │
 │  ┌──────────┐ ┌───────────┐ ┌────────────┐ ┌───────────┐ ┌────────┐ │
-│  │http_req  │ │json_parse │ │template    │ │secrets    │ │plugins │ │
+│  │http_req  │ │json_parse │ │template    │ │secrets    │ │plugins│ │
 │  └──────────┘ └───────────┘ └────────────┘ └───────────┘ └────────┘ │
+│  ┌──────────┐ ┌───────────┐ ┌────────────┐ ┌───────────┐          │
+│  │  agent   │ │ planner   │ │ researcher │ │code_review│  router  │
+│  │ (ReAct)  │ │           │ │            │ │           │          │
+│  └──────────┘ └───────────┘ └────────────┘ └───────────┘          │
 └─────────────────────────────────────────────────────────────────────┘
                              │
                              ▼
