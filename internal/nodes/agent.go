@@ -51,6 +51,10 @@ func NewReActAgent(provider, model, apiKey, endpoint, systemPrompt string, maxIt
 }
 
 func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
+	if strings.TrimSpace(input) == "" {
+		return "", fmt.Errorf("agent input cannot be empty")
+	}
+
 	toolDescs := a.buildToolDescriptions()
 	systemPrompt := a.buildSystemPrompt(toolDescs)
 
@@ -93,7 +97,21 @@ func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
 		})
 
 		if i == a.maxIters-1 {
-			lastAnswer = observation
+			conversation = append(conversation, LLMMessage{
+				Role:    "user",
+				Content: "You have reached the maximum number of iterations. Please provide your best final answer now using action: final_answer.",
+			})
+			finalResp, err := a.callLLM(ctx, conversation)
+			if err == nil {
+				finalThought, parseErr := parseReActResponse(finalResp)
+				if parseErr == nil && finalThought.FinalAnswer != "" {
+					lastAnswer = finalThought.FinalAnswer
+				} else {
+					lastAnswer = finalResp
+				}
+			} else {
+				lastAnswer = observation
+			}
 		}
 	}
 
@@ -142,9 +160,20 @@ Rules:
 
 func parseReActResponse(response string) (AgentThought, error) {
 	response = strings.TrimSpace(response)
+	// Strip markdown code fences: ```json ... ``` or ``` ... ```
 	response = strings.TrimPrefix(response, "```json")
+	response = strings.TrimPrefix(response, "```")
 	response = strings.TrimSuffix(response, "```")
 	response = strings.TrimSpace(response)
+
+	// Some LLMs wrap JSON in markdown even when told not to; try to extract
+	if !strings.HasPrefix(response, "{") {
+		if idx := strings.Index(response, "{"); idx != -1 {
+			if endIdx := strings.LastIndex(response, "}"); endIdx > idx {
+				response = response[idx : endIdx+1]
+			}
+		}
+	}
 
 	var thought AgentThought
 	if err := json.Unmarshal([]byte(response), &thought); err != nil {

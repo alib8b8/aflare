@@ -25,7 +25,6 @@ func (n *SupervisorNode) Schema() NodeSchema {
 	params = append(params,
 		ParamSchema{Name: "specialists", Type: "string", Description: "Comma-separated list of specialist agent names available (default: planner,researcher,critic,code_review)", Required: false, Default: "planner,researcher,critic,code_review"},
 		ParamSchema{Name: "strategy", Type: "string", Description: "Supervision strategy: sequential, parallel, hierarchical (default: sequential)", Required: false, Default: "sequential"},
-		ParamSchema{Name: "max_depth", Type: "string", Description: "Maximum delegation depth (default: 3)", Required: false, Default: "3"},
 		ParamSchema{Name: "output_format", Type: "string", Description: "Output format: json, markdown, summary (default: json)", Required: false, Default: "json"},
 	)
 	return NodeSchema{

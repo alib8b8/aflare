@@ -82,21 +82,7 @@ Respond with ONLY the JSON object, no extra text.`,
 			return ""
 		}())
 
-	compatNode := NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            provider,
-		DefaultModel:    model,
-		DefaultEndpoint: endpoint,
-		EnvAPIKey:       fmt.Sprintf("%s_API_KEY", provider),
-		ProviderName:    provider,
-	})
-	llmParams := map[string]string{
-		"model":    model,
-		"api_key":  apiKey,
-		"endpoint": endpoint,
-		"system":   systemPrompt,
-	}
-
-	result, err := compatNode.Execute(ctx, input, llmParams)
+	result, err := runAgentLLM(ctx, provider, model, apiKey, endpoint, systemPrompt, input)
 	if err != nil {
 		return "", fmt.Errorf("router agent failed: %w", err)
 	}

@@ -49,6 +49,12 @@ func (n *AgentNode) Execute(ctx context.Context, input string, params map[string
 
 	maxIters := 10
 	fmt.Sscanf(maxItersStr, "%d", &maxIters)
+	if maxIters < 1 {
+		maxIters = 1
+	}
+	if maxIters > 50 {
+		maxIters = 50
+	}
 
 	tools := parseToolsList(toolsParam)
 

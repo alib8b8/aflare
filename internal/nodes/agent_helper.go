@@ -6,6 +6,18 @@ import (
 )
 
 func runAgentLLM(ctx context.Context, provider, model, apiKey, endpoint, systemPrompt, userInput string) (string, error) {
+	llmParams := map[string]string{
+		"model":    model,
+		"api_key":  apiKey,
+		"endpoint": endpoint,
+		"system":   systemPrompt,
+	}
+
+	if provider == "ollama" {
+		node := &OllamaNode{}
+		return node.Execute(ctx, userInput, llmParams)
+	}
+
 	compatNode := NewOpenAICompatibleNode(LLMNodeConfig{
 		Name:            provider,
 		DefaultModel:    model,
@@ -13,12 +25,6 @@ func runAgentLLM(ctx context.Context, provider, model, apiKey, endpoint, systemP
 		EnvAPIKey:       fmt.Sprintf("%s_API_KEY", provider),
 		ProviderName:    provider,
 	})
-	llmParams := map[string]string{
-		"model":    model,
-		"api_key":  apiKey,
-		"endpoint": endpoint,
-		"system":   systemPrompt,
-	}
 	return compatNode.Execute(ctx, userInput, llmParams)
 }
 
