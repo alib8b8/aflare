@@ -60,6 +60,8 @@ func (n *ExecuteNode) Schema() NodeSchema {
 		Output:      "string - stdout and stderr of the command",
 		Params: []ParamSchema{
 			{Name: "command", Type: "string", Description: "Shell command to execute", Required: true},
+			{Name: "dry_run", Type: "string", Description: "If true, preview the command without executing (default: false)", Required: false, Default: "false"},
+			{Name: "timeout", Type: "string", Description: "Command timeout, e.g. 30s, 5m, 1h (default: 5m)", Required: false, Default: "5m"},
 		},
 	}
 }
@@ -73,6 +75,9 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 	if !ok || command == "" {
 		return "", fmt.Errorf("command parameter is required")
 	}
+
+	dryRun := getParam(params, "dry_run", "false") == "true"
+	timeoutStr := getParam(params, "timeout", "5m")
 
 	// When allowlist is enabled, block shell metacharacters to prevent injection
 	if allowListEnabled {
@@ -94,6 +99,21 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 		return "", fmt.Errorf("failed to write audit log: %w", err)
 	}
 
+	if dryRun {
+		return fmt.Sprintf("[DRY RUN] Command that would execute:\n%s\n\nTo execute, set dry_run=false", command), nil
+	}
+
+	// Apply timeout
+	timeout, err := time.ParseDuration(timeoutStr)
+	if err != nil {
+		timeout = 5 * time.Minute
+	}
+	if timeout > 30*time.Minute {
+		timeout = 30 * time.Minute // cap at 30 minutes
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		cmd = exec.CommandContext(ctx, "cmd.exe", "/c", command)
@@ -103,6 +123,9 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("command timed out after %s", timeoutStr)
+		}
 		return "", fmt.Errorf("command failed: %w\nOutput: %s", err, string(output))
 	}
 
