@@ -522,7 +522,7 @@ Result: API healthy — status: "ok"
 2. **Planner** - Breaks down into executable steps
 3. **Coordinator** - Manages distributed nodes, assigns tasks, monitors heartbeats
 4. **Workers** - Execute workflow steps across multiple machines
-5. **Nodes** - Built-in and extensible actions (20+ utility nodes)
+5. **Nodes** - Built-in and extensible actions (17+ utility and LLM nodes)
 6. **Web UI** - Visual workflow editor with real-time preview
 7. **Visualizer** - Generates Mermaid/JSON/DOT/ASCII diagrams
 8. **Output** - Formatted results to terminal, file, or notifications
@@ -729,6 +729,264 @@ Renders a Go template with input data and parameters.
       Date: {{ .date }}
     name: "My Report"
     date: "2026-06-29"
+```
+
+### condition
+Evaluates a condition and returns "true" or "false".
+
+**Parameters:**
+- `condition` (required) - Condition expression
+
+**Supported operators:** `contains`, `matches`, `==`, `!=`, `<`, `>`, `<=`, `>=`
+
+**Example:**
+```yaml
+- node: condition
+  params:
+    condition: "{{input}} contains 'error'"
+```
+
+### agent
+Generic LLM agent node that supports multiple providers.
+
+**Parameters:**
+- `provider` - LLM provider (openai, ollama, coze, fastgpt, ima)
+- `model` - Model name
+- `prompt` - Prompt template
+- `stream` (optional) - Enable streaming output. Default: true
+
+**Example:**
+```yaml
+- node: agent
+  params:
+    provider: openai
+    model: gpt-4o
+    prompt: "Summarize this: {{input}}"
+```
+
+### openai
+Calls OpenAI's API.
+
+**Parameters:**
+- `model` (required) - Model name (e.g., gpt-4o, gpt-4-turbo)
+- `api_key` (optional) - API key (uses secret if not provided)
+- `prompt` - Prompt template
+- `temperature` (optional) - Temperature (0-2). Default: 0.7
+
+**Example:**
+```yaml
+- node: openai
+  params:
+    model: gpt-4o
+    api_key: "{{secret.llm.openai}}"
+    prompt: "Analyze this data: {{input}}"
+```
+
+### ollama
+Calls local Ollama models.
+
+**Parameters:**
+- `model` (required) - Model name (e.g., llama3, mistral)
+- `prompt` - Prompt template
+- `temperature` (optional) - Temperature (0-2). Default: 0.7
+
+**Example:**
+```yaml
+- node: ollama
+  params:
+    model: llama3
+    prompt: "Summarize this: {{input}}"
+```
+
+### coze
+Calls Coze AI API.
+
+**Parameters:**
+- `model` (required) - Model name
+- `api_key` (optional) - API key (uses secret if not provided)
+- `prompt` - Prompt template
+
+**Example:**
+```yaml
+- node: coze
+  params:
+    model: coze-chat
+    api_key: "{{secret.llm.coze}}"
+```
+
+### fastgpt
+Calls FastGPT API.
+
+**Parameters:**
+- `model` (required) - Model name
+- `api_key` (optional) - API key (uses secret if not provided)
+- `prompt` - Prompt template
+
+**Example:**
+```yaml
+- node: fastgpt
+  params:
+    model: fastgpt-chat
+    api_key: "{{secret.llm.fastgpt}}"
+```
+
+### ima
+Calls IMA (Intelligent Multi-Agent) API.
+
+**Parameters:**
+- `model` (required) - Model name
+- `api_key` (optional) - API key (uses secret if not provided)
+- `prompt` - Prompt template
+
+**Example:**
+```yaml
+- node: ima
+  params:
+    model: ima-7b
+    api_key: "{{secret.llm.ima}}"
+```
+
+### call
+Calls another workflow file.
+
+**Parameters:**
+- `workflow` (required) - Path to workflow file
+- `input` (optional) - Input to pass to the workflow
+
+**Example:**
+```yaml
+- node: call
+  params:
+    workflow: "sub-workflow.yaml"
+```
+
+### planner
+Generates a plan for complex tasks.
+
+**Parameters:**
+- `task` (required) - Task description
+- `model` (optional) - LLM model to use
+
+**Example:**
+```yaml
+- node: planner
+  params:
+    task: "Create a web scraper for example.com"
+```
+
+### code_review
+Reviews code for issues and improvements.
+
+**Parameters:**
+- `model` (optional) - LLM model to use
+
+**Example:**
+```yaml
+- node: code_review
+  input: "{{step.code_output}}"
+  params:
+    model: gpt-4o
+```
+
+### critic
+Provides critical feedback on content.
+
+**Parameters:**
+- `model` (optional) - LLM model to use
+- `focus` (optional) - Focus area (quality, accuracy, clarity)
+
+**Example:**
+```yaml
+- node: critic
+  input: "{{step.report}}"
+  params:
+    model: gpt-4o
+    focus: "accuracy"
+```
+
+### evaluator
+Evaluates content against criteria.
+
+**Parameters:**
+- `criteria` (required) - Evaluation criteria
+- `model` (optional) - LLM model to use
+
+**Example:**
+```yaml
+- node: evaluator
+  input: "{{step.response}}"
+  params:
+    criteria: "Is this response accurate and helpful?"
+```
+
+### router
+Routes input to different nodes based on conditions.
+
+**Parameters:**
+- `routes` (required) - Array of route conditions and targets
+
+**Example:**
+```yaml
+- node: router
+  params:
+    routes: |
+      if contains(input, "code") then code_review
+      if contains(input, "question") then agent
+      else file_write
+```
+
+### supervisor
+Monitors and manages workflow execution.
+
+**Parameters:**
+- `max_steps` (optional) - Maximum steps allowed
+- `timeout` (optional) - Overall timeout
+
+**Example:**
+```yaml
+- node: supervisor
+  params:
+    max_steps: 100
+    timeout: "30m"
+```
+
+### researcher
+Performs research and information gathering.
+
+**Parameters:**
+- `query` (required) - Research query
+- `model` (optional) - LLM model to use
+
+**Example:**
+```yaml
+- node: researcher
+  params:
+    query: "Latest developments in AI"
+```
+
+### human_in_loop
+Pauses for human input/approval.
+
+**Parameters:**
+- `prompt` (required) - Prompt for human operator
+
+**Example:**
+```yaml
+- node: human_in_loop
+  params:
+    prompt: "Review the generated code and approve?"
+```
+
+### reflector
+Reflects on previous steps and provides insights.
+
+**Parameters:**
+- `model` (optional) - LLM model to use
+
+**Example:**
+```yaml
+- node: reflector
+  input: "{{step.execution_history}}"
 ```
 
 ---
