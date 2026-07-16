@@ -36,6 +36,9 @@ Install in 60 seconds:
 curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
 bash install.sh
 
+# macOS (Homebrew)
+brew install alib8b8/tap/llm-box
+
 # Windows
 # Download from releases: https://github.com/alib8b8/llm-box/releases/latest
 Invoke-WebRequest -Uri "https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-windows-amd64.exe" -OutFile llm-box.exe
@@ -140,6 +143,18 @@ Most workflow tools force developers to choose between:
 ## 🔒 Security
 
 llm-box takes security seriously. Here's how we protect you:
+
+### Security Protections
+
+| Protection | Description | Implementation |
+|------------|-------------|----------------|
+| **SSRF Protection** | Blocks access to localhost and private IPs | Custom `DialContext` validates resolved IPs at connect time, preventing DNS rebinding attacks |
+| **Path Traversal** | Blocks `../` and absolute paths | Input validation rejects paths starting with `/` or containing `..` |
+| **Command Injection** | Blocks shell metacharacters | Allowlist mode strips `;`, `|`, `&`, `` ` ``, `$`, `>` from commands |
+| **Template SSTI** | Prevents server-side template injection | Expression engine escapes all output, no arbitrary code evaluation |
+| **Timing Attack** | Constant-time token comparison | Uses `subtle.ConstantTimeCompare` for authentication tokens |
+| **Fail-Closed Auth** | Rejects requests when auth token is empty | Authentication middleware defaults to deny |
+| **Git Option Injection** | Blocks `-` prefixed branch names | Uses `--` delimiter to prevent option injection in git commands |
 
 ### Command Execution Safety (`execute` node)
 
@@ -672,6 +687,146 @@ llm-box run --distributed http://coordinator-host:8090 my-workflow.yaml
 ```
 
 > 📖 [Full Distributed Execution Documentation →](docs/distributed.md)
+
+---
+
+## 🌐 Web UI Editor
+
+A built-in web-based workflow editor with visualization capabilities.
+
+**Start the Web UI:**
+```bash
+# Default port 8081
+llm-box webui
+
+# Custom port
+llm-box webui --port 8080
+
+# Custom workflows directory
+llm-box webui --dir ./workflows
+```
+
+**Access:** `http://localhost:8081`
+
+**Features:**
+- Syntax-highlighted YAML editor
+- Real-time workflow validation
+- Visual preview (Mermaid/JSON/DOT/ASCII)
+- REST API endpoints for programmatic access
+
+> 📖 [Full Web UI Documentation →](docs/webui.md)
+
+---
+
+## 📊 Workflow Visualizer
+
+Generate visual diagrams from workflow YAML files.
+
+**Usage:**
+```bash
+# Generate Mermaid diagram (default)
+llm-box visualize workflow.yaml
+
+# Specific format
+llm-box visualize workflow.yaml --format mermaid
+llm-box visualize workflow.yaml --format dot
+llm-box visualize workflow.yaml --format ascii
+llm-box visualize workflow.yaml --format json
+
+# Output to file
+llm-box visualize workflow.yaml -o diagram.md
+```
+
+**Supported formats:** Mermaid (interactive), DOT (Graphviz), ASCII (text-based), JSON (custom rendering)
+
+> 📖 [Full Visualizer Documentation →](docs/visualizer.md)
+
+---
+
+## 🔗 MCP Integration
+
+Connect llm-box to external AI applications via the Model Context Protocol.
+
+**Start MCP server:**
+```bash
+# Stdin/stdout mode (default)
+llm-box mcp
+
+# HTTP mode
+llm-box mcp --port 8082
+```
+
+**Available tools:** `workflow_run`, `workflow_create`, `workflow_list`, `secrets_list`, `secrets_add`
+
+> 📖 [Full MCP Documentation →](docs/mcp.md)
+
+---
+
+## 🔌 Plugin System
+
+Extend llm-box with community-contributed plugins.
+
+**Plugin management:**
+```bash
+# List plugins
+llm-box plugins list
+
+# Enable/disable plugins
+llm-box plugins enable my-plugin
+llm-box plugins disable my-plugin
+
+# Check plugin status
+llm-box plugins info my-plugin
+```
+
+**Plugin types:**
+- **Node Plugin**: Adds new workflow nodes
+- **Extension Plugin**: Extends core functionality
+
+> 📖 [Full Plugin Documentation →](docs/plugins.md)
+
+---
+
+## 🏢 Tenant Isolation
+
+Run multi-tenant deployments with resource isolation.
+
+**Tenant management:**
+```bash
+# Create tenant
+llm-box tenant create --id acme --name "Acme Corp" --max-workflows 10
+
+# List tenants
+llm-box tenant list
+
+# Check quota
+llm-box tenant quota acme
+```
+
+**Resource isolation:** Workflows, execution history, and secrets are completely isolated per tenant.
+
+> 📖 [Full Tenant Documentation →](docs/tenants.md)
+
+---
+
+## 🛠️ Custom Nodes
+
+Build custom nodes in any programming language.
+
+**How it works:**
+1. Create a script that reads JSON from stdin
+2. Execute your logic
+3. Write JSON output to stdout
+
+**Example (Python):**
+```python
+import sys, json
+payload = json.loads(sys.stdin.read())
+result = f"Processed: {payload['input']}"
+print(json.dumps({"output": result}))
+```
+
+> 📖 [Full Custom Nodes Documentation →](docs/custom-nodes.md)
 
 ---
 
@@ -1926,6 +2081,116 @@ export OPENAI_API_BASE="https://openrouter.ai/api/v1"
 - Together AI
 - Anyscale
 - Any OpenAI-compatible endpoint
+
+---
+
+## 📖 CLI Command Reference
+
+### Core Commands
+
+| Command | Description |
+|---------|-------------|
+| `llm-box create "<description>"` | Generate workflow YAML from natural language |
+| `llm-box run <file>` | Execute a workflow file |
+| `llm-box validate <file>` | Validate workflow YAML without running |
+| `llm-box list` | List available nodes |
+| `llm-box version` | Show version information |
+| `llm-box help` | Show help message |
+
+### Registry & Node Management
+
+| Command | Description |
+|---------|-------------|
+| `llm-box install <node>` | Install an external node from registry |
+| `llm-box uninstall <node>` | Uninstall an external node |
+| `llm-box registry sync` | Sync node registry from GitHub |
+| `llm-box registry list` | List available nodes in registry |
+| `llm-box registry search <query>` | Search for nodes by name/description/tags |
+
+### Workflow Visualization
+
+| Command | Description |
+|---------|-------------|
+| `llm-box visualize <file>` | Generate workflow diagram (default: Mermaid) |
+| `llm-box visualize <file> --format mermaid` | Generate Mermaid diagram |
+| `llm-box visualize <file> --format dot` | Generate DOT format |
+| `llm-box visualize <file> --format ascii` | Generate ASCII diagram |
+| `llm-box visualize <file> --format json` | Generate JSON data |
+| `llm-box visualize <file> -o <output>` | Output to file |
+
+### Web UI
+
+| Command | Description |
+|---------|-------------|
+| `llm-box webui` | Start Web UI on default port (8081) |
+| `llm-box webui --port <port>` | Start Web UI on custom port |
+| `llm-box webui --dir <dir>` | Load workflows from custom directory |
+
+### MCP Server
+
+| Command | Description |
+|---------|-------------|
+| `llm-box mcp` | Start MCP server (stdin/stdout mode) |
+| `llm-box mcp --port <port>` | Start MCP server in HTTP mode |
+
+### Scheduled Workflows
+
+| Command | Description |
+|---------|-------------|
+| `llm-box schedule --cron "<expr>" <file>` | Schedule a workflow |
+| `llm-box schedule --list` | List scheduled tasks |
+| `llm-box schedule --info <id>` | Get task details |
+| `llm-box schedule --remove <id>` | Remove a scheduled task |
+
+### Tenant Management
+
+| Command | Description |
+|---------|-------------|
+| `llm-box tenant create --id <id> --name <name>` | Create a new tenant |
+| `llm-box tenant list` | List all tenants |
+| `llm-box tenant info <id>` | Get tenant details |
+| `llm-box tenant quota <id>` | Check tenant quota usage |
+| `llm-box tenant delete <id>` | Delete a tenant |
+
+### Secrets Management
+
+| Command | Description |
+|---------|-------------|
+| `llm-box secrets add --group <g> --key <k> --value <v>` | Add a secret |
+| `llm-box secrets list <group>` | List secrets in a group |
+| `llm-box secrets remove --group <g> --key <k>` | Remove a secret |
+| `llm-box secrets export <group> --output <file>` | Export secrets (encrypted) |
+| `llm-box secrets import --input <file>` | Import secrets |
+
+### Upgrade Commands
+
+| Command | Description |
+|---------|-------------|
+| `llm-box self-update` | Check for and install updates |
+| `llm-box autoupgrade status` | Show auto-upgrade status |
+| `llm-box autoupgrade enable` | Enable automatic updates |
+| `llm-box autoupgrade disable` | Disable automatic updates |
+| `llm-box autoupgrade monitor` | Enable monitor mode (notify only) |
+| `llm-box autoupgrade run` | Manually trigger upgrade check |
+| `llm-box autoupgrade config <key>=<value>` | Configure auto-upgrade settings |
+
+### Global Options
+
+| Option | Description |
+|--------|-------------|
+| `--safe-mode` | Disable execute node and other dangerous features |
+| `--lang <lang>` | Set language (en, zh) |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `LLM_BOX_SECRETS_PASSWORD` | Master password for secrets |
+| `LLM_BOX_SAFE_MODE` | Enable safe mode |
+| `LLM_BOX_EXECUTE_ALLOWLIST` | Enable execute allowlist mode |
+| `LLM_BOX_LOG_FILE` | Path to audit log file |
+| `LLM_BOX_LOG_LEVEL` | Log level (debug, info, warn, error) |
+| `LLM_BOX_LANG` | UI language |
 
 ---
 
