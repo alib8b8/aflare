@@ -164,15 +164,28 @@ export LLM_BOX_SAFE_MODE=1   # if you don't need shell execution at all
 
 API keys are **never stored in plain text**:
 
-- AES-GCM encryption with PBKDF2 key derivation (100K iterations)
+- AES-GCM encryption with PBKDF2 key derivation (600K iterations)
 - Master password protected
 - File permissions `0600`
 - Values masked in listings (e.g., `sk-****bc`)
 - Automatic redaction in audit logs (Bearer tokens, Authorization headers, URL credentials)
 
+**CLI Commands:**
 ```bash
+# Add a secret
 llm-box secrets add --group llm --key openai --value sk-...
+
+# List secrets in a group
 llm-box secrets list llm
+
+# Remove a secret
+llm-box secrets remove --group llm --key openai
+
+# Export secrets (encrypted)
+llm-box secrets export llm --output secrets-backup.json
+
+# Import secrets
+llm-box secrets import --input secrets-backup.json
 ```
 
 #### Using Secrets in Workflows
@@ -180,6 +193,7 @@ llm-box secrets list llm
 Reference stored secrets in your workflow YAML using the `{{secret.GROUP.KEY}}` syntax:
 
 ```yaml
+name: AI Summary Workflow
 steps:
   - node: openai
     params:
@@ -193,21 +207,58 @@ steps:
       headers: "Authorization: Bearer {{secret.api.example}}"
 ```
 
-**Supported Expression Syntax:**
+**Secrets Expression Syntax:**
+
+| Syntax | Description | Example |
+|--------|-------------|---------|
+| `{{secret.GROUP.KEY}}` | Retrieve secret by group and key | `{{secret.llm.openai}}` |
+
+**Supported Expression Syntax (Full Reference):**
 
 | Expression | Description | Example |
 |------------|-------------|---------|
 | `{{secret.llm.openai}}` | Secret value from group/key | API key |
 | `{{var.name}}` | Workflow variable | Defined in vars section |
-| `{{env.NAME}}` | Environment variable | OS env var |
-| `{{step.0}}` | Output of step 0 | Previous step output |
+| `{{env.NAME}}` | Environment variable | OS env var (allowed list only) |
+| `{{step.0}}` | Output of step 0 (0-indexed) | Previous step output |
 | `{{step.name}}` | Output by step name | Named step output |
+| `{{step.0.jsonpath:$.field}}` | JSONPath extraction from step output | Extract specific field |
 | `{{input}}` | Workflow initial input | User-provided input |
+| `{{file.path}}` | File contents | Read from local file |
+| `{{loop.item}}` | Current loop item | Inside loop context |
+| `{{loop.index}}` | Current loop index | Inside loop context |
+| `{{loop.count}}` | Total loop iterations | Inside loop context |
 
 **Setup:**
-1. Set `LLM_BOX_SECRETS_PASSWORD` environment variable
+1. Set `LLM_BOX_SECRETS_PASSWORD` environment variable (required for secrets operations)
 2. Add secrets via CLI: `llm-box secrets add --group llm --key openai --value sk-...`
 3. Reference in YAML: `{{secret.llm.openai}}`
+
+**Security:**
+- Secrets are decrypted only at runtime, never stored in memory longer than needed
+- Missing secrets cause workflow execution to fail with a clear error message
+- Secrets in audit logs are automatically redacted
+- Secret files are stored with `0600` permissions (read/write only by owner)
+
+**Example: Multiple secrets in a workflow**
+```yaml
+name: Multi-API Workflow
+steps:
+  - node: http_request
+    params:
+      url: "https://api.github.com/user"
+      headers: |
+        Authorization: Bearer {{secret.api.github}}
+        Accept: application/vnd.github.v3+json
+  - node: openai
+    params:
+      model: gpt-4o
+      api_key: "{{secret.llm.openai}}"
+      prompt: "Analyze this GitHub profile data: {{input}}"
+  - node: file_write
+    params:
+      path: "analysis.txt"
+```
 
 #### Audit Logs
 
@@ -806,19 +857,105 @@ Renders a Go template with input data and parameters.
 ```
 
 ### condition
-Evaluates a condition and returns "true" or "false".
+Evaluates a condition against the input and returns "true" or "false". Used within steps for conditional logic.
 
 **Parameters:**
-- `condition` (required) - Condition expression
+- `expr` (required) - Condition expression (or `condition` as alias)
 
-**Supported operators:** `contains`, `matches`, `==`, `!=`, `<`, `>`, `<=`, `>=`
+**Supported operators:**
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `contains:keyword` | Returns true if input contains the keyword | `contains:error` |
+| `equals:value` | Returns true if input exactly matches | `equals:success` |
+| `starts_with:prefix` | Returns true if input starts with prefix | `starts_with:https` |
+| `ends_with:suffix` | Returns true if input ends with suffix | `ends_with:.json` |
+| `regex:pattern` | Returns true if input matches regex | `regex:^\d+$` |
+| `empty` | Returns true if input is empty | `empty` |
+| `not_empty` | Returns true if input is not empty | `not_empty` |
+| `true` / `false` | Literal boolean values | `true` |
+
+**Negation:** Prefix any expression with `not ` to negate it.
 
 **Example:**
 ```yaml
 - node: condition
   params:
-    condition: "{{input}} contains 'error'"
+    expr: "contains:error"
 ```
+
+**Example with negation:**
+```yaml
+- node: condition
+  params:
+    expr: "not contains:success"
+```
+
+**Example with regex:**
+```yaml
+- node: condition
+  params:
+    expr: "regex:^[A-Za-z0-9]+$"
+```
+
+**Example with variables:**
+```yaml
+- node: condition
+  params:
+    expr: "equals:{{var.expected_value}}"
+```
+
+### Condition Execution (Workflow-level)
+In addition to the `condition` node, llm-box supports workflow-level conditional execution using the `if` field on steps, and branching with `if`/`else` blocks.
+
+#### Step-level condition (`condition` field)
+Skip a step based on a condition evaluated against the previous step's output:
+
+```yaml
+name: Conditional Workflow
+steps:
+  - node: http_request
+    params:
+      url: "https://api.example.com/health"
+  - node: notify
+    params:
+      channel: stdout
+    condition: "contains:error"
+```
+
+#### If/Else branching
+Execute different branches based on conditions:
+
+```yaml
+name: Approval Workflow
+steps:
+  - node: evaluator
+    params:
+      criteria: "Is this content ready for publication?"
+      threshold: "8"
+  - if:
+      condition: "contains:pass"
+      then:
+        - node: file_write
+          params:
+            path: "approved.txt"
+        - node: notify
+          params:
+            channel: stdout
+      else:
+        - node: reflector
+          params:
+            model: gpt-4o
+        - node: human_in_loop
+          params:
+            prompt: "Review and approve?"
+```
+
+**If/Else features:**
+- Supports nested if/else (max depth: 20)
+- Conditions use the same operators as the `condition` node
+- Branch steps are executed as sub-workflows
+- Output from the executed branch becomes the input for subsequent steps
 
 ### agent
 Generic LLM agent node that supports multiple providers.
@@ -921,17 +1058,65 @@ Calls IMA (Intelligent Multi-Agent) API.
 ```
 
 ### call
-Calls another workflow file.
+Calls another workflow file, enabling workflow chaining and modular reuse.
 
 **Parameters:**
-- `workflow` (required) - Path to workflow file
-- `input` (optional) - Input to pass to the workflow
+- `workflow` (required) - Relative path to the workflow file to call (absolute paths are not allowed for security)
+- `vars` (optional) - Variables to inject into the called workflow. Supports two formats:
+  - JSON: `{"key":"value","key2":"value2"}`
+  - Key=value pairs: `key=value,key2=value2`
 
-**Example:**
+**Security:**
+- Path validation prevents arbitrary file read (only relative paths allowed)
+- Maximum call depth of 10 to prevent infinite recursion
+- Workflow file size limit: 10MB
+
+**Example: Basic workflow chaining**
 ```yaml
-- node: call
-  params:
-    workflow: "sub-workflow.yaml"
+name: Main Workflow
+steps:
+  - node: fetch_url
+    params:
+      url: "https://api.example.com/data"
+  - node: call
+    params:
+      workflow: "process-data.yaml"
+  - node: file_write
+    params:
+      path: "result.txt"
+```
+
+**Example: Passing variables to sub-workflow**
+```yaml
+name: Main Workflow
+steps:
+  - node: call
+    params:
+      workflow: "generate-report.yaml"
+      vars: '{"topic":"AI Trends","format":"markdown"}'
+```
+
+**Example: Key=value format for variables**
+```yaml
+steps:
+  - node: call
+    params:
+      workflow: "deploy.yaml"
+      vars: "env=production,region=us-west"
+```
+
+**Sub-workflow example (`process-data.yaml`):**
+```yaml
+name: Process Data
+vars:
+  format: json
+steps:
+  - node: json_parse
+    params:
+      path: "items"
+  - node: transform
+    params:
+      operation: "summary"
 ```
 
 ### planner
