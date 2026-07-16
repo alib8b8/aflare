@@ -100,15 +100,15 @@ func initLogger(level slog.Level, format string, output string) {
 
 // sensitiveKeys are attribute keys whose values should be redacted from logs.
 var sensitiveKeys = map[string]bool{
-	"token":       true,
-	"auth_token":  true,
-	"password":    true,
-	"secret":      true,
-	"api_key":     true,
-	"apikey":      true,
-	"key":         true,
-	"credential":  true,
-	"credentials": true,
+	"token":         true,
+	"auth_token":    true,
+	"password":      true,
+	"secret":        true,
+	"api_key":       true,
+	"apikey":        true,
+	"key":           true,
+	"credential":    true,
+	"credentials":   true,
 	"authorization": true,
 }
 

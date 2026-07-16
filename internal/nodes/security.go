@@ -370,6 +370,7 @@ func validateLMLEndpointIPAllowLoopback(ip net.IP, displayHost string) error {
 	}
 	return nil
 }
+
 // validateLMLEndpoint validates an LLM API endpoint URL. It is similar to
 // validateURL but allows loopback/localhost addresses, because LLM servers
 // (e.g. Ollama, llama.cpp) commonly run on http://localhost:11434.
