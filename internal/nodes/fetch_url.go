@@ -110,9 +110,10 @@ func (n *FetchURLNode) Execute(ctx context.Context, input string, params map[str
 		}
 	}
 
-	// Custom redirect policy: validate each redirect target for SSRF
+	// Use safeHTTPClient with DNS rebinding protection, custom timeout and redirect validation
 	client := &http.Client{
 		Timeout:       timeout,
+		Transport:     safeHTTPClient.Transport,
 		CheckRedirect: httpRedirectValidator(validateURL),
 	}
 

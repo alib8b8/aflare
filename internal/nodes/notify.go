@@ -27,6 +27,7 @@ const (
 var (
 	notifyHTTPClient = &http.Client{
 		Timeout:       notifyTimeout,
+		Transport:     safeHTTPClient.Transport,
 		CheckRedirect: httpRedirectValidator(validateNotifyURL),
 	}
 	notifyURLValidator = validateNotifyURL

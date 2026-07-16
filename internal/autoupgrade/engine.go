@@ -270,7 +270,11 @@ func getLocalBranches() ([]string, error) {
 }
 
 func isValidBranchName(name string) bool {
-	if len(name) > 255 {
+	if len(name) > 255 || name == "" {
+		return false
+	}
+	// Reject branch names starting with '-' to prevent git option injection
+	if name[0] == '-' {
 		return false
 	}
 	for _, ch := range name {
@@ -299,7 +303,7 @@ func attemptAutoMerge(branch string) error {
 		return fmt.Errorf("failed to pull main: %w", err)
 	}
 
-	cmd = exec.Command("git", "checkout", branch)
+	cmd = exec.Command("git", "checkout", "--", branch)
 	cmd.Dir = repoDir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to checkout branch: %w", err)
@@ -320,7 +324,7 @@ func attemptAutoMerge(branch string) error {
 		return fmt.Errorf("failed to checkout main after rebase: %w", err)
 	}
 
-	cmd = exec.Command("git", "merge", "--no-ff", branch)
+	cmd = exec.Command("git", "merge", "--no-ff", "--", branch)
 	cmd.Dir = repoDir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("merge failed: %w", err)

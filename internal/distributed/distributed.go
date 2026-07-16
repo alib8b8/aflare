@@ -3,8 +3,10 @@ package distributed
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -20,6 +22,7 @@ const (
 	defaultWorkerPort      = "8091"
 	heartbeatInterval      = 10 * time.Second
 	heartbeatTimeout       = 30 * time.Second
+	maxRequestBodySize     = 10 * 1024 * 1024 // 10MB
 )
 
 type NodeStatus string
@@ -143,8 +146,17 @@ func (c *Coordinator) handleRegister(w http.ResponseWriter, r *http.Request) {
 		Capacity int    `json:"capacity"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxRequestBodySize)).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.Host == "" || !isValidPort(req.Port) {
+		http.Error(w, "invalid host or port", http.StatusBadRequest)
+		return
+	}
+	if req.Capacity <= 0 || req.Capacity > 1000 {
+		http.Error(w, "capacity must be between 1 and 1000", http.StatusBadRequest)
 		return
 	}
 
@@ -181,7 +193,7 @@ func (c *Coordinator) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		CurrentLoad int    `json:"current_load"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxRequestBodySize)).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -259,13 +271,13 @@ func (c *Coordinator) handleAssignTask(w http.ResponseWriter, r *http.Request) {
 		Step      workflow.WorkflowStep `json:"step"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxRequestBodySize)).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
 	c.mu.Lock()
-	nodeID := c.selectBestNode()
+	nodeID := c.selectBestNodeLocked()
 	if nodeID == "" {
 		c.mu.Unlock()
 		http.Error(w, "no available nodes", http.StatusServiceUnavailable)
@@ -301,7 +313,7 @@ func (c *Coordinator) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		Error  string     `json:"error"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxRequestBodySize)).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -318,7 +330,9 @@ func (c *Coordinator) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 			task.EndTime = &endTime
 
 			if node, ok := c.nodes[task.AssignedTo]; ok {
-				node.CurrentLoad--
+				if node.CurrentLoad > 0 {
+					node.CurrentLoad--
+				}
 			}
 		} else if req.Status == TaskStatusRunning {
 			startTime := time.Now()
@@ -366,7 +380,7 @@ func (c *Coordinator) handleExecute(w http.ResponseWriter, r *http.Request) {
 		WorkflowYAML string `json:"workflow"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxRequestBodySize)).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -398,7 +412,7 @@ func (c *Coordinator) executeWorkflowDistributed(wf *workflow.Workflow) {
 
 	for i, step := range wf.Steps {
 		c.mu.Lock()
-		nodeID := c.selectBestNode()
+		nodeID := c.selectBestNodeLocked()
 		c.mu.Unlock()
 
 		if nodeID == "" {
@@ -426,12 +440,20 @@ func (c *Coordinator) executeWorkflowDistributed(wf *workflow.Workflow) {
 
 		for {
 			c.mu.RLock()
-			t := c.tasks[taskID]
+			t, ok := c.tasks[taskID]
+			if !ok {
+				c.mu.RUnlock()
+				logger.Error("Task disappeared", "task_id", taskID)
+				break
+			}
+			// Copy fields under lock to avoid data race
+			status := t.Status
+			errMsg := t.Error
 			c.mu.RUnlock()
 
-			if t.Status == TaskStatusCompleted || t.Status == TaskStatusFailed {
-				if t.Status == TaskStatusFailed {
-					logger.Error("Step failed", "step", i, "error", t.Error)
+			if status == TaskStatusCompleted || status == TaskStatusFailed {
+				if status == TaskStatusFailed {
+					logger.Error("Step failed", "step", i, "error", errMsg)
 				} else {
 					logger.Info("Step completed", "step", i)
 				}
@@ -441,7 +463,10 @@ func (c *Coordinator) executeWorkflowDistributed(wf *workflow.Workflow) {
 			time.Sleep(100 * time.Millisecond)
 		}
 
-		if task.Status == TaskStatusFailed {
+		c.mu.RLock()
+		finalStatus := task.Status
+		c.mu.RUnlock()
+		if finalStatus == TaskStatusFailed {
 			break
 		}
 	}
@@ -477,7 +502,12 @@ func (c *Coordinator) dispatchTask(nodeID string, task *Task) {
 func (c *Coordinator) selectBestNode() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	return c.selectBestNodeLocked()
+}
 
+// selectBestNodeLocked returns the best node without acquiring the lock.
+// Caller must hold c.mu (read or write).
+func (c *Coordinator) selectBestNodeLocked() string {
 	var bestNodeID string
 	bestLoad := -1
 
@@ -570,15 +600,14 @@ func isValidCoordinatorURL(url string) bool {
 
 func (c *Coordinator) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if c.authToken != "" {
-			token := r.Header.Get("X-Auth-Token")
-			if token == "" {
-				token = r.URL.Query().Get("token")
-			}
-			if token != c.authToken {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
+		if c.authToken == "" {
+			http.Error(w, "server misconfigured: auth token not set", http.StatusServiceUnavailable)
+			return
+		}
+		token := r.Header.Get("X-Auth-Token")
+		if subtle.ConstantTimeCompare([]byte(token), []byte(c.authToken)) != 1 {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
 		}
 		next(w, r)
 	}
@@ -586,15 +615,14 @@ func (c *Coordinator) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 func (w *Worker) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(writer http.ResponseWriter, r *http.Request) {
-		if w.authToken != "" {
-			token := r.Header.Get("X-Auth-Token")
-			if token == "" {
-				token = r.URL.Query().Get("token")
-			}
-			if token != w.authToken {
-				http.Error(writer, "unauthorized", http.StatusUnauthorized)
-				return
-			}
+		if w.authToken == "" {
+			http.Error(writer, "server misconfigured: auth token not set", http.StatusServiceUnavailable)
+			return
+		}
+		token := r.Header.Get("X-Auth-Token")
+		if subtle.ConstantTimeCompare([]byte(token), []byte(w.authToken)) != 1 {
+			http.Error(writer, "unauthorized", http.StatusUnauthorized)
+			return
 		}
 		next(writer, r)
 	}
@@ -727,7 +755,7 @@ func (w *Worker) handleExecuteStep(writer http.ResponseWriter, r *http.Request) 
 		Step   workflow.WorkflowStep `json:"step"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxRequestBodySize)).Decode(&req); err != nil {
 		http.Error(writer, "invalid JSON", http.StatusBadRequest)
 		return
 	}

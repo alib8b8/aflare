@@ -98,9 +98,28 @@ func initLogger(level slog.Level, format string, output string) {
 	defaultLogger.Store(slog.New(handler))
 }
 
+// sensitiveKeys are attribute keys whose values should be redacted from logs.
+var sensitiveKeys = map[string]bool{
+	"token":       true,
+	"auth_token":  true,
+	"password":    true,
+	"secret":      true,
+	"api_key":     true,
+	"apikey":      true,
+	"key":         true,
+	"credential":  true,
+	"credentials": true,
+	"authorization": true,
+}
+
 func replaceAttr(groups []string, a slog.Attr) slog.Attr {
 	if a.Key == slog.TimeKey {
 		return a
+	}
+	// Redact sensitive attribute values
+	lowerKey := strings.ToLower(a.Key)
+	if sensitiveKeys[lowerKey] {
+		a.Value = slog.StringValue("[REDACTED]")
 	}
 	return a
 }

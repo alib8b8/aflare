@@ -312,7 +312,7 @@ func TestWith(t *testing.T) {
 	SetOutput(logPath)
 	SetLevel(slog.LevelInfo)
 
-	l := With("key", "value")
+	l := With("attr", "value")
 	l.Info("with test")
 
 	content, err := os.ReadFile(logPath)
@@ -320,7 +320,7 @@ func TestWith(t *testing.T) {
 		t.Fatalf("failed to read log file: %v", err)
 	}
 	s := string(content)
-	if !strings.Contains(s, "key") || !strings.Contains(s, "value") {
+	if !strings.Contains(s, "attr") || !strings.Contains(s, "value") {
 		t.Error("expected With attributes in log output")
 	}
 }
@@ -353,9 +353,9 @@ func TestDebugInfoWarnError(t *testing.T) {
 }
 
 func TestReplaceAttr(t *testing.T) {
-	attr := slog.String("key", "value")
+	attr := slog.String("attr", "value")
 	result := replaceAttr(nil, attr)
-	if result.Key != "key" || result.Value.String() != "value" {
+	if result.Key != "attr" || result.Value.String() != "value" {
 		t.Error("expected replaceAttr to pass through non-time attrs")
 	}
 

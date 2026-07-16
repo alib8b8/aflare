@@ -1,6 +1,7 @@
 package nodes
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -296,6 +297,79 @@ func validateIP(ip net.IP, displayHost string) error {
 	return nil
 }
 
+// safeHTTPClient is a shared HTTP client with a custom DialContext that
+// re-validates the resolved IP at connect time to close the TOCTOU window
+// (DNS rebinding) that exists when validation is done before the request
+// and the dial happens later.
+var safeHTTPClient = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+			if err != nil {
+				return nil, err
+			}
+			for _, ip := range ips {
+				if err := validateIP(ip.IP, host); err != nil {
+					return nil, err
+				}
+			}
+			if len(ips) > 0 {
+				addr = net.JoinHostPort(ips[0].IP.String(), port)
+			}
+			return (&net.Dialer{}).DialContext(ctx, network, addr)
+		},
+	},
+}
+
+// safeLLMHTTPClient is like safeHTTPClient but allows loopback addresses
+// (for local LLM servers like Ollama). It still blocks private non-loopback,
+// link-local, and other dangerous IP ranges at dial time.
+var safeLLMHTTPClient = &http.Client{
+	Timeout: 120 * time.Second,
+	Transport: &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+			if err != nil {
+				return nil, err
+			}
+			for _, ip := range ips {
+				if err := validateLMLEndpointIPAllowLoopback(ip.IP, host); err != nil {
+					return nil, err
+				}
+			}
+			if len(ips) > 0 {
+				addr = net.JoinHostPort(ips[0].IP.String(), port)
+			}
+			return (&net.Dialer{}).DialContext(ctx, network, addr)
+		},
+	},
+}
+
+// validateLMLEndpointIPAllowLoopback validates an IP for LLM endpoints, allowing loopback.
+func validateLMLEndpointIPAllowLoopback(ip net.IP, displayHost string) error {
+	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return fmt.Errorf("access to link-local address %s is not allowed", displayHost)
+	}
+	if ip.IsUnspecified() {
+		return fmt.Errorf("access to unspecified address %s is not allowed", displayHost)
+	}
+	if ip.IsMulticast() {
+		return fmt.Errorf("access to multicast address %s is not allowed", displayHost)
+	}
+	if isReservedIP(ip) {
+		return fmt.Errorf("access to reserved address %s is not allowed", displayHost)
+	}
+	return nil
+}
 // validateLMLEndpoint validates an LLM API endpoint URL. It is similar to
 // validateURL but allows loopback/localhost addresses, because LLM servers
 // (e.g. Ollama, llama.cpp) commonly run on http://localhost:11434.

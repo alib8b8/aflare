@@ -2,6 +2,7 @@ package webui
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -29,6 +30,7 @@ type WebUIServer struct {
 	host         string
 	port         string
 	workflowsDir string
+	authToken    string
 
 	mu     sync.RWMutex
 	server *http.Server
@@ -49,6 +51,25 @@ func NewWebUIServer(host, port string) *WebUIServer {
 	}
 }
 
+// SetAuthToken enables token-based authentication for the WebUI.
+// When set, all API requests must include an "X-Auth-Token" header.
+func (s *WebUIServer) SetAuthToken(token string) {
+	s.authToken = token
+}
+
+func (s *WebUIServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.authToken != "" {
+			token := r.Header.Get("X-Auth-Token")
+			if subtle.ConstantTimeCompare([]byte(token), []byte(s.authToken)) != 1 {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+		}
+		next(w, r)
+	}
+}
+
 func (s *WebUIServer) SetWorkflowsDir(dir string) {
 	s.workflowsDir = dir
 }
@@ -57,10 +78,10 @@ func (s *WebUIServer) Start() error {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", s.handleIndex)
-	mux.HandleFunc("/api/visualize", s.handleVisualize)
-	mux.HandleFunc("/api/workflows", s.handleListWorkflows)
-	mux.HandleFunc("/api/workflow", s.handleWorkflow)
-	mux.HandleFunc("/api/validate", s.handleValidate)
+	mux.HandleFunc("/api/visualize", s.authMiddleware(s.handleVisualize))
+	mux.HandleFunc("/api/workflows", s.authMiddleware(s.handleListWorkflows))
+	mux.HandleFunc("/api/workflow", s.authMiddleware(s.handleWorkflow))
+	mux.HandleFunc("/api/validate", s.authMiddleware(s.handleValidate))
 
 	srv := &http.Server{
 		Addr:         s.host + ":" + s.port,
@@ -251,7 +272,7 @@ func (s *WebUIServer) handleSaveWorkflow(w http.ResponseWriter, r *http.Request)
 	}
 
 	path := filepath.Join(dir, req.Name+".yaml")
-	if err := os.WriteFile(path, []byte(req.Content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(req.Content), 0600); err != nil {
 		http.Error(w, "failed to save workflow", http.StatusInternalServerError)
 		return
 	}
@@ -293,7 +314,7 @@ func (s *WebUIServer) handleValidate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Workflow string `json:"workflow"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxWorkflowFileSize)).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}

@@ -216,6 +216,11 @@ func (s *Server) runWorkflow(args map[string]interface{}) (*toolCallResult, erro
 		return nil, fmt.Errorf("file parameter is required")
 	}
 
+	// Security: block path traversal attempts
+	if strings.Contains(file, "..") {
+		return nil, fmt.Errorf("invalid file path: path traversal is not allowed")
+	}
+
 	wf, err := workflow.ParseWorkflow(file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse workflow: %w", err)
@@ -296,6 +301,11 @@ func (s *Server) validateWorkflow(args map[string]interface{}) (*toolCallResult,
 	file, ok := args["file"].(string)
 	if !ok || file == "" {
 		return nil, fmt.Errorf("file parameter is required")
+	}
+
+	// Security: block path traversal attempts
+	if strings.Contains(file, "..") {
+		return nil, fmt.Errorf("invalid file path: path traversal is not allowed")
 	}
 
 	wf, err := workflow.ParseWorkflow(file)

@@ -303,8 +303,9 @@ func TestIsValidBranchName(t *testing.T) {
 		{"main", true},
 		{"feature-branch", true},
 		{"feature_branch", true},
-		{"", true}, // empty string is allowed by current implementation
+		{"", false}, // empty string is not a valid branch name
 		{string(make([]byte, 256)), false},
+		{"-dash-start", false}, // branch names starting with '-' are rejected (git option injection)
 		{"branch\nname", false},
 		{"branch\rname", false},
 		{"branch\x00name", false},
