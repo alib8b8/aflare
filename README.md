@@ -1,8 +1,8 @@
 <div align="center">
   <img src="docs/logo.svg" alt="llm-box" width="200" />
   <h1>llm-box</h1>
-  <p><strong>Agentic Workflow Engine for the Terminal</strong></p>
-<p>Deterministic execution meets AI agents. Build self-driving workflows with autonomous agent nodes, tool use, and multi-step reasoning — all in plain YAML.</p>
+  <p><strong>Turn Natural Language Into Executable Workflows</strong></p>
+  <p>Agentic Workflow Engine for the Terminal — deterministic execution meets AI agents. Build self-driving workflows with autonomous agent nodes, tool use, and multi-step reasoning.</p>
 
   <p>
     <a href="https://github.com/alib8b8/llm-box/releases">
