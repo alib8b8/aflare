@@ -41,14 +41,20 @@ bash install.sh
 Invoke-WebRequest -Uri "https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-windows-amd64.exe" -OutFile llm-box.exe
 ```
 
-Create and run your first workflow:
+Create and run your first workflow in seconds:
 
 ```bash
-# Create (pattern-based workflow scaffolding)
-llm-box create "fetch Hacker News top stories and save to stories.txt"
+# DevOps — monitor server health
+llm-box create "Check my server CPU every 5 minutes and alert if high"
 
-# Run
-llm-box run hn_workflow.yaml
+# AI Research — stay updated
+llm-box create "Summarize today's AI news"
+
+# Crypto Trading — automated alerts
+llm-box create "Alert me when Bitcoin exceeds 100000"
+
+# Run any workflow
+llm-box run server_monitor.yaml
 ```
 
 ---
