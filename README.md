@@ -149,7 +149,7 @@ The `execute` node runs shell commands, which is inherently powerful and risky. 
 |-------|-------------|---------------|
 | **Safe Mode** | Completely disables the `execute` node | `llm-box --safe-mode` or `LLM_BOX_SAFE_MODE=1` |
 | **Allowlist** | Only allows known-safe commands; blocks shell metacharacters (`;`, `|`, `&`, `` ` ``, etc.) | `LLM_BOX_EXECUTE_ALLOWLIST=1` |
-| **Audit Logging** | Every command is logged with timestamp and redacted secrets (0600 permissions) | Enabled automatically |
+| **Audit Logging** | Every command logged to `~/.llm-box/logs/audit.log` with timestamp, user, and redacted secrets (0600 permissions) | Enabled automatically |
 | **Dry Run** | Preview commands before execution without running them | `dry_run: true` param on `execute` node |
 | **Timeout** | Commands auto-terminate after a configurable duration (default: 5m, max: 30m) | `timeout: 30s` param on `execute` node |
 | **Input Validation** | Empty commands rejected; shell injection patterns blocked | Always on |
@@ -174,6 +174,93 @@ API keys are **never stored in plain text**:
 llm-box secrets add --group llm --key openai --value sk-...
 llm-box secrets list llm
 ```
+
+#### Using Secrets in Workflows
+
+Reference stored secrets in your workflow YAML using the `{{secret.GROUP.KEY}}` syntax:
+
+```yaml
+steps:
+  - node: openai
+    params:
+      model: gpt-4o
+      api_key: "{{secret.llm.openai}}"
+    input: "Summarize this article"
+
+  - node: http_request
+    params:
+      url: "https://api.example.com/data"
+      headers: "Authorization: Bearer {{secret.api.example}}"
+```
+
+**Supported Expression Syntax:**
+
+| Expression | Description | Example |
+|------------|-------------|---------|
+| `{{secret.llm.openai}}` | Secret value from group/key | API key |
+| `{{var.name}}` | Workflow variable | Defined in vars section |
+| `{{env.NAME}}` | Environment variable | OS env var |
+| `{{step.0}}` | Output of step 0 | Previous step output |
+| `{{step.name}}` | Output by step name | Named step output |
+| `{{input}}` | Workflow initial input | User-provided input |
+
+**Setup:**
+1. Set `LLM_BOX_SECRETS_PASSWORD` environment variable
+2. Add secrets via CLI: `llm-box secrets add --group llm --key openai --value sk-...`
+3. Reference in YAML: `{{secret.llm.openai}}`
+
+#### Audit Logs
+
+All commands are automatically logged with the following details:
+
+```bash
+# Default log path
+~/.llm-box/logs/audit.log
+
+# View recent logs
+tail -f ~/.llm-box/logs/audit.log
+
+# Search logs by keyword
+grep "openai" ~/.llm-box/logs/audit.log
+
+# Search failed operations
+grep -i "error\|failed" ~/.llm-box/logs/audit.log
+```
+
+**Log Format:**
+
+```json
+{
+  "time": "2026-07-16T10:00:00Z",
+  "level": "info",
+  "command": "run",
+  "workflow": "my-workflow.yaml",
+  "steps": 5,
+  "duration_ms": 12345,
+  "user": "john",
+  "hostname": "workstation",
+  "secrets_redacted": true
+}
+```
+
+**Log Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `time` | ISO 8601 timestamp |
+| `level` | Log level (info, warn, error) |
+| `command` | Command executed |
+| `workflow` | Workflow file name |
+| `steps` | Number of steps |
+| `duration_ms` | Execution duration in milliseconds |
+| `user` | Current user |
+| `hostname` | Machine hostname |
+| `secrets_redacted` | Whether secrets were redacted |
+
+**Security:**
+- File permissions: `0600` (read/write only by owner)
+- Secrets are automatically redacted from logs
+- Environment variable override: `LLM_BOX_LOG_FILE=/path/to/audit.log`
 
 ### Secure Installation
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/alib8b8/llm-box/internal/logger"
 	"github.com/alib8b8/llm-box/internal/nodes"
+	"github.com/alib8b8/llm-box/internal/secrets"
 	"github.com/alib8b8/llm-box/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 	"gopkg.in/yaml.v3"
@@ -232,6 +233,15 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 			engine.SetVariable(k, v)
 		}
 	}
+
+	// Set up secrets access
+	engine.SetSecretGetter(func(group, key string) (string, error) {
+		sm, err := secrets.GetSecretManager()
+		if err != nil {
+			return "", err
+		}
+		return sm.GetSecret(group, key)
+	})
 
 	// Create global concurrency limiter
 	globalLimiter := NewConcurrencyLimiter(wf.MaxConcurrency)

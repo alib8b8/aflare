@@ -55,6 +55,8 @@ type ExpressionEngine struct {
 	variables map[string]string
 	// Loop variables (loop.item, loop.index, loop.count)
 	loopVars map[string]string
+	// Secrets accessor function
+	secretGetter func(group, key string) (string, error)
 }
 
 // NewExpressionEngine creates a new expression engine
@@ -106,6 +108,11 @@ func (e *ExpressionEngine) ClearLoopVars() {
 	e.loopVars = nil
 }
 
+// SetSecretGetter sets the function to retrieve secrets from the secret manager
+func (e *ExpressionEngine) SetSecretGetter(getter func(group, key string) (string, error)) {
+	e.secretGetter = getter
+}
+
 // varPattern matches {{ ... }} expressions
 var varPattern = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
@@ -119,6 +126,7 @@ var varPattern = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 //	{{var.NAME}}           - workflow variable
 //	{{env.NAME}}           - environment variable
 //	{{file.PATH}}          - file contents
+//	{{secret.GROUP.KEY}}   - secret from secret manager (e.g. {{secret.llm.openai}})
 //	{{loop.item}}          - current loop item
 //	{{loop.index}}         - current loop index
 //	{{loop.count}}         - total loop iterations
@@ -157,7 +165,7 @@ func isKnownExpressionPrefix(expr string) bool {
 	}
 	prefix := strings.TrimSpace(parts[0])
 	switch prefix {
-	case "step", "var", "env", "file", "input", "loop":
+	case "step", "var", "env", "file", "input", "loop", "secret":
 		return true
 	}
 	return false
@@ -235,6 +243,17 @@ func (e *ExpressionEngine) evalSingle(expr string, input string) (string, error)
 			return v, nil
 		}
 		return "", fmt.Errorf("loop variable not found: %s", name)
+	case "secret":
+		if e.secretGetter == nil {
+			return "", fmt.Errorf("secrets not available - use 'llm-box secrets add' to store secrets first")
+		}
+		secretParts := strings.SplitN(name, ".", 2)
+		if len(secretParts) < 2 {
+			return "", fmt.Errorf("secret expression requires format: secret.GROUP.KEY")
+		}
+		group := strings.TrimSpace(secretParts[0])
+		key := strings.TrimSpace(secretParts[1])
+		return e.secretGetter(group, key)
 	default:
 		return "", fmt.Errorf("unknown expression: %s", expr)
 	}
