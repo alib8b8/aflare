@@ -1,0 +1,14 @@
+name: Daily Report Generator
+steps:
+  - node: fetch_url
+    params:
+      url: https://api.weather.gov/forecast
+  - node: fetch_url
+    params:
+      url: https://api.stock.example.com/quote/ABC
+  - node: combine
+    params:
+      format: markdown
+  - node: file_write
+    params:
+      path: daily-report.md

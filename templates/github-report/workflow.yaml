@@ -1,0 +1,52 @@
+name: GitHub Weekly Report
+# Generates a weekly GitHub activity report
+# Usage: llm-box install github-report
+#        llm-box run github-report/workflow.yaml
+# Config: Set REPO and AUTHOR in params below
+
+steps:
+  - node: execute
+    params:
+      command: gh issue list --repo {{ .repo }} --since "1 week ago" --state all --limit 20 --json number,title,state,labels,createdAt
+    id: issues
+
+  - node: execute
+    params:
+      command: gh pr list --repo {{ .repo }} --since "1 week ago" --state all --limit 20 --json number,title,state,createdAt
+    id: prs
+
+  - node: execute
+    params:
+      command: git log --author="{{ .author }}" --since="1 week ago" --pretty=format:"%h %s" --shortstat
+    id: commits
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse,template_render
+      max_iterations: 3
+    input: |
+      Generate a weekly GitHub report with the following data:
+      Issues: {{ .issues }}
+      Pull Requests: {{ .prs }}
+      Commits: {{ .commits }}
+      
+      Format as a markdown report with sections:
+      - Summary statistics
+      - Top issues this week
+      - PR activity
+      - Commit highlights
+    id: report
+
+  - node: file_write
+    params:
+      path: github-weekly-report.md
+    input: report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: report
+    id: notify

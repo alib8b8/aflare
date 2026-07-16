@@ -29,6 +29,7 @@ const (
 	serverReadTimeout     = 10 * time.Second
 	serverWriteTimeout    = 10 * time.Second
 	serverShutdownTimeout = 5 * time.Second
+	maxConcurrentTasks    = 100 // Limit concurrent webhook executions to prevent goroutine leaks
 )
 
 // TaskStatus represents the execution status of a task.
@@ -118,6 +119,7 @@ type WebhookServer struct {
 	stopCh   chan struct{}
 	stopOnce sync.Once
 	wg       sync.WaitGroup
+	sem      chan struct{} // Semaphore to limit concurrent task execution
 }
 
 // NewWebhookServer creates a new WebhookServer.
@@ -132,6 +134,7 @@ func NewWebhookServer(port, secret string, registry *nodes.Registry) *WebhookSer
 		rateLimiter: NewRateLimiter(rateLimitPerMin, time.Minute),
 		tasks:       make(map[string]*Task),
 		stopCh:      make(chan struct{}),
+		sem:         make(chan struct{}, maxConcurrentTasks),
 	}
 }
 
@@ -241,6 +244,14 @@ func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Acquire semaphore to limit concurrent executions
+	select {
+	case s.sem <- struct{}{}:
+	default:
+		http.Error(w, "server too busy, try again later", http.StatusServiceUnavailable)
+		return
+	}
+
 	task := &Task{
 		ID:           generateTaskID(),
 		WorkflowName: workflowName,
@@ -253,6 +264,7 @@ func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
+		defer func() { <-s.sem }() // Release semaphore when done
 		s.runTask(task, body, r.URL.Query())
 	}()
 

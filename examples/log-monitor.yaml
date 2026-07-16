@@ -1,0 +1,11 @@
+name: Log Monitor
+steps:
+  - node: execute
+    params:
+      command: tail -n 100 /var/log/server.log
+  - node: transform
+    params:
+      operation: filter_errors
+  - node: notify
+    params:
+      channel: stdout

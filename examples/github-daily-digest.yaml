@@ -1,0 +1,11 @@
+name: GitHub Daily Digest
+steps:
+  - node: fetch_url
+    params:
+      url: https://github.com/your-username
+  - node: transform
+    params:
+      operation: extract_repos_and_activity
+  - node: file_write
+    params:
+      path: github-digest.md

@@ -1,0 +1,17 @@
+name: Research Assistant
+steps:
+  - node: fetch_url
+    params:
+      url: https://example.com/blog1
+  - node: fetch_url
+    params:
+      url: https://example.com/blog2
+  - node: fetch_url
+    params:
+      url: https://example.com/blog3
+  - node: transform
+    params:
+      operation: combine_and_summarize
+  - node: file_write
+    params:
+      path: research-notes.md

@@ -1,0 +1,14 @@
+name: Zero Downtime Deploy
+steps:
+  - node: execute
+    params:
+      command: docker build -t my-service .
+  - node: execute
+    params:
+      command: docker-compose up -d --no-deps my-service
+  - node: execute
+    params:
+      command: sleep 30 && curl -f http://localhost/health
+  - node: notify
+    params:
+      channel: stdout

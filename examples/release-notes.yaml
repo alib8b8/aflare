@@ -1,0 +1,11 @@
+name: Release Notes Generator
+steps:
+  - node: execute
+    params:
+      command: git log --oneline --since="2 weeks ago"
+  - node: transform
+    params:
+      operation: group_by_commit_type
+  - node: file_write
+    params:
+      path: RELEASE-NOTES.md

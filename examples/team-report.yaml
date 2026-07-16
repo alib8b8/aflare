@@ -1,0 +1,14 @@
+name: Team Weekly Report
+steps:
+  - node: execute
+    params:
+      command: gh issue list --repo my-org/my-repo --since "1 week ago" --state all
+  - node: transform
+    params:
+      operation: count_by_label
+  - node: execute
+    params:
+      command: git log --author="@my-team.com" --since="1 week ago" --oneline
+  - node: file_write
+    params:
+      path: team-report.md

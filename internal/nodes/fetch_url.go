@@ -12,6 +12,33 @@ import (
 
 const maxFetchURLSize = 10 * 1024 * 1024 // 10MB max response body for fetch_url
 
+// Pre-compiled regexps to avoid recompilation on every call
+var (
+	htmlTagRe      = regexp.MustCompile(`<[^>]+>`)
+	htmlScriptRe   = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	htmlStyleRe    = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
+	htmlNavRe      = regexp.MustCompile(`(?is)<nav[^>]*>.*?</nav>`)
+	htmlFooterRe   = regexp.MustCompile(`(?is)<footer[^>]*>.*?</footer>`)
+	htmlHeaderRe   = regexp.MustCompile(`(?is)<header[^>]*>.*?</header>`)
+	htmlNbspRe     = regexp.MustCompile(`&nbsp;`)
+	htmlAmpRe      = regexp.MustCompile(`&amp;`)
+	htmlLtRe       = regexp.MustCompile(`&lt;`)
+	htmlGtRe       = regexp.MustCompile(`&gt;`)
+	htmlQuotRe     = regexp.MustCompile(`&quot;`)
+	htmlAposRe     = regexp.MustCompile(`&#39;`)
+	htmlNewlinesRe = regexp.MustCompile(`\n\s*\n\s*\n+`)
+	htmlSpacesRe   = regexp.MustCompile(`[ \t]+`)
+
+	mainContentPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`(?is)<main[^>]*>(.*?)</main>`),
+		regexp.MustCompile(`(?is)<article[^>]*>(.*?)</article>`),
+		regexp.MustCompile(`(?is)<div[^>]*id=["']content["'][^>]*>(.*?)</div>`),
+		regexp.MustCompile(`(?is)<div[^>]*class=["'][^"']*content[^"']*["'][^>]*>(.*?)</div>`),
+		regexp.MustCompile(`(?is)<div[^>]*id=["']main["'][^>]*>(.*?)</div>`),
+		regexp.MustCompile(`(?is)<div[^>]*class=["'][^"']*main[^"']*["'][^>]*>(.*?)</div>`),
+	}
+)
+
 // FetchURLNode fetches content from a URL
 type FetchURLNode struct{}
 
@@ -130,37 +157,23 @@ func (n *FetchURLNode) Execute(ctx context.Context, input string, params map[str
 }
 
 func extractTextFromHTML(html string) string {
-	re := regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
-	html = re.ReplaceAllString(html, "")
-	re = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
-	html = re.ReplaceAllString(html, "")
-	re = regexp.MustCompile(`(?is)<nav[^>]*>.*?</nav>`)
-	html = re.ReplaceAllString(html, "")
-	re = regexp.MustCompile(`(?is)<footer[^>]*>.*?</footer>`)
-	html = re.ReplaceAllString(html, "")
-	re = regexp.MustCompile(`(?is)<header[^>]*>.*?</header>`)
-	html = re.ReplaceAllString(html, "")
+	html = htmlScriptRe.ReplaceAllString(html, "")
+	html = htmlStyleRe.ReplaceAllString(html, "")
+	html = htmlNavRe.ReplaceAllString(html, "")
+	html = htmlFooterRe.ReplaceAllString(html, "")
+	html = htmlHeaderRe.ReplaceAllString(html, "")
 
-	re = regexp.MustCompile(`<[^>]+>`)
-	text := re.ReplaceAllString(html, " ")
+	text := htmlTagRe.ReplaceAllString(html, " ")
 
-	re = regexp.MustCompile(`&nbsp;`)
-	text = re.ReplaceAllString(text, " ")
-	re = regexp.MustCompile(`&amp;`)
-	text = re.ReplaceAllString(text, "&")
-	re = regexp.MustCompile(`&lt;`)
-	text = re.ReplaceAllString(text, "<")
-	re = regexp.MustCompile(`&gt;`)
-	text = re.ReplaceAllString(text, ">")
-	re = regexp.MustCompile(`&quot;`)
-	text = re.ReplaceAllString(text, "\"")
-	re = regexp.MustCompile(`&#39;`)
-	text = re.ReplaceAllString(text, "'")
+	text = htmlNbspRe.ReplaceAllString(text, " ")
+	text = htmlAmpRe.ReplaceAllString(text, "&")
+	text = htmlLtRe.ReplaceAllString(text, "<")
+	text = htmlGtRe.ReplaceAllString(text, ">")
+	text = htmlQuotRe.ReplaceAllString(text, "\"")
+	text = htmlAposRe.ReplaceAllString(text, "'")
 
-	re = regexp.MustCompile(`\n\s*\n\s*\n+`)
-	text = re.ReplaceAllString(text, "\n\n")
-	re = regexp.MustCompile(`[ \t]+`)
-	text = re.ReplaceAllString(text, " ")
+	text = htmlNewlinesRe.ReplaceAllString(text, "\n\n")
+	text = htmlSpacesRe.ReplaceAllString(text, " ")
 	text = strings.TrimSpace(text)
 
 	return text
@@ -169,17 +182,7 @@ func extractTextFromHTML(html string) string {
 func extractMainContent(html string) string {
 	content := ""
 
-	patterns := []string{
-		`(?is)<main[^>]*>(.*?)</main>`,
-		`(?is)<article[^>]*>(.*?)</article>`,
-		`(?is)<div[^>]*id=["']content["'][^>]*>(.*?)</div>`,
-		`(?is)<div[^>]*class=["'].*?content.*?["'][^>]*>(.*?)</div>`,
-		`(?is)<div[^>]*id=["']main["'][^>]*>(.*?)</div>`,
-		`(?is)<div[^>]*class=["'].*?main.*?["'][^>]*>(.*?)</div>`,
-	}
-
-	for _, pattern := range patterns {
-		re := regexp.MustCompile(pattern)
+	for _, re := range mainContentPatterns {
 		matches := re.FindStringSubmatch(html)
 		if len(matches) > 1 && len(strings.TrimSpace(matches[1])) > 100 {
 			content = matches[1]

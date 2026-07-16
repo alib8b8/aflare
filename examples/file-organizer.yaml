@@ -1,0 +1,14 @@
+name: Downloads Organizer
+steps:
+  - node: execute
+    params:
+      command: ls -la ~/Downloads
+  - node: transform
+    params:
+      operation: group_by_extension
+  - node: execute
+    params:
+      command: mkdir -p ~/Downloads/images ~/Downloads/documents
+  - node: execute
+    params:
+      command: mv ~/Downloads/*.jpg ~/Downloads/*.png ~/Downloads/images/
