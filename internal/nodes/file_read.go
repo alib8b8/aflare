@@ -6,6 +6,8 @@ import (
 	"os"
 )
 
+const maxFileReadSize = 10 * 1024 * 1024 // 10MB max file read size
+
 type FileReadNode struct{}
 
 func init() {
@@ -41,6 +43,14 @@ func (n *FileReadNode) Execute(ctx context.Context, input string, params map[str
 	safePath, err := validateReadPath(path)
 	if err != nil {
 		return "", fmt.Errorf("path validation failed: %w", err)
+	}
+
+	fi, err := os.Stat(safePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to stat file: %w", err)
+	}
+	if fi.Size() > maxFileReadSize {
+		return "", fmt.Errorf("file too large (max %d bytes)", maxFileReadSize)
 	}
 
 	data, err := os.ReadFile(safePath)

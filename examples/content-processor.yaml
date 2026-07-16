@@ -1,0 +1,11 @@
+name: Content Processor
+steps:
+  - node: fetch_url
+    params:
+      url: file://post.md
+  - node: transform
+    params:
+      operation: markdown_to_html
+  - node: file_write
+    params:
+      path: post.html

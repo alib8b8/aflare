@@ -85,24 +85,55 @@ Most workflow tools force developers to choose between:
 
 ## ✨ Features
 
-- **Terminal First** - Native CLI, works anywhere you have a terminal
-- **Plain English Workflows** - Describe your goal in plain English, llm-box generates the YAML workflow for you
-- **Agentic Nodes** - 10 AI agent nodes with ReAct reasoning, planning, research, criticism, evaluation, reflection, supervision, code review, routing, and human-in-the-loop
-- **Single Binary** - Zero dependencies, install and run
-- **Workflow Reusability** - Save, version, and share your workflows
-- **Multi-LLM Support** - Ollama (local), DeepSeek API (cloud), and 15+ providers
-- **Extensible Node System** - Build custom nodes in any language
-- **MIT Licensed** - Open source, use freely
-- **Cross Platform** - Linux, macOS, Windows supported
-- **Beautiful TUI** - Real-time progress feedback
-- **Distributed Execution** - Scale workflows across multiple nodes with Coordinator/Worker architecture
-- **Web UI Editor** - Visual workflow editor with Mermaid/JSON/DOT/ASCII preview
-- **Automatic Updates** - Self-upgrade to latest version with one command
-- **MCP (Model Context Protocol)** - Connect external tools and services
-- **Workflow Visualizer** - Generate diagrams from workflow YAML
-- **Plugin System** - Extend functionality with community plugins
-- **Secrets Management** - Securely store API keys and credentials
-- **Audit Logging** - Track all command executions for compliance
+1. **Generate workflows from plain English** — describe what you want, llm-box writes the YAML
+2. **Run them locally** — single binary, zero dependencies, your data never leaves your machine
+3. **Share them as reusable templates** — version, publish, and reuse workflows across projects
+
+---
+
+## ⚙️ How It Works
+
+```
+┌─────────┐     ┌─────────┐     ┌──────────────┐     ┌──────────┐     ┌────────┐
+│  Prompt │────▶│ Planner │────▶│ Workflow YAML│────▶│ Executor │────▶│ Result │
+└─────────┘     └─────────┘     └──────────────┘     └──────────┘     └────────┘
+     │               │                  │                  │
+     │               │                  │                  ▼
+     │               │                  │           ┌──────────────┐
+     │               │                  │           │  Agent Nodes │
+     │               │                  │           │  ReAct Loop  │
+     │               │                  │           └──────────────┘
+     │               │                  │
+     │               │                  ▼
+     │               │           ┌──────────────┐
+     │               │           │ Utility Nodes│
+     │               │           │ fetch, exec  │
+     │               │           └──────────────┘
+     │               │
+     ▼               ▼
+┌─────────────────────────────────────────────────────────────┐
+│          "Check server CPU every 5 minutes"                  │
+│                      ↓                                       │
+│      ┌─────────────────────────────┐                        │
+│      │ steps:                      │                        │
+│      │   - node: execute           │                        │
+│      │     params:                 │                        │
+│      │       command: top -bn1     │                        │
+│      │   - node: transform         │                        │
+│      │     params:                 │                        │
+│      │       operation: extract_cpu│                        │
+│      │   - node: notify            │                        │
+│      │     params:                 │                        │
+│      │       channel: stdout       │                        │
+│      └─────────────────────────────┘                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+1. **Prompt** — describe what you want in plain English
+2. **Planner** — AI breaks it down into executable steps
+3. **Workflow YAML** — generates a structured, versioned workflow file
+4. **Executor** — runs each step deterministically (agent nodes use ReAct reasoning)
+5. **Result** — output to terminal, file, or notification
 
 ---
 
@@ -173,19 +204,27 @@ See [SECURITY.md](SECURITY.md) for our vulnerability disclosure policy.
 
 ---
 
-## 🔄 llm-box vs Alternatives
+## 🔄 When To Use llm-box
 
-| Feature | llm-box | Dify/n8n | Claude Code | CrewAI |
-|---------|---------|----------|-------------|--------|
-| **Interface** | Terminal + YAML | Visual GUI | Chat | Code |
-| **Execution** | Deterministic + Agentic | AI-driven | AI autonomous | AI orchestration |
-| **Agent Nodes** | 10 built-in (ReAct, planner, researcher, critic, evaluator, reflector, supervisor, code_review, router, human_in_loop) | Limited | Custom | Full framework |
-| **Setup** | 60 seconds | Hours | Minutes | Hours |
-| **Transparency** | 100% | Medium | Low | Medium |
-| **Reproducibility** | 100% | Variable | Variable | Variable |
-| **Best For** | Automation + AI agents | Enterprise apps | Coding | Research |
+We recommend the right tool for the job:
 
-**Choose llm-box when you need:** repeatable, auditable workflows with AI assistance without losing control.
+| Scenario | Recommended Tool | Why |
+|----------|-----------------|-----|
+| **Terminal automation & scripts** | **llm-box** | Natural language to YAML, deterministic execution, no dependencies |
+| **Enterprise workflow orchestration** | n8n / Dify | Visual builder, enterprise integrations, role-based access |
+| **AI-powered coding assistant** | Claude Code / Cursor | Deep IDE integration, codebase awareness, iterative coding |
+| **Pure AI agent orchestration** | CrewAI / LangGraph | Multi-agent frameworks, Python-native, research-oriented |
+| **Data ETL pipelines** | Apache Airflow / Dagster | DAG scheduling, data lineage, observability at scale |
+| **Infrastructure as Code** | Terraform / Pulumi | Cloud resource management, state tracking, plan/apply workflow |
+| **Scheduled cron jobs** | systemd timers / cron | Unix-native, zero overhead, battle-tested |
+| **API testing & mocking** | Postman / Insomnia | Interactive request builder, collection sharing, collaboration |
+
+### llm-box is built for engineers who want to:
+
+- Replace fragile bash scripts with **structured, versioned workflows**
+- Add **AI reasoning** to terminal automation without leaving the command line
+- Keep **full transparency** — every step is YAML, auditable, and reproducible
+- Stay **local-first** — no cloud dependency, no vendor lock-in
 
 > 📖 [Full comparison →](docs/comparison.md)
 
@@ -276,10 +315,67 @@ steps:
 
 ## 🎬 Demo
 
-![llm-box demo](docs/demo.svg)
+### 1. Generate Workflow from Plain English
 
-> **Generate your own demo**
-> Run `vhs docs/demo.tape` to create a high-quality GIF.
+```bash
+$ llm-box create "check server CPU every 5 minutes and alert if > 80%"
+
+✓ Generated workflow: cpu-monitor.yaml
+
+steps:
+  - node: execute
+    params:
+      command: "top -bn1 | grep 'Cpu(s)'"
+  - node: transform
+    params:
+      operation: extract_cpu_percent
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+    input: "Alert if CPU usage exceeds 80%"
+  - node: notify
+    params:
+      channel: stdout
+```
+
+### 2. Run the Workflow
+
+```bash
+$ llm-box run cpu-monitor.yaml
+
+▶ cpu-monitor.yaml
+  [1/4] execute     → top -bn1 | grep 'Cpu(s)'          ✓ 0.3s
+  [2/4] transform   → extract_cpu_percent                ✓ 0.1s
+  [3/4] agent       → llama3 reasoning...                ✓ 2.1s
+  [4/4] notify      → channel=stdout                     ✓ 0.0s
+
+Result: CPU at 45% — within normal range
+
+✓ Workflow completed in 2.5s
+```
+
+### 3. Retry on Failure with Logs
+
+```bash
+$ llm-box run api-health-check.yaml
+
+▶ api-health-check.yaml
+  [1/3] http_request → GET https://api.example.com/health
+  ⚠ Request failed: connection timeout
+  ↻ Retry 1/3 after 5s...                                  ✓ 5.8s
+  [2/3] json_parse   → status                             ✓ 0.1s
+  [3/3] notify       → channel=stdout                     ✓ 0.0s
+
+Result: API healthy — status: "ok"
+
+✓ Workflow completed in 6.2s (1 retry)
+
+📋 Audit log: ~/.llm-box/logs/2026-07-16_14-32-10_api-health-check.log
+```
+
+> **Record your own GIF**
+> Use [vhs](https://github.com/charmbracelet/vhs) with `docs/demo.tape` to create high-quality terminal recordings.
 
 ---
 
@@ -346,283 +442,51 @@ steps:
 
 ---
 
+## 🏪 Marketplace
+
+Browse and install ready-made workflow templates from the community:
+
+| Template | Description | Install |
+|----------|-------------|---------|
+| **btc-alert** | Monitor Bitcoin price and alert on threshold | `llm-box install btc-alert` |
+| **ai-news** | Daily AI/ML news summary from Hacker News | `llm-box install ai-news` |
+| **github-report** | Weekly GitHub activity report (issues, PRs, commits) | `llm-box install github-report` |
+| **telegram-bot** | Send notifications to Telegram | `llm-box install telegram-bot` |
+| **seo-writer** | Generate SEO-optimized articles with audit | `llm-box install seo-writer` |
+
+### Install a template
+
+```bash
+llm-box install btc-alert
+llm-box run templates/btc-alert/workflow.yaml
+```
+
+### Submit your own
+
+1. Create a directory under `templates/<your-template>/`
+2. Include `workflow.yaml` and `README.md`
+3. Open a PR — the community will review and merge
+
+**See [templates/](templates/) for all available templates.**
+
+---
+
 ## 📚 10 Real Use Cases
 
-### 1. Daily GitHub Summary
+| # | Use Case | Command | Example |
+|---|----------|---------|---------|
+| 1 | GitHub Daily Digest | `llm-box create "fetch my recent GitHub activity and save summary"` | [github-daily-digest.yaml](examples/github-daily-digest.yaml) |
+| 2 | Research Assistant | `llm-box create "fetch 3 tech blog posts and save key takeaways"` | [research-assistant.yaml](examples/research-assistant.yaml) |
+| 3 | Documentation Generator | `llm-box create "scan my Go project and generate API overview"` | [docs-generator.yaml](examples/docs-generator.yaml) |
+| 4 | Log Monitor | `llm-box create "monitor server logs for 5xx errors and alert"` | [log-monitor.yaml](examples/log-monitor.yaml) |
+| 5 | Release Notes Creator | `llm-box create "turn git commit history into release notes"` | [release-notes.yaml](examples/release-notes.yaml) |
+| 6 | Data Collector | `llm-box create "fetch weather and stock data, combine into report"` | [data-collector.yaml](examples/data-collector.yaml) |
+| 7 | File Organizer | `llm-box create "organize downloads folder by file type"` | [file-organizer.yaml](examples/file-organizer.yaml) |
+| 8 | Content Workflow | `llm-box create "take markdown post and generate HTML version"` | [content-processor.yaml](examples/content-processor.yaml) |
+| 9 | DevOps Automation | `llm-box create "build docker image and deploy with health check"` | [devops-deploy.yaml](examples/devops-deploy.yaml) |
+| 10 | Team Reporting | `llm-box create "compile weekly issue and commit stats"` | [team-report.yaml](examples/team-report.yaml) |
 
-**Goal:** Get an overview of your activity
-
-**Input:**
-```bash
-llm-box create "fetch my recent GitHub activity and save summary to github-digest.md"
-```
-
-**Workflow:**
-```yaml
-name: GitHub Daily Digest
-steps:
-  - node: fetch_url
-    params:
-      url: https://github.com/your-username
-  - node: transform
-    params:
-      operation: extract_repos_and_activity
-  - node: file_write
-    params:
-      path: github-digest.md
-```
-
----
-
-### 2. Research Assistant
-
-**Goal:** Collect and summarize technical docs
-
-**Input:**
-```bash
-llm-box create "fetch 3 tech blog posts about containerization and save key takeaways"
-```
-
-**Workflow:**
-```yaml
-name: Research Assistant
-steps:
-  - node: fetch_url
-    params:
-      url: https://example.com/blog1
-  - node: fetch_url
-    params:
-      url: https://example.com/blog2
-  - node: fetch_url
-    params:
-      url: https://example.com/blog3
-  - node: transform
-    params:
-      operation: combine_and_summarize
-  - node: file_write
-    params:
-      path: research-notes.md
-```
-
----
-
-### 3. Documentation Generator
-
-**Goal:** Auto-generate API docs
-
-**Input:**
-```bash
-llm-box create "scan my Go project and generate API overview"
-```
-
-**Workflow:**
-```yaml
-name: Docs Generator
-steps:
-  - node: execute
-    params:
-      command: find . -name "*.go"
-  - node: transform
-    params:
-      operation: extract_functions_and_types
-  - node: file_write
-    params:
-      path: API.md
-```
-
----
-
-### 4. Log Monitor
-
-**Goal:** Watch logs and notify on errors
-
-**Input:**
-```bash
-llm-box create "monitor server logs for 5xx errors and alert"
-```
-
-**Workflow:**
-```yaml
-name: Log Monitor
-steps:
-  - node: execute
-    params:
-      command: tail -n 100 /var/log/server.log
-  - node: transform
-    params:
-      operation: filter_errors
-  - node: notify
-    params:
-      channel: stdout
-```
-
----
-
-### 5. Release Notes Creator
-
-**Goal:** Generate changelog from commits
-
-**Input:**
-```bash
-llm-box create "turn git commit history into release notes"
-```
-
-**Workflow:**
-```yaml
-name: Release Notes Generator
-steps:
-  - node: execute
-    params:
-      command: git log --oneline --since="2 weeks ago"
-  - node: transform
-    params:
-      operation: group_by_commit_type
-  - node: file_write
-    params:
-      path: RELEASE-NOTES.md
-```
-
----
-
-### 6. Data Collector
-
-**Goal:** Aggregate data from multiple APIs
-
-**Input:**
-```bash
-llm-box create "fetch weather and stock data, combine into report"
-```
-
-**Workflow:**
-```yaml
-name: Daily Report Generator
-steps:
-  - node: fetch_url
-    params:
-      url: https://api.weather.gov/forecast
-  - node: fetch_url
-    params:
-      url: https://api.stock.example.com/quote/ABC
-  - node: combine
-    params:
-      format: markdown
-  - node: file_write
-    params:
-      path: daily-report.md
-```
-
----
-
-### 7. File Organizer
-
-**Goal:** Auto-sort downloads folder
-
-**Input:**
-```bash
-llm-box create "organize downloads folder by file type"
-```
-
-**Workflow:**
-```yaml
-name: Downloads Organizer
-steps:
-  - node: execute
-    params:
-      command: ls -la ~/Downloads
-  - node: transform
-    params:
-      operation: group_by_extension
-  - node: execute
-    params:
-      command: mkdir -p ~/Downloads/images ~/Downloads/documents
-  - node: execute
-    params:
-      command: mv ~/Downloads/*.jpg ~/Downloads/*.png ~/Downloads/images/
-```
-
----
-
-### 8. Content Workflow
-
-**Goal:** Prepare posts for publishing
-
-**Input:**
-```bash
-llm-box create "take markdown post and generate HTML version"
-```
-
-**Workflow:**
-```yaml
-name: Content Processor
-steps:
-  - node: fetch_url
-    params:
-      url: file://post.md
-  - node: transform
-    params:
-      operation: markdown_to_html
-  - node: file_write
-    params:
-      path: post.html
-```
-
----
-
-### 9. DevOps Automation
-
-**Goal:** Deploy with health checks
-
-**Input:**
-```bash
-llm-box create "build docker image and deploy with health check"
-```
-
-**Workflow:**
-```yaml
-name: Zero Downtime Deploy
-steps:
-  - node: execute
-    params:
-      command: docker build -t my-service .
-  - node: execute
-    params:
-      command: docker-compose up -d --no-deps my-service
-  - node: execute
-    params:
-      command: sleep 30 && curl -f http://localhost/health
-  - node: notify
-    params:
-      channel: stdout
-```
-
----
-
-### 10. Team Reporting
-
-**Goal:** Weekly team metrics
-
-**Input:**
-```bash
-llm-box create "compile weekly issue and commit stats"
-```
-
-**Workflow:**
-```yaml
-name: Team Weekly Report
-steps:
-  - node: execute
-    params:
-      command: gh issue list --repo my-org/my-repo --since "1 week ago" --state all
-  - node: transform
-    params:
-      operation: count_by_label
-  - node: execute
-    params:
-      command: git log --author="@my-team.com" --since="1 week ago" --oneline
-  - node: file_write
-    params:
-      path: team-report.md
-```
+**See [examples/](examples/) for full workflow definitions.**
 
 ---
 
@@ -1233,58 +1097,16 @@ export OPENAI_API_BASE="https://openrouter.ai/api/v1"
 
 ## 🗺️ Roadmap
 
-### v0.1 - Initial Release ✓
-- [x] Basic workflow creation
-- [x] Execution engine
-- [x] Built-in nodes (fetch_url, file_write, ollama)
-- [x] Terminal UI
-
-### v0.2 - Multi-LLM & Plugin System ✓
-- [x] DeepSeek API node support
-- [x] Coze API node support
-- [x] Zhipu GLM API node support
-- [x] Kimi (Moonshot) API node support
-- [x] MiniMax API node support
-- [x] Qwen (Tongyi Qianwen) API node support
-- [x] XVERSE API node support
-- [x] Yi (Lingyiwanwu) API node support
-- [x] Baichuan API node support
-- [x] InternLM (Shanghai AI Lab) API node support
-- [x] Mistral AI API node support
-- [x] Xiaomi MiMo API node support
-- [x] IMA Copilot API node support
-- [x] Universal OpenAI-compatible node (any provider)
-- [x] More utility nodes: file_read, json_parse, template_render, http_request
-- [x] FastGPT knowledge base platform integration
-- [x] Plugin system for custom nodes
-- [x] Workflow template library
-- [x] Workflow sharing via URL
-
-### v0.3 - Distributed & Web UI ✓
-- [x] Distributed execution (Coordinator/Worker architecture)
-- [x] Web UI workflow editor
-- [x] Workflow visualizer (Mermaid/JSON/DOT/ASCII)
-- [x] Automatic updates engine
-- [x] MCP (Model Context Protocol) support
-- [x] Secrets management
-- [x] Audit logging
-- [x] Scheduled workflows
-- [x] Tenant isolation
-
-### v0.4 - Team Features
-- [ ] Team workflow repository
-- [ ] Workflow versioning
-- [ ] Cloud sync (optional)
-
-### v0.5 - Enterprise
-- [ ] Access control
-- [ ] Advanced audit logging
-- [ ] High availability mode
-
-### v1.0 - Stable
-- [ ] Production readiness
-- [ ] Comprehensive docs
-- [ ] Long-term support
+| Version | Milestone | Status |
+|---------|-----------|--------|
+| **v0.1** | Workflow engine + core nodes | ✓ Done |
+| **v0.2** | 15+ LLM providers + plugin system | ✓ Done |
+| **v0.3** | Distributed execution + Web UI + MCP | ✓ Done |
+| **v0.4** | **Workflow Marketplace** — `llm-box install <template>` | In Progress |
+| **v0.5** | **100 Built-in Templates** — curated by category | Planned |
+| **v0.6** | **Community Template Hub** — anyone can publish | Planned |
+| **v0.7** | **Template Ranking** — stars, downloads, reviews | Planned |
+| **v1.0** | **Workflow Store** — full template ecosystem | Planned |
 
 ---
 

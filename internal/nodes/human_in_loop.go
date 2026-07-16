@@ -56,19 +56,23 @@ func (n *HumanInLoopNode) Execute(ctx context.Context, input string, params map[
 		return "", fmt.Errorf("human approval required: set %s=1 to approve", approvalEnv)
 
 	case "file":
-		_, err := os.Stat(approvalFile)
+		safeApprovalFile, err := validateWritePath(approvalFile)
+		if err != nil {
+			return "", fmt.Errorf("approval file path validation failed: %w", err)
+		}
+		_, err = os.Stat(safeApprovalFile)
 		if err == nil {
-			return buildApprovedOutput(input, onApprove, true, fmt.Sprintf("file %s exists", approvalFile)), nil
+			return buildApprovedOutput(input, onApprove, true, fmt.Sprintf("file %s exists", safeApprovalFile)), nil
 		}
 		reviewContent := input
 		if customPrompt != "" {
 			reviewContent = customPrompt + "\n\n" + input
 		}
-		reviewFile := approvalFile + ".review"
+		reviewFile := safeApprovalFile + ".review"
 		if writeErr := os.WriteFile(reviewFile, []byte(reviewContent), 0600); writeErr != nil {
 			return "", fmt.Errorf("failed to write review file: %w", writeErr)
 		}
-		return "", fmt.Errorf("human approval required: review %s, then create %s to approve", reviewFile, approvalFile)
+		return "", fmt.Errorf("human approval required: review %s, then create %s to approve", reviewFile, safeApprovalFile)
 
 	case "stdin":
 		fmt.Fprintln(os.Stderr, "=== Human Approval Required ===")

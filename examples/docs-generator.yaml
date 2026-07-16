@@ -1,0 +1,11 @@
+name: Docs Generator
+steps:
+  - node: execute
+    params:
+      command: find . -name "*.go"
+  - node: transform
+    params:
+      operation: extract_functions_and_types
+  - node: file_write
+    params:
+      path: API.md

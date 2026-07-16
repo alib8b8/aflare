@@ -1,0 +1,53 @@
+name: BTC Price Alert
+# Monitors Bitcoin price and alerts when threshold is crossed
+# Usage: llm-box install btc-alert
+#        llm-box run btc-alert/workflow.yaml
+# Config: Set PRICE_THRESHOLD and ALERT_METHOD in params below
+
+steps:
+  - node: http_request
+    params:
+      url: https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd
+      method: GET
+      timeout: 30s
+    id: fetch_price
+
+  - node: json_parse
+    params:
+      path: bitcoin.usd
+    input: fetch_price
+    id: current_price
+
+  - node: template_render
+    params:
+      template: |
+        BTC Price Alert
+        Current: ${{ .price }} USD
+        Threshold: ${{ .threshold }} USD
+        Time: ${{ .time }}
+      price: "{{ .input }}"
+      threshold: "{{ .params.threshold }}"
+      time: "{{ .params.time }}"
+    id: alert_message
+
+  - node: notify
+    params:
+      channel: stdout
+    input: alert_message
+    id: notify
+
+  - node: file_write
+    params:
+      path: btc-alert.log
+    input: alert_message
+    id: log
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: http_request,json_parse
+      max_iterations: 3
+    input: |
+      Compare the current BTC price {{ .current_price }} with the threshold {{ .threshold }}.
+      If the price crosses the threshold, generate an actionable alert message.

@@ -17,10 +17,8 @@ var allowedCommands = map[string]bool{
 	"grep": true, "sed": true, "awk": true, "sort": true,
 	"wc": true, "head": true, "tail": true, "cut": true,
 	"tr": true, "uniq": true, "find": true, "date": true,
-	"curl": true, "wget": true, "jq": true, "python3": true,
-	"python": true, "node": true, "git": true, "go": true,
-	"npm": true, "npx": true, "yarn": true, "pnpm": true,
-	"docker": true, "kubectl": true, "kubectx": true,
+	"curl": true, "wget": true, "jq": true,
+	"git": true, "go": true,
 }
 
 // shellMetachars detects shell metacharacters that can be used for command

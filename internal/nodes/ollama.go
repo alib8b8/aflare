@@ -104,7 +104,7 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("ollama not running, please start it first at %s: %w", endpoint, err)
+		return "", fmt.Errorf("ollama not running, please start it first (check endpoint configuration): %w", err)
 	}
 	defer resp.Body.Close()
 

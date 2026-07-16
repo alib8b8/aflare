@@ -140,6 +140,10 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("HTTP request failed with status %d", resp.StatusCode)
+	}
+
 	// Limit response body size to prevent OOM
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxHTTPResponseSize))
 	if err != nil {
