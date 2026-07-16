@@ -99,6 +99,7 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 
 	client := &http.Client{
 		Timeout:       DefaultLLMTimeout,
+		Transport:     safeLLMHTTPClient.Transport,
 		CheckRedirect: httpRedirectValidator(validateLMLEndpoint),
 	}
 

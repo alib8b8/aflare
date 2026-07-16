@@ -22,7 +22,7 @@ import (
 const (
 	SecretTypeNormal = "normal"
 	SecretTypeSecret = "secret"
-	pbkdf2Iterations = 100000
+	pbkdf2Iterations = 600000
 	pbkdf2SaltSize   = 16
 	pbkdf2KeySize    = 32
 )

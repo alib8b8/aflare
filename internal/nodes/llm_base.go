@@ -145,6 +145,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 
 	client := &http.Client{
 		Timeout:       DefaultLLMTimeout,
+		Transport:     safeLLMHTTPClient.Transport,
 		CheckRedirect: httpRedirectValidator(validateLMLEndpoint),
 	}
 

@@ -9,6 +9,9 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,6 +28,9 @@ import (
 // Port defaults to 8080
 var port = 8080
 
+// authToken, if set, requires clients to send "Authorization: Bearer <token>" header.
+var authToken string
+
 func main() {
 	if p := os.Getenv("LLM_BOX_MCP_PORT"); p != "" {
 		if v, err := strconv.Atoi(p); err == nil {
@@ -36,14 +42,15 @@ func main() {
 			port = v
 		}
 	}
+	authToken = os.Getenv("LLM_BOX_MCP_TOKEN")
 
 	mux := http.NewServeMux()
 
 	// SSE endpoint for Grok Remote MCP
-	mux.HandleFunc("/sse", handleSSE)
+	mux.HandleFunc("/sse", authMiddleware(handleSSE))
 
 	// Streamable HTTP endpoint (MCP spec 2025-03-26)
-	mux.HandleFunc("/mcp", handleStreamableHTTP)
+	mux.HandleFunc("/mcp", authMiddleware(handleStreamableHTTP))
 
 	// Health check
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -54,11 +61,14 @@ func main() {
 		}
 	})
 
-	addr := fmt.Sprintf(":%d", port)
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	log.Printf("llm-box Remote MCP server listening on %s", addr)
-	log.Printf("SSE endpoint:      http://localhost%s/sse", addr)
-	log.Printf("Streamable HTTP:   http://localhost%s/mcp", addr)
-	log.Printf("Health check:      http://localhost%s/health", addr)
+	log.Printf("SSE endpoint:      http://localhost:%d/sse", port)
+	log.Printf("Streamable HTTP:   http://localhost:%d/mcp", port)
+	log.Printf("Health check:      http://localhost:%d/health", port)
+	if authToken == "" {
+		log.Printf("WARNING: No auth token set (LLM_BOX_MCP_TOKEN). Server is unauthenticated.")
+	}
 
 	server := &http.Server{
 		Addr:         addr,
@@ -70,6 +80,20 @@ func main() {
 
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed: %v", err)
+	}
+}
+
+func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if authToken != "" {
+			token := r.Header.Get("Authorization")
+			token = strings.TrimPrefix(token, "Bearer ")
+			if subtle.ConstantTimeCompare([]byte(token), []byte(authToken)) != 1 {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+		}
+		next(w, r)
 	}
 }
 
@@ -100,6 +124,15 @@ var (
 	sessionsMu sync.RWMutex
 )
 
+func generateSessionID() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to timestamp (should not happen in practice)
+		return fmt.Sprintf("sess-%d", time.Now().UnixNano())
+	}
+	return "sess-" + hex.EncodeToString(b)
+}
+
 func handleSSEConnect(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -107,7 +140,7 @@ func handleSSEConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessionID := fmt.Sprintf("sess-%d", time.Now().UnixNano())
+	sessionID := generateSessionID()
 	events := make(chan string, 100)
 
 	session := &sseSession{
@@ -175,7 +208,6 @@ func handleSSEConnect(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	fmt.Fprintf(w, "event: endpoint\ndata: /sse?sessionId=%s\n\n", sessionID)
 	flusher.Flush()
@@ -328,7 +360,6 @@ func handleStreamableHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Return response(s)
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if len(responses) == 1 {
 		if _, err := w.Write(responses[0]); err != nil {

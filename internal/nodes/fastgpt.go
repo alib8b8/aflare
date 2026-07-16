@@ -139,6 +139,7 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 
 	client := &http.Client{
 		Timeout:       DefaultLLMTimeout,
+		Transport:     safeLLMHTTPClient.Transport,
 		CheckRedirect: httpRedirectValidator(validateLMLEndpoint),
 	}
 
