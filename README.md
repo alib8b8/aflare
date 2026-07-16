@@ -652,6 +652,27 @@ Result: API healthy — status: "ok"
 7. **Visualizer** - Generates Mermaid/JSON/DOT/ASCII diagrams
 8. **Output** - Formatted results to terminal, file, or notifications
 
+### Distributed Execution Quick Start
+
+llm-box supports distributed workflow execution across multiple machines using a Coordinator/Worker architecture.
+
+**Start the Coordinator:**
+```bash
+llm-box coordinator --port 8090 --auth-token my-secret-token
+```
+
+**Start a Worker:**
+```bash
+llm-box worker --coordinator http://coordinator-host:8090 --auth-token my-secret-token --capacity 5
+```
+
+**Submit a workflow:**
+```bash
+llm-box run --distributed http://coordinator-host:8090 my-workflow.yaml
+```
+
+> 📖 [Full Distributed Execution Documentation →](docs/distributed.md)
+
 ---
 
 ## 🏪 Marketplace
@@ -721,6 +742,62 @@ Linux, macOS, and Windows are fully supported.
 
 ### Where can I get help?
 Open a [GitHub Discussion](https://github.com/alib8b8/llm-box/discussions) or file an issue.
+
+---
+
+## 📝 Workflow Configuration
+
+### Variables (`vars` field)
+
+Define reusable variables at the workflow level using the `vars` field. Variables can be referenced anywhere in the workflow using the `{{var.name}}` expression syntax.
+
+**Basic example:**
+```yaml
+name: Report Generator
+vars:
+  output_file: "report.md"
+  api_endpoint: "https://api.example.com/data"
+  max_retries: "3"
+
+steps:
+  - node: http_request
+    params:
+      url: "{{var.api_endpoint}}"
+  - node: file_write
+    params:
+      path: "{{var.output_file}}"
+```
+
+**Use cases:**
+- Configuration values shared across multiple steps
+- Environment-specific settings
+- Template parameters
+- Default values that can be overridden via `call` node
+
+**Variable scope and usage:**
+- Workflow-level vars are available to all steps
+- Vars passed via `call` node's `vars` parameter override existing vars with the same name
+- Variables can be used in any `params` value, in `condition` expressions, and in step `input`
+- Variable values are strings (use string type for all values)
+
+**Example: Using variables in conditions**
+```yaml
+name: Conditional Workflow
+vars:
+  threshold: "error"
+  alert_channel: "stdout"
+
+steps:
+  - node: http_request
+    params:
+      url: "https://api.example.com/health"
+  - node: notify
+    params:
+      channel: "{{var.alert_channel}}"
+    condition: "contains:{{var.threshold}}"
+```
+
+> 💡 For more details about expression syntax, see the [full expression reference](#secrets-management).
 
 ---
 
