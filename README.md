@@ -704,6 +704,135 @@ llm-box run templates/btc-alert/workflow.yaml
 
 ---
 
+## ⏰ Scheduled Workflows
+
+Schedule workflows to run automatically using cron expressions.
+
+**Quick start:**
+```bash
+# Run daily at 9 AM
+llm-box schedule --cron "0 9 * * *" my-workflow.yaml
+
+# List scheduled tasks
+llm-box schedule --list
+
+# Remove a task
+llm-box schedule --remove daily-report
+```
+
+**Common schedules:**
+
+| Schedule | Cron Expression |
+|----------|----------------|
+| Every hour | `0 * * * *` |
+| Daily at 9 AM | `0 9 * * *` |
+| Every weekday at 9 AM | `0 9 * * 1-5` |
+| Every 15 minutes | `*/15 * * * *` |
+| Monthly on the 1st | `0 0 1 * *` |
+
+**YAML configuration:**
+```yaml
+name: daily-report
+schedule:
+  cron: "0 9 * * *"
+  enabled: true
+```
+
+> 📖 [Full Scheduling Documentation →](docs/scheduling.md)
+
+---
+
+## 📦 External Nodes & Registry
+
+Extend llm-box with community nodes from the registry.
+
+**Manage nodes:**
+```bash
+# Sync registry first
+llm-box registry sync
+
+# Install a node
+llm-box install weather-api
+
+# Uninstall a node
+llm-box uninstall weather-api
+
+# List available nodes
+llm-box registry list
+
+# Search for nodes
+llm-box registry search weather
+```
+
+**Available External Nodes (7):**
+
+| Node | Category | Description |
+|------|----------|-------------|
+| `weather-api` | Data | Fetch weather info from Open-Meteo API |
+| `rss-reader` | Data | Read and parse RSS/Atom feeds |
+| `github-issues` | DevOps | Fetch and filter GitHub issues |
+| `crypto-price` | Finance | Fetch crypto prices from CoinGecko |
+| `ip-info` | Network | IP address geolocation lookup |
+| `uuid-generator` | Utility | Generate UUIDs in various formats |
+| `qr-code` | Utility | Generate QR codes from text or URLs |
+
+> 💡 Total: **17 built-in + 7 external = 24 nodes**
+
+---
+
+## 🌍 Internationalization (i18n)
+
+llm-box supports multi-language UI via environment variables:
+
+```bash
+# English (default)
+export LLM_BOX_LANG=en
+
+# Auto-detect from system LANG env var
+unset LLM_BOX_LANG
+```
+
+**Supported languages:** English (`en`)
+
+> 📝 More languages coming soon. Community translations welcome!
+
+---
+
+## 📊 Resource Limits
+
+llm-box enforces default resource limits for safety and performance:
+
+| Limit | Default Value | Notes |
+|-------|--------------|-------|
+| Max file size | 10 MB | Workflow YAML, state files |
+| Max parallel steps | 50 | Per `parallel` block |
+| Max retries per step | 10 | Exponential backoff |
+| Max retry delay | 5 minutes | Backoff cap |
+| Node download size | 1 MB | External node files |
+| Registry size | 5 MB | Registry JSON |
+
+All limits are enforced at runtime to prevent resource exhaustion.
+
+---
+
+## ❌ Error Codes & Troubleshooting
+
+Common error codes and quick solutions:
+
+| Category | Code | Example Message | Quick Fix |
+|----------|------|-----------------|-----------|
+| Workflow | WF001 | node not found | Check spelling, run `llm-box registry list` |
+| HTTP/Network | ND001 | failed to fetch URL | Check connectivity, verify URL |
+| File ops | ND005 | permission denied | Check file/directory permissions |
+| LLM/AI | ND004 | API key invalid | Verify secrets, check `LLM_BOX_SECRETS_PASSWORD` |
+| Secrets | SEC001 | password not set | Set `LLM_BOX_SECRETS_PASSWORD` env var |
+| Scheduler | SCH001 | invalid cron | Use 5-field cron syntax |
+| Distributed | DST003 | authentication failed | Ensure auth tokens match |
+
+> 📖 [Full Troubleshooting Guide →](docs/troubleshooting.md)
+
+---
+
 ## 📚 10 Real Use Cases
 
 | # | Use Case | Command | Example |
@@ -798,6 +927,30 @@ steps:
 ```
 
 > 💡 For more details about expression syntax, see the [full expression reference](#secrets-management).
+
+### Data Flow Between Steps
+
+By default, each step receives the output of the previous step as its input (`{{input}}`). llm-box supports flexible data flow between steps:
+
+| Reference | Description | Example |
+|-----------|-------------|---------|
+| `{{input}}` | Output of the immediately previous step | Implicit flow |
+| `{{step.0}}` | Output of step by 0-based index | Any step |
+| `{{step.name}}` | Output of step by its `id` | Named step |
+| `{{var.name}}` | Workflow-level variable | Defined in `vars` section |
+| `{{secret.GROUP.KEY}}` | Secret value from secure storage | API keys |
+
+Use the `combine` node to merge outputs from multiple steps:
+```yaml
+- node: combine
+  input:
+    - "{{step.fetch_users}}"
+    - "{{step.fetch_orders}}"
+  params:
+    separator: "\n---\n"
+```
+
+> 📖 [Full Data Flow Documentation →](docs/dataflow.md)
 
 ---
 
