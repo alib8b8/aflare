@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	Version   = "dev"
-	BuildDate = "unknown"
+	Version   = "0.3.0"
+	BuildDate = "2026-07-16"
 )
 
 type GitHubRelease struct {
