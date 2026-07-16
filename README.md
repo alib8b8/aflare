@@ -665,25 +665,128 @@ Result: API healthy — status: "ok"
 5. **Nodes** - Built-in and extensible actions (17+ utility and LLM nodes)
 6. **Web UI** - Visual workflow editor with real-time preview
 7. **Visualizer** - Generates Mermaid/JSON/DOT/ASCII diagrams
-8. **Output** - Formatted results to terminal, file, or notifications
+8. **Plugin System** - Extend core behavior with community plugins
+9. **Custom Nodes** - Build your own nodes in any language
+10. **Output** - Formatted results to terminal, file, or notifications
 
-### Distributed Execution Quick Start
+## 🌐 Distributed Execution
 
-llm-box supports distributed workflow execution across multiple machines using a Coordinator/Worker architecture.
+llm-box supports distributed workflow execution across multiple machines using a Coordinator/Worker architecture. The Coordinator manages nodes, assigns tasks, and monitors heartbeats. Workers execute workflow steps and report results back.
 
-**Start the Coordinator:**
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Coordinator                          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────────┐ │
+│  │ Registry │ │ Tasks    │ │ Heartbeat│ │ Load Balancer  │ │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └───────┬────────┘ │
+└───────┼────────────┼────────────┼────────────────┼──────────┘
+        │            │            │                │
+        └────────────┴────────────┴────────────────┘
+                              │
+                    ┌─────────┴──────────┐
+                    │   Worker Nodes     │
+                    │ (Capacity varies)  │
+                    └────────────────────┘
+```
+
+### Quick Start
+
+**1. Start the Coordinator:**
 ```bash
+# Default port 8090
+llm-box coordinator --auth-token my-secret-token
+
+# Custom port
 llm-box coordinator --port 8090 --auth-token my-secret-token
 ```
 
-**Start a Worker:**
+**2. Start Workers (on each worker machine):**
 ```bash
-llm-box worker --coordinator http://coordinator-host:8090 --auth-token my-secret-token --capacity 5
+# Default capacity (5 tasks)
+llm-box worker --coordinator http://coordinator-host:8090 --auth-token my-secret-token
+
+# Custom capacity
+llm-box worker --coordinator http://coordinator-host:8090 --auth-token my-secret-token --capacity 10 --port 8091
 ```
 
-**Submit a workflow:**
+**3. Submit a workflow:**
 ```bash
 llm-box run --distributed http://coordinator-host:8090 my-workflow.yaml
+```
+
+### Configuration Reference
+
+**Coordinator Options:**
+
+| Option | Default | Required | Description |
+|--------|---------|----------|-------------|
+| `--port` | `8090` | No | HTTP port to listen on |
+| `--auth-token` | (empty) | Yes* | Authentication token for worker registration |
+
+**Worker Options:**
+
+| Option | Default | Required | Description |
+|--------|---------|----------|-------------|
+| `--port` | `8091` | No | HTTP port to listen on |
+| `--coordinator` | `http://localhost:8090` | Yes | Coordinator URL |
+| `--auth-token` | (empty) | Yes* | Authentication token matching coordinator |
+| `--capacity` | `5` | No | Maximum concurrent tasks this worker handles |
+
+\* Required for production deployments.
+
+**Environment Variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `LLM_BOX_COORDINATOR` | Default coordinator URL |
+| `LLM_BOX_AUTH_TOKEN` | Default authentication token |
+
+### Security & Networking
+
+- **Authentication**: Use `--auth-token` on both Coordinator and Workers; every request validates the token via constant-time comparison.
+- **TLS/HTTPS**: For production, place an HTTPS reverse proxy (e.g., nginx + Let's Encrypt) in front of the Coordinator.
+- **Firewall**: Restrict ports so only Workers can reach the Coordinator.
+- **Secrets Sync**: Each worker stores its own secrets. Use one of the following:
+  - **Manual sync**: `llm-box secrets export > secrets.json` on Coordinator, then `llm-box secrets import < secrets.json` on each Worker.
+  - **Shared volume**: Mount an encrypted secrets volume accessible to all Workers (permissions `0600`).
+  - **Environment**: Set `LLM_BOX_SECRETS_PASSWORD` on all nodes.
+
+### Example Distributed Workflow
+
+Workflows are authored the same way as local ones:
+
+```yaml
+name: distributed-data-processing
+vars:
+  api_key: "{{secret.api.service}}"
+
+steps:
+  - node: http_request
+    id: fetch_data
+    params:
+      url: "https://api.example.com/data"
+      headers: "Authorization: Bearer {{var.api_key}}"
+
+  - node: json_parse
+    id: parse_data
+    input: fetch_data
+    params:
+      path: results
+
+  - node: agent
+    id: analyze
+    input: "Analyze this data: {{step.parse_data}}"
+    params:
+      provider: ollama
+      model: llama3
+
+  - node: file_write
+    id: save_report
+    input: analyze
+    params:
+      path: analysis-report.md
 ```
 
 > 📖 [Full Distributed Execution Documentation →](docs/distributed.md)
@@ -764,12 +867,24 @@ llm-box mcp --port 8082
 
 ## 🔌 Plugin System
 
-Extend llm-box with community-contributed plugins.
+llm-box supports a plugin system for extending functionality with community-contributed plugins. Plugins can add new workflow nodes or extend core behavior.
 
-**Plugin management:**
+### Plugin Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| **Node Plugin** | Adds new nodes to the workflow engine | Custom LLM provider, database connector |
+| **Extension Plugin** | Extends core functionality | Custom authentication, logging |
+
+### Plugin Management
+
 ```bash
-# List plugins
+# List installed plugins
 llm-box plugins list
+
+# List by type
+llm-box plugins list --type node
+llm-box plugins list --type extension
 
 # Enable/disable plugins
 llm-box plugins enable my-plugin
@@ -779,9 +894,87 @@ llm-box plugins disable my-plugin
 llm-box plugins info my-plugin
 ```
 
-**Plugin types:**
-- **Node Plugin**: Adds new workflow nodes
-- **Extension Plugin**: Extends core functionality
+### Directory Layout
+
+Plugins are stored in `~/.llm-box/plugins/`:
+
+```
+~/.llm-box/plugins/
+├── my-plugin/
+│   ├── plugin.yaml      # Plugin metadata
+│   ├── main.go          # Implementation
+│   └── nodes/
+│       └── custom_node.py
+└── another-plugin/
+    ├── plugin.yaml
+    └── extension.js
+```
+
+### plugin.yaml Format
+
+```yaml
+name: "my-plugin"
+version: "1.0.0"
+description: "A custom plugin for llm-box"
+author: "John Doe"
+type: "node"          # or "extension"
+dependencies:
+  - "base-plugin"
+```
+
+### Node Plugin Example (Go)
+
+```go
+package main
+
+import "github.com/alib8b8/llm-box/internal/plugins"
+
+type MyNodePlugin struct {
+    info plugins.PluginInfo
+}
+
+func NewMyNodePlugin() *MyNodePlugin {
+    return &MyNodePlugin{
+        info: plugins.PluginInfo{
+            Name:         "my-node-plugin",
+            Version:      "1.0.0",
+            Description:  "Custom node plugin",
+            Author:       "John Doe",
+            Type:         plugins.PluginTypeNode,
+            Dependencies: []string{},
+        },
+    }
+}
+
+func (p *MyNodePlugin) GetInfo() plugins.PluginInfo { return p.info }
+func (p *MyNodePlugin) Init() error                { return nil }
+func (p *MyNodePlugin) Shutdown() error            { return nil }
+func (p *MyNodePlugin) GetNodes() []interface{}   { return []interface{}{"my_custom_node"} }
+```
+
+### Registering the Plugin
+
+```go
+pm := plugins.NewPluginManager()
+pm.Register(NewMyNodePlugin())
+pm.Enable("my-node-plugin")
+```
+
+### Plugin Lifecycle
+
+1. **Register** — Plugin is added to the plugin manager
+2. **Enable** — Plugin is initialized and its nodes/resources become available
+3. **Execute** — Plugin nodes are used in workflows
+4. **Disable** — Plugin is shut down and removed from available resources
+5. **Unregister** — Plugin is completely removed
+
+### Publishing Plugins
+
+1. Create a GitHub repository for your plugin
+2. Add a `plugin.yaml` file
+3. Implement the plugin interface
+4. Add documentation
+5. Tag releases with semantic versioning
 
 > 📖 [Full Plugin Documentation →](docs/plugins.md)
 
@@ -811,19 +1004,175 @@ llm-box tenant quota acme
 
 ## 🛠️ Custom Nodes
 
-Build custom nodes in any programming language.
+Build custom nodes in any programming language. Custom nodes extend the workflow engine with new functionality by communicating via stdin/stdout using a JSON protocol.
 
-**How it works:**
-1. Create a script that reads JSON from stdin
-2. Execute your logic
-3. Write JSON output to stdout
+### Supported Languages
 
-**Example (Python):**
+- Python
+- Node.js
+- Bash
+- Go
+- Any language that can read/write JSON
+
+### Interface Specification
+
+**Input via stdin (JSON):**
+
+```json
+{
+  "input": "input text from previous step",
+  "params": {
+    "param1": "value1",
+    "param2": "value2"
+  }
+}
+```
+
+**Output via stdout (JSON):**
+
+```json
+{
+  "output": "result text to pass to next step"
+}
+```
+
+**Environment variables available to the node:**
+
+| Variable | Description |
+|----------|-------------|
+| `LLM_BOX_NODE_NAME` | Name of the node |
+| `LLM_BOX_WORKFLOW_NAME` | Name of the current workflow |
+| `LLM_BOX_STEP_INDEX` | Zero-based step index |
+| `LLM_BOX_SECRETS_PASSWORD` | Secrets password (if set) |
+
+**Sensitive data filtering:** Parameters matching `api_key`, `key`, `secret`, `password`, `token`, or `credential` are automatically filtered before being passed to external nodes.
+
+### Directory Structure
+
+Custom nodes are stored in `~/.llm-box/nodes/`:
+
+```
+~/.llm-box/nodes/
+├── my_custom_node/
+│   ├── node.json      # Node metadata
+│   └── main.py        # Node implementation
+└── another_node/
+    ├── node.json
+    └── main.js
+```
+
+### Node Metadata (node.json)
+
+```json
+{
+  "name": "my_custom_node",
+  "description": "A custom node that does X",
+  "version": "1.0.0",
+  "author": "John Doe",
+  "entrypoint": "main.py",
+  "input_type": "string",
+  "output_type": "string",
+  "params": {
+    "prefix": {
+      "type": "string",
+      "description": "Prefix to add to input",
+      "required": false,
+      "default": "Result: "
+    }
+  }
+}
+```
+
+### Metadata Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Unique node name used in workflow YAML |
+| `description` | Yes | Human-readable description |
+| `version` | Yes | Semantic version |
+| `author` | No | Author name |
+| `entrypoint` | Yes | Script to execute |
+| `input_type` | Yes | Input type: `string`, `json`, or `binary` |
+| `output_type` | Yes | Output type: `string`, `json`, or `binary` |
+| `params` | No | Parameter schema |
+
+### Step-by-Step Example
+
+**1. Create the node directory:**
+```bash
+mkdir -p ~/.llm-box/nodes/echo_prefix
+```
+
+**2. Create metadata:**
+```json
+// ~/.llm-box/nodes/echo_prefix/node.json
+{
+  "name": "echo_prefix",
+  "description": "Echo input with custom prefix",
+  "version": "1.0.0",
+  "entrypoint": "main.py",
+  "input_type": "string",
+  "output_type": "string",
+  "params": {
+    "prefix": {
+      "type": "string",
+      "description": "Prefix to add",
+      "required": false,
+      "default": "Result: "
+    }
+  }
+}
+```
+
+**3. Create implementation (Python):**
 ```python
-import sys, json
+#!/usr/bin/env python3
+import sys
+import json
+
 payload = json.loads(sys.stdin.read())
-result = f"Processed: {payload['input']}"
-print(json.dumps({"output": result}))
+input_data = payload.get("input", "")
+params = payload.get("params", {})
+prefix = params.get("prefix", "Result: ")
+
+print(json.dumps({"output": prefix + input_data}))
+```
+
+**4. Make executable:**
+```bash
+chmod +x ~/.llm-box/nodes/echo_prefix/main.py
+```
+
+**5. Use in workflow:**
+```yaml
+name: test-custom-node
+steps:
+  - node: echo_prefix
+    params:
+      prefix: "Processed: "
+    input: "Hello World"
+```
+
+### Multi-Language Examples
+
+**Node.js:**
+```javascript
+#!/usr/bin/env node
+const data = [];
+process.stdin.on('data', chunk => data.push(chunk));
+process.stdin.on('end', () => {
+  const payload = JSON.parse(data.join(''));
+  const result = `Processed: ${payload.input}`;
+  console.log(JSON.stringify({ output: result }));
+});
+```
+
+**Bash:**
+```bash
+#!/bin/bash
+read -r payload
+input=$(echo "$payload" | jq -r '.input // ""')
+echo "{\"output\": \"Processed: $input\"}"
 ```
 
 > 📖 [Full Custom Nodes Documentation →](docs/custom-nodes.md)
@@ -972,17 +1321,117 @@ All limits are enforced at runtime to prevent resource exhaustion.
 
 ## ❌ Error Codes & Troubleshooting
 
-Common error codes and quick solutions:
+### Workflow Execution Errors
 
-| Category | Code | Example Message | Quick Fix |
-|----------|------|-----------------|-----------|
-| Workflow | WF001 | node not found | Check spelling, run `llm-box registry list` |
-| HTTP/Network | ND001 | failed to fetch URL | Check connectivity, verify URL |
-| File ops | ND005 | permission denied | Check file/directory permissions |
-| LLM/AI | ND004 | API key invalid | Verify secrets, check `LLM_BOX_SECRETS_PASSWORD` |
-| Secrets | SEC001 | password not set | Set `LLM_BOX_SECRETS_PASSWORD` env var |
-| Scheduler | SCH001 | invalid cron | Use 5-field cron syntax |
-| Distributed | DST003 | authentication failed | Ensure auth tokens match |
+| Code | Error Message | Cause | Solution |
+|------|---------------|-------|----------|
+| WF001 | `node '%s' not found in registry` | The specified node doesn't exist or isn't registered | Check node name spelling, run `llm-box list` to see available nodes, ensure the node is installed |
+| WF002 | `step %d (%s) failed: %w` | A step execution failed | Check the step's input/parameters, verify credentials, review node-specific error messages |
+| WF003 | `workflow timed out during retry delay` | Workflow exceeded timeout while waiting for retry | Increase `max_timeout`, reduce retry count, optimize step execution time |
+| WF004 | `condition evaluation failed: %w` | A condition expression couldn't be evaluated | Check condition syntax, ensure referenced variables exist |
+| WF005 | `expression evaluation failed: %w` | An expression like `{{step.0}}` couldn't be evaluated | Verify step indices/names exist, check variable references |
+| WF006 | `too many parallel steps (%d, max %d)` | Exceeded maximum parallel steps limit (50) | Reduce the number of parallel steps |
+| WF007 | `invalid workflow name: %s` | Workflow name contains invalid characters | Use only alphanumeric characters, hyphens, and underscores |
+
+### Node-Specific Errors
+
+#### HTTP/Network
+
+| Code | Error Message | Cause | Solution |
+|------|---------------|-------|----------|
+| ND001 | `failed to fetch URL: %w` | Network request failed | Check network connectivity, verify URL, check firewall rules |
+| ND002 | `HTTP request failed: %d %s` | HTTP request returned non-200 status | Check API endpoint, verify authentication, check rate limits |
+| ND003 | `connection timeout` | Connection to remote server timed out | Increase timeout parameter, check server availability |
+| ND004 | `API key invalid or missing` | Authentication failed | Verify API key, check secrets config, ensure `LLM_BOX_SECRETS_PASSWORD` is set |
+
+#### File Operations
+
+| Code | Error Message | Cause | Solution |
+|------|---------------|-------|----------|
+| ND005 | `permission denied` | Insufficient file permissions | Check file/directory permissions, run with appropriate privileges |
+| ND006 | `file not found: %s` | Specified file doesn't exist | Verify file path, check spelling, ensure file exists |
+| ND007 | `invalid mode: %s` | Invalid file write mode | Use only `write` or `append` for the mode parameter |
+| ND008 | `file too large` | File exceeds size limit | Reduce file size, check `MaxFileSize` limit |
+
+#### LLM/AI
+
+| Code | Error Message | Cause | Solution |
+|------|---------------|-------|----------|
+| ND009 | `model not found: %s` | Specified model doesn't exist | Verify model name, check provider availability |
+| ND010 | `rate limit exceeded` | API rate limit reached | Wait and retry, implement caching, upgrade provider plan |
+| ND011 | `insufficient quota` | API usage quota exhausted | Check provider billing, increase quota, reduce usage |
+| ND012 | `model unavailable` | Model is temporarily unavailable | Try again later, use a different model |
+
+#### Execute Node
+
+| Code | Error Message | Cause | Solution |
+|------|---------------|-------|----------|
+| ND013 | `command not allowed in safe mode` | Attempted to run execute node in safe mode | Disable safe mode with `--safe-mode=false` or use allowlist |
+| ND014 | `command not in allowlist` | Command not in allowlist | Add command to allowlist or disable allowlist mode |
+| ND015 | `command execution timed out` | Command exceeded timeout | Increase timeout parameter, optimize command |
+| ND016 | `shell injection detected` | Command contains dangerous characters | Remove shell metacharacters (`;`, `|`, `&`, `` ` ``) |
+
+### YAML/Parsing Errors
+
+| Code | Error Message | Cause | Solution |
+|------|---------------|-------|----------|
+| YML001 | `only .yaml and .yml workflow files are allowed` | Invalid file extension | Rename file to use `.yaml` or `.yml` extension |
+| YML002 | `invalid workflow file path: %w` | File path is invalid | Verify path, check for special characters |
+| YML003 | `YAML parse error: %w` | Invalid YAML syntax | Check YAML formatting, ensure proper indentation |
+| YML004 | `invalid filename: %s` | Invalid characters in filename | Use only alphanumeric characters and underscores |
+| YML005 | `missing required field: %s` | Required field is missing | Add the required field to the workflow YAML |
+
+### Secrets Management Errors
+
+| Code | Error Message | Cause | Solution |
+|------|---------------|-------|----------|
+| SEC001 | `secrets password not set` | Master password not configured | Set `LLM_BOX_SECRETS_PASSWORD` environment variable |
+| SEC002 | `invalid secret type: %s` | Unknown secret type | Use only `normal` or `secret` type |
+| SEC003 | `file too short: invalid format` | Secrets file is corrupted or empty | Restore from backup, recreate secrets file |
+| SEC004 | `failed to decrypt secrets: %w` | Incorrect master password | Verify `LLM_BOX_SECRETS_PASSWORD` is correct |
+| SEC005 | `secret not found: %s/%s` | Requested secret doesn't exist | Add the secret using `llm-box secrets add` |
+
+### Scheduler Errors
+
+| Code | Error Message | Cause | Solution |
+|------|---------------|-------|----------|
+| SCH001 | `invalid cron expression: %w` | Invalid cron syntax | Use 5-field cron format: `minute hour day month weekday` |
+| SCH002 | `task with id %q already exists` | Duplicate task ID | Use a different task ID or remove the existing task |
+| SCH003 | `task with id %q not found` | Task doesn't exist | Check task ID, list tasks with `llm-box schedule --list` |
+| SCH004 | `invalid step value %q` | Invalid step value in cron expression | Step must be a positive integer |
+| SCH005 | `value %d out of range [%d, %d]` | Cron field value is out of bounds | Use valid ranges (minute: 0-59, hour: 0-23, etc.) |
+
+### Distributed Execution Errors
+
+| Code | Error Message | Cause | Solution |
+|------|---------------|-------|----------|
+| DST001 | `invalid port: %s` | Invalid port number | Use numeric port between 1-65535 |
+| DST002 | `invalid coordinator URL: %s` | Invalid coordinator address | Verify URL format, ensure coordinator is running |
+| DST003 | `authentication failed` | Invalid auth token | Ensure auth tokens match between coordinator and workers |
+| DST004 | `no available workers` | No workers registered or all at capacity | Start more workers, increase worker capacity |
+| DST005 | `heartbeat timeout` | Worker didn't respond | Check worker health, verify network connectivity |
+
+### Common Issues
+
+**Workflow fails with "node not found"**
+1. Verify the node name is spelled correctly
+2. Check available nodes: `llm-box list`
+3. Ensure the node is built-in or installed as a plugin
+
+**API key authentication fails**
+1. Set `LLM_BOX_SECRETS_PASSWORD` environment variable
+2. Verify the secret exists: `llm-box secrets list <group>`
+3. Check the reference syntax: `{{secret.group.key}}`
+
+**Network timeout**
+1. Verify network connectivity to the target server
+2. Increase timeout parameter: `timeout: "30s"`
+3. Try accessing the URL directly with `curl`
+
+**YAML parsing error**
+1. Check YAML indentation (use spaces, not tabs)
+2. Ensure colons are followed by spaces
+3. Validate YAML with an online validator
 
 > 📖 [Full Troubleshooting Guide →](docs/troubleshooting.md)
 
