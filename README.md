@@ -428,6 +428,80 @@ steps:
 
 ### 2. Run the Workflow
 
+### `llm-box create` Command Reference
+
+Generate workflows from natural language descriptions using rule-based keyword matching.
+
+**Usage**:
+```bash
+llm-box create "your natural language description" [options]
+```
+
+**Options**:
+| Option | Description |
+|--------|-------------|
+| `-o`, `--output` | Output file path (default: auto-generated) |
+| `--name` | Workflow name |
+| `--dry-run` | Preview generated workflow without saving |
+| `--provider` | Preferred LLM provider (openai, ollama, etc.) |
+
+**Examples**:
+```bash
+# Basic creation
+llm-box create "Fetch weather and save to file"
+
+# Specify output file
+llm-box create "Summarize GitHub activity" -o github-summary.yaml
+
+# Preview without saving
+llm-box create "Monitor server logs" --dry-run
+
+# Specify preferred LLM provider
+llm-box create "Analyze code" --provider openai
+```
+
+**Generated YAML**:
+```bash
+$ llm-box create "check server CPU every 5 minutes and alert if > 80%"
+
+✓ Generated workflow: cpu-monitor.yaml
+
+steps:
+  - node: execute
+    params:
+      command: "top -bn1 | grep 'Cpu(s)'"
+  - node: transform
+    params:
+      operation: extract_cpu_percent
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+    input: "Alert if CPU usage exceeds 80%"
+  - node: notify
+    params:
+      channel: stdout
+```
+
+**Supported Keywords**:
+| Keyword | Action | Example |
+|---------|--------|---------|
+| `fetch`, `get`, `download` | HTTP request | "Fetch API data" |
+| `read`, `load` | File read | "Read config file" |
+| `write`, `save` | File write | "Save to report.md" |
+| `summarize`, `analyze`, `review` | LLM agent | "Summarize document" |
+| `notify`, `alert`, `send` | Notification | "Notify on Slack" |
+| `execute`, `run`, `command` | Shell execute | "Run backup script" |
+| `json`, `parse` | JSON parse | "Parse JSON response" |
+| `combine`, `merge` | Combine outputs | "Combine two files" |
+
+**Limitations**:
+- Rule-based generation (not AI-powered)
+- Supports a fixed set of keywords
+- For complex workflows, define YAML directly
+
+### 2. Run the Workflow
+
 ```bash
 $ llm-box run cpu-monitor.yaml
 
@@ -589,7 +663,7 @@ No for getting started — describe what you want in plain English, and llm-box 
 Yes! Build custom nodes in any language. See [docs/contributing.md](docs/contributing.md).
 
 ### Is it production-ready?
-v0.1 is early access. v1.0 (stable) is planned for Q3 2026.
+v0.3 is the current stable version with core features including workflow engine, 15+ LLM providers, distributed execution, Web UI, and MCP integration. v1.0 is planned for Q3 2026.
 
 ### Which platforms are supported?
 Linux, macOS, and Windows are fully supported.
