@@ -7,6 +7,10 @@ import (
 )
 
 func FuzzValidateLMLEndpoint(f *testing.F) {
+	if testing.Short() {
+		f.Skip("skipping fuzz test in short mode")
+	}
+
 	f.Add("http://localhost:11434")
 	f.Add("https://api.openai.com/v1")
 	f.Add("http://192.168.1.1:8080")
