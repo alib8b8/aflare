@@ -80,7 +80,7 @@ Most workflow tools force developers to choose between:
 ## ✨ Features
 
 - **Terminal First** - Native CLI, works anywhere you have a terminal
-- **Plain English Workflows** - Define what you want, not how to do it
+- **Plain English Workflows** - Describe your goal in plain English, llm-box generates the YAML workflow for you
 - **Agentic Nodes** - 10 AI agent nodes with ReAct reasoning, planning, research, criticism, evaluation, reflection, supervision, code review, routing, and human-in-the-loop
 - **Single Binary** - Zero dependencies, install and run
 - **Workflow Reusability** - Save, version, and share your workflows
@@ -97,6 +97,73 @@ Most workflow tools force developers to choose between:
 - **Plugin System** - Extend functionality with community plugins
 - **Secrets Management** - Securely store API keys and credentials
 - **Audit Logging** - Track all command executions for compliance
+
+---
+
+## 🔒 Security
+
+llm-box takes security seriously. Here's how we protect you:
+
+### Command Execution Safety (`execute` node)
+
+The `execute` node runs shell commands, which is inherently powerful and risky. llm-box implements multiple layers of defense:
+
+| Layer | What it does | How to enable |
+|-------|-------------|---------------|
+| **Safe Mode** | Completely disables the `execute` node | `llm-box --safe-mode` or `LLM_BOX_SAFE_MODE=1` |
+| **Allowlist** | Only allows known-safe commands; blocks shell metacharacters (`;`, `|`, `&`, `` ` ``, etc.) | `LLM_BOX_EXECUTE_ALLOWLIST=1` |
+| **Audit Logging** | Every command is logged with timestamp and redacted secrets (0600 permissions) | Enabled automatically |
+| **Dry Run** | Preview commands before execution without running them | `dry_run: true` param on `execute` node |
+| **Timeout** | Commands auto-terminate after a configurable duration (default: 5m, max: 30m) | `timeout: 30s` param on `execute` node |
+| **Input Validation** | Empty commands rejected; shell injection patterns blocked | Always on |
+
+**Recommended setup for CI/production:**
+```bash
+export LLM_BOX_EXECUTE_ALLOWLIST=1
+export LLM_BOX_SAFE_MODE=1   # if you don't need shell execution at all
+```
+
+### Secrets Management
+
+API keys are **never stored in plain text**:
+
+- AES-GCM encryption with PBKDF2 key derivation (100K iterations)
+- Master password protected
+- File permissions `0600`
+- Values masked in listings (e.g., `sk-****bc`)
+- Automatic redaction in audit logs (Bearer tokens, Authorization headers, URL credentials)
+
+```bash
+llm-box secrets add --group llm --key openai --value sk-...
+llm-box secrets list llm
+```
+
+### Secure Installation
+
+The `curl | bash` pattern is convenient but carries supply-chain risk. For maximum safety:
+
+```bash
+# Option 1: Download + verify checksum
+curl -sL https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-linux-amd64 -o llm-box
+curl -sL https://github.com/alib8b8/llm-box/releases/latest/download/checksums.txt -o checksums.txt
+sha256sum -c checksums.txt
+chmod +x llm-box
+
+# Option 2: Build from source
+git clone https://github.com/alib8b8/llm-box.git
+cd llm-box
+go build -o llm-box ./cmd/llm-box
+```
+
+### Automated Security Scanning
+
+Every PR is scanned with:
+- **gosec** — security-focused static analysis
+- **CodeQL** — GitHub's semantic analysis engine
+- **go vet** — Go compiler static analysis
+- **gofmt** — format consistency
+
+See [SECURITY.md](SECURITY.md) for our vulnerability disclosure policy.
 
 ---
 
@@ -559,7 +626,7 @@ steps:
 llm-box adds structure, reusability, and a beautiful UI without losing the power of the terminal.
 
 ### Do I have to write YAML?
-No! Describe what you want in plain English, and llm-box generates the YAML for you.
+No for getting started — describe what you want in plain English, and llm-box generates the YAML for you. For advanced use, you can edit the generated YAML directly for fine-grained control.
 
 ### Can I extend it?
 Yes! Build custom nodes in any language. See [docs/contributing.md](docs/contributing.md).
@@ -632,7 +699,7 @@ Executes a shell command.
 ```
 
 ### transform
-Transforms input text (simple text operations).
+Deterministic text transformation using pure string/regex operations — no LLM calls. Supported operations: `upper`, `lower`, `trim`, `lines`, `words`, `chars`, `first_line`, `first_500`, `first_1000`, `summary`, `reverse`, `unique_lines`, `sort_lines`, `remove_blank_lines`, `filter_errors`, `extract_urls`, `extract_emails`, `markdown_to_html`, `html_to_markdown`, and domain-specific helpers like `extract_repos_and_activity`, `group_by_commit_type`, `group_by_extension`.
 
 **Parameters:**
 - `operation` - Operation to perform (upper, lower, trim, etc.)
