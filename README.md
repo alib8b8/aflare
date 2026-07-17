@@ -86,6 +86,7 @@ llm-box run ai-news-summary.yaml
 | **Skill Self-Evolution** | Agent skills improve with use — auto-tracks success rate, latency, best practices, known pitfalls; auto-optimizes prompts |
 | **HarmonyOS Adaptation** | Ability launch, atomic service, desktop widget, 7-device-type adaptation (phone/foldable/tablet/TV/car/wearable) |
 | **Cross-Platform Protocol** | `intent://` and `ohos://` URI schemes, W3C DID identity verification, cross-domain agent messaging |
+| **Ascend NPU Adaptation** | 7-agent pipeline (search→verify→adapt→quantize→optimize→deploy→doc), CANN/MindIE/MindStudio integration, INT8/FP8 quantization, 1-hour auto-adapt |
 | **Utility Nodes** | 40+ built-in nodes: LLM providers, fetch, execute, transform, file I/O, JSON, notify, condition, combine, call, template |
 | **Data & Knowledge** | RAG retrieval, knowledge graph extraction/query/traversal, smart model router, multimodal image analysis |
 | **Code & Tools** | Python code interpreter sandbox, node marketplace, MCP integration, plugin system |
@@ -130,6 +131,19 @@ Specialized AI agent nodes for autonomous reasoning:
 | `agent_message` | Send cross-domain messages between agents using W3C DID identity |
 | `agent_inbox` | Query and manage agent message inbox |
 
+### Ascend NPU Adaptation Nodes
+
+| Node | Description |
+|------|-------------|
+| `ascend_model_search` | Search models in AtomGit/HuggingFace ModelZoo |
+| `ascend_model_verify` | Verify model manifest, dependencies, License, Ascend compatibility |
+| `ascend_model_adapt` | Adapt model to Ascend NPU via msTransplant, handle operator patches |
+| `ascend_model_quantize` | INT8/FP8/W8A8 quantization via msModelSlim with accuracy comparison |
+| `ascend_model_optimize` | Performance tuning via msProf/msprof-analyze, bottleneck analysis |
+| `ascend_model_deploy` | MindIE Service deployment, OpenAI API compatibility test |
+| `ascend_model_doc` | Auto-generate benchmark report and reproduction guide |
+| `ascend_model_agent` | End-to-end orchestrator (mode: full/quick/tune) |
+
 ---
 
 ## 🔒 Security
@@ -162,6 +176,7 @@ llm-box participates in multiple open-source ecosystems:
 | **GitCode G-Star** | Applied | Compute support, traffic exposure, HarmonyOS certification |
 | **HarmonyOS Agent Skills** | Published | 8 skills: ability launch, atomic service, widget, device adapt, cross-app, agent message, intent router, device state |
 | **ohpm SDK** | Published | `@llm-box/workflow-engine` — ArkTS SDK with WorkflowEngine, 30+ node types, device adaptation, intent protocol |
+| **Ascend NPU Adaptation** | Active | 7-agent auto-adapt pipeline, 3 workflow templates (end-to-end/quick/performance-tune), CANN/MindIE integration |
 | **GitHub** | Active | CI/CD, CodeQL security scan, automated releases |
 
 ### HarmonyOS Device Support
@@ -176,7 +191,17 @@ llm-box participates in multiple open-source ecosystems:
 | Car | steering_wheel_control, hud, voice |
 | Wearable | heart_rate, accelerometer, gyroscope |
 
-📖 [G-Star Application →](ecosystem/GSTAR_APPLICATION.md) | [HarmonyOS Skills →](ecosystem/harmonyos-skills/) | [ohpm SDK →](ecosystem/ohpm/)
+### Ascend NPU Hardware Support
+
+| Hardware | Position | Model Scale |
+|----------|----------|-------------|
+| Ascend 910B | Training/Inference | 7B-70B |
+| Ascend 910C | Training/Inference | 7B-170B |
+| Atlas 800I A2 | Inference Server | 7B-70B |
+| Atlas 300I Duo | Edge Inference | <13B |
+| 310P | Edge Inference | <7B |
+
+📖 [G-Star Application →](ecosystem/GSTAR_APPLICATION.md) | [HarmonyOS Skills →](ecosystem/harmonyos-skills/) | [ohpm SDK →](ecosystem/ohpm/) | [Ascend Adaptation →](ecosystem/ascend-adaptation/ASCEND_ADAPTATION.md)
 
 ---
 
@@ -260,6 +285,7 @@ llm-box help                   Show full help
 - **Edge Router** — ReAct reasoning loop, 3-tier persistent memory, local/cloud model routing
 - **Skill Evolution** — Self-improving agent skills with success rate tracking and prompt optimization
 - **Intent Protocol** — `intent://` and `ohos://` URI schemes, W3C DID identity, cross-domain messaging
+- **Ascend Adaptation** — 7-agent pipeline for Ascend NPU model adaptation (search/verify/adapt/quantize/optimize/deploy/doc)
 - **Coordinator/Worker** — Distributed task scheduling and execution
 
 ---
@@ -273,6 +299,7 @@ llm-box help                   Show full help
 | **v0.3** | ✅ Released | Agent nodes, distributed execution, Web UI, scheduling |
 | **v0.4** | ✅ Released | Code interpreter, RAG, knowledge graph, smart router, multimodal, node marketplace, 100+ templates, 16 specialists, Chain-of-Thought |
 | **v0.5** | ✅ Released | ReAct engine, layered memory, skill self-evolution, HarmonyOS adaptation (7 device types), cross-platform protocol (intent:// + ohos://), W3C DID identity, cross-domain agent messaging, GitCode G-Star + ohpm ecosystem |
+| **v0.5.1** | ✅ Released | Ascend NPU adaptation (7-agent pipeline, 3 workflow templates, CANN/MindIE integration) |
 | **v1.0** | 📅 Q3 2026 | Stable API, full documentation, LTS |
 
 📖 [Full Roadmap →](ROADMAP.md)
