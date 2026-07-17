@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 )
 
 type SupervisorNode struct{}
@@ -369,4 +371,238 @@ func cleanJSONResp(response string) string {
 	response = strings.TrimSuffix(response, "```")
 	response = strings.TrimSpace(response)
 	return response
+}
+
+// ============================================================
+// Skill 自演进机制（借鉴 jiuwenswarm 的 Skill 自演进）
+// Agent 技能越用越强：自动识别异常、优化技能、积累经验
+// ============================================================
+
+// SkillRecord 记录一个技能的使用情况和效果
+type SkillRecord struct {
+	Name            string   `json:"name"`
+	Description     string   `json:"description"`
+	UseCount        int      `json:"use_count"`
+	SuccessCount    int      `json:"success_count"`
+	FailCount       int      `json:"fail_count"`
+	SuccessRate     float64  `json:"success_rate"`
+	AvgLatencyMs    int64    `json:"avg_latency_ms"`
+	BestPractices   []string `json:"best_practices,omitempty"`
+	KnownPitfalls   []string `json:"known_pitfalls,omitempty"`
+	OptimizedPrompt string   `json:"optimized_prompt,omitempty"`
+	CreatedAt       string   `json:"created_at"`
+	UpdatedAt       string   `json:"updated_at"`
+}
+
+// SkillEvolution Skill 自演进引擎
+type SkillEvolution struct {
+	skills    map[string]*SkillRecord
+	maxSkills int
+	mu        sync.RWMutex
+}
+
+const (
+	defaultMaxSkills      = 100
+	maxBestPractices      = 20
+	maxKnownPitfalls      = 20
+	maxOptimizedPromptLen = 4096
+)
+
+// NewSkillEvolution 创建技能自演进引擎
+func NewSkillEvolution() *SkillEvolution {
+	return &SkillEvolution{
+		skills:    make(map[string]*SkillRecord),
+		maxSkills: defaultMaxSkills,
+	}
+}
+
+// RecordExecution 记录一次技能执行结果，自动更新成功率
+func (se *SkillEvolution) RecordExecution(skillName string, success bool, latencyMs int64) {
+	if skillName == "" || len(skillName) > 100 {
+		return
+	}
+
+	se.mu.Lock()
+	defer se.mu.Unlock()
+
+	skill, exists := se.skills[skillName]
+	if !exists {
+		if len(se.skills) >= se.maxSkills {
+			return // 达到上限，不再添加新技能
+		}
+		skill = &SkillRecord{
+			Name:      skillName,
+			CreatedAt: time.Now().Format(time.RFC3339),
+		}
+		se.skills[skillName] = skill
+	}
+
+	skill.UseCount++
+	if success {
+		skill.SuccessCount++
+	} else {
+		skill.FailCount++
+	}
+
+	// 更新成功率
+	if skill.UseCount > 0 {
+		skill.SuccessRate = float64(skill.SuccessCount) / float64(skill.UseCount)
+	}
+
+	// 更新平均延迟（滑动平均）
+	if skill.AvgLatencyMs == 0 {
+		skill.AvgLatencyMs = latencyMs
+	} else {
+		skill.AvgLatencyMs = (skill.AvgLatencyMs*7 + latencyMs*3) / 10
+	}
+
+	skill.UpdatedAt = time.Now().Format(time.RFC3339)
+}
+
+// AddBestPractice 添加最佳实践
+func (se *SkillEvolution) AddBestPractice(skillName, practice string) {
+	if practice == "" || len(practice) > 500 {
+		return
+	}
+
+	se.mu.Lock()
+	defer se.mu.Unlock()
+
+	skill, exists := se.skills[skillName]
+	if !exists {
+		return
+	}
+	// 去重
+	for _, bp := range skill.BestPractices {
+		if bp == practice {
+			return
+		}
+	}
+	if len(skill.BestPractices) >= maxBestPractices {
+		skill.BestPractices = skill.BestPractices[1:] // 移除最旧的
+	}
+	skill.BestPractices = append(skill.BestPractices, practice)
+}
+
+// AddKnownPitfall 添加已知陷阱
+func (se *SkillEvolution) AddKnownPitfall(skillName, pitfall string) {
+	if pitfall == "" || len(pitfall) > 500 {
+		return
+	}
+
+	se.mu.Lock()
+	defer se.mu.Unlock()
+
+	skill, exists := se.skills[skillName]
+	if !exists {
+		return
+	}
+	for _, kp := range skill.KnownPitfalls {
+		if kp == pitfall {
+			return
+		}
+	}
+	if len(skill.KnownPitfalls) >= maxKnownPitfalls {
+		skill.KnownPitfalls = skill.KnownPitfalls[1:]
+	}
+	skill.KnownPitfalls = append(skill.KnownPitfalls, pitfall)
+}
+
+// OptimizePrompt 根据历史经验优化技能的 prompt
+func (se *SkillEvolution) OptimizePrompt(skillName, basePrompt string) string {
+	se.mu.RLock()
+	defer se.mu.RUnlock()
+
+	skill, exists := se.skills[skillName]
+	if !exists || skill.UseCount < 3 {
+		return basePrompt // 数据不足，不优化
+	}
+
+	// 如果成功率低于 60%，添加已知陷阱提示
+	if skill.SuccessRate < 0.6 && len(skill.KnownPitfalls) > 0 {
+		basePrompt += "\n\nKnown pitfalls to avoid:\n"
+		for i, pitfall := range skill.KnownPitfalls {
+			if i >= 5 {
+				break
+			}
+			basePrompt += fmt.Sprintf("- %s\n", pitfall)
+		}
+	}
+
+	// 如果有最佳实践，添加到 prompt
+	if len(skill.BestPractices) > 0 {
+		basePrompt += "\n\nBest practices:\n"
+		for i, bp := range skill.BestPractices {
+			if i >= 5 {
+				break
+			}
+			basePrompt += fmt.Sprintf("- %s\n", bp)
+		}
+	}
+
+	if len(basePrompt) > maxOptimizedPromptLen {
+		basePrompt = basePrompt[:maxOptimizedPromptLen]
+	}
+
+	return basePrompt
+}
+
+// GetSkill 获取技能记录
+func (se *SkillEvolution) GetSkill(skillName string) (*SkillRecord, bool) {
+	se.mu.RLock()
+	defer se.mu.RUnlock()
+	skill, ok := se.skills[skillName]
+	return skill, ok
+}
+
+// ListSkills 列出所有技能
+func (se *SkillEvolution) ListSkills() []*SkillRecord {
+	se.mu.RLock()
+	defer se.mu.RUnlock()
+	result := make([]*SkillRecord, 0, len(se.skills))
+	for _, skill := range se.skills {
+		result = append(result, skill)
+	}
+	return result
+}
+
+// GetLowPerformingSkills 返回成功率低于阈值的技能（需要改进）
+func (se *SkillEvolution) GetLowPerformingSkills(threshold float64) []*SkillRecord {
+	if threshold < 0 || threshold > 1 {
+		threshold = 0.6
+	}
+	se.mu.RLock()
+	defer se.mu.RUnlock()
+	var result []*SkillRecord
+	for _, skill := range se.skills {
+		if skill.UseCount >= 3 && skill.SuccessRate < threshold {
+			result = append(result, skill)
+		}
+	}
+	return result
+}
+
+// GetSkillStats 返回技能统计概览
+func (se *SkillEvolution) GetSkillStats() map[string]interface{} {
+	se.mu.RLock()
+	defer se.mu.RUnlock()
+
+	totalUses := 0
+	totalSuccess := 0
+	for _, skill := range se.skills {
+		totalUses += skill.UseCount
+		totalSuccess += skill.SuccessCount
+	}
+
+	avgSuccessRate := 0.0
+	if totalUses > 0 {
+		avgSuccessRate = float64(totalSuccess) / float64(totalUses)
+	}
+
+	return map[string]interface{}{
+		"total_skills":     len(se.skills),
+		"total_executions": totalUses,
+		"total_success":    totalSuccess,
+		"avg_success_rate": avgSuccessRate,
+	}
 }

@@ -76,6 +76,7 @@ func init() {
 	Register(&HarmonyAbilityNode{})
 	Register(&HarmonyAtomicServiceNode{})
 	Register(&HarmonyWidgetNode{})
+	Register(&HarmonyDeviceAdaptNode{})
 }
 
 type AppLaunchNode struct{}
@@ -1031,4 +1032,266 @@ func (n *HarmonyWidgetNode) Execute(ctx context.Context, input string, params ma
 
 	result, _ := json.MarshalIndent(intent, "", "  ")
 	return fmt.Sprintf("HarmonyOS Widget operation:\n%s", string(result)), nil
+}
+
+// ============================================================
+// 鸿蒙多设备适配检测（借鉴 HarmonyOS Agent Skills 的多设备适配能力）
+// 支持：直板机、双折叠、三折叠、平板、智慧屏、车机、穿戴
+// ============================================================
+
+// HarmonyDeviceType 鸿蒙设备类型
+type HarmonyDeviceType string
+
+const (
+	DevicePhoneStandard   HarmonyDeviceType = "phone_standard"    // 直板机
+	DevicePhoneDualFold   HarmonyDeviceType = "phone_dual_fold"   // 双折叠
+	DevicePhoneTripleFold HarmonyDeviceType = "phone_triple_fold" // 三折叠
+	DeviceTablet          HarmonyDeviceType = "tablet"            // 平板
+	DeviceSmartScreen     HarmonyDeviceType = "smart_screen"      // 智慧屏
+	DeviceCar             HarmonyDeviceType = "car"               // 车机
+	DeviceWearable        HarmonyDeviceType = "wearable"          // 穿戴设备
+	DeviceUnknown         HarmonyDeviceType = "unknown"
+)
+
+// HarmonyDeviceInfo 鸿蒙设备信息
+type HarmonyDeviceInfo struct {
+	Type          HarmonyDeviceType `json:"type"`
+	ScreenWidth   int               `json:"screen_width"`
+	ScreenHeight  int               `json:"screen_height"`
+	ScreenDensity float64           `json:"screen_density"`
+	IsFoldable    bool              `json:"is_foldable"`
+	FoldState     string            `json:"fold_state,omitempty"`
+	Orientation   string            `json:"orientation,omitempty"`
+	Capabilities  []string          `json:"capabilities,omitempty"`
+}
+
+// HarmonyDeviceAdaptNode 鸿蒙多设备适配检测节点
+type HarmonyDeviceAdaptNode struct{}
+
+func (n *HarmonyDeviceAdaptNode) Name() string { return "harmony_device_adapt" }
+func (n *HarmonyDeviceAdaptNode) Description() string {
+	return "Detect HarmonyOS device type and provide adaptation guidance"
+}
+func (n *HarmonyDeviceAdaptNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "harmony_device_adapt",
+		Description: "Detect HarmonyOS device type (phone/tablet/foldable/TV/car/wearable) and generate UI adaptation guidance. Inspired by HarmonyOS Agent Skills multi-device adaptation.",
+		Input:       "string - optional adaptation requirements",
+		Output:      "string - device info and adaptation plan in JSON",
+		Params: []ParamSchema{
+			{Name: "screen_width", Type: "string", Description: "Screen width in pixels (optional, auto-detected if omitted)", Required: false},
+			{Name: "screen_height", Type: "string", Description: "Screen height in pixels (optional)", Required: false},
+			{Name: "screen_density", Type: "string", Description: "Screen density (dpi, optional)", Required: false},
+			{Name: "device_type", Type: "string", Description: "Device type hint: phone_standard, phone_dual_fold, phone_triple_fold, tablet, smart_screen, car, wearable (auto-detected if omitted)", Required: false},
+			{Name: "fold_state", Type: "string", Description: "Fold state for foldable devices: unfolded, half_folded, fully_folded (optional)", Required: false},
+			{Name: "orientation", Type: "string", Description: "Orientation: portrait, landscape, auto (default: auto)", Required: false, Default: "auto"},
+		},
+	}
+}
+
+func (n *HarmonyDeviceAdaptNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	// 解析设备类型
+	deviceType := HarmonyDeviceType(getMobileParam(params, "device_type", string(DevicePhoneStandard)))
+	validDeviceTypes := map[HarmonyDeviceType]bool{
+		DevicePhoneStandard: true, DevicePhoneDualFold: true, DevicePhoneTripleFold: true,
+		DeviceTablet: true, DeviceSmartScreen: true, DeviceCar: true, DeviceWearable: true,
+	}
+	if !validDeviceTypes[deviceType] {
+		return "", fmt.Errorf("invalid device_type: %s", deviceType)
+	}
+
+	// 解析屏幕参数
+	screenWidth := parseIntSafe(getMobileParam(params, "screen_width", "1080"), 1080)
+	screenHeight := parseIntSafe(getMobileParam(params, "screen_height", "2400"), 2400)
+	screenDensity := parseFloatSafe(getMobileParam(params, "screen_density", "3.0"), 3.0)
+
+	// 限制参数范围
+	if screenWidth < 100 || screenWidth > 10000 {
+		screenWidth = 1080
+	}
+	if screenHeight < 100 || screenHeight > 10000 {
+		screenHeight = 2400
+	}
+	if screenDensity < 0.5 || screenDensity > 10.0 {
+		screenDensity = 3.0
+	}
+
+	// 折叠状态验证
+	foldState := params["fold_state"]
+	if foldState != "" {
+		validFoldStates := map[string]bool{"unfolded": true, "half_folded": true, "fully_folded": true}
+		if !validFoldStates[foldState] {
+			return "", fmt.Errorf("invalid fold_state: %s (allowed: unfolded, half_folded, fully_folded)", foldState)
+		}
+	}
+
+	// 方向验证
+	orientation := getMobileParam(params, "orientation", "auto")
+	validOrientations := map[string]bool{"portrait": true, "landscape": true, "auto": true}
+	if !validOrientations[orientation] {
+		return "", fmt.Errorf("invalid orientation: %s (allowed: portrait, landscape, auto)", orientation)
+	}
+
+	// 构建设备信息
+	info := HarmonyDeviceInfo{
+		Type:          deviceType,
+		ScreenWidth:   screenWidth,
+		ScreenHeight:  screenHeight,
+		ScreenDensity: screenDensity,
+		IsFoldable:    deviceType == DevicePhoneDualFold || deviceType == DevicePhoneTripleFold,
+		FoldState:     foldState,
+		Orientation:   orientation,
+		Capabilities:  getDeviceCapabilities(deviceType),
+	}
+
+	// 生成适配建议
+	adaptation := generateAdaptationPlan(info, input)
+
+	result := map[string]interface{}{
+		"type":        "harmony_device_adapt",
+		"device_info": info,
+		"adaptation":  adaptation,
+		"version":     "1.0",
+	}
+
+	output, _ := json.MarshalIndent(result, "", "  ")
+	return fmt.Sprintf("HarmonyOS device adaptation:\n%s", string(output)), nil
+}
+
+func getDeviceCapabilities(dt HarmonyDeviceType) []string {
+	switch dt {
+	case DevicePhoneStandard:
+		return []string{"touch", "camera", "gps", "bluetooth", "nfc", "biometrics"}
+	case DevicePhoneDualFold, DevicePhoneTripleFold:
+		return []string{"touch", "camera", "gps", "bluetooth", "nfc", "biometrics", "foldable_screen", "multi_window"}
+	case DeviceTablet:
+		return []string{"touch", "camera", "gps", "bluetooth", "stylus", "multi_window", "split_screen"}
+	case DeviceSmartScreen:
+		return []string{"touch", "camera", "bluetooth", "voice", "gesture", "remote_control"}
+	case DeviceCar:
+		return []string{"touch", "voice", "gps", "bluetooth", "steering_wheel_control", "hud"}
+	case DeviceWearable:
+		return []string{"touch", "bluetooth", "heart_rate", "accelerometer", "gyroscope", "voice"}
+	default:
+		return []string{"touch"}
+	}
+}
+
+func generateAdaptationPlan(info HarmonyDeviceInfo, requirements string) map[string]interface{} {
+	plan := map[string]interface{}{
+		"layout_strategy":   getLayoutStrategy(info),
+		"breakpoints":       getBreakpoints(info),
+		"ui_components":     getUIComponents(info),
+		"interaction_hints": getInteractionHints(info),
+	}
+	if info.IsFoldable {
+		plan["fold_adaptation"] = getFoldAdaptation(info)
+	}
+	if requirements != "" {
+		plan["custom_requirements"] = truncateInput(requirements, 500)
+	}
+	return plan
+}
+
+func getLayoutStrategy(info HarmonyDeviceInfo) string {
+	switch info.Type {
+	case DevicePhoneStandard:
+		return "single_column"
+	case DevicePhoneDualFold, DevicePhoneTripleFold:
+		if info.FoldState == "half_folded" {
+			return "dual_column_split"
+		}
+		return "adaptive_column"
+	case DeviceTablet:
+		return "dual_column_or_grid"
+	case DeviceSmartScreen:
+		return "large_card_grid"
+	case DeviceCar:
+		return "simplified_single_column"
+	case DeviceWearable:
+		return "minimal_single_column"
+	default:
+		return "single_column"
+	}
+}
+
+func getBreakpoints(info HarmonyDeviceInfo) map[string]int {
+	switch info.Type {
+	case DevicePhoneStandard:
+		return map[string]int{"sm": 320, "md": 600, "lg": 840}
+	case DevicePhoneDualFold:
+		return map[string]int{"sm": 320, "md": 600, "lg": 1200, "xl": 1800}
+	case DevicePhoneTripleFold:
+		return map[string]int{"sm": 320, "md": 600, "lg": 1200, "xl": 2400}
+	case DeviceTablet:
+		return map[string]int{"sm": 600, "md": 840, "lg": 1200}
+	case DeviceSmartScreen:
+		return map[string]int{"sm": 960, "md": 1280, "lg": 1920}
+	case DeviceCar:
+		return map[string]int{"sm": 800, "md": 1200, "lg": 1920}
+	case DeviceWearable:
+		return map[string]int{"sm": 200, "md": 300, "lg": 400}
+	default:
+		return map[string]int{"sm": 320, "md": 600, "lg": 840}
+	}
+}
+
+func getUIComponents(info HarmonyDeviceInfo) []string {
+	switch info.Type {
+	case DevicePhoneStandard:
+		return []string{"navigation_bar", "tab_bar", "list", "card", "dialog"}
+	case DevicePhoneDualFold, DevicePhoneTripleFold:
+		return []string{"navigation_rail", "tab_bar", "list", "card", "dialog", "side_bar", "drag_to_split"}
+	case DeviceTablet:
+		return []string{"navigation_rail", "tab_bar", "grid", "card", "dialog", "side_bar", "split_view"}
+	case DeviceSmartScreen:
+		return []string{"navigation_rail", "card_grid", "voice_search", "gesture_control"}
+	case DeviceCar:
+		return []string{"simplified_list", "voice_command", "large_touch_target", "quick_action"}
+	case DeviceWearable:
+		return []string{"crown_scroll", "minimal_list", "voice_input", "notification_card"}
+	default:
+		return []string{"navigation_bar", "list", "card"}
+	}
+}
+
+func getInteractionHints(info HarmonyDeviceInfo) []string {
+	switch info.Type {
+	case DeviceCar:
+		return []string{"minimize_text input", "use voice first", "large touch targets (min 48dp)", "no complex gestures"}
+	case DeviceWearable:
+		return []string{"use crown for scroll", "minimal text input", "voice input preferred", "short interactions (<5s)"}
+	case DeviceSmartScreen:
+		return []string{"support remote control", "voice search", "gesture navigation", "viewing distance >2m"}
+	case DevicePhoneDualFold, DevicePhoneTripleFold:
+		return []string{"support drag-to-split", "adaptive layout on fold/unfold", "multi-window awareness", "continuity across fold states"}
+	default:
+		return []string{"standard touch interaction"}
+	}
+}
+
+func getFoldAdaptation(info HarmonyDeviceInfo) map[string]interface{} {
+	return map[string]interface{}{
+		"fold_type":     string(info.Type),
+		"current_state": info.FoldState,
+		"recommended":   "Use FlexContainer with adaptive breakpoints; listen to fold state changes via @ohos.display",
+		"layout_switch": "single_column -> dual_column when unfolding",
+		"animation":     "smooth transition (300ms) on fold state change",
+	}
+}
+
+func parseIntSafe(s string, defaultVal int) int {
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return defaultVal
+	}
+	return v
+}
+
+func parseFloatSafe(s string, defaultVal float64) float64 {
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return defaultVal
+	}
+	return v
 }

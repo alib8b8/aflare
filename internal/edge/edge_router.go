@@ -772,3 +772,425 @@ func (m *CrossDomainMessenger) GetStats() (sent, errors int) {
 	defer m.mu.RUnlock()
 	return m.sentCount, m.errCount
 }
+
+// ============================================================
+// ReAct 推理循环引擎（借鉴 JiuwenClaw-on-OpenHarmony）
+// ReAct = Reasoning + Acting，交替进行推理和行动，
+// 直到达成目标或超出最大迭代次数。
+// ============================================================
+
+// ReActStep 表示 ReAct 循环中的单步
+type ReActStep struct {
+	Iteration   int       `json:"iteration"`
+	Thought     string    `json:"thought"`
+	Action      string    `json:"action"`
+	Input       string    `json:"input"`
+	Observation string    `json:"observation"`
+	Timestamp   time.Time `json:"timestamp"`
+}
+
+// ReActEngine ReAct 推理循环引擎
+type ReActEngine struct {
+	maxIterations  int
+	thoughtHistory []ReActStep
+	memory         *LayeredMemory
+}
+
+// NewReActEngine 创建新的 ReAct 引擎
+func NewReActEngine(maxIterations int, memory *LayeredMemory) *ReActEngine {
+	if maxIterations <= 0 || maxIterations > 20 {
+		maxIterations = 10
+	}
+	if memory == nil {
+		memory = NewLayeredMemory()
+	}
+	return &ReActEngine{
+		maxIterations:  maxIterations,
+		thoughtHistory: make([]ReActStep, 0, maxIterations),
+		memory:         memory,
+	}
+}
+
+// ReActResult 是 ReAct 循环的最终结果
+type ReActResult struct {
+	Steps       []ReActStep `json:"steps"`
+	FinalAnswer string      `json:"final_answer"`
+	Iterations  int         `json:"iterations"`
+	Success     bool        `json:"success"`
+}
+
+// Run 执行 ReAct 推理循环
+// thinkFn: 推理函数，输入当前状态，输出 thought + action + actionInput
+// actFn: 行动函数，输入 action + actionInput，输出 observation
+func (e *ReActEngine) Run(ctx context.Context, task string, thinkFn ThinkFunc, actFn ActFunc) (*ReActResult, error) {
+	if thinkFn == nil {
+		return nil, fmt.Errorf("think function is required")
+	}
+	if actFn == nil {
+		return nil, fmt.Errorf("act function is required")
+	}
+	if len(task) > maxPromptLength {
+		return nil, fmt.Errorf("task too long (max %d)", maxPromptLength)
+	}
+
+	result := &ReActResult{Steps: []ReActStep{}}
+	currentContext := task
+
+	// 从记忆中检索相关历史
+	relevantMemories := e.memory.Recall(task)
+	if len(relevantMemories) > 0 {
+		contextBuilder := currentContext
+		for _, m := range relevantMemories {
+			contextBuilder += "\n[Related memory: " + m + "]"
+		}
+		currentContext = contextBuilder
+	}
+
+	for i := 1; i <= e.maxIterations; i++ {
+		select {
+		case <-ctx.Done():
+			result.Success = false
+			result.Iterations = i - 1
+			result.FinalAnswer = "context cancelled"
+			return result, ctx.Err()
+		default:
+		}
+
+		// 推理阶段：生成 thought + action
+		thought, action, actionInput, finished, err := thinkFn(ctx, i, currentContext)
+		if err != nil {
+			result.Success = false
+			result.Iterations = i
+			result.FinalAnswer = fmt.Sprintf("error at iteration %d: %v", i, err)
+			return result, nil
+		}
+
+		step := ReActStep{
+			Iteration: i,
+			Thought:   thought,
+			Action:    action,
+			Input:     actionInput,
+			Timestamp: time.Now(),
+		}
+
+		// 如果推理已完成，直接返回最终答案
+		if finished {
+			step.Observation = "task completed"
+			result.Steps = append(result.Steps, step)
+			result.FinalAnswer = actionInput
+			result.Success = true
+			result.Iterations = i
+			// 存入记忆
+			e.memory.Store(task, actionInput, MemoryLevelLongTerm)
+			return result, nil
+		}
+
+		// 行动阶段：执行 action
+		observation, err := actFn(ctx, action, actionInput)
+		if err != nil {
+			step.Observation = fmt.Sprintf("action error: %v", err)
+			result.Steps = append(result.Steps, step)
+			result.Success = false
+			result.Iterations = i
+			result.FinalAnswer = step.Observation
+			return result, nil
+		}
+
+		// 限制 observation 长度
+		if len(observation) > 4096 {
+			observation = observation[:4096] + "... (truncated)"
+		}
+
+		step.Observation = observation
+		result.Steps = append(result.Steps, step)
+		e.thoughtHistory = append(e.thoughtHistory, step)
+
+		// 更新上下文：加入新的观察结果
+		currentContext = fmt.Sprintf("%s\n\n[Step %d] Thought: %s\nAction: %s\nInput: %s\nObservation: %s",
+			task, i, thought, action, actionInput, observation)
+
+		// 存入短期记忆
+		e.memory.Store(fmt.Sprintf("step_%d_observation", i), observation, MemoryLevelShortTerm)
+	}
+
+	// 超过最大迭代次数
+	result.Success = false
+	result.Iterations = e.maxIterations
+	result.FinalAnswer = "max iterations reached without completion"
+	return result, nil
+}
+
+// GetHistory 返回推理历史
+func (e *ReActEngine) GetHistory() []ReActStep {
+	return e.thoughtHistory
+}
+
+// ThinkFunc 推理函数类型
+// 返回: thought, action, actionInput, finished, error
+type ThinkFunc func(ctx context.Context, iteration int, context string) (string, string, string, bool, error)
+
+// ActFunc 行动函数类型
+// 返回: observation, error
+type ActFunc func(ctx context.Context, action string, input string) (string, error)
+
+// ============================================================
+// 分层持久化记忆（借鉴 JiuwenClaw-on-OpenHarmony 的分层记忆系统）
+// 三层记忆：短期（会话级）、工作（任务级）、长期（持久化）
+// ============================================================
+
+// MemoryLevel 记忆层级
+type MemoryLevel string
+
+const (
+	MemoryLevelShortTerm MemoryLevel = "short_term" // 会话级，当前对话上下文
+	MemoryLevelWorking   MemoryLevel = "working"    // 任务级，跨步骤但非持久
+	MemoryLevelLongTerm  MemoryLevel = "long_term"  // 持久化，跨会话保留
+)
+
+// MemoryEntry 单条记忆
+type MemoryEntry struct {
+	ID          string      `json:"id"`
+	Content     string      `json:"content"`
+	Level       MemoryLevel `json:"level"`
+	Tags        []string    `json:"tags,omitempty"`
+	CreatedAt   time.Time   `json:"created_at"`
+	AccessCount int         `json:"access_count"`
+	LastAccess  time.Time   `json:"last_access"`
+}
+
+// LayeredMemory 分层记忆存储
+type LayeredMemory struct {
+	shortTerm  map[string]*MemoryEntry // 短期记忆（内存）
+	working    map[string]*MemoryEntry // 工作记忆（内存）
+	longTerm   map[string]*MemoryEntry // 长期记忆（持久化文件）
+	mu         sync.RWMutex
+	storePath  string // 长期记忆持久化路径
+	maxEntries int    // 每层最大条目数
+}
+
+const (
+	defaultMaxMemoryEntries = 500
+	maxMemoryContentLength  = 8192
+	maxMemoryTags           = 10
+)
+
+// NewLayeredMemory 创建分层记忆存储
+func NewLayeredMemory() *LayeredMemory {
+	return &LayeredMemory{
+		shortTerm:  make(map[string]*MemoryEntry),
+		working:    make(map[string]*MemoryEntry),
+		longTerm:   make(map[string]*MemoryEntry),
+		maxEntries: defaultMaxMemoryEntries,
+	}
+}
+
+// SetStorePath 设置长期记忆持久化路径
+func (m *LayeredMemory) SetStorePath(path string) error {
+	if len(path) > 512 {
+		return fmt.Errorf("path too long")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.storePath = path
+	// 尝试加载已有的长期记忆
+	m.loadLongTerm()
+	return nil
+}
+
+// Store 存储一条记忆
+func (m *LayeredMemory) Store(key, content string, level MemoryLevel) error {
+	if key == "" {
+		return fmt.Errorf("memory key is required")
+	}
+	if len(key) > 256 {
+		return fmt.Errorf("memory key too long")
+	}
+	if len(content) > maxMemoryContentLength {
+		content = content[:maxMemoryContentLength] + "... (truncated)"
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	entry := &MemoryEntry{
+		ID:         GenerateSecureID(),
+		Content:    content,
+		Level:      level,
+		CreatedAt:  time.Now(),
+		LastAccess: time.Now(),
+	}
+
+	switch level {
+	case MemoryLevelShortTerm:
+		if len(m.shortTerm) >= m.maxEntries {
+			m.evictOldest(m.shortTerm)
+		}
+		m.shortTerm[key] = entry
+	case MemoryLevelWorking:
+		if len(m.working) >= m.maxEntries {
+			m.evictOldest(m.working)
+		}
+		m.working[key] = entry
+	case MemoryLevelLongTerm:
+		if len(m.longTerm) >= m.maxEntries {
+			m.evictOldest(m.longTerm)
+		}
+		m.longTerm[key] = entry
+		// 持久化到文件
+		if m.storePath != "" {
+			m.persistLongTerm(key, entry)
+		}
+	default:
+		return fmt.Errorf("invalid memory level: %s", level)
+	}
+	return nil
+}
+
+// Recall 检索与查询相关的记忆
+func (m *LayeredMemory) Recall(query string) []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	queryLower := strings.ToLower(query)
+	var results []string
+
+	// 优先检索长期记忆（权重最高）
+	for _, entry := range m.longTerm {
+		if strings.Contains(strings.ToLower(entry.Content), queryLower) {
+			entry.AccessCount++
+			entry.LastAccess = time.Now()
+			results = append(results, "[long-term] "+entry.Content)
+		}
+	}
+	// 工作记忆
+	for _, entry := range m.working {
+		if strings.Contains(strings.ToLower(entry.Content), queryLower) {
+			entry.AccessCount++
+			entry.LastAccess = time.Now()
+			results = append(results, "[working] "+entry.Content)
+		}
+	}
+	// 短期记忆（仅最近几条）
+	count := 0
+	for _, entry := range m.shortTerm {
+		if count >= 5 {
+			break
+		}
+		results = append(results, "[short-term] "+entry.Content)
+		count++
+	}
+
+	return results
+}
+
+// Clear 清除指定层级的记忆
+func (m *LayeredMemory) Clear(level MemoryLevel) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	switch level {
+	case MemoryLevelShortTerm:
+		m.shortTerm = make(map[string]*MemoryEntry)
+	case MemoryLevelWorking:
+		m.working = make(map[string]*MemoryEntry)
+	case MemoryLevelLongTerm:
+		m.longTerm = make(map[string]*MemoryEntry)
+		if m.storePath != "" {
+			os.RemoveAll(m.storePath)
+		}
+	}
+}
+
+// GetStats 返回各层记忆统计
+func (m *LayeredMemory) GetStats() map[string]int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return map[string]int{
+		"short_term": len(m.shortTerm),
+		"working":    len(m.working),
+		"long_term":  len(m.longTerm),
+	}
+}
+
+// evictOldest 淘汰最旧的记忆条目
+func (m *LayeredMemory) evictOldest(store map[string]*MemoryEntry) {
+	var oldestKey string
+	var oldestTime time.Time
+	for k, v := range store {
+		if oldestKey == "" || v.CreatedAt.Before(oldestTime) {
+			oldestKey = k
+			oldestTime = v.CreatedAt
+		}
+	}
+	delete(store, oldestKey)
+}
+
+// persistLongTerm 将长期记忆持久化到文件
+func (m *LayeredMemory) persistLongTerm(key string, entry *MemoryEntry) {
+	if m.storePath == "" {
+		return
+	}
+	// 安全地创建目录
+	if err := os.MkdirAll(m.storePath, 0700); err != nil {
+		return
+	}
+	// 安全的文件名
+	safeKey := sanitizeKey(key)
+	filePath := m.storePath + "/" + safeKey + ".json"
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return
+	}
+	// 限制文件大小
+	if len(data) > maxMemoryContentLength*2 {
+		return
+	}
+	os.WriteFile(filePath, data, 0600)
+}
+
+// loadLongTerm 从文件加载长期记忆
+func (m *LayeredMemory) loadLongTerm() {
+	if m.storePath == "" {
+		return
+	}
+	entries, err := os.ReadDir(m.storePath)
+	if err != nil {
+		return
+	}
+	count := 0
+	for _, entry := range entries {
+		if count >= m.maxEntries {
+			break
+		}
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(m.storePath + "/" + entry.Name())
+		if err != nil {
+			continue
+		}
+		var memEntry MemoryEntry
+		if err := json.Unmarshal(data, &memEntry); err != nil {
+			continue
+		}
+		key := strings.TrimSuffix(entry.Name(), ".json")
+		m.longTerm[key] = &memEntry
+		count++
+	}
+}
+
+// sanitizeKey 将 key 转为安全的文件名
+func sanitizeKey(key string) string {
+	result := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			return r
+		}
+		return '_'
+	}, key)
+	if len(result) > 128 {
+		result = result[:128]
+	}
+	if result == "" {
+		result = "memory"
+	}
+	return result
+}
