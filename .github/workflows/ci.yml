@@ -24,7 +24,16 @@ jobs:
       run: go test ./... -race -short
 
     - name: Generate coverage profile
-      run: go test -coverprofile=coverage.out -covermode=atomic ./internal/... -short
+      run: |
+        set -x
+        go test -coverprofile=coverage.out -covermode=atomic ./internal/... -short 2>&1 | tail -100
+        if [ -f coverage.out ]; then
+          echo "Coverage file exists, size: $(wc -l coverage.out)"
+          head -20 coverage.out
+        else
+          echo "ERROR: coverage.out file not created!"
+          exit 1
+        fi
 
     - name: Check coverage threshold
       run: |
