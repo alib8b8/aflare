@@ -12,7 +12,7 @@
       <img src="https://img.shields.io/github/v/release/alib8b8/llm-box?display_name=tag&include_prereleases&style=flat-square" alt="release" />
     </a>
     <a href="https://golang.org/">
-      <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square" alt="Go" />
+      <img src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat-square" alt="Go" />
     </a>
     <a href="LICENSE">
       <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="license" />
@@ -78,30 +78,31 @@ llm-box run ai-news-summary.yaml
 
 | Category | Features |
 |----------|----------|
-| **Workflow Generation** | Natural language → YAML via keyword matching, 10+ built-in templates |
-| **Agent Nodes** | 10 AI agent nodes: ReAct agent, planner, researcher, critic, evaluator, reflector, supervisor, code reviewer, router, human-in-the-loop |
-| **Utility Nodes** | 20+ built-in nodes: fetch, execute, transform, file I/O, JSON, notify, condition, combine, call, template |
+| **Workflow Generation** | Natural language → YAML via keyword matching, 100+ built-in templates across 20+ categories |
+| **Agent Nodes** | 10+ AI agent nodes with ReAct, Chain-of-Thought, tool use, and autonomous reasoning |
+| **Utility Nodes** | 40+ built-in nodes: LLM providers, fetch, execute, transform, file I/O, JSON, notify, condition, combine, call, template |
+| **Data & Knowledge** | RAG retrieval, knowledge graph extraction/query/traversal, smart model router, multimodal image analysis |
+| **Code & Tools** | Python code interpreter sandbox, node marketplace, MCP integration, plugin system |
 | **Distributed Execution** | Coordinator/Worker architecture, horizontal scaling, heartbeat monitoring |
 | **Scheduling** | Cron-based scheduled workflows, interval triggers, CLI management |
 | **Security** | SSRF protection, path traversal prevention, command injection defense, AES-GCM secrets, audit logging |
-| **Extensibility** | Custom nodes in any language, MCP integration, plugin system, external node registry |
 | **Developer Experience** | Web UI editor, workflow visualizer (Mermaid/JSON/DOT/ASCII), TUI, 9 languages |
 
 ---
 
 ## 🤖 Agent Nodes
 
-10 specialized AI agent nodes for autonomous reasoning:
+Specialized AI agent nodes for autonomous reasoning:
 
 | Node | Description |
 |------|-------------|
-| `agent` | General-purpose ReAct agent with tool use |
+| `agent` | General-purpose ReAct agent with tool use, Chain-of-Thought mode |
 | `planner` | Breaks tasks into step-by-step plans |
 | `researcher` | Web research and information gathering |
 | `critic` | Reviews and provides constructive feedback |
 | `evaluator` | Evaluates outputs against criteria |
 | `reflector` | Reflects on process and suggests improvements |
-| `supervisor` | Oversees multi-agent workflows |
+| `supervisor` | Oversees multi-agent workflows with sequential/parallel/hierarchical/MoE/MindSearch strategies and 16 domain specialists |
 | `code_review` | Automated code review and suggestions |
 | `router` | Routes inputs to appropriate handlers |
 | `human_in_loop` | Pauses for human approval |
@@ -198,11 +199,11 @@ llm-box help                   Show full help
 ```
 
 **Key components:**
-- **Generator** — Keyword-based workflow generation from natural language
+- **Generator** — Keyword-based workflow generation from natural language, 100+ ready-to-use templates
 - **Parser** — YAML workflow validation and parsing
 - **Executor** — Deterministic step execution with dependency tracking
 - **Expression Engine** — Variable substitution, secrets injection, file reading
-- **Registry** — Built-in + external node discovery and loading
+- **Registry** — 40+ built-in nodes plus external node discovery and loading
 - **Coordinator/Worker** — Distributed task scheduling and execution
 
 ---
@@ -214,7 +215,7 @@ llm-box help                   Show full help
 | **v0.1** | ✅ Released | Core workflow engine, 10 utility nodes |
 | **v0.2** | ✅ Released | LLM nodes, MCP integration, external nodes |
 | **v0.3** | ✅ Released | Agent nodes, distributed execution, Web UI, scheduling |
-| **v0.4** | 🔄 In Progress | Marketplace, multi-language, resource limits |
+| **v0.4** | ✅ Released | Code interpreter, RAG, knowledge graph, smart router, multimodal, node marketplace, 100+ templates, 16 specialists, Chain-of-Thought |
 | **v1.0** | 📅 Q3 2026 | Stable API, full documentation, LTS |
 
 📖 [Full Roadmap →](ROADMAP.md)
