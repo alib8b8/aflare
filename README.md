@@ -31,7 +31,9 @@
 - [🚀 Quick Start](#-quick-start)
 - [✨ Core Features](#-core-features)
 - [🤖 Agent Nodes](#-agent-nodes)
+- [📱 HarmonyOS & Mobile Nodes](#-harmonyos--mobile-nodes)
 - [🔒 Security](#-security)
+- [🌐 Ecosystem](#-ecosystem)
 - [📚 Documentation](#-documentation)
 - [🛠️ CLI Commands](#️-cli-commands)
 - [🏗️ Architecture](#️-architecture)
@@ -80,12 +82,17 @@ llm-box run ai-news-summary.yaml
 |----------|----------|
 | **Workflow Generation** | Natural language → YAML via keyword matching, 100+ built-in templates across 20+ categories |
 | **Agent Nodes** | 10+ AI agent nodes with ReAct, Chain-of-Thought, tool use, and autonomous reasoning |
+| **Edge AI Engine** | ReAct reasoning loop, 3-tier persistent memory (short/working/long-term), local/cloud model routing, privacy analyzer |
+| **Skill Self-Evolution** | Agent skills improve with use — auto-tracks success rate, latency, best practices, known pitfalls; auto-optimizes prompts |
+| **HarmonyOS Adaptation** | Ability launch, atomic service, desktop widget, 7-device-type adaptation (phone/foldable/tablet/TV/car/wearable) |
+| **Cross-Platform Protocol** | `intent://` and `ohos://` URI schemes, W3C DID identity verification, cross-domain agent messaging |
 | **Utility Nodes** | 40+ built-in nodes: LLM providers, fetch, execute, transform, file I/O, JSON, notify, condition, combine, call, template |
 | **Data & Knowledge** | RAG retrieval, knowledge graph extraction/query/traversal, smart model router, multimodal image analysis |
 | **Code & Tools** | Python code interpreter sandbox, node marketplace, MCP integration, plugin system |
 | **Distributed Execution** | Coordinator/Worker architecture, horizontal scaling, heartbeat monitoring |
 | **Scheduling** | Cron-based scheduled workflows, interval triggers, CLI management |
-| **Security** | SSRF protection, path traversal prevention, command injection defense, AES-GCM secrets, audit logging |
+| **Security** | SSRF protection, path traversal prevention, command injection defense, AES-GCM secrets, audit logging, 61-vuln audited |
+| **Ecosystem** | GitCode G-Star, HarmonyOS Agent Skills, ohpm SDK (@llm-box/workflow-engine) |
 | **Developer Experience** | Web UI editor, workflow visualizer (Mermaid/JSON/DOT/ASCII), TUI, 9 languages |
 
 ---
@@ -107,6 +114,22 @@ Specialized AI agent nodes for autonomous reasoning:
 | `router` | Routes inputs to appropriate handlers |
 | `human_in_loop` | Pauses for human approval |
 
+### HarmonyOS & Mobile Nodes
+
+| Node | Description |
+|------|-------------|
+| `harmony_ability` | Launch HarmonyOS Ability (page/slice/service/data) with type validation |
+| `harmony_atomic_service` | Launch atomic service (card-based lightweight app, no install needed) |
+| `harmony_widget` | Manage desktop widgets: add, update, remove, query |
+| `harmony_device_adapt` | Detect 7 device types (phone/foldable/tablet/TV/car/wearable), generate UI adaptation plan |
+| `app_launch` | Launch mobile apps (Android/iOS/HarmonyOS) with platform auto-detection |
+| `ui_automate` | UI automation: click, scroll, type, swipe, screenshot (whitelist-validated actions) |
+| `cross_app_action` | Cross-app workflows: share content, save for later, compare prices |
+| `intent_router` | Route user intents to appropriate handlers with domain classification |
+| `device_state` | Query device state: battery, network, location, apps, storage |
+| `agent_message` | Send cross-domain messages between agents using W3C DID identity |
+| `agent_inbox` | Query and manage agent message inbox |
+
 ---
 
 ## 🔒 Security
@@ -122,8 +145,38 @@ llm-box takes security seriously. Key protections:
 | **Timing Attack** | `subtle.ConstantTimeCompare` for authentication tokens |
 | **Fail-Closed Auth** | Empty token = request rejected (503) |
 | **Audit Logging** | All commands logged with redacted secrets, `0600` permissions |
+| **DID Identity** | W3C DID format validation, signature verification, cross-domain message auth |
+| **Memory Safety** | Layered memory with LRU eviction, symlink-resistant persistence, 0600 file perms |
+| **Prompt Injection** | Skill evolution sanitizes best practices/pitfalls before injecting into prompts |
 
 📖 [Security Guide →](SECURITY.md) | [Audit Logs →](docs/getting-started.md#audit-logs)
+
+---
+
+## 🌐 Ecosystem
+
+llm-box participates in multiple open-source ecosystems:
+
+| Ecosystem | Status | Description |
+|-----------|--------|-------------|
+| **GitCode G-Star** | Applied | Compute support, traffic exposure, HarmonyOS certification |
+| **HarmonyOS Agent Skills** | Published | 8 skills: ability launch, atomic service, widget, device adapt, cross-app, agent message, intent router, device state |
+| **ohpm SDK** | Published | `@llm-box/workflow-engine` — ArkTS SDK with WorkflowEngine, 30+ node types, device adaptation, intent protocol |
+| **GitHub** | Active | CI/CD, CodeQL security scan, automated releases |
+
+### HarmonyOS Device Support
+
+| Device Type | Key Capabilities |
+|-------------|-----------------|
+| Phone (Standard) | touch, camera, gps, nfc, biometrics |
+| Phone (Dual Fold) | foldable_screen, multi_window, drag_to_split |
+| Phone (Triple Fold) | foldable_screen, multi_window, drag_to_split |
+| Tablet | stylus, multi_window, split_screen |
+| Smart Screen | voice, gesture, remote_control |
+| Car | steering_wheel_control, hud, voice |
+| Wearable | heart_rate, accelerometer, gyroscope |
+
+📖 [G-Star Application →](ecosystem/GSTAR_APPLICATION.md) | [HarmonyOS Skills →](ecosystem/harmonyos-skills/) | [ohpm SDK →](ecosystem/ohpm/)
 
 ---
 
@@ -203,7 +256,10 @@ llm-box help                   Show full help
 - **Parser** — YAML workflow validation and parsing
 - **Executor** — Deterministic step execution with dependency tracking
 - **Expression Engine** — Variable substitution, secrets injection, file reading
-- **Registry** — 40+ built-in nodes plus external node discovery and loading
+- **Registry** — 50+ built-in nodes plus external node discovery and loading
+- **Edge Router** — ReAct reasoning loop, 3-tier persistent memory, local/cloud model routing
+- **Skill Evolution** — Self-improving agent skills with success rate tracking and prompt optimization
+- **Intent Protocol** — `intent://` and `ohos://` URI schemes, W3C DID identity, cross-domain messaging
 - **Coordinator/Worker** — Distributed task scheduling and execution
 
 ---
@@ -216,6 +272,7 @@ llm-box help                   Show full help
 | **v0.2** | ✅ Released | LLM nodes, MCP integration, external nodes |
 | **v0.3** | ✅ Released | Agent nodes, distributed execution, Web UI, scheduling |
 | **v0.4** | ✅ Released | Code interpreter, RAG, knowledge graph, smart router, multimodal, node marketplace, 100+ templates, 16 specialists, Chain-of-Thought |
+| **v0.5** | ✅ Released | ReAct engine, layered memory, skill self-evolution, HarmonyOS adaptation (7 device types), cross-platform protocol (intent:// + ohos://), W3C DID identity, cross-domain agent messaging, GitCode G-Star + ohpm ecosystem |
 | **v1.0** | 📅 Q3 2026 | Stable API, full documentation, LTS |
 
 📖 [Full Roadmap →](ROADMAP.md)
