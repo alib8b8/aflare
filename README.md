@@ -8,8 +8,8 @@
     <a href="https://github.com/alib8b8/llm-box/actions/workflows/ci.yml">
       <img src="https://img.shields.io/github/actions/workflow/status/alib8b8/llm-box/ci.yml?branch=main&style=flat-square&label=CI" alt="CI Status" />
     </a>
-    <a href="https://codecov.io/gh/alib8b8/llm-box">
-      <img src="https://img.shields.io/codecov/c/github/alib8b8/llm-box?style=flat-square&label=coverage" alt="Coverage" />
+    <a href="https://github.com/alib8b8/llm-box/blob/main/coverage.out">
+      <img src="https://raw.githubusercontent.com/alib8b8/llm-box/main/coverage-badge.svg" alt="Coverage" />
     </a>
     <a href="https://github.com/alib8b8/llm-box/releases">
       <img src="https://img.shields.io/github/v/release/alib8b8/llm-box?display_name=tag&include_prereleases&style=flat-square" alt="release" />
