@@ -223,15 +223,15 @@ func (i *IntentURI) ToJSON() (string, error) {
 }
 
 type TaskMessage struct {
-	ID        string            `json:"id"`
-	Version   string            `json:"version"`
-	Timestamp time.Time         `json:"timestamp"`
-	Intent    *IntentURI        `json:"intent"`
-	Workflow  string            `json:"workflow,omitempty"`
+	ID        string                 `json:"id"`
+	Version   string                 `json:"version"`
+	Timestamp time.Time              `json:"timestamp"`
+	Intent    *IntentURI             `json:"intent"`
+	Workflow  string                 `json:"workflow,omitempty"`
 	Context   map[string]interface{} `json:"context,omitempty"`
-	Status    TaskStatus        `json:"status"`
-	Result    string            `json:"result,omitempty"`
-	Error     string            `json:"error,omitempty"`
+	Status    TaskStatus             `json:"status"`
+	Result    string                 `json:"result,omitempty"`
+	Error     string                 `json:"error,omitempty"`
 }
 
 type TaskStatus string
@@ -306,12 +306,12 @@ func validateTaskStatus(status TaskStatus) bool {
 }
 
 type WorkflowType struct {
-	Name            string   `json:"name"`
-	Description     string   `json:"description"`
-	Category        string   `json:"category"`
-	RequiredParams  []string `json:"required_params,omitempty"`
-	OptionalParams  []string `json:"optional_params,omitempty"`
-	Examples        []string `json:"examples,omitempty"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	Category       string   `json:"category"`
+	RequiredParams []string `json:"required_params,omitempty"`
+	OptionalParams []string `json:"optional_params,omitempty"`
+	Examples       []string `json:"examples,omitempty"`
 }
 
 var StandardWorkflowTypes = []WorkflowType{

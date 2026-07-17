@@ -30,13 +30,13 @@ type EdgeRouter struct {
 }
 
 type EdgeConfig struct {
-	LocalModelEndpoint string                   `json:"local_model_endpoint"`
-	LocalModelName     string                   `json:"local_model_name"`
+	LocalModelEndpoint string                      `json:"local_model_endpoint"`
+	LocalModelName     string                      `json:"local_model_name"`
 	CloudModels        map[string]CloudModelConfig `json:"cloud_models"`
-	PrivacyLevel       PrivacyLevel             `json:"privacy_level"`
-	LocalThreshold     int                      `json:"local_threshold"`
-	EnableFallback     bool                     `json:"enable_fallback"`
-	MaxLatency         int                      `json:"max_latency"`
+	PrivacyLevel       PrivacyLevel                `json:"privacy_level"`
+	LocalThreshold     int                         `json:"local_threshold"`
+	EnableFallback     bool                        `json:"enable_fallback"`
+	MaxLatency         int                         `json:"max_latency"`
 }
 
 type PrivacyLevel string

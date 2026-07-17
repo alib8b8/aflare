@@ -11,14 +11,14 @@ import (
 var (
 	validAppNames = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 	validActions  = map[string]bool{
-		"click":         true, "long_click": true, "type": true,
-		"scroll":        true, "swipe": true, "pinch": true, "drag": true,
-		"wait_element":  true, "screenshot": true, "open": true,
-		"search":        true, "share": true, "edit": true, "view": true,
+		"click": true, "long_click": true, "type": true,
+		"scroll": true, "swipe": true, "pinch": true, "drag": true,
+		"wait_element": true, "screenshot": true, "open": true,
+		"search": true, "share": true, "edit": true, "view": true,
 	}
 	validWorkflows = map[string]bool{
-		"share_content":     true, "save_for_later": true,
-		"compare_prices":    true, "book_and_add_calendar": true,
+		"share_content": true, "save_for_later": true,
+		"compare_prices": true, "book_and_add_calendar": true,
 	}
 )
 
@@ -33,8 +33,10 @@ func init() {
 
 type AppLaunchNode struct{}
 
-func (n *AppLaunchNode) Name() string        { return "app_launch" }
-func (n *AppLaunchNode) Description() string { return "Launch a mobile/desktop app with optional parameters" }
+func (n *AppLaunchNode) Name() string { return "app_launch" }
+func (n *AppLaunchNode) Description() string {
+	return "Launch a mobile/desktop app with optional parameters"
+}
 func (n *AppLaunchNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "app_launch",
@@ -143,8 +145,10 @@ func validateAppParams(params map[string]interface{}) error {
 
 type UIAutomateNode struct{}
 
-func (n *UIAutomateNode) Name() string        { return "ui_automate" }
-func (n *UIAutomateNode) Description() string { return "Automate UI interactions: click, type, scroll, swipe" }
+func (n *UIAutomateNode) Name() string { return "ui_automate" }
+func (n *UIAutomateNode) Description() string {
+	return "Automate UI interactions: click, type, scroll, swipe"
+}
 func (n *UIAutomateNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "ui_automate",
@@ -320,7 +324,7 @@ func (n *IntentRouterNode) Execute(ctx context.Context, input string, params map
 
 	domains := strings.Split(getMobileParam(params, "domains", "travel,food,shopping,entertainment,work,communication,system"), ",")
 	validDomains := map[string]bool{
-		"travel":        true, "food": true, "shopping": true,
+		"travel": true, "food": true, "shopping": true,
 		"entertainment": true, "work": true, "communication": true, "system": true,
 	}
 	for _, d := range domains {
@@ -337,13 +341,13 @@ func (n *IntentRouterNode) Execute(ctx context.Context, input string, params map
 	intent := classifyIntent(input, domains)
 
 	result := map[string]interface{}{
-		"type":            "intent_router",
-		"mode":            mode,
-		"input":           truncateInput(input, 500),
-		"classification":  intent,
-		"handler":         intent["handler"],
-		"fallback":        fallback,
-		"version":         "1.0",
+		"type":           "intent_router",
+		"mode":           mode,
+		"input":          truncateInput(input, 500),
+		"classification": intent,
+		"handler":        intent["handler"],
+		"fallback":       fallback,
+		"version":        "1.0",
 	}
 
 	output, _ := json.MarshalIndent(result, "", "  ")
@@ -409,8 +413,10 @@ func classifyIntent(input string, domains []string) map[string]interface{} {
 
 type DeviceStateNode struct{}
 
-func (n *DeviceStateNode) Name() string        { return "device_state" }
-func (n *DeviceStateNode) Description() string { return "Query device state: battery, network, location" }
+func (n *DeviceStateNode) Name() string { return "device_state" }
+func (n *DeviceStateNode) Description() string {
+	return "Query device state: battery, network, location"
+}
 func (n *DeviceStateNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "device_state",
