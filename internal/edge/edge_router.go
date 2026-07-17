@@ -1,24 +1,26 @@
-// Package edge provides edge-side AI agent capabilities for llm-box.
-// It enables local-first execution with cloud enhancement, similar to
-// Apple Intelligence's Private Cloud Compute approach.
 package edge
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 )
 
-// =============================================================================
-// Edge Router - Local-first AI task routing
-// =============================================================================
+const (
+	maxPromptLength    = 32768
+	maxTaskIDLength    = 100
+	maxProviderNameLen = 50
+)
 
-// EdgeRouter routes tasks between local and cloud models
 type EdgeRouter struct {
 	config      EdgeConfig
 	localModel  LocalModel
@@ -27,51 +29,31 @@ type EdgeRouter struct {
 	mu          sync.RWMutex
 }
 
-// EdgeConfig configures the edge router
 type EdgeConfig struct {
-	// LocalModelEndpoint is the local model endpoint (e.g., http://localhost:11434)
-	LocalModelEndpoint string `json:"local_model_endpoint"`
-
-	// LocalModelName is the default local model (e.g., llama3, qwen2)
-	LocalModelName string `json:"local_model_name"`
-
-	// CloudModels maps provider names to endpoints
-	CloudModels map[string]CloudModelConfig `json:"cloud_models"`
-
-	// PrivacyLevel controls data routing
-	// "strict" - never send to cloud
-	// "balanced" - send non-sensitive to cloud
-	// "permissive" - send all to best model
-	PrivacyLevel PrivacyLevel `json:"privacy_level"`
-
-	// LocalThreshold is the complexity threshold for local execution (0-10)
-	LocalThreshold int `json:"local_threshold"`
-
-	// EnableFallback enables fallback to cloud if local fails
-	EnableFallback bool `json:"enable_fallback"`
-
-	// MaxLatency is the maximum acceptable latency (ms)
-	MaxLatency int `json:"max_latency"`
+	LocalModelEndpoint string                   `json:"local_model_endpoint"`
+	LocalModelName     string                   `json:"local_model_name"`
+	CloudModels        map[string]CloudModelConfig `json:"cloud_models"`
+	PrivacyLevel       PrivacyLevel             `json:"privacy_level"`
+	LocalThreshold     int                      `json:"local_threshold"`
+	EnableFallback     bool                     `json:"enable_fallback"`
+	MaxLatency         int                      `json:"max_latency"`
 }
 
-// PrivacyLevel defines privacy level for task routing
 type PrivacyLevel string
 
 const (
-	PrivacyStrict     PrivacyLevel = "strict"     // Never send to cloud
-	PrivacyBalanced   PrivacyLevel = "balanced"   // Send non-sensitive to cloud
-	PrivacyPermissive PrivacyLevel = "permissive" // Send all to best model
+	PrivacyStrict     PrivacyLevel = "strict"
+	PrivacyBalanced   PrivacyLevel = "balanced"
+	PrivacyPermissive PrivacyLevel = "permissive"
 )
 
-// CloudModelConfig configures a cloud model
 type CloudModelConfig struct {
 	Endpoint string `json:"endpoint"`
-	APIKey   string `json:"api_key"`
+	APIKey   string `json:"api_key,omitempty"`
 	Model    string `json:"model"`
-	Priority int    `json:"priority"` // Higher = preferred
+	Priority int    `json:"priority"`
 }
 
-// LocalModel represents a local model (e.g., Ollama)
 type LocalModel interface {
 	IsAvailable() bool
 	GetModelName() string
@@ -79,14 +61,12 @@ type LocalModel interface {
 	GetMetrics() LocalMetrics
 }
 
-// CloudModel represents a cloud model (e.g., OpenAI, DeepSeek)
 type CloudModel interface {
 	GetProviderName() string
 	Execute(ctx context.Context, prompt string, opts map[string]string) (string, error)
 	GetMetrics() CloudMetrics
 }
 
-// LocalMetrics contains local model metrics
 type LocalMetrics struct {
 	Available    bool    `json:"available"`
 	ModelName    string  `json:"model_name"`
@@ -95,7 +75,6 @@ type LocalMetrics struct {
 	AvgLatencyMs int64   `json:"avg_latency_ms"`
 }
 
-// CloudMetrics contains cloud model metrics
 type CloudMetrics struct {
 	Provider     string `json:"provider"`
 	Available    bool   `json:"available"`
@@ -103,7 +82,6 @@ type CloudMetrics struct {
 	TotalCalls   int    `json:"total_calls"`
 }
 
-// RouterStats contains routing statistics
 type RouterStats struct {
 	LocalCalls   int     `json:"local_calls"`
 	CloudCalls   int     `json:"cloud_calls"`
@@ -112,20 +90,80 @@ type RouterStats struct {
 	AvgLocalLat  int64   `json:"avg_local_latency_ms"`
 	AvgCloudLat  int64   `json:"avg_cloud_latency_ms"`
 	TotalTokens  int     `json:"total_tokens"`
-	SavingsPct   float64 `json:"savings_pct"` // % saved by local
+	SavingsPct   float64 `json:"savings_pct"`
 }
 
-// NewEdgeRouter creates a new edge router
-func NewEdgeRouter(config EdgeConfig) *EdgeRouter {
+func NewEdgeRouter(config EdgeConfig) (*EdgeRouter, error) {
+	if err := validateEdgeConfig(config); err != nil {
+		return nil, err
+	}
+
 	return &EdgeRouter{
 		config:      config,
 		cloudModels: make(map[string]CloudModel),
 		stats:       RouterStats{},
-	}
+	}, nil
 }
 
-// Route decides where to execute a task
-func (r *EdgeRouter) Route(ctx context.Context, task TaskRequest) RouteDecision {
+func validateEdgeConfig(config EdgeConfig) error {
+	if config.LocalThreshold < 0 || config.LocalThreshold > 10 {
+		return fmt.Errorf("local_threshold must be between 0 and 10")
+	}
+
+	if config.MaxLatency < 0 {
+		return fmt.Errorf("max_latency cannot be negative")
+	}
+
+	switch config.PrivacyLevel {
+	case PrivacyStrict, PrivacyBalanced, PrivacyPermissive:
+	default:
+		return fmt.Errorf("invalid privacy_level: %s", config.PrivacyLevel)
+	}
+
+	for name, cm := range config.CloudModels {
+		if len(name) > maxProviderNameLen {
+			return fmt.Errorf("cloud model provider name too long: %s", name)
+		}
+		if cm.Endpoint == "" {
+			return fmt.Errorf("cloud model %s requires endpoint", name)
+		}
+		if cm.Model == "" {
+			return fmt.Errorf("cloud model %s requires model", name)
+		}
+		if err := validateEndpoint(cm.Endpoint); err != nil {
+			return fmt.Errorf("invalid endpoint for %s: %w", name, err)
+		}
+	}
+
+	return nil
+}
+
+func validateEndpoint(endpoint string) error {
+	if len(endpoint) > 2048 {
+		return fmt.Errorf("endpoint too long")
+	}
+
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return fmt.Errorf("invalid endpoint URL: %w", err)
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("endpoint must use http or https")
+	}
+
+	if u.User != nil {
+		return fmt.Errorf("endpoint cannot contain credentials")
+	}
+
+	return nil
+}
+
+func (r *EdgeRouter) Route(ctx context.Context, task TaskRequest) (RouteDecision, error) {
+	if err := validateTaskRequest(task); err != nil {
+		return RouteDecision{}, err
+	}
+
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -134,50 +172,61 @@ func (r *EdgeRouter) Route(ctx context.Context, task TaskRequest) RouteDecision 
 		Timestamp: time.Now(),
 	}
 
-	// Check privacy level
 	if r.config.PrivacyLevel == PrivacyStrict {
 		decision.Target = TargetLocal
 		decision.Reason = "privacy_strict_mode"
-		return decision
+		return decision, nil
 	}
 
-	// Check if task contains sensitive data
 	if task.ContainsSensitiveData && r.config.PrivacyLevel == PrivacyBalanced {
 		decision.Target = TargetLocal
 		decision.Reason = "contains_sensitive_data"
-		return decision
+		return decision, nil
 	}
 
-	// Analyze task complexity
 	complexity := r.analyzeComplexity(task)
 
-	// Route based on complexity and threshold
 	if complexity <= r.config.LocalThreshold {
-		// Check if local model is available
 		if r.localModel != nil && r.localModel.IsAvailable() {
 			decision.Target = TargetLocal
 			decision.Reason = fmt.Sprintf("low_complexity_%d", complexity)
-			return decision
+			return decision, nil
 		}
 	}
 
-	// Route to cloud
 	if r.config.PrivacyLevel == PrivacyPermissive || !task.ContainsSensitiveData {
 		decision.Target = TargetCloud
 		decision.Reason = fmt.Sprintf("high_complexity_%d", complexity)
 		decision.Provider = r.selectBestCloudProvider()
-		return decision
+		return decision, nil
 	}
 
-	// Fallback to local
 	decision.Target = TargetLocal
 	decision.Reason = "privacy_balanced_fallback"
-	return decision
+	return decision, nil
 }
 
-// Execute executes a task on the decided target
+func validateTaskRequest(task TaskRequest) error {
+	if task.ID == "" {
+		return fmt.Errorf("task ID is required")
+	}
+	if len(task.ID) > maxTaskIDLength {
+		return fmt.Errorf("task ID too long")
+	}
+	if len(task.Prompt) > maxPromptLength {
+		return fmt.Errorf("prompt too long (max %d characters)", maxPromptLength)
+	}
+	if len(task.Prompt) == 0 {
+		return fmt.Errorf("prompt cannot be empty")
+	}
+	return nil
+}
+
 func (r *EdgeRouter) Execute(ctx context.Context, task TaskRequest) (TaskResult, error) {
-	decision := r.Route(ctx, task)
+	decision, err := r.Route(ctx, task)
+	if err != nil {
+		return TaskResult{}, err
+	}
 
 	result := TaskResult{
 		TaskID:  task.ID,
@@ -185,47 +234,48 @@ func (r *EdgeRouter) Execute(ctx context.Context, task TaskRequest) (TaskResult,
 	}
 
 	var output string
-	var err error
+	var execErr error
 	startTime := time.Now()
 
 	switch decision.Target {
 	case TargetLocal:
-		output, err = r.executeLocal(ctx, task)
+		output, execErr = r.executeLocal(ctx, task)
 		r.mu.Lock()
 		r.stats.LocalCalls++
-		if err == nil {
+		if execErr == nil {
 			r.stats.LocalSuccess++
 			r.stats.AvgLocalLat = (r.stats.AvgLocalLat + time.Since(startTime).Milliseconds()) / 2
 		}
 		r.mu.Unlock()
 
 	case TargetCloud:
-		output, err = r.executeCloud(ctx, task, decision.Provider)
+		output, execErr = r.executeCloud(ctx, task, decision.Provider)
 		r.mu.Lock()
 		r.stats.CloudCalls++
-		if err == nil {
+		if execErr == nil {
 			r.stats.CloudSuccess++
 			r.stats.AvgCloudLat = (r.stats.AvgCloudLat + time.Since(startTime).Milliseconds()) / 2
 		}
 		r.mu.Unlock()
 	}
 
-	if err != nil && r.config.EnableFallback && decision.Target == TargetLocal {
-		// Fallback to cloud
-		output, err = r.executeCloud(ctx, task, r.selectBestCloudProvider())
+	if execErr != nil && r.config.EnableFallback && decision.Target == TargetLocal {
+		output, execErr = r.executeCloud(ctx, task, r.selectBestCloudProvider())
 		result.FallbackUsed = true
 	}
 
 	result.Output = output
-	result.Error = err
+	result.ErrorMsg = ""
+	if execErr != nil {
+		result.ErrorMsg = execErr.Error()
+	}
 	result.LatencyMs = time.Since(startTime).Milliseconds()
 	result.Decision = decision
-	result.Success = err == nil
+	result.Success = execErr == nil
 
-	return result, err
+	return result, execErr
 }
 
-// executeLocal executes on local model
 func (r *EdgeRouter) executeLocal(ctx context.Context, task TaskRequest) (string, error) {
 	if r.localModel == nil || !r.localModel.IsAvailable() {
 		return "", fmt.Errorf("local model not available")
@@ -233,7 +283,6 @@ func (r *EdgeRouter) executeLocal(ctx context.Context, task TaskRequest) (string
 	return r.localModel.Execute(ctx, task.Prompt, task.Options)
 }
 
-// executeCloud executes on cloud model
 func (r *EdgeRouter) executeCloud(ctx context.Context, task TaskRequest, provider string) (string, error) {
 	model, ok := r.cloudModels[provider]
 	if !ok {
@@ -242,11 +291,9 @@ func (r *EdgeRouter) executeCloud(ctx context.Context, task TaskRequest, provide
 	return model.Execute(ctx, task.Prompt, task.Options)
 }
 
-// analyzeComplexity analyzes task complexity (0-10)
 func (r *EdgeRouter) analyzeComplexity(task TaskRequest) int {
-	complexity := 5 // Default medium complexity
+	complexity := 5
 
-	// Analyze prompt length
 	promptLen := len(task.Prompt)
 	if promptLen > 1000 {
 		complexity += 2
@@ -254,7 +301,6 @@ func (r *EdgeRouter) analyzeComplexity(task TaskRequest) int {
 		complexity += 1
 	}
 
-	// Analyze keywords
 	complexKeywords := []string{
 		"分析", "比较", "评估", "研究", "深度",
 		"analyze", "compare", "evaluate", "research", "complex",
@@ -277,7 +323,6 @@ func (r *EdgeRouter) analyzeComplexity(task TaskRequest) int {
 		}
 	}
 
-	// Cap at 0-10
 	if complexity < 0 {
 		complexity = 0
 	}
@@ -288,7 +333,6 @@ func (r *EdgeRouter) analyzeComplexity(task TaskRequest) int {
 	return complexity
 }
 
-// selectBestCloudProvider selects the best cloud provider
 func (r *EdgeRouter) selectBestCloudProvider() string {
 	bestProvider := ""
 	bestPriority := -1
@@ -301,12 +345,11 @@ func (r *EdgeRouter) selectBestCloudProvider() string {
 	}
 
 	if bestProvider == "" {
-		return "openai" // Default
+		return "openai"
 	}
 	return bestProvider
 }
 
-// GetStats returns routing statistics
 func (r *EdgeRouter) GetStats() RouterStats {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -320,11 +363,6 @@ func (r *EdgeRouter) GetStats() RouterStats {
 	return stats
 }
 
-// =============================================================================
-// Task Types
-// =============================================================================
-
-// TaskRequest represents a task to be routed
 type TaskRequest struct {
 	ID                    string            `json:"id"`
 	Prompt                string            `json:"prompt"`
@@ -333,18 +371,16 @@ type TaskRequest struct {
 	Metadata              map[string]string `json:"metadata"`
 }
 
-// TaskResult represents the result of a task
 type TaskResult struct {
 	TaskID       string        `json:"task_id"`
 	Output       string        `json:"output"`
 	Success      bool          `json:"success"`
-	Error        error         `json:"error,omitempty"`
+	ErrorMsg     string        `json:"error,omitempty"`
 	LatencyMs    int64         `json:"latency_ms"`
 	FallbackUsed bool          `json:"fallback_used"`
 	Decision     RouteDecision `json:"decision"`
 }
 
-// RouteDecision represents a routing decision
 type RouteDecision struct {
 	TaskID    string    `json:"task_id"`
 	Target    Target    `json:"target"`
@@ -353,7 +389,6 @@ type RouteDecision struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// Target represents where to execute
 type Target string
 
 const (
@@ -361,11 +396,6 @@ const (
 	TargetCloud Target = "cloud"
 )
 
-// =============================================================================
-// Ollama Local Model Implementation
-// =============================================================================
-
-// OllamaModel is a local Ollama model
 type OllamaModel struct {
 	endpoint  string
 	modelName string
@@ -373,7 +403,6 @@ type OllamaModel struct {
 	metrics   LocalMetrics
 }
 
-// NewOllamaModel creates a new Ollama model
 func NewOllamaModel(endpoint, modelName string) *OllamaModel {
 	return &OllamaModel{
 		endpoint:  endpoint,
@@ -381,33 +410,22 @@ func NewOllamaModel(endpoint, modelName string) *OllamaModel {
 	}
 }
 
-// IsAvailable checks if Ollama is available
 func (o *OllamaModel) IsAvailable() bool {
-	// Check if endpoint is reachable (simplified)
 	return o.available
 }
 
-// GetModelName returns the model name
 func (o *OllamaModel) GetModelName() string {
 	return o.modelName
 }
 
-// Execute executes a prompt
 func (o *OllamaModel) Execute(ctx context.Context, prompt string, opts map[string]string) (string, error) {
-	// Simplified: actual implementation would call Ollama API
 	return fmt.Sprintf("Local model %s response for: %s", o.modelName, prompt[:min(50, len(prompt))]), nil
 }
 
-// GetMetrics returns local metrics
 func (o *OllamaModel) GetMetrics() LocalMetrics {
 	return o.metrics
 }
 
-// =============================================================================
-// Device Capability Detection
-// =============================================================================
-
-// DeviceCapability represents device capabilities for model selection
 type DeviceCapability struct {
 	CPUCount   int     `json:"cpu_count"`
 	MemoryGB   float64 `json:"memory_gb"`
@@ -420,46 +438,34 @@ type DeviceCapability struct {
 	OnCellular bool    `json:"on_cellular"`
 }
 
-// DetectCapability detects device capabilities
 func DetectCapability() DeviceCapability {
 	cap := DeviceCapability{
 		CPUCount: runtime.NumCPU(),
 	}
 
-	// Get memory info
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	cap.MemoryGB = float64(m.Sys) / 1024 / 1024 / 1024
 
-	// Check for GPU (simplified)
 	if os.Getenv("CUDA_VISIBLE_DEVICES") != "" || os.Getenv("NVIDIA_VISIBLE_DEVICES") != "" {
 		cap.HasGPU = true
 	}
 
-	// Check if mobile (simplified - would need platform-specific detection)
 	cap.IsMobile = os.Getenv("ANDROID_ROOT") != "" || os.Getenv("TERMUX_VERSION") != ""
 
 	return cap
 }
 
-// RecommendLocalModel recommends a local model based on device capability
 func RecommendLocalModel(cap DeviceCapability) string {
-	// High-end device with GPU
 	if cap.HasGPU && cap.MemoryGB >= 16 {
 		return "llama3:70b"
 	}
-
-	// Medium device with GPU
 	if cap.HasGPU && cap.MemoryGB >= 8 {
 		return "llama3:8b"
 	}
-
-	// Low-end device or mobile
 	if cap.MemoryGB < 8 || cap.IsMobile {
-		return "llama3:2b-q4" // Quantized for efficiency
+		return "llama3:2b-q4"
 	}
-
-	// Default
 	return "llama3:7b"
 }
 
@@ -470,57 +476,71 @@ func min(a, b int) int {
 	return b
 }
 
-// =============================================================================
-// Privacy Analyzer - Detect sensitive data
-// =============================================================================
-
-// PrivacyAnalyzer analyzes text for sensitive content
 type PrivacyAnalyzer struct {
-	sensitivePatterns []string
+	sensitivePatterns []*regexp.Regexp
 }
 
-// NewPrivacyAnalyzer creates a privacy analyzer
 func NewPrivacyAnalyzer() *PrivacyAnalyzer {
 	return &PrivacyAnalyzer{
-		sensitivePatterns: []string{
-			"密码", "password", "secret", "token",
-			"身份证", "id_card", "ssn", "social_security",
-			"银行卡", "credit_card", "card_number",
-			"私钥", "private_key", "api_key",
-			"地址", "address", "location",
-			"手机号", "phone", "telephone",
-			"邮箱", "email", "mail",
+		sensitivePatterns: []*regexp.Regexp{
+			regexp.MustCompile(`(?i)\b密码\b`),
+			regexp.MustCompile(`(?i)\bpassword\b`),
+			regexp.MustCompile(`(?i)\bsecret\b`),
+			regexp.MustCompile(`(?i)\btoken\b`),
+			regexp.MustCompile(`(?i)\b身份证\b`),
+			regexp.MustCompile(`(?i)\bid[_-]?card\b`),
+			regexp.MustCompile(`(?i)\bssn\b`),
+			regexp.MustCompile(`(?i)\bsocial[_-]?security\b`),
+			regexp.MustCompile(`(?i)\b银行卡\b`),
+			regexp.MustCompile(`(?i)\bcredit[_-]?card\b`),
+			regexp.MustCompile(`(?i)\bcard[_-]?number\b`),
+			regexp.MustCompile(`(?i)\b私钥\b`),
+			regexp.MustCompile(`(?i)\bprivate[_-]?key\b`),
+			regexp.MustCompile(`(?i)\bapi[_-]?key\b`),
+			regexp.MustCompile(`(?i)\b地址\b`),
+			regexp.MustCompile(`(?i)\baddress\b`),
+			regexp.MustCompile(`(?i)\blocation\b`),
+			regexp.MustCompile(`(?i)\b手机号\b`),
+			regexp.MustCompile(`(?i)\bphone\b`),
+			regexp.MustCompile(`(?i)\btelephone\b`),
+			regexp.MustCompile(`(?i)\b邮箱\b`),
+			regexp.MustCompile(`(?i)\bemail\b`),
+			regexp.MustCompile(`(?i)\bmail\b`),
+			regexp.MustCompile(`(?i)\bghp_[A-Za-z0-9]{20,}\b`),
+			regexp.MustCompile(`(?i)\bsk-[A-Za-z0-9]{20,}\b`),
+			regexp.MustCompile(`(?i)\bxox[baprs]-[A-Za-z0-9-]{10,}\b`),
+			regexp.MustCompile(`(?i)\bearer\s+[A-Za-z0-9-_]{10,}`),
+			regexp.MustCompile(`(?i)\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`),
+			regexp.MustCompile(`(?i)\b\d{3}[-.]?\d{3}[-.]?\d{4}\b`),
+			regexp.MustCompile(`(?i)\b\d{11}\b`),
+			regexp.MustCompile(`(?i)\b\d{6}[-]?\d{4}[-]?\d{4}[-]?\d{4}\b`),
 		},
 	}
 }
 
-// Analyze checks if text contains sensitive data
 func (p *PrivacyAnalyzer) Analyze(text string) bool {
 	textLower := strings.ToLower(text)
 	for _, pattern := range p.sensitivePatterns {
-		if strings.Contains(textLower, strings.ToLower(pattern)) {
+		if pattern.MatchString(textLower) {
 			return true
 		}
 	}
-
-	// Check for potential patterns (credit card, email, etc.)
-	// This is simplified - would use regex in production
-	if strings.Contains(text, "@") && strings.Contains(text, ".") {
-		return true // Possible email
-	}
-
 	return false
 }
 
-// =============================================================================
-// JSON helpers
-// =============================================================================
-
-// ToJSON converts to JSON string
 func ToJSON(v interface{}) (string, error) {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return "", err
 	}
 	return string(data), nil
+}
+
+func GenerateSecureID() string {
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		return fmt.Sprintf("edge-%d", time.Now().UnixNano())
+	}
+	return base64.URLEncoding.EncodeToString(b)
 }

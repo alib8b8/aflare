@@ -74,8 +74,21 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 		return "", fmt.Errorf("command parameter is required")
 	}
 
+	if len(command) > 4096 {
+		return "", fmt.Errorf("command too long (max 4096 characters)")
+	}
+
 	dryRun := getParam(params, "dry_run", "false") == "true"
 	timeoutStr := getParam(params, "timeout", "5m")
+
+	if len(params) > 10 {
+		return "", fmt.Errorf("too many parameters (max 10)")
+	}
+	for k, v := range params {
+		if len(k) > 50 || len(v) > 1000 {
+			return "", fmt.Errorf("parameter %s too long", k)
+		}
+	}
 
 	// When allowlist is enabled, block shell metacharacters to prevent injection
 	if allowListEnabled {

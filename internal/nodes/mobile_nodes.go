@@ -1,16 +1,28 @@
-// Package nodes provides built-in workflow nodes for mobile and cross-platform AI systems.
-// These nodes enable llm-box to serve as the orchestration engine for AI-powered operating systems.
 package nodes
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
+var (
+	validAppNames = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+	validActions  = map[string]bool{
+		"click":         true, "long_click": true, "type": true,
+		"scroll":        true, "swipe": true, "pinch": true, "drag": true,
+		"wait_element":  true, "screenshot": true, "open": true,
+		"search":        true, "share": true, "edit": true, "view": true,
+	}
+	validWorkflows = map[string]bool{
+		"share_content":     true, "save_for_later": true,
+		"compare_prices":    true, "book_and_add_calendar": true,
+	}
+)
+
 func init() {
-	// Mobile & Cross-platform nodes
 	Register(&AppLaunchNode{})
 	Register(&UIAutomateNode{})
 	Register(&NotificationNode{})
@@ -19,16 +31,10 @@ func init() {
 	Register(&CrossAppActionNode{})
 }
 
-// =============================================================================
-// App Launch Node - Launch and control mobile apps
-// =============================================================================
-
 type AppLaunchNode struct{}
 
-func (n *AppLaunchNode) Name() string { return "app_launch" }
-func (n *AppLaunchNode) Description() string {
-	return "Launch a mobile/desktop app with optional parameters"
-}
+func (n *AppLaunchNode) Name() string        { return "app_launch" }
+func (n *AppLaunchNode) Description() string { return "Launch a mobile/desktop app with optional parameters" }
 func (n *AppLaunchNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "app_launch",
@@ -38,7 +44,7 @@ func (n *AppLaunchNode) Schema() NodeSchema {
 		Params: []ParamSchema{
 			{Name: "app", Type: "string", Description: "App identifier: package name (Android), bundle ID (iOS), app name (desktop)", Required: true},
 			{Name: "action", Type: "string", Description: "Deep link action: open, search, share, edit, view (default: open)", Required: false, Default: "open"},
-			{Name: "uri", Type: "string", Description: "Deep link URI or URL scheme (e.g., myapp://detail?id=123)", Required: false},
+			{Name: "uri", Type: "string", Description: "Deep link URI or URL scheme", Required: false},
 			{Name: "params", Type: "string", Description: "JSON parameters to pass to the app", Required: false},
 			{Name: "wait", Type: "string", Description: "Wait for app to fully launch: true/false (default: true)", Required: false, Default: "true"},
 			{Name: "timeout", Type: "string", Description: "Launch timeout (default: 10s)", Required: false, Default: "10s"},
@@ -52,44 +58,93 @@ func (n *AppLaunchNode) Execute(ctx context.Context, input string, params map[st
 		return "", fmt.Errorf("app parameter is required")
 	}
 
+	if !validAppNames.MatchString(app) {
+		return "", fmt.Errorf("invalid app name: contains invalid characters")
+	}
+
 	action := getMobileParam(params, "action", "open")
+	if !validActions[action] {
+		return "", fmt.Errorf("invalid action: %s (allowed: open, search, share, edit, view)", action)
+	}
+
 	uri := params["uri"]
+	if uri != "" {
+		if err := validateAppURI(uri); err != nil {
+			return "", err
+		}
+	}
+
 	extraParams := params["params"]
-	wait := getMobileParam(params, "wait", "true") == "true"
+	var parsedParams map[string]interface{}
+	if extraParams != "" {
+		if err := json.Unmarshal([]byte(extraParams), &parsedParams); err != nil {
+			return "", fmt.Errorf("invalid params JSON: %w", err)
+		}
+		if err := validateAppParams(parsedParams); err != nil {
+			return "", err
+		}
+	}
 
 	intent := map[string]interface{}{
 		"type":    "app_launch",
 		"app":     app,
 		"action":  action,
-		"wait":    wait,
-		"input":   input,
+		"wait":    getMobileParam(params, "wait", "true") == "true",
+		"input":   truncateInput(input, 1000),
 		"version": "1.0",
 	}
 
 	if uri != "" {
 		intent["uri"] = uri
 	}
-	if extraParams != "" {
-		var parsed map[string]interface{}
-		if err := json.Unmarshal([]byte(extraParams), &parsed); err == nil {
-			intent["params"] = parsed
-		}
+	if parsedParams != nil {
+		intent["params"] = parsedParams
 	}
 
 	result, _ := json.MarshalIndent(intent, "", "  ")
 	return fmt.Sprintf("App launch intent created:\n%s", string(result)), nil
 }
 
-// =============================================================================
-// UI Automate Node - Automated UI interactions
-// =============================================================================
+func validateAppURI(uri string) error {
+	if len(uri) > 4096 {
+		return fmt.Errorf("URI too long")
+	}
+	disallowedSchemes := []string{"file://", "data://", "javascript://", "ftp://"}
+	for _, scheme := range disallowedSchemes {
+		if strings.HasPrefix(strings.ToLower(uri), scheme) {
+			return fmt.Errorf("URI scheme not allowed: %s", scheme)
+		}
+	}
+	return nil
+}
+
+func validateAppParams(params map[string]interface{}) error {
+	for k, v := range params {
+		if len(k) > 100 {
+			return fmt.Errorf("parameter key too long")
+		}
+		switch val := v.(type) {
+		case string:
+			if len(val) > 1000 {
+				return fmt.Errorf("parameter value too long for key: %s", k)
+			}
+		case map[string]interface{}:
+			if err := validateAppParams(val); err != nil {
+				return err
+			}
+		case []interface{}:
+			if len(val) > 100 {
+				return fmt.Errorf("array too long for key: %s", k)
+			}
+		}
+	}
+	return nil
+}
 
 type UIAutomateNode struct{}
 
-func (n *UIAutomateNode) Name() string { return "ui_automate" }
-func (n *UIAutomateNode) Description() string {
-	return "Automate UI interactions: click, type, scroll, swipe"
-}
+func (n *UIAutomateNode) Name() string        { return "ui_automate" }
+func (n *UIAutomateNode) Description() string { return "Automate UI interactions: click, type, scroll, swipe" }
 func (n *UIAutomateNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "ui_automate",
@@ -98,7 +153,7 @@ func (n *UIAutomateNode) Schema() NodeSchema {
 		Output:      "string - UI automation result and state changes",
 		Params: []ParamSchema{
 			{Name: "action", Type: "string", Description: "UI action: click, long_click, type, scroll, swipe, pinch, drag, wait_element, screenshot", Required: true},
-			{Name: "selector", Type: "string", Description: "Element selector: id, text, content_desc, class (e.g., 'id:button_submit', 'text:登录')", Required: false},
+			{Name: "selector", Type: "string", Description: "Element selector: id, text, content_desc, class", Required: false},
 			{Name: "x", Type: "string", Description: "X coordinate for swipe/click (0-100% of screen width)", Required: false},
 			{Name: "y", Type: "string", Description: "Y coordinate for swipe/click (0-100% of screen height)", Required: false},
 			{Name: "direction", Type: "string", Description: "Scroll/swipe direction: up, down, left, right", Required: false},
@@ -114,8 +169,19 @@ func (n *UIAutomateNode) Execute(ctx context.Context, input string, params map[s
 		return "", fmt.Errorf("action parameter is required")
 	}
 
+	if !validActions[action] {
+		return "", fmt.Errorf("invalid action: %s (allowed: click, long_click, type, scroll, swipe, pinch, drag, wait_element, screenshot)", action)
+	}
+
 	selector := params["selector"]
+	if selector != "" && len(selector) > 500 {
+		return "", fmt.Errorf("selector too long")
+	}
+
 	text := getMobileParam(params, "text", input)
+	if len(text) > 2000 {
+		text = text[:2000]
+	}
 
 	uiCmd := map[string]interface{}{
 		"type":     "ui_automate",
@@ -147,10 +213,6 @@ func (n *UIAutomateNode) Execute(ctx context.Context, input string, params map[s
 	return fmt.Sprintf("UI automation command:\n%s", string(result)), nil
 }
 
-// =============================================================================
-// Notification Node - Send and manage notifications
-// =============================================================================
-
 type NotificationNode struct{}
 
 func (n *NotificationNode) Name() string        { return "send_notification" }
@@ -177,9 +239,16 @@ func (n *NotificationNode) Execute(ctx context.Context, input string, params map
 		return "", fmt.Errorf("title parameter is required")
 	}
 
+	if len(title) > 100 {
+		title = title[:100]
+	}
+
 	body := getMobileParam(params, "body", input)
 	if body == "" {
 		body = input
+	}
+	if len(body) > 1000 {
+		body = body[:1000]
 	}
 
 	notif := map[string]interface{}{
@@ -193,18 +262,32 @@ func (n *NotificationNode) Execute(ctx context.Context, input string, params map
 
 	if actions := params["actions"]; actions != "" {
 		var parsed []map[string]string
-		if err := json.Unmarshal([]byte(actions), &parsed); err == nil {
-			notif["actions"] = parsed
+		if err := json.Unmarshal([]byte(actions), &parsed); err != nil {
+			return "", fmt.Errorf("invalid actions JSON: %w", err)
 		}
+		if len(parsed) > 3 {
+			return "", fmt.Errorf("too many action buttons (max 3)")
+		}
+		for _, action := range parsed {
+			if _, ok := action["id"]; !ok || action["id"] == "" {
+				return "", fmt.Errorf("action button requires 'id' field")
+			}
+			if _, ok := action["title"]; !ok || action["title"] == "" {
+				return "", fmt.Errorf("action button requires 'title' field")
+			}
+			if len(action["id"]) > 50 {
+				return "", fmt.Errorf("action button id too long")
+			}
+			if len(action["title"]) > 20 {
+				return "", fmt.Errorf("action button title too long")
+			}
+		}
+		notif["actions"] = parsed
 	}
 
 	result, _ := json.MarshalIndent(notif, "", "  ")
 	return fmt.Sprintf("Notification prepared:\n%s", string(result)), nil
 }
-
-// =============================================================================
-// Intent Router Node - Route intents to handlers
-// =============================================================================
 
 type IntentRouterNode struct{}
 
@@ -230,26 +313,43 @@ func (n *IntentRouterNode) Execute(ctx context.Context, input string, params map
 	}
 
 	mode := getMobileParam(params, "mode", "classify")
+	validModes := map[string]bool{"classify": true, "route": true, "execute": true}
+	if !validModes[mode] {
+		return "", fmt.Errorf("invalid mode: %s (allowed: classify, route, execute)", mode)
+	}
+
 	domains := strings.Split(getMobileParam(params, "domains", "travel,food,shopping,entertainment,work,communication,system"), ",")
+	validDomains := map[string]bool{
+		"travel":        true, "food": true, "shopping": true,
+		"entertainment": true, "work": true, "communication": true, "system": true,
+	}
+	for _, d := range domains {
+		if d != "" && !validDomains[d] {
+			return "", fmt.Errorf("invalid domain: %s", d)
+		}
+	}
+
 	fallback := getMobileParam(params, "fallback", "general_assistant")
+	if len(fallback) > 100 {
+		return "", fmt.Errorf("fallback handler name too long")
+	}
 
 	intent := classifyIntent(input, domains)
 
 	result := map[string]interface{}{
-		"type":           "intent_router",
-		"mode":           mode,
-		"input":          input,
-		"classification": intent,
-		"handler":        intent["handler"],
-		"fallback":       fallback,
-		"version":        "1.0",
+		"type":            "intent_router",
+		"mode":            mode,
+		"input":           truncateInput(input, 500),
+		"classification":  intent,
+		"handler":         intent["handler"],
+		"fallback":        fallback,
+		"version":         "1.0",
 	}
 
 	output, _ := json.MarshalIndent(result, "", "  ")
 	return string(output), nil
 }
 
-// classifyIntent performs keyword-based intent classification
 func classifyIntent(input string, domains []string) map[string]interface{} {
 	inputLower := strings.ToLower(input)
 
@@ -307,16 +407,10 @@ func classifyIntent(input string, domains []string) map[string]interface{} {
 	}
 }
 
-// =============================================================================
-// Device State Node - Query device state
-// =============================================================================
-
 type DeviceStateNode struct{}
 
-func (n *DeviceStateNode) Name() string { return "device_state" }
-func (n *DeviceStateNode) Description() string {
-	return "Query device state: battery, network, location"
-}
+func (n *DeviceStateNode) Name() string        { return "device_state" }
+func (n *DeviceStateNode) Description() string { return "Query device state: battery, network, location" }
 func (n *DeviceStateNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "device_state",
@@ -332,6 +426,11 @@ func (n *DeviceStateNode) Schema() NodeSchema {
 func (n *DeviceStateNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	query := getMobileParam(params, "query", "all")
 
+	validQueries := map[string]bool{"battery": true, "network": true, "location": true, "apps": true, "storage": true, "all": true}
+	if !validQueries[query] {
+		return "", fmt.Errorf("invalid query: %s (allowed: battery, network, location, apps, storage, all)", query)
+	}
+
 	state := map[string]interface{}{
 		"type":    "device_state",
 		"query":   query,
@@ -346,10 +445,6 @@ func (n *DeviceStateNode) Execute(ctx context.Context, input string, params map[
 	return fmt.Sprintf("Device state query:\n%s", string(result)), nil
 }
 
-// =============================================================================
-// Cross-App Action Node - Actions that span multiple apps
-// =============================================================================
-
 type CrossAppActionNode struct{}
 
 func (n *CrossAppActionNode) Name() string        { return "cross_app_action" }
@@ -362,7 +457,7 @@ func (n *CrossAppActionNode) Schema() NodeSchema {
 		Output:      "string - cross-app action result",
 		Params: []ParamSchema{
 			{Name: "workflow", Type: "string", Description: "Workflow name: share_content, save_for_later, compare_prices", Required: true},
-			{Name: "apps", Type: "string", Description: "Comma-separated apps involved (e.g., 'wechat,alipay,camera')", Required: false},
+			{Name: "apps", Type: "string", Description: "Comma-separated apps involved", Required: false},
 			{Name: "data", Type: "string", Description: "JSON data to pass between apps", Required: false},
 		},
 	}
@@ -374,17 +469,39 @@ func (n *CrossAppActionNode) Execute(ctx context.Context, input string, params m
 		return "", fmt.Errorf("workflow parameter is required")
 	}
 
+	if !validWorkflows[workflow] {
+		return "", fmt.Errorf("invalid workflow: %s (allowed: share_content, save_for_later, compare_prices, book_and_add_calendar)", workflow)
+	}
+
 	apps := strings.Split(params["apps"], ",")
+	for _, app := range apps {
+		if app != "" && !validAppNames.MatchString(app) {
+			return "", fmt.Errorf("invalid app name: %s", app)
+		}
+	}
+
+	var parsedData map[string]interface{}
+	if data := params["data"]; data != "" {
+		if err := json.Unmarshal([]byte(data), &parsedData); err != nil {
+			return "", fmt.Errorf("invalid data JSON: %w", err)
+		}
+		if err := validateAppParams(parsedData); err != nil {
+			return "", err
+		}
+	}
 
 	action := map[string]interface{}{
 		"type":     "cross_app_action",
 		"workflow": workflow,
-		"input":    input,
+		"input":    truncateInput(input, 500),
 		"version":  "1.0",
 	}
 
 	if len(apps) > 0 && apps[0] != "" {
 		action["apps"] = apps
+	}
+	if parsedData != nil {
+		action["data"] = parsedData
 	}
 
 	steps := generateCrossAppSteps(workflow, apps, input)
@@ -413,10 +530,16 @@ func generateCrossAppSteps(workflow string, apps []string, input string) []map[s
 	}
 }
 
-// Helper function to avoid name collision with existing getParam
 func getMobileParam(params map[string]string, key, defaultVal string) string {
 	if v, ok := params[key]; ok && v != "" {
 		return v
 	}
 	return defaultVal
+}
+
+func truncateInput(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "... (truncated)"
 }
