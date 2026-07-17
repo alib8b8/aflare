@@ -16,6 +16,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.22'
+        cache: true
 
     - name: Build
       run: go build ./...
@@ -32,7 +33,8 @@ jobs:
         echo "Total coverage: ${total}%"
         threshold=65
         echo "Threshold: ${threshold}%"
-        if (( $(echo "$total < $threshold" | bc -l) )); then
+        pass=$(awk -v total="$total" -v threshold="$threshold" 'BEGIN { print (total >= threshold) ? 1 : 0 }')
+        if [ "$pass" -eq 0 ]; then
           echo "FAIL: coverage ${total}% is below threshold ${threshold}%"
           exit 1
         fi
