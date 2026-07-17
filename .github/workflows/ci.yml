@@ -20,26 +20,10 @@ jobs:
     - name: Build
       run: go build ./...
 
-    - name: Test with race detector
-      run: go test ./... -race -short
-
-    - name: Generate coverage profile
+    - name: Test with race detector and generate coverage
       run: |
         go clean -testcache
-        for pkg in ./internal/...; do
-          echo "=== Testing $pkg ==="
-          if ! go test -coverprofile=$(basename $pkg).out -covermode=atomic "$pkg" -short; then
-            echo "FAILED: $pkg"
-            exit 1
-          fi
-        done
-        echo "mode: atomic" > coverage.out
-        for f in *.out; do
-          if [ "$f" != "coverage.out" ]; then
-            tail -n +2 "$f" >> coverage.out
-            rm "$f"
-          fi
-        done
+        go test -race -coverprofile=coverage.out -covermode=atomic ./internal/... -short
 
     - name: Check coverage threshold
       run: |
