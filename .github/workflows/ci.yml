@@ -24,7 +24,9 @@ jobs:
       run: go test ./... -race -short
 
     - name: Generate coverage profile
-      run: go test -coverprofile=coverage.out -covermode=atomic ./internal/... -short
+      run: |
+        go clean -testcache
+        go test -coverprofile=coverage.out -covermode=atomic ./internal/... -short
 
     - name: Check coverage threshold
       run: |
