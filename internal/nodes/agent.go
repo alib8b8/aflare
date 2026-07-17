@@ -46,7 +46,7 @@ func NewReActAgent(provider, model, apiKey, endpoint, systemPrompt string, maxIt
 		apiKey:         apiKey,
 		endpoint:       endpoint,
 		systemPrompt:   systemPrompt,
-		maxIters:        maxIters,
+		maxIters:       maxIters,
 		tools:          tools,
 		registry:       reg,
 		enableThinking: enableThinking,

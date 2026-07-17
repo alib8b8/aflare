@@ -192,8 +192,8 @@ type visionMessageContent struct {
 }
 
 type visionMessage struct {
-	Role    string                  `json:"role"`
-	Content []visionMessageContent  `json:"content"`
+	Role    string                 `json:"role"`
+	Content []visionMessageContent `json:"content"`
 }
 
 type visionRequest struct {

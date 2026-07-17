@@ -47,15 +47,15 @@ type KGEntity struct {
 }
 
 type KGRelation struct {
-	From      string `json:"from"`
-	To        string `json:"to"`
-	Relation  string `json:"relation"`
+	From       string  `json:"from"`
+	To         string  `json:"to"`
+	Relation   string  `json:"relation"`
 	Confidence float64 `json:"confidence,omitempty"`
 }
 
 type KnowledgeGraph struct {
-	Entities  map[string]KGEntity  `json:"entities"`
-	Relations []KGRelation         `json:"relations"`
+	Entities  map[string]KGEntity `json:"entities"`
+	Relations []KGRelation        `json:"relations"`
 }
 
 func NewKnowledgeGraph() *KnowledgeGraph {
@@ -326,10 +326,10 @@ func (n *KnowledgeGraphNode) queryGraph(graphPath, query string, topK int, forma
 	switch format {
 	case "json":
 		result := map[string]interface{}{
-			"query":      query,
-			"entities":   matchedEntities,
-			"relations":  matchedRelations,
-			"total_entities": len(matchedEntities),
+			"query":           query,
+			"entities":        matchedEntities,
+			"relations":       matchedRelations,
+			"total_entities":  len(matchedEntities),
 			"total_relations": len(matchedRelations),
 		}
 		data, _ := json.MarshalIndent(result, "", "  ")
@@ -406,10 +406,10 @@ func (n *KnowledgeGraphNode) traverseGraph(graphPath, startEntity string, maxDep
 	switch format {
 	case "json":
 		data, _ := json.MarshalIndent(map[string]interface{}{
-			"start":    startEntity,
-			"depth":    maxDepth,
-			"visited":  result,
-			"total":    len(result),
+			"start":   startEntity,
+			"depth":   maxDepth,
+			"visited": result,
+			"total":   len(result),
 		}, "", "  ")
 		return string(data), nil
 	default:
@@ -450,10 +450,10 @@ func (n *KnowledgeGraphNode) graphStats(graphPath, format string) (string, error
 	switch format {
 	case "json":
 		data, _ := json.MarshalIndent(map[string]interface{}{
-			"total_entities":   len(kg.Entities),
-			"total_relations":  len(kg.Relations),
-			"entity_types":     typeCounts,
-			"relation_types":   relationCounts,
+			"total_entities":  len(kg.Entities),
+			"total_relations": len(kg.Relations),
+			"entity_types":    typeCounts,
+			"relation_types":  relationCounts,
 		}, "", "  ")
 		return string(data), nil
 	default:

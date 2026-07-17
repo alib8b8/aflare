@@ -93,17 +93,17 @@ func defaultEndpointFor(provider string) string {
 
 func parseToolsList(toolsParam string) []AgentTool {
 	toolMap := map[string]AgentTool{
-		"fetch_url":       {Name: "fetch_url", Description: "Fetch content from a URL", NodeName: "fetch_url"},
-		"http_request":    {Name: "http_request", Description: "Make HTTP requests with any method, headers, body", NodeName: "http_request"},
-		"file_read":       {Name: "file_read", Description: "Read content from a file", NodeName: "file_read"},
-		"file_write":      {Name: "file_write", Description: "Write content to a file", NodeName: "file_write"},
-		"json_parse":      {Name: "json_parse", Description: "Parse and extract fields from JSON", NodeName: "json_parse"},
-		"transform":       {Name: "transform", Description: "Transform text (uppercase, lowercase, trim, replace, regex)", NodeName: "transform"},
-		"combine":         {Name: "combine", Description: "Combine multiple inputs into one", NodeName: "combine"},
-		"template":        {Name: "template", Description: "Render Go template with variables", NodeName: "template_render"},
-		"ollama":          {Name: "ollama_llm", Description: "Call Ollama LLM for analysis", NodeName: "ollama"},
+		"fetch_url":        {Name: "fetch_url", Description: "Fetch content from a URL", NodeName: "fetch_url"},
+		"http_request":     {Name: "http_request", Description: "Make HTTP requests with any method, headers, body", NodeName: "http_request"},
+		"file_read":        {Name: "file_read", Description: "Read content from a file", NodeName: "file_read"},
+		"file_write":       {Name: "file_write", Description: "Write content to a file", NodeName: "file_write"},
+		"json_parse":       {Name: "json_parse", Description: "Parse and extract fields from JSON", NodeName: "json_parse"},
+		"transform":        {Name: "transform", Description: "Transform text (uppercase, lowercase, trim, replace, regex)", NodeName: "transform"},
+		"combine":          {Name: "combine", Description: "Combine multiple inputs into one", NodeName: "combine"},
+		"template":         {Name: "template", Description: "Render Go template with variables", NodeName: "template_render"},
+		"ollama":           {Name: "ollama_llm", Description: "Call Ollama LLM for analysis", NodeName: "ollama"},
 		"code_interpreter": {Name: "code_interpreter", Description: "Execute Python code in a sandbox with file I/O", NodeName: "code_interpreter"},
-		"execute":         {Name: "execute", Description: "Execute shell commands (disabled in safe mode)", NodeName: "execute"},
+		"execute":          {Name: "execute", Description: "Execute shell commands (disabled in safe mode)", NodeName: "execute"},
 	}
 
 	parts := strings.Split(toolsParam, ",")

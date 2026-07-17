@@ -13,14 +13,14 @@ import (
 type NodeCategory string
 
 const (
-	CategoryLLM        NodeCategory = "llm"
-	CategoryAgent      NodeCategory = "agent"
-	CategoryIO         NodeCategory = "io"
-	CategoryTransform  NodeCategory = "transform"
-	CategoryFlow       NodeCategory = "flow"
-	CategoryData       NodeCategory = "data"
-	CategorySecurity   NodeCategory = "security"
-	CategoryUtility    NodeCategory = "utility"
+	CategoryLLM       NodeCategory = "llm"
+	CategoryAgent     NodeCategory = "agent"
+	CategoryIO        NodeCategory = "io"
+	CategoryTransform NodeCategory = "transform"
+	CategoryFlow      NodeCategory = "flow"
+	CategoryData      NodeCategory = "data"
+	CategorySecurity  NodeCategory = "security"
+	CategoryUtility   NodeCategory = "utility"
 )
 
 func (r *Registry) Search(query string) []NodeInfo {
