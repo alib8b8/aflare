@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"regexp"
 	"strconv"
@@ -614,7 +615,28 @@ func truncateInput(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
-	return s[:maxLen] + "... (truncated)"
+	r := []rune(s)
+	if len(r) <= maxLen {
+		return s[:maxLen]
+	}
+	return string(r[:maxLen]) + "..."
+}
+
+// sanitizeEcho 过滤控制字符并截断用户输入，防止错误消息泄露或注入控制序列。
+func sanitizeEcho(s string) string {
+	r := []rune(s)
+	out := make([]rune, 0, len(r))
+	for _, c := range r {
+		if c < 0x20 || c == 0x7f {
+			continue
+		}
+		out = append(out, c)
+		if len(out) >= 100 {
+			out = append(out, '.', '.', '.')
+			break
+		}
+	}
+	return string(out)
 }
 
 // AgentMessageNode sends cross-domain messages to other agents,
@@ -1090,6 +1112,8 @@ func (n *HarmonyDeviceAdaptNode) Schema() NodeSchema {
 }
 
 func (n *HarmonyDeviceAdaptNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	// 早期截断，避免过长输入流向下游
+	input = truncateInput(input, 500)
 	// 解析设备类型
 	deviceType := HarmonyDeviceType(getMobileParam(params, "device_type", string(DevicePhoneStandard)))
 	validDeviceTypes := map[HarmonyDeviceType]bool{
@@ -1097,7 +1121,7 @@ func (n *HarmonyDeviceAdaptNode) Execute(ctx context.Context, input string, para
 		DeviceTablet: true, DeviceSmartScreen: true, DeviceCar: true, DeviceWearable: true,
 	}
 	if !validDeviceTypes[deviceType] {
-		return "", fmt.Errorf("invalid device_type: %s", deviceType)
+		return "", fmt.Errorf("invalid device_type: %s", sanitizeEcho(string(deviceType)))
 	}
 
 	// 解析屏幕参数
@@ -1121,15 +1145,19 @@ func (n *HarmonyDeviceAdaptNode) Execute(ctx context.Context, input string, para
 	if foldState != "" {
 		validFoldStates := map[string]bool{"unfolded": true, "half_folded": true, "fully_folded": true}
 		if !validFoldStates[foldState] {
-			return "", fmt.Errorf("invalid fold_state: %s (allowed: unfolded, half_folded, fully_folded)", foldState)
+			return "", fmt.Errorf("invalid fold_state: %s (allowed: unfolded, half_folded, fully_folded)", sanitizeEcho(foldState))
 		}
+	}
+	// 一致性校验：仅折叠设备允许 fold_state
+	if deviceType != DevicePhoneDualFold && deviceType != DevicePhoneTripleFold {
+		foldState = ""
 	}
 
 	// 方向验证
 	orientation := getMobileParam(params, "orientation", "auto")
 	validOrientations := map[string]bool{"portrait": true, "landscape": true, "auto": true}
 	if !validOrientations[orientation] {
-		return "", fmt.Errorf("invalid orientation: %s (allowed: portrait, landscape, auto)", orientation)
+		return "", fmt.Errorf("invalid orientation: %s (allowed: portrait, landscape, auto)", sanitizeEcho(orientation))
 	}
 
 	// 构建设备信息
@@ -1154,7 +1182,10 @@ func (n *HarmonyDeviceAdaptNode) Execute(ctx context.Context, input string, para
 		"version":     "1.0",
 	}
 
-	output, _ := json.MarshalIndent(result, "", "  ")
+	output, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("marshal failed: %w", err)
+	}
 	return fmt.Sprintf("HarmonyOS device adaptation:\n%s", string(output)), nil
 }
 
@@ -1291,6 +1322,9 @@ func parseIntSafe(s string, defaultVal int) int {
 func parseFloatSafe(s string, defaultVal float64) float64 {
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
+		return defaultVal
+	}
+	if math.IsNaN(v) || math.IsInf(v, 0) {
 		return defaultVal
 	}
 	return v

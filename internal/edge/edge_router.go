@@ -3,16 +3,22 @@ package edge
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -791,6 +797,7 @@ type ReActStep struct {
 
 // ReActEngine ReAct 推理循环引擎
 type ReActEngine struct {
+	mu             sync.Mutex
 	maxIterations  int
 	thoughtHistory []ReActStep
 	memory         *LayeredMemory
@@ -829,9 +836,17 @@ func (e *ReActEngine) Run(ctx context.Context, task string, thinkFn ThinkFunc, a
 	if actFn == nil {
 		return nil, fmt.Errorf("act function is required")
 	}
+	if len(task) == 0 {
+		return nil, fmt.Errorf("task is required")
+	}
 	if len(task) > maxPromptLength {
 		return nil, fmt.Errorf("task too long (max %d)", maxPromptLength)
 	}
+
+	// Run 开始时重置 thoughtHistory，避免跨 Run 调用无限增长
+	e.mu.Lock()
+	e.thoughtHistory = make([]ReActStep, 0, e.maxIterations)
+	e.mu.Unlock()
 
 	result := &ReActResult{Steps: []ReActStep{}}
 	currentContext := task
@@ -865,6 +880,17 @@ func (e *ReActEngine) Run(ctx context.Context, task string, thinkFn ThinkFunc, a
 			return result, nil
 		}
 
+		// 限制 thought / action / actionInput 长度，防止内存膨胀
+		if len(thought) > maxThoughtLength {
+			thought = thought[:maxThoughtLength]
+		}
+		if len(action) > maxActionLength {
+			action = action[:maxActionLength]
+		}
+		if len(actionInput) > maxActionInputLength {
+			actionInput = actionInput[:maxActionInputLength]
+		}
+
 		step := ReActStep{
 			Iteration: i,
 			Thought:   thought,
@@ -880,8 +906,11 @@ func (e *ReActEngine) Run(ctx context.Context, task string, thinkFn ThinkFunc, a
 			result.FinalAnswer = actionInput
 			result.Success = true
 			result.Iterations = i
-			// 存入记忆
-			e.memory.Store(task, actionInput, MemoryLevelLongTerm)
+			// 存入长期记忆：对 task 做 hash 作为 key，避免 key 过长或与 task 不一致
+			longTermKey := hashMemoryKey(task)
+			if err := e.memory.Store(longTermKey, actionInput, MemoryLevelLongTerm); err != nil {
+				log.Printf("warning: failed to store long-term memory: %v", err)
+			}
 			return result, nil
 		}
 
@@ -896,14 +925,20 @@ func (e *ReActEngine) Run(ctx context.Context, task string, thinkFn ThinkFunc, a
 			return result, nil
 		}
 
-		// 限制 observation 长度
-		if len(observation) > 4096 {
-			observation = observation[:4096] + "... (truncated)"
+		// 限制 observation 长度，按 rune 边界截断避免产生无效 UTF-8
+		if len(observation) > maxObservationLength {
+			cut := maxObservationLength
+			for cut > 0 && !utf8.RuneStart(observation[cut]) {
+				cut--
+			}
+			observation = observation[:cut] + "... (truncated)"
 		}
 
 		step.Observation = observation
 		result.Steps = append(result.Steps, step)
+		e.mu.Lock()
 		e.thoughtHistory = append(e.thoughtHistory, step)
+		e.mu.Unlock()
 
 		// 更新上下文：加入新的观察结果
 		currentContext = fmt.Sprintf("%s\n\n[Step %d] Thought: %s\nAction: %s\nInput: %s\nObservation: %s",
@@ -920,9 +955,13 @@ func (e *ReActEngine) Run(ctx context.Context, task string, thinkFn ThinkFunc, a
 	return result, nil
 }
 
-// GetHistory 返回推理历史
+// GetHistory 返回推理历史（返回副本，避免外部修改内部切片）
 func (e *ReActEngine) GetHistory() []ReActStep {
-	return e.thoughtHistory
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	result := make([]ReActStep, len(e.thoughtHistory))
+	copy(result, e.thoughtHistory)
+	return result
 }
 
 // ThinkFunc 推理函数类型
@@ -972,6 +1011,14 @@ const (
 	defaultMaxMemoryEntries = 500
 	maxMemoryContentLength  = 8192
 	maxMemoryTags           = 10
+	maxRecallResults        = 10
+	maxRecallTotalBytes     = 64 * 1024 // 64KB
+	maxLongTermFileSize     = 64 * 1024 // 64KB
+	maxRecallQueryLength    = 1024
+	maxThoughtLength        = 4096
+	maxActionLength         = 256
+	maxActionInputLength    = 8192
+	maxObservationLength    = 4096
 )
 
 // NewLayeredMemory 创建分层记忆存储
@@ -989,10 +1036,23 @@ func (m *LayeredMemory) SetStorePath(path string) error {
 	if len(path) > 512 {
 		return fmt.Errorf("path too long")
 	}
+	// 路径安全校验：必须是绝对路径、不能是根目录、不包含 ".."
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("store path must be absolute")
+	}
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("store path cannot contain '..'")
+	}
+	cleanPath := filepath.Clean(path)
+	if cleanPath == "/" || cleanPath == filepath.VolumeName(cleanPath)+string(filepath.Separator) {
+		return fmt.Errorf("store path cannot be root directory")
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.storePath = path
-	// 尝试加载已有的长期记忆
+	m.storePath = cleanPath
+	// 注意：loadLongTerm 中的磁盘 I/O 在持锁状态下执行。
+	// 这是为了保证 storePath 与 longTerm map 的一致性，避免并发 SetStorePath / Store 期间出现竞态。
+	// SetStorePath 通常在初始化阶段调用，此处持锁加载可接受。
 	m.loadLongTerm()
 	return nil
 }
@@ -1004,6 +1064,9 @@ func (m *LayeredMemory) Store(key, content string, level MemoryLevel) error {
 	}
 	if len(key) > 256 {
 		return fmt.Errorf("memory key too long")
+	}
+	if content == "" {
+		return fmt.Errorf("content is required")
 	}
 	if len(content) > maxMemoryContentLength {
 		content = content[:maxMemoryContentLength] + "... (truncated)"
@@ -1023,22 +1086,27 @@ func (m *LayeredMemory) Store(key, content string, level MemoryLevel) error {
 	switch level {
 	case MemoryLevelShortTerm:
 		if len(m.shortTerm) >= m.maxEntries {
-			m.evictOldest(m.shortTerm)
+			m.evictOldest(m.shortTerm, MemoryLevelShortTerm)
 		}
 		m.shortTerm[key] = entry
 	case MemoryLevelWorking:
 		if len(m.working) >= m.maxEntries {
-			m.evictOldest(m.working)
+			m.evictOldest(m.working, MemoryLevelWorking)
 		}
 		m.working[key] = entry
 	case MemoryLevelLongTerm:
+		// 对 long-term key 做 sanitize（SHA-256 hex）后再作为 map key 与文件名，
+		// 保证磁盘条目与内存条目使用同一 key，evictOldest 删除文件时也能匹配。
+		storeKey := sanitizeKey(key)
 		if len(m.longTerm) >= m.maxEntries {
-			m.evictOldest(m.longTerm)
+			m.evictOldest(m.longTerm, MemoryLevelLongTerm)
 		}
-		m.longTerm[key] = entry
-		// 持久化到文件
+		m.longTerm[storeKey] = entry
+		// 持久化到文件。注意：persistLongTerm 中的磁盘 I/O 在持锁状态下执行，
+		// 这是为了保证内存 map 与磁盘文件的一致性（避免并发淘汰导致文件与 map 不同步）。
+		// 若长期记忆写入频繁成为瓶颈，可考虑改为异步队列写入，但需额外处理一致性。
 		if m.storePath != "" {
-			m.persistLongTerm(key, entry)
+			m.persistLongTerm(storeKey, entry)
 		}
 	default:
 		return fmt.Errorf("invalid memory level: %s", level)
@@ -1048,36 +1116,76 @@ func (m *LayeredMemory) Store(key, content string, level MemoryLevel) error {
 
 // Recall 检索与查询相关的记忆
 func (m *LayeredMemory) Recall(query string) []string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	// 使用写锁：Recall 会更新 entry.AccessCount 和 entry.LastAccess
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
+	// 限制 query 长度，避免超长 query 造成 DoS
+	if len(query) > maxRecallQueryLength {
+		query = query[:maxRecallQueryLength]
+	}
 	queryLower := strings.ToLower(query)
 	var results []string
+	totalBytes := 0
+
+	// tryAdd 在 top-K 与总字节数上限内追加结果
+	tryAdd := func(s string) bool {
+		if len(results) >= maxRecallResults {
+			return false
+		}
+		if totalBytes+len(s) > maxRecallTotalBytes {
+			return false
+		}
+		results = append(results, s)
+		totalBytes += len(s)
+		return true
+	}
 
 	// 优先检索长期记忆（权重最高）
 	for _, entry := range m.longTerm {
+		if len(results) >= maxRecallResults {
+			break
+		}
 		if strings.Contains(strings.ToLower(entry.Content), queryLower) {
 			entry.AccessCount++
 			entry.LastAccess = time.Now()
-			results = append(results, "[long-term] "+entry.Content)
+			if !tryAdd("[long-term] " + entry.Content) {
+				break
+			}
 		}
 	}
 	// 工作记忆
 	for _, entry := range m.working {
+		if len(results) >= maxRecallResults {
+			break
+		}
 		if strings.Contains(strings.ToLower(entry.Content), queryLower) {
 			entry.AccessCount++
 			entry.LastAccess = time.Now()
-			results = append(results, "[working] "+entry.Content)
+			if !tryAdd("[working] " + entry.Content) {
+				break
+			}
 		}
 	}
-	// 短期记忆（仅最近几条）
-	count := 0
+	// 短期记忆：按 CreatedAt 排序后取最近 5 条，避免依赖 map 随机迭代
+	shortTermList := make([]*MemoryEntry, 0, len(m.shortTerm))
 	for _, entry := range m.shortTerm {
-		if count >= 5 {
+		shortTermList = append(shortTermList, entry)
+	}
+	sort.Slice(shortTermList, func(i, j int) bool {
+		return shortTermList[i].CreatedAt.After(shortTermList[j].CreatedAt)
+	})
+	shortTermLimit := 5
+	for idx, entry := range shortTermList {
+		if idx >= shortTermLimit {
 			break
 		}
-		results = append(results, "[short-term] "+entry.Content)
-		count++
+		if len(results) >= maxRecallResults {
+			break
+		}
+		if !tryAdd("[short-term] " + entry.Content) {
+			break
+		}
 	}
 
 	return results
@@ -1095,7 +1203,29 @@ func (m *LayeredMemory) Clear(level MemoryLevel) {
 	case MemoryLevelLongTerm:
 		m.longTerm = make(map[string]*MemoryEntry)
 		if m.storePath != "" {
-			os.RemoveAll(m.storePath)
+			// 安全清理：仅删除目录下的 *.json 文件，绝不删除整个目录，
+			// 避免误删 storePath 自身或其兄弟目录。
+			entries, err := os.ReadDir(m.storePath)
+			if err != nil {
+				return
+			}
+			for _, entry := range entries {
+				if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+					continue
+				}
+				fullPath := filepath.Join(m.storePath, entry.Name())
+				// 跳过符号链接，避免跟随链接删除其他文件
+				if li, err := os.Lstat(fullPath); err == nil {
+					if li.Mode()&os.ModeSymlink != 0 {
+						continue
+					}
+				} else {
+					continue
+				}
+				if err := os.Remove(fullPath); err != nil {
+					log.Printf("warning: failed to remove long-term memory file %s: %v", fullPath, err)
+				}
+			}
 		}
 	}
 }
@@ -1111,40 +1241,60 @@ func (m *LayeredMemory) GetStats() map[string]int {
 	}
 }
 
-// evictOldest 淘汰最旧的记忆条目
-func (m *LayeredMemory) evictOldest(store map[string]*MemoryEntry) {
+// evictOldest 淘汰最旧的记忆条目（按 LastAccess 比较）。
+// 对 longTerm 层级会同时删除对应的 .json 文件，保证内存与磁盘一致。
+func (m *LayeredMemory) evictOldest(store map[string]*MemoryEntry, level MemoryLevel) {
 	var oldestKey string
 	var oldestTime time.Time
 	for k, v := range store {
-		if oldestKey == "" || v.CreatedAt.Before(oldestTime) {
+		if oldestKey == "" || v.LastAccess.Before(oldestTime) {
 			oldestKey = k
-			oldestTime = v.CreatedAt
+			oldestTime = v.LastAccess
 		}
 	}
+	if oldestKey == "" {
+		return
+	}
 	delete(store, oldestKey)
+	// 长期记忆淘汰时同时删除对应的 .json 文件
+	if level == MemoryLevelLongTerm && m.storePath != "" {
+		filePath := filepath.Join(m.storePath, oldestKey+".json")
+		if err := os.Remove(filePath); err != nil {
+			log.Printf("warning: failed to remove evicted long-term memory file %s: %v", filePath, err)
+		}
+	}
 }
 
-// persistLongTerm 将长期记忆持久化到文件
+// persistLongTerm 将长期记忆持久化到文件。
+// 注意：调用方传入的 key 已经过 sanitizeKey 处理（SHA-256 hex），
+// 此处直接用作文件名，不再二次 sanitize，保证与 loadLongTerm/evictOldest 的文件名一致。
 func (m *LayeredMemory) persistLongTerm(key string, entry *MemoryEntry) {
 	if m.storePath == "" {
 		return
 	}
 	// 安全地创建目录
 	if err := os.MkdirAll(m.storePath, 0700); err != nil {
+		log.Printf("warning: failed to create long-term memory dir %s: %v", m.storePath, err)
 		return
 	}
-	// 安全的文件名
-	safeKey := sanitizeKey(key)
-	filePath := m.storePath + "/" + safeKey + ".json"
+	filePath := filepath.Join(m.storePath, key+".json")
 	data, err := json.Marshal(entry)
 	if err != nil {
+		log.Printf("warning: failed to marshal long-term memory %s: %v", filePath, err)
 		return
 	}
 	// 限制文件大小
 	if len(data) > maxMemoryContentLength*2 {
 		return
 	}
-	os.WriteFile(filePath, data, 0600)
+	if err := os.WriteFile(filePath, data, 0600); err != nil {
+		log.Printf("warning: failed to write long-term memory file %s: %v", filePath, err)
+		return
+	}
+	// 文件已存在时 os.WriteFile 不会更改其权限，强制重置为 0600
+	if err := os.Chmod(filePath, 0600); err != nil {
+		log.Printf("warning: failed to chmod long-term memory file %s: %v", filePath, err)
+	}
 }
 
 // loadLongTerm 从文件加载长期记忆
@@ -1164,12 +1314,29 @@ func (m *LayeredMemory) loadLongTerm() {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
-		data, err := os.ReadFile(m.storePath + "/" + entry.Name())
+		fullPath := filepath.Join(m.storePath, entry.Name())
+		// 读取前用 os.Lstat 检查：跳过符号链接，避免跟随链接读取任意文件
+		li, err := os.Lstat(fullPath)
+		if err != nil {
+			continue
+		}
+		if li.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+		// 文件大小限制：超过 64KB 则跳过，防止读取超大文件造成内存膨胀
+		if li.Size() > maxLongTermFileSize {
+			continue
+		}
+		data, err := os.ReadFile(fullPath)
 		if err != nil {
 			continue
 		}
 		var memEntry MemoryEntry
 		if err := json.Unmarshal(data, &memEntry); err != nil {
+			continue
+		}
+		// 反序列化后检查 Content 长度，避免加载超长内容
+		if len(memEntry.Content) > maxMemoryContentLength {
 			continue
 		}
 		key := strings.TrimSuffix(entry.Name(), ".json")
@@ -1178,19 +1345,17 @@ func (m *LayeredMemory) loadLongTerm() {
 	}
 }
 
-// sanitizeKey 将 key 转为安全的文件名
+// sanitizeKey 将 key 转为安全的文件名。
+// 使用 SHA-256 hash 前 16 字节的 hex 编码（共 32 个十六进制字符），
+// 避免不同 key 经字符过滤后碰撞到同一文件名。
 func sanitizeKey(key string) string {
-	result := strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
-			return r
-		}
-		return '_'
-	}, key)
-	if len(result) > 128 {
-		result = result[:128]
-	}
-	if result == "" {
-		result = "memory"
-	}
-	return result
+	h := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(h[:16])
+}
+
+// hashMemoryKey 对 task 做哈希生成长期记忆的 key，
+// 保证 key 长度固定且与 task 内容一致，避免 task 过长或含特殊字符。
+func hashMemoryKey(task string) string {
+	h := sha256.Sum256([]byte(task))
+	return hex.EncodeToString(h[:16])
 }

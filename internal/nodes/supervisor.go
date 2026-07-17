@@ -421,6 +421,10 @@ func (se *SkillEvolution) RecordExecution(skillName string, success bool, latenc
 	if skillName == "" || len(skillName) > 100 {
 		return
 	}
+	// SE-3: latencyMs 边界校验，防止异常值污染统计数据（最大 1 小时）
+	if latencyMs < 0 || latencyMs > 3600000 {
+		return
+	}
 
 	se.mu.Lock()
 	defer se.mu.Unlock()
@@ -428,6 +432,8 @@ func (se *SkillEvolution) RecordExecution(skillName string, success bool, latenc
 	skill, exists := se.skills[skillName]
 	if !exists {
 		if len(se.skills) >= se.maxSkills {
+			// SE-4: 达到上限时输出日志，避免静默数据丢失
+			fmt.Printf("[SkillEvolution] maxSkills limit reached (%d), skipping new skill: %s\n", se.maxSkills, skillName)
 			return // 达到上限，不再添加新技能
 		}
 		skill = &SkillRecord{
@@ -461,6 +467,10 @@ func (se *SkillEvolution) RecordExecution(skillName string, success bool, latenc
 
 // AddBestPractice 添加最佳实践
 func (se *SkillEvolution) AddBestPractice(skillName, practice string) {
+	// SE-5: skillName 长度校验
+	if skillName == "" || len(skillName) > 100 {
+		return
+	}
 	if practice == "" || len(practice) > 500 {
 		return
 	}
@@ -479,13 +489,18 @@ func (se *SkillEvolution) AddBestPractice(skillName, practice string) {
 		}
 	}
 	if len(skill.BestPractices) >= maxBestPractices {
-		skill.BestPractices = skill.BestPractices[1:] // 移除最旧的
+		// SE-6: 显式复制，避免底层 array 内存滞留
+		skill.BestPractices = append([]string(nil), skill.BestPractices[1:]...) // 移除最旧的
 	}
 	skill.BestPractices = append(skill.BestPractices, practice)
 }
 
 // AddKnownPitfall 添加已知陷阱
 func (se *SkillEvolution) AddKnownPitfall(skillName, pitfall string) {
+	// SE-5: skillName 长度校验
+	if skillName == "" || len(skillName) > 100 {
+		return
+	}
 	if pitfall == "" || len(pitfall) > 500 {
 		return
 	}
@@ -503,7 +518,8 @@ func (se *SkillEvolution) AddKnownPitfall(skillName, pitfall string) {
 		}
 	}
 	if len(skill.KnownPitfalls) >= maxKnownPitfalls {
-		skill.KnownPitfalls = skill.KnownPitfalls[1:]
+		// SE-6: 显式复制，避免底层 array 内存滞留
+		skill.KnownPitfalls = append([]string(nil), skill.KnownPitfalls[1:]...)
 	}
 	skill.KnownPitfalls = append(skill.KnownPitfalls, pitfall)
 }
@@ -525,7 +541,8 @@ func (se *SkillEvolution) OptimizePrompt(skillName, basePrompt string) string {
 			if i >= 5 {
 				break
 			}
-			basePrompt += fmt.Sprintf("- %s\n", pitfall)
+			// SE-2: 对 pitfall 文本进行转义，防止间接 prompt 注入
+			basePrompt += fmt.Sprintf("- %s\n", sanitizeForPrompt(pitfall))
 		}
 	}
 
@@ -536,15 +553,39 @@ func (se *SkillEvolution) OptimizePrompt(skillName, basePrompt string) string {
 			if i >= 5 {
 				break
 			}
-			basePrompt += fmt.Sprintf("- %s\n", bp)
+			// SE-2: 对 bp 文本进行转义，防止间接 prompt 注入
+			basePrompt += fmt.Sprintf("- %s\n", sanitizeForPrompt(bp))
 		}
 	}
 
+	// SE-7: 按 rune 截断，避免破坏 UTF-8 字符
 	if len(basePrompt) > maxOptimizedPromptLen {
-		basePrompt = basePrompt[:maxOptimizedPromptLen]
+		runes := []rune(basePrompt)
+		if len(runes) > maxOptimizedPromptLen {
+			basePrompt = string(runes[:maxOptimizedPromptLen])
+		}
 	}
 
 	return basePrompt
+}
+
+// sanitizeForPrompt 对用户提供的文本进行转义，去除换行符、制表符，
+// 只保留可打印字符，防止间接 prompt 注入。
+func sanitizeForPrompt(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		// 去除换行符、制表符及其他控制字符
+		if r == '\n' || r == '\r' || r == '\t' {
+			continue
+		}
+		// 只允许可打印字符（控制字符与 DEL 移除）
+		if r < 0x20 || r == 0x7f {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 // GetSkill 获取技能记录
@@ -552,7 +593,11 @@ func (se *SkillEvolution) GetSkill(skillName string) (*SkillRecord, bool) {
 	se.mu.RLock()
 	defer se.mu.RUnlock()
 	skill, ok := se.skills[skillName]
-	return skill, ok
+	if !ok {
+		return nil, false
+	}
+	// SE-1: 返回深拷贝，避免锁外数据竞争
+	return cloneSkillRecord(skill), true
 }
 
 // ListSkills 列出所有技能
@@ -561,7 +606,8 @@ func (se *SkillEvolution) ListSkills() []*SkillRecord {
 	defer se.mu.RUnlock()
 	result := make([]*SkillRecord, 0, len(se.skills))
 	for _, skill := range se.skills {
-		result = append(result, skill)
+		// SE-1: 返回每个元素的深拷贝
+		result = append(result, cloneSkillRecord(skill))
 	}
 	return result
 }
@@ -576,10 +622,27 @@ func (se *SkillEvolution) GetLowPerformingSkills(threshold float64) []*SkillReco
 	var result []*SkillRecord
 	for _, skill := range se.skills {
 		if skill.UseCount >= 3 && skill.SuccessRate < threshold {
-			result = append(result, skill)
+			// SE-1: 返回深拷贝
+			result = append(result, cloneSkillRecord(skill))
 		}
 	}
 	return result
+}
+
+// cloneSkillRecord 深拷贝 SkillRecord，包括其切片字段，
+// 确保调用方在锁外访问的副本与内部 map 中的记录互不影响。
+func cloneSkillRecord(s *SkillRecord) *SkillRecord {
+	if s == nil {
+		return nil
+	}
+	cp := *s
+	if s.BestPractices != nil {
+		cp.BestPractices = append([]string(nil), s.BestPractices...)
+	}
+	if s.KnownPitfalls != nil {
+		cp.KnownPitfalls = append([]string(nil), s.KnownPitfalls...)
+	}
+	return &cp
 }
 
 // GetSkillStats 返回技能统计概览

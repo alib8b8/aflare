@@ -191,15 +191,33 @@ export function parseIntentURI(uri: string): IntentURI {
   const action = pathParts[0] || '';
   const type = pathParts[1] || '';
 
+  // 验证 action 和 type 格式
+  const namePattern = /^[a-zA-Z0-9._-]{1,64}$/;
+  if (action && !namePattern.test(action)) {
+    throw new Error('Invalid action in URI');
+  }
+  if (type && !namePattern.test(type)) {
+    throw new Error('Invalid type in URI');
+  }
+
   const params: Record<string, string> = {};
   if (query) {
     const pairs = query.split('&');
+    // 限制参数数量
+    if (pairs.length > 100) {
+      throw new Error('Too many params (max 100)');
+    }
+    let totalBytes = 0;
     for (const pair of pairs) {
       const eqIndex = pair.indexOf('=');
       if (eqIndex > 0) {
-        const key = decodeURIComponent(pair.substring(0, eqIndex));
-        const value = decodeURIComponent(pair.substring(eqIndex + 1));
+        const key = safeDecodeURIComponent(pair.substring(0, eqIndex));
+        const value = safeDecodeURIComponent(pair.substring(eqIndex + 1));
         if (key.length <= 100 && value.length <= 1000) {
+          totalBytes += key.length + value.length;
+          if (totalBytes > 65536) {
+            break;
+          }
           params[key] = value;
         }
       }
@@ -207,6 +225,17 @@ export function parseIntentURI(uri: string): IntentURI {
   }
 
   return { scheme, action, type, params };
+}
+
+/**
+ * 安全的 URI 解码，捕获无效编码异常
+ */
+function safeDecodeURIComponent(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
 }
 
 // ============================================================
@@ -236,11 +265,12 @@ export function validateDID(did: string): boolean {
     return false;
   }
   const parts = did.split(':');
-  if (parts.length < 3) {
+  // W3C DID 规范：did:method:identifier，不支持额外冒号段
+  if (parts.length !== 3) {
     return false;
   }
-  const methodPattern = /^[a-z0-9]+$/;
-  const idPattern = /^[a-zA-Z0-9._-]+$/;
+  const methodPattern = /^[a-z0-9]{1,32}$/;
+  const idPattern = /^[a-zA-Z0-9._-]{1,128}$/;
   return methodPattern.test(parts[1]) && idPattern.test(parts[2]);
 }
 
@@ -342,6 +372,9 @@ export class WorkflowEngine {
     if (!name || name.length > 100) {
       throw new Error('Invalid node name');
     }
+    if (this.nodes.has(name)) {
+      throw new Error(`Node "${name}" is already registered`);
+    }
     this.nodes.set(name, handler);
   }
 
@@ -359,13 +392,30 @@ export class WorkflowEngine {
     if (workflow.steps.length > 50) {
       throw new Error('Too many steps (max 50)');
     }
+    // 限制输入长度
+    const maxInputLength = 65536;
+    if (input.length > maxInputLength) {
+      input = input.substring(0, maxInputLength);
+    }
 
     const context: Record<string, string> = { input };
     let lastOutput = input;
+    const maxOutputLength = 65536;
+
+    // 检查 step.id 唯一性
+    const seenIds = new Set<string>();
+    for (const step of workflow.steps) {
+      if (step.id) {
+        if (seenIds.has(step.id)) {
+          throw new Error(`Duplicate step id: ${step.id}`);
+        }
+        seenIds.add(step.id);
+      }
+    }
 
     for (const step of workflow.steps) {
       if (!step.node || step.node.length > 100) {
-        throw new Error(`Invalid node name in step: ${step.node}`);
+        throw new Error('Invalid node name in step');
       }
 
       // 检查条件
@@ -381,8 +431,13 @@ export class WorkflowEngine {
       if (handler) {
         lastOutput = await handler(lastOutput, step.params || {});
       } else {
-        // 内置节点模拟
-        lastOutput = `[${step.node}] processed: ${lastOutput.substring(0, 100)}`;
+        // 未注册节点直接报错，不静默 mock
+        throw new Error(`Node not found: ${step.node}`);
+      }
+
+      // 限制中间输出长度
+      if (lastOutput.length > maxOutputLength) {
+        lastOutput = lastOutput.substring(0, maxOutputLength);
       }
 
       if (step.id) {
@@ -398,27 +453,35 @@ export class WorkflowEngine {
    */
   private evaluateCondition(condition: string, context: Record<string, string>): boolean {
     if (!condition || condition.length > 500) {
-      return true;
+      return false; // fail-closed: 超长或空条件默认不执行
     }
-    // 简化版条件评估
     try {
-      // 替换上下文变量
+      // 使用 split/join 替换变量，避免正则注入
       let expr = condition;
       for (const [key, value] of Object.entries(context)) {
-        expr = expr.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), value);
+        const placeholder = `\${${key}}`;
+        // 转义 value 中的比较运算符，防止逻辑注入
+        const safeValue = value.replace(/==/g, '\\x3d\\x3d').replace(/!=/g, '\\x21\\x3d');
+        expr = expr.split(placeholder).join(safeValue);
       }
       // 安全评估：仅支持简单的比较操作
       if (expr.includes('==')) {
-        const [left, right] = expr.split('==').map(s => s.trim());
-        return left === right;
+        const parts = expr.split('==');
+        if (parts.length !== 2) {
+          return false; // 多个 == 视为无效
+        }
+        return parts[0].trim() === parts[1].trim();
       }
       if (expr.includes('!=')) {
-        const [left, right] = expr.split('!=').map(s => s.trim());
-        return left !== right;
+        const parts = expr.split('!=');
+        if (parts.length !== 2) {
+          return false;
+        }
+        return parts[0].trim() !== parts[1].trim();
       }
       return expr.length > 0;
     } catch {
-      return true;
+      return false; // fail-closed: 异常时默认不执行
     }
   }
 
@@ -426,7 +489,15 @@ export class WorkflowEngine {
    * 获取引擎配置
    */
   getConfig(): EngineConfig {
-    return { ...this.config };
+    // 深拷贝并脱敏，避免泄露 API Key
+    const configCopy: EngineConfig = {
+      ...this.config,
+      cloudModel: this.config.cloudModel ? {
+        endpoint: this.config.cloudModel.endpoint,
+        model: this.config.cloudModel.model,
+      } : undefined,
+    };
+    return configCopy;
   }
 }
 
