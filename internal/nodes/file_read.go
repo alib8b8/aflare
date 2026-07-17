@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 const maxFileReadSize = 10 * 1024 * 1024 // 10MB max file read size
@@ -25,11 +26,12 @@ func (n *FileReadNode) Description() string {
 func (n *FileReadNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "file_read",
-		Description: "Read content from a file",
+		Description: "Read content from a file. Automatically redacts secrets (API keys, tokens, .env files) by default for privacy — set redact=false to disable.",
 		Input:       "string - not used",
-		Output:      "string - file content",
+		Output:      "string - file content (with secrets redacted by default)",
 		Params: []ParamSchema{
 			{Name: "path", Type: "string", Description: "File path to read from", Required: true},
+			{Name: "redact", Type: "string", Description: "Redact secrets in output: true (default) / false. When true, .env and credential files are fully masked; other files have known secret patterns masked.", Required: false, Default: "true"},
 		},
 	}
 }
@@ -58,5 +60,19 @@ func (n *FileReadNode) Execute(ctx context.Context, input string, params map[str
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 
-	return string(data), nil
+	content := string(data)
+
+	// 隐私优先：默认对读取内容进行密钥脱敏（借鉴 Grok Build 隐私丑闻教训）
+	redact := getParam(params, "redact", "true")
+	if redact != "false" {
+		// 敏感文件（.env / 私钥 / credentials）整文件脱敏
+		wholeFile := IsSensitiveFile(filepath.Base(safePath))
+		masked, hits := RedactSecrets(content, wholeFile)
+		if hits > 0 {
+			// 记录脱敏行为（不泄露文件内容，仅记录命中数）
+			return masked + fmt.Sprintf("\n\n[security: %d secret(s) redacted]", hits), nil
+		}
+	}
+
+	return content, nil
 }

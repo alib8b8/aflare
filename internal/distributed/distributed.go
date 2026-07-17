@@ -83,6 +83,7 @@ type Coordinator struct {
 	nodeIDCounter int
 	stopCh        chan struct{}
 	stopOnce      sync.Once
+	breakers      *BreakerRegistry // 节点级熔断器
 }
 
 func NewCoordinator(port, authToken string) *Coordinator {
@@ -95,6 +96,7 @@ func NewCoordinator(port, authToken string) *Coordinator {
 		nodes:     make(map[string]*NodeInfo),
 		tasks:     make(map[string]*Task),
 		stopCh:    make(chan struct{}),
+		breakers:  NewBreakerRegistry(),
 	}
 }
 
@@ -106,6 +108,7 @@ func (c *Coordinator) Start() error {
 	mux.HandleFunc("/api/task", c.authMiddleware(c.handleTask))
 	mux.HandleFunc("/api/tasks", c.authMiddleware(c.handleListTasks))
 	mux.HandleFunc("/api/execute", c.authMiddleware(c.handleExecute))
+	mux.HandleFunc("/api/breakers", c.authMiddleware(c.handleBreakers))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
@@ -339,11 +342,44 @@ func (c *Coordinator) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 			task.StartTime = &startTime
 		}
 	}
+	// 在锁内捕获，锁外记录熔断（避免与 breaker 内部锁形成嵌套）
+	assignedTo := ""
+	finalStatus := TaskStatusPending
+	if ok {
+		assignedTo = task.AssignedTo
+		finalStatus = req.Status
+	}
 	c.mu.Unlock()
+
+	// 熔断器：根据任务结果记录成功/失败
+	if assignedTo != "" {
+		switch finalStatus {
+		case TaskStatusCompleted:
+			c.breakers.RecordSuccess(assignedTo)
+		case TaskStatusFailed:
+			if tripped := c.breakers.RecordFailure(assignedTo); tripped {
+				logger.Warn("Circuit breaker tripped for node", "node_id", assignedTo)
+			}
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "updated"})
+}
+
+// handleBreakers 返回所有节点熔断器状态
+func (c *Coordinator) handleBreakers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	stats := c.breakers.StatsAll()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"breakers": stats,
+		"count":    len(stats),
+	})
 }
 
 func (c *Coordinator) handleListTasks(w http.ResponseWriter, r *http.Request) {
@@ -493,9 +529,19 @@ func (c *Coordinator) dispatchTask(nodeID string, task *Task) {
 		resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
 		if err != nil {
 			logger.Error("Failed to dispatch task", "error", err)
+			// 分派失败视为节点故障，记录熔断失败
+			if tripped := c.breakers.RecordFailure(nodeID); tripped {
+				logger.Warn("Circuit breaker tripped for node", "node_id", nodeID)
+			}
 			return
 		}
 		defer resp.Body.Close()
+		// 非成功 HTTP 状态码也视为失败（5xx 服务端错误）
+		if resp.StatusCode >= 500 {
+			if tripped := c.breakers.RecordFailure(nodeID); tripped {
+				logger.Warn("Circuit breaker tripped for node", "node_id", nodeID, "status", resp.StatusCode)
+			}
+		}
 	}()
 }
 
@@ -515,6 +561,10 @@ func (c *Coordinator) selectBestNodeLocked() string {
 		if node.Status != NodeStatusOffline &&
 			time.Since(node.LastHeartbeat) < heartbeatTimeout &&
 			node.CurrentLoad < node.Capacity {
+			// 熔断器：跳过已熔断节点（冷却期满会自动半开放行）
+			if !c.breakers.AllowRequest(id) {
+				continue
+			}
 			if bestLoad == -1 || node.CurrentLoad < bestLoad {
 				bestNodeID = id
 				bestLoad = node.CurrentLoad

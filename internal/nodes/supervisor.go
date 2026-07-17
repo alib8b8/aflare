@@ -36,6 +36,7 @@ func (n *SupervisorNode) Schema() NodeSchema {
 		ParamSchema{Name: "domain", Type: "string", Description: "Domain specialization: general,legal,medical,education,finance,creative,tech,business (default: general)", Required: false, Default: "general"},
 		ParamSchema{Name: "enable_moe", Type: "string", Description: "Enable Mixture-of-Experts routing (default: false)", Required: false, Default: "false"},
 		ParamSchema{Name: "max_depth", Type: "string", Description: "Max decomposition depth for hierarchical/mindsearch (default: 3)", Required: false, Default: "3"},
+		ParamSchema{Name: "subagent_prompts", Type: "string", Description: "Inject per-specialist subagent prompt templates into the supervisor context (default: true). Borrows Grok Build's main/subagent prompt hierarchy.", Required: false, Default: "true"},
 	)
 	return NodeSchema{
 		Name:        "supervisor",
@@ -125,6 +126,11 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 
 	if enableMoE && strategy != "moe" {
 		systemPrompt += "\n\nAdditionally, use Mixture-of-Experts routing: when a subtask requires multiple expertise areas, assign it to multiple specialists and merge their results."
+	}
+
+	// 子智能体提示词分层：注入各 specialist 的行为边界模板（借鉴 Grok Build 主/子 Agent 架构）
+	if getParam(params, "subagent_prompts", "true") != "false" {
+		systemPrompt += RenderSubagentPromptForSpecialists(specialistList)
 	}
 
 	result, err := runAgentLLM(ctx, provider, model, apiKey, endpoint, systemPrompt, input)

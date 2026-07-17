@@ -87,14 +87,20 @@ llm-box run ai-news-summary.yaml
 | **HarmonyOS Adaptation** | Ability launch, atomic service, desktop widget, 7-device-type adaptation (phone/foldable/tablet/TV/car/wearable) |
 | **Cross-Platform Protocol** | `intent://` and `ohos://` URI schemes, W3C DID identity verification, cross-domain agent messaging |
 | **Ascend NPU Adaptation** | 7-agent pipeline (search→verify→adapt→quantize→optimize→deploy→doc), CANN/MindIE/MindStudio integration, INT8/FP8 quantization, 1-hour auto-adapt |
+| **Code Intelligence** | Code graph node (AST/call graph/dependency extraction for Go/Python/JS/TS), Codex/OpenCode-compatible tools (glob/grep/list_dir/apply_patch) |
+| **Subagent Architecture** | Main/sub agent prompt hierarchy (17 specialist templates), borrowed from Grok Build's prompt.md + subagent_prompt.md pattern |
+| **Distributed Resilience** | Per-node circuit breaker (Closed/Open/HalfOpen state machine), auto-isolation of failing workers, breaker stats endpoint |
+| **Privacy by Design** | Auto secret redaction (.env/keys/tokens) on file read, outbound data volume monitor with anomaly alerting (prevents Grok-Build-style 27800× leaks) |
+| **File Watching** | Polling-based file watch node (create/modify/delete events) for log-monitor and file-organizer workflows |
+| **TUI Rendering** | Terminal Markdown renderer (headings/code/bold/italic/lists/quotes/tables) + Mermaid-to-ASCII converter (flow/sequence diagrams) |
 | **Utility Nodes** | 40+ built-in nodes: LLM providers, fetch, execute, transform, file I/O, JSON, notify, condition, combine, call, template |
 | **Data & Knowledge** | RAG retrieval, knowledge graph extraction/query/traversal, smart model router, multimodal image analysis |
 | **Code & Tools** | Python code interpreter sandbox, node marketplace, MCP integration, plugin system |
-| **Distributed Execution** | Coordinator/Worker architecture, horizontal scaling, heartbeat monitoring |
+| **Distributed Execution** | Coordinator/Worker architecture, horizontal scaling, heartbeat monitoring, circuit breaker |
 | **Scheduling** | Cron-based scheduled workflows, interval triggers, CLI management |
-| **Security** | SSRF protection, path traversal prevention, command injection defense, AES-GCM secrets, audit logging, 61-vuln audited |
+| **Security** | SSRF protection, path traversal prevention, command injection defense, AES-GCM secrets, audit logging, secret redaction, ANSI injection defense, 76-vuln audited |
 | **Ecosystem** | GitCode G-Star, HarmonyOS Agent Skills, ohpm SDK (@llm-box/workflow-engine) |
-| **Developer Experience** | Web UI editor, workflow visualizer (Mermaid/JSON/DOT/ASCII), TUI, 9 languages |
+| **Developer Experience** | Web UI editor, workflow visualizer (Mermaid/JSON/DOT/ASCII), TUI with Markdown/Mermaid rendering, 9 languages |
 
 ---
 
@@ -144,6 +150,17 @@ Specialized AI agent nodes for autonomous reasoning:
 | `ascend_model_doc` | Auto-generate benchmark report and reproduction guide |
 | `ascend_model_agent` | End-to-end orchestrator (mode: full/quick/tune) |
 
+### Code Intelligence & Tool Compatibility Nodes
+
+| Node | Description |
+|------|-------------|
+| `code_graph` | Extract code structure (imports/functions/calls) for Go/Python/JS/TS, output JSON or Mermaid graph |
+| `file_watch` | Watch a path for file changes (create/modify/delete), polling-based, context-aware |
+| `glob` | Recursive file glob matching (`**/*.go`), depth-limited, Codex-compatible |
+| `grep` | Recursive content search with regex, binary-skip, Codex/OpenCode-compatible |
+| `list_dir` | List directory contents (optional recursive), Codex-compatible |
+| `apply_patch` | Apply unified diff patches atomically (validate-then-commit), Codex-compatible |
+
 ---
 
 ## 🔒 Security
@@ -162,6 +179,12 @@ llm-box takes security seriously. Key protections:
 | **DID Identity** | W3C DID format validation, signature verification, cross-domain message auth |
 | **Memory Safety** | Layered memory with LRU eviction, symlink-resistant persistence, 0600 file perms |
 | **Prompt Injection** | Skill evolution sanitizes best practices/pitfalls before injecting into prompts |
+| **Secret Redaction** | Auto-detect & mask 10+ secret patterns (AWS/GitHub/Slack/JWT/private keys) on file read; `.env`/credentials fully masked by default |
+| **Outbound Monitoring** | Sliding-window data volume monitor with anomaly alerting (prevents Grok-Build-style 27800× data leaks) |
+| **Circuit Breaker** | Per-worker breaker (Closed→Open→HalfOpen), auto-isolation of failing nodes prevents cascade failures |
+| **Atomic Patches** | `apply_patch` validates-then-commits with temp staging + atomic rename; no partial writes on failure |
+| **ANSI Injection** | TUI Markdown/Mermaid renderers strip terminal control sequences (CSI/OSC/DCS) from user input |
+| **Tool Portability** | Codex/OpenCode-compatible tools (glob/grep/list_dir/apply_patch) with full path/symlink/DoS hardening |
 
 📖 [Security Guide →](SECURITY.md) | [Audit Logs →](docs/getting-started.md#audit-logs)
 
@@ -286,7 +309,11 @@ llm-box help                   Show full help
 - **Skill Evolution** — Self-improving agent skills with success rate tracking and prompt optimization
 - **Intent Protocol** — `intent://` and `ohos://` URI schemes, W3C DID identity, cross-domain messaging
 - **Ascend Adaptation** — 7-agent pipeline for Ascend NPU model adaptation (search/verify/adapt/quantize/optimize/deploy/doc)
-- **Coordinator/Worker** — Distributed task scheduling and execution
+- **Code Intelligence** — Code graph extraction, Codex/OpenCode-compatible tool nodes (glob/grep/list_dir/apply_patch)
+- **Subagent Prompts** — 17 specialist prompt templates, main/sub agent hierarchy (Grok Build pattern)
+- **Circuit Breaker** — Per-worker Closed/Open/HalfOpen state machine for distributed resilience
+- **Privacy Layer** — Secret redaction on file read, outbound data volume anomaly monitor
+- **Coordinator/Worker** — Distributed task scheduling and execution with circuit breaker protection
 
 ---
 
@@ -300,6 +327,7 @@ llm-box help                   Show full help
 | **v0.4** | ✅ Released | Code interpreter, RAG, knowledge graph, smart router, multimodal, node marketplace, 100+ templates, 16 specialists, Chain-of-Thought |
 | **v0.5** | ✅ Released | ReAct engine, layered memory, skill self-evolution, HarmonyOS adaptation (7 device types), cross-platform protocol (intent:// + ohos://), W3C DID identity, cross-domain agent messaging, GitCode G-Star + ohpm ecosystem |
 | **v0.5.1** | ✅ Released | Ascend NPU adaptation (7-agent pipeline, 3 workflow templates, CANN/MindIE integration) |
+| **v0.5.2** | ✅ Released | Grok Build-inspired capabilities: code graph, subagent prompt hierarchy, circuit breaker, secret redaction, file watch, Codex/OpenCode tool compat, TUI Markdown/Mermaid rendering (15-vuln audited) |
 | **v1.0** | 📅 Q3 2026 | Stable API, full documentation, LTS |
 
 📖 [Full Roadmap →](ROADMAP.md)
