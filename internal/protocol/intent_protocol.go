@@ -49,11 +49,18 @@ func ParseIntentURI(uri string) (*IntentURI, error) {
 		return nil, fmt.Errorf("intent URI too long")
 	}
 
-	if !strings.HasPrefix(uri, "intent://") {
-		return nil, fmt.Errorf("invalid intent URI: must start with 'intent://'")
+	// 支持 intent:// 和 ohos:// 两种 URI scheme
+	// ohos:// 是鸿蒙系统的标准 URI scheme
+	var schemePrefix string
+	if strings.HasPrefix(uri, "intent://") {
+		schemePrefix = "intent://"
+	} else if strings.HasPrefix(uri, "ohos://") {
+		schemePrefix = "ohos://"
+	} else {
+		return nil, fmt.Errorf("invalid intent URI: must start with 'intent://' or 'ohos://'")
 	}
 
-	uri = strings.TrimPrefix(uri, "intent://")
+	uri = strings.TrimPrefix(uri, schemePrefix)
 
 	parts := strings.SplitN(uri, "?", 2)
 	if len(parts) == 0 || parts[0] == "" {
@@ -556,6 +563,12 @@ var StandardWorkflowTypes = []WorkflowType{
 	{Name: "research_topic", Description: "Research a topic", Category: "agent", RequiredParams: []string{"topic"}, OptionalParams: []string{"depth"}, Examples: []string{"intent://workflow/research_topic?topic=AI发展趋势"}},
 	{Name: "analyze_document", Description: "Analyze a document", Category: "agent", RequiredParams: []string{"document"}, OptionalParams: []string{"analysis_type"}, Examples: []string{"intent://workflow/analyze_document?document=report.pdf"}},
 	{Name: "generate_content", Description: "Generate content", Category: "agent", RequiredParams: []string{"type"}, OptionalParams: []string{"topic", "length"}, Examples: []string{"intent://workflow/generate_content?type=文章&topic=科技"}},
+	// 鸿蒙 HarmonyOS 专用工作流类型
+	{Name: "harmony_ability", Description: "Launch HarmonyOS Ability (page/slice/service/data)", Category: "harmony", RequiredParams: []string{"bundle_name", "ability_name"}, OptionalParams: []string{"ability_type", "uri", "params"}, Examples: []string{"ohos://workflow/harmony_ability?bundle_name=com.example.app&ability_name=MainAbility"}},
+	{Name: "harmony_atomic_service", Description: "Launch HarmonyOS Atomic Service (card-based)", Category: "harmony", RequiredParams: []string{"service_id"}, OptionalParams: []string{"action", "card_id", "params"}, Examples: []string{"ohos://workflow/harmony_atomic_service?service_id=com.example.service&action=launch"}},
+	{Name: "harmony_widget", Description: "Manage HarmonyOS desktop widget (add/update/remove/query)", Category: "harmony", RequiredParams: []string{"action"}, OptionalParams: []string{"widget_id", "provider_bundle", "widget_name", "data"}, Examples: []string{"ohos://workflow/harmony_widget?action=add&provider_bundle=com.example.app&widget_name=WeatherCard"}},
+	{Name: "harmony_share", Description: "Share content via HarmonyOS system share sheet", Category: "harmony", RequiredParams: []string{}, OptionalParams: []string{"text", "uri", "type"}, Examples: []string{"ohos://workflow/harmony_share?text=分享内容&type=text/plain"}},
+	{Name: "harmony_notify", Description: "Send notification via HarmonyOS notification service", Category: "harmony", RequiredParams: []string{"title"}, OptionalParams: []string{"body", "priority"}, Examples: []string{"ohos://workflow/harmony_notify?title=提醒&body=开会时间到了"}},
 }
 
 func GetWorkflowType(name string) *WorkflowType {

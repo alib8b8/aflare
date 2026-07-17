@@ -439,6 +439,7 @@ type DeviceCapability struct {
 	HasGPU     bool    `json:"has_gpu"`
 	StorageGB  float64 `json:"storage_gb"`
 	IsMobile   bool    `json:"is_mobile"`
+	Platform   string  `json:"platform"`
 	BatteryPct int     `json:"battery_pct,omitempty"`
 	OnWiFi     bool    `json:"on_wifi"`
 	OnCellular bool    `json:"on_cellular"`
@@ -457,9 +458,37 @@ func DetectCapability() DeviceCapability {
 		cap.HasGPU = true
 	}
 
-	cap.IsMobile = os.Getenv("ANDROID_ROOT") != "" || os.Getenv("TERMUX_VERSION") != ""
+	// 检测移动端平台：Android、鸿蒙
+	cap.IsMobile = os.Getenv("ANDROID_ROOT") != "" ||
+		os.Getenv("TERMUX_VERSION") != "" ||
+		os.Getenv("OHOS_ROOT") != "" ||
+		os.Getenv("HOS_ROOT") != "" ||
+		isHarmonyOS()
+	cap.Platform = DetectPlatformType()
 
 	return cap
+}
+
+// isHarmonyOS 检测是否运行在鸿蒙系统上
+func isHarmonyOS() bool {
+	if _, err := os.Stat("/system/etc/param/ohos.para"); err == nil {
+		return true
+	}
+	return false
+}
+
+// DetectPlatformType 返回当前平台类型字符串
+func DetectPlatformType() string {
+	if os.Getenv("OHOS_ROOT") != "" || os.Getenv("HOS_ROOT") != "" || isHarmonyOS() {
+		return "harmony"
+	}
+	if os.Getenv("ANDROID_ROOT") != "" || os.Getenv("TERMUX_VERSION") != "" {
+		return "android"
+	}
+	if os.Getenv("CFFIXED_USER_HOME") != "" && os.Getenv("HOME") == "/var/mobile" {
+		return "ios"
+	}
+	return "desktop"
 }
 
 func RecommendLocalModel(cap DeviceCapability) string {

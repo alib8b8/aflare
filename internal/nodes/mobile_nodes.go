@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -22,7 +23,46 @@ var (
 		"share_content": true, "save_for_later": true,
 		"compare_prices": true, "book_and_add_calendar": true,
 	}
+	// 鸿蒙 Ability 类型白名单
+	validHarmonyAbilityTypes = map[string]bool{
+		"page": true, "slice": true, "service": true, "data": true,
+	}
+	// 鸿蒙原子化服务动作白名单
+	validHarmonyAtomicActions = map[string]bool{
+		"launch": true, "router": true, "share": true, "notify": true,
+	}
 )
+
+// Platform 表示目标运行平台
+type Platform string
+
+const (
+	PlatformAndroid Platform = "android"
+	PlatformIOS     Platform = "ios"
+	PlatformHarmony Platform = "harmony"
+	PlatformDesktop Platform = "desktop"
+	PlatformUnknown Platform = "unknown"
+)
+
+// DetectPlatform 根据环境变量检测当前运行平台
+func DetectPlatform() Platform {
+	// 鸿蒙检测：OHOS_ROOT 或 /system/etc/param/ohos.para
+	if os.Getenv("OHOS_ROOT") != "" || os.Getenv("HOS_ROOT") != "" {
+		return PlatformHarmony
+	}
+	if _, err := os.Stat("/system/etc/param/ohos.para"); err == nil {
+		return PlatformHarmony
+	}
+	// Android 检测
+	if os.Getenv("ANDROID_ROOT") != "" || os.Getenv("TERMUX_VERSION") != "" {
+		return PlatformAndroid
+	}
+	// iOS 检测（越狱环境）
+	if os.Getenv("CFFIXED_USER_HOME") != "" && os.Getenv("HOME") == "/var/mobile" {
+		return PlatformIOS
+	}
+	return PlatformDesktop
+}
 
 func init() {
 	Register(&AppLaunchNode{})
@@ -33,6 +73,9 @@ func init() {
 	Register(&CrossAppActionNode{})
 	Register(&AgentMessageNode{})
 	Register(&AgentInboxNode{})
+	Register(&HarmonyAbilityNode{})
+	Register(&HarmonyAtomicServiceNode{})
+	Register(&HarmonyWidgetNode{})
 }
 
 type AppLaunchNode struct{}
@@ -44,13 +87,14 @@ func (n *AppLaunchNode) Description() string {
 func (n *AppLaunchNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "app_launch",
-		Description: "Launch a mobile/desktop app with optional parameters. Cross-platform app control for AI systems.",
+		Description: "Launch a mobile/desktop app with optional parameters. Cross-platform app control for AI systems. Supports Android, iOS, and HarmonyOS.",
 		Input:       "string - optional input to pass to the app",
 		Output:      "string - launch result and app session info",
 		Params: []ParamSchema{
-			{Name: "app", Type: "string", Description: "App identifier: package name (Android), bundle ID (iOS), app name (desktop)", Required: true},
+			{Name: "app", Type: "string", Description: "App identifier: package name (Android), bundle ID (iOS), bundleName (HarmonyOS), app name (desktop)", Required: true},
 			{Name: "action", Type: "string", Description: "Deep link action: open, search, share, edit, view (default: open)", Required: false, Default: "open"},
-			{Name: "uri", Type: "string", Description: "Deep link URI or URL scheme", Required: false},
+			{Name: "uri", Type: "string", Description: "Deep link URI or URL scheme. HarmonyOS uses ohos:// or host:// scheme", Required: false},
+			{Name: "platform", Type: "string", Description: "Target platform: android, ios, harmony, desktop (auto-detected if omitted)", Required: false},
 			{Name: "params", Type: "string", Description: "JSON parameters to pass to the app", Required: false},
 			{Name: "wait", Type: "string", Description: "Wait for app to fully launch: true/false (default: true)", Required: false, Default: "true"},
 			{Name: "timeout", Type: "string", Description: "Launch timeout (default: 10s)", Required: false, Default: "10s"},
@@ -73,6 +117,13 @@ func (n *AppLaunchNode) Execute(ctx context.Context, input string, params map[st
 		return "", fmt.Errorf("invalid action: %s (allowed: open, search, share, edit, view)", action)
 	}
 
+	// 检测目标平台
+	platform := getMobileParam(params, "platform", string(DetectPlatform()))
+	validPlatforms := map[string]bool{"android": true, "ios": true, "harmony": true, "desktop": true}
+	if !validPlatforms[platform] {
+		return "", fmt.Errorf("invalid platform: %s (allowed: android, ios, harmony, desktop)", platform)
+	}
+
 	uri := params["uri"]
 	if uri != "" {
 		if err := validateAppURI(uri); err != nil {
@@ -92,12 +143,13 @@ func (n *AppLaunchNode) Execute(ctx context.Context, input string, params map[st
 	}
 
 	intent := map[string]interface{}{
-		"type":    "app_launch",
-		"app":     app,
-		"action":  action,
-		"wait":    getMobileParam(params, "wait", "true") == "true",
-		"input":   truncateInput(input, 1000),
-		"version": "1.0",
+		"type":     "app_launch",
+		"app":      app,
+		"action":   action,
+		"platform": platform,
+		"wait":     getMobileParam(params, "wait", "true") == "true",
+		"input":    truncateInput(input, 1000),
+		"version":  "1.0",
 	}
 
 	if uri != "" {
@@ -105,6 +157,15 @@ func (n *AppLaunchNode) Execute(ctx context.Context, input string, params map[st
 	}
 	if parsedParams != nil {
 		intent["params"] = parsedParams
+	}
+
+	// 鸿蒙特有字段
+	if platform == "harmony" {
+		intent["harmony"] = map[string]interface{}{
+			"bundle_name":  app,
+			"ability_type": "page",
+			"uri_scheme":   "ohos://",
+		}
 	}
 
 	result, _ := json.MarshalIndent(intent, "", "  ")
@@ -115,6 +176,7 @@ func validateAppURI(uri string) error {
 	if len(uri) > 4096 {
 		return fmt.Errorf("URI too long")
 	}
+	// 允许的 URI scheme：标准 scheme + 鸿蒙 ohos://
 	disallowedSchemes := []string{"file://", "data://", "javascript://", "ftp://"}
 	for _, scheme := range disallowedSchemes {
 		if strings.HasPrefix(strings.ToLower(uri), scheme) {
@@ -709,4 +771,264 @@ func (n *AgentInboxNode) Execute(ctx context.Context, input string, params map[s
 
 	result, _ := json.MarshalIndent(inbox, "", "  ")
 	return fmt.Sprintf("Agent inbox query:\n%s", string(result)), nil
+}
+
+// HarmonyAbilityNode 启动鸿蒙 Ability，支持 page/slice/service/data 四种类型
+type HarmonyAbilityNode struct{}
+
+func (n *HarmonyAbilityNode) Name() string { return "harmony_ability" }
+func (n *HarmonyAbilityNode) Description() string {
+	return "Launch HarmonyOS Ability (page, slice, service, data)"
+}
+func (n *HarmonyAbilityNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "harmony_ability",
+		Description: "Launch HarmonyOS Ability with specified type. Supports page (UI), slice (partial UI), service (background), data (data provider).",
+		Input:       "string - optional input data for the ability",
+		Output:      "string - ability launch result",
+		Params: []ParamSchema{
+			{Name: "bundle_name", Type: "string", Description: "HarmonyOS bundle name (e.g. com.example.myapplication)", Required: true},
+			{Name: "ability_name", Type: "string", Description: "Ability class name (e.g. MainAbility)", Required: true},
+			{Name: "ability_type", Type: "string", Description: "Ability type: page, slice, service, data (default: page)", Required: false, Default: "page"},
+			{Name: "uri", Type: "string", Description: "Deep link URI using ohos:// scheme", Required: false},
+			{Name: "params", Type: "string", Description: "JSON parameters for the ability", Required: false},
+		},
+	}
+}
+
+func (n *HarmonyAbilityNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	bundleName := params["bundle_name"]
+	if bundleName == "" {
+		return "", fmt.Errorf("bundle_name parameter is required")
+	}
+	if !validAppNames.MatchString(bundleName) {
+		return "", fmt.Errorf("invalid bundle_name: contains invalid characters")
+	}
+	if len(bundleName) > 256 {
+		return "", fmt.Errorf("bundle_name too long (max 256)")
+	}
+
+	abilityName := params["ability_name"]
+	if abilityName == "" {
+		return "", fmt.Errorf("ability_name parameter is required")
+	}
+	if !validAppNames.MatchString(abilityName) {
+		return "", fmt.Errorf("invalid ability_name: contains invalid characters")
+	}
+	if len(abilityName) > 128 {
+		return "", fmt.Errorf("ability_name too long (max 128)")
+	}
+
+	abilityType := getMobileParam(params, "ability_type", "page")
+	if !validHarmonyAbilityTypes[abilityType] {
+		return "", fmt.Errorf("invalid ability_type: %s (allowed: page, slice, service, data)", abilityType)
+	}
+
+	uri := params["uri"]
+	if uri != "" {
+		if err := validateAppURI(uri); err != nil {
+			return "", err
+		}
+	}
+
+	var parsedParams map[string]interface{}
+	if p := params["params"]; p != "" {
+		if err := json.Unmarshal([]byte(p), &parsedParams); err != nil {
+			return "", fmt.Errorf("invalid params JSON: %w", err)
+		}
+		if err := validateAppParams(parsedParams); err != nil {
+			return "", err
+		}
+	}
+
+	intent := map[string]interface{}{
+		"type":         "harmony_ability",
+		"bundle_name":  bundleName,
+		"ability_name": abilityName,
+		"ability_type": abilityType,
+		"uri_scheme":   "ohos://",
+		"input":        truncateInput(input, 1000),
+		"version":      "1.0",
+	}
+	if uri != "" {
+		intent["uri"] = uri
+	}
+	if parsedParams != nil {
+		intent["params"] = parsedParams
+	}
+
+	result, _ := json.MarshalIndent(intent, "", "  ")
+	return fmt.Sprintf("HarmonyOS Ability launch intent:\n%s", string(result)), nil
+}
+
+// HarmonyAtomicServiceNode 启动鸿蒙原子化服务
+type HarmonyAtomicServiceNode struct{}
+
+func (n *HarmonyAtomicServiceNode) Name() string { return "harmony_atomic_service" }
+func (n *HarmonyAtomicServiceNode) Description() string {
+	return "Launch HarmonyOS Atomic Service (card-based lightweight app)"
+}
+func (n *HarmonyAtomicServiceNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "harmony_atomic_service",
+		Description: "Launch HarmonyOS Atomic Service. Lightweight, card-based services that run without installation. Supports launch, router, share, notify actions.",
+		Input:       "string - optional input data",
+		Output:      "string - atomic service launch result",
+		Params: []ParamSchema{
+			{Name: "service_id", Type: "string", Description: "Atomic service ID (e.g. com.example.service)", Required: true},
+			{Name: "action", Type: "string", Description: "Action: launch, router, share, notify (default: launch)", Required: false, Default: "launch"},
+			{Name: "card_id", Type: "string", Description: "Service card ID for widget-style display", Required: false},
+			{Name: "params", Type: "string", Description: "JSON parameters for the service", Required: false},
+		},
+	}
+}
+
+func (n *HarmonyAtomicServiceNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	serviceID := params["service_id"]
+	if serviceID == "" {
+		return "", fmt.Errorf("service_id parameter is required")
+	}
+	if !validAppNames.MatchString(serviceID) {
+		return "", fmt.Errorf("invalid service_id: contains invalid characters")
+	}
+	if len(serviceID) > 256 {
+		return "", fmt.Errorf("service_id too long (max 256)")
+	}
+
+	action := getMobileParam(params, "action", "launch")
+	if !validHarmonyAtomicActions[action] {
+		return "", fmt.Errorf("invalid action: %s (allowed: launch, router, share, notify)", action)
+	}
+
+	cardID := params["card_id"]
+	if cardID != "" {
+		if !validAppNames.MatchString(cardID) {
+			return "", fmt.Errorf("invalid card_id: contains invalid characters")
+		}
+		if len(cardID) > 128 {
+			return "", fmt.Errorf("card_id too long (max 128)")
+		}
+	}
+
+	var parsedParams map[string]interface{}
+	if p := params["params"]; p != "" {
+		if err := json.Unmarshal([]byte(p), &parsedParams); err != nil {
+			return "", fmt.Errorf("invalid params JSON: %w", err)
+		}
+		if err := validateAppParams(parsedParams); err != nil {
+			return "", err
+		}
+	}
+
+	intent := map[string]interface{}{
+		"type":       "harmony_atomic_service",
+		"service_id": serviceID,
+		"action":     action,
+		"input":      truncateInput(input, 1000),
+		"version":    "1.0",
+	}
+	if cardID != "" {
+		intent["card_id"] = cardID
+	}
+	if parsedParams != nil {
+		intent["params"] = parsedParams
+	}
+
+	result, _ := json.MarshalIndent(intent, "", "  ")
+	return fmt.Sprintf("HarmonyOS Atomic Service intent:\n%s", string(result)), nil
+}
+
+// HarmonyWidgetNode 管理鸿蒙桌面卡片（Widget）
+type HarmonyWidgetNode struct{}
+
+func (n *HarmonyWidgetNode) Name() string { return "harmony_widget" }
+func (n *HarmonyWidgetNode) Description() string {
+	return "Manage HarmonyOS desktop widgets (cards)"
+}
+func (n *HarmonyWidgetNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "harmony_widget",
+		Description: "Manage HarmonyOS desktop widgets (service cards). Add, update, remove, or query widget state on the home screen.",
+		Input:       "string - optional widget content or query",
+		Output:      "string - widget operation result",
+		Params: []ParamSchema{
+			{Name: "action", Type: "string", Description: "Action: add, update, remove, query (default: query)", Required: false, Default: "query"},
+			{Name: "widget_id", Type: "string", Description: "Widget identifier (required for update, remove, query)", Required: false},
+			{Name: "provider_bundle", Type: "string", Description: "Provider bundle name for add action", Required: false},
+			{Name: "widget_name", Type: "string", Description: "Widget ability name for add action", Required: false},
+			{Name: "data", Type: "string", Description: "JSON data to update widget content", Required: false},
+		},
+	}
+}
+
+func (n *HarmonyWidgetNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	action := getMobileParam(params, "action", "query")
+	validWidgetActions := map[string]bool{"add": true, "update": true, "remove": true, "query": true}
+	if !validWidgetActions[action] {
+		return "", fmt.Errorf("invalid action: %s (allowed: add, update, remove, query)", action)
+	}
+
+	widgetID := params["widget_id"]
+	if action != "add" {
+		if widgetID == "" {
+			return "", fmt.Errorf("widget_id is required for %s action", action)
+		}
+		if !validAppNames.MatchString(widgetID) {
+			return "", fmt.Errorf("invalid widget_id: contains invalid characters")
+		}
+		if len(widgetID) > 128 {
+			return "", fmt.Errorf("widget_id too long (max 128)")
+		}
+	}
+
+	providerBundle := params["provider_bundle"]
+	widgetName := params["widget_name"]
+	if action == "add" {
+		if providerBundle == "" {
+			return "", fmt.Errorf("provider_bundle is required for add action")
+		}
+		if !validAppNames.MatchString(providerBundle) {
+			return "", fmt.Errorf("invalid provider_bundle")
+		}
+		if widgetName == "" {
+			return "", fmt.Errorf("widget_name is required for add action")
+		}
+		if !validAppNames.MatchString(widgetName) {
+			return "", fmt.Errorf("invalid widget_name")
+		}
+	}
+
+	var parsedData map[string]interface{}
+	if d := params["data"]; d != "" {
+		if err := json.Unmarshal([]byte(d), &parsedData); err != nil {
+			return "", fmt.Errorf("invalid data JSON: %w", err)
+		}
+		if err := validateAppParams(parsedData); err != nil {
+			return "", err
+		}
+	}
+
+	intent := map[string]interface{}{
+		"type":    "harmony_widget",
+		"action":  action,
+		"version": "1.0",
+	}
+	if widgetID != "" {
+		intent["widget_id"] = widgetID
+	}
+	if providerBundle != "" {
+		intent["provider_bundle"] = providerBundle
+	}
+	if widgetName != "" {
+		intent["widget_name"] = widgetName
+	}
+	if parsedData != nil {
+		intent["data"] = parsedData
+	}
+	if input != "" {
+		intent["input"] = truncateInput(input, 500)
+	}
+
+	result, _ := json.MarshalIndent(intent, "", "  ")
+	return fmt.Sprintf("HarmonyOS Widget operation:\n%s", string(result)), nil
 }
