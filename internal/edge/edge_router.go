@@ -544,3 +544,155 @@ func GenerateSecureID() string {
 	}
 	return base64.URLEncoding.EncodeToString(b)
 }
+
+// AgentInfo holds the metadata for a discoverable cross-domain agent,
+// including its DID identity, service endpoints, and declared capabilities.
+type AgentInfo struct {
+	DID          string            `json:"did"`
+	Endpoint     string            `json:"endpoint"`
+	Capabilities []string          `json:"capabilities"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	LastSeen     time.Time         `json:"last_seen"`
+	Trusted      bool              `json:"trusted"`
+}
+
+// Validate checks if the agent info is well-formed.
+func (a *AgentInfo) Validate() error {
+	if a.DID == "" {
+		return fmt.Errorf("agent DID is required")
+	}
+	if !strings.HasPrefix(a.DID, "did:") {
+		return fmt.Errorf("invalid agent DID format")
+	}
+	if a.Endpoint == "" {
+		return fmt.Errorf("agent endpoint is required")
+	}
+	if err := validateEndpoint(a.Endpoint); err != nil {
+		return fmt.Errorf("invalid agent endpoint: %w", err)
+	}
+	return nil
+}
+
+// AgentRegistry maintains a directory of known cross-domain agents.
+type AgentRegistry struct {
+	agents map[string]*AgentInfo
+	mu     sync.RWMutex
+}
+
+// NewAgentRegistry creates a new agent registry.
+func NewAgentRegistry() *AgentRegistry {
+	return &AgentRegistry{
+		agents: make(map[string]*AgentInfo),
+	}
+}
+
+// RegisterAgent adds or updates an agent in the registry.
+func (r *AgentRegistry) RegisterAgent(agent *AgentInfo) error {
+	if err := agent.Validate(); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	agent.LastSeen = time.Now()
+	r.agents[agent.DID] = agent
+	return nil
+}
+
+// GetAgent retrieves an agent by its DID.
+func (r *AgentRegistry) GetAgent(did string) (*AgentInfo, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	agent, ok := r.agents[did]
+	return agent, ok
+}
+
+// ListAgents returns all registered agents.
+func (r *AgentRegistry) ListAgents() []*AgentInfo {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	result := make([]*AgentInfo, 0, len(r.agents))
+	for _, agent := range r.agents {
+		result = append(result, agent)
+	}
+	return result
+}
+
+// DiscoverAgentsByCapability returns agents that support a given capability.
+func (r *AgentRegistry) DiscoverAgentsByCapability(capability string) []*AgentInfo {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var result []*AgentInfo
+	for _, agent := range r.agents {
+		for _, cap := range agent.Capabilities {
+			if cap == capability {
+				result = append(result, agent)
+				break
+			}
+		}
+	}
+	return result
+}
+
+// RemoveAgent removes an agent from the registry.
+func (r *AgentRegistry) RemoveAgent(did string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.agents, did)
+}
+
+// CrossDomainMessenger handles routing messages between agents across
+// different domains, inspired by awiki.ai's cross-domain messaging.
+type CrossDomainMessenger struct {
+	registry  *AgentRegistry
+	sentCount int
+	errCount  int
+	mu        sync.RWMutex
+}
+
+// NewCrossDomainMessenger creates a new cross-domain messenger.
+func NewCrossDomainMessenger(registry *AgentRegistry) *CrossDomainMessenger {
+	return &CrossDomainMessenger{
+		registry: registry,
+	}
+}
+
+// SendMessage routes a message to the target agent identified by DID.
+// This is a placeholder implementation; in production it would perform
+// an actual HTTP POST to the agent's endpoint with proper auth.
+func (m *CrossDomainMessenger) SendMessage(senderDID, receiverDID, payload string) error {
+	if senderDID == "" || receiverDID == "" {
+		return fmt.Errorf("sender and receiver DIDs are required")
+	}
+	agent, ok := m.registry.GetAgent(receiverDID)
+	if !ok {
+		return fmt.Errorf("agent %s not found in registry", receiverDID)
+	}
+	if !agent.Trusted {
+		return fmt.Errorf("agent %s is not trusted", receiverDID)
+	}
+
+	m.mu.Lock()
+	m.sentCount++
+	m.mu.Unlock()
+
+	// Placeholder: real implementation would POST to agent.Endpoint
+	_ = agent.Endpoint
+	_ = payload
+	return nil
+}
+
+// ResolveDIDEndpoint looks up the service endpoint for a given DID.
+func (m *CrossDomainMessenger) ResolveDIDEndpoint(did string) (string, error) {
+	agent, ok := m.registry.GetAgent(did)
+	if !ok {
+		return "", fmt.Errorf("DID %s not found", did)
+	}
+	return agent.Endpoint, nil
+}
+
+// GetStats returns messenger statistics.
+func (m *CrossDomainMessenger) GetStats() (sent, errors int) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.sentCount, m.errCount
+}

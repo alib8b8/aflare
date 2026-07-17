@@ -17,6 +17,8 @@ const (
 	maxTaskMessageLength = 65536
 	maxParamKeyLength    = 100
 	maxParamValueLength  = 1000
+	maxDIDLength         = 256
+	maxSignatureLength   = 1024
 )
 
 type IntentURI struct {
@@ -222,16 +224,133 @@ func (i *IntentURI) ToJSON() (string, error) {
 	return string(data), nil
 }
 
+// DIDIdentity represents a W3C DID-based agent identity for cross-domain
+// authentication and trust establishment, inspired by awiki.ai's agent-native
+// identity system.
+type DIDIdentity struct {
+	DID        string            `json:"did"`
+	Method     string            `json:"method"`
+	Endpoint   string            `json:"endpoint,omitempty"`
+	PublicKey  string            `json:"public_key,omitempty"`
+	Signature  string            `json:"signature,omitempty"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
+	VerifiedAt time.Time         `json:"verified_at,omitempty"`
+}
+
+// DIDDocument represents the resolvable document for a DID identity,
+// containing public keys and service endpoints.
+type DIDDocument struct {
+	ID             string         `json:"id"`
+	Context        []string       `json:"@context"`
+	PublicKeys     []DIDPublicKey `json:"publicKey,omitempty"`
+	Services       []DIDService   `json:"service,omitempty"`
+	Authentication []string       `json:"authentication,omitempty"`
+	Created        time.Time      `json:"created"`
+	Updated        time.Time      `json:"updated"`
+}
+
+// DIDPublicKey represents a public key entry in a DID document.
+type DIDPublicKey struct {
+	ID              string `json:"id"`
+	Type            string `json:"type"`
+	Controller      string `json:"controller"`
+	PublicKeyBase64 string `json:"publicKeyBase64,omitempty"`
+}
+
+// DIDService represents a service endpoint in a DID document.
+type DIDService struct {
+	ID              string `json:"id"`
+	Type            string `json:"type"`
+	ServiceEndpoint string `json:"serviceEndpoint"`
+}
+
+// Validate checks if the DID identity is well-formed and valid.
+func (d *DIDIdentity) Validate() error {
+	if d.DID == "" {
+		return fmt.Errorf("DID is required")
+	}
+	if len(d.DID) > maxDIDLength {
+		return fmt.Errorf("DID too long (max %d)", maxDIDLength)
+	}
+	if !strings.HasPrefix(d.DID, "did:") {
+		return fmt.Errorf("invalid DID format: must start with 'did:'")
+	}
+	parts := strings.Split(d.DID, ":")
+	if len(parts) < 3 {
+		return fmt.Errorf("invalid DID format: expected did:method:identifier")
+	}
+	if d.Method != "" && d.Method != parts[1] {
+		return fmt.Errorf("DID method mismatch")
+	}
+	if len(d.Signature) > maxSignatureLength {
+		return fmt.Errorf("signature too long (max %d)", maxSignatureLength)
+	}
+	return nil
+}
+
+// VerifySignature performs a placeholder signature verification.
+// In production this would use the public key from the DID document.
+func (d *DIDIdentity) VerifySignature(payload string) error {
+	if d.Signature == "" {
+		return fmt.Errorf("signature is required for verification")
+	}
+	// Placeholder: real implementation would verify using public key
+	if len(d.Signature) < 16 {
+		return fmt.Errorf("signature too short")
+	}
+	return nil
+}
+
+// NewDIDIdentity creates a new DID identity with the given method and identifier.
+func NewDIDIdentity(method, identifier string) *DIDIdentity {
+	did := fmt.Sprintf("did:%s:%s", method, identifier)
+	return &DIDIdentity{
+		DID:      did,
+		Method:   method,
+		Metadata: make(map[string]string),
+	}
+}
+
+// ToDIDDocument generates a DID document for this identity.
+func (d *DIDIdentity) ToDIDDocument() *DIDDocument {
+	now := time.Now()
+	return &DIDDocument{
+		ID:      d.DID,
+		Context: []string{"https://www.w3.org/ns/did/v1"},
+		PublicKeys: []DIDPublicKey{
+			{
+				ID:              d.DID + "#keys-1",
+				Type:            "Ed25519VerificationKey2020",
+				Controller:      d.DID,
+				PublicKeyBase64: d.PublicKey,
+			},
+		},
+		Services: []DIDService{
+			{
+				ID:              d.DID + "#agent",
+				Type:            "AgentService",
+				ServiceEndpoint: d.Endpoint,
+			},
+		},
+		Authentication: []string{d.DID + "#keys-1"},
+		Created:        now,
+		Updated:        now,
+	}
+}
+
 type TaskMessage struct {
-	ID        string                 `json:"id"`
-	Version   string                 `json:"version"`
-	Timestamp time.Time              `json:"timestamp"`
-	Intent    *IntentURI             `json:"intent"`
-	Workflow  string                 `json:"workflow,omitempty"`
-	Context   map[string]interface{} `json:"context,omitempty"`
-	Status    TaskStatus             `json:"status"`
-	Result    string                 `json:"result,omitempty"`
-	Error     string                 `json:"error,omitempty"`
+	ID          string                 `json:"id"`
+	Version     string                 `json:"version"`
+	Timestamp   time.Time              `json:"timestamp"`
+	Intent      *IntentURI             `json:"intent"`
+	Workflow    string                 `json:"workflow,omitempty"`
+	Context     map[string]interface{} `json:"context,omitempty"`
+	Status      TaskStatus             `json:"status"`
+	Result      string                 `json:"result,omitempty"`
+	Error       string                 `json:"error,omitempty"`
+	Sender      *DIDIdentity           `json:"sender,omitempty"`
+	Receiver    *DIDIdentity           `json:"receiver,omitempty"`
+	CrossDomain bool                   `json:"cross_domain,omitempty"`
 }
 
 type TaskStatus string
@@ -288,6 +407,22 @@ func ParseTaskMessage(jsonStr string) (*TaskMessage, error) {
 
 	if !validateTaskStatus(msg.Status) {
 		return nil, fmt.Errorf("invalid task status: %s", msg.Status)
+	}
+
+	// Validate DID identities for cross-domain messages
+	if msg.CrossDomain {
+		if msg.Sender == nil {
+			return nil, fmt.Errorf("cross-domain message requires sender DID")
+		}
+		if err := msg.Sender.Validate(); err != nil {
+			return nil, fmt.Errorf("invalid sender DID: %w", err)
+		}
+		if msg.Receiver == nil {
+			return nil, fmt.Errorf("cross-domain message requires receiver DID")
+		}
+		if err := msg.Receiver.Validate(); err != nil {
+			return nil, fmt.Errorf("invalid receiver DID: %w", err)
+		}
 	}
 
 	return &msg, nil

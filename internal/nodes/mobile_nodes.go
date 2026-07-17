@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -29,6 +31,8 @@ func init() {
 	Register(&IntentRouterNode{})
 	Register(&DeviceStateNode{})
 	Register(&CrossAppActionNode{})
+	Register(&AgentMessageNode{})
+	Register(&AgentInboxNode{})
 }
 
 type AppLaunchNode struct{}
@@ -548,4 +552,158 @@ func truncateInput(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "... (truncated)"
+}
+
+// AgentMessageNode sends cross-domain messages to other agents,
+// inspired by awiki.ai's agent-native messaging.
+type AgentMessageNode struct{}
+
+func (n *AgentMessageNode) Name() string        { return "agent_message" }
+func (n *AgentMessageNode) Description() string { return "Send message to another agent by DID" }
+func (n *AgentMessageNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "agent_message",
+		Description: "Send cross-domain message to another agent by DID. Inspired by awiki.ai agent-native messaging.",
+		Input:       "string - message body or payload",
+		Output:      "string - send result",
+		Params: []ParamSchema{
+			{Name: "to_did", Type: "string", Description: "Receiver agent DID (e.g. did:awiki:agent123)", Required: true},
+			{Name: "from_did", Type: "string", Description: "Sender agent DID", Required: false},
+			{Name: "subject", Type: "string", Description: "Message subject/type", Required: false},
+			{Name: "priority", Type: "string", Description: "Priority: low, normal, high, urgent (default: normal)", Required: false, Default: "normal"},
+			{Name: "endpoint", Type: "string", Description: "Target agent endpoint URL (optional, for direct send)", Required: false},
+		},
+	}
+}
+
+func (n *AgentMessageNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	toDID := params["to_did"]
+	if toDID == "" {
+		return "", fmt.Errorf("to_did parameter is required")
+	}
+	if !strings.HasPrefix(toDID, "did:") {
+		return "", fmt.Errorf("invalid to_did format: must start with 'did:'")
+	}
+	if len(toDID) > 256 {
+		return "", fmt.Errorf("to_did too long")
+	}
+
+	fromDID := getMobileParam(params, "from_did", "")
+	if fromDID != "" && !strings.HasPrefix(fromDID, "did:") {
+		return "", fmt.Errorf("invalid from_did format")
+	}
+
+	priority := getMobileParam(params, "priority", "normal")
+	validPriorities := map[string]bool{"low": true, "normal": true, "high": true, "urgent": true}
+	if !validPriorities[priority] {
+		return "", fmt.Errorf("invalid priority: %s", priority)
+	}
+
+	body := input
+	if len(body) > 5000 {
+		body = body[:5000] + "... (truncated)"
+	}
+
+	msg := map[string]interface{}{
+		"type":      "agent_message",
+		"from":      fromDID,
+		"to":        toDID,
+		"subject":   getMobileParam(params, "subject", ""),
+		"body":      body,
+		"priority":  priority,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"version":   "1.0",
+	}
+
+	endpoint := params["endpoint"]
+	if endpoint != "" {
+		if err := validateAgentEndpoint(endpoint); err != nil {
+			return "", err
+		}
+		msg["endpoint"] = endpoint
+	}
+
+	result, _ := json.MarshalIndent(msg, "", "  ")
+	return fmt.Sprintf("Agent message prepared:\n%s", string(result)), nil
+}
+
+func validateAgentEndpoint(endpoint string) error {
+	if len(endpoint) > 2048 {
+		return fmt.Errorf("endpoint too long")
+	}
+	if !strings.HasPrefix(endpoint, "http://") && !strings.HasPrefix(endpoint, "https://") {
+		return fmt.Errorf("endpoint must use http or https")
+	}
+	return nil
+}
+
+// AgentInboxNode queries or manages the local agent's message inbox.
+type AgentInboxNode struct{}
+
+func (n *AgentInboxNode) Name() string        { return "agent_inbox" }
+func (n *AgentInboxNode) Description() string { return "Query agent message inbox" }
+func (n *AgentInboxNode) Schema() NodeSchema {
+	return NodeSchema{
+		Name:        "agent_inbox",
+		Description: "Query agent message inbox. Retrieve and manage cross-domain messages.",
+		Input:       "string - optional filter query",
+		Output:      "string - inbox messages in JSON",
+		Params: []ParamSchema{
+			{Name: "action", Type: "string", Description: "Action: list, read, delete, mark_read (default: list)", Required: false, Default: "list"},
+			{Name: "message_id", Type: "string", Description: "Message ID for read/delete/mark_read", Required: false},
+			{Name: "from_did", Type: "string", Description: "Filter by sender DID", Required: false},
+			{Name: "limit", Type: "string", Description: "Max messages to return (default: 10)", Required: false, Default: "10"},
+		},
+	}
+}
+
+func (n *AgentInboxNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	action := getMobileParam(params, "action", "list")
+	validActions := map[string]bool{"list": true, "read": true, "delete": true, "mark_read": true}
+	if !validActions[action] {
+		return "", fmt.Errorf("invalid action: %s (allowed: list, read, delete, mark_read)", action)
+	}
+
+	if action != "list" {
+		msgID := params["message_id"]
+		if msgID == "" {
+			return "", fmt.Errorf("message_id is required for %s action", action)
+		}
+		if len(msgID) > 128 {
+			return "", fmt.Errorf("message_id too long")
+		}
+	}
+
+	fromDID := params["from_did"]
+	if fromDID != "" && !strings.HasPrefix(fromDID, "did:") {
+		return "", fmt.Errorf("invalid from_did format")
+	}
+
+	limit := 10
+	if v := params["limit"]; v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 && parsed <= 100 {
+			limit = parsed
+		}
+	}
+
+	inbox := map[string]interface{}{
+		"type":    "agent_inbox",
+		"action":  action,
+		"limit":   limit,
+		"version": "1.0",
+	}
+
+	if fromDID != "" {
+		inbox["filter_from"] = fromDID
+	}
+	if action != "list" {
+		inbox["message_id"] = params["message_id"]
+	}
+
+	// Placeholder: real implementation would query a message store
+	inbox["messages"] = []map[string]interface{}{}
+	inbox["total"] = 0
+
+	result, _ := json.MarshalIndent(inbox, "", "  ")
+	return fmt.Sprintf("Agent inbox query:\n%s", string(result)), nil
 }
