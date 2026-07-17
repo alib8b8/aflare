@@ -26,7 +26,20 @@ jobs:
     - name: Generate coverage profile
       run: |
         go clean -testcache
-        go test -coverprofile=coverage.out -covermode=atomic ./internal/... -short
+        for pkg in ./internal/...; do
+          echo "=== Testing $pkg ==="
+          if ! go test -coverprofile=$(basename $pkg).out -covermode=atomic "$pkg" -short; then
+            echo "FAILED: $pkg"
+            exit 1
+          fi
+        done
+        echo "mode: atomic" > coverage.out
+        for f in *.out; do
+          if [ "$f" != "coverage.out" ]; then
+            tail -n +2 "$f" >> coverage.out
+            rm "$f"
+          fi
+        done
 
     - name: Check coverage threshold
       run: |
