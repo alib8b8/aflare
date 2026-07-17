@@ -604,11 +604,16 @@ func (n *AgentMessageNode) Execute(ctx context.Context, input string, params map
 		body = body[:5000] + "... (truncated)"
 	}
 
+	subject := getMobileParam(params, "subject", "")
+	if len(subject) > 200 {
+		subject = subject[:200] + "... (truncated)"
+	}
+
 	msg := map[string]interface{}{
 		"type":      "agent_message",
 		"from":      fromDID,
 		"to":        toDID,
-		"subject":   getMobileParam(params, "subject", ""),
+		"subject":   subject,
 		"body":      body,
 		"priority":  priority,
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
@@ -631,10 +636,8 @@ func validateAgentEndpoint(endpoint string) error {
 	if len(endpoint) > 2048 {
 		return fmt.Errorf("endpoint too long")
 	}
-	if !strings.HasPrefix(endpoint, "http://") && !strings.HasPrefix(endpoint, "https://") {
-		return fmt.Errorf("endpoint must use http or https")
-	}
-	return nil
+	// Use the existing SSRF-safe URL validator from security.go
+	return validateURL(endpoint)
 }
 
 // AgentInboxNode queries or manages the local agent's message inbox.

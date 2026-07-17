@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -19,6 +21,16 @@ const (
 	maxParamValueLength  = 1000
 	maxDIDLength         = 256
 	maxSignatureLength   = 1024
+	maxMetadataEntries   = 50
+	maxMetadataKeyLen    = 64
+	maxMetadataValueLen  = 512
+)
+
+var (
+	// validDIDMethod restricts method names to lowercase letters and digits.
+	validDIDMethod = regexp.MustCompile(`^[a-z0-9]+$`)
+	// validDIDIdentifier restricts identifiers to alphanumeric, underscore, hyphen, and dot.
+	validDIDIdentifier = regexp.MustCompile(`^[a-zA-Z0-9._:-]+$`)
 )
 
 type IntentURI struct {
@@ -279,11 +291,72 @@ func (d *DIDIdentity) Validate() error {
 	if len(parts) < 3 {
 		return fmt.Errorf("invalid DID format: expected did:method:identifier")
 	}
+	if !validDIDMethod.MatchString(parts[1]) {
+		return fmt.Errorf("invalid DID method: %s", parts[1])
+	}
+	if !validDIDIdentifier.MatchString(parts[2]) {
+		return fmt.Errorf("invalid DID identifier: %s", parts[2])
+	}
 	if d.Method != "" && d.Method != parts[1] {
 		return fmt.Errorf("DID method mismatch")
 	}
 	if len(d.Signature) > maxSignatureLength {
 		return fmt.Errorf("signature too long (max %d)", maxSignatureLength)
+	}
+	if d.Endpoint != "" {
+		if err := validateDIDEndpoint(d.Endpoint); err != nil {
+			return fmt.Errorf("invalid DID endpoint: %w", err)
+		}
+	}
+	if len(d.Metadata) > maxMetadataEntries {
+		return fmt.Errorf("too many metadata entries (max %d)", maxMetadataEntries)
+	}
+	for k, v := range d.Metadata {
+		if len(k) > maxMetadataKeyLen {
+			return fmt.Errorf("metadata key too long: %s", k)
+		}
+		if len(v) > maxMetadataValueLen {
+			return fmt.Errorf("metadata value too long for key: %s", k)
+		}
+	}
+	return nil
+}
+
+// validateDIDEndpoint validates an endpoint URL for DID documents,
+// blocking private IP ranges to prevent SSRF.
+func validateDIDEndpoint(endpoint string) error {
+	if len(endpoint) > 2048 {
+		return fmt.Errorf("endpoint too long")
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("only http and https URLs are allowed")
+	}
+	if u.User != nil {
+		return fmt.Errorf("URL cannot contain credentials")
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("URL has no host")
+	}
+	ip := net.ParseIP(host)
+	if ip != nil {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() {
+			return fmt.Errorf("private IP addresses are not allowed")
+		}
+	} else {
+		ips, err := net.LookupIP(host)
+		if err != nil {
+			return fmt.Errorf("failed to resolve host: %w", err)
+		}
+		for _, resolvedIP := range ips {
+			if resolvedIP.IsLoopback() || resolvedIP.IsPrivate() || resolvedIP.IsLinkLocalUnicast() || resolvedIP.IsLinkLocalMulticast() || resolvedIP.IsUnspecified() || resolvedIP.IsMulticast() {
+				return fmt.Errorf("resolved to private IP address")
+			}
+		}
 	}
 	return nil
 }
@@ -422,6 +495,15 @@ func ParseTaskMessage(jsonStr string) (*TaskMessage, error) {
 		}
 		if err := msg.Receiver.Validate(); err != nil {
 			return nil, fmt.Errorf("invalid receiver DID: %w", err)
+		}
+		if msg.Sender.DID == msg.Receiver.DID {
+			return nil, fmt.Errorf("sender and receiver DIDs must be different")
+		}
+	} else {
+		// When CrossDomain is false, Sender and Receiver should not be set
+		// to prevent accidental DID leakage in non-cross-domain contexts.
+		if msg.Sender != nil || msg.Receiver != nil {
+			return nil, fmt.Errorf("sender/receiver DIDs require cross_domain=true")
 		}
 	}
 

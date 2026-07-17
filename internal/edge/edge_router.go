@@ -16,9 +16,15 @@ import (
 )
 
 const (
-	maxPromptLength    = 32768
-	maxTaskIDLength    = 100
-	maxProviderNameLen = 50
+	maxPromptLength          = 32768
+	maxTaskIDLength          = 100
+	maxProviderNameLen       = 50
+	maxAgentCapabilities     = 50
+	maxAgentMetadataEntries  = 50
+	maxAgentMetadataKeyLen   = 64
+	maxAgentMetadataValueLen = 512
+	maxPayloadLength         = 65536
+	maxRegistrySize          = 10000
 )
 
 type EdgeRouter struct {
@@ -561,14 +567,40 @@ func (a *AgentInfo) Validate() error {
 	if a.DID == "" {
 		return fmt.Errorf("agent DID is required")
 	}
+	if len(a.DID) > 256 {
+		return fmt.Errorf("agent DID too long")
+	}
 	if !strings.HasPrefix(a.DID, "did:") {
 		return fmt.Errorf("invalid agent DID format")
+	}
+	parts := strings.Split(a.DID, ":")
+	if len(parts) < 3 {
+		return fmt.Errorf("invalid DID format: expected did:method:identifier")
 	}
 	if a.Endpoint == "" {
 		return fmt.Errorf("agent endpoint is required")
 	}
 	if err := validateEndpoint(a.Endpoint); err != nil {
 		return fmt.Errorf("invalid agent endpoint: %w", err)
+	}
+	if len(a.Capabilities) > maxAgentCapabilities {
+		return fmt.Errorf("too many capabilities (max %d)", maxAgentCapabilities)
+	}
+	for _, cap := range a.Capabilities {
+		if len(cap) > 100 {
+			return fmt.Errorf("capability name too long")
+		}
+	}
+	if len(a.Metadata) > maxAgentMetadataEntries {
+		return fmt.Errorf("too many metadata entries (max %d)", maxAgentMetadataEntries)
+	}
+	for k, v := range a.Metadata {
+		if len(k) > maxAgentMetadataKeyLen {
+			return fmt.Errorf("metadata key too long: %s", k)
+		}
+		if len(v) > maxAgentMetadataValueLen {
+			return fmt.Errorf("metadata value too long for key: %s", k)
+		}
 	}
 	return nil
 }
@@ -593,6 +625,9 @@ func (r *AgentRegistry) RegisterAgent(agent *AgentInfo) error {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if _, exists := r.agents[agent.DID]; !exists && len(r.agents) >= maxRegistrySize {
+		return fmt.Errorf("agent registry is full (max %d)", maxRegistrySize)
+	}
 	agent.LastSeen = time.Now()
 	r.agents[agent.DID] = agent
 	return nil
@@ -662,6 +697,18 @@ func NewCrossDomainMessenger(registry *AgentRegistry) *CrossDomainMessenger {
 func (m *CrossDomainMessenger) SendMessage(senderDID, receiverDID, payload string) error {
 	if senderDID == "" || receiverDID == "" {
 		return fmt.Errorf("sender and receiver DIDs are required")
+	}
+	if len(senderDID) > 256 || !strings.HasPrefix(senderDID, "did:") {
+		return fmt.Errorf("invalid sender DID format")
+	}
+	if len(receiverDID) > 256 || !strings.HasPrefix(receiverDID, "did:") {
+		return fmt.Errorf("invalid receiver DID format")
+	}
+	if senderDID == receiverDID {
+		return fmt.Errorf("sender and receiver DIDs must be different")
+	}
+	if len(payload) > maxPayloadLength {
+		return fmt.Errorf("payload too long (max %d bytes)", maxPayloadLength)
 	}
 	agent, ok := m.registry.GetAgent(receiverDID)
 	if !ok {
