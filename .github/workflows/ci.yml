@@ -22,3 +22,19 @@ jobs:
 
     - name: Test with race detector
       run: go test ./... -race -short
+
+    - name: Generate coverage profile
+      run: go test -coverprofile=coverage.out -covermode=atomic ./internal/... -short
+
+    - name: Check coverage threshold (informational)
+      run: |
+        total=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}' | sed 's/%//')
+        echo "Total coverage: ${total}%"
+        threshold=65
+        echo "Threshold: ${threshold}%"
+        pass=$(awk -v total="$total" -v threshold="$threshold" 'BEGIN { print (total >= threshold) ? 1 : 0 }')
+        if [ "$pass" -eq 0 ]; then
+          echo "WARNING: coverage ${total}% is below threshold ${threshold}%"
+        else
+          echo "PASS: coverage ${total}% meets threshold ${threshold}%"
+        fi
