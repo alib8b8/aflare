@@ -1,0 +1,48 @@
+name: Support Ticket Classifier
+# Classify and prioritize support tickets
+# Usage: llm-box install customer-support/ticket-classifier
+#        llm-box run ticket-classifier/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.tickets_file }}"
+    id: tickets
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Analyze and classify these support tickets:
+      {{ .tickets }}
+      
+      For each ticket:
+      1. Categorize (bug, feature request, question, billing, account, other)
+      2. Assign priority (low, medium, high, urgent)
+      3. Estimate sentiment (positive, neutral, negative, angry)
+      4. Suggest assignee/department
+      5. Generate a suggested response template
+      6. Identify urgent issues that need immediate attention
+      
+      Also provide:
+      - Overall volume summary
+      - Category breakdown
+      - Priority distribution
+      - Top issues/patterns
+      - Response time recommendations
+    id: analysis
+
+  - node: file_write
+    params:
+      path: ticket-analysis.md
+    input: analysis
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: analysis
+    id: notify

@@ -1,0 +1,56 @@
+name: Dev Environment Setup
+# Automated development environment setup
+# Usage: llm-box install environment-setup/dev-setup
+#        llm-box run dev-setup/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: |
+        echo "OS: $(uname -a)"
+        echo "Shell: $SHELL"
+        echo "Home: $HOME"
+        which go python3 node git 2>/dev/null || echo "Some tools missing"
+    id: system_info
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 2
+    input: |
+      Generate a development environment setup script based on:
+      {{ .system_info }}
+      
+      Project type: {{ .params.project_type }}
+      Tools needed: {{ .params.tools }}
+      
+      Create setup instructions with:
+      1. Prerequisites checklist
+      2. Step-by-step setup guide
+         - Package manager setup
+         - Language runtime installation
+         - Database setup
+         - Other services
+      3. Environment variables
+         - .env.example
+         - Description of each variable
+      4. Verification steps
+      5. Common issues and fixes
+      6. Uninstall / cleanup instructions
+      
+      Include shell script snippets for automation.
+    id: setup_guide
+
+  - node: file_write
+    params:
+      path: dev-setup-guide.md
+    input: setup_guide
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: setup_guide
+    id: notify

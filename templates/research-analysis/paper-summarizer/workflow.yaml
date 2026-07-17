@@ -1,0 +1,44 @@
+name: Academic Paper Summarizer
+# Summarize academic papers into key insights
+# Usage: llm-box install research-analysis/paper-summarizer
+#        llm-box run paper-summarizer/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: "{{ .params.paper_url }}"
+      method: GET
+      timeout: 30s
+    id: paper_content
+
+  - node: fetch_url
+    params:
+      url: "{{ .params.paper_url }}"
+    id: extracted_text
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render, researcher
+      max_iterations: 4
+    input: |
+      Summarize this academic paper:
+      {{ .extracted_text }}
+      
+      Provide:
+      1. Title and authors
+      2. Abstract summary (3-5 sentences)
+      3. Key methodology
+      4. Main findings and contributions
+      5. Limitations
+      6. Practical implications
+      7. Future research directions
+      8. Related work references
+    id: summary
+
+  - node: file_write
+    params:
+      path: paper-summary.md
+    input: summary
+    id: save

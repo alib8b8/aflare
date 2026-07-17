@@ -1,0 +1,59 @@
+name: Terms of Service Generator
+# Generate terms of service agreement
+# Usage: llm-box install legal/terms-of-service
+#        llm-box run terms-of-service/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Generate terms of service for {{ .params.company }}.
+      
+      Company: {{ .params.company }}
+      Service: {{ .params.service }}
+      Business model: {{ .params.business_model }}
+      Jurisdiction: {{ .params.jurisdiction }}
+      
+      Terms of Service should include:
+      1. Acceptance of Terms
+      2. Description of Service
+      3. User Accounts and Registration
+      4. User Responsibilities and Conduct
+         - Acceptable use policy
+         - Prohibited activities
+      5. Payment Terms (if applicable)
+         - Subscription terms
+         - Refund policy
+         - Billing practices
+      6. Intellectual Property Rights
+         - Our IP
+         - User content
+      7. Third-Party Links and Services
+      8. Disclaimers and Warranties
+      9. Limitation of Liability
+      10. Indemnification
+      11. Termination
+         - By user
+         - By us
+      12. Dispute Resolution
+         - Governing law
+         - Dispute process
+      13. Changes to Terms
+      14. Contact Information
+      15. Miscellaneous
+         - Severability
+         - Entire agreement
+         - Waiver
+      
+      Include: "This is a template and not legal advice. Consult a lawyer."
+    id: terms
+
+  - node: file_write
+    params:
+      path: terms-of-service.md
+    input: terms
+    id: save

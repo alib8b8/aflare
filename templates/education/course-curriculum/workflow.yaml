@@ -1,0 +1,48 @@
+name: Course Curriculum Designer
+# Design complete course curriculum
+# Usage: llm-box install education/course-curriculum
+#        llm-box run course-curriculum/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Design a complete course curriculum for {{ .params.course_title }}.
+      
+      Target audience: {{ .params.audience }}
+      Prerequisites: {{ .params.prerequisites }}
+      Duration: {{ .params.duration }}
+      Level: {{ .params.level }}
+      
+      Curriculum should include:
+      1. Course Overview
+         - Learning objectives
+         - What students will build
+         - Prerequisites
+      2. Module Breakdown (10-15 modules):
+         For each module:
+         - Module title
+         - Learning outcomes
+         - Topics covered
+         - Hands-on exercise/project
+         - Estimated time
+      3. Capstone Project description
+      4. Assessment strategy
+         - Quizzes
+         - Assignments
+         - Projects
+         - Final exam/certification
+      5. Required tools and resources
+      6. Recommended textbooks and references
+      7. Teaching tips for instructors
+    id: curriculum
+
+  - node: file_write
+    params:
+      path: course-curriculum.md
+    input: curriculum
+    id: save

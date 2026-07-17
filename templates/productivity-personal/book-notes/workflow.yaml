@@ -1,0 +1,39 @@
+name: Book Notes Generator
+# Generate comprehensive book notes and key takeaways
+# Usage: llm-box install productivity-personal/book-notes
+#        llm-box run book-notes/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: researcher, template_render
+      max_iterations: 4
+    input: |
+      Create comprehensive notes for the book "{{ .params.book_title }}" by {{ .params.author }}.
+      
+      Include:
+      1. Book overview and main thesis
+      2. Chapter-by-chapter summaries (concise)
+      3. Top 10 key insights with explanations
+      4. Actionable takeaways (5-7 practical steps)
+      5. Memorable quotes
+      6. Who should read this book
+      7. Critical analysis (strengths and weaknesses)
+      8. How to apply these ideas in your life/work
+      
+      Aim for 2000-3000 words total.
+    id: book_notes
+
+  - node: file_write
+    params:
+      path: book-notes.md
+    input: book_notes
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: book_notes
+    id: notify

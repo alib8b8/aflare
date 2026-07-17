@@ -1,0 +1,56 @@
+name: Docker Image Cleaner
+# Clean up unused Docker images and containers
+# Usage: llm-box install devops-monitoring/docker-cleaner
+#        llm-box run docker-cleaner/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: docker images
+    id: current_images
+
+  - node: execute
+    params:
+      command: docker ps -a
+    id: containers
+
+  - node: execute
+    params:
+      command: docker image prune -f --filter "until=24h"
+    id: pruned_images
+
+  - node: execute
+    params:
+      command: docker container prune -f
+    id: pruned_containers
+
+  - node: execute
+    params:
+      command: df -h /var/lib/docker
+    id: disk_after
+
+  - node: template_render
+    params:
+      template: |
+        # Docker Cleanup Report
+        
+        ## Before Cleanup
+        Images:
+        {{ .current_images }}
+        
+        Containers:
+        {{ .containers }}
+        
+        ## Results
+        Pruned images: {{ .pruned_images }}
+        Pruned containers: {{ .pruned_containers }}
+        
+        ## Disk Usage After
+        {{ .disk_after }}
+    id: report
+
+  - node: file_write
+    params:
+      path: docker-cleanup-report.md
+    input: report
+    id: save

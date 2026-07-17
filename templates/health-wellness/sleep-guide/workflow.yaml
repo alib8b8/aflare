@@ -1,0 +1,58 @@
+name: Sleep Optimization Guide
+# Generate personalized sleep improvement plan
+# Usage: llm-box install health-wellness/sleep-guide
+#        llm-box run sleep-guide/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create a comprehensive sleep optimization plan.
+      
+      Current sleep issues: {{ .params.issues }}
+      Current sleep duration: {{ .params.current_sleep }}
+      Target sleep duration: {{ .params.target_sleep }}
+      Schedule constraints: {{ .params.schedule }}
+      
+      Sleep optimization plan:
+      1. Sleep Assessment
+         - Why sleep matters
+         - Your current situation analysis
+      2. Sleep Environment
+         - Room setup (temperature, light, sound)
+         - Mattress and pillow recommendations
+         - Bedding tips
+      3. Pre-Sleep Routine (1-2 hours before bed)
+         - Wind-down activities
+         - Screen time management
+         - Relaxation techniques
+      4. Daily Habits
+         - Morning sunlight
+         - Caffeine timing
+         - Exercise timing
+         - Food and drink
+      5. Sleep Schedule
+         - Consistent sleep/wake times
+         - Napping strategy
+         - Weekend schedule
+      6. Sleep Tracking
+         - Recommended metrics
+         - Tools and apps
+      7. Common Sleep Issues and Solutions
+         - Difficulty falling asleep
+         - Waking up in the night
+         - Early morning awakening
+         - Sleep apnea signs
+      8. 30-Day Improvement Plan
+      9. When to see a doctor
+    id: sleep_guide
+
+  - node: file_write
+    params:
+      path: sleep-guide.md
+    input: sleep_guide
+    id: save

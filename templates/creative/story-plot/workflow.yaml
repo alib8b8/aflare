@@ -1,0 +1,55 @@
+name: Story Plot Generator
+# Generate story plot and character outlines
+# Usage: llm-box install creative/story-plot
+#        llm-box run story-plot/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Create a compelling story outline for {{ .params.genre }} genre.
+      
+      Genre: {{ .params.genre }}
+      Length: {{ .params.length }}
+      Tone: {{ .params.tone }}
+      Setting: {{ .params.setting }}
+      
+      Story outline should include:
+      1. Logline (one sentence)
+      2. Elevator Pitch (paragraph)
+      3. Core Theme
+      4. Main Characters:
+         - Protagonist (arc, motivation, flaw, backstory)
+         - Antagonist (motivation, complexity)
+         - Mentor figure
+         - Love interest / Sidekick
+         - Supporting cast (5-7 characters)
+      5. Three-Act Structure
+         - Act 1: Setup (inciting incident, plot point 1)
+         - Act 2: Confrontation (midpoint, plot point 2)
+         - Act 3: Resolution (climax, denouement)
+      6. Chapter-by-Chapter Outline (15-20 chapters)
+      7. Key Plot Twists
+      8. Symbolism and Motifs
+      9. Subplots
+      10. Ending variations (3 alternatives)
+      11. Marketing hook
+      
+      Make it original and emotionally engaging.
+    id: story_outline
+
+  - node: file_write
+    params:
+      path: story-outline.md
+    input: story_outline
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: story_outline
+    id: notify

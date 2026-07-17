@@ -1,0 +1,79 @@
+name: Cloud Architecture Diagram
+# Generate cloud architecture design
+# Usage: llm-box install cloud-infra/cloud-architecture
+#        llm-box run cloud-architecture/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Design a cloud architecture for {{ .params.application }}.
+      
+      Application: {{ .params.application }}
+      Cloud provider: {{ .params.cloud_provider }}
+      Scale: {{ .params.scale }}
+      Budget: {{ .params.budget }}
+      
+      Architecture should include:
+      1. Architecture Overview
+         - High-level diagram description (text-based)
+         - Core components
+         - Why this architecture
+      2. Compute Layer
+         - Frontend hosting
+         - Backend services
+         - Serverless functions
+         - Container orchestration
+      3. Data Layer
+         - Database choices
+         - Caching strategy
+         - Storage (object storage)
+         - Data transfer
+      4. Network
+         - VPC design
+         - Subnets (public, private)
+         - Load balancing
+         - CDN
+         - DNS
+      5. Security
+         - IAM roles and policies
+         - Network security (security groups, NACLs)
+         - Encryption (at rest, in transit)
+         - Secrets management
+         - WAF
+      6. Monitoring & Observability
+         - Logging
+         - Metrics
+         - Alarms
+         - Tracing
+      7. Scaling Strategy
+         - Horizontal scaling
+         - Vertical scaling
+         - Auto-scaling rules
+      8. Disaster Recovery
+         - Backup strategy
+         - RTO / RPO
+         - Multi-region considerations
+      9. Cost Estimation
+         - Major cost components
+         - Optimization tips
+      10. CI/CD Pipeline
+      
+      Include specific service names (e.g., EC2, S3, Lambda for AWS).
+    id: cloud_arch
+
+  - node: file_write
+    params:
+      path: cloud-architecture.md
+    input: cloud_arch
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: cloud_arch
+    id: notify

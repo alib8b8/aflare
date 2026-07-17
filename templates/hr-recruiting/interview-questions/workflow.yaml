@@ -1,0 +1,44 @@
+name: Interview Questions Generator
+# Generate interview questions for any role
+# Usage: llm-box install hr-recruiting/interview-questions
+#        llm-box run interview-questions/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create comprehensive interview questions for {{ .params.role }}.
+      
+      Role: {{ .params.role }}
+      Level: {{ .params.level }}
+      Focus areas: {{ .params.focus_areas }}
+      
+      Interview question categories:
+      1. Behavioral Questions (15)
+         - STAR format expected
+         - Cover different competencies
+      2. Technical/Skill Questions (15)
+         - Varying difficulty levels
+         - Practical scenarios
+      3. Situational Questions (10)
+         - How would you handle X
+      4. Cultural Fit Questions (8)
+      5. Problem-Solving/Case Questions (8)
+      6. Questions for the candidate to ask (10)
+      
+      For each question, include:
+      - The question
+      - What to listen for in answers
+      - Red flags to watch for
+      - Follow-up questions
+    id: questions
+
+  - node: file_write
+    params:
+      path: interview-questions.md
+    input: questions
+    id: save

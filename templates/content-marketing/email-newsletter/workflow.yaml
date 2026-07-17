@@ -1,0 +1,51 @@
+name: Email Newsletter Generator
+# Generate weekly email newsletter content
+# Usage: llm-box install content-marketing/email-newsletter
+#        llm-box run email-newsletter/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: https://hn.algolia.com/api/v1/search_by_date?tags=story&query=tech&hitsPerPage=10
+      method: GET
+      timeout: 30s
+    id: tech_news
+
+  - node: json_parse
+    params:
+      path: hits
+    input: tech_news
+    id: stories
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create a weekly tech newsletter from these top stories:
+      {{ .stories }}
+      
+      Format the newsletter with:
+      - Engaging subject line
+      - Personalized greeting
+      - 3-5 curated stories with brief summaries
+      - "Editor's Pick" section
+      - Call to action at the end
+      - Friendly sign-off
+      
+      Keep it conversational and under 800 words.
+    id: newsletter
+
+  - node: file_write
+    params:
+      path: newsletter.md
+    input: newsletter
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: newsletter
+    id: notify

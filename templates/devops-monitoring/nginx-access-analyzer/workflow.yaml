@@ -1,0 +1,41 @@
+name: Nginx Access Analyzer
+# Analyze Nginx access logs for traffic patterns
+# Usage: llm-box install devops-monitoring/nginx-access-analyzer
+#        llm-box run nginx-access-analyzer/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: tail -500 /var/log/nginx/access.log 2>/dev/null || echo "No access log found"
+    id: access_log
+
+  - node: execute
+    params:
+      command: awk '{print $1}' /var/log/nginx/access.log 2>/dev/null | sort | uniq -c | sort -rn | head -10 || echo "N/A"
+    id: top_ips
+
+  - node: execute
+    params:
+      command: awk '{print $7}' /var/log/nginx/access.log 2>/dev/null | sort | uniq -c | sort -rn | head -15 || echo "N/A"
+    id: top_paths
+
+  - node: template_render
+    params:
+      template: |
+        # Nginx Access Log Analysis
+        
+        ## Top 10 IPs by Requests
+        {{ .top_ips }}
+        
+        ## Top 15 Requested Paths
+        {{ .top_paths }}
+        
+        ## Raw Sample (last 500 lines)
+        {{ .access_log }}
+    id: report
+
+  - node: file_write
+    params:
+      path: nginx-analysis.md
+    input: report
+    id: save

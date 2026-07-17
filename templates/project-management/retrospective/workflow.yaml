@@ -1,0 +1,67 @@
+name: Retrospective Template
+# Generate sprint retrospective template
+# Usage: llm-box install project-management/retrospective
+#        llm-box run retrospective/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 2
+    input: |
+      Create a comprehensive sprint retrospective template.
+      
+      Team: {{ .params.team }}
+      Sprint: {{ .params.sprint_name }}
+      
+      Retrospective template should include:
+      1. Retrospective Overview
+         - Date and participants
+         - Agenda
+         - Ground rules
+      2. Sprint Review
+         - What we committed to
+         - What we delivered
+         - Velocity vs planned
+      3. What Went Well (Start/Liked)
+         - Team wins
+         - Processes that worked
+         - Tools/tech that helped
+      4. What Didn't Go Well (Stop/Lacked)
+         - Issues and blockers
+         - Processes that failed
+         - Things to avoid
+      5. Action Items
+         - Specific actions to take
+         - Owners
+         - Due dates
+         - Priority
+      6. Improvements to Try
+         - Experiments for next sprint
+         - Process changes
+         - Tool changes
+      7. Team Health Check
+         - Morale indicators
+         - Workload assessment
+         - Collaboration quality
+      8. Retrospective Activities
+         - Multiple formats (4Ls, Start/Stop/Continue, etc.)
+         - Icebreaker ideas
+      9. Follow-up from last retro
+      
+      Make it interactive and engaging, not just a document.
+    id: retro
+
+  - node: file_write
+    params:
+      path: retrospective-template.md
+    input: retro
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: retro
+    id: notify

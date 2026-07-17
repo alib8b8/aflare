@@ -1,0 +1,50 @@
+name: CSV Data Analyzer
+# Analyze CSV data files and generate insights
+# Usage: llm-box install data-analytics/csv-analyzer
+#        llm-box run csv-analyzer/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.csv_path }}"
+    id: csv_data
+
+  - node: execute
+    params:
+      command: head -5 "{{ .params.csv_path }}" && echo "---" && wc -l "{{ .params.csv_path }}" && echo "---" && awk -F',' 'NR==1{print "Columns:", NF; for(i=1;i<=NF;i++) print i": "$i}' "{{ .params.csv_path }}"
+    id: csv_stats
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render, transform
+      max_iterations: 4
+    input: |
+      Analyze this CSV data:
+      
+      File stats: {{ .csv_stats }}
+      
+      Data preview: {{ .csv_data }}
+      
+      Provide:
+      1. Data quality assessment (missing values, outliers)
+      2. Descriptive statistics for numerical columns
+      3. Key trends and patterns
+      4. Interesting correlations
+      5. Top insights (5-7 findings)
+      6. Recommendations based on data
+      7. Suggested next steps for deeper analysis
+    id: analysis
+
+  - node: file_write
+    params:
+      path: data-analysis-report.md
+    input: analysis
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: analysis
+    id: notify

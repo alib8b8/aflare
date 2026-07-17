@@ -1,0 +1,44 @@
+name: Survey Results Analyzer
+# Analyze survey responses and extract insights
+# Usage: llm-box install data-analytics/survey-analyzer
+#        llm-box run survey-analyzer/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.survey_file }}"
+    id: survey_data
+
+  - node: execute
+    params:
+      command: echo "Total responses: $(wc -l < "{{ .params.survey_file }}")"
+    id: response_count
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Analyze these survey results:
+      
+      Total responses: {{ .response_count }}
+      Survey data: {{ .survey_data }}
+      
+      Create analysis report with:
+      1. Demographic breakdown
+      2. Overall satisfaction score
+      3. Top positive themes
+      4. Top negative themes / pain points
+      5. NPS calculation if applicable
+      6. Feature request prioritization
+      7. Customer segmentation insights
+      8. Actionable recommendations (prioritized)
+    id: analysis
+
+  - node: file_write
+    params:
+      path: survey-analysis.md
+    input: analysis
+    id: save

@@ -1,0 +1,63 @@
+name: Model Evaluation Report
+# Generate comprehensive model evaluation report
+# Usage: llm-box install ai-ml/model-evaluation
+#        llm-box run model-evaluation/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.metrics_file }}"
+    id: metrics_data
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create a comprehensive ML model evaluation report.
+      
+      Model: {{ .params.model_name }}
+      Task type: {{ .params.task_type }}
+      Metrics data: {{ .metrics_data }}
+      
+      Report sections:
+      1. Executive Summary
+         - Overall model performance
+         - Key metric scores
+         - Production readiness assessment
+      2. Detailed Metrics
+         - For classification: accuracy, precision, recall, F1, AUC-ROC
+         - For regression: MAE, MSE, RMSE, R²
+         - Per-class performance
+      3. Confusion Matrix / Error Analysis
+         - Most common error types
+         - High-confidence mispredictions
+      4. Feature Importance
+         - Top 10 most important features
+         - SHAP value interpretation
+      5. Calibration Analysis
+      6. Fairness Assessment
+      7. Performance by Segment
+      8. Computational Performance
+         - Training time
+         - Inference speed
+         - Memory usage
+      9. Recommendations
+         - Model improvements
+         - Next steps
+         - Deployment readiness
+    id: report
+
+  - node: file_write
+    params:
+      path: model-evaluation-report.md
+    input: report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: report
+    id: notify

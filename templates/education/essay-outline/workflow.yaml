@@ -1,0 +1,61 @@
+name: Essay Outline Generator
+# Generate structured essay outlines
+# Usage: llm-box install education/essay-outline
+#        llm-box run essay-outline/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: https://hn.algolia.com/api/v1/search?query={{ .params.topic }}&hitsPerPage=10
+      method: GET
+      timeout: 30s
+    id: references
+
+  - node: json_parse
+    params:
+      path: hits
+    input: references
+    id: ref_stories
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create a detailed essay outline on: {{ .params.topic }}
+      
+      Essay type: {{ .params.essay_type }}
+      Target length: {{ .params.length }}
+      
+      Reference context: {{ .ref_stories }}
+      
+      Outline should include:
+      1. Title options (5 alternatives)
+      2. Thesis statement (2-3 variations)
+      3. Introduction outline
+         - Hook
+         - Context
+         - Thesis
+         - Roadmap
+      4. Body paragraphs (5-7)
+         - Topic sentence
+         - Evidence/support
+         - Analysis
+         - Transition
+      5. Counterargument and rebuttal
+      6. Conclusion
+         - Restate thesis
+         - Synthesize points
+         - Broader implication
+         - Memorable closing
+      7. Potential sources and citations
+      8. Research gaps to fill
+    id: outline
+
+  - node: file_write
+    params:
+      path: essay-outline.md
+    input: outline
+    id: save

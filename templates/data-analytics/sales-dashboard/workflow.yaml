@@ -1,0 +1,49 @@
+name: Sales Dashboard Generator
+# Generate sales performance dashboard
+# Usage: llm-box install data-analytics/sales-dashboard
+#        llm-box run sales-dashboard/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.sales_data }}"
+    id: sales_data
+
+  - node: execute
+    params:
+      command: echo "Analysis period: {{ .params.period }}"
+    id: period_info
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create a sales performance dashboard from this data:
+      {{ .sales_data }}
+      
+      Period: {{ .period_info }}
+      
+      Include:
+      1. Executive Summary (key metrics)
+         - Total revenue
+         - Number of deals
+         - Average deal size
+         - Conversion rate
+         - YoY / MoM change
+      2. Top 10 customers by revenue
+      3. Sales by region/segment
+      4. Best performing products/services
+      5. Sales rep performance rankings
+      6. Pipeline analysis
+      7. Forecast for next period
+      8. Actionable recommendations
+    id: dashboard
+
+  - node: file_write
+    params:
+      path: sales-dashboard.md
+    input: dashboard
+    id: save

@@ -1,0 +1,59 @@
+name: Backup Automation
+# Automated backup workflow with verification
+# Usage: llm-box install automation/backup-automation
+#        llm-box run backup-automation/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: echo "Starting backup at $(date)"
+    id: start
+
+  - node: execute
+    params:
+      command: |
+        BACKUP_DIR="{{ .params.backup_dir }}"
+        DEST="{{ .params.destination }}"
+        tar -czf "$DEST/backup-$(date +%Y%m%d-%H%M%S).tar.gz" "$BACKUP_DIR" 2>&1
+        echo "Backup completed"
+    id: backup
+
+  - node: execute
+    params:
+      command: ls -lh "{{ .params.destination }}" | tail -5
+    id: verification
+
+  - node: execute
+    params:
+      command: |
+        find "{{ .params.destination }}" -name "*.tar.gz" -mtime +{{ .params.retention_days }} -delete
+        echo "Old backups cleaned up"
+    id: cleanup
+
+  - node: template_render
+    params:
+      template: |
+        # Backup Report
+        Date: {{ .date }}
+        Status: Completed
+        
+        Backup source: {{ .params.backup_dir }}
+        Destination: {{ .params.destination }}
+        
+        Recent backups:
+        {{ .verification }}
+        
+        Cleanup: Old backups (> {{ .params.retention_days }} days) removed
+    id: report
+
+  - node: file_write
+    params:
+      path: backup-report.md
+    input: report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: report
+    id: notify

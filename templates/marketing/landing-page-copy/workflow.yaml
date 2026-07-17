@@ -1,0 +1,71 @@
+name: Landing Page Copy
+# Generate high-converting landing page copy
+# Usage: llm-box install marketing/landing-page-copy
+#        llm-box run landing-page-copy/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Create high-converting landing page copy for {{ .params.product }}.
+      
+      Product: {{ .params.product }}
+      Unique value prop: {{ .params.value_prop }}
+      Target audience: {{ .params.audience }}
+      Main CTA: {{ .params.cta }}
+      Price point: {{ .params.price }}
+      
+      Landing page sections:
+      1. Hero Section
+         - Headline (3 alternatives)
+         - Sub-headline
+         - Hero body copy
+         - Primary CTA button copy
+         - Secondary CTA
+      2. Problem Section
+         - Pain point descriptions
+         - Agitate the problem
+      3. Solution Section
+         - Product intro
+         - How it works
+         - Key features with benefits
+      4. Social Proof
+         - Testimonials (3-5)
+         - Logos bar
+         - Stats/metrics
+         - Case study highlight
+      5. Feature Deep Dive
+         - 3 key features with benefit-focused copy
+      6. Pricing Section
+         - Tier descriptions
+         - Price anchoring
+         - Guarantee
+      7. FAQ Section
+         - 8-10 common objections
+         - Answers that address concerns
+      8. Final CTA Section
+         - Value recap
+         - Risk reversal
+         - Urgency/scarcity
+         - Final CTA
+      9. Footer
+      
+      Write in benefit-focused, conversion-oriented copy.
+      Use proven copywriting frameworks (PAS, AIDA, FAB).
+    id: landing_copy
+
+  - node: file_write
+    params:
+      path: landing-page-copy.md
+    input: landing_copy
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: landing_copy
+    id: notify

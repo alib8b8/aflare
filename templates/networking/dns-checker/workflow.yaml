@@ -1,0 +1,54 @@
+name: DNS Records Checker
+# Check all DNS records for a domain
+# Usage: llm-box install networking/dns-checker
+#        llm-box run dns-checker/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: |
+        DOMAIN="{{ .params.domain }}"
+        echo "=== DNS Records for $DOMAIN ==="
+        echo "A Records:"
+        dig +short A "$DOMAIN" 2>/dev/null || nslookup -type=A "$DOMAIN" 2>/dev/null
+        echo ""
+        echo "AAAA Records:"
+        dig +short AAAA "$DOMAIN" 2>/dev/null || echo "N/A"
+        echo ""
+        echo "MX Records:"
+        dig +short MX "$DOMAIN" 2>/dev/null || nslookup -type=MX "$DOMAIN" 2>/dev/null
+        echo ""
+        echo "NS Records:"
+        dig +short NS "$DOMAIN" 2>/dev/null || nslookup -type=NS "$DOMAIN" 2>/dev/null
+        echo ""
+        echo "TXT Records:"
+        dig +short TXT "$DOMAIN" 2>/dev/null || echo "N/A"
+        echo ""
+        echo "CNAME (www):"
+        dig +short CNAME "www.$DOMAIN" 2>/dev/null || echo "N/A"
+        echo ""
+        echo "SOA Record:"
+        dig +short SOA "$DOMAIN" 2>/dev/null || echo "N/A"
+    id: dns_records
+
+  - node: template_render
+    params:
+      template: |
+        # DNS Records Report
+        Date: {{ .date }}
+        Domain: {{ .params.domain }}
+        
+        {{ .dns_records }}
+    id: report
+
+  - node: file_write
+    params:
+      path: dns-report.md
+    input: report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: report
+    id: notify

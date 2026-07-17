@@ -1,0 +1,77 @@
+name: Migration Plan Generator
+# Generate database migration plan
+# Usage: llm-box install database/db-migration
+#        llm-box run db-migration/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.current_schema }}"
+    id: current
+
+  - node: file_read
+    params:
+      path: "{{ .params.target_schema }}"
+    id: target
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Generate a database migration plan from current to target schema.
+      
+      Current schema:
+      {{ .current }}
+      
+      Target schema:
+      {{ .target }}
+      
+      Database type: {{ .params.db_type }}
+      
+      Migration plan should include:
+      1. Overview
+         - Summary of changes
+         - Estimated downtime
+         - Risk level
+      2. Schema Changes
+         - New tables
+         - Dropped tables
+         - Added columns
+         - Removed columns
+         - Modified columns
+         - New indexes
+         - Constraint changes
+      3. Data Migration
+         - Data transformation needed
+         - Backfill strategy
+         - Validation queries
+      4. Rollback Plan
+         - How to revert each change
+      5. Migration Scripts
+         - Up migration SQL
+         - Down migration SQL
+      6. Testing Plan
+         - Pre-migration checks
+         - Post-migration validation
+         - Integration tests
+      7. Deployment Steps (ordered)
+      8. Rollback Steps
+      9. Monitoring
+      
+      Be specific and actionable.
+    id: migration
+
+  - node: file_write
+    params:
+      path: migration-plan.md
+    input: migration
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: migration
+    id: notify

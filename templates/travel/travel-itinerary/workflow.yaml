@@ -1,0 +1,76 @@
+name: Travel Itinerary Planner
+# Generate detailed travel itinerary
+# Usage: llm-box install travel/travel-itinerary
+#        llm-box run travel-itinerary/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: https://hn.algolia.com/api/v1/search?query={{ .params.destination }}+travel&hitsPerPage=10
+      method: GET
+      timeout: 30s
+    id: travel_info
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render, researcher
+      max_iterations: 4
+    input: |
+      Create a comprehensive travel itinerary for {{ .params.destination }}.
+      
+      Destination: {{ .params.destination }}
+      Duration: {{ .params.duration }}
+      Travel style: {{ .params.travel_style }}
+      Budget level: {{ .params.budget }}
+      Traveling with: {{ .params.companions }}
+      Interests: {{ .params.interests }}
+      
+      Reference info: {{ .travel_info }}
+      
+      Itinerary should include:
+      1. Trip Overview
+         - Best time to visit
+         - Duration and pace
+         - Budget estimate
+      2. Pre-Trip Preparation
+         - Visa requirements
+         - Packing list
+         - Bookings to make in advance
+         - Local etiquette tips
+      3. Day-by-Day Itinerary
+         For each day:
+         - Morning activities
+         - Lunch recommendations
+         - Afternoon activities
+         - Dinner and nightlife
+         - Evening entertainment
+         - Estimated costs
+         - Pro tips
+      4. Food & Dining Guide
+         - Must-try local dishes
+         - Restaurant recommendations (by price range)
+         - Street food safety
+      5. Transportation Guide
+         - Getting there
+         - Getting around
+         - Estimated costs
+      6. Hidden Gems / Off-the-beaten-path
+      7. Safety Tips
+      8. Budget Breakdown
+      9. Common Mistakes to Avoid
+      10. Packing Checklist
+    id: itinerary
+
+  - node: file_write
+    params:
+      path: travel-itinerary.md
+    input: itinerary
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: itinerary
+    id: notify

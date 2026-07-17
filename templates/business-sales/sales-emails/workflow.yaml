@@ -1,0 +1,49 @@
+name: Sales Email Generator
+# Generate cold email sequences for sales
+# Usage: llm-box install business-sales/sales-emails
+#        llm-box run sales-emails/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Generate a complete cold email sequence for {{ .params.product }}.
+      
+      Product/Service: {{ .params.product }}
+      Target audience: {{ .params.audience }}
+      Value proposition: {{ .params.value_prop }}
+      
+      Create a 7-email sequence:
+      1. Cold outreach email (initial touch)
+      2. Value-add email (share useful content)
+      3. Social proof email (case study/testimonial)
+      4. Problem-solution email (deep dive)
+      5. Objection handling email
+      6. Limited-time offer / urgency
+      7. Break-up / final email
+      
+      For each email:
+      - Subject line (3 alternatives)
+      - Email body (150-250 words)
+      - Call to action
+      - Best sending time
+      - Follow-up trigger
+      
+      Write in a conversational, not salesy tone.
+    id: email_sequence
+
+  - node: file_write
+    params:
+      path: sales-email-sequence.md
+    input: email_sequence
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: email_sequence
+    id: notify

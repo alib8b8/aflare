@@ -1,0 +1,47 @@
+name: A/B Test Analyzer
+# Analyze A/B test results and determine winner
+# Usage: llm-box install data-analytics/ab-test-analyzer
+#        llm-box run ab-test-analyzer/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.results_file }}"
+    id: results_data
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Analyze this A/B test data:
+      {{ .results_data }}
+      
+      Test: {{ .params.test_name }}
+      Metric: {{ .params.primary_metric }}
+      
+      Provide:
+      1. Results summary table
+      2. Statistical significance calculation (approximate)
+      3. Winner determination with confidence level
+      4. Effect size analysis
+      5. Secondary metrics impact
+      6. Segmentation insights (if available)
+      7. Edge cases and caveats
+      8. Recommendation: roll out / iterate / abandon
+      9. Next test suggestions
+    id: analysis
+
+  - node: file_write
+    params:
+      path: ab-test-results.md
+    input: analysis
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: analysis
+    id: notify

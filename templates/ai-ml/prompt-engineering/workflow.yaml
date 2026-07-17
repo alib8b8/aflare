@@ -1,0 +1,47 @@
+name: Prompt Engineering Guide
+# Generate optimized prompts for specific tasks
+# Usage: llm-box install ai-ml/prompt-engineering
+#        llm-box run prompt-engineering/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Create optimized prompt templates for: {{ .params.task }}
+      
+      Target model: {{ .params.model }}
+      
+      Create 5 prompt variations:
+      1. Zero-shot prompt
+      2. Few-shot prompt with 3 examples
+      3. Chain-of-thought prompt
+      4. Role-based system prompt
+      5. Multi-step structured prompt
+      
+      For each prompt:
+      - The prompt template itself
+      - When to use it
+      - Expected performance characteristics
+      - Customization tips
+      
+      Also include:
+      - Common pitfalls to avoid
+      - Prompt evaluation rubric
+      - Iteration strategy
+    id: prompts
+
+  - node: file_write
+    params:
+      path: prompt-templates.md
+    input: prompts
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: prompts
+    id: notify

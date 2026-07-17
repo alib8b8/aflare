@@ -1,0 +1,74 @@
+name: Whitepaper Generator
+# Generate whitepaper structure and content
+# Usage: llm-box install writing-content/whitepaper
+#        llm-box run whitepaper/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: https://hn.algolia.com/api/v1/search?query={{ .params.topic }}&hitsPerPage=15
+      method: GET
+      timeout: 30s
+    id: references
+
+  - node: json_parse
+    params:
+      path: hits
+    input: references
+    id: ref_data
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: researcher, template_render
+      max_iterations: 5
+    input: |
+      Create a comprehensive whitepaper on {{ .params.topic }}.
+      
+      Target audience: {{ .params.audience }}
+      
+      Reference context: {{ .ref_data }}
+      
+      Whitepaper structure:
+      1. Title page
+      2. Executive Summary
+      3. Introduction / Problem Statement
+      4. Background and Context
+         - Industry overview
+         - Current challenges
+         - Why traditional approaches fall short
+      5. Our Solution / Approach
+         - Core concept
+         - How it works
+         - Key innovations
+      6. Technical Details
+         - Architecture overview
+         - Key algorithms/techniques
+         - Implementation approach
+      7. Benefits and Value
+         - Quantifiable benefits
+         - ROI analysis
+         - Use cases
+      8. Case Studies / Real-world Examples
+      9. Comparison with Alternatives
+      10. Implementation Guide
+      11. Future Roadmap
+      12. Conclusion
+      13. References
+      14. About the Company
+      
+      Aim for 5000-7000 words of content outline.
+    id: whitepaper
+
+  - node: file_write
+    params:
+      path: whitepaper.md
+    input: whitepaper
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: whitepaper
+    id: notify

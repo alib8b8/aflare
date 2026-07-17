@@ -1,0 +1,54 @@
+name: FAQ Generator
+# Generate FAQ from support interactions
+# Usage: llm-box install customer-support/faq-generator
+#        llm-box run faq-generator/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.support_data }}"
+    id: support_data
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Generate a comprehensive FAQ from these support interactions:
+      {{ .support_data }}
+      
+      Product/Service: {{ .params.product }}
+      
+      Create FAQ with:
+      1. Getting Started (10 questions)
+      2. Billing & Account (10 questions)
+      3. Technical Issues (15 questions)
+      4. Features & How-To (15 questions)
+      5. Troubleshooting (10 questions)
+      6. Security & Privacy (5 questions)
+      
+      For each Q&A:
+      - Clear, concise question
+      - Helpful, thorough answer
+      - Related articles links
+      - Estimated read time
+      
+      Also include:
+      - How to contact support
+      - Escalation paths
+      - Video tutorials list
+    id: faq
+
+  - node: file_write
+    params:
+      path: faq.md
+    input: faq
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: faq
+    id: notify

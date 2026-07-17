@@ -1,0 +1,78 @@
+name: Image Optimizer
+# Batch optimize images for web
+# Usage: llm-box install automation/image-optimizer
+#        llm-box run image-optimizer/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: |
+        DIR="{{ .params.directory }}"
+        echo "=== Before ==="
+        du -sh "$DIR"
+        find "$DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) | wc -l
+        echo "images found"
+    id: before
+
+  - node: execute
+    params:
+      command: |
+        DIR="{{ .params.directory }}"
+        QUALITY="{{ .params.quality | default 80 }}"
+        mkdir -p "$DIR/optimized"
+        for img in "$DIR"/*.jpg "$DIR"/*.jpeg "$DIR"/*.png; do
+          [ -f "$img" ] || continue
+          fname=$(basename "$img")
+          if command -v convert &> /dev/null; then
+            convert "$img" -quality "$QUALITY" "$DIR/optimized/$fname"
+          else
+            cp "$img" "$DIR/optimized/$fname"
+          fi
+        done
+        echo "Optimization complete"
+    id: optimize
+
+  - node: execute
+    params:
+      command: |
+        DIR="{{ .params.directory }}"
+        echo "=== After ==="
+        du -sh "$DIR/optimized"
+        echo ""
+        echo "=== Savings ==="
+        original=$(du -sb "$DIR" | cut -f1)
+        optimized=$(du -sb "$DIR/optimized" | cut -f1)
+        echo "Original: $original bytes"
+        echo "Optimized: $optimized bytes"
+        if [ $original -gt 0 ]; then
+          saved=$(( (original - optimized) * 100 / original ))
+          echo "Saved: $saved%"
+        fi
+    id: after
+
+  - node: template_render
+    params:
+      template: |
+        # Image Optimization Report
+        Date: {{ .date }}
+        Directory: {{ .params.directory }}
+        Quality: {{ .params.quality | default 80 }}%
+        
+        ## Before
+        {{ .before }}
+        
+        ## After
+        {{ .after }}
+    id: report
+
+  - node: file_write
+    params:
+      path: optimization-report.md
+    input: report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: report
+    id: notify

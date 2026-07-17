@@ -1,0 +1,46 @@
+name: Password Policy Generator
+# Generate security password policy
+# Usage: llm-box install security/password-policy
+#        llm-box run password-policy/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 2
+    input: |
+      Create a comprehensive password security policy for {{ .params.organization }}.
+      
+      Organization type: {{ .params.org_type }}
+      Compliance requirements: {{ .params.compliance }}
+      
+      Policy should include:
+      1. Minimum Requirements
+         - Length requirements
+         - Character classes
+         - Common password blocking
+         - Dictionary word prevention
+      2. Account Security
+         - Lockout policy
+         - Password history
+         - Expiration / rotation
+         - MFA requirements
+      3. Storage Standards
+         - Hashing algorithms (bcrypt/Argon2)
+         - Salt requirements
+      4. User Guidelines
+         - Password manager recommendations
+         - Phishing awareness
+      5. Breach response
+      6. Audit and compliance
+      
+      Format as an official policy document.
+    id: policy
+
+  - node: file_write
+    params:
+      path: password-policy.md
+    input: policy
+    id: save

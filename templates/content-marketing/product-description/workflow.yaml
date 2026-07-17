@@ -1,0 +1,35 @@
+name: Product Description Writer
+# Write compelling product descriptions
+# Usage: llm-box install content-marketing/product-description
+#        llm-box run product-description/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Write a compelling product description for:
+      Product: {{ .params.product_name }}
+      Category: {{ .params.category }}
+      Key features: {{ .params.features }}
+      Target audience: {{ .params.audience }}
+      Price point: {{ .params.price }}
+      
+      Include:
+      - Catchy headline
+      - 3-5 benefit-driven bullet points
+      - Social proof elements
+      - Risk reversal guarantee
+      - Clear call to action
+      
+      Write in a benefit-oriented tone, not feature-focused.
+    id: description
+
+  - node: file_write
+    params:
+      path: product-description.md
+    input: description
+    id: save

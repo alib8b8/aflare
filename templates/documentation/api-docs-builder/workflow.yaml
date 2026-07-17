@@ -1,0 +1,70 @@
+name: API Documentation Builder
+# Build API documentation from spec
+# Usage: llm-box install documentation/api-docs-builder
+#        llm-box run api-docs-builder/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.spec_file }}"
+    id: api_spec
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render, json_parse
+      max_iterations: 4
+    input: |
+      Create comprehensive API documentation from this spec:
+      {{ .api_spec }}
+      
+      API: {{ .params.api_name }}
+      Version: {{ .params.version }}
+      Base URL: {{ .params.base_url }}
+      
+      Documentation should include:
+      1. Overview
+         - Introduction
+         - Base URL
+         - Authentication
+         - Rate limiting
+         - Versioning
+      2. Authentication Guide
+         - API key auth
+         - OAuth (if applicable)
+         - Token format
+         - Error codes
+      3. Endpoint Reference
+         For each endpoint:
+         - HTTP method and path
+         - Description
+         - Parameters (path, query, body)
+         - Request example
+         - Response format
+         - Response example
+         - Error responses
+      4. Data Models / Schemas
+      5. Error Handling
+         - Error format
+         - Common error codes
+      6. Pagination and Sorting
+      7. Webhooks (if applicable)
+      8. SDKs and Client Libraries
+      9. Changelog
+      10. Support / Contact
+      
+      Organize endpoints by resource/category.
+    id: api_docs
+
+  - node: file_write
+    params:
+      path: api-documentation.md
+    input: api_docs
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: api_docs
+    id: notify

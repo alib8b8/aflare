@@ -1,0 +1,40 @@
+name: Flashcard Generator
+# Generate flashcards from study material
+# Usage: llm-box install education/flashcards
+#        llm-box run flashcards/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.material_path }}"
+    id: study_material
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Generate comprehensive flashcards from this study material:
+      {{ .study_material }}
+      
+      Subject: {{ .params.subject }}
+      Difficulty: {{ .params.difficulty }}
+      
+      Create 50 flashcards with:
+      1. Basic definition cards (15)
+      2. Concept explanation cards (15)
+      3. Application/example cards (10)
+      4. Comparison cards (5)
+      5. Common misconception cards (5)
+      
+      Format as Q&A pairs in markdown.
+      Include a spaced repetition schedule recommendation.
+    id: flashcards
+
+  - node: file_write
+    params:
+      path: flashcards.md
+    input: flashcards
+    id: save

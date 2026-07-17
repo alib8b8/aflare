@@ -1,0 +1,33 @@
+name: API Documentation Generator
+# Generate API documentation from code comments
+# Usage: llm-box install developer-tools/api-docs-generator
+#        llm-box run api-docs-generator/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: find . -name "*.go" -type f -exec grep -l "// @" {} \;
+    id: api_files
+
+  - node: execute
+    params:
+      command: grep -r "// @" --include="*.go" . | head -100
+    id: api_comments
+
+  - node: template_render
+    params:
+      template: |
+        # API Documentation
+        
+        ## Overview
+        Auto-generated API documentation from code comments.
+        
+        ## Endpoints
+        {{ .api_comments }}
+    id: doc_template
+
+  - node: file_write
+    params:
+      path: api-docs.md
+    input: doc_template
+    id: save

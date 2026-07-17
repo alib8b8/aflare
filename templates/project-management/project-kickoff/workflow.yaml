@@ -1,0 +1,69 @@
+name: Project Kickoff Template
+# Generate project kickoff document
+# Usage: llm-box install project-management/project-kickoff
+#        llm-box run project-kickoff/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create a project kickoff document for "{{ .params.project }}".
+      
+      Project name: {{ .params.project }}
+      Project type: {{ .params.project_type }}
+      Team size: {{ .params.team_size }}
+      Timeline: {{ .params.timeline }}
+      Budget: {{ .params.budget }}
+      
+      Kickoff document should include:
+      1. Project Overview
+         - Background and context
+         - Project vision
+         - Success criteria (SMART goals)
+      2. Scope
+         - In scope
+         - Out of scope
+         - Assumptions
+         - Constraints
+      3. Stakeholders
+         - Project sponsor
+         - Core team
+         - Other stakeholders
+         - Roles and responsibilities (RACI)
+      4. Timeline & Milestones
+         - Phase breakdown
+         - Key milestones
+         - Critical path
+      5. Budget & Resources
+         - Budget breakdown
+         - Team resources
+         - Tools and tech stack
+      6. Risk Management
+         - Top 10 risks
+         - Likelihood and impact
+         - Mitigation strategies
+         - Risk owners
+      7. Communication Plan
+         - Meeting cadence
+         - Status reports
+         - Escalation paths
+      8. Quality Standards
+      9. Next Steps and Actions
+      10. Open Questions
+    id: kickoff
+
+  - node: file_write
+    params:
+      path: project-kickoff.md
+    input: kickoff
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: kickoff
+    id: notify

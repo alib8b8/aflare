@@ -1,0 +1,47 @@
+name: RSS Feed Aggregator
+# Aggregate and summarize RSS feeds
+# Usage: llm-box install automation/rss-aggregator
+#        llm-box run rss-aggregator/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: |
+        for feed in {{ .params.feeds }}; do
+          echo "=== $feed ==="
+          curl -s "$feed" 2>/dev/null | head -200
+          echo ""
+        done
+    id: feed_data
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render, json_parse
+      max_iterations: 3
+    input: |
+      Parse and summarize these RSS feeds:
+      {{ .feed_data }}
+      
+      Create a digest with:
+      1. Top 10 most important stories
+      2. Categorize by topic
+      3. Key trends across all feeds
+      4. Must-read articles with brief summaries
+      5. Sources and attribution
+      
+      Format as a readable daily digest.
+    id: digest
+
+  - node: file_write
+    params:
+      path: rss-digest.md
+    input: digest
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: digest
+    id: notify

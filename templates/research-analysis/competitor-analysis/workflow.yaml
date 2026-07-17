@@ -1,0 +1,48 @@
+name: Competitor Analysis
+# Analyze competitors and their strategies
+# Usage: llm-box install research-analysis/competitor-analysis
+#        llm-box run competitor-analysis/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: https://hn.algolia.com/api/v1/search?query={{ .params.company }}&tags=story&hitsPerPage=15
+      method: GET
+      timeout: 30s
+    id: company_news
+
+  - node: json_parse
+    params:
+      path: hits
+    input: company_news
+    id: news_items
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: researcher, template_render
+      max_iterations: 5
+    input: |
+      Conduct a comprehensive competitor analysis for {{ .params.company }}.
+      
+      Recent news: {{ .news_items }}
+      
+      Analyze:
+      1. Company overview and business model
+      2. Product/service offerings
+      3. Target market and customer segments
+      4. Pricing strategy
+      5. Marketing and sales approach
+      6. Strengths and competitive advantages
+      7. Weaknesses and vulnerabilities
+      8. Recent developments and trajectory
+      9. Key differentiators vs our offering
+      10. Actionable strategies to compete effectively
+    id: analysis
+
+  - node: file_write
+    params:
+      path: competitor-analysis.md
+    input: analysis
+    id: save

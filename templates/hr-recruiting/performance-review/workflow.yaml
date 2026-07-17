@@ -1,0 +1,49 @@
+name: Performance Review Template
+# Generate performance review templates
+# Usage: llm-box install hr-recruiting/performance-review
+#        llm-box run performance-review/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create comprehensive performance review templates for {{ .params.role }}.
+      
+      Role level: {{ .params.level }}
+      Review period: {{ .params.period }}
+      
+      Include templates for:
+      1. Self-Assessment Template
+         - Accomplishments section
+         - Areas of growth
+         - Goals achieved
+         - Challenges overcome
+         - Feedback on role/company
+      2. Manager Review Template
+         - Performance rating scale definitions
+         - Core competencies assessment
+         - Goals achievement
+         - Strengths
+         - Areas for development
+         - Overall rating
+         - Comments and examples
+      3. Peer Feedback Template
+      4. Development Plan Template
+      5. Useful phrases for giving feedback
+         - Positive feedback examples
+         - Constructive feedback examples
+         - Phrases to avoid
+      6. Conversation guide for the review meeting
+      
+      Make templates easy to fill in with clear sections.
+    id: review_templates
+
+  - node: file_write
+    params:
+      path: performance-review-templates.md
+    input: review_templates
+    id: save

@@ -1,0 +1,76 @@
+name: README Generator
+# Generate project README.md
+# Usage: llm-box install documentation/readme-generator
+#        llm-box run readme-generator/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: ls -la && echo "---" && head -50 *.go 2>/dev/null || echo "No Go files in root" && echo "---" && find . -name "*.md" -maxdepth 1 2>/dev/null
+    id: project_structure
+
+  - node: execute
+    params:
+      command: cat package.json 2>/dev/null || cat go.mod 2>/dev/null || cat Cargo.toml 2>/dev/null || echo "No package file found"
+    id: package_info
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create a comprehensive README.md for this project.
+      
+      Project structure:
+      {{ .project_structure }}
+      
+      Package info:
+      {{ .package_info }}
+      
+      Project name: {{ .params.project_name }}
+      Description: {{ .params.description }}
+      Tech stack: {{ .params.tech_stack }}
+      
+      README should include:
+      1. Title and tagline
+      2. Badges (CI, coverage, version, etc.)
+      3. Description / About
+         - What is this?
+         - Why build this?
+         - Key features (5-8 bullet points)
+      4. Demo / Screenshots (placeholders)
+      5. Getting Started
+         - Prerequisites
+         - Installation
+         - Quick start
+      6. Usage Examples
+         - Basic usage
+         - Advanced usage
+         - Configuration options
+      7. Development
+         - Setup dev environment
+         - Running tests
+         - Building
+         - Contributing guidelines
+      8. Architecture (brief)
+      9. Roadmap
+      10. FAQ
+      11. Community / Support
+      12. License
+      
+      Make it engaging and professional.
+    id: readme
+
+  - node: file_write
+    params:
+      path: README.md
+    input: readme
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: readme
+    id: notify

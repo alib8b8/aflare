@@ -1,0 +1,62 @@
+name: File Organizer
+# Organize files by type, date, or extension
+# Usage: llm-box install automation/file-organizer
+#        llm-box run file-organizer/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: ls -la "{{ .params.directory }}" | head -30
+    id: file_list
+
+  - node: execute
+    params:
+      command: |
+        DIR="{{ .params.directory }}"
+        cd "$DIR"
+        mkdir -p images documents archives code audio video other
+        find . -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.svg" -o -iname "*.webp" \) -exec mv {} images/ \; 2>/dev/null || true
+        find . -maxdepth 1 -type f \( -iname "*.pdf" -o -iname "*.doc" -o -iname "*.docx" -o -iname "*.txt" -o -iname "*.md" -o -iname "*.xls" -o -iname "*.xlsx" -o -iname "*.ppt" -o -iname "*.pptx" \) -exec mv {} documents/ \; 2>/dev/null || true
+        find . -maxdepth 1 -type f \( -iname "*.zip" -o -iname "*.tar.gz" -o -iname "*.rar" -o -iname "*.7z" \) -exec mv {} archives/ \; 2>/dev/null || true
+        find . -maxdepth 1 -type f \( -iname "*.py" -o -iname "*.js" -o -iname "*.go" -o -iname "*.java" -o -iname "*.cpp" -o -iname "*.rs" -o -iname "*.ts" \) -exec mv {} code/ \; 2>/dev/null || true
+        find . -maxdepth 1 -type f \( -iname "*.mp3" -o -iname "*.wav" -o -iname "*.flac" -o -iname "*.aac" \) -exec mv {} audio/ \; 2>/dev/null || true
+        find . -maxdepth 1 -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" -o -iname "*.webm" \) -exec mv {} video/ \; 2>/dev/null || true
+        find . -maxdepth 1 -type f -exec mv {} other/ \; 2>/dev/null || true
+        echo "Organization complete"
+    id: organize
+
+  - node: execute
+    params:
+      command: |
+        DIR="{{ .params.directory }}"
+        echo "=== Directory Structure ==="
+        for d in "$DIR"/*/; do
+          count=$(find "$d" -type f | wc -l)
+          echo "$(basename $d): $count files"
+        done
+    id: result
+
+  - node: template_render
+    params:
+      template: |
+        # File Organization Report
+        Date: {{ .date }}
+        Directory: {{ .params.directory }}
+        
+        ## Result
+        {{ .result }}
+        
+        Files organized by type into subdirectories.
+    id: report
+
+  - node: file_write
+    params:
+      path: file-organization-report.md
+    input: report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: report
+    id: notify

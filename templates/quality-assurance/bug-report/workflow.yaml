@@ -1,0 +1,55 @@
+name: Bug Report Template
+# Generate structured bug report template
+# Usage: llm-box install quality-assurance/bug-report
+#        llm-box run bug-report/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 2
+    input: |
+      Create a comprehensive bug report template and guide.
+      
+      Product: {{ .params.product }}
+      Team: {{ .params.team }}
+      
+      Bug report package should include:
+      1. Bug Report Template
+         - Title (with format guide)
+         - Environment details (OS, browser, app version)
+         - Steps to reproduce (numbered)
+         - Expected result
+         - Actual result
+         - Severity (with definitions: Critical/Major/Minor/Trivial)
+         - Priority (with definitions: High/Medium/Low)
+         - Frequency (always/sometimes/rarely)
+         - Attachments (screenshots, logs, videos)
+         - Related issues
+      2. Bug Triage Process
+         - How bugs are prioritized
+         - Triage meeting cadence
+         - Who's involved
+      3. Bug Life Cycle
+         - Status definitions
+         - Transitions
+      4. Writing Good Bug Reports
+         - Tips and best practices
+         - Common mistakes to avoid
+         - Examples of good vs bad reports
+      5. Severity vs Priority Matrix
+      6. Template variations
+         - Quick bug report (for standups)
+         - Detailed bug report (for tracking)
+         - Security bug report (special handling)
+      
+      Make it practical and actionable.
+    id: bug_report
+
+  - node: file_write
+    params:
+      path: bug-report-template.md
+    input: bug_report
+    id: save

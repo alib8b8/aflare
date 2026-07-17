@@ -1,0 +1,67 @@
+name: API Integration Test Suite
+# Generate API integration test suite
+# Usage: llm-box install api-development/api-test-suite
+#        llm-box run api-test-suite/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.api_spec }}"
+    id: api_spec
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Generate a comprehensive API integration test suite.
+      
+      API Spec: {{ .api_spec }}
+      
+      Framework: {{ .params.framework }}
+      Language: {{ .params.language }}
+      
+      Test suite should include:
+      1. Test Setup
+         - Test configuration
+         - Test data setup
+         - Fixtures
+      2. Authentication Tests
+         - Login success
+         - Login failure
+         - Token refresh
+         - Invalid token
+      3. CRUD Tests (for each resource)
+         - Create with valid data
+         - Create with invalid data
+         - Read existing
+         - Read non-existent
+         - Update own
+         - Update others (permission)
+         - Delete
+      4. Validation Tests
+         - Missing required fields
+         - Invalid data types
+         - Edge cases
+         - Max length
+      5. Authorization Tests
+         - Admin vs user vs guest
+         - Resource ownership
+      6. Error Handling Tests
+         - 4xx errors
+         - 5xx errors
+      7. Rate Limiting Tests
+      8. Pagination Tests
+      9. Performance baseline tests
+      10. Test Utilities and Helpers
+      
+      Include actual test code with assertions.
+    id: test_suite
+
+  - node: file_write
+    params:
+      path: api-tests.md
+    input: test_suite
+    id: save

@@ -1,0 +1,75 @@
+name: React/Component Architecture
+# Generate frontend architecture plan
+# Usage: llm-box install frontend/frontend-architecture
+#        llm-box run frontend-architecture/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Design a frontend architecture for {{ .params.project }}.
+      
+      Project: {{ .params.project }}
+      Framework: {{ .params.framework }}
+      Team size: {{ .params.team_size }}
+      Project scale: {{ .params.scale }}
+      
+      Architecture plan should include:
+      1. Project Structure
+         - Directory layout
+         - Feature-based or type-based organization
+         - File naming conventions
+      2. State Management
+         - Global state solution
+         - Server state / data fetching
+         - Form state
+         - Local state patterns
+      3. Component Architecture
+         - Component types (presentational, container, hoc, render props)
+         - Component communication patterns
+         - Component composition strategies
+      4. Data Fetching
+         - API layer
+         - Caching strategy
+         - Error handling
+         - Optimistic updates
+      5. Routing
+         - Route structure
+         - Protected routes
+         - Code splitting / lazy loading
+      6. Styling Approach
+         - CSS-in-JS vs CSS Modules vs Tailwind
+         - Theming strategy
+         - Design tokens
+      7. Testing Strategy
+         - Unit tests
+         - Integration tests
+         - E2E tests
+         - Visual regression
+      8. Performance Optimization
+         - Code splitting
+         - Memoization strategies
+         - Bundle optimization
+         - Image optimization
+      9. Build & Deployment
+         - Build tools
+         - CI/CD pipeline
+         - Environment configs
+      10. Code Quality
+         - Linting
+         - Formatting
+         - Type checking
+         - Code review checklist
+      
+      Include concrete examples and best practices.
+    id: architecture
+
+  - node: file_write
+    params:
+      path: frontend-architecture.md
+    input: architecture
+    id: save

@@ -1,0 +1,64 @@
+name: Sprint Planner
+# Plan and organize sprint tasks
+# Usage: llm-box install project-management/sprint-planner
+#        llm-box run sprint-planner/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.backlog_file }}"
+    id: backlog
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create a sprint plan based on this backlog:
+      {{ .backlog }}
+      
+      Team: {{ .params.team }}
+      Sprint length: {{ .params.sprint_length }}
+      Velocity: {{ .params.velocity }} points
+      Sprint goal: {{ .params.sprint_goal }}
+      
+      Sprint plan should include:
+      1. Sprint Goal
+      2. Sprint Capacity
+         - Team availability
+         - Estimated velocity
+         - Days in sprint
+      3. Selected User Stories (prioritized)
+         - Story ID, title, points, priority
+         - Why this sprint
+      4. Tasks Breakdown
+         - For each story: subtasks
+         - Estimated hours per task
+         - Assignee suggestions
+      5. Sprint Backlog
+         - Total story points
+         - Confidence level
+      6. Dependencies
+         - Internal and external
+         - Risks
+      7. Definition of Done
+      8. Sprint Calendar
+         - Key meetings and dates
+      9. Success Metrics
+         - What "done" looks like
+         - How to measure success
+    id: sprint_plan
+
+  - node: file_write
+    params:
+      path: sprint-plan.md
+    input: sprint_plan
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: sprint_plan
+    id: notify

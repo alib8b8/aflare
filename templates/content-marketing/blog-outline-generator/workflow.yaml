@@ -1,0 +1,50 @@
+name: Blog Post Outline Generator
+# Generate structured blog post outlines from topics
+# Usage: llm-box install content-marketing/blog-outline-generator
+#        llm-box run blog-outline-generator/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: https://hn.algolia.com/api/v1/search?query={{ .params.topic }}&tags=story
+      method: GET
+      timeout: 30s
+    id: reference_articles
+
+  - node: json_parse
+    params:
+      path: hits
+    input: reference_articles
+    id: hits
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Generate a comprehensive blog post outline about: {{ .params.topic }}
+      
+      Use these reference articles for context:
+      {{ .hits }}
+      
+      The outline should include:
+      - Engaging title
+      - Introduction with hook
+      - 5-7 main sections with subpoints
+      - Conclusion with call to action
+      - SEO keywords suggestions
+    id: outline
+
+  - node: file_write
+    params:
+      path: blog-outline.md
+    input: outline
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: outline
+    id: notify

@@ -1,0 +1,63 @@
+name: Trip Budget Calculator
+# Calculate and plan trip budget
+# Usage: llm-box install travel/trip-budget
+#        llm-box run trip-budget/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create a detailed trip budget for {{ .params.destination }}.
+      
+      Destination: {{ .params.destination }}
+      Duration: {{ .params.duration }}
+      Number of people: {{ .params.num_people }}
+      Budget level: {{ .params.budget_level }}
+      Travel style: {{ .params.travel_style }}
+      
+      Budget breakdown:
+      1. Transportation
+         - Flights/trains
+         - Airport transfers
+         - Local transportation
+         - Rental car (if applicable)
+      2. Accommodation
+         - By night
+         - Different options (budget, mid, luxury)
+      3. Food & Drinks
+         - Breakfast
+         - Lunch
+         - Dinner
+         - Snacks and drinks
+         - Fine dining budget
+      4. Activities & Entertainment
+         - Tours and attractions
+         - Shows/events
+         - Shopping budget
+      5. Miscellaneous
+         - Travel insurance
+         - SIM card/WiFi
+         - Visa fees
+         - Souvenirs
+         - Tips/gratuities
+         - Emergency fund
+      6. Total Estimated Budget
+         - Conservative estimate
+         - Average estimate
+         - Luxury estimate
+      7. Money-saving Tips
+      8. Budget Tracking Template
+      9. Currency exchange tips
+      
+      Include actual dollar amount estimates.
+    id: budget
+
+  - node: file_write
+    params:
+      path: trip-budget.md
+    input: budget
+    id: save

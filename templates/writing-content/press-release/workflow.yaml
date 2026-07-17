@@ -1,0 +1,51 @@
+name: Press Release Generator
+# Generate professional press release
+# Usage: llm-box install writing-content/press-release
+#        llm-box run press-release/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create a professional press release for {{ .params.news }}.
+      
+      Company: {{ .params.company }}
+      News type: {{ .params.news_type }} (product launch, funding, partnership, etc.)
+      Announcement: {{ .params.announcement }}
+      
+      Press release format:
+      1. FOR IMMEDIATE RELEASE
+      2. Contact information
+      3. Dateline and Headline
+      4. Subheadline
+      5. Lead paragraph (who, what, when, where, why)
+      6. Body paragraphs
+         - Details of the announcement
+         - Quote from CEO/executive
+         - More details and context
+         - Quote from customer/partner
+         - Company information
+      7. About the Company boilerplate
+      8. Media Contact
+      9. ### (standard end marker)
+      
+      Follow AP style guidelines.
+      Write in the inverted pyramid style.
+      Keep it under 500 words.
+    id: press_release
+
+  - node: file_write
+    params:
+      path: press-release.md
+    input: press_release
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: press_release
+    id: notify

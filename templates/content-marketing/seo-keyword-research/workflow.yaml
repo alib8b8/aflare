@@ -1,0 +1,45 @@
+name: SEO Keyword Research
+# Research and analyze SEO keywords for a topic
+# Usage: llm-box install content-marketing/seo-keyword-research
+#        llm-box run seo-keyword-research/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: https://api.datamuse.com/words?rel_trg={{ .params.topic }}&max=30
+      method: GET
+      timeout: 30s
+    id: related_keywords
+
+  - node: http_request
+    params:
+      url: https://api.datamuse.com/words?ml={{ .params.topic }}&max=30
+      method: GET
+      timeout: 30s
+    id: similar_words
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse, template_render
+      max_iterations: 3
+    input: |
+      Analyze these keywords for the topic "{{ .params.topic }}":
+      
+      Related keywords: {{ .related_keywords }}
+      Similar words: {{ .similar_words }}
+      
+      Create an SEO keyword strategy with:
+      1. Primary keywords (top 5)
+      2. Long-tail keyword variations (10-15)
+      3. Semantic related terms
+      4. Content gap opportunities
+      5. Difficulty estimation for each
+    id: strategy
+
+  - node: file_write
+    params:
+      path: seo-keyword-strategy.md
+    input: strategy
+    id: save

@@ -1,0 +1,70 @@
+name: Test Plan Generator
+# Generate comprehensive test plan
+# Usage: llm-box install quality-assurance/test-plan
+#        llm-box run test-plan/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Create a comprehensive test plan for {{ .params.product }}.
+      
+      Product: {{ .params.product }}
+      Product type: {{ .params.product_type }}
+      Version: {{ .params.version }}
+      Test level: {{ .params.test_level }}
+      
+      Test plan should include:
+      1. Test Strategy
+         - Scope of testing
+         - Test levels (unit, integration, system, UAT)
+         - Test types to perform
+      2. Test Objectives
+      3. Test Scope
+         - In scope
+         - Out of scope
+      4. Test Environment
+         - Hardware requirements
+         - Software requirements
+         - Test data strategy
+      5. Test Types to Execute
+         - Functional testing
+         - Performance testing
+         - Security testing
+         - Usability testing
+         - Compatibility testing
+         - Regression testing
+      6. Test Schedule
+         - Test phases
+         - Milestones
+         - Resource allocation
+      7. Test Cases Overview
+         - Module breakdown
+         - Estimated test case count
+      8. Defect Management
+         - Bug report template
+         - Severity/priority definitions
+         - Bug lifecycle
+      9. Risks and Mitigation
+      10. Entry and Exit Criteria
+      11. Test Deliverables
+      12. Tools and Resources
+      
+      Include a sample test case template.
+    id: test_plan
+
+  - node: file_write
+    params:
+      path: test-plan.md
+    input: test_plan
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: test_plan
+    id: notify

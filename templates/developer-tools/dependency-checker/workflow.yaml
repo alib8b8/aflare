@@ -1,0 +1,37 @@
+name: Dependency Checker
+# Check project dependencies for updates and vulnerabilities
+# Usage: llm-box install developer-tools/dependency-checker
+#        llm-box run dependency-checker/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: go list -m -json all
+    id: dependencies
+
+  - node: execute
+    params:
+      command: go mod graph | head -50
+    id: dep_graph
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse, template_render
+      max_iterations: 2
+    input: |
+      Analyze these Go module dependencies:
+      {{ .dependencies }}
+      
+      Create a report with:
+      1. Total number of direct and indirect dependencies
+      2. Top 5 largest dependency packages
+      3. Recommendations for cleanup
+    id: report
+
+  - node: file_write
+    params:
+      path: dependency-report.md
+    input: report
+    id: save

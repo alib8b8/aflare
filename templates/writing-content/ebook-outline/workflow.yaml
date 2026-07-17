@@ -1,0 +1,63 @@
+name: Ebook Outline Generator
+# Generate comprehensive ebook outline
+# Usage: llm-box install writing-content/ebook-outline
+#        llm-box run ebook-outline/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: researcher, template_render
+      max_iterations: 4
+    input: |
+      Create a comprehensive ebook outline for "{{ .params.title }}".
+      
+      Topic: {{ .params.topic }}
+      Target audience: {{ .params.audience }}
+      Length: {{ .params.length }} words
+      Tone: {{ .params.tone }}
+      
+      Ebook structure:
+      1. Front Matter
+         - Title page
+         - Copyright page
+         - Foreword / Preface
+         - Table of contents
+      2. Introduction
+         - Why this book
+         - What you'll learn
+         - How to read this book
+      3. Main Chapters (10-15 chapters)
+         For each chapter:
+         - Chapter title
+         - Key takeaways
+         - Section breakdown (3-5 sections)
+         - Stories/examples to include
+         - Action steps / exercises
+         - Approximate word count
+      4. Conclusion / Final Thoughts
+      5. Appendices
+         - Resources list
+         - Templates/tools
+         - Glossary
+      6. About the Author
+      7. Bonus / Lead magnet
+      
+      Also include:
+      - Book positioning and unique value
+      - Promotion ideas
+      - Cover design suggestions
+    id: ebook_outline
+
+  - node: file_write
+    params:
+      path: ebook-outline.md
+    input: ebook_outline
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: ebook_outline
+    id: notify

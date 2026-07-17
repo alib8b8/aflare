@@ -1,0 +1,56 @@
+name: Security Audit Checklist
+# Run security audit checklist on a project
+# Usage: llm-box install security/security-audit
+#        llm-box run security-audit/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: ls -la && echo "---" && find . -name "*.env" -o -name "*.key" -o -name "*.pem" 2>/dev/null
+    id: file_check
+
+  - node: execute
+    params:
+      command: grep -r "password\|secret\|api_key\|token" --include="*.yaml" --include="*.yml" --include="*.json" --include="*.env" . 2>/dev/null | grep -v ".git" | head -20
+    id: secret_check
+
+  - node: execute
+    params:
+      command: grep -r "TODO\|FIXME\|HACK\|XXX" --include="*.go" . 2>/dev/null | head -20
+    id: todo_check
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Conduct a security audit based on these findings:
+      
+      File structure: {{ .file_check }}
+      Potential secrets: {{ .secret_check }}
+      Code TODOs: {{ .todo_check }}
+      
+      Create a security report with:
+      1. Critical findings (immediate action required)
+      2. High priority issues
+      3. Medium priority issues
+      4. Low priority / best practices
+      5. Recommended remediation steps
+      6. Security checklist for future projects
+      
+      Be thorough but not alarmist.
+    id: audit_report
+
+  - node: file_write
+    params:
+      path: security-audit.md
+    input: audit_report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: audit_report
+    id: notify

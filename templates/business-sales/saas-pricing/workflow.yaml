@@ -1,0 +1,46 @@
+name: SaaS Pricing Calculator
+# Design SaaS pricing strategy and tiers
+# Usage: llm-box install business-sales/saas-pricing
+#        llm-box run saas-pricing/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Design a SaaS pricing strategy for {{ .params.product }}.
+      
+      Product type: {{ .params.product }}
+      Target customers: {{ .params.customers }}
+      Cost structure: {{ .params.costs }}
+      
+      Create pricing strategy with:
+      1. Pricing Methodology
+         - Value-based vs cost-plus vs competitor-based
+         - Your approach and why
+      2. Pricing Tiers:
+         - Free tier (what's included, limits)
+         - Starter/Basic ($X/month)
+         - Pro/Standard ($Y/month)
+         - Enterprise (custom pricing)
+         For each tier: features, limits, use case, target customer
+      3. Add-ons and Upsells
+      4. Annual discount strategy
+      5. Free trial policy
+      6. Refund policy
+      7. Competitive positioning
+      8. Pricing page layout recommendations
+      9. Pricing experiments to run
+      10. FAQs (anticipated pricing questions)
+      
+      Include actual dollar amounts as placeholders.
+    id: pricing
+
+  - node: file_write
+    params:
+      path: saas-pricing.md
+    input: pricing
+    id: save

@@ -1,0 +1,65 @@
+name: Network Diagnostics
+# Run network diagnostics and generate report
+# Usage: llm-box install networking/network-diagnostics
+#        llm-box run network-diagnostics/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: echo "=== Ping Test ===" && ping -c 4 "{{ .params.target }}" 2>&1 || echo "ping failed"
+    id: ping_test
+
+  - node: execute
+    params:
+      command: echo "=== Traceroute ===" && traceroute "{{ .params.target }}" 2>&1 || tracepath "{{ .params.target }}" 2>&1 || echo "traceroute unavailable"
+    id: traceroute
+
+  - node: execute
+    params:
+      command: echo "=== DNS Lookup ===" && nslookup "{{ .params.target }}" 2>&1 && echo "=== DNS Dig ===" && dig "{{ .params.target }}" 2>&1 || echo "dig unavailable"
+    id: dns_lookup
+
+  - node: execute
+    params:
+      command: echo "=== Port Scan (common ports) ===" && (echo > /dev/tcp/"{{ .params.target }}"/80 2>&1 && echo "Port 80: OPEN" || echo "Port 80: closed") 2>&1 && (echo > /dev/tcp/"{{ .params.target }}"/443 2>&1 && echo "Port 443: OPEN" || echo "Port 443: closed") 2>&1 && (echo > /dev/tcp/"{{ .params.target }}"/22 2>&1 && echo "Port 22: OPEN" || echo "Port 22: closed") 2>&1
+    id: port_check
+
+  - node: execute
+    params:
+      command: echo "=== Speed Test ===" && (curl -s -o /dev/null -w "Download speed: %{speed_download} bytes/sec\n" "https://speed.cloudflare.com/__down?bytes=10000000" 2>&1 || echo "speed test failed")
+    id: speed_test
+
+  - node: template_render
+    params:
+      template: |
+        # Network Diagnostics Report
+        Date: {{ .date }}
+        Target: {{ .params.target }}
+        
+        ## Ping Test
+        {{ .ping_test }}
+        
+        ## Traceroute
+        {{ .traceroute }}
+        
+        ## DNS Lookup
+        {{ .dns_lookup }}
+        
+        ## Port Check
+        {{ .port_check }}
+        
+        ## Speed Test
+        {{ .speed_test }}
+    id: report
+
+  - node: file_write
+    params:
+      path: network-report.md
+    input: report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: report
+    id: notify

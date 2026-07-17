@@ -1,0 +1,40 @@
+name: SSL Certificate Checker
+# Check SSL certificate expiry for domains
+# Usage: llm-box install devops-monitoring/ssl-cert-checker
+#        llm-box run ssl-cert-checker/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: |
+        for domain in {{ .params.domains }}; do
+          echo "=== $domain ==="
+          echo | openssl s_client -servername $domain -connect $domain:443 2>/dev/null | openssl x509 -noout -dates -subject 2>/dev/null || echo "Failed to connect"
+          echo ""
+        done
+    id: cert_info
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 2
+    input: |
+      Analyze these SSL certificates and create an expiry alert report:
+      {{ .cert_info }}
+      
+      Highlight certificates expiring within 30 days.
+    id: report
+
+  - node: file_write
+    params:
+      path: ssl-cert-report.md
+    input: report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: report
+    id: notify

@@ -1,0 +1,56 @@
+name: Server Health Check
+# Check server health metrics and generate report
+# Usage: llm-box install devops-monitoring/server-health-check
+#        llm-box run server-health-check/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: df -h
+    id: disk_usage
+
+  - node: execute
+    params:
+      command: free -h
+    id: memory_usage
+
+  - node: execute
+    params:
+      command: uptime
+    id: uptime_info
+
+  - node: execute
+    params:
+      command: ps aux --sort=-%mem | head -10
+    id: top_processes
+
+  - node: template_render
+    params:
+      template: |
+        # Server Health Report
+        Date: {{ .date }}
+        
+        ## Disk Usage
+        {{ .disk_usage }}
+        
+        ## Memory Usage
+        {{ .memory_usage }}
+        
+        ## Uptime
+        {{ .uptime_info }}
+        
+        ## Top Processes by Memory
+        {{ .top_processes }}
+    id: report
+
+  - node: file_write
+    params:
+      path: health-report.md
+    input: report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: report
+    id: notify

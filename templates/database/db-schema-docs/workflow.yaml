@@ -1,0 +1,62 @@
+name: Database Schema Documentation
+# Generate database schema documentation
+# Usage: llm-box install database/db-schema-docs
+#        llm-box run db-schema-docs/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.schema_file }}"
+    id: schema_data
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render, json_parse
+      max_iterations: 4
+    input: |
+      Generate comprehensive database schema documentation from:
+      {{ .schema_data }}
+      
+      Database type: {{ .params.db_type }}
+      Database name: {{ .params.db_name }}
+      
+      Documentation should include:
+      1. Database Overview
+         - Purpose and scope
+         - Entity relationship overview
+         - Key entities
+      2. Table Reference
+         For each table:
+         - Table name
+         - Description
+         - Columns (name, type, nullable, default, description)
+         - Primary key
+         - Foreign keys
+         - Indexes
+         - Estimated row count
+      3. Relationships Diagram (text-based)
+      4. Common Queries
+         - Most frequent queries
+         - Complex query examples
+      5. Performance Considerations
+         - Slow queries to watch
+         - Index recommendations
+      6. Data Dictionary
+      7. Maintenance Notes
+      
+      Be thorough and well-organized.
+    id: docs
+
+  - node: file_write
+    params:
+      path: database-docs.md
+    input: docs
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: docs
+    id: notify
