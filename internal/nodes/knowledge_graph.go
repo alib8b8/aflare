@@ -107,19 +107,27 @@ func (kg *KnowledgeGraph) AddRelation(from, to, relation string, confidence floa
 }
 
 func (kg *KnowledgeGraph) Save(path string) error {
+	safePath, err := validateWritePath(path)
+	if err != nil {
+		return fmt.Errorf("invalid save path: %w", err)
+	}
 	data, err := json.MarshalIndent(kg, "", "  ")
 	if err != nil {
 		return err
 	}
-	dir := filepath.Dir(path)
+	dir := filepath.Dir(safePath)
 	if dir != "." && dir != "" {
 		os.MkdirAll(dir, 0755)
 	}
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(safePath, data, 0644)
 }
 
 func LoadKnowledgeGraph(path string) (*KnowledgeGraph, error) {
-	data, err := os.ReadFile(path)
+	safePath, err := validateReadPath(path)
+	if err != nil {
+		return nil, fmt.Errorf("invalid load path: %w", err)
+	}
+	data, err := os.ReadFile(safePath)
 	if err != nil {
 		return nil, err
 	}

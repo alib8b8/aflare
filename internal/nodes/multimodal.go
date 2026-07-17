@@ -149,11 +149,16 @@ func resolveImageURL(imagePath string) (string, error) {
 		return imagePath, nil
 	}
 
-	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
-		return "", fmt.Errorf("image file not found: %s", imagePath)
+	safePath, err := validateReadPath(imagePath)
+	if err != nil {
+		return "", fmt.Errorf("invalid image path: %w", err)
 	}
 
-	data, err := os.ReadFile(imagePath)
+	if _, err := os.Stat(safePath); os.IsNotExist(err) {
+		return "", fmt.Errorf("image file not found: %s", safePath)
+	}
+
+	data, err := os.ReadFile(safePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read image: %w", err)
 	}

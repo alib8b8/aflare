@@ -100,37 +100,49 @@ func (n *RAGNode) Execute(ctx context.Context, input string, params map[string]s
 			Source string
 		}{Text: source, Source: "inline_text"})
 	case "file":
-		content, err := os.ReadFile(source)
+		safePath, err := validateReadPath(source)
 		if err != nil {
-			return "", fmt.Errorf("failed to read file %s: %w", source, err)
+			return "", fmt.Errorf("invalid file path: %w", err)
+		}
+		content, err := os.ReadFile(safePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read file %s: %w", safePath, err)
 		}
 		documents = append(documents, struct {
 			Text   string
 			Source string
-		}{Text: string(content), Source: source})
+		}{Text: string(content), Source: safePath})
 	case "dir":
-		docs, err := loadDirectory(source)
+		safePath, err := validateReadPath(source)
 		if err != nil {
-			return "", fmt.Errorf("failed to load directory %s: %w", source, err)
+			return "", fmt.Errorf("invalid directory path: %w", err)
+		}
+		docs, err := loadDirectory(safePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to load directory %s: %w", safePath, err)
 		}
 		documents = docs
 	default:
 		if _, err := os.Stat(source); err == nil {
-			if info, _ := os.Stat(source); info.IsDir() {
-				docs, err := loadDirectory(source)
+			safePath, validateErr := validateReadPath(source)
+			if validateErr != nil {
+				return "", fmt.Errorf("invalid path: %w", validateErr)
+			}
+			if info, _ := os.Stat(safePath); info.IsDir() {
+				docs, err := loadDirectory(safePath)
 				if err != nil {
 					return "", fmt.Errorf("failed to load directory: %w", err)
 				}
 				documents = docs
 			} else {
-				content, err := os.ReadFile(source)
+				content, err := os.ReadFile(safePath)
 				if err != nil {
 					return "", fmt.Errorf("failed to read file: %w", err)
 				}
 				documents = append(documents, struct {
 					Text   string
 					Source string
-				}{Text: string(content), Source: source})
+				}{Text: string(content), Source: safePath})
 			}
 		} else {
 			documents = append(documents, struct {

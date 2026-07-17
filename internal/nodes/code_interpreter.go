@@ -67,6 +67,12 @@ func (n *CodeInterpreterNode) Execute(ctx context.Context, input string, params 
 		}
 		defer os.RemoveAll(tempDir)
 		workDir = tempDir
+	} else {
+		safeWorkDir, err := validateWritePath(workDir)
+		if err != nil {
+			return "", fmt.Errorf("invalid work_dir: %w", err)
+		}
+		workDir = safeWorkDir
 	}
 
 	if err := os.MkdirAll(workDir, 0755); err != nil {
