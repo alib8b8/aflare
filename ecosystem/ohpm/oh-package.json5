@@ -1,0 +1,31 @@
+{
+  "name": "@llm-box/workflow-engine",
+  "version": "1.0.0",
+  "description": "llm-box AI workflow engine SDK for HarmonyOS",
+  "main": "Index.ets",
+  "author": "llm-box",
+  "license": "MIT",
+  "homepage": "https://gitcode.com/llm-box/llm-box",
+  "repository": "https://gitcode.com/llm-box/llm-box",
+  "keywords": [
+    "ai",
+    "workflow",
+    "llm",
+    "agent",
+    "harmonyos",
+    "ohos",
+    "react",
+    "rag",
+    "edge-ai"
+  ],
+  "dependencies": {},
+  "tags": [
+    "AI",
+    "Workflow",
+    "Agent",
+    "HarmonyOS"
+  ],
+  "platforms": [
+    "HarmonyOS"
+  ]
+}
