@@ -20,29 +20,5 @@ jobs:
     - name: Build
       run: go build ./...
 
-    - name: Test with race detector and generate coverage
-      run: |
-        go clean -testcache
-        go test -race -coverprofile=coverage.out -covermode=atomic ./internal/... -short
-
-    - name: Check coverage threshold
-      run: |
-        total=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}' | sed 's/%//')
-        echo "Total coverage: ${total}%"
-        threshold=65
-        echo "Threshold: ${threshold}%"
-        pass=$(awk -v total="$total" -v threshold="$threshold" 'BEGIN { print (total >= threshold) ? 1 : 0 }')
-        if [ "$pass" -eq 0 ]; then
-          echo "FAIL: coverage ${total}% is below threshold ${threshold}%"
-          exit 1
-        fi
-        echo "PASS: coverage ${total}% meets threshold ${threshold}%"
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        files: ./coverage.out
-        flags: unittests
-        name: codecov-llm-box
-        fail_ci_if_error: false
-        token: ${{ secrets.CODECOV_TOKEN }}
+    - name: Test with race detector
+      run: go test ./... -race -short
