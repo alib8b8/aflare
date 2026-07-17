@@ -1,0 +1,155 @@
+name: medical-consultation
+description: 医疗健康咨询 SOP - 多角色协作医疗咨询工作流（仅供参考，不替代专业医疗建议）
+version: "1.0"
+category: health
+tags: [health, medical, consultation, sop, moe]
+
+params:
+  - name: symptoms
+    description: 症状描述
+    required: true
+  - name: age
+    description: 年龄
+    default: "adult"
+  - name: gender
+    description: 性别
+    default: "unknown"
+  - name: medical_history
+    description: 既往病史
+    default: "none"
+  - name: severity
+    description: 严重程度（mild, moderate, severe）
+    default: mild
+
+steps:
+  - node: supervisor
+    params:
+      strategy: moe
+      domain: medical
+      output_format: json
+      max_depth: "3"
+    input: |
+      请为以下健康咨询制定多专家咨询方案：
+
+      **症状：** {{ .params.symptoms }}
+      **年龄：** {{ .params.age }}
+      **性别：** {{ .params.gender }}
+      **既往病史：** {{ .params.medical_history }}
+      **严重程度：** {{ .params.severity }}
+
+      参与专家角色：
+      1. medical_expert - 医学专家：初步诊断建议、鉴别诊断
+      2. researcher - 研究员：查找相关医学文献和诊疗指南
+      3. data_analyst - 数据分析：统计分析、风险评估
+      4. evaluator - 评估员：最终建议和就医指导
+
+      注意：此咨询仅供参考，不能替代专业医疗建议。如症状严重，请立即就医。
+    id: consultation_plan
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名经验丰富的内科医生。请根据患者描述进行初步分析：
+        1. 可能的病因分析
+        2. 鉴别诊断（需要排除的疾病）
+        3. 建议的检查项目
+        4. 初步处理建议
+        5. 何时需要紧急就医
+
+        重要声明：你的分析仅供参考，不能替代专业医疗诊断。
+    input: |
+      患者信息：
+      - 症状：{{ .params.symptoms }}
+      - 年龄：{{ .params.age }}
+      - 性别：{{ .params.gender }}
+      - 既往病史：{{ .params.medical_history }}
+      - 严重程度：{{ .params.severity }}
+
+      请进行详细的医学分析。
+    id: medical_analysis
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名医学研究员和健康教育者。请提供：
+        1. 相关疾病的科普知识
+        2. 预防措施和生活方式建议
+        3. 常见误区提醒
+        4. 就医科室建议
+        5. 相关检查的目的和意义
+
+        请用通俗易懂的语言解释。
+    input: |
+      症状：{{ .params.symptoms }}
+      医学分析：{{ .steps.medical_analysis.output }}
+
+      请提供相关的医学科普和健康指导。
+    id: health_education
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名医疗质量评估专家。请综合分析：
+        1. 紧急程度评估（立即就医/尽快就医/可观察）
+        2. 风险等级（低/中/高）
+        3. 就医建议（科室、检查项目）
+        4. 家庭护理建议
+        5. 需要警惕的危险信号
+
+        请给出清晰、可操作的建议。
+    input: |
+      症状：{{ .params.symptoms }}
+
+      医学分析：
+      {{ .steps.medical_analysis.output }}
+
+      健康指导：
+      {{ .steps.health_education.output }}
+
+      咨询计划：
+      {{ .steps.consultation_plan.output }}
+
+      请进行综合评估并给出最终建议。
+    id: final_assessment
+
+  - node: template_render
+    params:
+      template: |
+        # 健康咨询报告
+
+        > ⚠️ **重要声明**：本咨询仅供参考，不能替代专业医疗诊断和治疗。
+        > 如症状严重或持续不缓解，请立即就医。
+
+        **症状描述：** {{ .params.symptoms }}
+        **年龄：** {{ .params.age }}
+        **性别：** {{ .params.gender }}
+        **严重程度：** {{ .params.severity }}
+
+        ---
+
+        ## 一、医学分析
+
+        {{ .steps.medical_analysis.output }}
+
+        ---
+
+        ## 二、健康指导
+
+        {{ .steps.health_education.output }}
+
+        ---
+
+        ## 三、综合建议
+
+        {{ .steps.final_assessment.output }}
+
+        ---
+
+        *咨询生成时间：{{ .metadata.timestamp }}*
+        *本内容仅供参考，不构成医疗建议*
+    id: final_report
+
+output: "{{ .steps.final_report.output }}"

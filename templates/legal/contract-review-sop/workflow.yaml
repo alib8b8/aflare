@@ -1,0 +1,152 @@
+name: legal-contract-review
+description: 法律合同审查 SOP - 多角色协作合同审查工作流
+version: "1.0"
+category: legal
+tags: [legal, contract, review, sop, moe]
+
+params:
+  - name: contract_file
+    description: 合同文件路径
+    required: true
+  - name: contract_type
+    description: 合同类型（employment, sales, service, nda, lease, other）
+    default: other
+  - name: review_depth
+    description: 审查深度（basic, standard, comprehensive）
+    default: standard
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.contract_file }}"
+    id: read_contract
+
+  - node: supervisor
+    params:
+      strategy: moe
+      domain: legal
+      output_format: json
+      max_depth: "3"
+    input: |
+      请对以下{{ .params.contract_type }}合同进行全面审查，审查深度为{{ .params.review_depth }}。
+
+      合同内容：
+      {{ .steps.read_contract.output }}
+
+      请使用 MoE 多专家模式，安排以下角色参与审查：
+      1. legal_expert - 法律专家：审查法律条款、合规性、风险点
+      2. researcher - 研究员：查找相关法律法规和判例
+      3. financial_expert - 财务专家：审查财务条款、付款条件、违约责任
+      4. critic - 评论家：整体质量评估和改进建议
+      5. evaluator - 评估员：最终风险评级和优先级排序
+
+      输出审查计划：每个专家负责的部分、权重和输出格式。
+    id: contract_review_plan
+
+  - node: rag
+    params:
+      source: "{{ .params.contract_file }}"
+      source_type: file
+      chunk_size: "1500"
+      top_k: "8"
+      search_method: hybrid
+    input: "合同中的关键法律条款和风险点"
+    id: key_clauses
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名资深律师和合同审查专家。请对合同进行法律审查，重点关注：
+        1. 条款完整性和明确性
+        2. 法律风险和漏洞
+        3. 权利义务不对等
+        4. 违约责任和争议解决
+        5. 合规性问题
+
+        请逐条列出发现的问题，并给出修改建议。
+    input: |
+      合同关键条款：
+      {{ .steps.key_clauses.output }}
+
+      完整合同：
+      {{ .steps.read_contract.output }}
+
+      请进行全面的法律审查。
+    id: legal_review
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名财务和商业分析专家。请从商业和财务角度审查合同：
+        1. 付款条件和账期
+        2. 价格合理性
+        3. 违约责任的财务影响
+        4. 成本和收益分析
+        5. 现金流影响
+
+        请量化风险，给出财务建议。
+    input: |
+      合同内容：
+      {{ .steps.read_contract.output }}
+
+      请从财务和商业角度进行审查。
+    id: financial_review
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名合同质量评估专家。请综合各方审查意见：
+        1. 对发现的问题进行风险评级（高/中/低）
+        2. 按优先级排序
+        3. 给出修改建议的优先级
+        4. 评估整体合同风险等级
+        5. 给出是否建议签署的结论
+    input: |
+      法律审查意见：
+      {{ .steps.legal_review.output }}
+
+      财务审查意见：
+      {{ .steps.financial_review.output }}
+
+      审查计划：
+      {{ .steps.contract_review_plan.output }}
+
+      请综合评估并给出最终报告。
+    id: final_assessment
+
+  - node: template_render
+    params:
+      template: |
+        # 合同审查报告
+
+        **合同类型：** {{ .params.contract_type }}
+        **审查深度：** {{ .params.review_depth }}
+        **文件：** {{ .params.contract_file }}
+
+        ---
+
+        ## 一、法律审查意见
+
+        {{ .steps.legal_review.output }}
+
+        ---
+
+        ## 二、财务审查意见
+
+        {{ .steps.financial_review.output }}
+
+        ---
+
+        ## 三、综合评估
+
+        {{ .steps.final_assessment.output }}
+
+        ---
+
+        *审查生成时间：{{ .metadata.timestamp }}*
+    id: final_report
+
+output: "{{ .steps.final_report.output }}"

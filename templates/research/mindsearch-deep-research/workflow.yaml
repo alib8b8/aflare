@@ -1,0 +1,196 @@
+name: mindsearch-research
+description: MindSearch 深度研究工作流 - 图结构探索式研究，多路径发散与收敛
+version: "1.0"
+category: research
+tags: [research, mindsearch, deep-research, exploration, graph]
+
+params:
+  - name: topic
+    description: 研究主题或问题
+    required: true
+  - name: depth
+    description: 探索深度（1-5）
+    default: "3"
+  - name: breadth
+    description: 探索广度（每个节点的子节点数）
+    default: "3"
+  - name: output_format
+    description: 输出格式（report, summary, mindmap, full）
+    default: report
+
+steps:
+  - node: supervisor
+    params:
+      strategy: mindsearch
+      domain: research
+      output_format: json
+      max_depth: "{{ .params.depth }}"
+      specialists: "planner,researcher,data_analyst,critic,evaluator"
+    input: |
+      请对以下主题进行深度研究：
+
+      **研究主题：** {{ .params.topic }}
+      **探索深度：** {{ .params.depth }} 层
+      **探索广度：** 每个节点 {{ .params.breadth }} 个子方向
+
+      请使用 MindSearch 模式：
+      1. 定义核心问题和初始假设
+      2. 构建探索图（多路径、多维度）
+      3. 规划探索阶段
+      4. 定义收敛标准
+      5. 指定综合方法
+
+      目标：全面、深入、多角度地研究该主题。
+    id: research_plan
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名高级研究分析师（探索阶段）。请对研究主题进行第一轮深度探索：
+        1. 从多个角度分析主题
+        2. 提出关键问题和子问题
+        3. 识别重要的概念和术语
+        4. 列出需要进一步研究的方向
+        5. 标注不确定性和争议点
+
+        请保持开放和探索的心态，不要急于下结论。
+    input: |
+      研究主题：{{ .params.topic }}
+
+      研究计划：
+      {{ .steps.research_plan.output }}
+
+      请进行第一轮探索性研究。
+    id: exploration_phase1
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名研究分析师（深化阶段）。请基于第一轮探索结果，对关键方向进行深入研究：
+        1. 对每个重要方向深入分析
+        2. 寻找支持证据和反证
+        3. 分析不同观点的论据
+        4. 识别模式和趋势
+        5. 建立概念之间的联系
+
+        请深入挖掘，不要停留在表面。
+    input: |
+      研究主题：{{ .params.topic }}
+
+      第一轮探索结果：
+      {{ .steps.exploration_phase1.output }}
+
+      研究计划：
+      {{ .steps.research_plan.output }}
+
+      请进行第二轮深入研究。
+    id: exploration_phase2
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名批判性思考者和质量评估专家。请对研究结果进行批判性审查：
+        1. 检查论据的充分性
+        2. 识别逻辑漏洞和谬误
+        3. 指出偏见和假设
+        4. 评估信息来源的可靠性
+        5. 提出反方观点
+        6. 标注不确定性程度
+
+        请保持客观和批判的态度。
+    input: |
+      研究主题：{{ .params.topic }}
+
+      第一轮探索：
+      {{ .steps.exploration_phase1.output }}
+
+      第二轮深入：
+      {{ .steps.exploration_phase2.output }}
+
+      研究计划：
+      {{ .steps.research_plan.output }}
+
+      请进行批判性审查和质量评估。
+    id: critical_review
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名研究综合专家。请综合所有研究结果，形成最终的研究报告：
+        1. 核心发现和结论
+        2. 支持证据和推理
+        3. 不同观点的对比
+        4. 不确定性和局限性
+        5. 实践意义和应用
+        6. 未来研究方向
+        7. 参考文献和资源
+
+        请确保报告结构清晰、论据充分、结论可靠。
+    input: |
+      研究主题：{{ .params.topic }}
+
+      研究计划：
+      {{ .steps.research_plan.output }}
+
+      第一轮探索：
+      {{ .steps.exploration_phase1.output }}
+
+      第二轮深入：
+      {{ .steps.exploration_phase2.output }}
+
+      批判性审查：
+      {{ .steps.critical_review.output }}
+
+      请综合所有内容，生成最终研究报告。
+    id: final_report
+
+  - node: template_render
+    params:
+      template: |
+        # 深度研究报告：{{ .params.topic }}
+
+        **探索深度：** {{ .params.depth }} 层
+        **输出格式：** {{ .params.output_format }}
+        **研究方法：** MindSearch 图结构探索
+        **生成时间：** {{ .metadata.timestamp }}
+
+        ---
+
+        ## 一、研究计划
+
+        {{ .steps.research_plan.output }}
+
+        ---
+
+        ## 二、探索阶段 - 广度扫描
+
+        {{ .steps.exploration_phase1.output }}
+
+        ---
+
+        ## 三、深化阶段 - 深度挖掘
+
+        {{ .steps.exploration_phase2.output }}
+
+        ---
+
+        ## 四、批判性审查
+
+        {{ .steps.critical_review.output }}
+
+        ---
+
+        ## 五、最终研究报告
+
+        {{ .steps.final_report.output }}
+
+        ---
+
+        *本报告由 MindSearch 工作流生成，基于图结构探索方法*
+    id: formatted_report
+
+output: "{{ .steps.formatted_report.output }}"

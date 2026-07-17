@@ -24,29 +24,33 @@ type AgentThought struct {
 }
 
 type ReActAgent struct {
-	provider     string
-	model        string
-	apiKey       string
-	endpoint     string
-	systemPrompt string
-	maxIters     int
-	tools        []AgentTool
-	registry     *Registry
+	provider       string
+	model          string
+	apiKey         string
+	endpoint       string
+	systemPrompt   string
+	maxIters       int
+	tools          []AgentTool
+	registry       *Registry
+	enableThinking bool
+	showThinking   bool
 }
 
-func NewReActAgent(provider, model, apiKey, endpoint, systemPrompt string, maxIters int, tools []AgentTool, reg *Registry) *ReActAgent {
+func NewReActAgent(provider, model, apiKey, endpoint, systemPrompt string, maxIters int, tools []AgentTool, reg *Registry, enableThinking, showThinking bool) *ReActAgent {
 	if maxIters <= 0 {
 		maxIters = defaultMaxAgentIterations
 	}
 	return &ReActAgent{
-		provider:     provider,
-		model:        model,
-		apiKey:       apiKey,
-		endpoint:     endpoint,
-		systemPrompt: systemPrompt,
-		maxIters:     maxIters,
-		tools:        tools,
-		registry:     reg,
+		provider:       provider,
+		model:          model,
+		apiKey:         apiKey,
+		endpoint:       endpoint,
+		systemPrompt:   systemPrompt,
+		maxIters:        maxIters,
+		tools:          tools,
+		registry:       reg,
+		enableThinking: enableThinking,
+		showThinking:   showThinking,
 	}
 }
 
@@ -63,7 +67,9 @@ func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
 		{Role: "user", Content: input},
 	}
 
+	var thoughtChain []string
 	var lastAnswer string
+
 	for i := 0; i < a.maxIters; i++ {
 		response, err := a.callLLM(ctx, conversation)
 		if err != nil {
@@ -79,6 +85,10 @@ func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
 			continue
 		}
 
+		if a.enableThinking && thought.Thought != "" {
+			thoughtChain = append(thoughtChain, fmt.Sprintf("[Step %d] %s", i+1, thought.Thought))
+		}
+
 		if thought.FinalAnswer != "" {
 			lastAnswer = thought.FinalAnswer
 			break
@@ -89,6 +99,10 @@ func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
 		observation, err := a.executeTool(ctx, thought.Action, thought.ActionInput)
 		if err != nil {
 			observation = fmt.Sprintf("Error: %v", err)
+		}
+
+		if a.enableThinking {
+			thoughtChain = append(thoughtChain, fmt.Sprintf("[Step %d Observation] %s", i+1, truncate(observation, 200)))
 		}
 
 		conversation = append(conversation, LLMMessage{
@@ -119,7 +133,20 @@ func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
 		return "", fmt.Errorf("agent reached max iterations (%d) without producing a final answer", a.maxIters)
 	}
 
+	if a.enableThinking && a.showThinking && len(thoughtChain) > 0 {
+		fullOutput := fmt.Sprintf("--- Thinking Chain ---\n%s\n--- Final Answer ---\n%s",
+			strings.Join(thoughtChain, "\n\n"), lastAnswer)
+		return fullOutput, nil
+	}
+
 	return lastAnswer, nil
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 func (a *ReActAgent) buildToolDescriptions() string {
@@ -131,8 +158,21 @@ func (a *ReActAgent) buildToolDescriptions() string {
 }
 
 func (a *ReActAgent) buildSystemPrompt(toolDescs string) string {
+	thinkingInstruction := ""
+	if a.enableThinking {
+		thinkingInstruction = `
+Thinking mode is ENABLED. For the "thought" field:
+- Think deeply and step by step
+- Break down complex problems into smaller parts
+- Consider multiple approaches before deciding
+- Reflect on potential mistakes or edge cases
+- Be thorough and explicit about your reasoning
+- The thought field is for your internal reasoning — make it detailed and comprehensive`
+	}
+
 	basePrompt := `You are a helpful AI agent that uses tools to answer questions.
 Follow the ReAct (Reason + Act) pattern strictly.
+%s
 
 Available tools:
 %s
@@ -155,7 +195,7 @@ Rules:
 		basePrompt = a.systemPrompt + "\n\n" + basePrompt
 	}
 
-	return fmt.Sprintf(basePrompt, toolDescs)
+	return fmt.Sprintf(basePrompt, thinkingInstruction, toolDescs)
 }
 
 func parseReActResponse(response string) (AgentThought, error) {

@@ -32,8 +32,10 @@ func (n *AgentNode) Schema() NodeSchema {
 			{Name: "api_key", Type: "string", Description: "API key (for cloud providers)", Required: false},
 			{Name: "endpoint", Type: "string", Description: "API endpoint URL", Required: false},
 			{Name: "system", Type: "string", Description: "System prompt / role definition for the agent", Required: false},
-			{Name: "tools", Type: "string", Description: "Comma-separated list of tools to enable: fetch_url,http_request,file_read,file_write,json_parse,transform,combine,ollama,openai", Required: false, Default: "fetch_url,json_parse"},
+			{Name: "tools", Type: "string", Description: "Comma-separated list of tools to enable: fetch_url,http_request,file_read,file_write,json_parse,transform,combine,ollama,openai,code_interpreter,execute", Required: false, Default: "fetch_url,json_parse"},
 			{Name: "max_iterations", Type: "string", Description: "Maximum number of ReAct iterations (default: 10)", Required: false, Default: "10"},
+			{Name: "enable_thinking", Type: "string", Description: "Enable deep thinking / chain-of-thought mode (default: false)", Required: false, Default: "false"},
+			{Name: "show_thinking", Type: "string", Description: "Show the thinking chain in output (default: true)", Required: false, Default: "true"},
 		},
 	}
 }
@@ -46,6 +48,8 @@ func (n *AgentNode) Execute(ctx context.Context, input string, params map[string
 	systemPrompt := getParam(params, "system", "")
 	toolsParam := getParam(params, "tools", "fetch_url,json_parse")
 	maxItersStr := getParam(params, "max_iterations", "10")
+	enableThinking := getParam(params, "enable_thinking", "false") == "true"
+	showThinking := getParam(params, "show_thinking", "true") == "true"
 
 	maxIters := 10
 	fmt.Sscanf(maxItersStr, "%d", &maxIters)
@@ -60,7 +64,7 @@ func (n *AgentNode) Execute(ctx context.Context, input string, params map[string
 
 	reg := GetGlobalRegistry()
 
-	agent := NewReActAgent(provider, model, apiKey, endpoint, systemPrompt, maxIters, tools, reg)
+	agent := NewReActAgent(provider, model, apiKey, endpoint, systemPrompt, maxIters, tools, reg, enableThinking, showThinking)
 	return agent.Run(ctx, input)
 }
 
@@ -89,15 +93,17 @@ func defaultEndpointFor(provider string) string {
 
 func parseToolsList(toolsParam string) []AgentTool {
 	toolMap := map[string]AgentTool{
-		"fetch_url":    {Name: "fetch_url", Description: "Fetch content from a URL", NodeName: "fetch_url"},
-		"http_request": {Name: "http_request", Description: "Make HTTP requests with any method, headers, body", NodeName: "http_request"},
-		"file_read":    {Name: "file_read", Description: "Read content from a file", NodeName: "file_read"},
-		"file_write":   {Name: "file_write", Description: "Write content to a file", NodeName: "file_write"},
-		"json_parse":   {Name: "json_parse", Description: "Parse and extract fields from JSON", NodeName: "json_parse"},
-		"transform":    {Name: "transform", Description: "Transform text (uppercase, lowercase, trim, replace, regex)", NodeName: "transform"},
-		"combine":      {Name: "combine", Description: "Combine multiple inputs into one", NodeName: "combine"},
-		"template":     {Name: "template", Description: "Render Go template with variables", NodeName: "template_render"},
-		"ollama":       {Name: "ollama_llm", Description: "Call Ollama LLM for analysis", NodeName: "ollama"},
+		"fetch_url":       {Name: "fetch_url", Description: "Fetch content from a URL", NodeName: "fetch_url"},
+		"http_request":    {Name: "http_request", Description: "Make HTTP requests with any method, headers, body", NodeName: "http_request"},
+		"file_read":       {Name: "file_read", Description: "Read content from a file", NodeName: "file_read"},
+		"file_write":      {Name: "file_write", Description: "Write content to a file", NodeName: "file_write"},
+		"json_parse":      {Name: "json_parse", Description: "Parse and extract fields from JSON", NodeName: "json_parse"},
+		"transform":       {Name: "transform", Description: "Transform text (uppercase, lowercase, trim, replace, regex)", NodeName: "transform"},
+		"combine":         {Name: "combine", Description: "Combine multiple inputs into one", NodeName: "combine"},
+		"template":        {Name: "template", Description: "Render Go template with variables", NodeName: "template_render"},
+		"ollama":          {Name: "ollama_llm", Description: "Call Ollama LLM for analysis", NodeName: "ollama"},
+		"code_interpreter": {Name: "code_interpreter", Description: "Execute Python code in a sandbox with file I/O", NodeName: "code_interpreter"},
+		"execute":         {Name: "execute", Description: "Execute shell commands (disabled in safe mode)", NodeName: "execute"},
 	}
 
 	parts := strings.Split(toolsParam, ",")

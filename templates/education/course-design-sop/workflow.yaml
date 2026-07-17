@@ -1,0 +1,192 @@
+name: course-design
+description: 教育课程设计 SOP - 多角色协作课程开发工作流
+version: "1.0"
+category: education
+tags: [education, course, design, curriculum, sop]
+
+params:
+  - name: topic
+    description: 课程主题
+    required: true
+  - name: target_audience
+    description: 目标受众（beginner, intermediate, advanced）
+    default: beginner
+  - name: duration
+    description: 课程时长（hours）
+    default: "10"
+  - name: learning_objectives
+    description: 学习目标
+    default: "掌握核心概念和基本应用"
+
+steps:
+  - node: supervisor
+    params:
+      strategy: hierarchical
+      domain: education
+      output_format: json
+      max_depth: "3"
+    input: |
+      请设计一门关于"{{ .params.topic }}"的课程。
+
+      **课程要求：**
+      - 目标受众：{{ .params.target_audience }}
+      - 预计时长：{{ .params.duration }} 小时
+      - 学习目标：{{ .params.learning_objectives }}
+
+      **参与角色：**
+      1. educational_expert - 教育专家：教学设计、学习路径规划
+      2. planner - 规划师：课程大纲和进度安排
+      3. creative_writer - 创意写作：课程内容编写、案例设计
+      4. researcher - 研究员：资料收集、最新进展调研
+      5. evaluator - 评估员：课程质量评估、考核设计
+
+      请使用层次化结构设计课程：
+      - 顶层：模块
+      - 中层：章节
+      - 底层：具体课时和知识点
+    id: course_plan
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名资深课程设计师和教学法专家。请进行详细的教学设计：
+        1. 学习者特征分析
+        2. 教学策略选择
+        3. 教学方法设计（讲授、讨论、实践、项目等）
+        4. 学习评价方式
+        5. 重难点分析
+        6. 前置知识要求
+
+        请遵循教育学最佳实践。
+    input: |
+      课程主题：{{ .params.topic }}
+      目标受众：{{ .params.target_audience }}
+      课程时长：{{ .params.duration }} 小时
+      学习目标：{{ .params.learning_objectives }}
+
+      课程框架：
+      {{ .steps.course_plan.output }}
+
+      请进行详细的教学设计分析。
+    id: instructional_design
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名内容开发专家。请为课程设计详细的内容大纲：
+        1. 每个模块的详细内容
+        2. 每节课的具体知识点
+        3. 案例和示例设计
+        4. 实践练习和作业
+        5. 推荐阅读和资源
+
+        请确保内容由浅入深，循序渐进。
+    input: |
+      课程主题：{{ .params.topic }}
+      目标受众：{{ .params.target_audience }}
+      课程时长：{{ .params.duration }} 小时
+
+      课程框架：
+      {{ .steps.course_plan.output }}
+
+      教学设计：
+      {{ .steps.instructional_design.output }}
+
+      请设计详细的课程内容大纲。
+    id: content_outline
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名教育评估专家。请设计课程评估体系：
+        1. 形成性评估（课堂练习、小测验）
+        2. 总结性评估（期末考试、项目作业）
+        3. 评估标准和评分细则
+        4. 课程反馈机制
+        5. 学习效果度量指标
+
+        请确保评估方式多样化，能有效衡量学习成果。
+    input: |
+      课程主题：{{ .params.topic }}
+      目标受众：{{ .params.target_audience }}
+
+      课程内容：
+      {{ .steps.content_outline.output }}
+
+      请设计完整的课程评估体系。
+    id: assessment_design
+
+  - node: ollama
+    params:
+      model: "llama3"
+      system: |
+        你是一名课程质量保障专家。请进行最终的课程质量评审：
+        1. 课程目标是否明确可衡量
+        2. 内容结构是否合理
+        3. 教学方法是否适合目标受众
+        4. 评估方式是否有效
+        5. 整体质量评分（1-10分）
+        6. 改进建议
+    input: |
+      课程主题：{{ .params.topic }}
+
+      教学设计：
+      {{ .steps.instructional_design.output }}
+
+      内容大纲：
+      {{ .steps.content_outline.output }}
+
+      评估体系：
+      {{ .steps.assessment_design.output }}
+
+      请进行全面的课程质量评审。
+    id: quality_review
+
+  - node: template_render
+    params:
+      template: |
+        # 课程设计方案：{{ .params.topic }}
+
+        **目标受众：** {{ .params.target_audience }}
+        **课程时长：** {{ .params.duration }} 小时
+        **学习目标：** {{ .params.learning_objectives }}
+
+        ---
+
+        ## 一、课程总体规划
+
+        {{ .steps.course_plan.output }}
+
+        ---
+
+        ## 二、教学设计
+
+        {{ .steps.instructional_design.output }}
+
+        ---
+
+        ## 三、详细内容大纲
+
+        {{ .steps.content_outline.output }}
+
+        ---
+
+        ## 四、评估体系
+
+        {{ .steps.assessment_design.output }}
+
+        ---
+
+        ## 五、质量评审
+
+        {{ .steps.quality_review.output }}
+
+        ---
+
+        *课程设计生成时间：{{ .metadata.timestamp }}*
+    id: final_course
+
+output: "{{ .steps.final_course.output }}"
