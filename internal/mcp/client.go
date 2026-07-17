@@ -3,15 +3,88 @@ package mcp
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+// safeHTTPClient is a shared HTTP client with SSRF protection for MCP connections.
+// It uses a custom DialContext that re-validates resolved IPs at connect time
+// to prevent DNS rebinding attacks. Loopback addresses are allowed because
+// MCP servers commonly run on localhost.
+var safeHTTPClient = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+			if err != nil {
+				return nil, err
+			}
+			for _, ip := range ips {
+				if err := validateMCPIP(ip.IP, host); err != nil {
+					return nil, err
+				}
+			}
+			if len(ips) > 0 {
+				addr = net.JoinHostPort(ips[0].IP.String(), port)
+			}
+			return (&net.Dialer{}).DialContext(ctx, network, addr)
+		},
+	},
+}
+
+// validateMCPIP validates an IP address for MCP connections.
+// Loopback is allowed (local MCP servers are common), but private,
+// link-local, multicast, and reserved ranges are blocked.
+func validateMCPIP(ip net.IP, displayHost string) error {
+	if ip.IsLoopback() {
+		return nil
+	}
+	if ip.IsPrivate() {
+		return fmt.Errorf("access to private address %s is not allowed for MCP", displayHost)
+	}
+	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return fmt.Errorf("access to link-local address %s is not allowed for MCP", displayHost)
+	}
+	if ip.IsUnspecified() {
+		return fmt.Errorf("access to unspecified address %s is not allowed for MCP", displayHost)
+	}
+	if ip.IsMulticast() {
+		return fmt.Errorf("access to multicast address %s is not allowed for MCP", displayHost)
+	}
+	return nil
+}
+
+// validateMCPURL validates an MCP server URL.
+func validateMCPURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid MCP URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("only http and https URLs are allowed for MCP, got: %s", u.Scheme)
+	}
+	if u.User != nil {
+		return fmt.Errorf("URLs with userinfo (credentials) are not allowed")
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("URL has no host")
+	}
+	return nil
+}
 
 // Client implements an MCP client that communicates with a remote MCP server
 // using JSON-RPC 2.0 over HTTP SSE or Streamable HTTP.
@@ -35,10 +108,14 @@ type Client struct {
 // Connect establishes a connection to an MCP server at the given URL.
 // The URL should point to either an SSE endpoint (e.g., http://host/sse)
 // or a Streamable HTTP endpoint (e.g., http://host/mcp).
-func Connect(url string) (*Client, error) {
+func Connect(serverURL string) (*Client, error) {
+	if err := validateMCPURL(serverURL); err != nil {
+		return nil, err
+	}
+
 	c := &Client{
-		baseURL:    strings.TrimRight(url, "/"),
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		baseURL:    strings.TrimRight(serverURL, "/"),
+		httpClient: safeHTTPClient,
 		pending:    make(map[int]chan *rpcResponse),
 		sseDone:    make(chan struct{}),
 	}

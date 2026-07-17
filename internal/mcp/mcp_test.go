@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1145,6 +1146,64 @@ func TestCallExtendedTool_AllTools(t *testing.T) {
 			case <-done:
 			case <-time.After(time.Second * 15):
 				t.Fatal("timeout")
+			}
+		})
+	}
+}
+
+func TestValidateMCPURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		url     string
+		wantErr bool
+	}{
+		{"valid http", "http://example.com/mcp", false},
+		{"valid https", "https://example.com/mcp", false},
+		{"valid localhost", "http://localhost:3000/sse", false},
+		{"valid 127.0.0.1", "http://127.0.0.1:3000/mcp", false},
+		{"invalid scheme ftp", "ftp://example.com/mcp", true},
+		{"invalid scheme file", "file:///etc/passwd", true},
+		{"invalid empty", "", true},
+		{"invalid no host", "http:///mcp", true},
+		{"userinfo in URL", "http://user:pass@example.com/mcp", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateMCPURL(tt.url)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateMCPURL(%q) error = %v, wantErr %v", tt.url, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateMCPIP(t *testing.T) {
+	tests := []struct {
+		name    string
+		ip      string
+		wantErr bool
+	}{
+		{"loopback 127.0.0.1", "127.0.0.1", false},
+		{"loopback ::1", "::1", false},
+		{"public 8.8.8.8", "8.8.8.8", false},
+		{"private 10.0.0.1", "10.0.0.1", true},
+		{"private 192.168.1.1", "192.168.1.1", true},
+		{"private 172.16.0.1", "172.16.0.1", true},
+		{"link-local 169.254.1.1", "169.254.1.1", true},
+		{"unspecified 0.0.0.0", "0.0.0.0", true},
+		{"multicast 224.0.0.1", "224.0.0.1", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ip := net.ParseIP(tt.ip)
+			if ip == nil {
+				t.Fatalf("invalid test IP: %s", tt.ip)
+			}
+			err := validateMCPIP(ip, tt.ip)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateMCPIP(%q) error = %v, wantErr %v", tt.ip, err, tt.wantErr)
 			}
 		})
 	}
