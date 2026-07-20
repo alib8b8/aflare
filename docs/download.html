@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>llm-box - AI 工作流引擎 | 一键下载安装</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    min-height: 100vh;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+}
+.container {
+    max-width: 900px;
+    width: 100%;
+}
+.header {
+    text-align: center;
+    margin-bottom: 50px;
+}
+.logo {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.4);
+}
+h1 {
+    font-size: 42px;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #fff 0%, #a8b4f0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.subtitle {
+    font-size: 18px;
+    color: #a0aec0;
+    margin-bottom: 8px;
+}
+.tagline {
+    font-size: 14px;
+    color: #718096;
+}
+.download-section {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 40px;
+    margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.section-title {
+    font-size: 22px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.section-title .icon { font-size: 28px; }
+.platform-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+.tab {
+    padding: 12px 24px;
+    border-radius: 12px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.tab:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+}
+.tab.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: transparent;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+}
+.install-box {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.install-label {
+    font-size: 13px;
+    color: #a0aec0;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.copy-btn {
+    background: rgba(102, 126, 234, 0.2);
+    border: 1px solid rgba(102, 126, 234, 0.4);
+    color: #a8b4f0;
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+.copy-btn:hover {
+    background: rgba(102, 126, 234, 0.4);
+}
+.code-block {
+    background: #1a1a2e;
+    padding: 16px;
+    border-radius: 8px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    overflow-x: auto;
+    color: #e2e8f0;
+    line-height: 1.6;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.code-block .cmd { color: #68d391; }
+.code-block .url { color: #90cdf4; }
+.features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+}
+.feature {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: all 0.3s;
+}
+.feature:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateY(-2px);
+}
+.feature-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+.feature-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.feature-desc {
+    font-size: 12px;
+    color: #a0aec0;
+    line-height: 1.5;
+}
+.steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 20px;
+}
+.step {
+    text-align: center;
+    padding: 20px 12px;
+}
+.step-num {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin: 0 auto 12px;
+    font-size: 16px;
+}
+.step-title {
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+.step-desc {
+    font-size: 12px;
+    color: #a0aec0;
+    line-height: 1.5;
+}
+.direct-download {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+}
+.dl-btn {
+    flex: 1;
+    min-width: 140px;
+    padding: 14px 20px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-decoration: none;
+    text-align: center;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.3s;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.dl-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+.dl-btn.secondary {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.note {
+    font-size: 12px;
+    color: #718096;
+    margin-top: 12px;
+    line-height: 1.6;
+    padding: 12px;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 8px;
+    border-left: 3px solid #667eea;
+}
+.footer {
+    text-align: center;
+    margin-top: 40px;
+    padding-top: 30px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: #718096;
+    font-size: 13px;
+}
+.footer a {
+    color: #a0aec0;
+    text-decoration: none;
+    margin: 0 8px;
+}
+.footer a:hover { color: #fff; }
+@media (max-width: 640px) {
+    h1 { font-size: 32px; }
+    .download-section { padding: 24px; }
+    .steps { grid-template-columns: 1fr; gap: 8px; }
+    .features { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div class="logo">📦</div>
+        <h1>llm-box</h1>
+        <p class="subtitle">AI 工作流引擎</p>
+        <p class="tagline">Turn Natural Language Into Executable Workflows</p>
+    </div>
+
+    <div class="download-section">
+        <div class="section-title">
+            <span class="icon">⬇️</span>
+            <span>一键安装</span>
+        </div>
+
+        <div class="platform-tabs">
+            <div class="tab active" data-os="mac">
+                <span>🍎</span> macOS
+            </div>
+            <div class="tab" data-os="linux">
+                <span>🐧</span> Linux
+            </div>
+            <div class="tab" data-os="windows">
+                <span>🪟</span> Windows
+            </div>
+            <div class="tab" data-os="docker">
+                <span>🐳</span> Docker
+            </div>
+        </div>
+
+        <div id="mac-panel" class="panel">
+            <div class="install-box">
+                <div class="install-label">
+                    <span>Homebrew 安装（推荐）</span>
+                    <button class="copy-btn" onclick="copyCode('brew-code')">复制</button>
+                </div>
+                <div class="code-block" id="brew-code">
+                    <span class="cmd">brew</span> install alib8b8/tap/llm-box
+                </div>
+            </div>
+            <div class="install-box">
+                <div class="install-label">
+                    <span>一键脚本安装</span>
+                    <button class="copy-btn" onclick="copyCode('mac-cmd')">复制</button>
+                </div>
+                <div class="code-block" id="mac-cmd">
+                    <span class="cmd">curl</span> -fsSL <span class="url">https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh</span> | bash
+                </div>
+                <div class="note">💡 国内用户建议使用镜像加速版本</div>
+                <div class="install-box" style="margin-top: 12px; margin-bottom: 0;">
+                    <div class="install-label">
+                        <span>国内加速安装</span>
+                        <button class="copy-btn" onclick="copyCode('mac-cn')">复制</button>
+                    </div>
+                    <div class="code-block" id="mac-cn">
+                        <span class="cmd">curl</span> -fsSL <span class="url">https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh</span> | bash
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="linux-panel" class="panel" style="display:none;">
+            <div class="install-box">
+                <div class="install-label">
+                    <span>一键脚本安装</span>
+                    <button class="copy-btn" onclick="copyCode('linux-cmd')">复制</button>
+                </div>
+                <div class="code-block" id="linux-cmd">
+                    <span class="cmd">curl</span> -fsSL <span class="url">https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh</span> | bash
+                </div>
+            </div>
+            <div class="install-box">
+                <div class="install-label">
+                    <span>国内加速安装</span>
+                    <button class="copy-btn" onclick="copyCode('linux-cn')">复制</button>
+                </div>
+                <div class="code-block" id="linux-cn">
+                    <span class="cmd">curl</span> -fsSL <span class="url">https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh</span> | bash
+                </div>
+            </div>
+        </div>
+
+        <div id="windows-panel" class="panel" style="display:none;">
+            <div class="install-box">
+                <div class="install-label">
+                    <span>PowerShell 一键安装</span>
+                    <button class="copy-btn" onclick="copyCode('win-cmd')">复制</button>
+                </div>
+                <div class="code-block" id="win-cmd">
+                    irm <span class="url">https://raw.githubusercontent.com/alib8b8/llm-box/main/install.ps1</span> | iex
+                </div>
+            </div>
+            <div class="install-box">
+                <div class="install-label">
+                    <span>国内加速安装</span>
+                    <button class="copy-btn" onclick="copyCode('win-cn')">复制</button>
+                </div>
+                <div class="code-block" id="win-cn">
+                    irm <span class="url">https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.ps1</span> | iex
+                </div>
+            </div>
+            <div class="direct-download">
+                <a href="https://gitcode.com/llm-box/llm-box/-/releases" target="_blank" class="dl-btn">
+                    <span>📥</span> GitCode 下载
+                </a>
+                <a href="https://github.com/alib8b8/llm-box/releases" target="_blank" class="dl-btn secondary">
+                    <span>📦</span> GitHub Releases
+                </a>
+            </div>
+        </div>
+
+        <div id="docker-panel" class="panel" style="display:none;">
+            <div class="install-box">
+                <div class="install-label">
+                    <span>Docker 运行</span>
+                    <button class="copy-btn" onclick="copyCode('docker-cmd')">复制</button>
+                </div>
+                <div class="code-block" id="docker-cmd">
+                    <span class="cmd">docker</span> run -it --rm ghcr.io/alib8b8/llm-box:latest --help
+                </div>
+            </div>
+        </div>
+
+        <div class="note">
+            📌 安装完成后，打开新的终端窗口运行 <code style="color:#90cdf4;">llm-box --help</code> 验证安装
+        </div>
+    </div>
+
+    <div class="download-section">
+        <div class="section-title">
+            <span class="icon">🚀</span>
+            <span>三步上手</span>
+        </div>
+        <div class="steps">
+            <div class="step">
+                <div class="step-num">1</div>
+                <div class="step-title">安装</div>
+                <div class="step-desc">选择你的平台，运行一键安装命令</div>
+            </div>
+            <div class="step">
+                <div class="step-num">2</div>
+                <div class="step-title">创建工作流</div>
+                <div class="step-desc">用自然语言描述你想做的事</div>
+            </div>
+            <div class="step">
+                <div class="step-num">3</div>
+                <div class="step-title">运行</div>
+                <div class="step-desc">执行工作流，让 AI 帮你完成任务</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="download-section">
+        <div class="section-title">
+            <span class="icon">✨</span>
+            <span>核心功能</span>
+        </div>
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">🤖</div>
+                <div class="feature-title">AI Agent</div>
+                <div class="feature-desc">ReAct 推理循环，自主使用工具完成复杂任务</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔄</div>
+                <div class="feature-title">50+ 节点</div>
+                <div class="feature-desc">LLM、RAG、代码执行、多模态等开箱即用</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📱</div>
+                <div class="feature-title">鸿蒙适配</div>
+                <div class="feature-desc">支持 7 种鸿蒙设备类型，全场景覆盖</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🇨🇳</div>
+                <div class="feature-title">国产支持</div>
+                <div class="feature-desc">支持通义千问、智谱、DeepSeek、Kimi 等</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <div class="feature-title">安全可靠</div>
+                <div class="feature-desc">SSRF防护、命令注入防护、密钥加密存储</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📦</div>
+                <div class="feature-title">100+ 模板</div>
+                <div class="feature-desc">覆盖开发、营销、研究、金融等 20+ 领域</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>
+            <a href="https://gitcode.com/llm-box/llm-box" target="_blank">GitCode</a>
+            <a href="https://github.com/alib8b8/llm-box" target="_blank">GitHub</a>
+            <a href="https://gitcode.com/llm-box/llm-box/-/blob/main/docs/getting-started.md" target="_blank">文档</a>
+            <a href="https://gitcode.com/llm-box/llm-box/-/issues" target="_blank">反馈</a>
+        </p>
+        <p style="margin-top: 12px;">© 2026 llm-box · MIT License</p>
+    </div>
+</div>
+
+<script>
+const tabs = document.querySelectorAll('.tab');
+const panels = document.querySelectorAll('.panel');
+
+tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+        const os = tab.dataset.os;
+        tabs.forEach(t => t.classList.remove('active'));
+        panels.forEach(p => p.style.display = 'none');
+        tab.classList.add('active');
+        document.getElementById(os + '-panel').style.display = 'block';
+    });
+});
+
+function copyCode(id) {
+    const el = document.getElementById(id);
+    const text = el.textContent.trim();
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = el.previousElementSibling.querySelector('.copy-btn');
+        const original = btn.textContent;
+        btn.textContent = '已复制 ✓';
+        setTimeout(() => btn.textContent = original, 2000);
+    }).catch(() => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        document.execCommand('copy');
+    });
+}
+
+function detectOS() {
+    const ua = navigator.userAgent;
+    if (ua.includes('Mac')) return 'mac';
+    if (ua.includes('Win')) return 'windows';
+    if (ua.includes('Linux')) return 'linux';
+    return 'mac';
+}
+
+const detectedOS = detectOS();
+document.querySelector(`.tab[data-os="${detectedOS}"]`).click();
+</script>
+</body>
+</html>

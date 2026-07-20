@@ -45,24 +45,28 @@
 
 ## 🚀 Quick Start
 
-Install in 60 seconds:
+**One command to install:**
+
+| macOS | Linux | Windows |
+|-------|-------|---------|
+| `brew install alib8b8/tap/llm-box` | `curl -fsSL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh \| bash` | `irm https://raw.githubusercontent.com/alib8b8/llm-box/main/install.ps1 \| iex` |
+
+**🌏 China users — use mirror for faster download:**
+
+| macOS/Linux | Windows |
+|-------------|---------|
+| `curl -fsSL https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh \| bash` | `irm https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.ps1 \| iex` |
+
+**Or download from [GitCode Releases](https://gitcode.com/llm-box/llm-box/-/releases) / [GitHub Releases](https://github.com/alib8b8/llm-box/releases)**
+
+📖 [Interactive Download Page →](docs/download.html)
+
+---
+
+### Create & run your first workflow
 
 ```bash
-# Linux/macOS
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
-bash install.sh
-
-# macOS (Homebrew)
-brew install alib8b8/tap/llm-box
-
-# Windows
-Invoke-WebRequest -Uri "https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-windows-amd64.exe" -OutFile llm-box.exe
-```
-
-Create and run your first workflow:
-
-```bash
-# Generate a workflow from natural language (keyword-based, no API key needed)
+# Generate a workflow from natural language
 llm-box create "Summarize today's AI news"
 
 # Or use a built-in template

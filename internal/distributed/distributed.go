@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -24,6 +25,26 @@ const (
 	heartbeatTimeout       = 30 * time.Second
 	maxRequestBodySize     = 10 * 1024 * 1024 // 10MB
 )
+
+var safeHTTPClient = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			ip := net.ParseIP(host)
+			if ip != nil {
+				if ip.IsLoopback() || ip.IsPrivate() {
+					return (&net.Dialer{}).DialContext(ctx, network, addr)
+				}
+				return nil, fmt.Errorf("only loopback and private network addresses are allowed for distributed communication")
+			}
+			return (&net.Dialer{}).DialContext(ctx, network, addr)
+		},
+	},
+}
 
 type NodeStatus string
 
@@ -722,8 +743,7 @@ func (w *Worker) httpPost(path string, body []byte) (*http.Response, error) {
 	if w.authToken != "" {
 		req.Header.Set("X-Auth-Token", w.authToken)
 	}
-	client := &http.Client{Timeout: 30 * time.Second}
-	return client.Do(req)
+	return safeHTTPClient.Do(req)
 }
 
 func (w *Worker) httpPut(path string, body []byte) (*http.Response, error) {
@@ -735,8 +755,7 @@ func (w *Worker) httpPut(path string, body []byte) (*http.Response, error) {
 	if w.authToken != "" {
 		req.Header.Set("X-Auth-Token", w.authToken)
 	}
-	client := &http.Client{Timeout: 30 * time.Second}
-	return client.Do(req)
+	return safeHTTPClient.Do(req)
 }
 
 func (w *Worker) registerWithCoordinator() error {

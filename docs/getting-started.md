@@ -15,6 +15,13 @@ curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o in
 bash install.sh
 ```
 
+**国内网络加速**（推荐国内用户使用）：
+
+```bash
+curl -sL https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
+bash install.sh
+```
+
 ### Windows
 
 Download the latest binary from the [Releases page](https://github.com/alib8b8/llm-box/releases), then:
@@ -24,10 +31,25 @@ Invoke-WebRequest -Uri "https://github.com/alib8b8/llm-box/releases/latest/downl
 .\llm-box.exe --help
 ```
 
+**国内网络加速**（PowerShell）：
+
+```powershell
+Invoke-WebRequest -Uri "https://ghproxy.com/https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-windows-amd64.exe" -OutFile llm-box.exe
+.\llm-box.exe --help
+```
+
 ### Build from Source
 
 ```bash
 git clone https://github.com/alib8b8/llm-box.git
+cd llm-box
+go install ./cmd/llm-box
+```
+
+**国内网络加速**（使用GitCode镜像）：
+
+```bash
+git clone https://gitcode.com/llm-box/llm-box.git
 cd llm-box
 go install ./cmd/llm-box
 ```

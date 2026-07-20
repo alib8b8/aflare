@@ -1,22 +1,31 @@
 #!/bin/bash
-
 set -e
 
-# llm-box installation script
-
-REPO="alib8b8/llm-box"
 BINARY_NAME="llm-box"
-INSTALL_DIR="/usr/local/bin"
+INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+REPO="alib8b8/llm-box"
+GITCODE_REPO="llm-box/llm-box"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[OK]${NC} $1"; }
+warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 
 detect_platform() {
     OS=$(uname -s | tr '[:upper:]' '[:lower:]')
     ARCH=$(uname -m)
-    
+
     case $ARCH in
-        x86_64) ARCH="amd64" ;;
+        x86_64|amd64) ARCH="amd64" ;;
         aarch64|arm64) ARCH="arm64" ;;
         *) 
-            echo "Unsupported architecture: $ARCH"
+            error "Unsupported architecture: $ARCH"
             exit 1
             ;;
     esac
@@ -25,75 +34,207 @@ detect_platform() {
         linux) OS="linux" ;;
         darwin) OS="darwin" ;;
         *) 
-            echo "Unsupported OS: $OS"
+            error "Unsupported OS: $OS"
             exit 1
             ;;
     esac
 }
 
-download_binary() {
-    local archive_ext="tar.gz"
-    local archive_name="$BINARY_NAME-$OS-$ARCH.$archive_ext"
-    if [ "$OS" = "windows" ]; then
-        archive_ext="zip"
-        archive_name="$BINARY_NAME-$OS-$ARCH.$archive_ext"
-    fi
+check_command() {
+    command -v "$1" >/dev/null 2>&1
+}
 
-    echo "Downloading $archive_name..."
-
-    LATEST_RELEASE=$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
-    echo "Latest release: $LATEST_RELEASE"
-
-    URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/$archive_name"
-    CHECKSUM_URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/checksums.txt"
-
-    if ! curl -sL -o "$archive_name" "$URL"; then
-        echo "Failed to download $URL"
-        exit 1
-    fi
-
-    if curl -sL -o checksums.txt "$CHECKSUM_URL"; then
-        echo "Verifying checksum..."
-        if ! grep "$archive_name" checksums.txt | sha256sum --check --status; then
-            echo "❌ Checksum verification failed!"
-            rm -f "$archive_name" checksums.txt
-            exit 1
+detect_region() {
+    if check_command curl; then
+        local result=$(curl -s --connect-timeout 3 https://ipapi.co/country/ 2>/dev/null || echo "")
+        if [ "$result" = "CN" ]; then
+            echo "cn"
+            return
         fi
-        rm -f checksums.txt
-        echo "✅ Checksum verified"
-    else
-        echo "⚠️  Checksum file not found, skipping verification"
     fi
+    echo "global"
+}
 
-    local binary_name="$BINARY_NAME"
-    if [ "$OS" = "windows" ]; then
-        binary_name="$BINARY_NAME.exe"
-        unzip -o "$archive_name" "$binary_name"
-    else
-        tar -xzf "$archive_name" "$binary_name"
+get_latest_release() {
+    local region="$1"
+    
+    if [ "$region" = "cn" ]; then
+        local gitcode_api="https://gitcode.com/api/v5/repos/$GITCODE_REPO/releases/latest"
+        local tag=$(curl -s --connect-timeout 5 "$gitcode_api" 2>/dev/null | grep -o '"tag_name":"[^"]*"' | head -1 | sed 's/"tag_name":"//;s/"//')
+        if [ -n "$tag" ] && echo "$tag" | grep -qE '^v?[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9]+)?$'; then
+            echo "$tag"
+            return 0
+        fi
+        warn "GitCode release API failed, trying GitHub mirror..."
     fi
-    rm -f "$archive_name"
+    
+    local github_api="https://api.github.com/repos/$REPO/releases/latest"
+    local mirrors=(
+        ""
+        "https://ghproxy.com/"
+        "https://gh.api.99988866.xyz/"
+    )
+    
+    for mirror in "${mirrors[@]}"; do
+        local url="${mirror}${github_api}"
+        local tag=$(curl -s --connect-timeout 10 "$url" 2>/dev/null | grep '"tag_name"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+        if [ -n "$tag" ] && [ "$tag" != "null" ] && echo "$tag" | grep -qE '^v?[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9]+)?$'; then
+            echo "$tag"
+            return 0
+        fi
+    done
+    
+    return 1
+}
 
-    chmod +x "$binary_name"
-
-    if [ -w "$INSTALL_DIR" ]; then
-        echo "Installing to $INSTALL_DIR..."
-        mv "$binary_name" "$INSTALL_DIR/$BINARY_NAME"
-        echo "✅ $BINARY_NAME installed successfully!"
-        echo "Run 'llm-box' to get started."
+download_file() {
+    local url="$1"
+    local output="$2"
+    local region="$3"
+    
+    local mirrors=()
+    if [ "$region" = "cn" ]; then
+        mirrors=(
+            "https://ghproxy.com/"
+            "https://gh.api.99988866.xyz/"
+            ""
+        )
     else
-        echo "🔒 Need sudo to install to $INSTALL_DIR"
-        echo "Please run: sudo mv $binary_name $INSTALL_DIR/$BINARY_NAME"
+        mirrors=("")
     fi
+    
+    for mirror in "${mirrors[@]}"; do
+        local final_url="${mirror}${url}"
+        info "Trying: ${final_url:0:80}..."
+        
+        if curl -fSL --connect-timeout 15 --max-time 120 --retry 2 --retry-delay 2 -o "$output" "$final_url" 2>/dev/null; then
+            local size=$(stat -c%s "$output" 2>/dev/null || stat -f%z "$output" 2>/dev/null || echo 0)
+            if [ "$size" -gt 1000000 ]; then
+                success "Downloaded ($((size / 1024 / 1024)) MB)"
+                return 0
+            else
+                warn "File too small ($size bytes), trying next mirror..."
+                rm -f "$output"
+            fi
+        fi
+    done
+    
+    return 1
 }
 
 main() {
-    echo "🚀 Installing $BINARY_NAME..."
+    echo ""
+    echo "╔══════════════════════════════════════════╗"
+    echo "║          llm-box 安装向导                ║"
+    echo "║   AI Workflow Engine Installer          ║"
+    echo "╚══════════════════════════════════════════╝"
+    echo ""
     
     detect_platform
-    echo "Detected platform: $OS/$ARCH"
+    info "检测系统: $OS / $ARCH"
     
-    download_binary
+    info "检测网络环境..."
+    REGION=$(detect_region)
+    if [ "$REGION" = "cn" ]; then
+        success "检测到国内网络，将使用镜像加速下载"
+    else
+        info "检测到国际网络环境"
+    fi
+    
+    info "获取最新版本..."
+    VERSION=$(get_latest_release "$REGION")
+    if [ -z "$VERSION" ]; then
+        error "无法获取最新版本信息"
+        echo ""
+        echo "手动下载地址："
+        echo "  GitHub:  https://github.com/$REPO/releases"
+        echo "  GitCode: https://gitcode.com/$GITCODE_REPO/-/releases"
+        exit 1
+    fi
+    success "最新版本: $VERSION"
+    
+    ARCHIVE_NAME="$BINARY_NAME-$OS-$ARCH.tar.gz"
+    DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ARCHIVE_NAME"
+    CHECKSUMS_URL="https://github.com/$REPO/releases/download/$VERSION/checksums.txt"
+    
+    TMP_DIR=$(mktemp -d)
+    cd "$TMP_DIR"
+    
+    info "下载 $ARCHIVE_NAME..."
+    if ! download_file "$DOWNLOAD_URL" "$ARCHIVE_NAME" "$REGION"; then
+        error "下载失败"
+        echo ""
+        echo "请尝试手动下载："
+        echo "  GitHub:  $DOWNLOAD_URL"
+        echo "  镜像加速: https://ghproxy.com/$DOWNLOAD_URL"
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
+    
+    info "下载校验和..."
+    if download_file "$CHECKSUMS_URL" "checksums.txt" "$REGION"; then
+        info "校验文件完整性..."
+        if echo "$(grep "$ARCHIVE_NAME" checksums.txt | awk '{print $1}')  $ARCHIVE_NAME" | sha256sum --check --status 2>/dev/null; then
+            success "校验通过"
+        else
+            warn "校验失败，可能文件已损坏，是否继续？(y/N)"
+            read -r answer
+            if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
+                rm -rf "$TMP_DIR"
+                exit 1
+            fi
+        fi
+    else
+        warn "无法下载校验文件，跳过校验"
+    fi
+    
+    info "解压..."
+    tar -xzf "$ARCHIVE_NAME"
+    
+    if [ ! -f "$BINARY_NAME" ]; then
+        error "解压后未找到 $BINARY_NAME"
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
+    
+    chmod +x "$BINARY_NAME"
+    
+    info "安装到 $INSTALL_DIR..."
+    if [ -w "$INSTALL_DIR" ]; then
+        mv "$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
+        success "安装成功！"
+    else
+        if check_command sudo && [ -t 0 ]; then
+            info "需要 sudo 权限安装到 $INSTALL_DIR"
+            sudo mv "$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
+            success "安装成功！"
+        else
+            warn "无法写入 $INSTALL_DIR，安装到当前目录"
+            mv "$BINARY_NAME" "$OLDPWD/$BINARY_NAME"
+            cd "$OLDPWD"
+            success "文件已保存到 ./$BINARY_NAME"
+            echo ""
+            echo "请手动添加到 PATH："
+            echo "  export PATH=\"\$PATH:$(pwd)\""
+            rm -rf "$TMP_DIR"
+            exit 0
+        fi
+    fi
+    
+    rm -rf "$TMP_DIR"
+    
+    echo ""
+    echo "╔══════════════════════════════════════════╗"
+    echo "║           安装完成！🎉                   ║"
+    echo "╚══════════════════════════════════════════╝"
+    echo ""
+    echo "快速开始："
+    echo "  $BINARY_NAME --help"
+    echo "  $BINARY_NAME create \"Summarize today's AI news\""
+    echo "  $BINARY_NAME run your-workflow.yaml"
+    echo ""
+    echo "更多文档：https://gitcode.com/$GITCODE_REPO"
+    echo ""
 }
 
 main "$@"
