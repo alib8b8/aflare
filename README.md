@@ -105,7 +105,7 @@ llm-box run ai-news-summary.yaml
 | **Distributed Execution** | Coordinator/Worker architecture, horizontal scaling, heartbeat monitoring, circuit breaker |
 | **Scheduling** | Cron-based scheduled workflows, interval triggers, CLI management |
 | **Security** | SSRF protection, path traversal prevention, command injection defense, AES-GCM secrets, audit logging, secret redaction, ANSI injection defense, 84+ vuln audited |
-| **Ecosystem** | GitCode G-Star, HarmonyOS Agent Skills, ohpm SDK (@llm-box/workflow-engine) |
+| **Ecosystem** | GitCode G-Star, HarmonyOS Agent Skills, ohpm SDK, OPPO X-OmniClaw Skill Adapter, OPPO 小布技能, AndesGPT |
 | **Developer Experience** | Web UI editor, workflow visualizer (Mermaid/JSON/DOT/ASCII), TUI with Markdown/Mermaid rendering, 9 languages |
 
 ---
@@ -149,6 +149,7 @@ Specialized AI agent nodes for autonomous reasoning:
 | `screen_understanding` | L3-level screen content understanding: parse UI elements, identify actionable items, generate interaction plans for agent phones |
 | `voice_input` | Voice pipeline: VAD, wake word detection (hey_box/hello_box/hi_box/ok_box/box_box), speech-to-text with on-device support |
 | `robot_control` | Plan and execute robot action sequences for embodied AI: humanoid/mobile_base/arm/drone/dog/wheelchair with safety checks |
+| `andesgpt` | OPPO AndesGPT integration: Tiny (端侧1B) / Turbo (端云协同7B) / Titan (云端100B+), PersonaX personalization, end-cloud collaboration |
 
 ### Ascend NPU Adaptation Nodes
 

@@ -1,0 +1,80 @@
+{
+  "skills": [
+    {
+      "skill_id": "llm-box-morning-briefing",
+      "name": "晨间简报",
+      "description": "每天早上自动总结未读消息、日程和天气，语音播报",
+      "trigger": {
+        "type": "alarm",
+        "keyword": "晨间简报"
+      },
+      "voice_command": ["早上好", "晨间简报", "今天有什么安排"],
+      "scene": "life",
+      "privacy_level": "on_device",
+      "workflow": "morning-briefing.yaml"
+    },
+    {
+      "skill_id": "llm-box-smart-reply",
+      "name": "智能回复",
+      "description": "根据聊天内容自动生成回复建议",
+      "trigger": {
+        "type": "notification",
+        "filter_app": "com.tencent.mm"
+      },
+      "voice_command": ["帮我回复", "智能回复"],
+      "scene": "productivity",
+      "privacy_level": "on_device",
+      "workflow": "smart-reply.yaml"
+    },
+    {
+      "skill_id": "llm-box-food-order",
+      "name": "一键点餐",
+      "description": "用自然语言描述想吃的，自动打开外卖App下单",
+      "trigger": {
+        "type": "voice"
+      },
+      "voice_command": ["帮我点餐", "我想吃", "点外卖"],
+      "scene": "life",
+      "privacy_level": "hybrid",
+      "workflow": "food-ordering.yaml"
+    },
+    {
+      "skill_id": "llm-box-translate",
+      "name": "即时翻译",
+      "description": "截屏或语音输入，实时翻译为指定语言",
+      "trigger": {
+        "type": "voice"
+      },
+      "voice_command": ["翻译", "translate", "帮我翻译"],
+      "scene": "productivity",
+      "privacy_level": "on_device",
+      "workflow": "realtime-translate.yaml"
+    },
+    {
+      "skill_id": "llm-box-health-monitor",
+      "name": "健康管家",
+      "description": "监测健康数据异常，主动提醒吃药/喝水/休息",
+      "trigger": {
+        "type": "timer",
+        "interval_minutes": 30
+      },
+      "voice_command": ["健康提醒", "我该喝水了吗"],
+      "scene": "life",
+      "privacy_level": "on_device",
+      "workflow": "health-monitor.yaml"
+    },
+    {
+      "skill_id": "llm-box-travel-assistant",
+      "name": "出行助手",
+      "description": "出发前自动查天气/路况/票务，到达后推荐当地美食",
+      "trigger": {
+        "type": "location",
+        "radius_m": 500
+      },
+      "voice_command": ["帮我规划行程", "附近有什么好吃的"],
+      "scene": "life",
+      "privacy_level": "hybrid",
+      "workflow": "travel-assistant.yaml"
+    }
+  ]
+}

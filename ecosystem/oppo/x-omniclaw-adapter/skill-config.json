@@ -1,0 +1,63 @@
+{
+  "skill_name": "llm-box-workflow-engine",
+  "skill_version": "1.0.0",
+  "skill_description": "AI工作流编排引擎，将自然语言意图转化为可执行工作流。支持50+节点、100+模板、端侧推理、功耗管理。",
+  "skill_author": "llm-box开源社区",
+  "skill_type": "agent_skill",
+  "permissions": [
+    "voice_input",
+    "screen_read",
+    "notification_listen",
+    "app_launch",
+    "clipboard_read"
+  ],
+  "capabilities": {
+    "perceive": {
+      "inputs": ["voice_text", "screen_text", "camera_objects"],
+      "outputs": ["intent", "parameters", "suggested_workflow"]
+    },
+    "plan": {
+      "inputs": ["intent", "memory"],
+      "outputs": ["workflow_yaml", "estimated_steps", "estimated_time_ms"]
+    },
+    "execute": {
+      "inputs": ["workflow_yaml", "device_context"],
+      "outputs": ["actions", "result", "audit_hash"]
+    }
+  },
+  "supported_models": [
+    "qwen2-0.5b",
+    "qwen2-1.5b",
+    "minicpm-2b",
+    "phi-3-mini"
+  ],
+  "power_profiles": ["eco", "balanced", "high"],
+  "workflow_templates": [
+    "morning-briefing",
+    "message-summary",
+    "smart-reply",
+    "food-ordering",
+    "travel-planning",
+    "health-reminder",
+    "photo-organizer",
+    "expense-tracker"
+  ],
+  "integration": {
+    "x_omniclaw": {
+      "adapter": "ecosystem/oppo/x-omniclaw-adapter/llmbox_skill.py",
+      "interface": "perceive-plan-execute"
+    },
+    "oppo_ai_engine": {
+      "sdk": "ecosystem/oppo/aiengine-bridge.go",
+      "capabilities": ["ondevice_llm", "screen_understanding", "voice_input", "system_event"]
+    },
+    "xiaobu_skill": {
+      "manifest": "ecosystem/oppo/xiaobu-skills/skill-manifest.json"
+    }
+  },
+  "links": {
+    "gitcode": "https://gitcode.com/llm-box/llm-box",
+    "github": "https://github.com/alib8b8/llm-box",
+    "docs": "https://gitcode.com/llm-box/llm-box/-/blob/main/docs/getting-started.md"
+  }
+}
