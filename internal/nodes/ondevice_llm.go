@@ -14,22 +14,24 @@ import (
 
 var (
 	validOnDeviceModels = map[string]bool{
-		"qwen2-0.5b":     true,
-		"qwen2-1.5b":     true,
-		"qwen2.5-1.5b":   true,
-		"minicpm-2b":     true,
-		"minicpm-2b-dpo": true,
-		"phi-3-mini":     true,
-		"phi-3-small":    true,
-		"gemma-2b":       true,
-		"gemma-4b":       true,
-		"llama3.2-1b":    true,
-		"llama3.2-3b":    true,
-		"yi-1.5-6b":      true,
-		"baichuan2-7b":   true,
-		"chatglm3-6b":    true,
-		"internlm2-1.8b": true,
-		"deepseek-1.5b":  true,
+		"qwen2-0.5b":           true,
+		"qwen2-1.5b":           true,
+		"qwen2.5-1.5b":         true,
+		"minicpm-2b":           true,
+		"minicpm-2b-dpo":       true,
+		"phi-3-mini":           true,
+		"phi-3-small":          true,
+		"gemma-2b":             true,
+		"gemma-4b":             true,
+		"llama3.2-1b":          true,
+		"llama3.2-3b":          true,
+		"yi-1.5-6b":            true,
+		"baichuan2-7b":         true,
+		"chatglm3-6b":          true,
+		"internlm2-1.8b":       true,
+		"deepseek-1.5b":        true,
+		"sensenova-u1-8b":      true,
+		"sensenova-u1-a3b-moe": true,
 	}
 	validQuantizations = map[string]bool{
 		"int4": true,
@@ -58,7 +60,7 @@ type OnDeviceLLMNode struct{}
 func (n *OnDeviceLLMNode) Name() string { return "ondevice_llm" }
 
 func (n *OnDeviceLLMNode) Description() string {
-	return "Run LLM inference locally on the device (no cloud required). Supports 1B-7B models with INT4/INT8 quantization"
+	return "Run LLM inference locally on the device (no cloud required). Supports 1B-8B models with INT4/INT8 quantization, including SenseNova U1 open-source models"
 }
 
 func (n *OnDeviceLLMNode) Schema() NodeSchema {
@@ -187,22 +189,24 @@ func (n *OnDeviceLLMNode) Execute(ctx context.Context, input string, params map[
 
 func estimateModelSize(model, quantization string) int {
 	sizes := map[string]int{
-		"qwen2-0.5b":     500,
-		"qwen2-1.5b":     1500,
-		"qwen2.5-1.5b":   1500,
-		"minicpm-2b":     2000,
-		"minicpm-2b-dpo": 2000,
-		"phi-3-mini":     3800,
-		"phi-3-small":    7000,
-		"gemma-2b":       2000,
-		"gemma-4b":       4000,
-		"llama3.2-1b":    1000,
-		"llama3.2-3b":    3000,
-		"yi-1.5-6b":      6000,
-		"baichuan2-7b":   7000,
-		"chatglm3-6b":    6000,
-		"internlm2-1.8b": 1800,
-		"deepseek-1.5b":  1500,
+		"qwen2-0.5b":           500,
+		"qwen2-1.5b":           1500,
+		"qwen2.5-1.5b":         1500,
+		"minicpm-2b":           2000,
+		"minicpm-2b-dpo":       2000,
+		"phi-3-mini":           3800,
+		"phi-3-small":          7000,
+		"gemma-2b":             2000,
+		"gemma-4b":             4000,
+		"llama3.2-1b":          1000,
+		"llama3.2-3b":          3000,
+		"yi-1.5-6b":            6000,
+		"baichuan2-7b":         7000,
+		"chatglm3-6b":          6000,
+		"internlm2-1.8b":       1800,
+		"deepseek-1.5b":        1500,
+		"sensenova-u1-8b":      8000,
+		"sensenova-u1-a3b-moe": 3000,
 	}
 	baseSize := sizes[model]
 	if baseSize == 0 {
