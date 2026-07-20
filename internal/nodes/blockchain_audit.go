@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const maxAuditLogEntries = 10000
+
 var (
 	validBlockchainTypes = map[string]bool{
 		"ethereum":    true,
@@ -26,7 +28,9 @@ var (
 		"parameter": true,
 		"full":      true,
 	}
-	hexPattern = regexp.MustCompile(`^[0-9a-fA-F]+$`)
+	hexPattern       = regexp.MustCompile(`^[0-9a-fA-F]+$`)
+	didPattern       = regexp.MustCompile(`^did:[a-zA-Z0-9]+:[a-zA-Z0-9._:%\-]+$`)
+	didMethodPattern = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 )
 
 // BlockchainAuditNode records workflow execution on blockchain for tamper-proof auditing
@@ -119,9 +123,13 @@ func (n *BlockchainAuditNode) Execute(ctx context.Context, input string, params 
 		return "", fmt.Errorf("blockchain submission failed: %v", err)
 	}
 
-	// Store in local audit log
+	// Store in local audit log with rotation
 	bcAuditLogMu.Lock()
 	bcAuditLog = append(bcAuditLog, record)
+	if len(bcAuditLog) > maxAuditLogEntries {
+		excess := len(bcAuditLog) - maxAuditLogEntries
+		bcAuditLog = bcAuditLog[excess:]
+	}
 	bcAuditLogMu.Unlock()
 
 	result := map[string]interface{}{
@@ -239,7 +247,27 @@ func simulatedSubmit(record AuditRecord) (*TxReceipt, error) {
 }
 
 func isValidDID(did string) bool {
-	return strings.HasPrefix(did, "did:") && len(did) < 2048
+	if len(did) == 0 || len(did) > 2048 {
+		return false
+	}
+	if !strings.HasPrefix(did, "did:") {
+		return false
+	}
+
+	parts := strings.SplitN(did, ":", 3)
+	if len(parts) < 3 {
+		return false
+	}
+	if parts[0] != "did" {
+		return false
+	}
+	if !didMethodPattern.MatchString(parts[1]) {
+		return false
+	}
+	if parts[2] == "" {
+		return false
+	}
+	return didPattern.MatchString(did)
 }
 
 func safeParseMetadata(s string) map[string]interface{} {

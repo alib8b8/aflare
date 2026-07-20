@@ -125,6 +125,9 @@ func (n *OnDeviceLLMNode) Execute(ctx context.Context, input string, params map[
 
 	modelPath := getMobileParam(params, "model_path", "")
 	if modelPath != "" {
+		if strings.Contains(modelPath, "..") {
+			return "", fmt.Errorf("invalid model_path: path traversal not allowed")
+		}
 		if !modelPathPattern.MatchString(modelPath) {
 			return "", fmt.Errorf("invalid model_path: %s", modelPath)
 		}

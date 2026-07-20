@@ -2,6 +2,7 @@ package nodes
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -86,8 +87,23 @@ func (n *VoiceInputNode) Execute(ctx context.Context, input string, params map[s
 	}
 
 	// Validate input (audio data or file path)
-	if input != "" && len(input) > 1024*1024 {
-		return "", fmt.Errorf("audio input too large (max 1MB)")
+	if input != "" {
+		if len(input) > 1024*1024 {
+			return "", fmt.Errorf("audio input too large (max 1MB)")
+		}
+		// Check if input looks like base64 and validate
+		trimmed := strings.TrimSpace(input)
+		if looksLikeBase64(trimmed) {
+			cleaned := strings.ReplaceAll(trimmed, "\n", "")
+			cleaned = strings.ReplaceAll(cleaned, "\r", "")
+			cleaned = strings.ReplaceAll(cleaned, " ", "")
+			if _, err := base64.StdEncoding.DecodeString(cleaned); err != nil {
+				// Try URL-safe base64
+				if _, err2 := base64.URLEncoding.DecodeString(cleaned); err2 != nil {
+					return "", fmt.Errorf("invalid base64 audio data")
+				}
+			}
+		}
 	}
 
 	// Simulate voice pipeline
@@ -283,6 +299,23 @@ func simulateASR(input, language string, offline bool, threshold float64) *ASRRe
 			{Word: text, StartMs: 0, EndMs: processingTime, Confidence: confidence},
 		},
 	}
+}
+
+func looksLikeBase64(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	for _, c := range s {
+		if !((c >= 'A' && c <= 'Z') ||
+			(c >= 'a' && c <= 'z') ||
+			(c >= '0' && c <= '9') ||
+			c == '+' || c == '/' || c == '=' ||
+			c == '-' || c == '_' ||
+			c == '\n' || c == '\r' || c == ' ') {
+			return false
+		}
+	}
+	return true
 }
 
 func init() {

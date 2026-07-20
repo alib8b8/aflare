@@ -192,12 +192,13 @@ func (pm *PowerManager) CanRunInference() (bool, string) {
 	pm.mu.RLock()
 	profile := pm.profile
 	maxHz := pm.maxInferenceHz
+	lastInf := pm.lastInference
 	pm.mu.RUnlock()
 
 	// Check rate limiting
 	if maxHz > 0 {
 		minInterval := time.Duration(float64(time.Second) / maxHz)
-		if time.Since(pm.lastInference) < minInterval {
+		if time.Since(lastInf) < minInterval {
 			return false, fmt.Sprintf("rate limited: max %.1f Hz", maxHz)
 		}
 	}
@@ -220,13 +221,16 @@ func (pm *PowerManager) CanRunInference() (bool, string) {
 func (pm *PowerManager) RecordInference(latency time.Duration) {
 	pm.inferenceCount.Add(1)
 	pm.inferenceLatency.Add(latency.Milliseconds())
+	pm.mu.Lock()
 	pm.lastInference = time.Now()
+	pm.mu.Unlock()
 }
 
 // GetStats returns current power/inference statistics
 func (pm *PowerManager) GetStats() map[string]interface{} {
 	pm.mu.RLock()
 	profile := pm.profile
+	lastInf := pm.lastInference
 	pm.mu.RUnlock()
 
 	count := pm.inferenceCount.Load()
@@ -240,7 +244,7 @@ func (pm *PowerManager) GetStats() map[string]interface{} {
 		"inference_count": count,
 		"avg_latency_ms":  avgLatency,
 		"throttled":       pm.throttled.Load(),
-		"last_inference":  pm.lastInference.Format(time.RFC3339),
+		"last_inference":  lastInf.Format(time.RFC3339),
 	}
 }
 

@@ -191,6 +191,9 @@ func simulateEventData(eventType, input, filterApp, filterKeyword string, batter
 	}
 }
 
+const maxEventSubscriptions = 1000
+const subscriptionExpiry = 24 * time.Hour
+
 // EventSubscription manages active event listeners
 type EventSubscription struct {
 	ID            string
@@ -200,8 +203,10 @@ type EventSubscription struct {
 	FilterApp     string
 	FilterKeyword string
 	Callback      func(event map[string]interface{})
-	LastTrigger   time.Time
+	lastTrigger   time.Time
+	lastTriggerMu sync.Mutex
 	Active        bool
+	createdAt     time.Time
 }
 
 var (
@@ -218,12 +223,30 @@ func generateEventID() string {
 	return fmt.Sprintf("sub_%d_%d", time.Now().Unix(), eventIDCounter)
 }
 
+func cleanupExpiredSubscriptionsLocked() {
+	now := time.Now()
+	for id, sub := range eventSubscriptions {
+		if now.Sub(sub.createdAt) > subscriptionExpiry {
+			sub.Active = false
+			delete(eventSubscriptions, id)
+		}
+	}
+}
+
 // SubscribeEvent registers a new system event listener
 func SubscribeEvent(sub *EventSubscription) string {
 	eventSubscriptionsMu.Lock()
 	defer eventSubscriptionsMu.Unlock()
+
+	cleanupExpiredSubscriptionsLocked()
+
+	if len(eventSubscriptions) >= maxEventSubscriptions {
+		return ""
+	}
+
 	sub.ID = generateEventID()
 	sub.Active = true
+	sub.createdAt = time.Now()
 	eventSubscriptions[sub.ID] = sub
 	return sub.ID
 }
@@ -243,13 +266,15 @@ func UnsubscribeEvent(id string) bool {
 // DispatchEvent dispatches a system event to all matching subscribers
 func DispatchEvent(eventType string, eventData map[string]interface{}) {
 	eventSubscriptionsMu.RLock()
-	defer eventSubscriptionsMu.RUnlock()
-
+	var subs []*EventSubscription
 	for _, sub := range eventSubscriptions {
-		if !sub.Active || sub.EventType != eventType {
-			continue
+		if sub.Active && sub.EventType == eventType {
+			subs = append(subs, sub)
 		}
+	}
+	eventSubscriptionsMu.RUnlock()
 
+	for _, sub := range subs {
 		// Filter by app
 		if sub.FilterApp != "" {
 			if app, ok := eventData["package_name"].(string); ok && !strings.Contains(app, sub.FilterApp) {
@@ -271,18 +296,25 @@ func DispatchEvent(eventType string, eventData map[string]interface{}) {
 			}
 		}
 
-		// Apply debounce/throttle
+		// Apply debounce/throttle with per-subscription lock
 		now := time.Now()
+		shouldTrigger := true
+		sub.lastTriggerMu.Lock()
 		if sub.TriggerMode == "debounce" || sub.TriggerMode == "throttle" {
-			if now.Sub(sub.LastTrigger) < time.Duration(sub.DebounceMs)*time.Millisecond {
+			if now.Sub(sub.lastTrigger) < time.Duration(sub.DebounceMs)*time.Millisecond {
 				if sub.TriggerMode == "throttle" {
-					continue
+					shouldTrigger = false
 				}
 			}
 		}
+		if shouldTrigger {
+			sub.lastTrigger = now
+		}
+		sub.lastTriggerMu.Unlock()
 
-		sub.LastTrigger = now
-		go safeCallback(sub.Callback, eventData)
+		if shouldTrigger {
+			go safeCallback(sub.Callback, eventData)
+		}
 	}
 }
 
