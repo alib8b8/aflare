@@ -89,6 +89,7 @@ llm-box run ai-news-summary.yaml
 | **Edge AI Engine** | ReAct reasoning loop, 3-tier persistent memory (short/working/long-term), local/cloud model routing, privacy analyzer |
 | **Skill Self-Evolution** | Agent skills improve with use — auto-tracks success rate, latency, best practices, known pitfalls; auto-optimizes prompts |
 | **HarmonyOS Adaptation** | Ability launch, atomic service, desktop widget, 7-device-type adaptation (phone/foldable/tablet/TV/car/wearable) |
+| **Phone Built-in AI** | System event listening (notification/call/SMS/location/battery), on-device LLM inference (1B-7B, INT4/INT8), adaptive power management (eco/balanced/high, battery/thermal-aware) |
 | **Cross-Platform Protocol** | `intent://` and `ohos://` URI schemes, W3C DID identity verification, cross-domain agent messaging |
 | **Ascend NPU Adaptation** | 7-agent pipeline (search→verify→adapt→quantize→optimize→deploy→doc), CANN/MindIE/MindStudio integration, INT8/FP8 quantization, 1-hour auto-adapt |
 | **Code Intelligence** | Code graph node (AST/call graph/dependency extraction for Go/Python/JS/TS), Codex/OpenCode-compatible tools (glob/grep/list_dir/apply_patch) |
@@ -102,7 +103,7 @@ llm-box run ai-news-summary.yaml
 | **Code & Tools** | Python code interpreter sandbox, node marketplace, MCP integration, plugin system |
 | **Distributed Execution** | Coordinator/Worker architecture, horizontal scaling, heartbeat monitoring, circuit breaker |
 | **Scheduling** | Cron-based scheduled workflows, interval triggers, CLI management |
-| **Security** | SSRF protection, path traversal prevention, command injection defense, AES-GCM secrets, audit logging, secret redaction, ANSI injection defense, 76-vuln audited |
+| **Security** | SSRF protection, path traversal prevention, command injection defense, AES-GCM secrets, audit logging, secret redaction, ANSI injection defense, 80+ vuln audited |
 | **Ecosystem** | GitCode G-Star, HarmonyOS Agent Skills, ohpm SDK (@llm-box/workflow-engine) |
 | **Developer Experience** | Web UI editor, workflow visualizer (Mermaid/JSON/DOT/ASCII), TUI with Markdown/Mermaid rendering, 9 languages |
 
@@ -140,6 +141,9 @@ Specialized AI agent nodes for autonomous reasoning:
 | `device_state` | Query device state: battery, network, location, apps, storage |
 | `agent_message` | Send cross-domain messages between agents using W3C DID identity |
 | `agent_inbox` | Query and manage agent message inbox |
+| `system_event` | Listen for mobile system events: notification, call, SMS, location, battery, alarm, screen state |
+| `ondevice_llm` | Run LLM inference locally on device (1B-7B models, INT4/INT8/FP16, llama.cpp/MLC-LLM/ONNX backends) |
+| `power_manager` | Adaptive power management: eco/balanced/high profiles, battery-aware & thermal-aware throttling |
 
 ### Ascend NPU Adaptation Nodes
 
