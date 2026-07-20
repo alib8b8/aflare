@@ -11,20 +11,20 @@ import (
 
 var (
 	validSenseNovaModels = map[string]bool{
-		"u1-lite":       true,
-		"u1-lite-moe":   true,
-		"u1-pro":        true,
-		"flash-lite":    true,
-		"flash":         true,
-		"flash-pro":     true,
+		"u1-lite":     true,
+		"u1-lite-moe": true,
+		"u1-pro":      true,
+		"flash-lite":  true,
+		"flash":       true,
+		"flash-pro":   true,
 	}
 	validSenseNovaScenes = map[string]bool{
-		"chat":           true,
-		"code":           true,
-		"image":          true,
-		"document":       true,
-		"data":           true,
-		"workflow":       true,
+		"chat":     true,
+		"code":     true,
+		"image":    true,
+		"document": true,
+		"data":     true,
+		"workflow": true,
 	}
 	apiKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9]{32,64}$`)
 )
@@ -102,12 +102,12 @@ func (n *SenseNovaNode) Execute(ctx context.Context, input string, params map[st
 	outputTokens := len(response) / 4
 
 	result := map[string]interface{}{
-		"type":          "sensenova",
-		"model":         model,
-		"scene":         scene,
-		"has_vision":    hasVisionCap && vision,
-		"enable_tools":  enableTools,
-		"response":      response,
+		"type":         "sensenova",
+		"model":        model,
+		"scene":        scene,
+		"has_vision":   hasVisionCap && vision,
+		"enable_tools": enableTools,
+		"response":     response,
 		"usage": map[string]interface{}{
 			"input_tokens":  inputTokens,
 			"output_tokens": outputTokens,
