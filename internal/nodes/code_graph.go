@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/alib8b8/llm-box/internal/logger"
 )
@@ -102,6 +104,8 @@ type codeGraphFile struct {
 	Imports   []string            `json:"imports"`
 	Functions []codeGraphFunction `json:"functions"`
 	Calls     []string            `json:"calls"`
+	ModTime   int64               `json:"mod_time"`
+	Size      int64               `json:"size"`
 	// callEdges 用于构建 mermaid 调用边，不输出到 JSON
 	callEdges []codeGraphCall `json:"-"`
 }
@@ -112,12 +116,133 @@ type codeGraphStats struct {
 	TotalFunctions int `json:"total_functions"`
 	TotalImports   int `json:"total_imports"`
 	TotalCalls     int `json:"total_calls"`
+	CachedFiles    int `json:"cached_files"`
+	UpdatedFiles   int `json:"updated_files"`
 }
 
 // codeGraphResult 图谱总结果
 type codeGraphResult struct {
 	Files []codeGraphFile `json:"files"`
 	Stats codeGraphStats  `json:"stats"`
+}
+
+// codeGraphCache 持久化缓存
+type codeGraphCache struct {
+	mu       sync.RWMutex
+	rootPath string
+	cacheDir string
+	data     map[string]codeGraphFile
+	loaded   bool
+}
+
+var (
+	graphCache     *codeGraphCache
+	graphCacheOnce sync.Once
+)
+
+func getGraphCache() *codeGraphCache {
+	graphCacheOnce.Do(func() {
+		graphCache = &codeGraphCache{
+			data:   make(map[string]codeGraphFile),
+			loaded: false,
+		}
+	})
+	return graphCache
+}
+
+func (c *codeGraphCache) cachePath(root string) string {
+	return filepath.Join(root, ".llm-box", "codegraph-cache.json")
+}
+
+func (c *codeGraphCache) Load(root string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	cachePath := c.cachePath(root)
+	data, err := os.ReadFile(cachePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			c.rootPath = root
+			c.loaded = true
+			return nil
+		}
+		return err
+	}
+
+	var loaded struct {
+		RootPath string                   `json:"root_path"`
+		Files    map[string]codeGraphFile `json:"files"`
+	}
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		return err
+	}
+
+	c.rootPath = root
+	c.data = loaded.Files
+	if c.data == nil {
+		c.data = make(map[string]codeGraphFile)
+	}
+	c.loaded = true
+	return nil
+}
+
+func (c *codeGraphCache) Save(root string) error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	cacheDir := filepath.Join(root, ".llm-box")
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return err
+	}
+
+	cachePath := c.cachePath(root)
+	toSave := struct {
+		RootPath string                   `json:"root_path"`
+		Version  string                   `json:"version"`
+		Files    map[string]codeGraphFile `json:"files"`
+		SavedAt  string                   `json:"saved_at"`
+	}{
+		RootPath: root,
+		Version:  "1.0",
+		Files:    c.data,
+		SavedAt:  time.Now().UTC().Format(time.RFC3339),
+	}
+
+	data, err := json.MarshalIndent(toSave, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(cachePath, data, 0644)
+}
+
+func (c *codeGraphCache) Get(path string) (codeGraphFile, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	f, ok := c.data[path]
+	return f, ok
+}
+
+func (c *codeGraphCache) Set(path string, file codeGraphFile) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.data[path] = file
+}
+
+func (c *codeGraphCache) Delete(path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.data, path)
+}
+
+func (c *codeGraphCache) Keys() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	keys := make([]string, 0, len(c.data))
+	for k := range c.data {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // --- 节点实现 ---
@@ -140,7 +265,7 @@ func (n *CodeGraphNode) Description() string {
 func (n *CodeGraphNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "code_graph",
-		Description: "Parse source code files to extract function definitions, call relationships, and import dependencies, then output a code graph (JSON or Mermaid). Supports Go, Python, JavaScript, and TypeScript.",
+		Description: "Parse source code files to extract function definitions, call relationships, and import dependencies, then output a code graph (JSON or Mermaid). Supports Go, Python, JavaScript, TypeScript. Features: persistent cache, incremental updates.",
 		Input:       "string - not used",
 		Output:      "string - code graph in JSON or Mermaid format",
 		Params: []ParamSchema{
@@ -149,6 +274,9 @@ func (n *CodeGraphNode) Schema() NodeSchema {
 			{Name: "output_format", Type: "string", Description: "Output format: json or mermaid (default: json)", Required: false, Default: "json"},
 			{Name: "max_files", Type: "string", Description: "Max number of files to analyze (default: 100)", Required: false, Default: "100"},
 			{Name: "max_file_size", Type: "string", Description: "Max single file size in bytes (default: 1048576 = 1MB)", Required: false, Default: "1048576"},
+			{Name: "use_cache", Type: "string", Description: "Use persistent cache for incremental updates (default: true)", Required: false, Default: "true"},
+			{Name: "refresh", Type: "string", Description: "Force refresh cache, ignore existing cache (default: false)", Required: false, Default: "false"},
+			{Name: "save_cache", Type: "string", Description: "Save results to persistent cache (default: true)", Required: false, Default: "true"},
 		},
 	}
 }
@@ -194,13 +322,18 @@ func (n *CodeGraphNode) Execute(ctx context.Context, input string, params map[st
 		maxFileSize = codeGraphHardMaxSize
 	}
 
-	// 6. 校验路径（防路径遍历，返回绝对路径）
+	// 6. 缓存相关参数
+	useCache := strings.ToLower(getParam(params, "use_cache", "true")) == "true"
+	refresh := strings.ToLower(getParam(params, "refresh", "false")) == "true"
+	saveCache := strings.ToLower(getParam(params, "save_cache", "true")) == "true"
+
+	// 7. 校验路径（防路径遍历，返回绝对路径）
 	safePath, err := validateReadPath(rawPath)
 	if err != nil {
 		return "", fmt.Errorf("path validation failed: %w", err)
 	}
 
-	// 7. 判断是文件还是目录
+	// 8. 判断是文件还是目录
 	info, err := os.Stat(safePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to stat path: %w", err)
@@ -221,34 +354,81 @@ func (n *CodeGraphNode) Execute(ctx context.Context, input string, params map[st
 		return "", fmt.Errorf("no source files found at path: %s", rawPath)
 	}
 
-	// 8. 逐个解析文件
+	// 9. 加载缓存（目录模式）
+	cache := getGraphCache()
+	cacheLoaded := false
+	var cachedCount, updatedCount int
+
+	if useCache && isDir && !refresh {
+		if loadErr := cache.Load(safePath); loadErr == nil {
+			cacheLoaded = true
+		}
+	}
+
+	// 10. 逐个解析文件（支持增量更新）
 	result := codeGraphResult{
 		Files: make([]codeGraphFile, 0, len(filePaths)),
 	}
+
 	for _, fp := range filePaths {
 		if err := ctx.Err(); err != nil {
 			return "", fmt.Errorf("context cancelled: %w", err)
 		}
+
+		fi, statErr := os.Stat(fp)
+		if statErr != nil {
+			continue
+		}
+
+		// 尝试从缓存获取
+		if useCache && !refresh && cacheLoaded {
+			if cached, ok := cache.Get(fp); ok {
+				if cached.ModTime == fi.ModTime().Unix() && cached.Size == fi.Size() {
+					result.Files = append(result.Files, cached)
+					cachedCount++
+					continue
+				}
+			}
+		}
+
+		// 需要重新解析
 		cf, perr := n.parseFile(fp, language, maxFileSize)
 		if perr != nil {
-			// 单文件模式直接返回错误，目录模式记录日志并跳过
 			if !isDir {
 				return "", fmt.Errorf("failed to parse file %s: %w", rawPath, perr)
 			}
 			logger.Warn("code_graph: failed to parse file, skipping", "path", fp, "error", perr)
 			continue
 		}
+
+		cf.ModTime = fi.ModTime().Unix()
+		cf.Size = fi.Size()
 		result.Files = append(result.Files, cf)
+		updatedCount++
+
+		// 更新缓存
+		if useCache && saveCache && isDir {
+			cache.Set(fp, cf)
+		}
 	}
 
 	if len(result.Files) == 0 {
 		return "", fmt.Errorf("no files could be parsed at path: %s", rawPath)
 	}
 
-	// 9. 计算统计信息
-	result.Stats = n.computeStats(result.Files)
+	// 11. 保存缓存
+	if useCache && saveCache && isDir && updatedCount > 0 {
+		if saveErr := cache.Save(safePath); saveErr != nil {
+			logger.Warn("code_graph: failed to save cache", "error", saveErr)
+		}
+	}
 
-	// 10. 按 output_format 输出
+	// 12. 计算统计信息
+	result.Stats = n.computeStats(result.Files)
+	result.Stats.CachedFiles = cachedCount
+	result.Stats.UpdatedFiles = updatedCount
+
+	// 13. 按 output_format 输出
 	switch outputFormat {
 	case "json":
 		return n.outputJSON(result)
