@@ -15,18 +15,20 @@
 
 ## 项目简介
 
-llm-box 是一个开源的 AI 工作流编排引擎，让开发者通过 YAML 定义工作流，串联 50+ 节点（LLM、Agent、代码执行、RAG、多模态等）构建复杂的 AI 应用。项目深度融合 ReAct 推理循环、分层持久化记忆、Skill 自演进机制，并率先完成鸿蒙 HarmonyOS 与昇腾 NPU 双生态适配，是国内首个覆盖"端侧 Agent + 国产算力 + 鸿蒙生态"的开源 AI 工作流引擎。
+llm-box 是一个开源的 AI 工作流编排引擎，让开发者通过 YAML 定义工作流，串联 55+ 节点（LLM、Agent、代码执行、RAG、多模态等）构建复杂的 AI 应用。项目深度融合 ReAct 推理循环、分层持久化记忆、Skill 自演进机制，率先完成鸿蒙 HarmonyOS 与昇腾 NPU 双生态适配，是国内首个覆盖"端侧 Agent + 国产算力 + 鸿蒙生态"的开源 AI 工作流引擎。
 
-### 核心能力
+**核心亮点：**
 
-- **50+ 节点类型**：OpenAI/DeepSeek/Qwen/GLM/Kimi 等 LLM 节点、Agent、Supervisor（5种策略+17位专家）、Code Interpreter、RAG、知识图谱、多模态、Smart Router、代码图谱、文件监控、熔断器
+- **55+ 节点类型**：支持 OpenAI/DeepSeek/Qwen/GLM/Kimi/AndesGPT 等 LLM 节点、Agent、Supervisor（5种策略+17位专家）、Code Interpreter、RAG、知识图谱、多模态、Smart Router、代码图谱、文件监控、熔断器、区块链审计、屏幕理解、语音输入、机器人控制、端侧 LLM、功耗管理
 - **100+ 工作流模板**：覆盖开发工具、DevOps、内容营销、研究分析、AI/ML、安全、教育、金融等 20+ 领域
-- **跨平台 AI 任务协议**：基于 intent:// 和 ohos:// 的统一意图协议，支持 W3C DID 身份验证
+- **跨平台 AI 任务协议**：基于 `intent://` 和 `ohos://` 的统一意图协议，支持 W3C DID 身份验证与跨域 Agent 消息路由
 - **端侧 AI Agent 引擎**：ReAct 推理循环、三层持久化记忆（会话/任务/长期）、本地/云端模型路由、隐私保护
 - **鸿蒙 HarmonyOS 深度适配**：Ability 启动、原子化服务、桌面卡片、7种设备类型适配（直板/双折叠/三折叠/平板/智慧屏/车机/穿戴）、ohpm SDK
 - **昇腾 NPU 模型适配**：7-Agent 自动化适配流水线（搜索→验证→适配→量化→优化→部署→文档），单模型端到端适配 ≤ 60 分钟
-- **安全防护**：SSRF 防护、命令注入防护、路径验证、认证时序攻击防护、AES-GCM 密钥管理、密钥自动脱敏、出站数据量监控；已修复 61 个安全漏洞
-- **多平台集成**：VS Code 插件、Claude/Grok/Trae/Codex 插件、MCP 协议支持
+- **OPPO AndesGPT 集成**：支持 Tiny/Turbo/Titan 三规格模型、PersonaX 千人千面、端云协同
+- **安全防护**：SSRF 防护、命令注入防护、路径验证、认证时序攻击防护、AES-GCM 密钥管理、密钥自动脱敏、出站数据量监控、区块链审计；已修复 84+ 安全漏洞
+
+**AtomGit/GitCode 链接：** https://gitcode.com/llm-box/llm-box
 
 ## 技术架构
 
