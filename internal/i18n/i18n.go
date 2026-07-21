@@ -178,9 +178,17 @@ func normalizeLang(lang string) string {
 		lang = lang[:idx]
 	}
 
+	if idx := strings.Index(lang, "-"); idx > 0 {
+		lang = lang[:idx]
+	}
+
 	switch lang {
 	case "en", "english":
 		return "en"
+	case "zh", "chinese", "中文":
+		return "zh"
+	case "ru", "russian", "русский":
+		return "ru"
 	default:
 		return "en"
 	}

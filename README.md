@@ -1,5 +1,10 @@
 <div align="center">
   <h1>llm-box</h1>
+  <p>🌍
+    <strong>中文</strong> ·
+    <a href="README.en.md">English</a> ·
+    <a href="README.ru.md">Русский</a>
+  </p>
   <p><strong>将自然语言转化为可执行工作流</strong></p>
   <p>面向终端的 Agent 工作流引擎 —— 确定性执行与 AI 智能体相结合。构建具备自主 Agent 节点、工具调用和多步推理能力的自驱动工作流。</p>
 
