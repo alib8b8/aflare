@@ -16,11 +16,11 @@ var (
 		"dark":  true,
 	}
 
-	cliSessionHistory   = make(map[string][]string)
-	cliSessionMu        sync.RWMutex
-	cliSessionLastUsed  = make(map[string]time.Time)
+	cliSessionHistory    = make(map[string][]string)
+	cliSessionMu         sync.RWMutex
+	cliSessionLastUsed   = make(map[string]time.Time)
 	cliSessionLastUsedMu sync.RWMutex
-	cliSessionRandMu    sync.Mutex
+	cliSessionRandMu     sync.Mutex
 )
 
 type CLISessionNode struct{}
@@ -117,8 +117,8 @@ func (n *CLISessionNode) Execute(ctx context.Context, input string, params map[s
 func generateSessionID() string {
 	cliSessionRandMu.Lock()
 	defer cliSessionRandMu.Unlock()
-	rand.Seed(time.Now().UnixNano())
-	return fmt.Sprintf("cli-session-%d-%d", time.Now().Unix(), rand.Intn(10000))
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return fmt.Sprintf("cli-session-%d-%d", time.Now().Unix(), r.Intn(10000))
 }
 
 func simulateCLISessionResponse(input, model string, historyCount int) string {

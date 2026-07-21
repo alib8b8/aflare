@@ -247,7 +247,7 @@ func (n *MoEStreamingNode) getQuantizationFactor(quant string) float64 {
 
 func (n *MoEStreamingNode) simulateExpertLoading(model string, config moeModelConfig, maxExpertsPerToken, expertGroupSize int, loadStrategy string) []moeLoadOrderEntry {
 	var order []moeLoadOrderEntry
-	rand.Seed(time.Now().UnixNano())
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	numGroups := (config.NumExperts + expertGroupSize - 1) / expertGroupSize
 
@@ -280,7 +280,7 @@ func (n *MoEStreamingNode) simulateExpertLoading(model string, config moeModelCo
 						expertsInGroup = expertGroupSize
 					}
 				}
-				activeExperts := rand.Perm(expertsInGroup)[:maxExpertsPerToken]
+				activeExperts := r.Perm(expertsInGroup)[:maxExpertsPerToken]
 				for _, idx := range activeExperts {
 					expertIdx := group*expertGroupSize + idx
 					for l := layer; l < layer+4 && l < config.TotalLayers; l++ {
@@ -297,7 +297,7 @@ func (n *MoEStreamingNode) simulateExpertLoading(model string, config moeModelCo
 
 	case "on_demand":
 		for layer := 0; layer < config.TotalLayers; layer++ {
-			activeExperts := rand.Perm(config.NumExperts)[:maxExpertsPerToken]
+			activeExperts := r.Perm(config.NumExperts)[:maxExpertsPerToken]
 			for _, expertIdx := range activeExperts {
 				order = append(order, moeLoadOrderEntry{
 					Layer:     layer,
@@ -337,7 +337,8 @@ func (n *MoEStreamingNode) calculateLatency(config moeModelConfig, strategy, qua
 		strategyFactor = 1.0
 	}
 
-	return int64(float64(baseLatency) * quantFactor * strategyFactor * (1 + rand.Float64()*0.2))
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return int64(float64(baseLatency) * quantFactor * strategyFactor * (1 + r.Float64()*0.2))
 }
 
 func (n *MoEStreamingNode) calculateThroughput(config moeModelConfig, quantization string, streaming bool) float64 {
@@ -360,5 +361,6 @@ func (n *MoEStreamingNode) calculateThroughput(config moeModelConfig, quantizati
 		streamingFactor = 1.5
 	}
 
-	return baseThroughput * quantFactor * streamingFactor * (0.9 + rand.Float64()*0.2)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return baseThroughput * quantFactor * streamingFactor * (0.9 + r.Float64()*0.2)
 }

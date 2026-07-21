@@ -192,7 +192,8 @@ func (n *MetaOrchestratorNode) Execute(ctx context.Context, input string, params
 	if useHierarchy {
 		baseLatency += maxDepth * 50
 	}
-	totalLatency := latency.Milliseconds() + int64(baseLatency) + int64(rand.Intn(100))
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	totalLatency := latency.Milliseconds() + int64(baseLatency) + int64(r.Intn(100))
 
 	inputTokens := len(input) / 4
 	outputTokens := len(response) / 4
@@ -311,7 +312,8 @@ func selectAutoModel(taskType string, models []string) string {
 		candidates = models
 	}
 
-	return candidates[rand.Intn(len(candidates))]
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return candidates[r.Intn(len(candidates))]
 }
 
 func determineHierarchyLevel(taskType string, maxDepth int) string {

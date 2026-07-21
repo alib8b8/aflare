@@ -433,23 +433,23 @@ func (n *CodeKnowledgeGraphNode) extractFromFile(path string) ([]ckgEntity, []ck
 		}
 	}
 
-	rand.Seed(time.Now().UnixNano() + int64(len(path)))
-	numEntities := rand.Intn(5) + 1
+	r := rand.New(rand.NewSource(time.Now().UnixNano() + int64(len(path))))
+	numEntities := r.Intn(5) + 1
 
 	usedNames := make(map[string]bool)
 	for i := 0; i < numEntities; i++ {
 		name := fmt.Sprintf("%s_%d", strings.Title(language), i+1)
 		if usedNames[name] {
-			name = fmt.Sprintf("%s_%d_%d", strings.Title(language), i+1, rand.Intn(100))
+			name = fmt.Sprintf("%s_%d_%d", strings.Title(language), i+1, r.Intn(100))
 		}
 		usedNames[name] = true
 
 		entity := ckgEntity{
 			Name:     name,
-			Type:     ckgEntityTypes[rand.Intn(len(ckgEntityTypes))],
+			Type:     ckgEntityTypes[r.Intn(len(ckgEntityTypes))],
 			Location: relPath,
-			Line:     rand.Intn(500) + 1,
-			Score:    0.8 + rand.Float64()*0.2,
+			Line:     r.Intn(500) + 1,
+			Score:    0.8 + r.Float64()*0.2,
 		}
 		entities = append(entities, entity)
 	}
@@ -458,7 +458,7 @@ func (n *CodeKnowledgeGraphNode) extractFromFile(path string) ([]ckgEntity, []ck
 		relation := ckgRelation{
 			Source: entities[i].Name,
 			Target: entities[i+1].Name,
-			Type:   ckgRelationTypes[rand.Intn(len(ckgRelationTypes))],
+			Type:   ckgRelationTypes[r.Intn(len(ckgRelationTypes))],
 		}
 		relations = append(relations, relation)
 	}
@@ -496,27 +496,27 @@ func (n *CodeKnowledgeGraphNode) extractConcepts(entities []ckgEntity) []ckgConc
 func (n *CodeKnowledgeGraphNode) performVectorSearch(query, queryType string, entities []ckgEntity, topK int, threshold float64) []ckgQueryResult {
 	var results []ckgQueryResult
 
-	rand.Seed(time.Now().UnixNano() + int64(len(query)))
+	r := rand.New(rand.NewSource(time.Now().UnixNano() + int64(len(query))))
 
 	for _, entity := range entities {
 		similarity := 0.0
 		switch queryType {
 		case "semantic":
-			similarity = 0.6 + rand.Float64()*0.4
+			similarity = 0.6 + r.Float64()*0.4
 		case "symbol":
 			if strings.Contains(strings.ToLower(entity.Name), strings.ToLower(query)) {
-				similarity = 0.8 + rand.Float64()*0.2
+				similarity = 0.8 + r.Float64()*0.2
 			} else {
-				similarity = 0.3 + rand.Float64()*0.3
+				similarity = 0.3 + r.Float64()*0.3
 			}
 		case "path":
 			if strings.Contains(entity.Location, query) {
-				similarity = 0.85 + rand.Float64()*0.15
+				similarity = 0.85 + r.Float64()*0.15
 			} else {
-				similarity = 0.2 + rand.Float64()*0.3
+				similarity = 0.2 + r.Float64()*0.3
 			}
 		case "relation":
-			similarity = 0.5 + rand.Float64()*0.4
+			similarity = 0.5 + r.Float64()*0.4
 		}
 
 		if similarity >= threshold {
