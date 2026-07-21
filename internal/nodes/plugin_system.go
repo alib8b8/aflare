@@ -142,8 +142,13 @@ func installPlugin(pluginID, source, version, input string) (map[string]interfac
 		}
 	}
 
+	const maxPlugins = 100
 	pluginMu.Lock()
 	defer pluginMu.Unlock()
+
+	if len(installedPlugins) >= maxPlugins {
+		return nil, "error: maximum number of plugins reached"
+	}
 
 	if _, exists := installedPlugins[pluginID]; exists {
 		return nil, "error: plugin already installed"
@@ -302,20 +307,40 @@ func validateGitURL(gitURL string) bool {
 	if gitURL == "" {
 		return false
 	}
+	if len(gitURL) > 1024 {
+		return false
+	}
 	return strings.HasPrefix(gitURL, "git@") ||
-		strings.HasPrefix(gitURL, "https://") ||
-		strings.HasPrefix(gitURL, "http://")
+		strings.HasPrefix(gitURL, "https://github.com/") ||
+		strings.HasPrefix(gitURL, "https://gitlab.com/") ||
+		strings.HasPrefix(gitURL, "https://gitcode.com/") ||
+		strings.HasPrefix(gitURL, "https://gitee.com/")
 }
 
 func validatePluginURL(u string) bool {
 	if u == "" {
 		return false
 	}
+	if len(u) > 1024 {
+		return false
+	}
 	parsed, err := url.Parse(u)
 	if err != nil {
 		return false
 	}
-	return parsed.Scheme == "http" || parsed.Scheme == "https"
+	if parsed.Scheme != "https" {
+		return false
+	}
+	if parsed.Host == "" {
+		return false
+	}
+	forbiddenHosts := []string{"localhost", "127.0.0.1", "0.0.0.0", "::1"}
+	for _, h := range forbiddenHosts {
+		if strings.Contains(parsed.Host, h) {
+			return false
+		}
+	}
+	return true
 }
 
 func validateMarketID(id string) bool {

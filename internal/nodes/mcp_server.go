@@ -114,6 +114,8 @@ func (n *MCPServerNode) Execute(ctx context.Context, input string, params map[st
 		result, status = startMCPServer(port, protocol, host, exposeTools, authToken)
 	}
 
+	cleanupExpiredMCPSessions()
+
 	response := map[string]interface{}{
 		"action":    action,
 		"status":    status,
@@ -233,6 +235,23 @@ func isPortAvailable(host string, port int) bool {
 	}
 	ln.Close()
 	return true
+}
+
+func cleanupExpiredMCPSessions() {
+	mcpServerState.mu.Lock()
+	defer mcpServerState.mu.Unlock()
+
+	const maxSessions = 1000
+	if len(mcpServerState.sessions) < maxSessions {
+		return
+	}
+
+	now := time.Now()
+	for id, createdAt := range mcpServerState.sessions {
+		if now.Sub(createdAt) > 24*time.Hour {
+			delete(mcpServerState.sessions, id)
+		}
+	}
 }
 
 func init() {

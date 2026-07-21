@@ -388,15 +388,27 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 
 func (n *CodeKnowledgeGraphNode) collectFiles(root string) ([]string, error) {
 	var files []string
+	const maxFiles = 5000
+	const maxDepth = 5
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return nil
+		}
+		if len(files) >= maxFiles {
+			return filepath.SkipDir
+		}
+		depth := strings.Count(strings.TrimPrefix(path, root), string(filepath.Separator))
+		if depth > maxDepth {
+			return filepath.SkipDir
 		}
 		if info.IsDir() {
 			name := info.Name()
 			if strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || name == ".git" || name == "dist" || name == "build" {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
 			return nil
 		}
 		ext := strings.ToLower(filepath.Ext(path))

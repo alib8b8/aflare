@@ -16,8 +16,11 @@ var (
 		"dark":  true,
 	}
 
-	cliSessionHistory = make(map[string][]string)
-	cliSessionMu      sync.RWMutex
+	cliSessionHistory   = make(map[string][]string)
+	cliSessionMu        sync.RWMutex
+	cliSessionLastUsed  = make(map[string]time.Time)
+	cliSessionLastUsedMu sync.RWMutex
+	cliSessionRandMu    sync.Mutex
 )
 
 type CLISessionNode struct{}
@@ -86,6 +89,12 @@ func (n *CLISessionNode) Execute(ctx context.Context, input string, params map[s
 	historyCount := len(history)
 	cliSessionMu.Unlock()
 
+	cliSessionLastUsedMu.Lock()
+	cliSessionLastUsed[sessionID] = time.Now()
+	cliSessionLastUsedMu.Unlock()
+
+	cleanupExpiredCLISessions()
+
 	response := simulateCLISessionResponse(input, model, historyCount)
 
 	latency := time.Since(startTime)
@@ -106,6 +115,8 @@ func (n *CLISessionNode) Execute(ctx context.Context, input string, params map[s
 }
 
 func generateSessionID() string {
+	cliSessionRandMu.Lock()
+	defer cliSessionRandMu.Unlock()
 	rand.Seed(time.Now().UnixNano())
 	return fmt.Sprintf("cli-session-%d-%d", time.Now().Unix(), rand.Intn(10000))
 }
@@ -115,7 +126,7 @@ func simulateCLISessionResponse(input, model string, historyCount int) string {
 
 	switch {
 	case strings.Contains(lowerInput, "clear") || strings.Contains(lowerInput, "清屏"):
-		return "\u001b[2J\u001b[H// 屏幕已清除"
+		return "// [Screen cleared]"
 	case strings.Contains(lowerInput, "exit") || strings.Contains(lowerInput, "quit") || strings.Contains(lowerInput, "退出"):
 		return "// 会话结束。欢迎下次使用！"
 	case strings.Contains(lowerInput, "history") || strings.Contains(lowerInput, "历史"):
@@ -143,6 +154,32 @@ func simulateCLISessionResponse(input, model string, historyCount int) string {
 		return fmt.Sprintf("// %s", strings.TrimPrefix(strings.TrimPrefix(input, "echo"), " "))
 	default:
 		return fmt.Sprintf("(%s) >>> %s", model, input)
+	}
+}
+
+func cleanupExpiredCLISessions() {
+	cliSessionLastUsedMu.RLock()
+	if len(cliSessionLastUsed) < 500 {
+		cliSessionLastUsedMu.RUnlock()
+		return
+	}
+	toDelete := []string{}
+	for id, lastUsed := range cliSessionLastUsed {
+		if time.Since(lastUsed) > 24*time.Hour {
+			toDelete = append(toDelete, id)
+		}
+	}
+	cliSessionLastUsedMu.RUnlock()
+
+	if len(toDelete) > 0 {
+		cliSessionMu.Lock()
+		cliSessionLastUsedMu.Lock()
+		for _, id := range toDelete {
+			delete(cliSessionHistory, id)
+			delete(cliSessionLastUsed, id)
+		}
+		cliSessionLastUsedMu.Unlock()
+		cliSessionMu.Unlock()
 	}
 }
 

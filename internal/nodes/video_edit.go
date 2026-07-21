@@ -137,9 +137,16 @@ func parseInputFiles(input string) []string {
 	var result []string
 	for _, part := range parts {
 		trimmed := strings.TrimSpace(part)
-		if trimmed != "" {
-			result = append(result, trimmed)
+		if trimmed == "" {
+			continue
 		}
+		if strings.Contains(trimmed, "..") {
+			continue
+		}
+		if strings.Contains(trimmed, ";") || strings.Contains(trimmed, "&") || strings.Contains(trimmed, "|") {
+			continue
+		}
+		result = append(result, trimmed)
 	}
 	return result
 }
