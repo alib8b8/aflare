@@ -88,7 +88,7 @@ llm-box run ai-news-summary.yaml
 | Category | Features |
 |----------|----------|
 | **Workflow Generation** | Natural language → YAML via keyword matching, 100+ built-in templates across 20+ categories |
-| **Agent Nodes** | 30+ AI agent nodes with ReAct, Chain-of-Thought, tool use, and autonomous reasoning |
+| **Agent Nodes** | 35+ AI agent nodes with ReAct, Chain-of-Thought, tool use, and autonomous reasoning |
 | **Edge AI Engine** | ReAct reasoning loop, 3-tier persistent memory (short/working/long-term), local/cloud model routing, privacy analyzer |
 | **Skill Self-Evolution** | Agent skills improve with use — auto-tracks success rate, latency, best practices, known pitfalls; auto-optimizes prompts |
 | **HarmonyOS Adaptation** | Ability launch, atomic service, desktop widget, 7-device-type adaptation (phone/foldable/tablet/TV/car/wearable) |
@@ -102,19 +102,23 @@ llm-box run ai-news-summary.yaml
 | **Privacy by Design** | Auto secret redaction (.env/keys/tokens) on file read, outbound data volume monitor with anomaly alerting (prevents Grok-Build-style 27800× leaks) |
 | **File Watching** | Polling-based file watch node (create/modify/delete events) for log-monitor and file-organizer workflows |
 | **TUI Rendering** | Terminal Markdown renderer (headings/code/bold/italic/lists/quotes/tables) + Mermaid-to-ASCII converter (flow/sequence diagrams) |
-| **Meta Orchestration** | Multi-model router (18 models: OpenAI/Anthropic/Google/AndesGPT/SenseNova/DeepSeek/Qwen), 5 strategies (auto/fastest/cheapest/best_quality/privacy_first), hierarchical agent network (supervisor→specialist→worker) |
+| **Meta Orchestration** | Multi-model router (22+ models: OpenAI/Anthropic/Google/AndesGPT/SenseNova/AntLing/DeepSeek/Qwen), 5 strategies (auto/fastest/cheapest/best_quality/privacy_first), hierarchical agent network (supervisor→specialist→worker) |
 | **MCP Protocol** | MCP bridge client (7 operations, 5 built-in tools) + MCP server mode (HTTP/WebSocket, tool exposure, session management, auth) |
 | **Quality Guard** | Anti-AI-slop detection, 5 assessment types (AI detection/design/code/writing/overall), auto-fix with quality threshold enforcement |
 | **Engineer Skills** | 16 pre-built skills across 4 domains (frontend/backend/devops/architecture): React/TypeScript/API/Database/CI-CD/Docker/Design Patterns |
 | **Skill Distillation** | Extract methodologies from books/videos/podcasts/articles into callable skills: workflow/decision/analysis/creative/prompt/checklist |
 | **Video Editing** | AI video editing: smart_cut/merge/effects/subtitle/storyboard/upscale, 4 styles, 720p/1080p/4k |
+| **AI Gateway** | OmniRoute unified layer: 15+ providers, 6 routing strategies (auto/fastest/cheapest/best_quality/availability/custom_fallback), Claude Code/Cursor/Cline/llm-box compatibility |
+| **Agent Memory** | Three-level memory infrastructure (short/medium/long): 8 operations (store/retrieve/delete/search/summary/forget/transfer/merge), LRU eviction, cross-session long-term memory |
+| **Voice AI Toolchain** | Full voice studio: TTS + voice cloning + ASR transcription + speaker diarization + voice analysis, 11 languages, 5 ASR engines |
+| **Agent Teamization** | 200+ professional specialist roles across 12+ domains, Agency workflow (8 phases: Discovery→Strategy→Design→Development→QA→Deployment→Launch→Post-Launch) |
 | **Utility Nodes** | 40+ built-in nodes: LLM providers, fetch, execute, transform, file I/O, JSON, notify, condition, combine, call, template |
 | **Data & Knowledge** | RAG retrieval, knowledge graph extraction/query/traversal, smart model router, multimodal image analysis |
 | **Code & Tools** | Python code interpreter sandbox, node marketplace, MCP integration, plugin system |
 | **Distributed Execution** | Coordinator/Worker architecture, horizontal scaling, heartbeat monitoring, circuit breaker |
 | **Scheduling** | Cron-based scheduled workflows, interval triggers, CLI management |
 | **Security** | SSRF protection, path traversal prevention, command injection defense, AES-GCM secrets, audit logging, secret redaction, ANSI injection defense, data race fixes, DoS prevention (subscription limits, log rotation, memory caps), 92+ vuln audited |
-| **Ecosystem** | GitCode G-Star, HarmonyOS Agent Skills, ohpm SDK, OPPO X-OmniClaw Skill Adapter, OPPO 小布技能, AndesGPT, SenseNova |
+| **Ecosystem** | GitCode G-Star, HarmonyOS Agent Skills, ohpm SDK, OPPO X-OmniClaw Skill Adapter, OPPO 小布技能, AndesGPT, SenseNova, Ant Ling |
 | **Developer Experience** | Web UI editor, workflow visualizer (Mermaid/JSON/DOT/ASCII), TUI with Markdown/Mermaid rendering, 9 languages |
 
 ---
@@ -131,12 +135,12 @@ Specialized AI agent nodes for autonomous reasoning:
 | `critic` | Reviews and provides constructive feedback |
 | `evaluator` | Evaluates outputs against criteria |
 | `reflector` | Reflects on process and suggests improvements |
-| `supervisor` | Oversees multi-agent workflows with sequential/parallel/hierarchical/MoE/MindSearch strategies and 16 domain specialists |
+| `supervisor` | Oversees multi-agent workflows with sequential/parallel/hierarchical/MoE/MindSearch/Agency strategies and 200+ domain specialists |
 | `code_review` | Automated code review and suggestions |
 | `router` | Routes inputs to appropriate handlers |
 | `human_in_loop` | Pauses for human approval |
-| `meta_orchestrator` | Multi-model router with 18 models, 5 strategies, hierarchical agent network |
-| `code_knowledge_graph` | Semantic code knowledge graph: 158 languages, vector retrieval, entity/relation/concept extraction |
+| `meta_orchestrator` | Multi-model router with 22+ models, 5 strategies, hierarchical agent network |
+| `code_knowledge_graph` | Semantic code knowledge graph: 158 languages, vector retrieval, entity/relation/concept extraction, MCP tool exposure, token-efficient review |
 | `moe_streaming` | MoE expert streaming: consumer hardware runs 744B models with on-demand loading |
 | `cli_session` | Interactive terminal session with context persistence, streaming output, auto-completion |
 | `plugin_system` | Plugin extension: install/uninstall/update from local/git/url/market with sandbox isolation |
@@ -145,9 +149,11 @@ Specialized AI agent nodes for autonomous reasoning:
 | `quality_guard` | Anti-AI-slop detection: 5 assessment types, auto-fix, quality threshold enforcement |
 | `engineer_skills` | 16 pre-built skills: React/TypeScript/API/Database/CI-CD/Docker/Design Patterns |
 | `skill_distill` | Distill methodologies from books/videos/podcasts into callable skills |
-| `voice_output` | TTS + voice cloning: 6 engines, 4 operations, 6 voice styles |
+| `voice_output` | Voice AI toolchain: TTS + voice cloning + ASR transcription + speaker diarization + voice analysis, 11 languages, 5 ASR engines |
 | `doc_gen` | AI document generation: 7 types (readme/api/function/module/changelog/tutorial/architecture) |
 | `video_edit` | AI video editing: smart_cut/merge/effects/subtitle/storyboard/upscale |
+| `omniroute` | AI gateway unified layer: 15+ providers, 6 routing strategies, Claude Code/Cursor/Cline compatibility |
+| `memory` | Agent memory infrastructure: three-level memory (short/medium/long), 8 operations, LRU eviction, cross-session long-term memory |
 
 ### HarmonyOS & Mobile Nodes
 
@@ -241,6 +247,7 @@ llm-box participates in multiple open-source ecosystems:
 | **ohpm SDK** | Published | `@llm-box/workflow-engine` — ArkTS SDK with WorkflowEngine, 30+ node types, device adaptation, intent protocol |
 | **Ascend NPU Adaptation** | Active | 7-agent auto-adapt pipeline, 3 workflow templates (end-to-end/quick/performance-tune), CANN/MindIE integration |
 | **SenseNova** | Active | API integration (6 models), on-device U1-Lite support (8B/A3B MoE), 8 skills for SenseNova ecosystem |
+| **Ant Ling (百灵)** | Active | API integration (4 models: ling-2.6-flash/ling-2.6-1t/ring-2.6-1t/ming-flash-omni-2.0), OpenAI-compatible endpoint |
 | **GitHub** | Active | CI/CD, CodeQL security scan, automated releases |
 
 ### HarmonyOS Device Support
