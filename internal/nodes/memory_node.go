@@ -20,15 +20,15 @@ var (
 		"long":   true,
 	}
 	validMemoryOperations = map[string]bool{
-		"store":          true,
-		"retrieve":       true,
-		"delete":         true,
-		"search":         true,
-		"summary":        true,
-		"forget":         true,
-		"transfer":       true,
-		"merge":          true,
-		"visualize":      true,
+		"store":            true,
+		"retrieve":         true,
+		"delete":           true,
+		"search":           true,
+		"summary":          true,
+		"forget":           true,
+		"transfer":         true,
+		"merge":            true,
+		"visualize":        true,
 		"inkling_retrieve": true,
 	}
 	validMemoryTypes = map[string]bool{
@@ -662,13 +662,13 @@ func (n *MemoryNode) visualizeMemory(params map[string]string) (map[string]inter
 		levelCount[entry.Level]++
 
 		node := map[string]interface{}{
-			"id":         entry.ID,
-			"key":        entry.Key,
-			"type":       entry.Type,
-			"level":      entry.Level,
-			"confidence": entry.Confidence,
-			"score":      entry.Score,
-			"created_at": entry.CreatedAt.Format(time.RFC3339),
+			"id":          entry.ID,
+			"key":         entry.Key,
+			"type":        entry.Type,
+			"level":       entry.Level,
+			"confidence":  entry.Confidence,
+			"score":       entry.Score,
+			"created_at":  entry.CreatedAt.Format(time.RFC3339),
 			"accessed_at": entry.AccessedAt.Format(time.RFC3339),
 			"expires_at":  entry.ExpiresAt.Format(time.RFC3339),
 			"tags":        entry.Tags,
@@ -686,10 +686,10 @@ func (n *MemoryNode) visualizeMemory(params map[string]string) (map[string]inter
 
 	for _, edge := range memoryStateInstance.graph.Edges {
 		edges = append(edges, map[string]interface{}{
-			"source":    edge.Source,
-			"target":    edge.Target,
-			"relation":  edge.Relation,
-			"weight":    edge.Weight,
+			"source":     edge.Source,
+			"target":     edge.Target,
+			"relation":   edge.Relation,
+			"weight":     edge.Weight,
 			"created_at": edge.CreatedAt.Format(time.RFC3339),
 		})
 	}
@@ -711,16 +711,16 @@ func (n *MemoryNode) visualizeMemory(params map[string]string) (map[string]inter
 	}
 
 	result := map[string]interface{}{
-		"operation":      "visualize",
-		"view_type":      viewType,
-		"total_nodes":    len(nodes),
-		"total_edges":    len(edges),
-		"nodes":          nodes,
-		"edges":          edges,
-		"clusters":       clusters,
-		"type_distribution": typeCount,
+		"operation":          "visualize",
+		"view_type":          viewType,
+		"total_nodes":        len(nodes),
+		"total_edges":        len(edges),
+		"nodes":              nodes,
+		"edges":              edges,
+		"clusters":           clusters,
+		"type_distribution":  typeCount,
 		"level_distribution": levelCount,
-		"status":         "success",
+		"status":             "success",
 	}
 
 	return result, nil
@@ -767,15 +767,15 @@ func (n *MemoryNode) retrieveMemoryWithInkling(query, level string, topK int, th
 	inklingAnalysis := n.performInklingAnalysis(combinedContext, query, len(results))
 
 	return map[string]interface{}{
-		"operation":          "inkling_retrieve",
-		"query":              query,
-		"level":              level,
-		"count":              len(results),
-		"results":            results,
-		"inkling_analysis":   inklingAnalysis,
-		"context_window":     "1M tokens",
-		"model":              "Inkling (975B MoE, 41B active)",
-		"status":             "success",
+		"operation":        "inkling_retrieve",
+		"query":            query,
+		"level":            level,
+		"count":            len(results),
+		"results":          results,
+		"inkling_analysis": inklingAnalysis,
+		"context_window":   "1M tokens",
+		"model":            "Inkling (975B MoE, 41B active)",
+		"status":           "success",
 	}, nil
 }
 
@@ -806,14 +806,14 @@ func (n *MemoryNode) performInklingAnalysis(context, query string, resultCount i
 	}
 
 	return map[string]interface{}{
-		"synthesis_quality":    synthesisQuality,
-		"context_relevance":    contextRelevance,
-		"long_term_coherence":  longTermCoherence,
-		"key_insights":         keyInsights,
-		"analyzed_entries":     resultCount,
-		"architecture":         "MoE (975B params, 41B active)",
-		"context_window_used":  "up to 1M tokens",
-		"method":               "Inkling-powered semantic retrieval",
+		"synthesis_quality":   synthesisQuality,
+		"context_relevance":   contextRelevance,
+		"long_term_coherence": longTermCoherence,
+		"key_insights":        keyInsights,
+		"analyzed_entries":    resultCount,
+		"architecture":        "MoE (975B params, 41B active)",
+		"context_window_used": "up to 1M tokens",
+		"method":              "Inkling-powered semantic retrieval",
 	}
 }
 

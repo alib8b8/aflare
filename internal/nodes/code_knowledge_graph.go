@@ -236,39 +236,39 @@ type ckgQueryResult struct {
 }
 
 type ckgReviewScore struct {
-	Category    string  `json:"category"`
-	Score       float64 `json:"score"`
-	MaxScore    float64 `json:"max_score"`
-	Description string  `json:"description"`
+	Category    string   `json:"category"`
+	Score       float64  `json:"score"`
+	MaxScore    float64  `json:"max_score"`
+	Description string   `json:"description"`
 	Issues      []string `json:"issues,omitempty"`
 }
 
 type ckgReviewResult struct {
-	OverallScore float64        `json:"overall_score"`
-	MaxScore     float64        `json:"max_score"`
-	Passed       bool           `json:"passed"`
+	OverallScore float64          `json:"overall_score"`
+	MaxScore     float64          `json:"max_score"`
+	Passed       bool             `json:"passed"`
 	Scores       []ckgReviewScore `json:"scores"`
-	Summary      string         `json:"summary"`
+	Summary      string           `json:"summary"`
 }
 
 type ckgPRAnalysis struct {
-	PRNumber     string              `json:"pr_number"`
-	Title        string              `json:"title"`
-	Author       string              `json:"author"`
-	FilesChanged int                 `json:"files_changed"`
-	LinesAdded   int                 `json:"lines_added"`
-	LinesRemoved int                 `json:"lines_removed"`
-	ReviewResult ckgReviewResult     `json:"review_result"`
-	Impact       string              `json:"impact"`
-	RiskLevel    string              `json:"risk_level"`
-	Suggestions  []string            `json:"suggestions"`
+	PRNumber     string          `json:"pr_number"`
+	Title        string          `json:"title"`
+	Author       string          `json:"author"`
+	FilesChanged int             `json:"files_changed"`
+	LinesAdded   int             `json:"lines_added"`
+	LinesRemoved int             `json:"lines_removed"`
+	ReviewResult ckgReviewResult `json:"review_result"`
+	Impact       string          `json:"impact"`
+	RiskLevel    string          `json:"risk_level"`
+	Suggestions  []string        `json:"suggestions"`
 }
 
 type ckgStats struct {
-	FilesAnalyzed      int `json:"files_analyzed"`
-	EntitiesExtracted  int `json:"entities_extracted"`
-	RelationsExtracted int `json:"relations_extracted"`
-	ConceptsExtracted  int `json:"concepts_extracted"`
+	FilesAnalyzed      int   `json:"files_analyzed"`
+	EntitiesExtracted  int   `json:"entities_extracted"`
+	RelationsExtracted int   `json:"relations_extracted"`
+	ConceptsExtracted  int   `json:"concepts_extracted"`
 	QueryTimeMs        int64 `json:"query_time_ms"`
 }
 

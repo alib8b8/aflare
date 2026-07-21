@@ -683,12 +683,12 @@ func (n *VoiceOutputNode) executeInklingAudioOperation(ctx context.Context, inpu
 	latency := time.Since(startTime)
 
 	result := map[string]interface{}{
-		"operation":        "inkling_audio",
-		"engine":           "inkling",
-		"language":         language,
-		"audio_analysis":   inklingResult,
-		"latency_ms":       latency.Milliseconds(),
-		"timestamp":        time.Now().UTC().Format(time.RFC3339),
+		"operation":      "inkling_audio",
+		"engine":         "inkling",
+		"language":       language,
+		"audio_analysis": inklingResult,
+		"latency_ms":     latency.Milliseconds(),
+		"timestamp":      time.Now().UTC().Format(time.RFC3339),
 	}
 
 	output, _ := json.MarshalIndent(result, "", "  ")

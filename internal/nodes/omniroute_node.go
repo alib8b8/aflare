@@ -347,56 +347,56 @@ var (
 		"text-generation-webui": "http://localhost:5001/v1",
 	}
 	providerModels = map[string][]string{
-		"openai":          {"gpt-4o", "gpt-4", "gpt-3.5-turbo"},
-		"anthropic":       {"claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240229"},
-		"google":          {"gemini-pro", "gemini-flash"},
-		"deepseek":        {"deepseek-chat", "deepseek-coder"},
-		"qwen":            {"qwen-max", "qwen-turbo"},
-		"ernie":           {"ernie-4.0", "ernie-3.5"},
-		"sensenova":       {"flash-lite", "flash", "u1-lite", "u1-pro"},
-		"antling":         {"ling-2.6-flash", "ling-2.6-1t", "ring-2.6-1t"},
-		"andesgpt":        {"tiny", "turbo", "titan"},
-		"ollama":          {"llama3", "mistral", "phi3"},
-		"inkling":         {"inkling-64k", "inkling-256k", "inkling-1m"},
+		"openai":           {"gpt-4o", "gpt-4", "gpt-3.5-turbo"},
+		"anthropic":        {"claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240229"},
+		"google":           {"gemini-pro", "gemini-flash"},
+		"deepseek":         {"deepseek-chat", "deepseek-coder"},
+		"qwen":             {"qwen-max", "qwen-turbo"},
+		"ernie":            {"ernie-4.0", "ernie-3.5"},
+		"sensenova":        {"flash-lite", "flash", "u1-lite", "u1-pro"},
+		"antling":          {"ling-2.6-flash", "ling-2.6-1t", "ring-2.6-1t"},
+		"andesgpt":         {"tiny", "turbo", "titan"},
+		"ollama":           {"llama3", "mistral", "phi3"},
+		"inkling":          {"inkling-64k", "inkling-256k", "inkling-1m"},
 		"thinkingmachines": {"inkling-64k", "inkling-256k", "inkling-1m"},
-		"tinker":          {"inkling-64k", "inkling-256k", "inkling-1m"},
-		"vllm":            {"llama-3-70b", "mixtral-8x7b"},
+		"tinker":           {"inkling-64k", "inkling-256k", "inkling-1m"},
+		"vllm":             {"llama-3-70b", "mixtral-8x7b"},
 	}
 	providerLatency = map[string]int{
-		"openai":          800,
-		"anthropic":       1200,
-		"google":          600,
-		"azure":           900,
-		"aws":             1000,
-		"deepseek":        500,
-		"qwen":            550,
-		"ernie":           650,
-		"sensenova":       350,
-		"antling":         300,
-		"andesgpt":        250,
-		"ollama":          200,
-		"inkling":         700,
+		"openai":           800,
+		"anthropic":        1200,
+		"google":           600,
+		"azure":            900,
+		"aws":              1000,
+		"deepseek":         500,
+		"qwen":             550,
+		"ernie":            650,
+		"sensenova":        350,
+		"antling":          300,
+		"andesgpt":         250,
+		"ollama":           200,
+		"inkling":          700,
 		"thinkingmachines": 700,
-		"tinker":          700,
-		"vllm":            150,
+		"tinker":           700,
+		"vllm":             150,
 	}
 	providerCost = map[string]float64{
-		"openai":          0.015,
-		"anthropic":       0.015,
-		"google":          0.00125,
-		"azure":           0.012,
-		"aws":             0.008,
-		"deepseek":        0.001,
-		"qwen":            0.002,
-		"ernie":           0.003,
-		"sensenova":       0.001,
-		"antling":         0.0005,
-		"andesgpt":        0.0005,
-		"ollama":          0,
-		"inkling":         0.00655,
+		"openai":           0.015,
+		"anthropic":        0.015,
+		"google":           0.00125,
+		"azure":            0.012,
+		"aws":              0.008,
+		"deepseek":         0.001,
+		"qwen":             0.002,
+		"ernie":            0.003,
+		"sensenova":        0.001,
+		"antling":          0.0005,
+		"andesgpt":         0.0005,
+		"ollama":           0,
+		"inkling":          0.00655,
 		"thinkingmachines": 0.00655,
-		"tinker":          0.00655,
-		"vllm":            0,
+		"tinker":           0.00655,
+		"vllm":             0,
 	}
 	toolProviderMapping = map[string][]string{
 		"claude_code": {"anthropic", "openai", "inkling"},
@@ -404,9 +404,9 @@ var (
 		"cline":       {"openai", "anthropic", "google", "inkling"},
 		"llm_box":     {"openai", "anthropic", "sensenova", "antling", "ollama", "inkling"},
 	}
-	providerPattern     = regexp.MustCompile(`^[a-zA-Z0-9_-]{2,32}$`)
-	baseURLPattern      = regexp.MustCompile(`^https?://[a-zA-Z0-9._-]+(:[0-9]+)?(/.*)?$`)
-	regionPattern       = regexp.MustCompile(`^[a-zA-Z0-9_-]{2,32}$`)
+	providerPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{2,32}$`)
+	baseURLPattern  = regexp.MustCompile(`^https?://[a-zA-Z0-9._-]+(:[0-9]+)?(/.*)?$`)
+	regionPattern   = regexp.MustCompile(`^[a-zA-Z0-9_-]{2,32}$`)
 )
 
 type OmniRouteNode struct{}
@@ -664,33 +664,33 @@ func (n *OmniRouteNode) simulateOmniRouteResponse(input, provider, model, tool s
 }
 
 type providerHealth struct {
-	Provider     string  `json:"provider"`
-	Status       string  `json:"status"`
-	LatencyMs    int     `json:"latency_ms"`
-	ErrorRate    float64 `json:"error_rate"`
-	LastChecked  string  `json:"last_checked"`
-	IsAvailable  bool    `json:"is_available"`
+	Provider    string  `json:"provider"`
+	Status      string  `json:"status"`
+	LatencyMs   int     `json:"latency_ms"`
+	ErrorRate   float64 `json:"error_rate"`
+	LastChecked string  `json:"last_checked"`
+	IsAvailable bool    `json:"is_available"`
 }
 
 var (
-	providerHealthStatus   = make(map[string]providerHealth)
-	providerHealthMu       sync.RWMutex
-	healthCheckInterval    = 60 * time.Second
-	healthCleanupInterval  = 5 * time.Minute
-	omniRand               = rand.New(rand.NewSource(time.Now().UnixNano()))
-	omniRandMu             sync.Mutex
+	providerHealthStatus  = make(map[string]providerHealth)
+	providerHealthMu      sync.RWMutex
+	healthCheckInterval   = 60 * time.Second
+	healthCleanupInterval = 5 * time.Minute
+	omniRand              = rand.New(rand.NewSource(time.Now().UnixNano()))
+	omniRandMu            sync.Mutex
 )
 
 func initHealthChecker() {
 	providerHealthMu.Lock()
 	for provider := range validOmniRouteProviders {
 		providerHealthStatus[provider] = providerHealth{
-			Provider:     provider,
-			Status:       "unknown",
-			LatencyMs:    0,
-			ErrorRate:    0,
-			LastChecked:  time.Now().UTC().Format(time.RFC3339),
-			IsAvailable:  true,
+			Provider:    provider,
+			Status:      "unknown",
+			LatencyMs:   0,
+			ErrorRate:   0,
+			LastChecked: time.Now().UTC().Format(time.RFC3339),
+			IsAvailable: true,
 		}
 	}
 	providerHealthMu.Unlock()
@@ -725,12 +725,12 @@ func performHealthChecks() {
 		}
 
 		providerHealthStatus[provider] = providerHealth{
-			Provider:     provider,
-			Status:       status,
-			LatencyMs:    latencyMs,
-			ErrorRate:    errorRate,
-			LastChecked:  time.Now().UTC().Format(time.RFC3339),
-			IsAvailable:  isAvailable,
+			Provider:    provider,
+			Status:      status,
+			LatencyMs:   latencyMs,
+			ErrorRate:   errorRate,
+			LastChecked: time.Now().UTC().Format(time.RFC3339),
+			IsAvailable: isAvailable,
 		}
 	}
 }
@@ -785,12 +785,12 @@ func (n *OmniRouteNode) ExecuteHealthCheck(provider string) providerHealth {
 	}
 
 	health := providerHealth{
-		Provider:     provider,
-		Status:       status,
-		LatencyMs:    latencyMs,
-		ErrorRate:    errorRate,
-		LastChecked:  time.Now().UTC().Format(time.RFC3339),
-		IsAvailable:  isAvailable,
+		Provider:    provider,
+		Status:      status,
+		LatencyMs:   latencyMs,
+		ErrorRate:   errorRate,
+		LastChecked: time.Now().UTC().Format(time.RFC3339),
+		IsAvailable: isAvailable,
 	}
 
 	providerHealthMu.Lock()
