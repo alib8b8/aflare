@@ -1,54 +1,59 @@
 ---
-name: workflow
+name: llm-box
 description: Generate and execute terminal workflows using llm-box. Use when the user wants to automate multi-step terminal tasks, chain commands, fetch URLs, process data, create reusable pipelines, or build CI/CD-like automation locally.
 invocation: both
+allowed-tools: Read, Edit, Write, Bash, Glob, Grep, WebFetch
+version: 0.6.0
+author: llm-box
+license: MIT
+compatibility: claude-code >= 0.7.0
+tags: [workflow, automation, cli, pipeline, terminal]
 ---
 
-# llm-box Workflow Skill
+## Overview
 
-## When to Use
+llm-box is an AI-powered terminal workflow engine that generates and executes multi-step automation pipelines from natural language descriptions. It supports 30+ agent nodes including LLM providers, code analysis, file operations, web fetching, and system integrations. Workflows are defined as deterministic YAML files that can be version-controlled and reused.
 
-Use this skill when the user wants to:
+Key features:
+- Natural language to YAML workflow generation
+- 30+ built-in nodes (LLM, fetch, execute, transform, etc.)
+- MCP protocol support for external tool integration
+- Security-hardened with SSRF protection, path traversal prevention, and resource limits
+- On-device LLM inference support (1B-8B models)
 
-- **Automate multi-step terminal tasks** — fetching data, processing it, saving results
-- **Create reusable pipelines** — workflows that can be run repeatedly
-- **Chain commands** — where output of one step feeds into the next
-- **Batch process data** — transform, filter, combine multiple data sources
-- **Integrate LLMs into automation** — use Ollama, DeepSeek, or OpenAI-compatible models
-- **Replace fragile bash scripts** — with structured, auditable YAML workflows
+## Prerequisites
 
-## How llm-box Works
+- llm-box CLI installed (`go install github.com/alib8b8/llm-box/cmd/llm-box@latest`)
+- Go 1.21+ or a pre-built binary
+- Optional: Ollama for local LLM inference
 
-```
-Plain English description → YAML workflow → Execute with progress
-```
+## Instructions
 
-llm-box generates a YAML workflow file from a natural language description.
-The workflow is deterministic and reproducible — same workflow always produces
-the same result. Users can edit the YAML by hand if they want to tweak things.
-
-## Quick Reference
+1. **Generate a workflow**: Describe the task in natural language
+2. **Review the YAML**: The generated workflow is deterministic and editable
+3. **Execute**: Run the workflow with progress tracking
+4. **Chain outputs**: Use `{{.steps[N].output}}` to pass data between steps
 
 ### CLI Commands
 
 ```bash
 # Generate a workflow from plain English
-llm-box create "<description>"
+llm-box create "fetch weather data and save to file"
 
 # Run a workflow file
-llm-box run <workflow.yaml>
+llm-box run workflow.yaml
 
 # List all available nodes
 llm-box list
 
-# Validate a workflow file without running
-llm-box validate <workflow.yaml>
-
-# Run in safe mode (disables execute node)
-llm-box --safe-mode run <workflow.yaml>
+# Validate a workflow without executing
+llm-box validate workflow.yaml
 
 # Dry run (show steps without executing)
-llm-box --dry-run run <workflow.yaml>
+llm-box --dry-run run workflow.yaml
+
+# Safe mode (disables execute node)
+llm-box --safe-mode run workflow.yaml
 ```
 
 ### Available Nodes
@@ -56,7 +61,7 @@ llm-box --dry-run run <workflow.yaml>
 **Utility Nodes:**
 | Node | Description |
 |------|-------------|
-| `fetch_url` | Fetch content from a URL (with SSRF protection) |
+| `fetch_url` | Fetch content from a URL (SSRF protected) |
 | `http_request` | Full HTTP client — any method, headers, body |
 | `file_read` | Read file contents |
 | `file_write` | Write content to a file |
@@ -85,62 +90,34 @@ llm-box --dry-run run <workflow.yaml>
 | `condition` | Conditional execution based on expression |
 | `call` | Call another workflow file (nested) |
 
-## YAML Workflow Structure
+## Output
 
+The skill generates a YAML workflow file and optionally executes it. Output includes:
+- Generated workflow YAML
+- Execution progress and logs
+- Final output from the last step
+- Error details if any step fails
+
+## Examples
+
+**Example 1: Fetch and Save**
 ```yaml
-name: my-workflow
-description: What this workflow does
-vars:
-  api_key: "your-api-key"
+name: fetch-and-save
+description: Fetch data from API and save to file
 steps:
   - node: fetch_url
     params:
       url: "https://api.example.com/data"
-  - node: json_parse
-    params:
-      path: "result.items.[0].name"
-  - node: file_write
-    params:
-      path: "output.txt"
-  - node: notify
-    condition: "{{.output}} != ''"
-    params:
-      message: "Done!"
-```
-
-### Step Features
-
-- **`condition`**: Go template expression, step runs only if true
-- **`retry`**: Number of retries on failure
-- **`delay`**: Delay between retries (e.g., "2s", "1m")
-- **`parallel`**: Run multiple steps concurrently
-- **`_timeout`**: Per-step timeout (e.g., "30s")
-
-## Workflow Generation Guidelines
-
-When generating a workflow for the user:
-
-1. **Identify the steps** — break the task into discrete operations
-2. **Choose the right nodes** — prefer specific nodes over `execute` when possible
-3. **Chain with variables** — use `{{.steps[N].output}}` to reference previous outputs
-4. **Add error handling** — use `condition` and `retry` where appropriate
-5. **Keep it readable** — add a `description` field, use meaningful step names
-
-### Common Patterns
-
-**Fetch and Save:**
-```yaml
-steps:
-  - node: fetch_url
-    params:
-      url: "https://example.com/data"
   - node: file_write
     params:
       path: "data.txt"
+      content: "{{.steps[0].output}}"
 ```
 
-**Fetch, Parse, and Summarize:**
+**Example 2: Fetch, Parse, and Summarize**
 ```yaml
+name: summarize-article
+description: Fetch article and summarize with LLM
 steps:
   - node: fetch_url
     params:
@@ -152,10 +129,13 @@ steps:
   - node: file_write
     params:
       path: "summary.md"
+      content: "{{.steps[1].output}}"
 ```
 
-**Multi-source Aggregation:**
+**Example 3: Multi-source Aggregation**
 ```yaml
+name: aggregate-sources
+description: Fetch from multiple APIs and analyze
 steps:
   - parallel:
       - node: fetch_url
@@ -173,21 +153,10 @@ steps:
       prompt: "Analyze: {{.steps[1].output}}"
 ```
 
-## Security Notes
+## Resources
 
-- Built-in SSRF protection (URL validation, DNS rebinding checks)
-- Path traversal protection (sandboxed paths, symlink resolution)
-- Command injection prevention (shell metachar filtering, optional allowlist)
-- Resource limits (file size, response body, step count, timeouts)
-- Safe mode disables the `execute` node entirely
-
-## Installation
-
-```bash
-# Linux/macOS
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
-bash install.sh
-
-# Or via Go
-go install github.com/alib8b8/llm-box/cmd/llm-box@latest
-```
+- **GitHub**: https://github.com/alib8b8/llm-box
+- **GitCode**: https://gitcode.com/llm-box/llm-box
+- **Documentation**: https://gitcode.com/llm-box/llm-box/blob/main/README.md
+- **Issues**: https://github.com/alib8b8/llm-box/issues
+- **License**: MIT
