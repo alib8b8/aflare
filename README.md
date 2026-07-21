@@ -60,7 +60,7 @@
 |-------------|---------|
 | `curl -fsSL https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh \| bash` | `irm https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.ps1 \| iex` |
 
-**Or download from [GitCode Releases](https://gitcode.com/llm-box/llm-box/-/releases) / [GitHub Releases](https://github.com/alib8b8/llm-box/releases)**
+**Or download from [GitCode Releases](https://gitcode.com/llm-box/llm-box/releases) / [GitHub Releases](https://github.com/alib8b8/llm-box/releases)**
 
 📖 [Interactive Download Page →](docs/download.html)
 
