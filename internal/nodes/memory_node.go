@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const maxMemoryValueSize = 1024 * 1024 // 1MB
+
 var (
 	validMemoryLevels = map[string]bool{
 		"short":  true,
@@ -151,6 +153,10 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 		return "", fmt.Errorf("value is required for store operation")
 	}
 
+	if len(value) > maxMemoryValueSize {
+		return "", fmt.Errorf("value too large (max 1MB)")
+	}
+
 	if operation == "retrieve" && key == "" {
 		return "", fmt.Errorf("key is required for retrieve operation")
 	}
@@ -160,7 +166,7 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 	if tagsStr != "" {
 		for _, t := range strings.Split(tagsStr, ",") {
 			t = strings.TrimSpace(t)
-			if t != "" {
+			if t != "" && len(t) <= 128 {
 				tags = append(tags, t)
 			}
 		}
@@ -347,8 +353,9 @@ func (n *MemoryNode) searchMemory(query, level string, topK int, threshold float
 
 		similarity := n.calculateSimilarity(query, entry.Value)
 		if similarity >= threshold {
-			entry.Score = similarity * 100
-			results = append(results, *entry)
+			entryCopy := *entry
+			entryCopy.Score = similarity * 100
+			results = append(results, entryCopy)
 		}
 	}
 

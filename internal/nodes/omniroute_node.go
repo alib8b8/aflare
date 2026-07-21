@@ -139,6 +139,10 @@ func (n *OmniRouteNode) Schema() NodeSchema {
 }
 
 func (n *OmniRouteNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	if len(input) > 8192 {
+		return "", fmt.Errorf("input too long (max 8192 chars)")
+	}
+
 	tool := getParam(params, "tool", "llm_box")
 	if !validOmniRouteTools[tool] {
 		return "", fmt.Errorf("invalid tool: %s (supported: claude_code, cursor, cline, llm_box)", tool)
@@ -185,10 +189,23 @@ func (n *OmniRouteNode) Execute(ctx context.Context, input string, params map[st
 	response := n.simulateOmniRouteResponse(input, provider, model, tool)
 	latency := time.Since(startTime)
 
-	effectiveLatency := latency.Milliseconds() + int64(providerLatency[provider])
+	latencyMs, ok := providerLatency[provider]
+	if !ok {
+		latencyMs = 500
+	}
+	costPer1k, ok := providerCost[provider]
+	if !ok {
+		costPer1k = 0.01
+	}
+	models, ok := providerModels[provider]
+	if !ok {
+		models = []string{"default"}
+	}
+
+	effectiveLatency := latency.Milliseconds() + int64(latencyMs)
 	inputTokens := len(input) / 4
 	outputTokens := len(response) / 4
-	cost := (float64(inputTokens)/1000.0)*providerCost[provider] + (float64(outputTokens)/1000.0)*providerCost[provider]*2
+	cost := (float64(inputTokens)/1000.0)*costPer1k + (float64(outputTokens)/1000.0)*costPer1k*2
 
 	result := map[string]interface{}{
 		"route": map[string]interface{}{
@@ -208,10 +225,10 @@ func (n *OmniRouteNode) Execute(ctx context.Context, input string, params map[st
 		},
 		"latency_ms": effectiveLatency,
 		"metadata": map[string]interface{}{
-			"provider_latency": providerLatency[provider],
-			"provider_cost":    providerCost[provider],
+			"provider_latency": latencyMs,
+			"provider_cost":    costPer1k,
 			"is_fallback":      false,
-			"available_models": providerModels[provider],
+			"available_models": models,
 		},
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	}
