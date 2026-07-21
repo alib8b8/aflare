@@ -31,7 +31,7 @@ func (n *SupervisorNode) Schema() NodeSchema {
 	}
 	params = append(params,
 		ParamSchema{Name: "specialists", Type: "string", Description: "Comma-separated list of specialist agents: planner,researcher,critic,code_review,evaluator,reflector,legal_expert,medical_expert,educational_expert,financial_expert,creative_writer,data_analyst", Required: false, Default: "planner,researcher,critic,evaluator"},
-		ParamSchema{Name: "strategy", Type: "string", Description: "Strategy: sequential, parallel, hierarchical, mindsearch, moe (default: sequential)", Required: false, Default: "sequential"},
+		ParamSchema{Name: "strategy", Type: "string", Description: "Strategy: sequential, parallel, hierarchical, mindsearch, moe, agency (default: sequential)", Required: false, Default: "sequential"},
 		ParamSchema{Name: "output_format", Type: "string", Description: "Output format: json, markdown, summary (default: json)", Required: false, Default: "json"},
 		ParamSchema{Name: "domain", Type: "string", Description: "Domain specialization: general,legal,medical,education,finance,creative,tech,business (default: general)", Required: false, Default: "general"},
 		ParamSchema{Name: "enable_moe", Type: "string", Description: "Enable Mixture-of-Experts routing (default: false)", Required: false, Default: "false"},
@@ -48,22 +48,196 @@ func (n *SupervisorNode) Schema() NodeSchema {
 }
 
 var allSpecialists = map[string]string{
-	"planner":            "planner — breaks tasks into structured steps and milestones",
-	"researcher":         "researcher — gathers, verifies, and synthesizes information",
-	"critic":             "critic — reviews quality, finds flaws, suggests improvements",
-	"code_review":        "code_review — audits code for bugs, security, performance, style",
-	"evaluator":          "evaluator — scores output against rubrics and success criteria",
-	"reflector":          "reflector — self-improves output through iterative refinement",
-	"legal_expert":       "legal_expert — legal analysis, contract review, compliance guidance",
-	"medical_expert":     "medical_expert — health information, medical research, clinical guidance",
-	"educational_expert": "educational_expert — curriculum design, learning paths, pedagogical advice",
-	"financial_expert":   "financial_expert — financial analysis, investment, budgeting, risk assessment",
-	"creative_writer":    "creative_writer — content creation, storytelling, copywriting, editing",
-	"data_analyst":       "data_analyst — data analysis, statistics, visualization, insights",
-	"ux_designer":        "ux_designer — user experience design, wireframing, usability review",
-	"product_manager":    "product_manager — product strategy, roadmap, requirements, prioritization",
-	"qa_engineer":        "qa_engineer — test planning, quality assurance, edge case analysis",
-	"devops_engineer":    "devops_engineer — infrastructure, deployment, CI/CD, monitoring",
+	"planner":               "planner — breaks tasks into structured steps and milestones",
+	"researcher":            "researcher — gathers, verifies, and synthesizes information",
+	"critic":                "critic — reviews quality, finds flaws, suggests improvements",
+	"code_review":           "code_review — audits code for bugs, security, performance, style",
+	"evaluator":             "evaluator — scores output against rubrics and success criteria",
+	"reflector":             "reflector — self-improves output through iterative refinement",
+	"legal_expert":          "legal_expert — legal analysis, contract review, compliance guidance",
+	"medical_expert":        "medical_expert — health information, medical research, clinical guidance",
+	"educational_expert":    "educational_expert — curriculum design, learning paths, pedagogical advice",
+	"financial_expert":      "financial_expert — financial analysis, investment, budgeting, risk assessment",
+	"creative_writer":       "creative_writer — content creation, storytelling, copywriting, editing",
+	"data_analyst":          "data_analyst — data analysis, statistics, visualization, insights",
+	"ux_designer":           "ux_designer — user experience design, wireframing, usability review",
+	"product_manager":       "product_manager — product strategy, roadmap, requirements, prioritization",
+	"qa_engineer":           "qa_engineer — test planning, quality assurance, edge case analysis",
+	"devops_engineer":       "devops_engineer — infrastructure, deployment, CI/CD, monitoring",
+	"architect":             "architect — system architecture, design patterns, scalability",
+	"backend_dev":           "backend_dev — backend development, APIs, databases",
+	"frontend_dev":          "frontend_dev — frontend development, UI/UX, frameworks",
+	"mobile_dev":            "mobile_dev — mobile app development, iOS/Android/HarmonyOS",
+	"fullstack_dev":         "fullstack_dev — full-stack development, end-to-end solutions",
+	"security_expert":       "security_expert — cybersecurity, penetration testing, secure coding",
+	"cloud_engineer":        "cloud_engineer — cloud infrastructure, AWS/GCP/Azure/Alibaba Cloud",
+	"database_admin":        "database_admin — database design, optimization, administration",
+	"network_engineer":      "network_engineer — network architecture, protocols, security",
+	"systems_admin":         "systems_admin — system administration, server management",
+	"machine_learning":      "machine_learning — ML model development, training, deployment",
+	"deep_learning":         "deep_learning — neural networks, NLP, computer vision",
+	"data_scientist":        "data_scientist — data mining, predictive analytics, modeling",
+	"AI_researcher":         "AI_researcher — cutting-edge AI research, new models, techniques",
+	"blockchain_dev":        "blockchain_dev — smart contracts, DApps, DeFi",
+	"game_dev":              "game_dev — game development, engines, graphics",
+	"embedded_dev":          "embedded_dev — embedded systems, IoT, firmware",
+	"quality_assurance":     "quality_assurance — QA processes, test automation, standards",
+	"tech_lead":             "tech_lead — technical leadership, team management, architecture",
+	"CTO":                   "CTO — technology strategy, vision, innovation",
+	"startup_advisor":       "startup_advisor — startup strategy, funding, growth",
+	"business_analyst":      "business_analyst — business requirements, process analysis",
+	"marketing_expert":      "marketing_expert — digital marketing, SEO, branding",
+	"sales_expert":          "sales_expert — sales strategy, customer acquisition, CRM",
+	"customer_success":      "customer_success — customer retention, support, satisfaction",
+	"project_manager":       "project_manager — project planning, resource allocation, deadlines",
+	"scrum_master":          "scrum_master — agile methodology, sprint planning, team facilitation",
+	"UX_researcher":         "UX_researcher — user research, personas, usability testing",
+	"UI_designer":           "UI_designer — visual design, typography, color theory",
+	"graphic_designer":      "graphic_designer — graphics, branding, visual identity",
+	"content_strategist":    "content_strategist — content planning, SEO, audience targeting",
+	"community_manager":     "community_manager — community building, engagement, moderation",
+	"technical_writer":      "technical_writer — documentation, tutorials, API docs",
+	"translator":            "translator — language translation, localization",
+	"video_producer":        "video_producer — video production, editing, storytelling",
+	"audio_engineer":        "audio_engineer — audio production, sound design, mixing",
+	"photographer":          "photographer — photography, composition, editing",
+	"3D_artist":             "3D_artist — 3D modeling, rendering, animation",
+	"animator":              "animator — animation, motion graphics, character design",
+	"copywriter":            "copywriter — persuasive copy, advertising, marketing content",
+	"SEO_expert":            "SEO_expert — search engine optimization, keyword strategy",
+	"social_media":          "social_media — social media strategy, content creation, analytics",
+	"PR_specialist":         "PR_specialist — public relations, media relations, crisis management",
+	"event_planner":         "event_planner — event planning, logistics, coordination",
+	"recruiter":             "recruiter — talent acquisition, interviewing, hiring",
+	"HR_expert":             "HR_expert — human resources, employee relations, culture",
+	"accountant":            "accountant — accounting, financial reporting, tax",
+	"investment_advisor":    "investment_advisor — investment advice, portfolio management",
+	"real_estate":           "real_estate — real estate analysis, property valuation",
+	"travel_expert":         "travel_expert — travel planning, destinations, logistics",
+	"food_expert":           "food_expert — culinary expertise, recipe development",
+	"fitness_coach":         "fitness_coach — fitness training, nutrition, wellness",
+	"life_coach":            "life_coach — personal development, goal setting, motivation",
+	"career_coach":          "career_coach — career guidance, resume, interviews",
+	"psychologist":          "psychologist — psychology, mental health, counseling",
+	"philosopher":           "philosopher — philosophy, critical thinking, ethics",
+	"historian":             "historian — historical research, analysis, interpretation",
+	"scientist":             "scientist — scientific research, methodology, analysis",
+	"engineer":              "engineer — engineering principles, problem solving",
+	"mathematician":         "mathematician — mathematics, algorithms, proofs",
+	"physicist":             "physicist — physics, quantum mechanics, relativity",
+	"chemist":               "chemist — chemistry, materials, reactions",
+	"biologist":             "biologist — biology, genetics, ecology",
+	"astronomer":            "astronomer — astronomy, cosmology, space exploration",
+	"geologist":             "geologist — geology, earth sciences, mineralogy",
+	"paleontologist":        "paleontologist — paleontology, fossils, evolution",
+	"linguist":              "linguist — linguistics, language structure, semantics",
+	"anthropologist":        "anthropologist — anthropology, culture, society",
+	"sociologist":           "sociologist — sociology, social structures, behavior",
+	"economist":             "economist — economics, markets, policy analysis",
+	"politician":            "politician — politics, governance, policy",
+	"lawyer":                "lawyer — legal practice, litigation, contracts",
+	"judge":                 "judge — legal judgment, dispute resolution",
+	"doctor":                "doctor — medical diagnosis, treatment, healthcare",
+	"nurse":                 "nurse — nursing care, patient support",
+	"pharmacist":            "pharmacist — pharmacy, medications, drug interactions",
+	"dentist":               "dentist — dentistry, oral health",
+	"veterinarian":          "veterinarian — veterinary medicine, animal health",
+	"architect_civil":       "architect_civil — civil architecture, building design",
+	"urban_planner":         "urban_planner — urban planning, city design",
+	"interior_designer":     "interior_designer — interior design, space planning",
+	"landscape_designer":    "landscape_designer — landscape design, outdoor spaces",
+	"fashion_designer":      "fashion_designer — fashion design, clothing",
+	"industrial_designer":   "industrial_designer — product design, consumer goods",
+	"packaging_designer":    "packaging_designer — packaging design, branding",
+	"typographer":           "typographer — typography, font design",
+	"illustrator":           "illustrator — illustration, drawing",
+	"cartoonist":            "cartoonist — cartooning, comics",
+	"screenwriter":          "screenwriter — screenwriting, film scripts",
+	"director":              "director — film/TV direction, storytelling",
+	"producer":              "producer — film/TV production, budgeting",
+	"journalist":            "journalist — journalism, news reporting",
+	"editor":                "editor — editing, publishing",
+	"publisher":             "publisher — publishing, content distribution",
+	"blogger":               "blogger — blogging, content creation",
+	"podcaster":             "podcaster — podcasting, audio content",
+	"youtuber":              "youtuber — YouTube content, video production",
+	"streamer":              "streamer — live streaming, content creation",
+	"influencer":            "influencer — social media influence, marketing",
+	"entrepreneur":          "entrepreneur — entrepreneurship, business building",
+	"angel_investor":        "angel_investor — angel investing, startup funding",
+	"venture_capitalist":    "venture_capitalist — venture capital, investment",
+	"business_developer":    "business_developer — business development, partnerships",
+	"supply_chain":          "supply_chain — supply chain management, logistics",
+	"operations_manager":    "operations_manager — operations management, efficiency",
+	"quality_manager":       "quality_manager — quality management, ISO standards",
+	"risk_manager":          "risk_manager — risk management, mitigation",
+	"compliance_officer":    "compliance_officer — compliance, regulations",
+	"auditor":               "auditor — auditing, financial review",
+	"actuary":               "actuary — actuarial science, risk assessment",
+	"underwriter":           "underwriter — insurance underwriting, risk analysis",
+	"broker":                "broker — brokerage, financial transactions",
+	"trader":                "trader — trading, financial markets",
+	"analyst":               "analyst — market analysis, research",
+	"consultant":            "consultant — professional consulting, advisory",
+	"advisor":               "advisor — strategic advice, guidance",
+	"mentor":                "mentor — mentorship, guidance, support",
+	"trainer":               "trainer — training, education, workshops",
+	"teacher":               "teacher — teaching, education",
+	"professor":             "professor — academic teaching, research",
+	"researcher_academic":   "researcher_academic — academic research, publishing",
+	"librarian":             "librarian — library science, information management",
+	"archivist":             "archivist — archives, records management",
+	"curator":               "curator — museum curation, exhibitions",
+	"conservationist":       "conservationist — conservation, preservation",
+	"environmentalists":     "environmentalists — environmental advocacy, sustainability",
+	"activist":              "activist — activism, social change",
+	"advocate":              "advocate — advocacy, representation",
+	"mediator":              "mediator — mediation, conflict resolution",
+	"negotiator":            "negotiator — negotiation, deal making",
+	"diplomat":              "diplomat — diplomacy, international relations",
+	"ambassador":            "ambassador — ambassadorship, representation",
+	"translator_legal":      "translator_legal — legal translation",
+	"translator_medical":    "translator_medical — medical translation",
+	"localization":          "localization — localization, internationalization",
+	"interpreter":           "interpreter — simultaneous interpretation",
+	"voice_actor":           "voice_actor — voice acting, narration",
+	"narrator":              "narrator — narration, storytelling",
+	"songwriter":            "songwriter — songwriting, music composition",
+	"composer":              "composer — music composition, scoring",
+	"producer_music":        "producer_music — music production, recording",
+	"DJ":                    "DJ — DJing, music mixing",
+	"sound_designer":        "sound_designer — sound design, audio engineering",
+	"recording_engineer":    "recording_engineer — recording engineering",
+	"mixing_engineer":       "mixing_engineer — audio mixing",
+	"mastering_engineer":    "mastering_engineer — audio mastering",
+	"video_editor":          "video_editor — video editing, post-production",
+	"colorist":              "colorist — color grading, visual effects",
+	"VFX_artist":            "VFX_artist — visual effects, CGI",
+	"motion_graphics":       "motion_graphics — motion graphics, animation",
+	"3D_modeler":            "3D_modeler — 3D modeling",
+	"texture_artist":        "texture_artist — texture art, materials",
+	"lighting_artist":       "lighting_artist — lighting design, rendering",
+	"rendering_specialist":  "rendering_specialist — rendering, visualization",
+	"game_designer":         "game_designer — game design, mechanics",
+	"level_designer":        "level_designer — level design, game environments",
+	"game_programmer":       "game_programmer — game programming, engines",
+	"VR_developer":          "VR_developer — virtual reality development",
+	"AR_developer":          "AR_developer — augmented reality development",
+	"MR_developer":          "MR_developer — mixed reality development",
+	"metaverse_developer":   "metaverse_developer — metaverse development",
+	"cybersecurity_analyst": "cybersecurity_analyst — security analysis, threat detection",
+	"penetration_tester":    "penetration_tester — penetration testing, ethical hacking",
+	"security_architect":    "security_architect — security architecture, design",
+	"cryptographer":         "cryptographer — cryptography, encryption",
+	"network_security":      "network_security — network security, protocols",
+	"application_security":  "application_security — application security, secure coding",
+	"cloud_security":        "cloud_security — cloud security, compliance",
+	"devsecops":             "devsecops — DevSecOps, security automation",
+	"IT_security":           "IT_security — IT security, infrastructure",
+	"information_security":  "information_security — information security, policies",
+	"database_security":     "database_security — database security, data protection",
+	"privacy_expert":        "privacy_expert — privacy, GDPR, data protection",
+	"compliance_security":   "compliance_security — compliance, security standards",
 }
 
 var domainSpecialistPresets = map[string][]string{
@@ -120,6 +294,8 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 		systemPrompt = buildParallelPrompt(specDescs)
 	case "hierarchical":
 		systemPrompt = buildHierarchicalPrompt(specDescs, maxDepth)
+	case "agency":
+		systemPrompt = buildAgencyPrompt(specDescs)
 	default:
 		systemPrompt = buildSequentialPrompt(specDescs)
 	}
@@ -365,6 +541,149 @@ Output format (MUST be valid JSON):
   "synthesis_method": "how to combine outputs from all experts",
   "selected_experts": ["list of all selected expert names"],
   "total_experts": N
+}
+
+Respond with ONLY the JSON object, no extra text, no markdown code blocks.`, specDescs)
+}
+
+func buildAgencyPrompt(specDescs string) string {
+	return fmt.Sprintf(`You are an AI Agency manager. Your job is to run a complete AI Agency workflow for the given task. Think of yourself as the CEO of a digital agency with specialized departments.
+
+Available specialists (your agency team):
+%s
+
+Agency Workflow Phases (MUST follow this order):
+
+1. DISCOVERY PHASE (planner + business_analyst)
+   - Understand client requirements
+   - Define project scope and deliverables
+   - Create project brief
+
+2. STRATEGY PHASE (product_manager + UX_researcher)
+   - Develop strategic approach
+   - Define success metrics
+   - Create project roadmap
+
+3. DESIGN PHASE (ux_designer + UI_designer + content_strategist)
+   - Create wireframes and prototypes
+   - Develop visual design system
+   - Plan content strategy
+
+4. DEVELOPMENT PHASE (architect + backend_dev + frontend_dev + mobile_dev + AI_researcher)
+   - Build core architecture
+   - Implement features
+   - Integrate AI capabilities
+
+5. QUALITY ASSURANCE PHASE (qa_engineer + code_review + security_expert)
+   - Testing and validation
+   - Code review and security audit
+   - Performance optimization
+
+6. DEPLOYMENT PHASE (devops_engineer + cloud_engineer + systems_admin)
+   - Infrastructure setup
+   - CI/CD pipeline
+   - Production deployment
+
+7. LAUNCH PHASE (marketing_expert + community_manager + social_media)
+   - Launch strategy
+   - Marketing campaign
+   - Community building
+
+8. POST-LAUNCH PHASE (customer_success + data_analyst + evaluator)
+   - Monitor performance
+   - Analyze user feedback
+   - Continuous improvement
+
+Strategy: agency — Complete AI Agency workflow with 8 phases.
+Inspired by agency-agents and professional service workflows.
+
+Output format (MUST be valid JSON):
+{
+  "task": "the original task/project",
+  "agency_workflow": {
+    "phases": [
+      {
+        "phase": 1,
+        "name": "DISCOVERY",
+        "description": "what this phase accomplishes",
+        "assigned_specialists": ["list of specialist names"],
+        "duration_estimate": "2 days",
+        "deliverables": ["list of expected outputs"],
+        "status": "pending"
+      },
+      {
+        "phase": 2,
+        "name": "STRATEGY",
+        "description": "what this phase accomplishes",
+        "assigned_specialists": ["list of specialist names"],
+        "duration_estimate": "3 days",
+        "deliverables": ["list of expected outputs"],
+        "status": "pending"
+      },
+      {
+        "phase": 3,
+        "name": "DESIGN",
+        "description": "what this phase accomplishes",
+        "assigned_specialists": ["list of specialist names"],
+        "duration_estimate": "5 days",
+        "deliverables": ["list of expected outputs"],
+        "status": "pending"
+      },
+      {
+        "phase": 4,
+        "name": "DEVELOPMENT",
+        "description": "what this phase accomplishes",
+        "assigned_specialists": ["list of specialist names"],
+        "duration_estimate": "10 days",
+        "deliverables": ["list of expected outputs"],
+        "status": "pending"
+      },
+      {
+        "phase": 5,
+        "name": "QUALITY_ASSURANCE",
+        "description": "what this phase accomplishes",
+        "assigned_specialists": ["list of specialist names"],
+        "duration_estimate": "3 days",
+        "deliverables": ["list of expected outputs"],
+        "status": "pending"
+      },
+      {
+        "phase": 6,
+        "name": "DEPLOYMENT",
+        "description": "what this phase accomplishes",
+        "assigned_specialists": ["list of specialist names"],
+        "duration_estimate": "2 days",
+        "deliverables": ["list of expected outputs"],
+        "status": "pending"
+      },
+      {
+        "phase": 7,
+        "name": "LAUNCH",
+        "description": "what this phase accomplishes",
+        "assigned_specialists": ["list of specialist names"],
+        "duration_estimate": "1 day",
+        "deliverables": ["list of expected outputs"],
+        "status": "pending"
+      },
+      {
+        "phase": 8,
+        "name": "POST_LAUNCH",
+        "description": "what this phase accomplishes",
+        "assigned_specialists": ["list of specialist names"],
+        "duration_estimate": "ongoing",
+        "deliverables": ["list of expected outputs"],
+        "status": "pending"
+      }
+    ]
+  },
+  "project_summary": {
+    "total_phases": 8,
+    "total_specialists": N,
+    "estimated_total_duration": "XX days",
+    "key_deliverables": ["list of main deliverables"],
+    "success_criteria": ["list of criteria to determine project completion"]
+  },
+  "selected_specialists": ["list of all selected specialist names for this project"]
 }
 
 Respond with ONLY the JSON object, no extra text, no markdown code blocks.`, specDescs)
