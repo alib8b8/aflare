@@ -112,17 +112,17 @@ llm-box run ai-news-summary.yaml
 | **工程师技能包** | 4 个领域 16 个预置技能：React/TypeScript/API/数据库/CI-CD/Docker/设计模式 |
 | **技能蒸馏** | 从书籍/视频/播客/文章中提取方法论并转化为可调用技能：工作流/决策/分析/创意/提示词/检查清单 |
 | **视频编辑** | AI 视频编辑：智能剪辑/合并/特效/字幕/故事板/超分、4 种风格、720p/1080p/4k |
-| **AI 网关** | OmniRoute 统一层：**15+ 提供商**、6 种路由策略（自动/最快/最便宜/最佳质量/可用性/自定义降级）、Claude Code/Cursor/Cline/llm-box 兼容 |
-| **Agent 记忆** | 三层记忆基础设施（短期/中期/长期）：8 种操作（存储/检索/删除/搜索/摘要/遗忘/转移/合并）、LRU 淘汰、跨会话长期记忆 |
-| **语音 AI 工具链** | 完整语音工作室：TTS + 声音克隆 + **ASR 转录** + **说话人分离** + **语音分析**、11 种语言、5 种 ASR 引擎 |
-| **Agent 团队化** | **200+ 个专业角色**覆盖 12+ 领域、Agency 工作流（8 阶段：发现→策略→设计→开发→测试→部署→发布→发布后） |
+| **AI 网关** | OmniRoute 统一层：**268+ 提供商**、6 种路由策略（自动/最快/最便宜/最佳质量/可用性/自定义降级）、健康检查机制、Claude Code/Cursor/Cline/llm-box 兼容、**Inkling MoE 原生支持** |
+| **Agent 记忆** | 三层记忆基础设施（短期/中期/长期）：10 种操作（存储/检索/删除/搜索/摘要/遗忘/转移/合并/可视化/Inkling检索）、LRU 淘汰、跨会话长期记忆、**自动过期清理** |
+| **语音 AI 工具链** | 完整语音工作室：TTS + 声音克隆 + **ASR 转录** + **说话人分离** + **语音分析** + 创作模式（播客/有声书/旁白/广告/教育）、11 种语言、5 种 ASR 引擎、**Inkling 多模态音频理解** |
+| **Agent 团队化** | **232+ 个专业角色**覆盖 12+ 领域、Agency 工作流（8 阶段）、**19 个协作模板**、**Inkling MoE 专家团队** |
 | **实用节点** | 40+ 内置节点：大模型提供商、获取、执行、转换、文件 I/O、JSON、通知、条件、组合、调用、模板 |
 | **数据与知识** | RAG 检索、知识图谱提取/查询/遍历、智能模型路由器、多模态图像分析 |
 | **代码与工具** | Python 代码解释器沙箱、节点市场、MCP 集成、插件系统 |
 | **分布式执行** | 协调器/工作者架构、水平扩展、心跳监控、熔断器 |
 | **调度** | 基于 Cron 的定时工作流、间隔触发器、CLI 管理 |
-| **安全** | SSRF 防护、路径遍历防护、命令注入防御、AES-GCM 加密、审计日志、秘密脱敏、ANSI 注入防御、数据竞争修复、DoS 防护（订阅限制、日志轮转、内存上限）、**92+ 漏洞已审计** |
-| **生态** | GitCode G-Star、鸿蒙 Agent 技能、ohpm SDK、OPPO X-OmniClaw 技能适配器、OPPO 小布技能、AndesGPT、SenseNova、**Ant Ling** |
+| **安全** | SSRF 防护、路径遍历防护、命令注入防御、AES-GCM 加密、审计日志、秘密脱敏、ANSI 注入防御、数据竞争修复、DoS 防护（订阅限制、日志轮转、内存上限）、**98+ 漏洞已审计** |
+| **生态** | GitCode G-Star、鸿蒙 Agent 技能、ohpm SDK、OPPO X-OmniClaw 技能适配器、OPPO 小布技能、AndesGPT、SenseNova、**Ant Ling**、**Inkling / Thinking Machines** |
 | **开发者体验** | Web UI 编辑器、工作流可视化器（Mermaid/JSON/DOT/ASCII）、支持 Markdown/Mermaid 的 TUI、9 种语言 |
 
 ---
@@ -139,12 +139,12 @@ llm-box run ai-news-summary.yaml
 | `critic` | 评审并提供建设性反馈 |
 | `evaluator` | 根据标准评估输出 |
 | `reflector` | 反思过程并提出改进建议 |
-| `supervisor` | 监管多 Agent 工作流，支持顺序/并行/层级/MoE/MindSearch/**Agency** 策略和 **200+ 领域专家** |
+| `supervisor` | 监管多 Agent 工作流，支持顺序/并行/层级/MoE/MindSearch/**Agency** 策略和 **232+ 领域专家**、**19 个协作模板** |
 | `code_review` | 自动代码评审与建议 |
 | `router` | 将输入路由到合适的处理器 |
 | `human_in_loop` | 暂停等待人工审批 |
 | `meta_orchestrator` | 多模型路由器，**22+ 模型**、5 种策略、层级 Agent 网络 |
-| `code_knowledge_graph` | 语义代码知识图谱：158 种语言、向量检索、实体/关系/概念提取、**MCP 工具暴露**、**Token 高效审查** |
+| `code_knowledge_graph` | 语义代码知识图谱：158 种语言、向量检索、实体/关系/概念提取、**MCP 工具暴露**、**Token 高效审查**、**PR 分析**、**Inkling 代码审查** |
 | `moe_streaming` | MoE 专家流式加载：消费级硬件运行 744B 模型，按需加载 |
 | `cli_session` | 交互式终端会话，支持上下文持久化、流式输出、自动补全 |
 | `plugin_system` | 插件扩展：从本地/git/网址/市场安装/卸载/更新，沙箱隔离 |
@@ -153,11 +153,11 @@ llm-box run ai-news-summary.yaml
 | `quality_guard` | 反 AI-slop 检测：5 种评估类型、自动修复、质量阈值强制执行 |
 | `engineer_skills` | 16 个预置技能：React/TypeScript/API/数据库/CI-CD/Docker/设计模式 |
 | `skill_distill` | 从书籍/视频/播客中蒸馏方法论为可调用技能 |
-| `voice_output` | 语音 AI 工具链：TTS + 声音克隆 + **ASR 转录** + **说话人分离** + **语音分析**、11 种语言、5 种 ASR 引擎 |
+| `voice_output` | 语音 AI 工具链：TTS + 声音克隆 + **ASR 转录** + **说话人分离** + **语音分析** + 创作模式、11 种语言、5 种 ASR 引擎、**Inkling 音频理解** |
 | `doc_gen` | AI 文档生成：7 种类型（自述文件/API/函数/模块/变更日志/教程/架构） |
 | `video_edit` | AI 视频编辑：智能剪辑/合并/特效/字幕/故事板/超分 |
-| `omniroute` | **AI 网关统一层**：15+ 提供商、6 种路由策略、Claude Code/Cursor/Cline 兼容 |
-| `memory` | **Agent 记忆基础设施**：三层记忆（短期/中期/长期）、8 种操作、LRU 淘汰、跨会话长期记忆 |
+| `omniroute` | **AI 网关统一层**：268+ 提供商、健康检查机制、6 种路由策略、Claude Code/Cursor/Cline 兼容、**Inkling MoE 支持** |
+| `memory` | **Agent 记忆基础设施**：三层记忆（短期/中期/长期）、10 种操作、可视化、LRU 淘汰、自动清理、**Inkling 长上下文检索** |
 
 ### 鸿蒙 & 移动端节点
 
