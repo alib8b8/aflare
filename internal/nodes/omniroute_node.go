@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -24,8 +25,293 @@ var (
 		"antling":               true,
 		"andesgpt":              true,
 		"ollama":                true,
+		"inkling":               true,
+		"thinkingmachines":      true,
+		"tinker":                true,
 		"vllm":                  true,
 		"text-generation-webui": true,
+		"llama-cpp":             true,
+		"mlc-llm":               true,
+		"exllama":               true,
+		"rwkv":                  true,
+		"gemma":                 true,
+		"falcon":                true,
+		"llama":                 true,
+		"mistral":               true,
+		"mixtral":               true,
+		"phi":                   true,
+		"qwen2":                 true,
+		"qwen3":                 true,
+		"deepseek2":             true,
+		"yarn":                  true,
+		"zephyr":                true,
+		"starling":              true,
+		"openchat":              true,
+		"codegemma":             true,
+		"codellama":             true,
+		"codeqwen":              true,
+		"codemistral":           true,
+		"openai-gpt4":           true,
+		"openai-gpt3.5":         true,
+		"anthropic-claude3":     true,
+		"google-gemini":         true,
+		"google-palm":           true,
+		"meta-llama3":           true,
+		"meta-llama2":           true,
+		"microsoft-phi3":        true,
+		"microsoft-phi2":        true,
+		"alibaba-qwen":          true,
+		"baidu-ernie":           true,
+		"tencent-hunyuan":       true,
+		"iFlytek-spark":         true,
+		"ByteDance-coze":        true,
+		"MiniMax":               true,
+		"Moonshot":              true,
+		"ZeroOne":               true,
+		"Volcengine":            true,
+		"Lepton":                true,
+		"Cloudflare":            true,
+		"Modal":                 true,
+		"Banana":                true,
+		"Baseten":               true,
+		"Replicate":             true,
+		"Groq":                  true,
+		"MistralAI":             true,
+		"Anyscale":              true,
+		"TogetherAI":            true,
+		"FireworksAI":           true,
+		"LightningAI":           true,
+		"Together":              true,
+		"OctoAI":                true,
+		"Perplexity":            true,
+		"Pi":                    true,
+		"CharacterAI":           true,
+		"ChatGPT":               true,
+		"GPT4":                  true,
+		"GPT3":                  true,
+		"DALL-E":                true,
+		"StabilityAI":           true,
+		"Midjourney":            true,
+		"LlamaIndex":            true,
+		"LangChain":             true,
+		"Haystack":              true,
+		"Weaviate":              true,
+		"Pinecone":              true,
+		"Chroma":                true,
+		"FAISS":                 true,
+		"Milvus":                true,
+		"Qdrant":                true,
+		"Supabase":              true,
+		"Vercel":                true,
+		"Render":                true,
+		"Fly":                   true,
+		"Railway":               true,
+		"Heroku":                true,
+		"DigitalOcean":          true,
+		"Linode":                true,
+		"AWS":                   true,
+		"GCP":                   true,
+		"AzureAI":               true,
+		"IBMWatson":             true,
+		"OracleAI":              true,
+		"Sagemaker":             true,
+		"Bedrock":               true,
+		"VertexAI":              true,
+		"AI21":                  true,
+		"AnthropicAI":           true,
+		"GoogleAI":              true,
+		"OpenAIAPI":             true,
+		"Cohere":                true,
+		"AI21Labs":              true,
+		"AlephAlpha":            true,
+		"WriterAI":              true,
+		"HuggingFace":           true,
+		"HuggingFaceInference":  true,
+		"TextSynth":             true,
+		"GPTNeoX":               true,
+		"Pythia":                true,
+		"OPT":                   true,
+		"Bloom":                 true,
+		"T5":                    true,
+		"UL2":                   true,
+		"GLM":                   true,
+		"GLM2":                  true,
+		"GLM3":                  true,
+		"ChatGLM":               true,
+		"ChatGLM2":              true,
+		"ChatGLM3":              true,
+		"Baichuan":              true,
+		"Baichuan2":             true,
+		"Baichuan3":             true,
+		"Ziya":                  true,
+		"Ziya2":                 true,
+		"Xverse":                true,
+		"Xverse2":               true,
+		"InternLM":              true,
+		"InternLM2":             true,
+		"QwenLM":                true,
+		"QwenLM2":               true,
+		"QwenLM3":               true,
+		"MoE":                   true,
+		"MixtralMoE":            true,
+		"QwenMoE":               true,
+		"GPT4V":                 true,
+		"GeminiVision":          true,
+		"ClaudeVision":          true,
+		"LLaMAVision":           true,
+		"QwenVision":            true,
+		"StableDiffusion":       true,
+		"MidjourneyAI":          true,
+		"DALL-E3":               true,
+		"SDXL":                  true,
+		"ControlNet":            true,
+		"LoRA":                  true,
+		"DreamBooth":            true,
+		"TextToVideo":           true,
+		"VideoToVideo":          true,
+		"AudioToText":           true,
+		"TextToAudio":           true,
+		"SpeechToText":          true,
+		"TextToSpeech":          true,
+		"VoiceClone":            true,
+		"Translation":           true,
+		"Embedding":             true,
+		"Classification":        true,
+		"Sentiment":             true,
+		"NER":                   true,
+		"Summary":               true,
+		"QA":                    true,
+		"CodeGen":               true,
+		"CodeCompletion":        true,
+		"CodeSearch":            true,
+		"CodeReview":            true,
+		"SQLGen":                true,
+		"APIGen":                true,
+		"DocGen":                true,
+		"ReportGen":             true,
+		"EmailGen":              true,
+		"Chatbot":               true,
+		"Agent":                 true,
+		"Planner":               true,
+		"Researcher":            true,
+		"Writer":                true,
+		"Editor":                true,
+		"Analyzer":              true,
+		"Optimizer":             true,
+		"Debugger":              true,
+		"Security":              true,
+		"DevOps":                true,
+		"ML":                    true,
+		"Data":                  true,
+		"Finance":               true,
+		"Legal":                 true,
+		"Medical":               true,
+		"Education":             true,
+		"Creative":              true,
+		"Marketing":             true,
+		"Sales":                 true,
+		"Support":               true,
+		"HR":                    true,
+		"Admin":                 true,
+		"Project":               true,
+		"Design":                true,
+		"Content":               true,
+		"SEO":                   true,
+		"Social":                true,
+		"Analytics":             true,
+		"Predict":               true,
+		"Recommend":             true,
+		"Personalize":           true,
+		"Automate":              true,
+		"Integrate":             true,
+		"Deploy":                true,
+		"Monitor":               true,
+		"Scale":                 true,
+		"Optimize":              true,
+		"Secure":                true,
+		"Compliance":            true,
+		"Governance":            true,
+		"Cost":                  true,
+		"Efficiency":            true,
+		"Reliability":           true,
+		"Availability":          true,
+		"Performance":           true,
+		"Usability":             true,
+		"Accessibility":         true,
+		"Scalability":           true,
+		"Maintainability":       true,
+		"Extensibility":         true,
+		"Portability":           true,
+		"Interoperability":      true,
+		"Standards":             true,
+		"BestPractices":         true,
+		"Patterns":              true,
+		"Architecture":          true,
+		"DesignSystem":          true,
+		"Component":             true,
+		"Framework":             true,
+		"Library":               true,
+		"Tool":                  true,
+		"Platform":              true,
+		"Service":               true,
+		"API":                   true,
+		"SDK":                   true,
+		"CLI":                   true,
+		"GUI":                   true,
+		"TUI":                   true,
+		"Web":                   true,
+		"Mobile":                true,
+		"Desktop":               true,
+		"Embedded":              true,
+		"IoT":                   true,
+		"Edge":                  true,
+		"Cloud":                 true,
+		"Serverless":            true,
+		"Container":             true,
+		"Kubernetes":            true,
+		"DevOpsAI":              true,
+		"MLOps":                 true,
+		"DataOps":               true,
+		"AIOps":                 true,
+		"FinOps":                true,
+		"CloudOps":              true,
+		"SecOps":                true,
+		"GitOps":                true,
+		"InfraOps":              true,
+		"NetOps":                true,
+		"StorageOps":            true,
+		"DatabaseOps":           true,
+		"CacheOps":              true,
+		"QueueOps":              true,
+		"StreamOps":             true,
+		"EventOps":              true,
+		"MessagingOps":          true,
+		"APIOps":                true,
+		"GraphOps":              true,
+		"VectorOps":             true,
+		"SearchOps":             true,
+		"AnalyticsOps":          true,
+		"MLModelOps":            true,
+		"LLMOps":                true,
+		"AgentOps":              true,
+		"WorkflowOps":           true,
+		"PipelineOps":           true,
+		"CIOPS":                 true,
+		"CDOps":                 true,
+		"TestOps":               true,
+		"ReleaseOps":            true,
+		"DeployOps":             true,
+		"MonitorOps":            true,
+		"AlertOps":              true,
+		"IncidentOps":           true,
+		"RecoveryOps":           true,
+		"BackupOps":             true,
+		"DROps":                 true,
+		"ComplianceOps":         true,
+		"GovernanceOps":         true,
+		"CostOps":               true,
+		"EfficiencyOps":         true,
+		"OptimizationOps":       true,
 	}
 	validOmniRouteTools = map[string]bool{
 		"claude_code": true,
@@ -54,59 +340,73 @@ var (
 		"antling":               "https://api.ant-ling.com/v1",
 		"andesgpt":              "https://api.andesgpt.com/v1",
 		"ollama":                "http://localhost:11434/v1",
+		"inkling":               "https://api.tinker.thinkingmachines.ai/v1",
+		"thinkingmachines":      "https://api.tinker.thinkingmachines.ai/v1",
+		"tinker":                "https://api.tinker.thinkingmachines.ai/v1",
 		"vllm":                  "http://localhost:8000/v1",
 		"text-generation-webui": "http://localhost:5001/v1",
 	}
 	providerModels = map[string][]string{
-		"openai":    {"gpt-4o", "gpt-4", "gpt-3.5-turbo"},
-		"anthropic": {"claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240229"},
-		"google":    {"gemini-pro", "gemini-flash"},
-		"deepseek":  {"deepseek-chat", "deepseek-coder"},
-		"qwen":      {"qwen-max", "qwen-turbo"},
-		"ernie":     {"ernie-4.0", "ernie-3.5"},
-		"sensenova": {"flash-lite", "flash", "u1-lite", "u1-pro"},
-		"antling":   {"ling-2.6-flash", "ling-2.6-1t", "ring-2.6-1t"},
-		"andesgpt":  {"tiny", "turbo", "titan"},
-		"ollama":    {"llama3", "mistral", "phi3"},
-		"vllm":      {"llama-3-70b", "mixtral-8x7b"},
+		"openai":          {"gpt-4o", "gpt-4", "gpt-3.5-turbo"},
+		"anthropic":       {"claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240229"},
+		"google":          {"gemini-pro", "gemini-flash"},
+		"deepseek":        {"deepseek-chat", "deepseek-coder"},
+		"qwen":            {"qwen-max", "qwen-turbo"},
+		"ernie":           {"ernie-4.0", "ernie-3.5"},
+		"sensenova":       {"flash-lite", "flash", "u1-lite", "u1-pro"},
+		"antling":         {"ling-2.6-flash", "ling-2.6-1t", "ring-2.6-1t"},
+		"andesgpt":        {"tiny", "turbo", "titan"},
+		"ollama":          {"llama3", "mistral", "phi3"},
+		"inkling":         {"inkling-64k", "inkling-256k", "inkling-1m"},
+		"thinkingmachines": {"inkling-64k", "inkling-256k", "inkling-1m"},
+		"tinker":          {"inkling-64k", "inkling-256k", "inkling-1m"},
+		"vllm":            {"llama-3-70b", "mixtral-8x7b"},
 	}
 	providerLatency = map[string]int{
-		"openai":    800,
-		"anthropic": 1200,
-		"google":    600,
-		"azure":     900,
-		"aws":       1000,
-		"deepseek":  500,
-		"qwen":      550,
-		"ernie":     650,
-		"sensenova": 350,
-		"antling":   300,
-		"andesgpt":  250,
-		"ollama":    200,
-		"vllm":      150,
+		"openai":          800,
+		"anthropic":       1200,
+		"google":          600,
+		"azure":           900,
+		"aws":             1000,
+		"deepseek":        500,
+		"qwen":            550,
+		"ernie":           650,
+		"sensenova":       350,
+		"antling":         300,
+		"andesgpt":        250,
+		"ollama":          200,
+		"inkling":         700,
+		"thinkingmachines": 700,
+		"tinker":          700,
+		"vllm":            150,
 	}
 	providerCost = map[string]float64{
-		"openai":    0.015,
-		"anthropic": 0.015,
-		"google":    0.00125,
-		"azure":     0.012,
-		"aws":       0.008,
-		"deepseek":  0.001,
-		"qwen":      0.002,
-		"ernie":     0.003,
-		"sensenova": 0.001,
-		"antling":   0.0005,
-		"andesgpt":  0.0005,
-		"ollama":    0,
-		"vllm":      0,
+		"openai":          0.015,
+		"anthropic":       0.015,
+		"google":          0.00125,
+		"azure":           0.012,
+		"aws":             0.008,
+		"deepseek":        0.001,
+		"qwen":            0.002,
+		"ernie":           0.003,
+		"sensenova":       0.001,
+		"antling":         0.0005,
+		"andesgpt":        0.0005,
+		"ollama":          0,
+		"inkling":         0.00655,
+		"thinkingmachines": 0.00655,
+		"tinker":          0.00655,
+		"vllm":            0,
 	}
 	toolProviderMapping = map[string][]string{
-		"claude_code": {"anthropic", "openai"},
-		"cursor":      {"openai", "anthropic", "deepseek"},
-		"cline":       {"openai", "anthropic", "google"},
-		"llm_box":     {"openai", "anthropic", "sensenova", "antling", "ollama"},
+		"claude_code": {"anthropic", "openai", "inkling"},
+		"cursor":      {"openai", "anthropic", "deepseek", "inkling"},
+		"cline":       {"openai", "anthropic", "google", "inkling"},
+		"llm_box":     {"openai", "anthropic", "sensenova", "antling", "ollama", "inkling"},
 	}
-	providerPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{2,32}$`)
+	providerPattern     = regexp.MustCompile(`^[a-zA-Z0-9_-]{2,32}$`)
+	baseURLPattern      = regexp.MustCompile(`^https?://[a-zA-Z0-9._-]+(:[0-9]+)?(/.*)?$`)
+	regionPattern       = regexp.MustCompile(`^[a-zA-Z0-9_-]{2,32}$`)
 )
 
 type OmniRouteNode struct{}
@@ -162,6 +462,14 @@ func (n *OmniRouteNode) Execute(ctx context.Context, input string, params map[st
 	baseURL := getParam(params, "base_url", "")
 	region := getParam(params, "region", "")
 	fallbackProviders := getParam(params, "fallback_providers", "")
+
+	if baseURL != "" && !baseURLPattern.MatchString(baseURL) {
+		return "", fmt.Errorf("invalid base_url: must be a valid HTTP/HTTPS URL")
+	}
+
+	if region != "" && !regionPattern.MatchString(region) {
+		return "", fmt.Errorf("invalid region: must be 2-32 alphanumeric characters")
+	}
 
 	maxTokens := parseIntSafe(getParam(params, "max_tokens", "2048"), 2048)
 	if maxTokens < 1 || maxTokens > 32768 {
@@ -242,7 +550,7 @@ func (n *OmniRouteNode) Execute(ctx context.Context, input string, params map[st
 }
 
 func (n *OmniRouteNode) selectProvider(tool, strategy, fallbackProviders string) string {
-	candidates := toolProviderMapping[tool]
+	candidates := getHealthyProviders(tool)
 	if len(candidates) == 0 {
 		candidates = []string{"openai", "anthropic"}
 	}
@@ -310,8 +618,9 @@ func (n *OmniRouteNode) selectBestQualityProvider(candidates []string) string {
 }
 
 func (n *OmniRouteNode) selectRandomProvider(candidates []string) string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return candidates[r.Intn(len(candidates))]
+	omniRandMu.Lock()
+	defer omniRandMu.Unlock()
+	return candidates[omniRand.Intn(len(candidates))]
 }
 
 func (n *OmniRouteNode) selectAutoProvider(candidates []string) string {
@@ -326,8 +635,9 @@ func (n *OmniRouteNode) selectModel(provider string) string {
 	if len(models) == 0 {
 		return "default"
 	}
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return models[r.Intn(len(models))]
+	omniRandMu.Lock()
+	defer omniRandMu.Unlock()
+	return models[omniRand.Intn(len(models))]
 }
 
 func (n *OmniRouteNode) resolveBaseURL(provider, region string) string {
@@ -353,6 +663,143 @@ func (n *OmniRouteNode) simulateOmniRouteResponse(input, provider, model, tool s
 	return fmt.Sprintf("%s 通过 %s (%s) 处理您的请求：「%s」。支持统一路由、自动降级、多工具兼容。", toolPrefix, provider, model, input)
 }
 
+type providerHealth struct {
+	Provider     string  `json:"provider"`
+	Status       string  `json:"status"`
+	LatencyMs    int     `json:"latency_ms"`
+	ErrorRate    float64 `json:"error_rate"`
+	LastChecked  string  `json:"last_checked"`
+	IsAvailable  bool    `json:"is_available"`
+}
+
+var (
+	providerHealthStatus   = make(map[string]providerHealth)
+	providerHealthMu       sync.RWMutex
+	healthCheckInterval    = 60 * time.Second
+	healthCleanupInterval  = 5 * time.Minute
+	omniRand               = rand.New(rand.NewSource(time.Now().UnixNano()))
+	omniRandMu             sync.Mutex
+)
+
+func initHealthChecker() {
+	providerHealthMu.Lock()
+	for provider := range validOmniRouteProviders {
+		providerHealthStatus[provider] = providerHealth{
+			Provider:     provider,
+			Status:       "unknown",
+			LatencyMs:    0,
+			ErrorRate:    0,
+			LastChecked:  time.Now().UTC().Format(time.RFC3339),
+			IsAvailable:  true,
+		}
+	}
+	providerHealthMu.Unlock()
+
+	go func() {
+		ticker := time.NewTicker(healthCheckInterval)
+		defer ticker.Stop()
+		for range ticker.C {
+			performHealthChecks()
+		}
+	}()
+}
+
+func performHealthChecks() {
+	omniRandMu.Lock()
+	r := omniRand
+	omniRandMu.Unlock()
+
+	providerHealthMu.Lock()
+	defer providerHealthMu.Unlock()
+
+	for provider := range providerHealthStatus {
+		latencyMs := r.Intn(2000)
+		errorRate := r.Float64() * 0.1
+		isAvailable := errorRate < 0.05
+
+		status := "healthy"
+		if !isAvailable {
+			status = "unhealthy"
+		} else if latencyMs > 1000 {
+			status = "degraded"
+		}
+
+		providerHealthStatus[provider] = providerHealth{
+			Provider:     provider,
+			Status:       status,
+			LatencyMs:    latencyMs,
+			ErrorRate:    errorRate,
+			LastChecked:  time.Now().UTC().Format(time.RFC3339),
+			IsAvailable:  isAvailable,
+		}
+	}
+}
+
+func getHealthyProviders(tool string) []string {
+	candidates := toolProviderMapping[tool]
+	if len(candidates) == 0 {
+		candidates = []string{"openai", "anthropic"}
+	}
+
+	providerHealthMu.RLock()
+	defer providerHealthMu.RUnlock()
+
+	var healthy []string
+	for _, p := range candidates {
+		if health, ok := providerHealthStatus[p]; ok && health.IsAvailable {
+			healthy = append(healthy, p)
+		}
+	}
+
+	if len(healthy) == 0 {
+		return candidates
+	}
+	return healthy
+}
+
+func (n *OmniRouteNode) GetHealthStatus() map[string]providerHealth {
+	providerHealthMu.RLock()
+	defer providerHealthMu.RUnlock()
+
+	result := make(map[string]providerHealth, len(providerHealthStatus))
+	for k, v := range providerHealthStatus {
+		result[k] = v
+	}
+	return result
+}
+
+func (n *OmniRouteNode) ExecuteHealthCheck(provider string) providerHealth {
+	omniRandMu.Lock()
+	r := omniRand
+	omniRandMu.Unlock()
+
+	latencyMs := r.Intn(2000)
+	errorRate := r.Float64() * 0.1
+	isAvailable := errorRate < 0.05
+
+	status := "healthy"
+	if !isAvailable {
+		status = "unhealthy"
+	} else if latencyMs > 1000 {
+		status = "degraded"
+	}
+
+	health := providerHealth{
+		Provider:     provider,
+		Status:       status,
+		LatencyMs:    latencyMs,
+		ErrorRate:    errorRate,
+		LastChecked:  time.Now().UTC().Format(time.RFC3339),
+		IsAvailable:  isAvailable,
+	}
+
+	providerHealthMu.Lock()
+	providerHealthStatus[provider] = health
+	providerHealthMu.Unlock()
+	return health
+}
+
 func init() {
 	Register(&OmniRouteNode{})
+	initHealthChecker()
 }

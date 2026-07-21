@@ -37,10 +37,12 @@ func (n *SupervisorNode) Schema() NodeSchema {
 		ParamSchema{Name: "enable_moe", Type: "string", Description: "Enable Mixture-of-Experts routing (default: false)", Required: false, Default: "false"},
 		ParamSchema{Name: "max_depth", Type: "string", Description: "Max decomposition depth for hierarchical/mindsearch (default: 3)", Required: false, Default: "3"},
 		ParamSchema{Name: "subagent_prompts", Type: "string", Description: "Inject per-specialist subagent prompt templates into the supervisor context (default: true). Borrows Grok Build's main/subagent prompt hierarchy.", Required: false, Default: "true"},
+		ParamSchema{Name: "collaboration_template", Type: "string", Description: "Collaboration template: software_development, product_design, data_science, marketing, research, legal_compliance, healthcare, education, finance, game_development, video_production, security_operations, cloud_infrastructure, content_creation, community_management, startup_acceleration, ai_development, design_system, event_management, translation_localization", Required: false},
+		ParamSchema{Name: "template_role", Type: "string", Description: "Template role to use: team, workflow, review_cycle (default: team)", Required: false, Default: "team"},
 	)
 	return NodeSchema{
 		Name:        "supervisor",
-		Description: "Advanced supervisor with MoE routing, MindSearch deep research, and 12+ domain specialists",
+		Description: "Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates",
 		Input:       "string - the overall goal or task to supervise",
 		Output:      "string - structured task plan with delegation and synthesis",
 		Params:      params,
@@ -78,6 +80,11 @@ var allSpecialists = map[string]string{
 	"deep_learning":         "deep_learning — neural networks, NLP, computer vision",
 	"data_scientist":        "data_scientist — data mining, predictive analytics, modeling",
 	"AI_researcher":         "AI_researcher — cutting-edge AI research, new models, techniques",
+	"inkling_expert":        "inkling_expert — Thinking Machines Inkling model expert, MoE architecture, Tinker platform",
+	"moe_specialist":        "moe_specialist — Mixture of Experts architecture specialist, routing strategies",
+	"multimodal_engineer":   "multimodal_engineer — multimodal AI systems, text/image/audio integration",
+	"code_architect":        "code_architect — high-performance coding, software architecture, engineering best practices",
+	"AI_agent":              "AI_agent — autonomous AI agent design, tool use, task automation",
 	"blockchain_dev":        "blockchain_dev — smart contracts, DApps, DeFi",
 	"game_dev":              "game_dev — game development, engines, graphics",
 	"embedded_dev":          "embedded_dev — embedded systems, IoT, firmware",
@@ -252,6 +259,114 @@ var domainSpecialistPresets = map[string][]string{
 	"research":  {"planner", "researcher", "data_analyst", "critic", "evaluator"},
 }
 
+var collaborationTemplates = map[string]map[string][]string{
+	"software_development": {
+		"team":           {"architect", "backend_dev", "frontend_dev", "qa_engineer", "devops_engineer"},
+		"workflow":       {"architect", "backend_dev", "frontend_dev", "qa_engineer", "devops_engineer"},
+		"review_cycle":   {"code_review", "security_expert", "qa_engineer"},
+	},
+	"product_design": {
+		"team":           {"product_manager", "UX_researcher", "ux_designer", "UI_designer", "content_strategist"},
+		"workflow":       {"UX_researcher", "ux_designer", "UI_designer", "product_manager"},
+		"review_cycle":   {"critic", "product_manager", "UX_researcher"},
+	},
+	"data_science": {
+		"team":           {"data_scientist", "machine_learning", "data_analyst", "deep_learning", "AI_researcher"},
+		"workflow":       {"data_scientist", "machine_learning", "data_analyst"},
+		"review_cycle":   {"evaluator", "data_scientist", "AI_researcher"},
+	},
+	"marketing": {
+		"team":           {"marketing_expert", "content_strategist", "SEO_expert", "social_media", "copywriter"},
+		"workflow":       {"content_strategist", "copywriter", "SEO_expert", "social_media"},
+		"review_cycle":   {"creative_writer", "marketing_expert", "critic"},
+	},
+	"research": {
+		"team":           {"researcher", "scientist", "data_analyst", "AI_researcher", "critic"},
+		"workflow":       {"researcher", "data_analyst", "scientist"},
+		"review_cycle":   {"critic", "evaluator", "researcher"},
+	},
+	"legal_compliance": {
+		"team":           {"legal_expert", "lawyer", "compliance_officer", "privacy_expert", "auditor"},
+		"workflow":       {"legal_expert", "compliance_officer", "privacy_expert"},
+		"review_cycle":   {"lawyer", "compliance_officer", "critic"},
+	},
+	"healthcare": {
+		"team":           {"medical_expert", "doctor", "nurse", "pharmacist", "researcher"},
+		"workflow":       {"medical_expert", "doctor", "pharmacist"},
+		"review_cycle":   {"doctor", "nurse", "evaluator"},
+	},
+	"education": {
+		"team":           {"educational_expert", "teacher", "professor", "content_strategist", "creative_writer"},
+		"workflow":       {"educational_expert", "teacher", "content_strategist"},
+		"review_cycle":   {"evaluator", "teacher", "critic"},
+	},
+	"finance": {
+		"team":           {"financial_expert", "investment_advisor", "accountant", "risk_manager", "analyst"},
+		"workflow":       {"financial_expert", "analyst", "risk_manager"},
+		"review_cycle":   {"investment_advisor", "accountant", "evaluator"},
+	},
+	"game_development": {
+		"team":           {"game_designer", "game_programmer", "game_dev", "level_designer", "3D_artist"},
+		"workflow":       {"game_designer", "level_designer", "game_programmer"},
+		"review_cycle":   {"critic", "game_designer", "qa_engineer"},
+	},
+	"video_production": {
+		"team":           {"video_producer", "video_editor", "director", "colorist", "sound_designer"},
+		"workflow":       {"director", "video_producer", "video_editor"},
+		"review_cycle":   {"critic", "director", "colorist"},
+	},
+	"security_operations": {
+		"team":           {"security_expert", "cybersecurity_analyst", "penetration_tester", "security_architect", "devsecops"},
+		"workflow":       {"security_architect", "security_expert", "penetration_tester"},
+		"review_cycle":   {"security_expert", "cybersecurity_analyst", "critic"},
+	},
+	"cloud_infrastructure": {
+		"team":           {"cloud_engineer", "devops_engineer", "systems_admin", "network_engineer", "database_admin"},
+		"workflow":       {"cloud_engineer", "devops_engineer", "database_admin"},
+		"review_cycle":   {"architect", "cloud_engineer", "qa_engineer"},
+	},
+	"content_creation": {
+		"team":           {"creative_writer", "copywriter", "technical_writer", "editor", "graphic_designer"},
+		"workflow":       {"creative_writer", "copywriter", "editor"},
+		"review_cycle":   {"editor", "critic", "creative_writer"},
+	},
+	"community_management": {
+		"team":           {"community_manager", "social_media", "content_strategist", "moderator", "PR_specialist"},
+		"workflow":       {"community_manager", "social_media", "content_strategist"},
+		"review_cycle":   {"PR_specialist", "critic", "community_manager"},
+	},
+	"startup_acceleration": {
+		"team":           {"startup_advisor", "entrepreneur", "product_manager", "CTO", "marketing_expert"},
+		"workflow":       {"startup_advisor", "product_manager", "CTO"},
+		"review_cycle":   {"entrepreneur", "critic", "evaluator"},
+	},
+	"ai_development": {
+		"team":           {"AI_researcher", "machine_learning", "deep_learning", "data_scientist", "blockchain_dev"},
+		"workflow":       {"AI_researcher", "machine_learning", "data_scientist"},
+		"review_cycle":   {"evaluator", "AI_researcher", "critic"},
+	},
+	"design_system": {
+		"team":           {"ux_designer", "UI_designer", "graphic_designer", "typographer", "illustrator"},
+		"workflow":       {"ux_designer", "UI_designer", "graphic_designer"},
+		"review_cycle":   {"critic", "UX_researcher", "ux_designer"},
+	},
+	"event_management": {
+		"team":           {"event_planner", "project_manager", "marketing_expert", "PR_specialist", "copywriter"},
+		"workflow":       {"event_planner", "project_manager", "marketing_expert"},
+		"review_cycle":   {"PR_specialist", "critic", "evaluator"},
+	},
+	"translation_localization": {
+		"team":           {"translator", "localization", "interpreter", "translator_legal", "translator_medical"},
+		"workflow":       {"translator", "localization", "interpreter"},
+		"review_cycle":   {"editor", "critic", "translator"},
+	},
+	"inkling_moe": {
+		"team":           {"inkling_expert", "moe_specialist", "multimodal_engineer", "code_architect", "AI_agent"},
+		"workflow":       {"inkling_expert", "moe_specialist", "multimodal_engineer"},
+		"review_cycle":   {"code_review", "security_expert", "evaluator"},
+	},
+}
+
 func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	provider := getParam(params, "provider", "ollama")
 	model := getParam(params, "model", "llama3")
@@ -263,6 +378,8 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 	domain := getParam(params, "domain", "general")
 	enableMoE := getParam(params, "enable_moe", "false") == "true"
 	maxDepthStr := getParam(params, "max_depth", "3")
+	collaborationTemplate := getParam(params, "collaboration_template", "")
+	templateRole := getParam(params, "template_role", "team")
 
 	maxDepth := 3
 	fmt.Sscanf(maxDepthStr, "%d", &maxDepth)
@@ -273,7 +390,13 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 		maxDepth = 10
 	}
 
-	if preset, ok := domainSpecialistPresets[domain]; ok && specialists == "planner,researcher,critic,evaluator" {
+	if collaborationTemplate != "" {
+		if template, ok := collaborationTemplates[collaborationTemplate]; ok {
+			if roleSpecialists, ok := template[templateRole]; ok {
+				specialists = strings.Join(roleSpecialists, ",")
+			}
+		}
+	} else if preset, ok := domainSpecialistPresets[domain]; ok && specialists == "planner,researcher,critic,evaluator" {
 		specialists = strings.Join(preset, ",")
 	}
 
