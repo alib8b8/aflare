@@ -30,6 +30,10 @@ var (
 		"deepseek-v2":          true,
 		"qwen-max":             true,
 		"ernie-4":              true,
+		"ling-2.6-flash":       true,
+		"ling-2.6-1t":          true,
+		"ring-2.6-1t":          true,
+		"ming-flash-omni-2.0":  true,
 	}
 	validRoutingStrategies = map[string]bool{
 		"auto":          true,
@@ -64,6 +68,10 @@ var (
 		"deepseek-v2":          500,
 		"qwen-max":             550,
 		"ernie-4":              650,
+		"ling-2.6-flash":       150,
+		"ling-2.6-1t":          700,
+		"ring-2.6-1t":          1200,
+		"ming-flash-omni-2.0":  500,
 	}
 	modelCostMap = map[string]float64{
 		"gpt-4o":               0.015,
@@ -84,6 +92,10 @@ var (
 		"deepseek-v2":          0.001,
 		"qwen-max":             0.002,
 		"ernie-4":              0.003,
+		"ling-2.6-flash":       0.0001,
+		"ling-2.6-1t":          0.012,
+		"ring-2.6-1t":          0.018,
+		"ming-flash-omni-2.0":  0.008,
 	}
 	modelQualityScore = map[string]float64{
 		"gpt-4o":               0.95,
@@ -104,11 +116,16 @@ var (
 		"deepseek-v2":          0.83,
 		"qwen-max":             0.86,
 		"ernie-4":              0.84,
+		"ling-2.6-flash":       0.80,
+		"ling-2.6-1t":          0.93,
+		"ring-2.6-1t":          0.96,
+		"ming-flash-omni-2.0":  0.88,
 	}
 	privacyFirstModels = []string{
 		"andesgpt-tiny", "andesgpt-turbo", "andesgpt-titan",
 		"sensenova-flash-lite", "sensenova-flash", "sensenova-u1-lite", "sensenova-u1-pro",
 		"deepseek-v2", "qwen-max", "ernie-4",
+		"ling-2.6-flash", "ling-2.6-1t", "ring-2.6-1t", "ming-flash-omni-2.0",
 	}
 	hierarchyLevels = []string{"supervisor", "specialist", "worker"}
 	taskTypePattern = regexp.MustCompile(`^[a-z]+$`)
@@ -125,7 +142,7 @@ func (n *MetaOrchestratorNode) Name() string {
 }
 
 func (n *MetaOrchestratorNode) Description() string {
-	return "Multi-model meta orchestrator with unified model routing and hierarchical agent network. Supports 18+ models across OpenAI, Anthropic, Google, AndesGPT, SenseNova, and domestic providers."
+	return "Multi-model meta orchestrator with unified model routing and hierarchical agent network. Supports 22+ models across OpenAI, Anthropic, Google, AndesGPT, SenseNova, Ant Ling, and domestic providers."
 }
 
 func (n *MetaOrchestratorNode) Schema() NodeSchema {
@@ -135,7 +152,7 @@ func (n *MetaOrchestratorNode) Schema() NodeSchema {
 		Input:       "string - the task or prompt to process",
 		Output:      "json - selected model, routing strategy, task type, hierarchy level, response, usage, latency_ms",
 		Params: []ParamSchema{
-			{Name: "model", Type: "string", Description: "Model name (optional, overrides routing). Supported: gpt-4o, gpt-4, gpt-3.5-turbo, claude-3-opus, claude-3-sonnet, claude-3-haiku, gemini-pro, gemini-flash, andesgpt-tiny, andesgpt-turbo, andesgpt-titan, sensenova-flash-lite, sensenova-flash, sensenova-u1-lite, sensenova-u1-pro, deepseek-v2, qwen-max, ernie-4", Required: false},
+			{Name: "model", Type: "string", Description: "Model name (optional, overrides routing). Supported: gpt-4o, gpt-4, gpt-3.5-turbo, claude-3-opus, claude-3-sonnet, claude-3-haiku, gemini-pro, gemini-flash, andesgpt-tiny, andesgpt-turbo, andesgpt-titan, sensenova-flash-lite, sensenova-flash, sensenova-u1-lite, sensenova-u1-pro, deepseek-v2, qwen-max, ernie-4, ling-2.6-flash, ling-2.6-1t, ring-2.6-1t, ming-flash-omni-2.0", Required: false},
 			{Name: "routing_strategy", Type: "string", Description: "Routing strategy: auto/fastest/cheapest/best_quality/privacy_first (default: auto)", Required: false, Default: "auto"},
 			{Name: "task_type", Type: "string", Description: "Task type: code/writing/analysis/creative/data (default: analysis)", Required: false, Default: "analysis"},
 			{Name: "max_depth", Type: "int", Description: "Max hierarchy depth 1-5 (default: 3)", Required: false, Default: "3"},
@@ -289,15 +306,15 @@ func selectAutoModel(taskType string, models []string) string {
 	var preferred []string
 	switch taskType {
 	case "code":
-		preferred = []string{"gpt-4o", "claude-3-opus", "deepseek-v2", "qwen-max"}
+		preferred = []string{"gpt-4o", "claude-3-opus", "deepseek-v2", "qwen-max", "ling-2.6-1t", "ring-2.6-1t"}
 	case "writing":
-		preferred = []string{"claude-3-opus", "gpt-4o", "qwen-max", "ernie-4"}
+		preferred = []string{"claude-3-opus", "gpt-4o", "qwen-max", "ernie-4", "ling-2.6-1t"}
 	case "analysis":
-		preferred = []string{"gpt-4o", "claude-3-sonnet", "gemini-pro", "qwen-max"}
+		preferred = []string{"gpt-4o", "claude-3-sonnet", "gemini-pro", "qwen-max", "ling-2.6-1t", "ring-2.6-1t"}
 	case "creative":
-		preferred = []string{"claude-3-opus", "gpt-4o", "gemini-pro", "andesgpt-titan"}
+		preferred = []string{"claude-3-opus", "gpt-4o", "gemini-pro", "andesgpt-titan", "ling-2.6-1t", "ming-flash-omni-2.0"}
 	case "data":
-		preferred = []string{"gpt-4o", "claude-3-sonnet", "sensenova-u1-pro", "qwen-max"}
+		preferred = []string{"gpt-4o", "claude-3-sonnet", "sensenova-u1-pro", "qwen-max", "ling-2.6-1t", "ring-2.6-1t"}
 	default:
 		preferred = models
 	}
