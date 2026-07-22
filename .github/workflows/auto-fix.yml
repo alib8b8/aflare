@@ -10,19 +10,15 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  auto-fix:
-    name: Auto Fix Code Issues
+  format-check:
+    name: Format Check
     runs-on: ubuntu-latest
-    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip-fix]')
-    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -32,77 +28,17 @@ jobs:
       - name: Run go mod tidy
         run: go mod tidy
 
-      - name: Auto format with gofmt
+      - name: Check gofmt
         run: |
-          gofmt -w .
-          echo "=== gofmt fixed files ==="
-          git diff --name-only || true
-
-      - name: Check for changes
-        id: check-changes
-        run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "Found changes to auto-fix"
-            git status --short
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "No changes needed"
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Files need formatting:"
+            gofmt -l .
+            exit 1
           fi
-
-      - name: Create auto-fix branch and push
-        if: steps.check-changes.outputs.has_changes == 'true'
-        continue-on-error: true
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b auto-fix-${{ github.run_id }}
-          git add -A
-          git status --short
-          git commit -m "$(cat <<'EOF'
-fix: 自动代码格式化与依赖整理
-
-- gofmt 格式化修复
-- go mod tidy 依赖整理
-[skip-fix]
-EOF
-          )" || echo "Commit failed (no changes or other issue)"
-          git push origin auto-fix-${{ github.run_id }} || echo "Push failed (branch protection or other issue)"
-
-      - name: Create Pull Request
-        if: steps.check-changes.outputs.has_changes == 'true'
-        continue-on-error: true
-        uses: actions/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: auto-fix-${{ github.run_id }}
-          title: "🔧 Auto-Fix: Code formatting and dependency cleanup"
-          body: |
-            ## 自动修复 PR
-
-            **触发原因**: 代码格式化或依赖问题
-
-            **修复内容**:
-            - gofmt 格式化修复
-            - go mod tidy 依赖整理
-
-            **扫描结果**:
-            - 运行: ${{ github.run_id }}
-            - 分支: ${{ github.ref }}
-
-            **请检查**:
-            - [ ] 构建是否通过
-            - [ ] 测试是否通过
-            - [ ] 格式化是否合理
-          labels: |
-            automated
-            formatting
-            dependencies
 
   lint-check:
     name: Lint Check
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
