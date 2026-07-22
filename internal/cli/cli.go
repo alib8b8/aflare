@@ -16,12 +16,13 @@ import (
 )
 
 // ParseArgs parses the command-line arguments and returns the command and its arguments.
-// It also detects the --safe-mode, --dry-run, --mcp-server, and --lang flags.
-func ParseArgs(args []string) (command string, commandArgs []string, safeMode bool, dryRun bool, mcpServer bool, lang string) {
+// It also detects the --safe-mode, --dry-run, --mcp-server, --lang, and --concise flags.
+func ParseArgs(args []string) (command string, commandArgs []string, safeMode bool, dryRun bool, mcpServer bool, lang string, concise bool) {
 	safeMode = false
 	dryRun = false
 	mcpServer = false
 	lang = ""
+	concise = false
 	var filtered []string
 	skipNext := false
 	for i, arg := range args {
@@ -35,6 +36,8 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 			dryRun = true
 		} else if arg == "--mcp-server" {
 			mcpServer = true
+		} else if arg == "--concise" || arg == "-q" || arg == "--quiet" {
+			concise = true
 		} else if arg == "--lang" {
 			if i+1 < len(args) {
 				lang = args[i+1]
@@ -63,7 +66,7 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 	}
 
 	if len(filtered) == 0 {
-		return "", nil, safeMode, dryRun, mcpServer, lang
+		return "", nil, safeMode, dryRun, mcpServer, lang, concise
 	}
 
 	command = filtered[0]

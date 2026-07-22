@@ -1213,14 +1213,19 @@ func (n *CodeKnowledgeGraphNode) generateSuggestions(reviewResult ckgReviewResul
 
 // ckgIndex 持久化索引结构
 type ckgIndex struct {
-	Path       string            `json:"path"`
-	Entities   []ckgEntity       `json:"entities"`
-	Relations  []ckgRelation     `json:"relations"`
-	Concepts   []ckgConcept      `json:"concepts"`
-	FileHashes map[string]string `json:"file_hashes"` // 文件路径 -> SHA256哈希
-	CreatedAt  time.Time         `json:"created_at"`
-	UpdatedAt  time.Time         `json:"updated_at"`
-	mu         sync.RWMutex      `json:"-"`
+	Path          string            `json:"path"`
+	Entities      []ckgEntity       `json:"entities"`
+	Relations     []ckgRelation     `json:"relations"`
+	Concepts      []ckgConcept      `json:"concepts"`
+	FileHashes    map[string]string `json:"file_hashes"`    // 文件路径 -> SHA256哈希
+	CreatedAt     time.Time         `json:"created_at"`
+	UpdatedAt     time.Time         `json:"updated_at"`
+	TotalFiles    int               `json:"total_files"`    // 索引文件总数
+	TotalLines    int               `json:"total_lines"`    // 代码总行数
+	TotalTokens   int               `json:"total_tokens"`   // 预估 Token 数（用于全量审查）
+	TokensSaved   int               `json:"tokens_saved"`   // 通过增量更新节省的 Token
+	SavingsRatio  float64           `json:"savings_ratio"`  // Token 节省比例（0-1）
+	mu            sync.RWMutex      `json:"-"`
 }
 
 var (
@@ -1332,6 +1337,21 @@ func (n *CodeKnowledgeGraphNode) buildIndexIncremental(root string, idx *ckgInde
 		return nil, err
 	}
 
+	// 计算预估 Token 数（用于显示节省比例）
+	estimateTokensForFiles := func(fileList []string) int {
+		totalTokens := 0
+		for _, f := range fileList {
+			data, err := os.ReadFile(f)
+			if err != nil {
+				continue
+			}
+			// 粗略估算：1 token ≈ 4 字符（英文）或 1.5 字符（中文/代码）
+			tokens := len(data) / 3
+			totalTokens += tokens
+		}
+		return totalTokens
+	}
+
 	if idx == nil || forceRebuild {
 		// 全量构建
 		idx = &ckgIndex{
@@ -1342,6 +1362,7 @@ func (n *CodeKnowledgeGraphNode) buildIndexIncremental(root string, idx *ckgInde
 			FileHashes: make(map[string]string),
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
+			TotalFiles: len(files),
 		}
 
 		for _, f := range files {
@@ -1355,6 +1376,9 @@ func (n *CodeKnowledgeGraphNode) buildIndexIncremental(root string, idx *ckgInde
 		}
 
 		idx.Concepts = n.extractConcepts(idx.Entities)
+		idx.TotalTokens = estimateTokensForFiles(files)
+		idx.TokensSaved = 0
+		idx.SavingsRatio = 0
 		return idx, nil
 	}
 
@@ -1366,11 +1390,24 @@ func (n *CodeKnowledgeGraphNode) buildIndexIncremental(root string, idx *ckgInde
 		return idx, nil
 	}
 
+	// 计算 Token 节省
+	changedFiles := append(added, modified...)
+	tokensForChanged := estimateTokensForFiles(changedFiles)
+	tokensForAll := estimateTokensForFiles(files)
+	
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
 
+	// 记录节省的 Token（全量审查需要的 - 实际增量审查的）
+	previousTokensSaved := idx.TokensSaved
+	idx.TokensSaved = previousTokensSaved + (tokensForAll - tokensForChanged)
+	if tokensForAll > 0 {
+		idx.SavingsRatio = float64(idx.TokensSaved) / float64(tokensForAll+idx.TokensSaved)
+	}
+	idx.TotalTokens = tokensForAll
+	idx.TotalFiles = len(files)
+
 	// 移除已修改文件的旧实体
-	changedFiles := append(added, modified...)
 	for _, f := range changedFiles {
 		oldHash := idx.FileHashes[f]
 		if oldHash != "" {
@@ -1434,6 +1471,69 @@ func (n *CodeKnowledgeGraphNode) buildIndexIncremental(root string, idx *ckgInde
 	idx.UpdatedAt = time.Now()
 
 	return idx, nil
+}
+
+// GetTokenSavingsReport 生成 Token 节省统计报告
+func (n *CodeKnowledgeGraphNode) GetTokenSavingsReport(indexPath string) string {
+	idx, err := n.loadIndex(indexPath)
+	if err != nil {
+		return "❌ 无法加载索引"
+	}
+
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+
+	var report string
+	report += "📊 Token 节省统计\n"
+	report += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+	report += fmt.Sprintf("📁 索引路径: %s\n", idx.Path)
+	report += fmt.Sprintf("📄 文件总数: %d\n", idx.TotalFiles)
+	report += fmt.Sprintf("🔢 实体数量: %d\n", len(idx.Entities))
+	report += fmt.Sprintf("🔗 关系数量: %d\n", len(idx.Relations))
+	report += fmt.Sprintf("💡 概念数量: %d\n\n", len(idx.Concepts))
+
+	if idx.TotalTokens > 0 {
+		report += "📈 Token 分析\n"
+		report += "─────────────────────────────────────────\n"
+		report += fmt.Sprintf("  全量审查预估 Token: %d\n", idx.TotalTokens)
+		
+		if idx.TokensSaved > 0 {
+			report += fmt.Sprintf("  累计节省 Token: %d\n", idx.TokensSaved)
+			savingsPercent := idx.SavingsRatio * 100
+			report += fmt.Sprintf("  节省比例: %.1f%%\n", savingsPercent)
+			
+			// 计算节省的成本（假设 GPT-4o-mini 定价）
+			costPer1K := 0.00015 // USD
+			savedCost := float64(idx.TokensSaved) / 1000 * costPer1K
+			report += fmt.Sprintf("  节省成本: $%.4f\n", savedCost)
+		} else {
+			report += "  （首次索引，无节省数据）\n"
+		}
+	}
+
+	report += fmt.Sprintf("\n🕐 创建时间: %s\n", idx.CreatedAt.Format("2006-01-02 15:04:05"))
+	report += fmt.Sprintf("🕐 更新时间: %s\n", idx.UpdatedAt.Format("2006-01-02 15:04:05"))
+
+	return report
+}
+
+// GetCompactSavingsReport 生成简洁的 Token 节省报告
+func (n *CodeKnowledgeGraphNode) GetCompactSavingsReport(indexPath string) string {
+	idx, err := n.loadIndex(indexPath)
+	if err != nil {
+		return ""
+	}
+
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+
+	if idx.TokensSaved > 0 {
+		savingsPercent := idx.SavingsRatio * 100
+		return fmt.Sprintf("📊 Token 节省: %d (%.1f%%) | 文件: %d | 实体: %d",
+			idx.TokensSaved, savingsPercent, idx.TotalFiles, len(idx.Entities))
+	}
+	return fmt.Sprintf("📊 文件: %d | 实体: %d | 首次索引", idx.TotalFiles, len(idx.Entities))
 }
 
 // getIndexFilePath 获取索引文件路径
