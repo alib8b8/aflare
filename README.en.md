@@ -235,8 +235,29 @@ llm-box takes security seriously. Key protections:
 | **Plugin Limits** | Max 100 plugins, HTTPS-only URLs, restricted git hosts (GitHub/GitLab/GitCode/Gitee) |
 | **Resource Limits** | Code knowledge graph: max 5000 files/depth 5; video edit: shell metacharacter filtering |
 | **Concurrent Safety** | Per-session rand mutex, RWMutex for shared state, no global mutable state without locks |
+| **Auto Fix** | CI auto-runs gofmt/go vet/gosec/govulncheck, auto-commits fixes on detection |
 
 📖 [Security Guide →](SECURITY.md) | [Audit Logs →](docs/getting-started.md#audit-logs)
+
+### 🤖 Automated Security Fixes
+
+After every code push, GitHub Actions automatically performs the following security checks and fixes:
+
+| Check | Tool | Auto-Fix | Trigger |
+|-------|------|----------|---------|
+| Code Formatting | `gofmt` | ✅ Auto-format and commit | Every push |
+| Dependency Tidy | `go mod tidy` | ✅ Auto-tidy and commit | Every push |
+| Static Analysis | `go vet` | ⚠️ Report issues | Every push |
+| Lint Check | `golangci-lint` | ⚠️ Report issues | Every push |
+| Security Scan | `gosec` | ⚠️ Report issues | Every push + Daily |
+| Dependency Vulns | `govulncheck` | ✅ Auto `go get -u` fix | Every push + Daily |
+
+**Auto-Fix Workflow:**
+1. gofmt formatting issues detected → Auto-format → Commit with `[skip-fix]` tag
+2. govulncheck vulnerabilities detected → Auto `go get -u ./...` → Verify build → Commit with `[skip-sec]` tag
+3. Auto-fix fails → Create GitHub Issue to notify maintainers
+
+**Scheduled Scan:** Daily at 2:00 AM (UTC) for full security scan, ensuring dependencies stay at latest secure versions.
 
 ---
 
