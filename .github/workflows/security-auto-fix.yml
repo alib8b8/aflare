@@ -85,20 +85,22 @@ jobs:
 
       - name: Auto commit security fixes
         if: steps.check-changes.outputs.has_changes == 'true'
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
+          git status --short
           git commit -m "$(cat <<'EOF'
-            security: 自动修复依赖安全漏洞
+security: 自动修复依赖安全漏洞
 
-            - govulncheck 检测到依赖漏洞
-            - 自动更新依赖到安全版本
-            - go mod tidy 整理依赖
-            [skip-sec]
-            EOF
-          )"
-          git push
+- govulncheck 检测到依赖漏洞
+- 自动更新依赖到安全版本
+- go mod tidy 整理依赖
+[skip-sec]
+EOF
+          )" || echo "Commit failed (no changes or other issue)"
+          git push || echo "Push failed (branch protection or other issue)"
 
       - name: Upload security scan results
         if: always()

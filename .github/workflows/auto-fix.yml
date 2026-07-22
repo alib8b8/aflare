@@ -51,19 +51,21 @@ jobs:
 
       - name: Auto commit fixes
         if: steps.check-changes.outputs.has_changes == 'true'
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
+          git status --short
           git commit -m "$(cat <<'EOF'
-            fix: 自动代码格式化与依赖整理
+fix: 自动代码格式化与依赖整理
 
-            - gofmt 格式化修复
-            - go mod tidy 依赖整理
-            [skip-fix]
-            EOF
-          )"
-          git push
+- gofmt 格式化修复
+- go mod tidy 依赖整理
+[skip-fix]
+EOF
+          )" || echo "Commit failed (no changes or other issue)"
+          git push || echo "Push failed (branch protection or other issue)"
 
   lint-check:
     name: Lint Check
