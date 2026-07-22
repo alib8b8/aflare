@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/alib8b8/llm-box/internal/history"
+	"github.com/alib8b8/llm-box/internal/memory"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/templates"
 	"github.com/alib8b8/llm-box/internal/workflow"
@@ -308,6 +309,159 @@ func (s *Server) getExtendedTools() []tool {
 				Required: []string{"name"},
 			},
 		},
+		// Memory tools (session-isolated)
+		{
+			Name:        "memory_store",
+			Description: "Store a memory entry in the session-isolated memory system.",
+			InputSchema: inputSchema{
+				Type: "object",
+				Properties: map[string]interface{}{
+					"session_id": map[string]interface{}{
+						"type":        "string",
+						"description": "Session ID for isolated memory (default: 'default')",
+						"default":     "default",
+					},
+					"key": map[string]interface{}{
+						"type":        "string",
+						"description": "Memory key (optional, auto-generated if empty)",
+					},
+					"value": map[string]interface{}{
+						"type":        "string",
+						"description": "Memory content to store",
+					},
+					"level": map[string]interface{}{
+						"type":        "string",
+						"description": "Memory level: short/medium/long (default: medium)",
+						"default":     "medium",
+					},
+					"type": map[string]interface{}{
+						"type":        "string",
+						"description": "Memory type: fact/concept/experience/preference/relationship/task/context (default: fact)",
+						"default":     "fact",
+					},
+					"tags": map[string]interface{}{
+						"type":        "string",
+						"description": "Comma-separated tags for categorization",
+					},
+					"confidence": map[string]interface{}{
+						"type":        "number",
+						"description": "Confidence level 0.0-1.0 (default: 0.8)",
+						"default":     0.8,
+					},
+				},
+				Required: []string{"value"},
+			},
+		},
+		{
+			Name:        "memory_retrieve",
+			Description: "Retrieve a memory entry by key from session-isolated memory.",
+			InputSchema: inputSchema{
+				Type: "object",
+				Properties: map[string]interface{}{
+					"session_id": map[string]interface{}{
+						"type":        "string",
+						"description": "Session ID (default: 'default')",
+						"default":     "default",
+					},
+					"key": map[string]interface{}{
+						"type":        "string",
+						"description": "Memory key to retrieve",
+					},
+				},
+				Required: []string{"key"},
+			},
+		},
+		{
+			Name:        "memory_search",
+			Description: "Search memory entries matching a query in session-isolated memory.",
+			InputSchema: inputSchema{
+				Type: "object",
+				Properties: map[string]interface{}{
+					"session_id": map[string]interface{}{
+						"type":        "string",
+						"description": "Session ID (default: 'default')",
+						"default":     "default",
+					},
+					"query": map[string]interface{}{
+						"type":        "string",
+						"description": "Search query",
+					},
+					"level": map[string]interface{}{
+						"type":        "string",
+						"description": "Filter by memory level: short/medium/long (optional)",
+					},
+					"top_k": map[string]interface{}{
+						"type":        "integer",
+						"description": "Number of results (1-100, default: 10)",
+						"default":     10,
+					},
+				},
+				Required: []string{"query"},
+			},
+		},
+		{
+			Name:        "memory_stats",
+			Description: "Get memory statistics for a session or global stats.",
+			InputSchema: inputSchema{
+				Type: "object",
+				Properties: map[string]interface{}{
+					"session_id": map[string]interface{}{
+						"type":        "string",
+						"description": "Session ID (default: 'default', use 'global' for all sessions)",
+						"default":     "default",
+					},
+				},
+			},
+		},
+		{
+			Name:        "memory_list_sessions",
+			Description: "List all active memory sessions.",
+			InputSchema: inputSchema{
+				Type:       "object",
+				Properties: map[string]interface{}{},
+			},
+		},
+		// Code knowledge graph tools
+		{
+			Name:        "code_graph_index",
+			Description: "Build or update the code knowledge graph index for a directory. Enables incremental updates and reduces token usage for large repos.",
+			InputSchema: inputSchema{
+				Type: "object",
+				Properties: map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Path to the code directory to index (default: current working directory)",
+					},
+				},
+			},
+		},
+		{
+			Name:        "code_graph_query",
+			Description: "Query the code knowledge graph to find entities, relations, and concepts related to your query.",
+			InputSchema: inputSchema{
+				Type: "object",
+				Properties: map[string]interface{}{
+					"query": map[string]interface{}{
+						"type":        "string",
+						"description": "Search query for the code graph (e.g., 'authentication', 'database', 'error handling')",
+					},
+					"top_k": map[string]interface{}{
+						"type":        "integer",
+						"description": "Number of results (default: 10)",
+						"default":     10,
+					},
+				},
+				Required: []string{"query"},
+			},
+		},
+		{
+			Name:        "code_graph_stats",
+			Description: "Get code knowledge graph statistics including total files, tokens saved, and index size.",
+			InputSchema: inputSchema{
+				Type:       "object",
+				Properties: map[string]interface{}{},
+			},
+		},
 	}
 }
 
@@ -359,6 +513,24 @@ func (s *Server) callExtendedTool(params *toolCallParams) (*toolCallResult, erro
 			r.res, r.err = s.toolTemplateList(params.Arguments)
 		case "template_render":
 			r.res, r.err = s.toolTemplateRender(params.Arguments)
+		// Memory tools
+		case "memory_store":
+			r.res, r.err = s.toolMemoryStore(params.Arguments)
+		case "memory_retrieve":
+			r.res, r.err = s.toolMemoryRetrieve(params.Arguments)
+		case "memory_search":
+			r.res, r.err = s.toolMemorySearch(params.Arguments)
+		case "memory_stats":
+			r.res, r.err = s.toolMemoryStats(params.Arguments)
+		case "memory_list_sessions":
+			r.res, r.err = s.toolMemoryListSessions()
+		// Code graph tools
+		case "code_graph_index":
+			r.res, r.err = s.toolCodeGraphIndex(params.Arguments)
+		case "code_graph_query":
+			r.res, r.err = s.toolCodeGraphQuery(params.Arguments)
+		case "code_graph_stats":
+			r.res, r.err = s.toolCodeGraphStats()
 		default:
 			r.err = fmt.Errorf("unknown tool: %s", params.Name)
 		}
@@ -715,6 +887,245 @@ func (s *Server) toolTemplateRender(args map[string]interface{}) (*toolCallResul
 
 	return &toolCallResult{
 		Content: []content{{Type: "text", Text: rendered}},
+	}, nil
+}
+
+// ------------------------------------------------------------------
+// Memory tool implementations
+// ------------------------------------------------------------------
+
+func (s *Server) toolMemoryStore(args map[string]interface{}) (*toolCallResult, error) {
+	sessionID := optionalString(args, "session_id")
+	if sessionID == "" {
+		sessionID = "default"
+	}
+	value, err := requireString(args, "value")
+	if err != nil {
+		return nil, err
+	}
+	key := optionalString(args, "key")
+	level := optionalString(args, "level")
+	if level == "" {
+		level = "medium"
+	}
+	memType := optionalString(args, "type")
+	if memType == "" {
+		memType = "fact"
+	}
+	tagsStr := optionalString(args, "tags")
+	var tags []string
+	if tagsStr != "" {
+		for _, t := range strings.Split(tagsStr, ",") {
+			t = strings.TrimSpace(t)
+			if t != "" {
+				tags = append(tags, t)
+			}
+		}
+	}
+	confidence := 0.8
+	switch v := args["confidence"].(type) {
+	case float64:
+		confidence = v
+	case int:
+		confidence = float64(v)
+	}
+
+	sess := memory.GetSession(sessionID)
+	id, expiresAt, err := sess.Store(key, value, level, memType, tags, 72, confidence, "mcp")
+	if err != nil {
+		return nil, fmt.Errorf("failed to store memory: %w", err)
+	}
+
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: fmt.Sprintf("Stored: key=%s id=%s expires=%s", key, id, expiresAt.Format(time.RFC3339))}},
+	}, nil
+}
+
+func (s *Server) toolMemoryRetrieve(args map[string]interface{}) (*toolCallResult, error) {
+	sessionID := optionalString(args, "session_id")
+	if sessionID == "" {
+		sessionID = "default"
+	}
+	key, err := requireString(args, "key")
+	if err != nil {
+		return nil, err
+	}
+
+	sess := memory.GetSession(sessionID)
+	entry, err := sess.Retrieve(key)
+	if err != nil {
+		return nil, err
+	}
+
+	data, _ := json.MarshalIndent(entry, "", "  ")
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: string(data)}},
+	}, nil
+}
+
+func (s *Server) toolMemorySearch(args map[string]interface{}) (*toolCallResult, error) {
+	sessionID := optionalString(args, "session_id")
+	if sessionID == "" {
+		sessionID = "default"
+	}
+	query, err := requireString(args, "query")
+	if err != nil {
+		return nil, err
+	}
+	level := optionalString(args, "level")
+	topK := optionalInt(args, "top_k", 10)
+
+	sess := memory.GetSession(sessionID)
+	results := sess.Search(query, level, topK, 0.3)
+
+	if len(results) == 0 {
+		return &toolCallResult{
+			Content: []content{{Type: "text", Text: "No matching memory entries found."}},
+		}, nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Found %d memory entries:\n\n", len(results)))
+	for i, r := range results {
+		sb.WriteString(fmt.Sprintf("%d. [%s] %s (key: %s)\n", i+1, r.Type, r.Value, r.Key))
+		if len(r.Value) > 150 {
+			sb.WriteString(fmt.Sprintf("   Preview: %s...\n", r.Value[:147]))
+		}
+	}
+
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: sb.String()}},
+	}, nil
+}
+
+func (s *Server) toolMemoryStats(args map[string]interface{}) (*toolCallResult, error) {
+	sessionID := optionalString(args, "session_id")
+	if sessionID == "" {
+		sessionID = "default"
+	}
+
+	if sessionID == "global" {
+		gs := memory.GetGlobalStats()
+		return &toolCallResult{
+			Content: []content{{Type: "text", Text: fmt.Sprintf(
+				"Global Memory: %d sessions, %d entries, %.2f MB total",
+				gs.ActiveSessions, gs.TotalEntries, gs.TotalEstimatedMB,
+			)}},
+		}, nil
+	}
+
+	sess := memory.GetSession(sessionID)
+	stats := sess.GetStats()
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: fmt.Sprintf(
+			"Session '%s': %d entries (S:%d M:%d L:%d), %.2f KB, %d accesses",
+			sessionID, stats.TotalEntries,
+			stats.ShortTermCount, stats.MediumTermCount, stats.LongTermCount,
+			float64(stats.EstimatedBytes)/1024, stats.TotalAccesses,
+		)}},
+	}, nil
+}
+
+func (s *Server) toolMemoryListSessions() (*toolCallResult, error) {
+	sessions := memory.ListSessions()
+	gs := memory.GetGlobalStats()
+
+	if len(sessions) == 0 {
+		return &toolCallResult{
+			Content: []content{{Type: "text", Text: "No active memory sessions."}},
+		}, nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Active memory sessions (%d):\n\n", len(sessions)))
+	for _, id := range sessions {
+		ss := gs.PerSession[id]
+		sb.WriteString(fmt.Sprintf("  • %s: %d entries (%.2f KB)\n",
+			id, ss.TotalEntries, float64(ss.EstimatedBytes)/1024))
+	}
+
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: sb.String()}},
+	}, nil
+}
+
+// ------------------------------------------------------------------
+// Code graph tool implementations
+// ------------------------------------------------------------------
+
+func (s *Server) toolCodeGraphIndex(args map[string]interface{}) (*toolCallResult, error) {
+	path := optionalString(args, "path")
+	if path == "" {
+		var err error
+		path, err = os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get working directory: %w", err)
+		}
+	}
+
+	reg := nodes.GetGlobalRegistry()
+	nodes.RegisterBuiltins(reg)
+	ckg, ok := reg.Get("code_knowledge_graph")
+	if !ok {
+		return nil, fmt.Errorf("code_knowledge_graph node not available")
+	}
+
+	result, err := ckg.Execute(context.Background(), path, map[string]string{
+		"operation": "index",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("code graph indexing failed: %w", err)
+	}
+
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: result}},
+	}, nil
+}
+
+func (s *Server) toolCodeGraphQuery(args map[string]interface{}) (*toolCallResult, error) {
+	query, err := requireString(args, "query")
+	if err != nil {
+		return nil, err
+	}
+	topK := optionalInt(args, "top_k", 10)
+
+	reg := nodes.GetGlobalRegistry()
+	nodes.RegisterBuiltins(reg)
+	ckg, ok := reg.Get("code_knowledge_graph")
+	if !ok {
+		return nil, fmt.Errorf("code_knowledge_graph node not available")
+	}
+
+	result, err := ckg.Execute(context.Background(), query, map[string]string{
+		"operation": "query",
+		"top_k":     fmt.Sprintf("%d", topK),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("code graph query failed: %w", err)
+	}
+
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: result}},
+	}, nil
+}
+
+func (s *Server) toolCodeGraphStats() (*toolCallResult, error) {
+	reg := nodes.GetGlobalRegistry()
+	nodes.RegisterBuiltins(reg)
+	ckg, ok := reg.Get("code_knowledge_graph")
+	if !ok {
+		return nil, fmt.Errorf("code_knowledge_graph node not available")
+	}
+
+	result, err := ckg.Execute(context.Background(), "", map[string]string{
+		"operation": "stats",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("code graph stats failed: %w", err)
+	}
+
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: result}},
 	}, nil
 }
 

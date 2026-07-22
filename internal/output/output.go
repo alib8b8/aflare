@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -18,6 +19,8 @@ const (
 	ModeConcise
 	// ModeQuiet suppresses all non-essential output.
 	ModeQuiet
+	// ModeADHD shows answer-first, numbered, no-fluff output (inspired by i-have-adhd).
+	ModeADHD
 )
 
 // OutputManager manages output modes.
@@ -49,11 +52,11 @@ func (o *OutputManager) GetMode() Mode {
 	return o.mode
 }
 
-// IsConcise returns true if concise mode is enabled.
+// IsConcise returns true if concise mode is enabled (includes ADHD mode).
 func (o *OutputManager) IsConcise() bool {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	return o.mode == ModeConcise || o.mode == ModeQuiet
+	return o.mode == ModeConcise || o.mode == ModeQuiet || o.mode == ModeADHD
 }
 
 // IsQuiet returns true if quiet mode is enabled.
@@ -61,6 +64,13 @@ func (o *OutputManager) IsQuiet() bool {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 	return o.mode == ModeQuiet
+}
+
+// IsADHD returns true if ADHD-friendly mode is enabled.
+func (o *OutputManager) IsADHD() bool {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	return o.mode == ModeADHD
 }
 
 // Print prints a message (respects output mode).
@@ -184,7 +194,116 @@ func (o *OutputManager) ProgressDone(msg string) {
 		fmt.Fprintf(o.out, "\r✅ %s\n", msg)
 	} else if o.mode == ModeNormal {
 		fmt.Fprintf(o.out, "✅ %s\n", msg)
+	} else if o.mode == ModeADHD {
+		fmt.Fprintf(o.out, "✅ %s\n", msg)
 	}
+}
+
+// Answer prints the direct answer first (ADHD mode: always short, no fluff).
+// In ADHD mode this is the ONLY thing shown for results.
+func (o *OutputManager) Answer(answer string) {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+
+	if o.mode == ModeQuiet {
+		return
+	}
+
+	if o.mode == ModeADHD {
+		fmt.Fprintf(o.out, "⚡ %s\n", strings.TrimSpace(answer))
+	} else {
+		fmt.Fprintf(o.out, "%s\n", answer)
+	}
+}
+
+// Numbered prints items as a numbered list (ADHD-friendly: skips fluff).
+func (o *OutputManager) Numbered(items []string) {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+
+	if o.mode == ModeQuiet {
+		return
+	}
+
+	for i, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if o.mode == ModeADHD {
+			if len(item) > 120 {
+				item = item[:117] + "..."
+			}
+			fmt.Fprintf(o.out, "%d. %s\n", i+1, item)
+		} else {
+			fmt.Fprintf(o.out, "  %d. %s\n", i+1, item)
+		}
+	}
+}
+
+// KeyPoints prints key takeaways (ADHD mode: max 3 bullet points).
+func (o *OutputManager) KeyPoints(points []string) {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+
+	if o.mode == ModeQuiet {
+		return
+	}
+
+	maxPoints := len(points)
+	if o.mode == ModeADHD {
+		maxPoints = 3
+	}
+	if len(points) < maxPoints {
+		maxPoints = len(points)
+	}
+
+	if o.mode == ModeADHD {
+		fmt.Fprintln(o.out, "🔑 Key:")
+	} else {
+		fmt.Fprintln(o.out, "Key points:")
+	}
+
+	for i := 0; i < maxPoints; i++ {
+		p := strings.TrimSpace(points[i])
+		if p == "" {
+			continue
+		}
+		if o.mode == ModeADHD && len(p) > 100 {
+			p = p[:97] + "..."
+		}
+		fmt.Fprintf(o.out, "  • %s\n", p)
+	}
+}
+
+// NoFluff removes common filler phrases (optimized for ADHD mode).
+func NoFluff(text string) string {
+	fluff := []string{
+		"First of all, ",
+		"First, ",
+		"It's important to note that ",
+		"It should be noted that ",
+		"As you may know, ",
+		"As we all know, ",
+		"Basically, ",
+		"Essentially, ",
+		"Actually, ",
+		"Honestly, ",
+		"To be honest, ",
+		"For what it's worth, ",
+		"At the end of the day, ",
+		"That being said, ",
+		"With that being said, ",
+		"in order to ",
+		"in order for ",
+		"the fact that ",
+	}
+	result := text
+	for _, f := range fluff {
+		result = strings.ReplaceAll(result, f, "")
+		result = strings.ReplaceAll(result, strings.ToLower(f), "")
+	}
+	return strings.TrimSpace(result)
 }
 
 // Convenience functions using the global manager
@@ -257,4 +376,24 @@ func Progress(step, total int, msg string) {
 // ProgressDone completes progress using the global manager.
 func ProgressDone(msg string) {
 	Global.ProgressDone(msg)
+}
+
+// IsADHD returns true if global ADHD mode is enabled.
+func IsADHD() bool {
+	return Global.IsADHD()
+}
+
+// Answer prints the direct answer using the global manager.
+func Answer(answer string) {
+	Global.Answer(answer)
+}
+
+// Numbered prints items as a numbered list using the global manager.
+func Numbered(items []string) {
+	Global.Numbered(items)
+}
+
+// KeyPoints prints key takeaways using the global manager.
+func KeyPoints(points []string) {
+	Global.KeyPoints(points)
 }
