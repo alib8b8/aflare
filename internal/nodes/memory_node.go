@@ -9,9 +9,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/memory"
 )
 
-const maxMemoryValueSize = 1024 * 1024 // 1MB
+const maxMemoryValueSize = 1024 * 1024
 
 var (
 	validMemoryLevels = map[string]bool{
@@ -30,6 +32,9 @@ var (
 		"merge":            true,
 		"visualize":        true,
 		"inkling_retrieve": true,
+		"list_sessions":    true,
+		"session_stats":    true,
+		"global_stats":     true,
 	}
 	validMemoryTypes = map[string]bool{
 		"fact":         true,
@@ -43,119 +48,17 @@ var (
 	memoryKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
 )
 
-type MemoryEntry struct {
-	ID         string    `json:"id"`
-	Key        string    `json:"key"`
-	Value      string    `json:"value"`
-	Type       string    `json:"type"`
-	Level      string    `json:"level"`
-	Score      float64   `json:"score"`
-	ExpiresAt  time.Time `json:"expires_at"`
-	AccessedAt time.Time `json:"accessed_at"`
-	CreatedAt  time.Time `json:"created_at"`
-	Tags       []string  `json:"tags"`
-	Source     string    `json:"source"`
-	Confidence float64   `json:"confidence"`
-}
-
-type MemoryGraph struct {
-	Nodes []MemoryEntry `json:"nodes"`
-	Edges []MemoryEdge  `json:"edges"`
-}
-
-type MemoryEdge struct {
-	Source    string    `json:"source"`
-	Target    string    `json:"target"`
-	Relation  string    `json:"relation"`
-	Weight    float64   `json:"weight"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type MemoryStats struct {
-	TotalEntries    int     `json:"total_entries"`
-	ShortTermCount  int     `json:"short_term_count"`
-	MediumTermCount int     `json:"medium_term_count"`
-	LongTermCount   int     `json:"long_term_count"`
-	AvgConfidence   float64 `json:"avg_confidence"`
-	TotalAccesses   int     `json:"total_accesses"`
-	RetentionRate   float64 `json:"retention_rate"`
-}
-
-type memoryState struct {
-	mu          sync.RWMutex
-	entries     map[string]*MemoryEntry
-	graph       MemoryGraph
-	accessCount int
-	maxEntries  int
-}
+type MemoryNode struct{}
 
 var (
-	memoryStateInstance = &memoryState{
-		entries:    make(map[string]*MemoryEntry),
-		maxEntries: 10000,
-	}
-	memoryCleanupInterval = 5 * time.Minute
-	memoryRand            = rand.New(rand.NewSource(time.Now().UnixNano()))
-	memoryRandMu          sync.Mutex
+	memoryRand   = rand.New(rand.NewSource(time.Now().UnixNano()))
+	memoryRandMu sync.Mutex
 )
-
-func initMemoryCleanup() {
-	go func() {
-		ticker := time.NewTicker(memoryCleanupInterval)
-		defer ticker.Stop()
-		for range ticker.C {
-			cleanupExpiredMemory()
-		}
-	}()
-}
-
-func cleanupExpiredMemory() {
-	memoryStateInstance.mu.Lock()
-	defer memoryStateInstance.mu.Unlock()
-
-	now := time.Now()
-	expiredKeys := []string{}
-
-	for key, entry := range memoryStateInstance.entries {
-		if now.After(entry.ExpiresAt) {
-			expiredKeys = append(expiredKeys, key)
-		}
-	}
-
-	for _, key := range expiredKeys {
-		delete(memoryStateInstance.entries, key)
-	}
-
-	if len(memoryStateInstance.entries) > memoryStateInstance.maxEntries {
-		evictCount := len(memoryStateInstance.entries) - memoryStateInstance.maxEntries
-		for i := 0; i < evictCount; i++ {
-			evictLRULocked()
-		}
-	}
-}
-
-func evictLRULocked() {
-	var oldestKey string
-	var oldestTime time.Time
-
-	for key, entry := range memoryStateInstance.entries {
-		if oldestKey == "" || entry.AccessedAt.Before(oldestTime) {
-			oldestKey = key
-			oldestTime = entry.AccessedAt
-		}
-	}
-
-	if oldestKey != "" {
-		delete(memoryStateInstance.entries, oldestKey)
-	}
-}
-
-type MemoryNode struct{}
 
 func (n *MemoryNode) Name() string { return "memory" }
 
 func (n *MemoryNode) Description() string {
-	return "AI Agent memory infrastructure with persistent knowledge graph engine. Supports short/medium/long term memory, cross-session long-term memory, memory retrieval/storage/forgetting mechanisms."
+	return "AI Agent memory infrastructure with session-isolated persistent knowledge graph engine. Supports multi-session parallel memory, short/medium/long term memory, cross-session long-term memory, and memory usage monitoring."
 }
 
 func (n *MemoryNode) Schema() NodeSchema {
@@ -165,7 +68,8 @@ func (n *MemoryNode) Schema() NodeSchema {
 		Input:       "string - memory content to store or query for retrieval",
 		Output:      "string - JSON with memory operations result, entries, or statistics",
 		Params: []ParamSchema{
-			{Name: "operation", Type: "string", Description: "Operation: store/retrieve/delete/search/summary/forget/transfer/merge (default: store)", Required: false, Default: "store"},
+			{Name: "operation", Type: "string", Description: "Operation: store/retrieve/delete/search/summary/forget/transfer/merge/inkling_retrieve/list_sessions/session_stats/global_stats (default: store)", Required: false, Default: "store"},
+			{Name: "session_id", Type: "string", Description: "Session ID for isolated memory (default: default)", Required: false, Default: "default"},
 			{Name: "key", Type: "string", Description: "Memory key for storage/retrieval", Required: false},
 			{Name: "value", Type: "string", Description: "Memory value/content", Required: false},
 			{Name: "level", Type: "string", Description: "Memory level: short/medium/long (default: medium)", Required: false, Default: "medium"},
@@ -184,8 +88,19 @@ func (n *MemoryNode) Schema() NodeSchema {
 func (n *MemoryNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	operation := getParam(params, "operation", "store")
 	if !validMemoryOperations[operation] {
-		return "", fmt.Errorf("invalid operation: %s (supported: store, retrieve, delete, search, summary, forget, transfer, merge)", operation)
+		return "", fmt.Errorf("invalid operation: %s (supported: store, retrieve, delete, search, summary, forget, transfer, merge, inkling_retrieve, list_sessions, session_stats, global_stats)", operation)
 	}
+
+	sessionID := getParam(params, "session_id", "default")
+
+	if operation == "list_sessions" {
+		return n.listSessions()
+	}
+	if operation == "global_stats" {
+		return n.globalStats()
+	}
+
+	session := memory.GetSession(sessionID)
 
 	level := getParam(params, "level", "medium")
 	if !validMemoryLevels[level] {
@@ -272,25 +187,27 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 
 	switch operation {
 	case "store":
-		result, err = n.storeMemory(key, value, level, memType, tags, ttlHours, confidence, source)
+		result, err = n.storeMemory(session, key, value, level, memType, tags, ttlHours, confidence, source)
 	case "retrieve":
-		result, err = n.retrieveMemory(key)
+		result, err = n.retrieveMemory(session, key)
 	case "delete":
-		result, err = n.deleteMemory(key)
+		result, err = n.deleteMemory(session, key)
 	case "search":
-		result, err = n.searchMemory(query, level, topK, threshold)
+		result, err = n.searchMemory(session, query, level, topK, threshold)
 	case "summary":
-		result, err = n.getMemorySummary()
+		result, err = n.getMemorySummary(session, sessionID)
 	case "forget":
-		result, err = n.forgetMemory(level)
+		result, err = n.forgetMemory(session, level)
 	case "transfer":
-		result, err = n.transferMemory(key, level)
+		result, err = n.transferMemory(session, key, level)
 	case "merge":
-		result, err = n.mergeMemory(params)
+		result, err = n.mergeMemory(session, params)
 	case "visualize":
-		result, err = n.visualizeMemory(params)
+		result, err = n.visualizeMemory(session, params)
 	case "inkling_retrieve":
-		result, err = n.retrieveMemoryWithInkling(query, level, topK, threshold)
+		result, err = n.retrieveMemoryWithInkling(session, query, level, topK, threshold)
+	case "session_stats":
+		result, err = n.getMemorySummary(session, sessionID)
 	}
 
 	if err != nil {
@@ -300,6 +217,7 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 	latency := time.Since(startTime)
 	result["latency_ms"] = latency.Milliseconds()
 	result["timestamp"] = time.Now().UTC().Format(time.RFC3339)
+	result["session_id"] = sessionID
 
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
@@ -309,49 +227,22 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 	return string(data), nil
 }
 
-func (n *MemoryNode) storeMemory(key, value, level, memType string, tags []string, ttlHours int, confidence float64, source string) (map[string]interface{}, error) {
+func (n *MemoryNode) storeMemory(session *memory.SessionMemory, key, value, level, memType string, tags []string, ttlHours int, confidence float64, source string) (map[string]interface{}, error) {
 	if key == "" {
 		memoryRandMu.Lock()
 		key = fmt.Sprintf("mem_%d_%d", time.Now().UnixNano(), memoryRand.Intn(10000))
 		memoryRandMu.Unlock()
 	}
 
-	memoryStateInstance.mu.Lock()
-	defer memoryStateInstance.mu.Unlock()
-
-	if len(memoryStateInstance.entries) >= memoryStateInstance.maxEntries {
-		n.cleanupExpiredLocked()
-		if len(memoryStateInstance.entries) >= memoryStateInstance.maxEntries {
-			evictLRULocked()
-		}
+	id, expiresAt, err := session.Store(key, value, level, memType, tags, ttlHours, confidence, source)
+	if err != nil {
+		return nil, err
 	}
-
-	expiresAt := time.Now().Add(time.Duration(ttlHours) * time.Hour)
-	if level == "long" {
-		expiresAt = time.Now().Add(365 * 24 * time.Hour)
-	}
-
-	entry := &MemoryEntry{
-		ID:         fmt.Sprintf("entry_%d", time.Now().UnixNano()),
-		Key:        key,
-		Value:      value,
-		Type:       memType,
-		Level:      level,
-		Score:      confidence * 100,
-		ExpiresAt:  expiresAt,
-		AccessedAt: time.Now(),
-		CreatedAt:  time.Now(),
-		Tags:       tags,
-		Source:     source,
-		Confidence: confidence,
-	}
-
-	memoryStateInstance.entries[key] = entry
 
 	return map[string]interface{}{
 		"operation":  "store",
 		"key":        key,
-		"id":         entry.ID,
+		"id":         id,
 		"level":      level,
 		"type":       memType,
 		"status":     "success",
@@ -359,22 +250,11 @@ func (n *MemoryNode) storeMemory(key, value, level, memType string, tags []strin
 	}, nil
 }
 
-func (n *MemoryNode) retrieveMemory(key string) (map[string]interface{}, error) {
-	memoryStateInstance.mu.Lock()
-	defer memoryStateInstance.mu.Unlock()
-
-	entry, ok := memoryStateInstance.entries[key]
-	if !ok {
-		return nil, fmt.Errorf("memory not found: %s", key)
+func (n *MemoryNode) retrieveMemory(session *memory.SessionMemory, key string) (map[string]interface{}, error) {
+	entry, err := session.Retrieve(key)
+	if err != nil {
+		return nil, err
 	}
-
-	if time.Now().After(entry.ExpiresAt) {
-		delete(memoryStateInstance.entries, key)
-		return nil, fmt.Errorf("memory expired: %s", key)
-	}
-
-	entry.AccessedAt = time.Now()
-	memoryStateInstance.accessCount++
 
 	return map[string]interface{}{
 		"operation": "retrieve",
@@ -384,16 +264,10 @@ func (n *MemoryNode) retrieveMemory(key string) (map[string]interface{}, error) 
 	}, nil
 }
 
-func (n *MemoryNode) deleteMemory(key string) (map[string]interface{}, error) {
-	memoryStateInstance.mu.Lock()
-	defer memoryStateInstance.mu.Unlock()
-
-	_, ok := memoryStateInstance.entries[key]
-	if !ok {
-		return nil, fmt.Errorf("memory not found: %s", key)
+func (n *MemoryNode) deleteMemory(session *memory.SessionMemory, key string) (map[string]interface{}, error) {
+	if err := session.Delete(key); err != nil {
+		return nil, err
 	}
-
-	delete(memoryStateInstance.entries, key)
 
 	return map[string]interface{}{
 		"operation": "delete",
@@ -402,38 +276,8 @@ func (n *MemoryNode) deleteMemory(key string) (map[string]interface{}, error) {
 	}, nil
 }
 
-func (n *MemoryNode) searchMemory(query, level string, topK int, threshold float64) (map[string]interface{}, error) {
-	memoryStateInstance.mu.RLock()
-	defer memoryStateInstance.mu.RUnlock()
-
-	var results []MemoryEntry
-	for _, entry := range memoryStateInstance.entries {
-		if level != "" && entry.Level != level {
-			continue
-		}
-		if time.Now().After(entry.ExpiresAt) {
-			continue
-		}
-
-		similarity := n.calculateSimilarity(query, entry.Value)
-		if similarity >= threshold {
-			entryCopy := *entry
-			entryCopy.Score = similarity * 100
-			results = append(results, entryCopy)
-		}
-	}
-
-	for i := range results {
-		for j := i + 1; j < len(results); j++ {
-			if results[j].Score > results[i].Score {
-				results[i], results[j] = results[j], results[i]
-			}
-		}
-	}
-
-	if len(results) > topK {
-		results = results[:topK]
-	}
+func (n *MemoryNode) searchMemory(session *memory.SessionMemory, query, level string, topK int, threshold float64) (map[string]interface{}, error) {
+	results := session.Search(query, level, topK, threshold)
 
 	return map[string]interface{}{
 		"operation": "search",
@@ -445,65 +289,19 @@ func (n *MemoryNode) searchMemory(query, level string, topK int, threshold float
 	}, nil
 }
 
-func (n *MemoryNode) getMemorySummary() (map[string]interface{}, error) {
-	memoryStateInstance.mu.RLock()
-	defer memoryStateInstance.mu.RUnlock()
-
-	short := 0
-	medium := 0
-	long := 0
-	totalConfidence := 0.0
-	count := 0
-
-	for _, entry := range memoryStateInstance.entries {
-		if time.Now().After(entry.ExpiresAt) {
-			continue
-		}
-		switch entry.Level {
-		case "short":
-			short++
-		case "medium":
-			medium++
-		case "long":
-			long++
-		}
-		totalConfidence += entry.Confidence
-		count++
-	}
-
-	avgConfidence := 0.0
-	if count > 0 {
-		avgConfidence = totalConfidence / float64(count)
-	}
-
-	stats := MemoryStats{
-		TotalEntries:    count,
-		ShortTermCount:  short,
-		MediumTermCount: medium,
-		LongTermCount:   long,
-		AvgConfidence:   avgConfidence,
-		TotalAccesses:   memoryStateInstance.accessCount,
-		RetentionRate:   float64(count) / float64(len(memoryStateInstance.entries)+1),
-	}
+func (n *MemoryNode) getMemorySummary(session *memory.SessionMemory, sessionID string) (map[string]interface{}, error) {
+	stats := session.GetStats()
 
 	return map[string]interface{}{
-		"operation": "summary",
-		"stats":     stats,
-		"status":    "success",
+		"operation":  "summary",
+		"session_id": sessionID,
+		"stats":      stats,
+		"status":     "success",
 	}, nil
 }
 
-func (n *MemoryNode) forgetMemory(level string) (map[string]interface{}, error) {
-	memoryStateInstance.mu.Lock()
-	defer memoryStateInstance.mu.Unlock()
-
-	deletedCount := 0
-	for key, entry := range memoryStateInstance.entries {
-		if level == "" || entry.Level == level {
-			delete(memoryStateInstance.entries, key)
-			deletedCount++
-		}
-	}
+func (n *MemoryNode) forgetMemory(session *memory.SessionMemory, level string) (map[string]interface{}, error) {
+	deletedCount := session.Forget(level)
 
 	return map[string]interface{}{
 		"operation": "forget",
@@ -513,21 +311,26 @@ func (n *MemoryNode) forgetMemory(level string) (map[string]interface{}, error) 
 	}, nil
 }
 
-func (n *MemoryNode) transferMemory(key, newLevel string) (map[string]interface{}, error) {
-	memoryStateInstance.mu.Lock()
-	defer memoryStateInstance.mu.Unlock()
-
-	entry, ok := memoryStateInstance.entries[key]
-	if !ok {
-		return nil, fmt.Errorf("memory not found: %s", key)
+func (n *MemoryNode) transferMemory(session *memory.SessionMemory, key, newLevel string) (map[string]interface{}, error) {
+	entry, err := session.Retrieve(key)
+	if err != nil {
+		return nil, err
 	}
 
 	oldLevel := entry.Level
-	entry.Level = newLevel
+
+	var expiresAt time.Time
 	if newLevel == "long" {
-		entry.ExpiresAt = time.Now().Add(365 * 24 * time.Hour)
+		expiresAt = time.Now().Add(365 * 24 * time.Hour)
 	} else if newLevel == "short" {
-		entry.ExpiresAt = time.Now().Add(1 * time.Hour)
+		expiresAt = time.Now().Add(1 * time.Hour)
+	} else {
+		expiresAt = time.Now().Add(72 * time.Hour)
+	}
+
+	_, _, err = session.Store(key, entry.Value, newLevel, entry.Type, entry.Tags, int(time.Until(expiresAt).Hours()), entry.Confidence, entry.Source)
+	if err != nil {
+		return nil, err
 	}
 
 	return map[string]interface{}{
@@ -539,7 +342,7 @@ func (n *MemoryNode) transferMemory(key, newLevel string) (map[string]interface{
 	}, nil
 }
 
-func (n *MemoryNode) mergeMemory(params map[string]string) (map[string]interface{}, error) {
+func (n *MemoryNode) mergeMemory(session *memory.SessionMemory, params map[string]string) (map[string]interface{}, error) {
 	key1 := getParam(params, "key1", "")
 	key2 := getParam(params, "key2", "")
 
@@ -547,13 +350,10 @@ func (n *MemoryNode) mergeMemory(params map[string]string) (map[string]interface
 		return nil, fmt.Errorf("key1 and key2 are required for merge operation")
 	}
 
-	memoryStateInstance.mu.Lock()
-	defer memoryStateInstance.mu.Unlock()
+	entry1, err1 := session.Retrieve(key1)
+	entry2, err2 := session.Retrieve(key2)
 
-	entry1, ok1 := memoryStateInstance.entries[key1]
-	entry2, ok2 := memoryStateInstance.entries[key2]
-
-	if !ok1 || !ok2 {
+	if err1 != nil || err2 != nil {
 		return nil, fmt.Errorf("one or both keys not found")
 	}
 
@@ -566,98 +366,34 @@ func (n *MemoryNode) mergeMemory(params map[string]string) (map[string]interface
 		newKey = fmt.Sprintf("merged_%d", time.Now().UnixNano())
 	}
 
-	expiresAt := time.Now().Add(7 * 24 * time.Hour)
-
-	entry := &MemoryEntry{
-		ID:         fmt.Sprintf("entry_%d", time.Now().UnixNano()),
-		Key:        newKey,
-		Value:      mergedValue,
-		Type:       "concept",
-		Level:      "long",
-		Score:      mergedConfidence * 100,
-		ExpiresAt:  expiresAt,
-		AccessedAt: time.Now(),
-		CreatedAt:  time.Now(),
-		Tags:       mergedTags,
-		Source:     "merge",
-		Confidence: mergedConfidence,
+	id, expiresAt, err := session.Store(newKey, mergedValue, "long", "concept", mergedTags, 7*24, mergedConfidence, "merge")
+	if err != nil {
+		return nil, err
 	}
 
-	memoryStateInstance.entries[newKey] = entry
-
 	return map[string]interface{}{
-		"operation": "merge",
-		"key1":      key1,
-		"key2":      key2,
-		"new_key":   newKey,
-		"status":    "success",
+		"operation":  "merge",
+		"key1":       key1,
+		"key2":       key2,
+		"new_key":    newKey,
+		"id":         id,
+		"expires_at": expiresAt.Format(time.RFC3339),
+		"status":     "success",
 	}, nil
 }
 
-func (n *MemoryNode) calculateSimilarity(query, text string) float64 {
-	queryWords := strings.Fields(strings.ToLower(query))
-	textWords := strings.Fields(strings.ToLower(text))
-
-	if len(queryWords) == 0 {
-		return 0.0
-	}
-
-	matches := 0
-	for _, qw := range queryWords {
-		for _, tw := range textWords {
-			if strings.Contains(tw, qw) || strings.Contains(qw, tw) {
-				matches++
-				break
-			}
-		}
-	}
-
-	return float64(matches) / float64(len(queryWords))
-}
-
-func (n *MemoryNode) cleanupExpired() {
-	memoryStateInstance.mu.Lock()
-	defer memoryStateInstance.mu.Unlock()
-	n.cleanupExpiredLocked()
-}
-
-func (n *MemoryNode) cleanupExpiredLocked() {
-	now := time.Now()
-	for key, entry := range memoryStateInstance.entries {
-		if now.After(entry.ExpiresAt) {
-			delete(memoryStateInstance.entries, key)
-		}
-	}
-}
-
-func (n *MemoryNode) evictLRU() {
-	memoryStateInstance.mu.Lock()
-	defer memoryStateInstance.mu.Unlock()
-	evictLRULocked()
-}
-
-func (n *MemoryNode) visualizeMemory(params map[string]string) (map[string]interface{}, error) {
-	memoryStateInstance.mu.RLock()
-	defer memoryStateInstance.mu.RUnlock()
-
+func (n *MemoryNode) visualizeMemory(session *memory.SessionMemory, params map[string]string) (map[string]interface{}, error) {
+	stats := session.GetStats()
 	viewType := getParam(params, "view", "graph")
 	maxNodes := parseIntSafe(getParam(params, "max_nodes", "50"), 50)
 
-	var nodes []map[string]interface{}
-	var edges []map[string]interface{}
-	var clusters []map[string]interface{}
+	results := session.Search("", "", maxNodes, 0)
 
+	var nodes []map[string]interface{}
 	typeCount := make(map[string]int)
 	levelCount := make(map[string]int)
 
-	for _, entry := range memoryStateInstance.entries {
-		if len(nodes) >= maxNodes {
-			break
-		}
-		if time.Now().After(entry.ExpiresAt) {
-			continue
-		}
-
+	for _, entry := range results {
 		typeCount[entry.Type]++
 		levelCount[entry.Level]++
 
@@ -684,16 +420,7 @@ func (n *MemoryNode) visualizeMemory(params map[string]string) (map[string]inter
 		nodes = append(nodes, node)
 	}
 
-	for _, edge := range memoryStateInstance.graph.Edges {
-		edges = append(edges, map[string]interface{}{
-			"source":     edge.Source,
-			"target":     edge.Target,
-			"relation":   edge.Relation,
-			"weight":     edge.Weight,
-			"created_at": edge.CreatedAt.Format(time.RFC3339),
-		})
-	}
-
+	clusters := []map[string]interface{}{}
 	for memType, count := range typeCount {
 		clusters = append(clusters, map[string]interface{}{
 			"type":  "type",
@@ -701,7 +428,6 @@ func (n *MemoryNode) visualizeMemory(params map[string]string) (map[string]inter
 			"count": count,
 		})
 	}
-
 	for memLevel, count := range levelCount {
 		clusters = append(clusters, map[string]interface{}{
 			"type":  "level",
@@ -710,54 +436,22 @@ func (n *MemoryNode) visualizeMemory(params map[string]string) (map[string]inter
 		})
 	}
 
-	result := map[string]interface{}{
+	return map[string]interface{}{
 		"operation":          "visualize",
 		"view_type":          viewType,
 		"total_nodes":        len(nodes),
-		"total_edges":        len(edges),
 		"nodes":              nodes,
-		"edges":              edges,
+		"edges":              []interface{}{},
 		"clusters":           clusters,
 		"type_distribution":  typeCount,
 		"level_distribution": levelCount,
+		"session_stats":      stats,
 		"status":             "success",
-	}
-
-	return result, nil
+	}, nil
 }
 
-func (n *MemoryNode) retrieveMemoryWithInkling(query, level string, topK int, threshold float64) (map[string]interface{}, error) {
-	memoryStateInstance.mu.RLock()
-	defer memoryStateInstance.mu.RUnlock()
-
-	var results []MemoryEntry
-	for _, entry := range memoryStateInstance.entries {
-		if level != "" && entry.Level != level {
-			continue
-		}
-		if time.Now().After(entry.ExpiresAt) {
-			continue
-		}
-
-		similarity := n.calculateSimilarity(query, entry.Value)
-		if similarity >= threshold {
-			entryCopy := *entry
-			entryCopy.Score = similarity * 100
-			results = append(results, entryCopy)
-		}
-	}
-
-	for i := range results {
-		for j := i + 1; j < len(results); j++ {
-			if results[j].Score > results[i].Score {
-				results[i], results[j] = results[j], results[i]
-			}
-		}
-	}
-
-	if len(results) > topK {
-		results = results[:topK]
-	}
+func (n *MemoryNode) retrieveMemoryWithInkling(session *memory.SessionMemory, query, level string, topK int, threshold float64) (map[string]interface{}, error) {
+	results := session.Search(query, level, topK, threshold)
 
 	var combinedContext string
 	for _, entry := range results {
@@ -817,7 +511,54 @@ func (n *MemoryNode) performInklingAnalysis(context, query string, resultCount i
 	}
 }
 
+func (n *MemoryNode) listSessions() (string, error) {
+	sessions := memory.ListSessions()
+	globalStats := memory.GetGlobalStats()
+
+	result := map[string]interface{}{
+		"operation":       "list_sessions",
+		"active_sessions": sessions,
+		"session_count":   len(sessions),
+		"total_entries":   globalStats.TotalEntries,
+		"total_mb":        globalStats.TotalEstimatedMB,
+		"status":          "success",
+		"timestamp":       time.Now().UTC().Format(time.RFC3339),
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	return string(data), nil
+}
+
+func (n *MemoryNode) globalStats() (string, error) {
+	globalStats := memory.GetGlobalStats()
+
+	result := map[string]interface{}{
+		"operation":       "global_stats",
+		"active_sessions": globalStats.ActiveSessions,
+		"total_entries":   globalStats.TotalEntries,
+		"total_mb":        globalStats.TotalEstimatedMB,
+		"total_accesses":  globalStats.TotalAccesses,
+		"per_session":     globalStats.PerSession,
+		"jcode_compare": map[string]interface{}{
+			"jcode_10_sessions_mb": 117,
+			"description":          "Rust jcode: 10 active sessions = 117MB (~1/20 of Claude Code)",
+		},
+		"status":    "success",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	return string(data), nil
+}
+
 func init() {
 	Register(&MemoryNode{})
-	initMemoryCleanup()
 }
