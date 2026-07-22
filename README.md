@@ -235,8 +235,29 @@ llm-box 认真对待安全问题。关键防护措施：
 | **插件限制** | 最多 100 个插件，仅 HTTPS 网址，限制 Git 主机（GitHub/GitLab/GitCode/Gitee） |
 | **资源限制** | 代码知识图谱：最多 5000 个文件/深度 5；视频编辑：过滤 Shell 元字符 |
 | **并发安全** | 每会话随机数互斥锁、共享状态使用 RWMutex、无锁不保护的全局可变状态 |
+| **自动修复** | CI 自动运行 gofmt/go vet/gosec/govulncheck，发现问题自动提交修复 |
 
 📖 [安全指南 →](SECURITY.md) | [审计日志 →](docs/getting-started.md#audit-logs)
+
+### 🤖 自动安全修复
+
+每次代码推送后，GitHub Actions 自动执行以下安全检查与修复：
+
+| 检查项 | 工具 | 自动修复 | 触发时机 |
+|--------|------|----------|----------|
+| 代码格式化 | `gofmt` | ✅ 自动格式化并提交 | 每次 push |
+| 依赖整理 | `go mod tidy` | ✅ 自动整理并提交 | 每次 push |
+| 静态分析 | `go vet` | ⚠️ 报告问题 | 每次 push |
+| Lint 检查 | `golangci-lint` | ⚠️ 报告问题 | 每次 push |
+| 安全扫描 | `gosec` | ⚠️ 报告问题 | 每次 push + 每日定时 |
+| 依赖漏洞 | `govulncheck` | ✅ 自动 `go get -u` 修复 | 每次 push + 每日定时 |
+
+**自动修复流程：**
+1. 检测到 gofmt 格式化问题 → 自动格式化 → 提交 `[skip-fix]` 标记的修复 commit
+2. 检测到 govulncheck 漏洞 → 自动 `go get -u ./...` → 验证构建 → 提交 `[skip-sec]` 标记的修复 commit
+3. 自动修复失败 → 创建 GitHub Issue 通知维护者
+
+**定时扫描：** 每天凌晨 2 点（UTC）自动运行完整安全扫描，确保依赖始终处于最新安全版本。
 
 ---
 

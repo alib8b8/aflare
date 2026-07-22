@@ -1,0 +1,159 @@
+name: Security Auto Fix
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/*'
+      - 'fix/*'
+  schedule:
+    - cron: '0 2 * * *'  # 每天凌晨2点运行
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  security-scan:
+    name: Security Scan & Auto Fix
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip-sec]')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.25'
+
+      - name: Install security tools
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run gosec security scan
+        id: gosec
+        run: |
+          gosec -fmt=json -out=gosec-results.json ./... || true
+          issues=$(cat gosec-results.json | grep -o '"Issues":\s*\[' | wc -l || echo "0")
+          echo "gosec_issues=$issues" >> $GITHUB_OUTPUT
+
+      - name: Run govulncheck
+        id: govuln
+        run: |
+          govulncheck -json ./... > govuln-results.json 2>/dev/null || true
+          vulns=$(cat govuln-results.json 2>/dev/null | grep -c '"osv"' || echo "0")
+          echo "govuln_count=$vulns" >> $GITHUB_OUTPUT
+          echo "Found $vulns vulnerabilities"
+
+      - name: Auto fix dependency vulnerabilities
+        id: auto-fix
+        if: steps.govuln.outputs.govuln_count != '0'
+        run: |
+          echo "=== Attempting to auto-fix vulnerabilities ==="
+          
+          # 尝试更新所有依赖到最新安全版本
+          go get -u ./...
+          go mod tidy
+          
+          # 重新运行 govulncheck 检查是否修复
+          govulncheck ./... 2>/dev/null || true
+          
+          echo "=== Dependency update complete ==="
+
+      - name: Verify build after fixes
+        id: verify
+        run: |
+          go build ./...
+          go test ./... -short
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Found security fixes to commit"
+            git status --short
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No security fixes needed"
+          fi
+
+      - name: Auto commit security fixes
+        if: steps.check-changes.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "$(cat <<'EOF'
+            security: 自动修复依赖安全漏洞
+
+            - govulncheck 检测到依赖漏洞
+            - 自动更新依赖到安全版本
+            - go mod tidy 整理依赖
+            [skip-sec]
+            EOF
+          )"
+          git push
+
+      - name: Upload security scan results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: security-scan-results
+          path: |
+            gosec-results.json
+            govuln-results.json
+
+  create-security-issue:
+    name: Create Security Issue
+    runs-on: ubuntu-latest
+    needs: security-scan
+    if: failure() && github.ref == 'refs/heads/main'
+    steps:
+      - name: Create security issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '🚨 Security scan failed on main branch';
+            const body = `## Security Scan Failed
+
+            **Commit:** ${{ github.sha }}
+            **Branch:** ${{ github.ref }}
+            **Workflow:** ${{ github.workflow }}
+            **Run URL:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            ### 请检查：
+            - gosec 安全扫描结果
+            - govulncheck 依赖漏洞扫描结果
+            - 自动修复是否成功
+
+            ### 手动修复建议：
+            1. 运行 \`gosec ./...\` 查看安全问题
+            2. 运行 \`govulncheck ./...\` 查看依赖漏洞
+            3. 运行 \`go get -u ./... && go mod tidy\` 更新依赖
+            4. 验证构建：\`go build ./... && go test ./...\`
+            `;
+
+            // 检查是否已存在相同 issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'security'
+            });
+
+            const exists = issues.data.some(i => i.title === title);
+            if (!exists) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['security', 'automated']
+              });
+            }

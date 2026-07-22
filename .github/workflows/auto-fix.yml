@@ -1,0 +1,91 @@
+name: Auto Fix
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/*'
+      - 'fix/*'
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  auto-fix:
+    name: Auto Fix Code Issues
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip-fix]')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.25'
+
+      - name: Run go mod tidy
+        run: go mod tidy
+
+      - name: Auto format with gofmt
+        run: |
+          gofmt -w .
+          echo "=== gofmt fixed files ==="
+          git diff --name-only || true
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Found changes to auto-fix"
+            git status --short
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes needed"
+          fi
+
+      - name: Auto commit fixes
+        if: steps.check-changes.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "$(cat <<'EOF'
+            fix: 自动代码格式化与依赖整理
+
+            - gofmt 格式化修复
+            - go mod tidy 依赖整理
+            [skip-fix]
+            EOF
+          )"
+          git push
+
+  lint-check:
+    name: Lint Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.25'
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        continue-on-error: true
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Run tests
+        run: go test ./... -short
