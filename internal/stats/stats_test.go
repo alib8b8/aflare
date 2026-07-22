@@ -67,7 +67,7 @@ func TestCalculateCost(t *testing.T) {
 		wantCost     bool // true if cost > 0
 	}{
 		{"gpt-4o", 1000, 500, true},
-		{"llama2", 1000, 500, false}, // local model, free
+		{"llama2", 1000, 500, false},       // local model, free
 		{"unknown-model", 1000, 500, true}, // uses default pricing
 	}
 
@@ -151,5 +151,10 @@ func TestGlobalStatsCollector(t *testing.T) {
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[0:len(substr)] == substr || contains(s[1:], substr)
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

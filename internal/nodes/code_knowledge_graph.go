@@ -423,7 +423,7 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 
 		// 保存索引
 		if err := n.saveIndex(idx, indexPath); err != nil {
-			// 保存失败不影响查询，只记录
+			fmt.Fprintf(os.Stderr, "[ckg] warning: failed to save index: %v\n", err)
 		}
 
 		files, err = n.collectFiles(safePath)
@@ -1213,19 +1213,19 @@ func (n *CodeKnowledgeGraphNode) generateSuggestions(reviewResult ckgReviewResul
 
 // ckgIndex 持久化索引结构
 type ckgIndex struct {
-	Path          string            `json:"path"`
-	Entities      []ckgEntity       `json:"entities"`
-	Relations     []ckgRelation     `json:"relations"`
-	Concepts      []ckgConcept      `json:"concepts"`
-	FileHashes    map[string]string `json:"file_hashes"`    // 文件路径 -> SHA256哈希
-	CreatedAt     time.Time         `json:"created_at"`
-	UpdatedAt     time.Time         `json:"updated_at"`
-	TotalFiles    int               `json:"total_files"`    // 索引文件总数
-	TotalLines    int               `json:"total_lines"`    // 代码总行数
-	TotalTokens   int               `json:"total_tokens"`   // 预估 Token 数（用于全量审查）
-	TokensSaved   int               `json:"tokens_saved"`   // 通过增量更新节省的 Token
-	SavingsRatio  float64           `json:"savings_ratio"`  // Token 节省比例（0-1）
-	mu            sync.RWMutex      `json:"-"`
+	Path         string            `json:"path"`
+	Entities     []ckgEntity       `json:"entities"`
+	Relations    []ckgRelation     `json:"relations"`
+	Concepts     []ckgConcept      `json:"concepts"`
+	FileHashes   map[string]string `json:"file_hashes"` // 文件路径 -> SHA256哈希
+	CreatedAt    time.Time         `json:"created_at"`
+	UpdatedAt    time.Time         `json:"updated_at"`
+	TotalFiles   int               `json:"total_files"`   // 索引文件总数
+	TotalLines   int               `json:"total_lines"`   // 代码总行数
+	TotalTokens  int               `json:"total_tokens"`  // 预估 Token 数（用于全量审查）
+	TokensSaved  int               `json:"tokens_saved"`  // 通过增量更新节省的 Token
+	SavingsRatio float64           `json:"savings_ratio"` // Token 节省比例（0-1）
+	mu           sync.RWMutex      `json:"-"`
 }
 
 var (
@@ -1394,7 +1394,7 @@ func (n *CodeKnowledgeGraphNode) buildIndexIncremental(root string, idx *ckgInde
 	changedFiles := append(added, modified...)
 	tokensForChanged := estimateTokensForFiles(changedFiles)
 	tokensForAll := estimateTokensForFiles(files)
-	
+
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
 
@@ -1497,12 +1497,12 @@ func (n *CodeKnowledgeGraphNode) GetTokenSavingsReport(indexPath string) string 
 		report += "📈 Token 分析\n"
 		report += "─────────────────────────────────────────\n"
 		report += fmt.Sprintf("  全量审查预估 Token: %d\n", idx.TotalTokens)
-		
+
 		if idx.TokensSaved > 0 {
 			report += fmt.Sprintf("  累计节省 Token: %d\n", idx.TokensSaved)
 			savingsPercent := idx.SavingsRatio * 100
 			report += fmt.Sprintf("  节省比例: %.1f%%\n", savingsPercent)
-			
+
 			// 计算节省的成本（假设 GPT-4o-mini 定价）
 			costPer1K := 0.00015 // USD
 			savedCost := float64(idx.TokensSaved) / 1000 * costPer1K
@@ -1538,8 +1538,11 @@ func (n *CodeKnowledgeGraphNode) GetCompactSavingsReport(indexPath string) strin
 
 // getIndexFilePath 获取索引文件路径
 func (n *CodeKnowledgeGraphNode) getIndexFilePath(root string) string {
-	absPath, _ := filepath.Abs(root)
+	absPath, err := filepath.Abs(root)
+	if err != nil {
+		absPath = root // fallback to raw path
+	}
 	hash := sha256.Sum256([]byte(absPath))
-	hashStr := hex.EncodeToString(hash[:8])
+	hashStr := hex.EncodeToString(hash[:16]) // Use 16 bytes for lower collision risk
 	return filepath.Join(os.TempDir(), ckgIndexDir, fmt.Sprintf("ckg-index-%s.json", hashStr))
 }

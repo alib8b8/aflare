@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -33,19 +34,37 @@ func (h HealthStatus) String() string {
 
 // Provider represents an LLM provider configuration.
 type Provider struct {
-	Name           string        `json:"name"`
-	BaseURL        string        `json:"base_url"`
-	Model          string        `json:"model"`
-	APIKey         string        `json:"api_key,omitempty"`
-	Priority       int           `json:"priority"`        // Higher = preferred
-	QuotaLimit     int           `json:"quota_limit"`     // Requests per minute
-	QuotaUsed      int           `json:"quota_used"`
-	CostMultiplier float64       `json:"cost_multiplier"` // 1.0 = base price
-	Health         HealthStatus  `json:"health"`
-	LastError      string        `json:"last_error,omitempty"`
-	LastSuccess    time.Time     `json:"last_success"`
-	FailCount      int           `json:"fail_count"`
+	Name           string       `json:"name"`
+	BaseURL        string       `json:"base_url"`
+	Model          string       `json:"model"`
+	APIKey         string       `json:"-"`           // Never serialize API key
+	Priority       int          `json:"priority"`    // Higher = preferred
+	QuotaLimit     int          `json:"quota_limit"` // Requests per minute
+	QuotaUsed      int          `json:"quota_used"`
+	CostMultiplier float64      `json:"cost_multiplier"` // 1.0 = base price
+	Health         HealthStatus `json:"health"`
+	LastError      string       `json:"last_error,omitempty"`
+	LastSuccess    time.Time    `json:"last_success"`
+	FailCount      int          `json:"fail_count"`
 	mu             sync.RWMutex
+}
+
+// providerSnapshot is a read-only snapshot of Provider for safe comparison.
+type providerSnapshot struct {
+	Name     string
+	Priority int
+	Health   HealthStatus
+}
+
+// snapshot returns a thread-safe copy of the provider's key fields.
+func (p *Provider) snapshot() providerSnapshot {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return providerSnapshot{
+		Name:     p.Name,
+		Priority: p.Priority,
+		Health:   p.Health,
+	}
 }
 
 // CanAccept checks if the provider can accept a new request.
@@ -102,12 +121,12 @@ func (p *Provider) ResetQuota() {
 
 // ProviderManager manages multiple LLM providers with fallback.
 type ProviderManager struct {
-	mu           sync.RWMutex
-	providers    []*Provider
-	healthCheck  map[string]time.Time
-	rand         *rand.Rand
-	randMu       sync.Mutex
-	onFallback   func(from, to string)
+	mu          sync.RWMutex
+	providers   []*Provider
+	healthCheck map[string]time.Time
+	rand        *rand.Rand
+	randMu      sync.Mutex
+	onFallback  atomic.Value // func(from, to string)
 }
 
 // NewProviderManager creates a new provider manager.
@@ -136,11 +155,13 @@ func (pm *ProviderManager) GetProvider() (*Provider, error) {
 		return nil, fmt.Errorf("no providers available")
 	}
 
-	// Filter healthy providers with available quota
+	// Filter healthy providers with available quota and take snapshots
 	var candidates []*Provider
+	var snapshots []providerSnapshot
 	for _, p := range pm.providers {
 		if p.CanAccept() {
 			candidates = append(candidates, p)
+			snapshots = append(snapshots, p.snapshot())
 		}
 	}
 
@@ -148,32 +169,31 @@ func (pm *ProviderManager) GetProvider() (*Provider, error) {
 		return nil, fmt.Errorf("all providers are at quota limit or unhealthy")
 	}
 
-	// Sort by priority (higher first), then by health (healthy first)
-	// Return the best candidate
-	best := candidates[0]
-	for _, p := range candidates[1:] {
-		if p.Priority > best.Priority {
-			best = p
-		} else if p.Priority == best.Priority && p.Health < best.Health {
-			best = p
+	// Find best candidate using snapshots (no lock needed for comparison)
+	bestIdx := 0
+	for i := 1; i < len(snapshots); i++ {
+		if snapshots[i].Priority > snapshots[bestIdx].Priority {
+			bestIdx = i
+		} else if snapshots[i].Priority == snapshots[bestIdx].Priority && snapshots[i].Health < snapshots[bestIdx].Health {
+			bestIdx = i
 		}
 	}
 
-	return best, nil
+	return candidates[bestIdx], nil
 }
 
 // GetProviderWithFallback returns a provider, falling back to alternatives if primary fails.
 func (pm *ProviderManager) GetProviderWithFallback(preferred string) (*Provider, error) {
-	pm.mu.RLock()
-	defer pm.mu.RUnlock()
-
 	// Try preferred provider first
 	if preferred != "" {
+		pm.mu.RLock()
 		for _, p := range pm.providers {
 			if p.Name == preferred && p.CanAccept() {
+				pm.mu.RUnlock()
 				return p, nil
 			}
 		}
+		pm.mu.RUnlock()
 	}
 
 	// Fallback to any available provider
@@ -189,7 +209,23 @@ func (pm *ProviderManager) ExecuteWithFallback(
 	var lastErr error
 	triedProviders := make(map[string]bool)
 
-	for {
+	pm.mu.RLock()
+	maxAttempts := len(pm.providers) * 2 // Limit total attempts
+	pm.mu.RUnlock()
+
+	if maxAttempts == 0 {
+		return fmt.Errorf("no providers available")
+	}
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		// Check context cancellation
+		if ctx.Err() != nil {
+			if lastErr != nil {
+				return fmt.Errorf("context cancelled, last error: %v", lastErr)
+			}
+			return ctx.Err()
+		}
+
 		// Get next available provider (excluding already tried)
 		provider, err := pm.getNextProvider(preferred, triedProviders)
 		if err != nil {
@@ -211,14 +247,32 @@ func (pm *ProviderManager) ExecuteWithFallback(
 		triedProviders[provider.Name] = true
 		lastErr = err
 
-		// Notify fallback
-		if pm.onFallback != nil {
+		// Notify fallback callback
+		if cb := pm.getFallbackCallback(); cb != nil {
 			nextProvider, _ := pm.peekNextProvider(triedProviders)
 			if nextProvider != nil {
-				pm.onFallback(provider.Name, nextProvider.Name)
+				cb(provider.Name, nextProvider.Name)
 			}
 		}
 	}
+
+	if lastErr != nil {
+		return fmt.Errorf("all providers failed after %d attempts, last error: %v", maxAttempts, lastErr)
+	}
+	return fmt.Errorf("no providers available")
+}
+
+// getFallbackCallback safely reads the callback from atomic.Value.
+func (pm *ProviderManager) getFallbackCallback() func(from, to string) {
+	val := pm.onFallback.Load()
+	if val == nil {
+		return nil
+	}
+	cb, ok := val.(func(from, to string))
+	if !ok {
+		return nil
+	}
+	return cb
 }
 
 // getNextProvider returns the next provider that hasn't been tried yet.
@@ -260,7 +314,7 @@ func (pm *ProviderManager) peekNextProvider(tried map[string]bool) (*Provider, e
 
 // SetFallbackCallback sets a callback for fallback events.
 func (pm *ProviderManager) SetFallbackCallback(callback func(from, to string)) {
-	pm.onFallback = callback
+	pm.onFallback.Store(callback)
 }
 
 // StartHealthMonitor starts a background health check routine.
@@ -278,7 +332,7 @@ func (pm *ProviderManager) StartHealthMonitor(ctx context.Context, interval time
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				pm.checkHealth(ctx)
+				pm.checkHealth()
 			case <-quotaTicker.C:
 				pm.resetQuotas()
 			}
@@ -287,18 +341,18 @@ func (pm *ProviderManager) StartHealthMonitor(ctx context.Context, interval time
 }
 
 // checkHealth performs health checks on all providers.
-func (pm *ProviderManager) checkHealth(ctx context.Context) {
+func (pm *ProviderManager) checkHealth() {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
 
 	for _, p := range pm.providers {
+		p.mu.Lock()
 		// If provider has been unhealthy for > 5 minutes, reset health to try again
 		if p.Health == HealthUnhealthy && time.Since(p.LastSuccess) > 5*time.Minute {
-			p.mu.Lock()
 			p.Health = HealthDegraded // Give it another chance
 			p.FailCount = 0
-			p.mu.Unlock()
 		}
+		p.mu.Unlock()
 	}
 }
 

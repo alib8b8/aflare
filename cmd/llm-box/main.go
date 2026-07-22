@@ -12,6 +12,7 @@ import (
 	"github.com/alib8b8/llm-box/internal/i18n"
 	"github.com/alib8b8/llm-box/internal/mcp"
 	"github.com/alib8b8/llm-box/internal/nodes"
+	"github.com/alib8b8/llm-box/internal/output"
 	"github.com/alib8b8/llm-box/internal/tui"
 	"github.com/alib8b8/llm-box/internal/webui"
 	"github.com/alib8b8/llm-box/internal/workflow"
@@ -51,7 +52,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	command, args, safeMode, dryRun, mcpServer, lang := cli.ParseArgs(os.Args[1:])
+	command, args, safeMode, dryRun, mcpServer, lang, concise := cli.ParseArgs(os.Args[1:])
+
+	// Set output mode based on --concise flag
+	if concise {
+		output.SetMode(output.ModeConcise)
+	}
 
 	// Initialize i18n with detected or specified language
 	i18n.Init(lang)

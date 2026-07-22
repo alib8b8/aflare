@@ -14,17 +14,17 @@ type ModelPricing struct {
 	OutputPricePer1K float64 // USD per 1K output tokens
 }
 
-// PricingTable maps model names to their pricing.
+// pricingTable maps model names to their pricing.
 // Prices are approximate and may vary by provider.
-var PricingTable = map[string]ModelPricing{
+var pricingTable = map[string]ModelPricing{
 	// OpenAI models
-	"gpt-4o":           {0.0025, 0.01},
-	"gpt-4o-mini":      {0.00015, 0.0006},
-	"gpt-4-turbo":      {0.01, 0.03},
-	"gpt-4":            {0.03, 0.06},
-	"gpt-3.5-turbo":    {0.0005, 0.0015},
-	"o1-preview":       {0.015, 0.06},
-	"o1-mini":          {0.003, 0.012},
+	"gpt-4o":        {0.0025, 0.01},
+	"gpt-4o-mini":   {0.00015, 0.0006},
+	"gpt-4-turbo":   {0.01, 0.03},
+	"gpt-4":         {0.03, 0.06},
+	"gpt-3.5-turbo": {0.0005, 0.0015},
+	"o1-preview":    {0.015, 0.06},
+	"o1-mini":       {0.003, 0.012},
 
 	// Anthropic models
 	"claude-3-5-sonnet": {0.003, 0.015},
@@ -38,18 +38,18 @@ var PricingTable = map[string]ModelPricing{
 	"deepseek-reasoner": {0.00055, 0.00219},
 
 	// Qwen models
-	"qwen-max":          {0.0004, 0.0012},
-	"qwen-plus":         {0.00008, 0.0002},
-	"qwen-turbo":        {0.00002, 0.00006},
+	"qwen-max":   {0.0004, 0.0012},
+	"qwen-plus":  {0.00008, 0.0002},
+	"qwen-turbo": {0.00002, 0.00006},
 
 	// GLM models
-	"glm-4":             {0.001, 0.001},
-	"glm-4-flash":       {0.00001, 0.00001},
+	"glm-4":       {0.001, 0.001},
+	"glm-4-flash": {0.00001, 0.00001},
 
 	// Kimi models
-	"moonshot-v1-8k":    {0.012, 0.012},
-	"moonshot-v1-32k":   {0.024, 0.024},
-	"moonshot-v1-128k":  {0.06, 0.06},
+	"moonshot-v1-8k":   {0.012, 0.012},
+	"moonshot-v1-32k":  {0.024, 0.024},
+	"moonshot-v1-128k": {0.06, 0.06},
 
 	// Local models (free)
 	"llama2":      {0, 0},
@@ -58,6 +58,12 @@ var PricingTable = map[string]ModelPricing{
 	"mistral":     {0, 0},
 	"qwen2":       {0, 0},
 	"deepseek-r1": {0, 0},
+}
+
+// GetModelPricing returns pricing for a model. Returns false if not found.
+func GetModelPricing(model string) (ModelPricing, bool) {
+	p, ok := pricingTable[model]
+	return p, ok
 }
 
 // StepStats tracks statistics for a single step.
@@ -75,23 +81,22 @@ type StepStats struct {
 
 // WorkflowStats tracks overall workflow statistics.
 type WorkflowStats struct {
-	mu            sync.RWMutex
-	WorkflowName  string     `json:"workflow_name"`
-	Steps         []StepStats `json:"steps"`
-	TotalInput    int        `json:"total_input_tokens"`
-	TotalOutput   int        `json:"total_output_tokens"`
-	TotalCost     float64    `json:"total_cost"`
-	StartTime     time.Time  `json:"start_time"`
-	EndTime       time.Time  `json:"end_time"`
-	Duration      time.Duration `json:"duration"`
-	ProviderCalls map[string]int `json:"provider_calls"` // Provider -> call count
+	WorkflowName string         `json:"workflow_name"`
+	Steps        []StepStats    `json:"steps"`
+	TotalInput   int            `json:"total_input_tokens"`
+	TotalOutput  int            `json:"total_output_tokens"`
+	TotalCost    float64        `json:"total_cost"`
+	StartTime    time.Time      `json:"start_time"`
+	EndTime      time.Time      `json:"end_time"`
+	Duration     time.Duration  `json:"duration"`
+	ModelCalls   map[string]int `json:"model_calls"` // Model name -> call count
 }
 
 // StatsCollector collects and aggregates workflow statistics.
 type StatsCollector struct {
-	mu     sync.RWMutex
-	stats  map[string]*WorkflowStats
-	current *WorkflowStats
+	mu      sync.RWMutex
+	stats   map[string]*WorkflowStats
+	current string
 }
 
 // NewStatsCollector creates a new stats collector.
@@ -107,21 +112,26 @@ func (s *StatsCollector) StartWorkflow(name string) {
 	defer s.mu.Unlock()
 
 	stats := &WorkflowStats{
-		WorkflowName:  name,
-		Steps:         make([]StepStats, 0),
-		StartTime:     time.Now(),
-		ProviderCalls: make(map[string]int),
+		WorkflowName: name,
+		Steps:        make([]StepStats, 0),
+		StartTime:    time.Now(),
+		ModelCalls:   make(map[string]int),
 	}
 	s.stats[name] = stats
-	s.current = stats
+	s.current = name
 }
 
-// RecordStep records statistics for a completed step.
+// RecordStep records statistics for a completed step in the current workflow.
 func (s *StatsCollector) RecordStep(stepName, nodeType, model string, inputTokens, outputTokens int, duration time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.current == nil {
+	if s.current == "" {
+		return
+	}
+
+	stats, ok := s.stats[s.current]
+	if !ok {
 		return
 	}
 
@@ -139,18 +149,17 @@ func (s *StatsCollector) RecordStep(stepName, nodeType, model string, inputToken
 		Timestamp:    time.Now(),
 	}
 
-	s.current.Steps = append(s.current.Steps, stepStats)
-	s.current.TotalInput += inputTokens
-	s.current.TotalOutput += outputTokens
-	s.current.TotalCost += cost
+	stats.Steps = append(stats.Steps, stepStats)
+	stats.TotalInput += inputTokens
+	stats.TotalOutput += outputTokens
+	stats.TotalCost += cost
 
-	// Track provider calls
 	if model != "" {
-		s.current.ProviderCalls[model]++
+		stats.ModelCalls[model]++
 	}
 }
 
-// EndWorkflow finalizes the workflow statistics.
+// EndWorkflow finalizes the workflow statistics and resets the current pointer.
 func (s *StatsCollector) EndWorkflow(name string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -159,22 +168,59 @@ func (s *StatsCollector) EndWorkflow(name string) {
 		stats.EndTime = time.Now()
 		stats.Duration = stats.EndTime.Sub(stats.StartTime)
 	}
+
+	if s.current == name {
+		s.current = ""
+	}
 }
 
-// GetStats returns statistics for a specific workflow.
+// GetStats returns a copy of statistics for a specific workflow.
 func (s *StatsCollector) GetStats(name string) *WorkflowStats {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.stats[name]
+	stats, ok := s.stats[name]
+	if !ok {
+		return nil
+	}
+
+	return copyStats(stats)
 }
 
-// GetCurrentStats returns the current workflow statistics.
+// GetCurrentStats returns a copy of the current workflow statistics.
 func (s *StatsCollector) GetCurrentStats() *WorkflowStats {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.current
+	if s.current == "" {
+		return nil
+	}
+
+	stats, ok := s.stats[s.current]
+	if !ok {
+		return nil
+	}
+
+	return copyStats(stats)
+}
+
+// copyStats creates a deep copy of WorkflowStats to avoid data races.
+func copyStats(src *WorkflowStats) *WorkflowStats {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+	if src.Steps != nil {
+		dst.Steps = make([]StepStats, len(src.Steps))
+		copy(dst.Steps, src.Steps)
+	}
+	if src.ModelCalls != nil {
+		dst.ModelCalls = make(map[string]int, len(src.ModelCalls))
+		for k, v := range src.ModelCalls {
+			dst.ModelCalls[k] = v
+		}
+	}
+	return &dst
 }
 
 // FormatReport generates a human-readable report.
@@ -187,30 +233,43 @@ func (s *StatsCollector) FormatReport(name string) string {
 		return "No statistics available"
 	}
 
+	// Read fields under lock to avoid races
+	workflowName := stats.WorkflowName
+	duration := stats.Duration
+	stepsCopy := make([]StepStats, len(stats.Steps))
+	copy(stepsCopy, stats.Steps)
+	totalInput := stats.TotalInput
+	totalOutput := stats.TotalOutput
+	totalCost := stats.TotalCost
+	modelCalls := make(map[string]int, len(stats.ModelCalls))
+	for k, v := range stats.ModelCalls {
+		modelCalls[k] = v
+	}
+
 	var sb strings.Builder
 
 	sb.WriteString("📊 Token Usage Report\n")
 	sb.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
-	sb.WriteString(fmt.Sprintf("Workflow: %s\n", stats.WorkflowName))
-	sb.WriteString(fmt.Sprintf("Duration: %v\n", stats.Duration.Round(time.Millisecond)))
-	sb.WriteString(fmt.Sprintf("Steps: %d\n\n", len(stats.Steps)))
+	sb.WriteString(fmt.Sprintf("Workflow: %s\n", workflowName))
+	sb.WriteString(fmt.Sprintf("Duration: %v\n", duration.Round(time.Millisecond)))
+	sb.WriteString(fmt.Sprintf("Steps: %d\n\n", len(stepsCopy)))
 
 	// Token summary
 	sb.WriteString("📈 Token Summary\n")
 	sb.WriteString("─────────────────────────────────────────\n")
-	sb.WriteString(fmt.Sprintf("  Input tokens:  %d\n", stats.TotalInput))
-	sb.WriteString(fmt.Sprintf("  Output tokens: %d\n", stats.TotalOutput))
-	sb.WriteString(fmt.Sprintf("  Total tokens:  %d\n", stats.TotalInput+stats.TotalOutput))
-	sb.WriteString(fmt.Sprintf("  Estimated cost: $%.6f\n\n", stats.TotalCost))
+	sb.WriteString(fmt.Sprintf("  Input tokens:  %d\n", totalInput))
+	sb.WriteString(fmt.Sprintf("  Output tokens: %d\n", totalOutput))
+	sb.WriteString(fmt.Sprintf("  Total tokens:  %d\n", totalInput+totalOutput))
+	sb.WriteString(fmt.Sprintf("  Estimated cost: $%.6f\n\n", totalCost))
 
-	// Provider breakdown
-	if len(stats.ProviderCalls) > 0 {
-		sb.WriteString("🔌 Provider Calls\n")
+	// Model breakdown
+	if len(modelCalls) > 0 {
+		sb.WriteString("🔌 Model Calls\n")
 		sb.WriteString("─────────────────────────────────────────\n")
-		for model, count := range stats.ProviderCalls {
-			pricing := PricingTable[model]
-			if pricing.InputPricePer1K == 0 && pricing.OutputPricePer1K == 0 {
+		for model, count := range modelCalls {
+			pricing, ok := pricingTable[model]
+			if ok && pricing.InputPricePer1K == 0 && pricing.OutputPricePer1K == 0 {
 				sb.WriteString(fmt.Sprintf("  %s: %d calls (local/free)\n", model, count))
 			} else {
 				sb.WriteString(fmt.Sprintf("  %s: %d calls\n", model, count))
@@ -220,10 +279,10 @@ func (s *StatsCollector) FormatReport(name string) string {
 	}
 
 	// Step breakdown
-	if len(stats.Steps) > 0 {
+	if len(stepsCopy) > 0 {
 		sb.WriteString("📝 Step Breakdown\n")
 		sb.WriteString("─────────────────────────────────────────\n")
-		for _, step := range stats.Steps {
+		for _, step := range stepsCopy {
 			sb.WriteString(fmt.Sprintf("  %s (%s)\n", step.StepName, step.NodeType))
 			if step.Model != "" {
 				sb.WriteString(fmt.Sprintf("    Model: %s\n", step.Model))
@@ -261,7 +320,7 @@ func (s *StatsCollector) FormatCompactReport(name string) string {
 
 // calculateCost calculates the cost for a given model and token usage.
 func calculateCost(model string, inputTokens, outputTokens int) float64 {
-	pricing, ok := PricingTable[model]
+	pricing, ok := pricingTable[model]
 	if !ok {
 		// Default to GPT-4o-mini pricing for unknown models
 		pricing = ModelPricing{0.00015, 0.0006}

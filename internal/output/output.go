@@ -22,10 +22,10 @@ const (
 
 // OutputManager manages output modes.
 type OutputManager struct {
-	mu    sync.RWMutex
-	mode  Mode
-	out   io.Writer
-	err   io.Writer
+	mu   sync.RWMutex
+	mode Mode
+	out  io.Writer
+	err  io.Writer
 }
 
 // Global is the default output manager.
@@ -67,11 +67,11 @@ func (o *OutputManager) IsQuiet() bool {
 func (o *OutputManager) Print(msg string) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	if o.mode == ModeQuiet {
 		return
 	}
-	
+
 	fmt.Fprint(o.out, msg)
 }
 
@@ -79,11 +79,11 @@ func (o *OutputManager) Print(msg string) {
 func (o *OutputManager) Println(msg string) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	if o.mode == ModeQuiet {
 		return
 	}
-	
+
 	fmt.Fprintln(o.out, msg)
 }
 
@@ -91,11 +91,11 @@ func (o *OutputManager) Println(msg string) {
 func (o *OutputManager) Printf(format string, args ...interface{}) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	if o.mode == ModeQuiet {
 		return
 	}
-	
+
 	fmt.Fprintf(o.out, format, args...)
 }
 
@@ -103,7 +103,7 @@ func (o *OutputManager) Printf(format string, args ...interface{}) {
 func (o *OutputManager) Error(msg string) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	fmt.Fprintln(o.err, msg)
 }
 
@@ -111,7 +111,7 @@ func (o *OutputManager) Error(msg string) {
 func (o *OutputManager) Errorf(format string, args ...interface{}) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	fmt.Fprintf(o.err, format, args...)
 }
 
@@ -119,7 +119,7 @@ func (o *OutputManager) Errorf(format string, args ...interface{}) {
 func (o *OutputManager) Status(msg string) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	fmt.Fprintln(o.out, msg)
 }
 
@@ -127,11 +127,11 @@ func (o *OutputManager) Status(msg string) {
 func (o *OutputManager) Detail(msg string) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	if o.mode != ModeNormal {
 		return
 	}
-	
+
 	fmt.Fprintln(o.out, msg)
 }
 
@@ -139,11 +139,11 @@ func (o *OutputManager) Detail(msg string) {
 func (o *OutputManager) Detailf(format string, args ...interface{}) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	if o.mode != ModeNormal {
 		return
 	}
-	
+
 	fmt.Fprintf(o.out, format, args...)
 }
 
@@ -151,12 +151,22 @@ func (o *OutputManager) Detailf(format string, args ...interface{}) {
 func (o *OutputManager) Progress(step, total int, msg string) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	if o.mode == ModeConcise {
 		// Concise: show progress percentage
 		percent := 0
 		if total > 0 {
 			percent = step * 100 / total
+			if percent < 0 {
+				percent = 0
+			}
+			if percent > 100 {
+				percent = 100
+			}
+		}
+		// Truncate msg to avoid display issues with long lines
+		if len(msg) > 60 {
+			msg = msg[:57] + "..."
 		}
 		fmt.Fprintf(o.out, "\r⏳ [%d%%] %s", percent, msg)
 	} else if o.mode == ModeNormal {
@@ -169,7 +179,7 @@ func (o *OutputManager) Progress(step, total int, msg string) {
 func (o *OutputManager) ProgressDone(msg string) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	if o.mode == ModeConcise {
 		fmt.Fprintf(o.out, "\r✅ %s\n", msg)
 	} else if o.mode == ModeNormal {
