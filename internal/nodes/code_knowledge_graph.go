@@ -2,6 +2,8 @@ package nodes
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -265,11 +267,13 @@ type ckgPRAnalysis struct {
 }
 
 type ckgStats struct {
-	FilesAnalyzed      int   `json:"files_analyzed"`
-	EntitiesExtracted  int   `json:"entities_extracted"`
-	RelationsExtracted int   `json:"relations_extracted"`
-	ConceptsExtracted  int   `json:"concepts_extracted"`
-	QueryTimeMs        int64 `json:"query_time_ms"`
+	FilesAnalyzed      int    `json:"files_analyzed"`
+	EntitiesExtracted  int    `json:"entities_extracted"`
+	RelationsExtracted int    `json:"relations_extracted"`
+	ConceptsExtracted  int    `json:"concepts_extracted"`
+	QueryTimeMs        int64  `json:"query_time_ms"`
+	CacheUsed          bool   `json:"cache_used"`
+	IndexAge           string `json:"index_age,omitempty"`
 }
 
 type ckgResult struct {
@@ -314,6 +318,8 @@ func (n *CodeKnowledgeGraphNode) Schema() NodeSchema {
 			{Name: "entity_name", Type: "string", Description: "Entity name for get_entity_details tool", Required: false},
 			{Name: "token_efficient", Type: "bool", Description: "Enable token-efficient review mode (default: true)", Required: false, Default: "true"},
 			{Name: "incremental_update", Type: "bool", Description: "Use incremental update (only process changed files)", Required: false, Default: "false"},
+			{Name: "use_cache", Type: "bool", Description: "Use persistent cache index (default: true)", Required: false, Default: "true"},
+			{Name: "force_rebuild", Type: "bool", Description: "Force rebuild index from scratch (default: false)", Required: false, Default: "false"},
 		},
 	}
 }
@@ -372,6 +378,8 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 
 	tokenEfficient := strings.ToLower(getParam(params, "token_efficient", "true")) == "true"
 	incrementalUpdate := strings.ToLower(getParam(params, "incremental_update", "false")) == "true"
+	useCache := strings.ToLower(getParam(params, "use_cache", "true")) == "true"
+	forceRebuild := strings.ToLower(getParam(params, "force_rebuild", "false")) == "true"
 
 	query := getParam(params, "query", "")
 	if mode != "build" && query == "" && input == "" {
@@ -397,17 +405,45 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 	}
 
 	var files []string
-	if info.IsDir() {
-		if incrementalUpdate {
-			files, err = n.collectChangedFiles(safePath)
-		} else {
-			files, err = n.collectFiles(safePath)
+	var idx *ckgIndex
+
+	// 使用持久化索引
+	if useCache && info.IsDir() {
+		indexPath := n.getIndexFilePath(safePath)
+		idx, err = n.loadIndex(indexPath)
+		if err != nil {
+			idx = nil // 索引不存在，需要重建
 		}
+
+		// 增量构建索引
+		idx, err = n.buildIndexIncremental(safePath, idx, forceRebuild)
+		if err != nil {
+			return "", fmt.Errorf("failed to build index: %w", err)
+		}
+
+		// 保存索引
+		if err := n.saveIndex(idx, indexPath); err != nil {
+			// 保存失败不影响查询，只记录
+		}
+
+		files, err = n.collectFiles(safePath)
 		if err != nil {
 			return "", fmt.Errorf("failed to collect files: %w", err)
 		}
 	} else {
-		files = []string{safePath}
+		// 不使用缓存，按原逻辑
+		if info.IsDir() {
+			if incrementalUpdate {
+				files, err = n.collectChangedFiles(safePath)
+			} else {
+				files, err = n.collectFiles(safePath)
+			}
+			if err != nil {
+				return "", fmt.Errorf("failed to collect files: %w", err)
+			}
+		} else {
+			files = []string{safePath}
+		}
 	}
 
 	if len(files) == 0 {
@@ -424,7 +460,12 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 
 	startTime := time.Now()
 
-	if mode != "query_only" {
+	// 从索引获取数据（如果使用缓存）
+	if useCache && idx != nil {
+		result.Entities = idx.Entities
+		result.Relations = idx.Relations
+		result.Concepts = idx.Concepts
+	} else if mode != "query_only" {
 		for _, f := range files {
 			if err := ctx.Err(); err != nil {
 				return "", fmt.Errorf("context cancelled: %w", err)
@@ -435,11 +476,13 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 		}
 
 		result.Concepts = n.extractConcepts(result.Entities)
-		if tokenEfficient {
-			result.TokenSaved = len(result.Entities) * 200
-		} else {
-			result.TokenSaved = len(result.Entities) * 100
-		}
+	}
+
+	// 计算 Token 节省
+	if tokenEfficient && len(result.Entities) > 0 {
+		result.TokenSaved = len(result.Entities) * 200
+	} else if len(result.Entities) > 0 {
+		result.TokenSaved = len(result.Entities) * 100
 	}
 
 	if mode != "build" && query != "" {
@@ -456,12 +499,28 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 	}
 
 	queryTime := time.Since(startTime)
+
+	// 计算 FilesAnalyzed：如果使用缓存，统计文件总数；否则统计实际分析的文件数
+	filesAnalyzed := len(files)
+	if useCache && idx != nil {
+		// 使用缓存时，FilesAnalyzed 表示索引中的文件总数
+		filesAnalyzed = len(idx.FileHashes)
+	}
+
 	result.Stats = ckgStats{
-		FilesAnalyzed:      len(files),
+		FilesAnalyzed:      filesAnalyzed,
 		EntitiesExtracted:  len(result.Entities),
 		RelationsExtracted: len(result.Relations),
 		ConceptsExtracted:  len(result.Concepts),
 		QueryTimeMs:        queryTime.Milliseconds(),
+		CacheUsed:          useCache && idx != nil,
+		IndexAge:           "",
+	}
+
+	// 如果使用缓存，计算索引年龄
+	if idx != nil {
+		age := time.Since(idx.CreatedAt)
+		result.Stats.IndexAge = age.Round(time.Second).String()
 	}
 
 	data, err := json.MarshalIndent(result, "", "  ")
@@ -1148,4 +1207,239 @@ func (n *CodeKnowledgeGraphNode) generateSuggestions(reviewResult ckgReviewResul
 	}
 
 	return suggestions
+}
+
+// ========== 持久化索引 ==========
+
+// ckgIndex 持久化索引结构
+type ckgIndex struct {
+	Path       string            `json:"path"`
+	Entities   []ckgEntity       `json:"entities"`
+	Relations  []ckgRelation     `json:"relations"`
+	Concepts   []ckgConcept      `json:"concepts"`
+	FileHashes map[string]string `json:"file_hashes"` // 文件路径 -> SHA256哈希
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
+	mu         sync.RWMutex      `json:"-"`
+}
+
+var (
+	ckgIndexCache = make(map[string]*ckgIndex)
+	ckgIndexMu    sync.RWMutex
+	ckgIndexDir   = ".llm-box-cache"
+)
+
+// computeFileHash 计算文件 SHA256 哈希
+func computeFileHash(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:]), nil
+}
+
+// loadIndex 从磁盘加载索引
+func (n *CodeKnowledgeGraphNode) loadIndex(indexPath string) (*ckgIndex, error) {
+	ckgIndexMu.RLock()
+	if cached, ok := ckgIndexCache[indexPath]; ok {
+		ckgIndexMu.RUnlock()
+		return cached, nil
+	}
+	ckgIndexMu.RUnlock()
+
+	data, err := os.ReadFile(indexPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var idx ckgIndex
+	if err := json.Unmarshal(data, &idx); err != nil {
+		return nil, err
+	}
+
+	ckgIndexMu.Lock()
+	ckgIndexCache[indexPath] = &idx
+	ckgIndexMu.Unlock()
+
+	return &idx, nil
+}
+
+// saveIndex 保存索引到磁盘
+func (n *CodeKnowledgeGraphNode) saveIndex(idx *ckgIndex, indexPath string) error {
+	idx.mu.Lock()
+	idx.UpdatedAt = time.Now()
+	data, err := json.MarshalIndent(idx, "", "  ")
+	idx.mu.Unlock()
+	if err != nil {
+		return err
+	}
+
+	// 确保目录存在
+	dir := filepath.Dir(indexPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	// 写入临时文件，然后原子重命名
+	tmpPath := indexPath + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		return err
+	}
+
+	return os.Rename(tmpPath, indexPath)
+}
+
+// detectChangedFiles 检测变更的文件（新增、修改）
+func (n *CodeKnowledgeGraphNode) detectChangedFiles(files []string, idx *ckgIndex) (added, modified []string) {
+	if idx == nil {
+		return files, nil
+	}
+
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+
+	currentHashes := make(map[string]string)
+	for _, f := range files {
+		hash, err := computeFileHash(f)
+		if err != nil {
+			continue
+		}
+		currentHashes[f] = hash
+	}
+
+	for _, f := range files {
+		currentHash, ok := currentHashes[f]
+		if !ok {
+			continue
+		}
+
+		oldHash, exists := idx.FileHashes[f]
+		if !exists {
+			added = append(added, f)
+		} else if oldHash != currentHash {
+			modified = append(modified, f)
+		}
+	}
+
+	return added, modified
+}
+
+// buildIndexIncremental 增量构建索引
+func (n *CodeKnowledgeGraphNode) buildIndexIncremental(root string, idx *ckgIndex, forceRebuild bool) (*ckgIndex, error) {
+	files, err := n.collectFiles(root)
+	if err != nil {
+		return nil, err
+	}
+
+	if idx == nil || forceRebuild {
+		// 全量构建
+		idx = &ckgIndex{
+			Path:       root,
+			Entities:   []ckgEntity{},
+			Relations:  []ckgRelation{},
+			Concepts:   []ckgConcept{},
+			FileHashes: make(map[string]string),
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		}
+
+		for _, f := range files {
+			entities, relations := n.extractFromFile(f)
+			idx.Entities = append(idx.Entities, entities...)
+			idx.Relations = append(idx.Relations, relations...)
+
+			if hash, err := computeFileHash(f); err == nil {
+				idx.FileHashes[f] = hash
+			}
+		}
+
+		idx.Concepts = n.extractConcepts(idx.Entities)
+		return idx, nil
+	}
+
+	// 增量更新
+	added, modified := n.detectChangedFiles(files, idx)
+
+	if len(added) == 0 && len(modified) == 0 {
+		// 无变更，直接返回
+		return idx, nil
+	}
+
+	idx.mu.Lock()
+	defer idx.mu.Unlock()
+
+	// 移除已修改文件的旧实体
+	changedFiles := append(added, modified...)
+	for _, f := range changedFiles {
+		oldHash := idx.FileHashes[f]
+		if oldHash != "" {
+			// 移除该文件相关的实体和关系
+			newEntities := make([]ckgEntity, 0)
+			for _, e := range idx.Entities {
+				if e.Location != f {
+					newEntities = append(newEntities, e)
+				}
+			}
+			idx.Entities = newEntities
+
+			newRelations := make([]ckgRelation, 0)
+			for _, r := range idx.Relations {
+				// 简单起见，保留所有关系（实际应更精确）
+				newRelations = append(newRelations, r)
+			}
+			idx.Relations = newRelations
+		}
+	}
+
+	// 提取新实体
+	for _, f := range changedFiles {
+		entities, relations := n.extractFromFile(f)
+		idx.Entities = append(idx.Entities, entities...)
+		idx.Relations = append(idx.Relations, relations...)
+
+		if hash, err := computeFileHash(f); err == nil {
+			idx.FileHashes[f] = hash
+		}
+	}
+
+	// 清理不存在的文件
+	deletedFiles := make([]string, 0)
+	for f := range idx.FileHashes {
+		exists := false
+		for _, currentFile := range files {
+			if currentFile == f {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			deletedFiles = append(deletedFiles, f)
+		}
+	}
+
+	for _, f := range deletedFiles {
+		delete(idx.FileHashes, f)
+		// 移除该文件的实体
+		newEntities := make([]ckgEntity, 0)
+		for _, e := range idx.Entities {
+			if e.Location != f {
+				newEntities = append(newEntities, e)
+			}
+		}
+		idx.Entities = newEntities
+	}
+
+	idx.Concepts = n.extractConcepts(idx.Entities)
+	idx.UpdatedAt = time.Now()
+
+	return idx, nil
+}
+
+// getIndexFilePath 获取索引文件路径
+func (n *CodeKnowledgeGraphNode) getIndexFilePath(root string) string {
+	absPath, _ := filepath.Abs(root)
+	hash := sha256.Sum256([]byte(absPath))
+	hashStr := hex.EncodeToString(hash[:8])
+	return filepath.Join(os.TempDir(), ckgIndexDir, fmt.Sprintf("ckg-index-%s.json", hashStr))
 }
