@@ -49,12 +49,13 @@ jobs:
             echo "No changes needed"
           fi
 
-      - name: Auto commit fixes
+      - name: Create auto-fix branch and push
         if: steps.check-changes.outputs.has_changes == 'true'
         continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b auto-fix-${{ github.run_id }}
           git add -A
           git status --short
           git commit -m "$(cat <<'EOF'
@@ -65,7 +66,37 @@ fix: 自动代码格式化与依赖整理
 [skip-fix]
 EOF
           )" || echo "Commit failed (no changes or other issue)"
-          git push || echo "Push failed (branch protection or other issue)"
+          git push origin auto-fix-${{ github.run_id }} || echo "Push failed (branch protection or other issue)"
+
+      - name: Create Pull Request
+        if: steps.check-changes.outputs.has_changes == 'true'
+        continue-on-error: true
+        uses: actions/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: auto-fix-${{ github.run_id }}
+          title: "🔧 Auto-Fix: Code formatting and dependency cleanup"
+          body: |
+            ## 自动修复 PR
+
+            **触发原因**: 代码格式化或依赖问题
+
+            **修复内容**:
+            - gofmt 格式化修复
+            - go mod tidy 依赖整理
+
+            **扫描结果**:
+            - 运行: ${{ github.run_id }}
+            - 分支: ${{ github.ref }}
+
+            **请检查**:
+            - [ ] 构建是否通过
+            - [ ] 测试是否通过
+            - [ ] 格式化是否合理
+          labels: |
+            automated
+            formatting
+            dependencies
 
   lint-check:
     name: Lint Check

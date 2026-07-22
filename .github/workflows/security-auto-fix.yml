@@ -83,12 +83,13 @@ jobs:
             echo "No security fixes needed"
           fi
 
-      - name: Auto commit security fixes
+      - name: Create auto-fix branch and push
         if: steps.check-changes.outputs.has_changes == 'true'
         continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b auto-security-fix-${{ github.run_id }}
           git add -A
           git status --short
           git commit -m "$(cat <<'EOF'
@@ -100,7 +101,37 @@ security: 自动修复依赖安全漏洞
 [skip-sec]
 EOF
           )" || echo "Commit failed (no changes or other issue)"
-          git push || echo "Push failed (branch protection or other issue)"
+          git push origin auto-security-fix-${{ github.run_id }} || echo "Push failed (branch protection or other issue)"
+
+      - name: Create Pull Request
+        if: steps.check-changes.outputs.has_changes == 'true'
+        continue-on-error: true
+        uses: actions/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: auto-security-fix-${{ github.run_id }}
+          title: "🔒 Security Auto-Fix: Update vulnerable dependencies"
+          body: |
+            ## 自动安全修复 PR
+
+            **触发原因**: govulncheck 检测到依赖漏洞
+
+            **修复内容**:
+            - 更新依赖到安全版本
+            - go mod tidy 整理依赖
+
+            **扫描结果**:
+            - 运行: ${{ github.run_id }}
+            - 分支: ${{ github.ref }}
+
+            **请检查**:
+            - [ ] 构建是否通过
+            - [ ] 测试是否通过
+            - [ ] 依赖变更是否合理
+          labels: |
+            security
+            automated
+            dependencies
 
       - name: Upload security scan results
         if: always()
