@@ -450,24 +450,32 @@ func TestHandleRequest_ToolsCall_UnknownTool(t *testing.T) {
 func TestGetTools(t *testing.T) {
 	s := NewServer()
 	tools := s.getTools()
-	if len(tools) != 14 {
-		t.Errorf("expected 14 tools, got %d", len(tools))
+	if len(tools) != 22 {
+		t.Errorf("expected 22 tools, got %d", len(tools))
 	}
 	expectedNames := map[string]bool{
-		"create_workflow":   true,
-		"run_workflow":      true,
-		"run_workflow_yaml": true,
-		"list_nodes":        true,
-		"validate_workflow": true,
-		"workflow_run":      true,
-		"workflow_create":   true,
-		"workflow_list":     true,
-		"workflow_validate": true,
-		"node_list":         true,
-		"node_info":         true,
-		"history_list":      true,
-		"template_list":     true,
-		"template_render":   true,
+		"create_workflow":     true,
+		"run_workflow":        true,
+		"run_workflow_yaml":   true,
+		"list_nodes":          true,
+		"validate_workflow":   true,
+		"workflow_run":        true,
+		"workflow_create":     true,
+		"workflow_list":       true,
+		"workflow_validate":   true,
+		"node_list":           true,
+		"node_info":           true,
+		"history_list":        true,
+		"template_list":       true,
+		"template_render":     true,
+		"memory_store":        true,
+		"memory_retrieve":     true,
+		"memory_search":       true,
+		"memory_stats":        true,
+		"memory_list_sessions": true,
+		"code_graph_index":    true,
+		"code_graph_query":    true,
+		"code_graph_stats":    true,
 	}
 	for _, tool := range tools {
 		if !expectedNames[tool.Name] {
