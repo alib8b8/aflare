@@ -61,7 +61,7 @@ const (
 
 type CloudModelConfig struct {
 	Endpoint string `json:"endpoint"`
-	APIKey   string `json:"api_key,omitempty"`
+	APIKey   string `json:"-"`
 	Model    string `json:"model"`
 	Priority int    `json:"priority"`
 }
