@@ -11,6 +11,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/config"
+	"github.com/alib8b8/llm-box/internal/stats"
 )
 
 var (
@@ -48,6 +51,7 @@ func safeJoinPath(baseDir, userPath string) (string, error) {
 
 	cleanPath := filepath.Clean(userPath)
 	if strings.HasPrefix(cleanPath, "/") || strings.HasPrefix(cleanPath, "\\") {
+		stats.GetSecurityStats().RecordBlock(stats.BlockPathTraversal, "absolute path: "+userPath, "")
 		return "", fmt.Errorf("absolute paths are not allowed, use relative paths within the working directory")
 	}
 
@@ -67,17 +71,21 @@ func safeJoinPath(baseDir, userPath string) (string, error) {
 		return "", fmt.Errorf("path validation failed: %w", err)
 	}
 	if strings.HasPrefix(relPath, "..") || relPath == ".." {
+		stats.GetSecurityStats().RecordBlock(stats.BlockPathTraversal, "path escapes: "+userPath, "")
 		return "", fmt.Errorf("path escapes the allowed directory")
 	}
 
-	// Resolve symlinks to prevent symlink-based bypass
-	resolvedPath, err := filepath.EvalSymlinks(absFullPath)
-	if err == nil {
-		resolvedRel, err := filepath.Rel(absBase, resolvedPath)
-		if err != nil || strings.HasPrefix(resolvedRel, "..") {
-			return "", fmt.Errorf("path escapes the allowed directory (symlink)")
+	// Resolve symlinks to prevent symlink-based bypass (L2+ only)
+	if config.SecurityLevelAtLeast(config.SecurityLevelL2) {
+		resolvedPath, err := filepath.EvalSymlinks(absFullPath)
+		if err == nil {
+			resolvedRel, err := filepath.Rel(absBase, resolvedPath)
+			if err != nil || strings.HasPrefix(resolvedRel, "..") {
+				stats.GetSecurityStats().RecordBlock(stats.BlockSymlinkBypass, "symlink escape: "+userPath, "")
+				return "", fmt.Errorf("path escapes the allowed directory (symlink)")
+			}
+			return resolvedPath, nil
 		}
-		return resolvedPath, nil
 	}
 
 	return absFullPath, nil
@@ -99,78 +107,87 @@ func validateWritePath(path string) (string, error) {
 		return "", err
 	}
 
-	// Reject dotfiles (e.g. .bashrc, .ssh/authorized_keys)
-	baseName := filepath.Base(safePath)
-	if strings.HasPrefix(baseName, ".") {
-		return "", fmt.Errorf("dotfiles are not allowed for writing")
+	// Reject dotfiles (L1+ only)
+	if config.SecurityLevelAtLeast(config.SecurityLevelL1) {
+		baseName := filepath.Base(safePath)
+		if strings.HasPrefix(baseName, ".") {
+			stats.GetSecurityStats().RecordBlock(stats.BlockSensitiveFile, "dotfile: "+path, "")
+			return "", fmt.Errorf("dotfiles are not allowed for writing")
+		}
 	}
 
 	ext := strings.ToLower(filepath.Ext(safePath))
-	allowedExts := map[string]bool{
-		".txt":  true,
-		".md":   true,
-		".yaml": true,
-		".yml":  true,
-		".json": true,
-		".csv":  true,
-		".xml":  true,
-		".log":  true,
-		".html": true,
-		".htm":  true,
-		".css":  true,
-		".js":   true,
-		".ts":   true,
-		".go":   true,
-		".rs":   true,
-		".java": true,
-		".c":    true,
-		".cpp":  true,
-		".h":    true,
-		".hpp":  true,
-		".rb":   true,
-		".php":  true,
-		".sql":  true,
-		".toml": true,
-		".ini":  true,
-		".conf": true,
-		".cfg":  true,
-		".svg":  true,
-		".png":  true,
-		".jpg":  true,
-		".jpeg": true,
-		".gif":  true,
-		".webp": true,
-		".pdf":  true,
-		".epub": true,
-		".mobi": true,
-		".mp3":  true,
-		".wav":  true,
-		".mp4":  true,
-		".mov":  true,
-		".avi":  true,
-		".zip":  true,
-		".tar":  true,
-		".gz":   true,
-		".7z":   true,
-	}
 
+	// Forbidden extensions (L1+)
 	forbiddenExts := map[string]bool{
-		".env":  true,
-		".sh":   true,
-		".bash": true,
-		".zsh":  true,
-		".fish": true,
-		".bat":  true,
-		".ps1":  true,
-		".py":   true,
+		".env":   true,
+		".sh":    true,
+		".bash":  true,
+		".zsh":   true,
+		".fish":  true,
+		".bat":   true,
+		".ps1":   true,
+		".exe":   true,
+		".dll":   true,
+		".so":    true,
+		".dylib": true,
+		".msi":   true,
+		".apk":   true,
+		".ipa":   true,
+		".deb":   true,
+		".rpm":   true,
+		".pkg":   true,
 	}
-
+	if config.SecurityLevelAtLeast(config.SecurityLevelL3) {
+		forbiddenExts[".py"] = true
+		forbiddenExts[".rb"] = true
+		forbiddenExts[".php"] = true
+		forbiddenExts[".pl"] = true
+	}
 	if forbiddenExts[ext] {
+		stats.GetSecurityStats().RecordBlock(stats.BlockUnsafeExtension, "forbidden ext: "+ext, "")
 		return "", fmt.Errorf("writing to %s files is not allowed (security risk)", ext)
 	}
 
-	if ext != "" && !allowedExts[ext] {
-		return "", fmt.Errorf("file extension '%s' is not allowed for writing", ext)
+	// Allowed extensions (L3 only - strict allowlist)
+	if config.SecurityLevelAtLeast(config.SecurityLevelL3) {
+		allowedExts := map[string]bool{
+			".txt":  true,
+			".md":   true,
+			".yaml": true,
+			".yml":  true,
+			".json": true,
+			".csv":  true,
+			".xml":  true,
+			".log":  true,
+			".html": true,
+			".htm":  true,
+			".css":  true,
+			".js":   true,
+			".ts":   true,
+			".go":   true,
+			".rs":   true,
+			".java": true,
+			".c":    true,
+			".cpp":  true,
+			".h":    true,
+			".sql":  true,
+			".toml": true,
+			".ini":  true,
+			".svg":  true,
+			".png":  true,
+			".jpg":  true,
+			".jpeg": true,
+			".gif":  true,
+			".pdf":  true,
+			".zip":  true,
+			".tar":  true,
+			".gz":   true,
+		}
+		if ext != "" && !allowedExts[ext] {
+			stats.GetSecurityStats().RecordBlock(stats.BlockUnsafeExtension, "ext not allowed: "+ext, "")
+			return "", fmt.Errorf("file extension '%s' is not allowed for writing at L3 security level", ext)
+		}
 	}
 
 	return safePath, nil
@@ -233,6 +250,7 @@ func validateURL(rawURL string) error {
 	}
 
 	if u.Scheme != "http" && u.Scheme != "https" {
+		stats.GetSecurityStats().RecordBlock(stats.BlockNetwork, "non-http scheme: "+u.Scheme, "")
 		return fmt.Errorf("only http and https URLs are allowed, got: %s", u.Scheme)
 	}
 
@@ -255,6 +273,7 @@ func validateURL(rawURL string) error {
 		"ip6-loopback":          true,
 	}
 	if localhostVariants[lowerHost] {
+		stats.GetSecurityStats().RecordBlock(stats.BlockSSRF, "localhost: "+host, "")
 		return fmt.Errorf("access to localhost is not allowed")
 	}
 
@@ -262,6 +281,7 @@ func validateURL(rawURL string) error {
 	ip := net.ParseIP(host)
 	if ip != nil {
 		if err := validateIP(ip, host); err != nil {
+			stats.GetSecurityStats().RecordBlock(stats.BlockSSRF, "blocked IP: "+host, "")
 			return err
 		}
 	} else {
@@ -272,6 +292,7 @@ func validateURL(rawURL string) error {
 		}
 		for _, resolvedIP := range ips {
 			if err := validateIP(resolvedIP, host); err != nil {
+				stats.GetSecurityStats().RecordBlock(stats.BlockSSRF, "blocked IP: "+resolvedIP.String(), "")
 				return err
 			}
 		}

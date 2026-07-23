@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/config"
+	"github.com/alib8b8/llm-box/internal/stats"
 )
 
 type CodeInterpreterNode struct{}
@@ -33,16 +36,21 @@ func (n *CodeInterpreterNode) Schema() NodeSchema {
 		Params: []ParamSchema{
 			{Name: "code", Type: "string", Description: "Python code to execute", Required: true},
 			{Name: "language", Type: "string", Description: "Programming language (default: python)", Required: false, Default: "python"},
-			{Name: "timeout", Type: "string", Description: "Execution timeout (default: 30s)", Required: false, Default: "30s"},
+			{Name: "timeout", Type: "string", Description: "Execution timeout (default based on security level)", Required: false},
 			{Name: "work_dir", Type: "string", Description: "Working directory for code execution (default: temp dir)", Required: false},
 			{Name: "save_outputs", Type: "string", Description: "If true, save output files to work_dir (default: true)", Required: false, Default: "true"},
+			{Name: "network", Type: "string", Description: "Allow network access during execution (L0/L1 only, default: false)", Required: false, Default: "false"},
 		},
 	}
 }
 
 func (n *CodeInterpreterNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
-	if IsSafeMode() {
-		return "", fmt.Errorf("code_interpreter node is disabled in safe mode")
+	secLevel := config.GetSecurityLevel()
+	stats.GetSecurityStats().RecordSecurityLevel(secLevel)
+
+	if secLevel == config.SecurityLevelL3 {
+		stats.GetSecurityStats().RecordBlock(stats.BlockSafeMode, "code_interpreter blocked at L3", "code_interpreter")
+		return "", fmt.Errorf("code_interpreter node is disabled at L3 security level (max security)")
 	}
 
 	code := params["code"]
@@ -51,13 +59,29 @@ func (n *CodeInterpreterNode) Execute(ctx context.Context, input string, params 
 	}
 
 	language := getParam(params, "language", "python")
-	timeoutStr := getParam(params, "timeout", "30s")
+	timeoutStr := getParam(params, "timeout", "")
 	workDir := params["work_dir"]
 	saveOutputs := getParam(params, "save_outputs", "true") == "true"
+	allowNetwork := getParam(params, "network", "false") == "true"
 
 	timeout, err := time.ParseDuration(timeoutStr)
-	if err != nil {
-		timeout = 30 * time.Second
+	if err != nil || timeout <= 0 {
+		switch secLevel {
+		case config.SecurityLevelL0:
+			timeout = 120 * time.Second
+		case config.SecurityLevelL1:
+			timeout = 30 * time.Second
+		case config.SecurityLevelL2:
+			timeout = 15 * time.Second
+		default:
+			timeout = 5 * time.Second
+		}
+	}
+
+	if allowNetwork && !config.SecurityLevelAtLeast(config.SecurityLevelL2) == false {
+		if secLevel == config.SecurityLevelL2 || secLevel == config.SecurityLevelL3 {
+			allowNetwork = false
+		}
 	}
 
 	if workDir == "" {
@@ -80,12 +104,21 @@ func (n *CodeInterpreterNode) Execute(ctx context.Context, input string, params 
 	}
 
 	var result string
+	startTime := time.Now()
+	var timedOut bool
+
 	switch language {
 	case "python", "python3", "py":
-		result, err = runPython(ctx, code, workDir, timeout, input)
+		result, err = runPython(ctx, code, workDir, timeout, input, allowNetwork)
+		if err != nil && strings.Contains(err.Error(), "DeadlineExceeded") {
+			timedOut = true
+		}
 	default:
 		return "", fmt.Errorf("unsupported language: %s (currently only python is supported)", language)
 	}
+
+	durationMs := time.Since(startTime).Milliseconds()
+	stats.GetSecurityStats().RecordCodeInterpreterRun(durationMs, false, timedOut)
 
 	if err != nil && result == "" {
 		return result, err
@@ -101,7 +134,7 @@ func (n *CodeInterpreterNode) Execute(ctx context.Context, input string, params 
 	return result, nil
 }
 
-func runPython(ctx context.Context, code, workDir string, timeout time.Duration, stdin string) (string, error) {
+func runPython(ctx context.Context, code, workDir string, timeout time.Duration, stdin string, allowNetwork bool) (string, error) {
 	scriptPath := filepath.Join(workDir, "script.py")
 	if err := os.WriteFile(scriptPath, []byte(code), 0644); err != nil {
 		return "", fmt.Errorf("failed to write script: %w", err)
@@ -110,7 +143,53 @@ func runPython(ctx context.Context, code, workDir string, timeout time.Duration,
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "python3", scriptPath)
+	networkDisabledCode := ""
+	if !allowNetwork {
+		networkDisabledCode = `
+import socket
+import urllib.request
+_orig_connect = socket.socket.connect
+_orig_create = socket.create_connection
+_orig_urlopen = urllib.request.urlopen
+def _block_connect(*a, **k): raise OSError("Network access disabled by security policy")
+def _block_urlopen(*a, **k): raise OSError("Network access disabled by security policy")
+socket.socket.connect = _block_connect
+socket.create_connection = _block_connect
+urllib.request.urlopen = _block_urlopen
+`
+	}
+
+	finalCode := networkDisabledCode + code
+	if err := os.WriteFile(scriptPath, []byte(finalCode), 0644); err != nil {
+		return "", fmt.Errorf("failed to write script: %w", err)
+	}
+
+	var cmd *exec.Cmd
+	if bwrap, err := exec.LookPath("bwrap"); err == nil {
+		roBinds := []string{}
+		for _, p := range []string{"/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc/ld.so.cache", "/etc/alternatives"} {
+			if _, err := os.Stat(p); err == nil {
+				roBinds = append(roBinds, "--ro-bind", p, p)
+			}
+		}
+		args := []string{}
+		args = append(args, roBinds...)
+		args = append(args,
+			"--dev", "/dev",
+			"--proc", "/proc",
+			"--bind", workDir, workDir,
+			"--chdir", workDir,
+			"--unshare-all",
+			"--share-net",
+		)
+		if !allowNetwork {
+			args[len(args)-1] = "--unshare-net"
+		}
+		args = append(args, "--", "python3", scriptPath)
+		cmd = exec.CommandContext(ctx, bwrap, args...)
+	} else {
+		cmd = exec.CommandContext(ctx, "python3", scriptPath)
+	}
 	cmd.Dir = workDir
 	cmd.Stdin = strings.NewReader(stdin)
 

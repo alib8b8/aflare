@@ -45,6 +45,10 @@ func (tm *TemplateManager) registerBuiltins() {
 		buildWebScraperTemplate(),
 		buildTranslationTemplate(),
 		buildBatchProcessorTemplate(),
+		buildSecurityAuditTemplate(),
+		buildSecurityPathTraversalTestTemplate(),
+		buildSecuritySSRFTestTemplate(),
+		buildSecurityCommandInjectionTestTemplate(),
 	}
 	for _, t := range builtins {
 		tm.templates[t.Name] = t
@@ -428,6 +432,265 @@ steps:
     params:
       channel: stdout
       message: "Batch processing completed"
+`,
+	}
+}
+
+func buildSecurityAuditTemplate() *Template {
+	return &Template{
+		Name:        "security-audit",
+		Description: "全面安全审计工作流，自动运行代码审查、漏洞扫描和安全自检",
+		Category:    "security",
+		Tags:        []string{"security", "audit", "vulnerability", "safety"},
+		Version:     "1.0.0",
+		Variables: []TemplateVar{
+			{Name: "workflow_name", Description: "工作流名称", Default: "security-audit-workflow", Required: false},
+			{Name: "target_dir", Description: "要审计的目标目录", Default: ".", Required: false},
+			{Name: "model", Description: "用于代码审查的 LLM 模型", Default: "llama3", Required: false},
+			{Name: "output_file", Description: "审计报告输出路径", Default: "security-audit-report.md", Required: false},
+			{Name: "depth", Description: "审计深度: basic, standard, deep (default: standard)", Default: "standard", Required: false},
+		},
+		Content: `name: {{.workflow_name}}
+description: Security audit workflow - automated code review and vulnerability scanning
+vars:
+  target_dir: "{{.target_dir}}"
+  model: "{{.model}}"
+  output_file: "{{.output_file}}"
+  depth: "{{.depth}}"
+steps:
+  - name: collect-source-files
+    node: file_read
+    params:
+      path: "{{.vars.target_dir}}"
+  - name: llm-security-review
+    node: code_review
+    params:
+      model: "{{.vars.model}}"
+      focus: security
+  - name: verify-findings
+    node: verify
+    params:
+      verifier_type: security
+      output_format: detailed
+  - name: generate-report
+    node: combine
+    params:
+      separator: "\n\n---\n\n"
+{{- if .output_file}}
+  - node: file_write
+    params:
+      path: "{{.vars.output_file}}"
+{{- end}}
+  - node: notify
+    params:
+      channel: stdout
+      message: "Security audit completed"
+`,
+	}
+}
+
+func buildSecurityPathTraversalTestTemplate() *Template {
+	return &Template{
+		Name:        "security-test-path-traversal",
+		Description: "路径穿越安全自测套件，验证文件访问防护是否有效",
+		Category:    "security",
+		Tags:        []string{"security", "test", "path-traversal", "owasp"},
+		Version:     "1.0.0",
+		Variables: []TemplateVar{
+			{Name: "workflow_name", Description: "工作流名称", Default: "security-path-traversal-test", Required: false},
+			{Name: "base_dir", Description: "测试基准目录", Default: "tmp/security-test", Required: false},
+			{Name: "report_file", Description: "测试报告路径", Default: "path-traversal-test-report.md", Required: false},
+		},
+		Content: `name: {{.workflow_name}}
+description: Path traversal security self-test suite
+vars:
+  base_dir: "{{.base_dir}}"
+  report_file: "{{.report_file}}"
+steps:
+  - name: test-dotdot-slash
+    node: file_read
+    params:
+      path: "{{.vars.base_dir}}/../../../etc/passwd"
+  - name: test-absolute-path
+    node: file_read
+    params:
+      path: "/etc/passwd"
+  - name: test-encoded-path
+    node: file_read
+    params:
+      path: "{{.vars.base_dir}}/%2e%2e/%2e%2e/etc/passwd"
+  - name: test-symlink-bypass
+    node: file_read
+    params:
+      path: "{{.vars.base_dir}}/symlink_to_etc"
+  - name: test-double-encoding
+    node: file_read
+    params:
+      path: "{{.vars.base_dir}}/%252e%252e/etc/passwd"
+  - name: test-null-byte
+    node: file_read
+    params:
+      path: "{{.vars.base_dir}}/../../../etc/passwd%00.txt"
+  - name: test-dotfile-write
+    node: file_write
+    params:
+      path: "{{.vars.base_dir}}/.ssh/authorized_keys"
+  - name: test-env-write
+    node: file_write
+    params:
+      path: "{{.vars.base_dir}}/.env"
+  - name: aggregate-results
+    node: combine
+    params:
+      separator: "\n"
+{{- if .report_file}}
+  - node: file_write
+    params:
+      path: "{{.vars.report_file}}"
+{{- end}}
+  - node: notify
+    params:
+      channel: stdout
+      message: "Path traversal security test suite completed"
+`,
+	}
+}
+
+func buildSecuritySSRFTestTemplate() *Template {
+	return &Template{
+		Name:        "security-test-ssrf",
+		Description: "SSRF 安全自测套件，验证服务器端请求伪造防护是否有效",
+		Category:    "security",
+		Tags:        []string{"security", "test", "ssrf", "owasp"},
+		Version:     "1.0.0",
+		Variables: []TemplateVar{
+			{Name: "workflow_name", Description: "工作流名称", Default: "security-ssrf-test", Required: false},
+			{Name: "report_file", Description: "测试报告路径", Default: "ssrf-test-report.md", Required: false},
+		},
+		Content: `name: {{.workflow_name}}
+description: SSRF security self-test suite
+vars:
+  report_file: "{{.report_file}}"
+steps:
+  - name: test-localhost
+    node: http_request
+    params:
+      url: "http://localhost:8080/secret"
+  - name: test-127-0-0-1
+    node: http_request
+    params:
+      url: "http://127.0.0.1/admin"
+  - name: test-metadata-service
+    node: http_request
+    params:
+      url: "http://169.254.169.254/latest/meta-data/"
+  - name: test-internal-private
+    node: http_request
+    params:
+      url: "http://192.168.1.1/admin"
+  - name: test-10-range
+    node: http_request
+    params:
+      url: "http://10.0.0.1/internal"
+  - name: test-172-range
+    node: http_request
+    params:
+      url: "http://172.16.0.1/admin"
+  - name: test-file-scheme
+    node: http_request
+    params:
+      url: "file:///etc/passwd"
+  - name: test-ftp-scheme
+    node: http_request
+    params:
+      url: "ftp://internal-server/data"
+  - name: test-dns-rebinding
+    node: http_request
+    params:
+      url: "http://127.0.0.1.nip.io/admin"
+  - name: test-ipv6-loopback
+    node: http_request
+    params:
+      url: "http://[::1]/admin"
+  - name: aggregate-results
+    node: combine
+    params:
+      separator: "\n"
+{{- if .report_file}}
+  - node: file_write
+    params:
+      path: "{{.vars.report_file}}"
+{{- end}}
+  - node: notify
+    params:
+      channel: stdout
+      message: "SSRF security test suite completed"
+`,
+	}
+}
+
+func buildSecurityCommandInjectionTestTemplate() *Template {
+	return &Template{
+		Name:        "security-test-command-injection",
+		Description: "命令注入安全自测套件，验证命令注入防护是否有效",
+		Category:    "security",
+		Tags:        []string{"security", "test", "command-injection", "owasp"},
+		Version:     "1.0.0",
+		Variables: []TemplateVar{
+			{Name: "workflow_name", Description: "工作流名称", Default: "security-command-injection-test", Required: false},
+			{Name: "report_file", Description: "测试报告路径", Default: "command-injection-test-report.md", Required: false},
+		},
+		Content: `name: {{.workflow_name}}
+description: Command injection security self-test suite
+vars:
+  report_file: "{{.vars.report_file}}"
+steps:
+  - name: test-semicolon-injection
+    node: code_interpreter
+    params:
+      code: "print('hello'); import os; os.system('cat /etc/passwd')"
+  - name: test-backtick-injection
+    node: code_interpreter
+    params:
+      code: "print('hello [backtick injection test]')"
+  - name: test-dollar-paren
+    node: code_interpreter
+    params:
+      code: "import subprocess; subprocess.run('$(cat /etc/passwd)', shell=True)"
+  - name: test-python-eval-exec
+    node: code_interpreter
+    params:
+      code: "eval('__import__(\"os\").system(\"id\")')"
+  - name: test-network-access
+    node: code_interpreter
+    params:
+      code: "import urllib.request; print(urllib.request.urlopen('http://169.254.169.254/').read())"
+      network: "false"
+  - name: test-file-escape
+    node: code_interpreter
+    params:
+      code: "with open('/etc/passwd') as f: print(f.read())"
+  - name: test-shell-metachar
+    node: code_interpreter
+    params:
+      code: "import subprocess; subprocess.run(['echo', 'test; id'], shell=False)"
+  - name: test-python-subprocess-shell
+    node: code_interpreter
+    params:
+      code: "import subprocess; subprocess.run('id; whoami', shell=True)"
+  - name: aggregate-results
+    node: combine
+    params:
+      separator: "\n"
+{{- if .report_file}}
+  - node: file_write
+    params:
+      path: "{{.vars.report_file}}"
+{{- end}}
+  - node: notify
+    params:
+      channel: stdout
+      message: "Command injection security test suite completed"
 `,
 	}
 }

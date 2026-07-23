@@ -17,8 +17,9 @@ type LLMProviderConfig struct {
 }
 
 type Config struct {
-	Providers map[string]LLMProviderConfig `yaml:"providers,omitempty"`
-	SafeMode  bool                         `yaml:"safe_mode,omitempty"`
+	Providers     map[string]LLMProviderConfig `yaml:"providers,omitempty"`
+	SafeMode      bool                         `yaml:"safe_mode,omitempty"`
+	SecurityLevel string                       `yaml:"security_level,omitempty"`
 }
 
 var (
@@ -146,7 +147,6 @@ func GetDefaultModel(provider, envVar, defaultModel string) string {
 
 func IsSafeMode() bool {
 	if envVal := os.Getenv("LLM_BOX_SAFE_MODE"); envVal != "" {
-		// Treat explicit false values as disabled
 		lower := strings.ToLower(strings.TrimSpace(envVal))
 		switch lower {
 		case "false", "0", "no", "off", "disable", "disabled":
@@ -161,6 +161,48 @@ func IsSafeMode() bool {
 	}
 
 	return cfg.SafeMode
+}
+
+const (
+	SecurityLevelL0 = "L0"
+	SecurityLevelL1 = "L1"
+	SecurityLevelL2 = "L2"
+	SecurityLevelL3 = "L3"
+)
+
+func GetSecurityLevel() string {
+	if envVal := os.Getenv("LLM_BOX_SECURITY_LEVEL"); envVal != "" {
+		upper := strings.ToUpper(strings.TrimSpace(envVal))
+		switch upper {
+		case SecurityLevelL0, SecurityLevelL1, SecurityLevelL2, SecurityLevelL3:
+			return upper
+		}
+	}
+
+	cfg, err := LoadConfig()
+	if err == nil && cfg.SecurityLevel != "" {
+		upper := strings.ToUpper(strings.TrimSpace(cfg.SecurityLevel))
+		switch upper {
+		case SecurityLevelL0, SecurityLevelL1, SecurityLevelL2, SecurityLevelL3:
+			return upper
+		}
+	}
+
+	if IsSafeMode() {
+		return SecurityLevelL3
+	}
+	return SecurityLevelL1
+}
+
+func SecurityLevelAtLeast(level string) bool {
+	current := GetSecurityLevel()
+	levels := map[string]int{SecurityLevelL0: 0, SecurityLevelL1: 1, SecurityLevelL2: 2, SecurityLevelL3: 3}
+	curVal, ok1 := levels[current]
+	reqVal, ok2 := levels[level]
+	if !ok1 || !ok2 {
+		return false
+	}
+	return curVal >= reqVal
 }
 
 func SetConfig(cfg *Config) {
