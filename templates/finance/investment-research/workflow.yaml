@@ -1,0 +1,101 @@
+name: Investment Research Workflow
+# Deep investment research: asset analysis, due diligence, portfolio construction
+# Usage: llm-box install finance/investment-research
+#        llm-box run investment-research/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.research_brief }}"
+    id: brief
+
+  - node: search_aggregate
+    params:
+      platforms: reddit,hackernews,github,google
+      max_results: "30"
+    input: |
+      {{ .brief }}
+      Deep research: fundamentals, technicals, competitive landscape, management quality, risks
+    id: deep_research
+
+  - node: supervisor
+    params:
+      strategy: sequential
+      domain: finance
+      specialists: financial_expert,researcher,data_analyst,critic,evaluator,risk_manager
+    input: |
+      Conduct comprehensive investment research on:
+
+      Research Brief:
+      {{ .brief }}
+
+      Gathered Intelligence:
+      {{ .deep_research }}
+
+      Research Framework:
+      1. COMPANY/FUND ANALYSIS
+         - Business model and revenue streams
+         - Management quality and track record
+         - Competitive advantages (moats)
+         - Financial health: balance sheet, cash flow, profitability
+         - Growth trajectory and catalysts
+
+      2. VALUATION
+         - Current valuation vs historical
+         - Peer comparison
+         - DCF or comparable analysis
+         - Margin of safety assessment
+
+      3. TECHNICAL ANALYSIS
+         - Price action and trends
+         - Key support/resistance levels
+         - Volume analysis
+         - Momentum indicators
+
+      4. RISK ASSESSMENT
+         - Downside scenarios
+         - Regulatory and legal risks
+         - Concentration and correlation risks
+         - Black swan potential
+
+      5. PORTFOLIO CONSTRUCTION
+         - Position sizing recommendation
+         - Entry points (scale-in plan)
+         - Stop-loss and exit strategy
+         - Rebalancing schedule
+         - Correlation with existing holdings
+
+      6. CATALYST TIMELINE
+         - Earnings dates
+         - Product launches
+         - Regulatory decisions
+         - Industry events
+    id: research_report
+
+  - node: verify
+    params:
+      verify_type: security
+      output_format: detailed
+    input: |
+      Verify this investment research for:
+      1. Factual accuracy of financial data
+      2. Logical consistency in analysis
+      3. Completeness of risk assessment
+      4. Realistic return expectations
+      5. Absence of misleading claims
+
+      Research Report:
+      {{ .research_report }}
+    id: verification
+
+  - node: file_write
+    params:
+      path: investment-research-report.md
+    input: research_report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: research_report
+    id: notify

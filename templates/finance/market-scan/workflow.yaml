@@ -1,0 +1,61 @@
+name: Market Scan & Intelligence
+# Scan financial markets, aggregate news, and build investment thesis
+# Usage: llm-box install finance/market-scan
+#        llm-box run market-scan/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: "{{ .params.market_data_url }}"
+      method: GET
+    id: market_data
+
+  - node: search_aggregate
+    params:
+      platforms: reddit,hackernews,github,google
+      max_results: "20"
+    input: |
+      {{ .params.query }}
+      Recent financial news, market sentiment, and investment signals
+    id: news_aggregation
+
+  - node: supervisor
+    params:
+      strategy: swarm
+      domain: finance
+      specialists: financial_expert,data_analyst,researcher,critic,evaluator
+    input: |
+      Build an investment thesis based on:
+
+      Market Data:
+      {{ .market_data }}
+
+      Aggregated News & Signals:
+      {{ .news_aggregation }}
+
+      Investment Context:
+      - Strategy: {{ .params.strategy }}
+      - Risk Tolerance: {{ .params.risk_tolerance }}
+      - Time Horizon: {{ .params.time_horizon }}
+      - Capital: {{ .params.capital }}
+
+      Produce:
+      1. Market sentiment analysis (bullish/bearish/neutral)
+      2. Top opportunities ranked by risk/reward
+      3. Key risks and red flags
+      4. Watchlist of assets to monitor
+      5. Suggested position sizing
+      6. Entry and exit criteria
+    id: thesis
+
+  - node: file_write
+    params:
+      path: market-scan-report.md
+    input: thesis
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: thesis
+    id: notify

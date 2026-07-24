@@ -34,6 +34,8 @@ func (n *CodeReviewNode) Schema() NodeSchema {
 			{Name: "language", Type: "string", Description: "Programming language (auto-detected if not specified)", Required: false},
 			{Name: "focus", Type: "string", Description: "Review focus: all, bugs, security, style, performance (default: all)", Required: false, Default: "all"},
 			{Name: "severity", Type: "string", Description: "Minimum severity: low, medium, high, critical (default: medium)", Required: false, Default: "medium"},
+			{Name: "auto_clarify", Type: "string", Description: "Run ACQUIRE-style clarification before review (default: false). Ask clarifying questions if review scope is ambiguous.", Required: false, Default: "false"},
+			{Name: "clarify_threshold", Type: "string", Description: "Confidence threshold for auto-clarification 0-100 (default: 70)", Required: false, Default: "70"},
 		},
 	}
 }
@@ -46,9 +48,27 @@ func (n *CodeReviewNode) Execute(ctx context.Context, input string, params map[s
 	language := getParam(params, "language", "")
 	focus := getParam(params, "focus", "all")
 	severity := getParam(params, "severity", "medium")
+	autoClarify := getParam(params, "auto_clarify", "false") == "true"
 
 	if strings.TrimSpace(input) == "" {
 		return "", fmt.Errorf("code input is required for code review")
+	}
+
+	if autoClarify {
+		clarifyNode := &ClarifyNode{}
+		clarifyParams := map[string]string{
+			"provider":  provider,
+			"model":     model,
+			"api_key":   apiKey,
+			"endpoint":  endpoint,
+			"threshold": getParam(params, "clarify_threshold", "70"),
+			"context":   fmt.Sprintf("Code review task. Language: %s, Focus: %s, Severity: %s", language, focus, severity),
+		}
+		clarifyResult, err := clarifyNode.Execute(ctx, input, clarifyParams)
+		if err != nil {
+			return "", fmt.Errorf("auto-clarify failed: %w", err)
+		}
+		return fmt.Sprintf(`{"auto_clarify": true, "clarification_result": %s}`, clarifyResult), nil
 	}
 
 	backtick := "```"

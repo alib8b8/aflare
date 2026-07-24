@@ -31,7 +31,7 @@ func (n *SupervisorNode) Schema() NodeSchema {
 	}
 	params = append(params,
 		ParamSchema{Name: "specialists", Type: "string", Description: "Comma-separated list of specialist agents: planner,researcher,critic,code_review,evaluator,reflector,legal_expert,medical_expert,educational_expert,financial_expert,creative_writer,data_analyst", Required: false, Default: "planner,researcher,critic,evaluator"},
-		ParamSchema{Name: "strategy", Type: "string", Description: "Strategy: sequential, parallel, hierarchical, mindsearch, moe, agency (default: sequential)", Required: false, Default: "sequential"},
+		ParamSchema{Name: "strategy", Type: "string", Description: "Strategy: sequential, parallel, hierarchical, mindsearch, moe, agency, swarm (default: sequential)", Required: false, Default: "sequential"},
 		ParamSchema{Name: "output_format", Type: "string", Description: "Output format: json, markdown, summary (default: json)", Required: false, Default: "json"},
 		ParamSchema{Name: "domain", Type: "string", Description: "Domain specialization: general,legal,medical,education,finance,creative,tech,business (default: general)", Required: false, Default: "general"},
 		ParamSchema{Name: "enable_moe", Type: "string", Description: "Enable Mixture-of-Experts routing (default: false)", Required: false, Default: "false"},
@@ -419,6 +419,8 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 		systemPrompt = buildHierarchicalPrompt(specDescs, maxDepth)
 	case "agency":
 		systemPrompt = buildAgencyPrompt(specDescs)
+	case "swarm":
+		systemPrompt = buildSwarmPrompt(specDescs)
 	default:
 		systemPrompt = buildSequentialPrompt(specDescs)
 	}
@@ -807,6 +809,64 @@ Output format (MUST be valid JSON):
     "success_criteria": ["list of criteria to determine project completion"]
   },
   "selected_specialists": ["list of all selected specialist names for this project"]
+}
+
+Respond with ONLY the JSON object, no extra text, no markdown code blocks.`, specDescs)
+}
+
+func buildSwarmPrompt(specDescs string) string {
+	return fmt.Sprintf(`You are a swarm intelligence coordinator. Your job is to orchestrate a decentralized "hive mind" of specialist agents that communicate peer-to-peer, not just top-down.
+
+Inspired by block/buzz swarm communication and decentralized message passing paradigms.
+
+Available specialists (swarm members):
+%s
+
+Strategy: swarm — decentralized peer-to-peer communication with emergent coordination.
+
+Swarm Principles:
+1. NO central controller — every specialist can message every other specialist directly
+2. Emergent intelligence — solutions arise from many small local interactions
+3. Pheromone trails — specialists leave "information markers" that others can pick up
+4. Stigmergy — coordination through shared environment, not explicit commands
+5. Adaptive topology — communication graph forms dynamically based on task needs
+
+Swarm Communication Patterns:
+- Broadcast: specialist sends info to ALL other specialists
+- Direct message: specialist A sends specific info to specialist B
+- Shared blackboard: all specialists read/write to a common knowledge space
+- Request-for-comment: specialist asks specific question to relevant peers
+- Consensus voting: specialists vote on uncertain decisions
+
+Output format (MUST be valid JSON):
+{
+  "task": "the original task",
+  "swarm_analysis": {
+    "emergent_goal": "what the swarm should collectively achieve",
+    "key_uncertainties": ["areas where specialist input is needed"],
+    "coordination_topology": "mesh|hub_and_spoke|dynamic_graph"
+  },
+  "swarm_members": [
+    {
+      "specialist": "specialist_name",
+      "role": "contributor|validator|coordinator|researcher",
+      "initial_focus": "what this specialist should work on first",
+      "communication_channels": [
+        {"type": "broadcast|direct|blackboard|rfc|vote", "to": "target or 'all'", "frequency": "high|medium|low"}
+      ]
+    }
+  ],
+  "communication_protocol": {
+    "message_format": "how specialists should format messages to each other",
+    "shared_blackboard_fields": ["field1", "field2"],
+    "consensus_rules": "how decisions are made when specialists disagree"
+  },
+  "emergence_plan": {
+    "phase_1_individual_exploration": "each specialist works independently and broadcasts findings",
+    "phase_2_cross_pollination": "specialists respond to each other's findings",
+    "phase_3_consensus_building": "converge on solution through voting and synthesis"
+  },
+  "success_metrics": ["how to measure swarm effectiveness"]
 }
 
 Respond with ONLY the JSON object, no extra text, no markdown code blocks.`, specDescs)

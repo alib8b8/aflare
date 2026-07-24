@@ -33,6 +33,9 @@ func (n *PlannerNode) Schema() NodeSchema {
 			{Name: "endpoint", Type: "string", Description: "API endpoint URL", Required: false},
 			{Name: "max_steps", Type: "string", Description: "Maximum number of steps to plan (default: 10)", Required: false, Default: "10"},
 			{Name: "context", Type: "string", Description: "Additional context or constraints for the plan", Required: false},
+			{Name: "auto_clarify", Type: "string", Description: "Run ACQUIRE-style clarification before planning (default: false). If task is ambiguous, ask clarifying questions first.", Required: false, Default: "false"},
+			{Name: "clarify_threshold", Type: "string", Description: "Confidence threshold for auto-clarification 0-100 (default: 70)", Required: false, Default: "70"},
+			{Name: "clarify_max_questions", Type: "string", Description: "Max clarification questions (default: 3)", Required: false, Default: "3"},
 		},
 	}
 }
@@ -44,6 +47,25 @@ func (n *PlannerNode) Execute(ctx context.Context, input string, params map[stri
 	endpoint := getParam(params, "endpoint", defaultEndpointFor(provider))
 	maxSteps := getParam(params, "max_steps", "10")
 	contextInfo := getParam(params, "context", "")
+	autoClarify := getParam(params, "auto_clarify", "false") == "true"
+
+	if autoClarify {
+		clarifyNode := &ClarifyNode{}
+		clarifyParams := map[string]string{
+			"provider":      provider,
+			"model":         model,
+			"api_key":       apiKey,
+			"endpoint":      endpoint,
+			"threshold":     getParam(params, "clarify_threshold", "70"),
+			"max_questions": getParam(params, "clarify_max_questions", "3"),
+			"context":       contextInfo,
+		}
+		clarifyResult, err := clarifyNode.Execute(ctx, input, clarifyParams)
+		if err != nil {
+			return "", fmt.Errorf("auto-clarify failed: %w", err)
+		}
+		return fmt.Sprintf(`{"auto_clarify": true, "clarification_result": %s}`, clarifyResult), nil
+	}
 
 	systemPrompt := fmt.Sprintf(`You are an expert task planner. Break down the given goal into clear, actionable steps.
 
