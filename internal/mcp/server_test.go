@@ -450,8 +450,8 @@ func TestHandleRequest_ToolsCall_UnknownTool(t *testing.T) {
 func TestGetTools(t *testing.T) {
 	s := NewServer()
 	tools := s.getTools()
-	if len(tools) != 22 {
-		t.Errorf("expected 22 tools, got %d", len(tools))
+	if len(tools) != 27 {
+		t.Errorf("expected 27 tools, got %d", len(tools))
 	}
 	expectedNames := map[string]bool{
 		"create_workflow":      true,
@@ -476,6 +476,11 @@ func TestGetTools(t *testing.T) {
 		"code_graph_index":     true,
 		"code_graph_query":     true,
 		"code_graph_stats":     true,
+		"context_compress":     true,
+		"search_aggregated":    true,
+		"geospatial_query":     true,
+		"preference_get":       true,
+		"preference_set":       true,
 	}
 	for _, tool := range tools {
 		if !expectedNames[tool.Name] {

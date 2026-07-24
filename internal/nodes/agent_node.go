@@ -86,6 +86,10 @@ func defaultEndpointFor(provider string) string {
 		return "https://api.mistral.ai/v1"
 	case "yi":
 		return "https://api.lingyiwanwu.com/v1"
+	case "anthropic":
+		return "https://api.anthropic.com/v1"
+	case "gemini":
+		return "https://generativelanguage.googleapis.com/v1beta/openai"
 	default:
 		return "http://localhost:11434"
 	}

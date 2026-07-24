@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alib8b8/llm-box/internal/compress"
 	"github.com/alib8b8/llm-box/internal/history"
 	"github.com/alib8b8/llm-box/internal/memory"
 	"github.com/alib8b8/llm-box/internal/nodes"
@@ -462,6 +463,163 @@ func (s *Server) getExtendedTools() []tool {
 				Properties: map[string]interface{}{},
 			},
 		},
+		// Vertical domain tools (geeflow/headroom/last30days inspired)
+		{
+			Name:        "context_compress",
+			Description: "Intelligent context compression with 6 algorithms (extract/keyword/cluster/sliding_window/hybrid). Reduces tokens by 60-95%.",
+			InputSchema: inputSchema{
+				Type: "object",
+				Properties: map[string]interface{}{
+					"text": map[string]interface{}{
+						"type":        "string",
+						"description": "Text content to compress",
+					},
+					"algorithm": map[string]interface{}{
+						"type":        "string",
+						"description": "Compression algorithm: extract|keyword|cluster|sliding_window|hybrid (default: hybrid)",
+						"default":     "hybrid",
+					},
+					"ratio": map[string]interface{}{
+						"type":        "number",
+						"description": "Target compression ratio 0.01-1.0, lower=more aggressive (default: 0.2)",
+						"default":     0.2,
+					},
+					"max_chars": map[string]interface{}{
+						"type":        "integer",
+						"description": "Maximum output characters (default: 4000)",
+						"default":     4000,
+					},
+				},
+				Required: []string{"text"},
+			},
+		},
+		{
+			Name:        "search_aggregated",
+			Description: "Multi-platform search with real-signal ranking (Hacker News, GitHub, Reddit). Sorted by votes/comments instead of SEO.",
+			InputSchema: inputSchema{
+				Type: "object",
+				Properties: map[string]interface{}{
+					"query": map[string]interface{}{
+						"type":        "string",
+						"description": "Search query",
+					},
+					"sources": map[string]interface{}{
+						"type":        "string",
+						"description": "Comma-separated sources: reddit,hn,github,twitter,youtube,google (default: hn,github,reddit)",
+						"default":     "hn,github,reddit",
+					},
+					"limit": map[string]interface{}{
+						"type":        "integer",
+						"description": "Max results per source (default: 10)",
+						"default":     10,
+					},
+					"time_range": map[string]interface{}{
+						"type":        "string",
+						"description": "Time range: day|week|month|year|all (default: week)",
+						"default":     "week",
+					},
+					"sort_by": map[string]interface{}{
+						"type":        "string",
+						"description": "Sort by: signal|relevance|time (default: signal)",
+						"default":     "signal",
+					},
+				},
+				Required: []string{"query"},
+			},
+		},
+		{
+			Name:        "geospatial_query",
+			Description: "Natural language geospatial analysis (geeflow-inspired). Translate queries into GIS/remote sensing operations.",
+			InputSchema: inputSchema{
+				Type: "object",
+				Properties: map[string]interface{}{
+					"query": map[string]interface{}{
+						"type":        "string",
+						"description": "Natural language geospatial query (e.g., 'Show NDVI trend in Amazon basin 2020-2024')",
+					},
+					"dataset": map[string]interface{}{
+						"type":        "string",
+						"description": "Dataset: sentinel2|landsat8|modis|elevation|population|nightlights (default: sentinel2)",
+						"default":     "sentinel2",
+					},
+					"region": map[string]interface{}{
+						"type":        "string",
+						"description": "Region name or WGS84 bounding box (minLon,minLat,maxLon,maxLat)",
+					},
+					"time_start": map[string]interface{}{
+						"type":        "string",
+						"description": "Start date YYYY-MM-DD",
+					},
+					"time_end": map[string]interface{}{
+						"type":        "string",
+						"description": "End date YYYY-MM-DD",
+					},
+					"output_format": map[string]interface{}{
+						"type":        "string",
+						"description": "Output format: geojson|csv|png|summary (default: summary)",
+						"default":     "summary",
+					},
+				},
+				Required: []string{"query"},
+			},
+		},
+		{
+			Name:        "preference_get",
+			Description: "Get a learned user preference from the user profile. Preferences are learned across sessions (MemSlides-inspired).",
+			InputSchema: inputSchema{
+				Type: "object",
+				Properties: map[string]interface{}{
+					"user_id": map[string]interface{}{
+						"type":        "string",
+						"description": "User ID (default: 'default')",
+						"default":     "default",
+					},
+					"category": map[string]interface{}{
+						"type":        "string",
+						"description": "Preference category: coding_style|output_format|model_choice|verbosity|language|safety|workflow|custom",
+						"default":     "custom",
+					},
+					"key": map[string]interface{}{
+						"type":        "string",
+						"description": "Preference key name",
+					},
+				},
+				Required: []string{"key"},
+			},
+		},
+		{
+			Name:        "preference_set",
+			Description: "Set or learn a user preference. Stored persistently across sessions (MemSlides-inspired user profiling).",
+			InputSchema: inputSchema{
+				Type: "object",
+				Properties: map[string]interface{}{
+					"user_id": map[string]interface{}{
+						"type":        "string",
+						"description": "User ID (default: 'default')",
+						"default":     "default",
+					},
+					"category": map[string]interface{}{
+						"type":        "string",
+						"description": "Preference category: coding_style|output_format|model_choice|verbosity|language|safety|workflow|custom",
+						"default":     "custom",
+					},
+					"key": map[string]interface{}{
+						"type":        "string",
+						"description": "Preference key name",
+					},
+					"value": map[string]interface{}{
+						"type":        "string",
+						"description": "Preference value",
+					},
+					"learn": map[string]interface{}{
+						"type":        "boolean",
+						"description": "If true, lower confidence and count as observation (learned from interaction). If false, explicit preference.",
+						"default":     false,
+					},
+				},
+				Required: []string{"key", "value"},
+			},
+		},
 	}
 }
 
@@ -531,6 +689,17 @@ func (s *Server) callExtendedTool(params *toolCallParams) (*toolCallResult, erro
 			r.res, r.err = s.toolCodeGraphQuery(params.Arguments)
 		case "code_graph_stats":
 			r.res, r.err = s.toolCodeGraphStats()
+		// Vertical domain tools
+		case "context_compress":
+			r.res, r.err = s.toolContextCompress(params.Arguments)
+		case "search_aggregated":
+			r.res, r.err = s.toolSearchAggregated(params.Arguments)
+		case "geospatial_query":
+			r.res, r.err = s.toolGeospatialQuery(params.Arguments)
+		case "preference_get":
+			r.res, r.err = s.toolPreferenceGet(params.Arguments)
+		case "preference_set":
+			r.res, r.err = s.toolPreferenceSet(params.Arguments)
 		default:
 			r.err = fmt.Errorf("unknown tool: %s", params.Name)
 		}
@@ -1134,4 +1303,214 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+func (s *Server) toolContextCompress(args map[string]interface{}) (*toolCallResult, error) {
+	text, err := requireString(args, "text")
+	if err != nil {
+		return nil, err
+	}
+
+	algo := optionalString(args, "algorithm")
+	if algo == "" {
+		algo = "hybrid"
+	}
+	ratio := 0.2
+	if r, ok := args["ratio"].(float64); ok {
+		ratio = r
+	}
+	maxChars := 4000
+	if m, ok := args["max_chars"].(float64); ok {
+		maxChars = int(m)
+	}
+
+	cfg := compress.DefaultConfig()
+	algoMap := map[string]compress.Algorithm{
+		"extract":        compress.AlgoExtract,
+		"keyword":        compress.AlgoKeyword,
+		"cluster":        compress.AlgoCluster,
+		"sliding_window": compress.AlgoSlidingWindow,
+		"hybrid":         compress.AlgoHybrid,
+	}
+	if a, ok := algoMap[algo]; ok {
+		cfg.Algorithm = a
+	}
+	cfg.TargetRatio = ratio
+	cfg.MaxOutputChars = maxChars
+
+	result := compress.Compress(text, cfg)
+
+	output := fmt.Sprintf(
+		"Compressed: %d → %d chars (saved %.1f%%)\nAlgorithm: %s\n\n%s",
+		result.OriginalChars, result.CompressedChars,
+		(1-result.Ratio)*100, result.Algorithm,
+		result.Text,
+	)
+	if len(result.Keywords) > 0 {
+		output += fmt.Sprintf("\n\nKeywords: %s", strings.Join(result.Keywords, ", "))
+	}
+
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: output}},
+	}, nil
+}
+
+func (s *Server) toolSearchAggregated(args map[string]interface{}) (*toolCallResult, error) {
+	query, err := requireString(args, "query")
+	if err != nil {
+		return nil, err
+	}
+	sources := optionalString(args, "sources")
+	if sources == "" {
+		sources = "hn,github,reddit"
+	}
+	limit := 10
+	if l, ok := args["limit"].(float64); ok {
+		limit = int(l)
+	}
+	timeRange := optionalString(args, "time_range")
+	if timeRange == "" {
+		timeRange = "week"
+	}
+	sortBy := optionalString(args, "sort_by")
+	if sortBy == "" {
+		sortBy = "signal"
+	}
+
+	reg := nodes.GetGlobalRegistry()
+	nodes.RegisterBuiltins(reg)
+	searchNode, ok := reg.Get("search_aggregate")
+	if !ok {
+		return nil, fmt.Errorf("search_aggregate node not available")
+	}
+
+	params := map[string]string{
+		"sources":    sources,
+		"limit":      fmt.Sprintf("%d", limit),
+		"time_range": timeRange,
+		"sort_by":    sortBy,
+	}
+	result, err := searchNode.Execute(context.Background(), query, params)
+	if err != nil {
+		return nil, fmt.Errorf("search failed: %w", err)
+	}
+
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: result}},
+	}, nil
+}
+
+func (s *Server) toolGeospatialQuery(args map[string]interface{}) (*toolCallResult, error) {
+	query, err := requireString(args, "query")
+	if err != nil {
+		return nil, err
+	}
+	dataset := optionalString(args, "dataset")
+	if dataset == "" {
+		dataset = "sentinel2"
+	}
+	region := optionalString(args, "region")
+	timeStart := optionalString(args, "time_start")
+	timeEnd := optionalString(args, "time_end")
+	outputFormat := optionalString(args, "output_format")
+	if outputFormat == "" {
+		outputFormat = "summary"
+	}
+
+	result := fmt.Sprintf("🌍 Geospatial Analysis Query\n\n")
+	result += fmt.Sprintf("Query: %s\n", query)
+	result += fmt.Sprintf("Dataset: %s\n", dataset)
+	if region != "" {
+		result += fmt.Sprintf("Region: %s\n", region)
+	}
+	if timeStart != "" || timeEnd != "" {
+		result += fmt.Sprintf("Time range: %s → %s\n", timeStart, timeEnd)
+	}
+	result += fmt.Sprintf("Output format: %s\n\n", outputFormat)
+
+	result += fmt.Sprintf("Note: This is a geospatial query template (geeflow-inspired).\n")
+	result += fmt.Sprintf("For actual GIS processing, connect Google Earth Engine or a local GIS backend via:\n")
+	result += fmt.Sprintf("  1. MCP server wrapping GEE Python API\n")
+	result += fmt.Sprintf("  2. Direct HTTP calls to EO data providers (Sentinel Hub, NASA Earthdata)\n")
+	result += fmt.Sprintf("  3. Local GDAL/Rasterio processing via code_interpreter\n\n")
+
+	result += fmt.Sprintf("Query would be translated to:\n")
+	result += fmt.Sprintf("  - Image collection: %s\n", dataset)
+	if region != "" {
+		result += fmt.Sprintf("  - Filter bounds: %s\n", region)
+	}
+	if timeStart != "" {
+		result += fmt.Sprintf("  - Filter date: %s to %s\n", timeStart, timeEnd)
+	}
+	result += fmt.Sprintf("  - Natural language: %s\n", query)
+
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: result}},
+	}, nil
+}
+
+func (s *Server) toolPreferenceGet(args map[string]interface{}) (*toolCallResult, error) {
+	key, err := requireString(args, "key")
+	if err != nil {
+		return nil, err
+	}
+	userID := optionalString(args, "user_id")
+	if userID == "" {
+		userID = "default"
+	}
+	category := optionalString(args, "category")
+	if category == "" {
+		category = "custom"
+	}
+
+	pm := memory.GetProfileManager()
+	profile := pm.GetProfile(userID)
+	value, confidence, ok := profile.GetPreference(memory.PreferenceCategory(category), key)
+	if !ok {
+		return &toolCallResult{
+			Content: []content{{Type: "text", Text: fmt.Sprintf("No preference found for [%s:%s]", category, key)}},
+		}, nil
+	}
+
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: fmt.Sprintf("%s (confidence: %.0f%%)", value, confidence*100)}},
+	}, nil
+}
+
+func (s *Server) toolPreferenceSet(args map[string]interface{}) (*toolCallResult, error) {
+	key, err := requireString(args, "key")
+	if err != nil {
+		return nil, err
+	}
+	value, err := requireString(args, "value")
+	if err != nil {
+		return nil, err
+	}
+	userID := optionalString(args, "user_id")
+	if userID == "" {
+		userID = "default"
+	}
+	category := optionalString(args, "category")
+	if category == "" {
+		category = "custom"
+	}
+	isLearn := optionalBool(args, "learn", false)
+
+	pm := memory.GetProfileManager()
+	profile := pm.GetProfile(userID)
+
+	if isLearn {
+		profile.LearnFromInteraction(userID, category, key, value, "mcp")
+	} else {
+		profile.SetPreference(memory.PreferenceCategory(category), key, value, "mcp", 1.0)
+	}
+	pm.Save(userID)
+
+	mode := "set"
+	if isLearn {
+		mode = "learned"
+	}
+	return &toolCallResult{
+		Content: []content{{Type: "text", Text: fmt.Sprintf("Preference %s: [%s:%s] = %s", mode, category, key, value)}},
+	}, nil
 }

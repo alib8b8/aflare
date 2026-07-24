@@ -4,7 +4,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -124,8 +123,6 @@ type ProviderManager struct {
 	mu          sync.RWMutex
 	providers   []*Provider
 	healthCheck map[string]time.Time
-	rand        *rand.Rand
-	randMu      sync.Mutex
 	onFallback  atomic.Value // func(from, to string)
 }
 
@@ -134,7 +131,6 @@ func NewProviderManager() *ProviderManager {
 	return &ProviderManager{
 		providers:   make([]*Provider, 0),
 		healthCheck: make(map[string]time.Time),
-		rand:        rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
