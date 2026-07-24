@@ -471,7 +471,6 @@ llm-box 在多个平台同步，欢迎在您常用的平台关注和贡献：
 |------|------|
 | **GitHub** | https://github.com/alib8b8/llm-box |
 | **GitCode / AtomGit** | https://gitcode.com/llm-box/llm-box |
-| **Gitee** | https://gitee.com/llm-box/llm-box |
 
 ---
 

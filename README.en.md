@@ -471,7 +471,6 @@ llm-box is synced across multiple platforms — follow and contribute on your pr
 |----------|------|
 | **GitHub** | https://github.com/alib8b8/llm-box |
 | **GitCode / AtomGit** | https://gitcode.com/llm-box/llm-box |
-| **Gitee** | https://gitee.com/llm-box/llm-box |
 
 ---
 
