@@ -47,7 +47,6 @@
 
 ## 📋 Table of Contents
 
-- [🏆 Awards &amp; Certifications](#-awards--certifications)
 - [🚀 Quick Start](#-quick-start)
 - [✨ Core Features](#-core-features)
 - [🤖 Agent Nodes](#-agent-nodes)
@@ -63,15 +62,6 @@
 - [🤝 Contributing](#-contributing)
 - [📦 Code Hosting](#-code-hosting)
 - [📄 License](#-license)
-
----
-
-## 🏆 Awards &amp; Certifications
-
-| Award | Issued By |
-|-------|-----------|
-| **GitCode G-Star Quality Open Source Project** | GitCode / AtomGit |
-| **OpenAtom Open Source Foundation** | OpenAtom Foundation |
 
 ---
 
