@@ -47,6 +47,7 @@
 
 ## 📋 Table of Contents
 
+- [🏆 Awards &amp; Certifications](#-awards--certifications)
 - [🚀 Quick Start](#-quick-start)
 - [✨ Core Features](#-core-features)
 - [🤖 Agent Nodes](#-agent-nodes)
@@ -57,8 +58,20 @@
 - [🛠️ CLI Commands](#-cli-commands)
 - [🏗️ Architecture](#-architecture)
 - [🗺️ Roadmap](#-roadmap)
+- [🌟 Featured Integrations](#-featured-integrations)
+- [📖❓ FAQ](#-faq)
 - [🤝 Contributing](#-contributing)
+- [📦 Code Hosting](#-code-hosting)
 - [📄 License](#-license)
+
+---
+
+## 🏆 Awards &amp; Certifications
+
+| Award | Issued By |
+|-------|-----------|
+| **GitCode G-Star Quality Open Source Project** | GitCode / AtomGit |
+| **OpenAtom Open Source Foundation** | OpenAtom Foundation |
 
 ---
 
@@ -397,6 +410,68 @@ llm-box help                   Show full help
 | **v1.0** | 📅 Q3 2026 | Stable API, full documentation, LTS |
 
 📖 [Full Roadmap &rarr;](ROADMAP.md)
+
+---
+
+## 🌟 Featured Integrations
+
+Excellent open-source projects built with llm-box:
+
+| Project | Description |
+|---------|-------------|
+| [AI News Assistant]() | AI news aggregation and summary system based on llm-box workflows |
+| [Code Review Agent]() | Automated code review tool leveraging code knowledge graph nodes |
+| [Research Assistant]() | Academic research workflow combining researcher + knowledge_graph nodes |
+
+> If your project uses llm-box, feel free to submit a PR to add it here!
+
+---
+
+## 📖❓ FAQ
+
+### 1. How is llm-box different from other agent frameworks?
+
+llm-box focuses on the **combination of deterministic workflows and AI agents**: workflows ensure reliable and reproducible execution, while agent nodes provide intelligent reasoning capabilities. We don't rely on a single model provider, supporting 22+ models with 5 routing strategies. The core is written in Go with zero dependencies — fast startup and low memory footprint.
+
+### 2. Which large language models are supported?
+
+Currently supporting **22+ models** across mainstream providers:
+- **Domestic**: SenseNova, Ant Ling, AndesGPT (OPPO), DeepSeek, Qwen (Alibaba)
+- **International**: OpenAI, Anthropic Claude, Google Gemini, Inkling (Thinking Machines)
+- **On-device**: llama.cpp, ONNX Runtime, SenseNova U1 (INT4/INT8)
+
+### 3. Can it be used in enterprise environments?
+
+Absolutely. llm-box uses the MIT license and provides:
+- **Tiered security configuration** (L0-L3), supporting security gradients from development to production
+- **Secret redaction** + **outbound data monitoring** to prevent data leaks
+- **Audit logging** for traceability of all operations
+- **Distributed circuit breakers** for system stability
+
+### 4. How do I extend with custom nodes?
+
+llm-box supports three extension methods:
+- **Plugin System**: Install plugins from local/git/URL/market with sandbox isolation
+- **MCP Protocol**: Connect external tools via Model Context Protocol
+- **Custom Nodes**: Implement standard interfaces in any language — see [custom nodes guide](docs/custom-nodes.md)
+
+### 5. What's the long-term roadmap?
+
+Short-term (v0.6-v0.9): Complete agent team collaboration, multimodal capabilities, performance optimization
+Long-term (v1.0+): Stable API, LTS releases, enterprise support, more hardware adaptation (Ascend/Cambricon/Hygon)
+See [Roadmap →](#-roadmap) for details.
+
+---
+
+## 📦 Code Hosting
+
+llm-box is synced across multiple platforms — follow and contribute on your preferred platform:
+
+| Platform | Link |
+|----------|------|
+| **GitHub** | https://github.com/alib8b8/llm-box |
+| **GitCode / AtomGit** | https://gitcode.com/llm-box/llm-box |
+| **Gitee** | https://gitee.com/llm-box/llm-box |
 
 ---
 

@@ -1,6 +1,6 @@
 module github.com/alib8b8/llm-box
 
-go 1.25.1
+go 1.25.12
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
