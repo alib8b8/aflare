@@ -813,7 +813,15 @@ func joinSources(srcs []SearchSource) string {
 }
 
 func httpGet(ctx context.Context, urlStr, userAgent string) (string, error) {
-	client := &http.Client{Timeout: 15 * time.Second}
+	if err := validateURL(urlStr); err != nil {
+		return "", fmt.Errorf("URL validation failed: %w", err)
+	}
+
+	client := &http.Client{
+		Timeout:       15 * time.Second,
+		Transport:     safeHTTPClient.Transport,
+		CheckRedirect: httpRedirectValidator(validateURL),
+	}
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
 		return "", err
@@ -835,7 +843,7 @@ func httpGet(ctx context.Context, urlStr, userAgent string) (string, error) {
 		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxHTTPResponseSize))
 	if err != nil {
 		return "", err
 	}

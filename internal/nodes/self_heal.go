@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -118,9 +117,13 @@ func runCmd(cmdStr string) (string, int, error) {
 	if len(parts) == 0 {
 		return "", -1, fmt.Errorf("empty command")
 	}
+	return runCmdArgs(parts[0], parts[1:]...)
+}
+
+func runCmdArgs(name string, args ...string) (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
+	cmd := exec.CommandContext(ctx, name, args...)
 	out, err := cmd.CombinedOutput()
 	exitCode := 0
 	if err != nil {
@@ -135,7 +138,7 @@ func runCmd(cmdStr string) (string, int, error) {
 
 func checkGofmt(autoFix bool) HealCheck {
 	c := HealCheck{Name: "gofmt", Status: "ok"}
-	out, code, _ := runCmd("gofmt -l .")
+	out, _, _ := runCmd("gofmt -l .")
 	unformatted := []string{}
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		line = strings.TrimSpace(line)
@@ -148,13 +151,12 @@ func checkGofmt(autoFix bool) HealCheck {
 		c.Issue = fmt.Sprintf("%d files not formatted: %s", len(unformatted), strings.Join(unformatted, ", "))
 		if autoFix {
 			for _, f := range unformatted {
-				runCmd("gofmt -w " + f)
+				runCmdArgs("gofmt", "-w", f)
 			}
 			c.Fixed = true
 			c.Message = fmt.Sprintf("Auto-formatted %d files", len(unformatted))
 		}
 	}
-	_ = code
 	return c
 }
 
@@ -214,7 +216,6 @@ func checkGoTest(autoFix bool) HealCheck {
 			c.Message = "Test failures require manual review"
 		}
 	}
-	_ = runtime.Version()
 	return c
 }
 
