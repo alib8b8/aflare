@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -50,7 +51,7 @@ func setupClaudeCodeMCP(exePath string) (*MCPSetupResult, error) {
 	configDir := filepath.Join(home, ".claude")
 	configFile := filepath.Join(configDir, "claude_desktop_config.json")
 
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -65,13 +66,13 @@ func setupClaudeCodeMCP(exePath string) (*MCPSetupResult, error) {
 
 	existing, err := os.ReadFile(configFile)
 	if err == nil && len(existing) > 0 {
-		merged, mergeErr := mergeMCPConfig(string(existing), exePath)
+		merged, mergeErr := mergeMCPConfigSafe(existing, exePath)
 		if mergeErr == nil {
 			config = merged
 		}
 	}
 
-	if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
+	if err := os.WriteFile(configFile, []byte(config), 0600); err != nil {
 		return nil, fmt.Errorf("failed to write config: %w", err)
 	}
 
@@ -100,7 +101,7 @@ func setupOpenCodeMCP(exePath string) (*MCPSetupResult, error) {
 
 	configFile := filepath.Join(configDir, "mcp.json")
 
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -115,13 +116,13 @@ func setupOpenCodeMCP(exePath string) (*MCPSetupResult, error) {
 
 	existing, err := os.ReadFile(configFile)
 	if err == nil && len(existing) > 0 {
-		merged, mergeErr := mergeMCPConfig(string(existing), exePath)
+		merged, mergeErr := mergeMCPConfigSafe(existing, exePath)
 		if mergeErr == nil {
 			config = merged
 		}
 	}
 
-	if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
+	if err := os.WriteFile(configFile, []byte(config), 0600); err != nil {
 		return nil, fmt.Errorf("failed to write config: %w", err)
 	}
 
@@ -138,24 +139,37 @@ func escapeJSONString(s string) string {
 	return s
 }
 
-func mergeMCPConfig(existing string, exePath string) (string, error) {
-	if !strings.Contains(existing, `"llm-box"`) {
-		insertPos := strings.Index(existing, `"mcpServers"`)
-		if insertPos == -1 {
-			return "", fmt.Errorf("no mcpServers found")
-		}
-		bracePos := strings.Index(existing[insertPos:], "{")
-		if bracePos == -1 {
-			return "", fmt.Errorf("invalid mcpServers format")
-		}
-		entry := fmt.Sprintf(`
-    "llm-box": {
-      "command": "%s",
-      "args": ["--mcp-server"]
-    },`, escapeJSONString(exePath))
-		return existing[:insertPos+bracePos+1] + entry + existing[insertPos+bracePos+1:], nil
+type mcpConfig struct {
+	MCPServers map[string]mcpServerEntry `json:"mcpServers"`
+}
+
+type mcpServerEntry struct {
+	Command string   `json:"command"`
+	Args    []string `json:"args"`
+}
+
+func mergeMCPConfigSafe(existing []byte, exePath string) (string, error) {
+	var cfg mcpConfig
+	if err := json.Unmarshal(existing, &cfg); err != nil {
+		return "", fmt.Errorf("failed to parse existing config: %w", err)
 	}
-	return existing, nil
+
+	if cfg.MCPServers == nil {
+		cfg.MCPServers = make(map[string]mcpServerEntry)
+	}
+
+	if _, exists := cfg.MCPServers["llm-box"]; !exists {
+		cfg.MCPServers["llm-box"] = mcpServerEntry{
+			Command: exePath,
+			Args:    []string{"--mcp-server"},
+		}
+	}
+
+	result, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal config: %w", err)
+	}
+	return string(result), nil
 }
 
 type SkillInstallResult struct {
@@ -220,7 +234,7 @@ func installOpenCodeSkills(home, source string) (*SkillInstallResult, error) {
 }
 
 func installSkillsToDir(skillsDir, source, agentName string) (*SkillInstallResult, error) {
-	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+	if err := os.MkdirAll(skillsDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create skills directory: %w", err)
 	}
 
@@ -263,7 +277,7 @@ func copyDir(src, dst string) error {
 		return err
 	}
 
-	if err := os.MkdirAll(dst, 0755); err != nil {
+	if err := os.MkdirAll(dst, 0700); err != nil {
 		return err
 	}
 
@@ -280,7 +294,7 @@ func copyDir(src, dst string) error {
 			if err != nil {
 				return err
 			}
-			if err := os.WriteFile(dstPath, data, 0644); err != nil {
+			if err := os.WriteFile(dstPath, data, 0600); err != nil {
 				return err
 			}
 		}
