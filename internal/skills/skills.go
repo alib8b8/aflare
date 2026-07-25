@@ -18,25 +18,25 @@ type SkillIO struct {
 }
 
 type SkillMeta struct {
-	ID           string     `json:"id"`
-	Name         string     `json:"name"`
-	Version      string     `json:"version"`
-	Description  string     `json:"description"`
-	Author       string     `json:"author"`
-	Category     string     `json:"category"`
-	Tags         []string   `json:"tags"`
-	Keywords     []string   `json:"keywords"`
-	Inputs       []SkillIO  `json:"inputs"`
-	Outputs      []SkillIO  `json:"outputs"`
-	Dependencies []string   `json:"dependencies"`
-	Path         string     `json:"-"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Version      string    `json:"version"`
+	Description  string    `json:"description"`
+	Author       string    `json:"author"`
+	Category     string    `json:"category"`
+	Tags         []string  `json:"tags"`
+	Keywords     []string  `json:"keywords"`
+	Inputs       []SkillIO `json:"inputs"`
+	Outputs      []SkillIO `json:"outputs"`
+	Dependencies []string  `json:"dependencies"`
+	Path         string    `json:"-"`
 }
 
 type SkillRegistry struct {
-	mu        sync.RWMutex
-	skills    map[string]*SkillMeta
-	baseDir   string
-	indexed   bool
+	mu      sync.RWMutex
+	skills  map[string]*SkillMeta
+	baseDir string
+	indexed bool
 }
 
 const (
