@@ -562,7 +562,13 @@ func (c *Coordinator) dispatchTask(nodeID string, task *Task) {
 	})
 
 	go func() {
-		resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewBuffer(data))
+		if err != nil {
+			logger.Error("Failed to create request", "error", err)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := safeHTTPClient.Do(req)
 		if err != nil {
 			logger.Error("Failed to dispatch task", "error", err)
 			// 分派失败视为节点故障，记录熔断失败
