@@ -1,0 +1,114 @@
+name: Experiment Design
+# Rigorous experimental design for scientific research
+# Usage: llm-box install research/experiment-design
+#        llm-box run experiment-design/workflow.yaml
+
+steps:
+  - node: supervisor
+    params:
+      strategy: sequential
+      domain: research
+      specialists: researcher,planner,critic,evaluator,data_analyst
+    input: |
+      Design a rigorous experiment for:
+
+      Research question: {{ .params.research_question }}
+      Hypothesis: {{ .params.hypothesis }}
+      Field: {{ .params.field }}
+      Resources available: {{ .params.resources }}
+      Timeline: {{ .params.timeline }}
+
+      Produce a complete experiment design covering:
+
+      1. STUDY DESIGN
+         - Type: RCT, quasi-experiment, observational, mixed methods
+         - Between-subjects vs within-subjects
+         - Control groups and conditions
+         - Counterbalancing and randomization scheme
+
+      2. VARIABLES
+         - Independent variables (manipulated)
+         - Dependent variables (measured)
+         - Control variables (held constant)
+         - Confounding variables (potential threats)
+         - Operational definitions for each variable
+
+      3. PARTICIPANTS / SAMPLES
+         - Target population
+         - Sample size with power analysis
+         - Inclusion/exclusion criteria
+         - Recruitment method
+         - Randomization procedure
+
+      4. MATERIALS & APPARATUS
+         - Equipment, software, instruments
+         - Stimuli and test materials
+         - Validation of measures
+
+      5. PROCEDURE
+         - Step-by-step protocol
+         - Timing and sequence
+         - Instructions to participants
+         - Debriefing procedure
+
+      6. DATA ANALYSIS PLAN
+         - Statistical tests planned
+         - Software and packages
+         - Outlier handling criteria
+         - Multiple comparison correction
+         - Planned contrasts/post-hoc tests
+
+      7. ETHICAL CONSIDERATIONS
+         - IRB requirements
+         - Informed consent
+         - Confidentiality/anonymity
+         - Risk/benefit assessment
+         - Data retention plan
+
+      8. VALIDITY & RELIABILITY
+         - Internal validity threats
+         - External validity considerations
+         - Construct validity
+         - Reliability of measures
+
+      9. TIMELINE & BUDGET
+         - Milestones
+         - Resource allocation
+         - Contingency plan
+
+      10. PILOT TESTING
+         - What to pilot
+         - Criteria for proceeding
+         - How to iterate
+    id: design
+
+  - node: verify
+    params:
+      verify_type: factual
+      output_format: detailed
+    input: |
+      Review this experiment design for methodological rigor:
+
+      {{ .design }}
+
+      Check:
+      1. Is the design appropriate for the research question?
+      2. Are there obvious confounds not addressed?
+      3. Is the sample size justified?
+      4. Are the statistical plans appropriate?
+      5. Are ethical considerations adequate?
+      6. Are validity threats properly addressed?
+      7. Is the procedure detailed enough to be replicable?
+    id: verification
+
+  - node: file_write
+    params:
+      path: experiment-design.md
+    input: design
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: design
+    id: notify

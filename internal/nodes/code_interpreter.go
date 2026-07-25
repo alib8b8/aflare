@@ -24,18 +24,18 @@ func (n *CodeInterpreterNode) Name() string {
 }
 
 func (n *CodeInterpreterNode) Description() string {
-	return "Execute Python code in a sandboxed environment with file I/O"
+	return "Execute Python/Node.js/Rust code in a sandboxed environment with file I/O"
 }
 
 func (n *CodeInterpreterNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "code_interpreter",
-		Description: "Execute Python code in a sandboxed environment with file I/O",
-		Input:       "string - stdin for the Python code (optional)",
+		Description: "Execute Python/Node.js/Rust code in a sandboxed environment with file I/O",
+		Input:       "string - stdin for the code (optional)",
 		Output:      "string - stdout, stderr, and generated files",
 		Params: []ParamSchema{
-			{Name: "code", Type: "string", Description: "Python code to execute", Required: true},
-			{Name: "language", Type: "string", Description: "Programming language (default: python)", Required: false, Default: "python"},
+			{Name: "code", Type: "string", Description: "Code to execute", Required: true},
+			{Name: "language", Type: "string", Description: "Programming language: python, nodejs, rust (default: python)", Required: false, Default: "python"},
 			{Name: "timeout", Type: "string", Description: "Execution timeout (default based on security level)", Required: false},
 			{Name: "work_dir", Type: "string", Description: "Working directory for code execution (default: temp dir)", Required: false},
 			{Name: "save_outputs", Type: "string", Description: "If true, save output files to work_dir (default: true)", Required: false, Default: "true"},
@@ -113,8 +113,18 @@ func (n *CodeInterpreterNode) Execute(ctx context.Context, input string, params 
 		if err != nil && strings.Contains(err.Error(), "DeadlineExceeded") {
 			timedOut = true
 		}
+	case "node", "nodejs", "javascript", "js":
+		result, err = runNode(ctx, code, workDir, timeout, input, allowNetwork)
+		if err != nil && strings.Contains(err.Error(), "DeadlineExceeded") {
+			timedOut = true
+		}
+	case "rust", "rs":
+		result, err = runRust(ctx, code, workDir, timeout, input, allowNetwork)
+		if err != nil && strings.Contains(err.Error(), "DeadlineExceeded") {
+			timedOut = true
+		}
 	default:
-		return "", fmt.Errorf("unsupported language: %s (currently only python is supported)", language)
+		return "", fmt.Errorf("unsupported language: %s (supported: python, nodejs, rust)", language)
 	}
 
 	durationMs := time.Since(startTime).Milliseconds()
@@ -223,6 +233,219 @@ urllib.request.urlopen = _block_urlopen
 	return result, nil
 }
 
+func runNode(ctx context.Context, code, workDir string, timeout time.Duration, stdin string, allowNetwork bool) (string, error) {
+	scriptPath := filepath.Join(workDir, "script.js")
+
+	networkDisabledCode := ""
+	if !allowNetwork {
+		networkDisabledCode = `
+const _origFetch = globalThis.fetch;
+const _origHttp = require('http');
+const _origHttps = require('https');
+function _blockNet(...a) { throw new Error('Network access disabled by security policy'); }
+globalThis.fetch = _blockNet;
+require('http').request = _blockNet;
+require('http').get = _blockNet;
+require('https').request = _blockNet;
+require('https').get = _blockNet;
+`
+	}
+
+	finalCode := networkDisabledCode + code
+	if err := os.WriteFile(scriptPath, []byte(finalCode), 0644); err != nil {
+		return "", fmt.Errorf("failed to write script: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	var cmd *exec.Cmd
+	if bwrap, err := exec.LookPath("bwrap"); err == nil {
+		roBinds := []string{}
+		for _, p := range []string{"/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc/ld.so.cache", "/etc/alternatives"} {
+			if _, err := os.Stat(p); err == nil {
+				roBinds = append(roBinds, "--ro-bind", p, p)
+			}
+		}
+		args := []string{}
+		args = append(args, roBinds...)
+		args = append(args,
+			"--dev", "/dev",
+			"--proc", "/proc",
+			"--bind", workDir, workDir,
+			"--chdir", workDir,
+			"--unshare-all",
+			"--share-net",
+		)
+		if !allowNetwork {
+			args[len(args)-1] = "--unshare-net"
+		}
+		args = append(args, "--", "node", scriptPath)
+		cmd = exec.CommandContext(ctx, bwrap, args...)
+	} else {
+		cmd = exec.CommandContext(ctx, "node", scriptPath)
+	}
+	cmd.Dir = workDir
+	cmd.Stdin = strings.NewReader(stdin)
+
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+
+	result := ""
+	if stdoutStr := stdout.String(); stdoutStr != "" {
+		result += stdoutStr
+	}
+	if stderrStr := stderr.String(); stderrStr != "" {
+		if result != "" {
+			result += "\n"
+		}
+		result += "[stderr] " + stderrStr
+	}
+
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			result += fmt.Sprintf("\n[Error] Execution timed out after %s", timeout)
+		} else if result == "" {
+			return "", fmt.Errorf("code execution failed: %w", err)
+		} else {
+			result += fmt.Sprintf("\n[Error] %v", err)
+		}
+	}
+
+	return result, nil
+}
+
+func runRust(ctx context.Context, code, workDir string, timeout time.Duration, stdin string, allowNetwork bool) (string, error) {
+	srcPath := filepath.Join(workDir, "main.rs")
+	binPath := filepath.Join(workDir, "program")
+
+	networkCrateBlock := ""
+	if !allowNetwork {
+		networkCrateBlock = `
+#[allow(dead_code)]
+mod net_block {
+    use std::io;
+    fn blocked() -> io::Result<std::net::TcpStream> {
+        Err(io::Error::new(io::ErrorKind::PermissionDenied, "Network access disabled by security policy"))
+    }
+}
+`
+	}
+
+	finalCode := networkCrateBlock + code
+	if err := os.WriteFile(srcPath, []byte(finalCode), 0644); err != nil {
+		return "", fmt.Errorf("failed to write source: %w", err)
+	}
+
+	compileTimeout := timeout
+	compileCtx, compileCancel := context.WithTimeout(ctx, compileTimeout)
+	defer compileCancel()
+
+	var compileCmd *exec.Cmd
+	if bwrap, err := exec.LookPath("bwrap"); err == nil {
+		roBinds := []string{}
+		for _, p := range []string{"/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc/ld.so.cache", "/etc/alternatives", filepath.Dir(srcPath)} {
+			if _, err := os.Stat(p); err == nil {
+				roBinds = append(roBinds, "--ro-bind", p, p)
+			}
+		}
+		args := []string{}
+		args = append(args, roBinds...)
+		args = append(args,
+			"--dev", "/dev",
+			"--proc", "/proc",
+			"--bind", workDir, workDir,
+			"--chdir", workDir,
+			"--unshare-all",
+		)
+		if allowNetwork {
+			args = append(args, "--share-net")
+		} else {
+			args = append(args, "--unshare-net")
+		}
+		args = append(args, "--", "rustc", "-o", binPath, srcPath)
+		compileCmd = exec.CommandContext(compileCtx, bwrap, args...)
+	} else {
+		compileCmd = exec.CommandContext(compileCtx, "rustc", "-o", binPath, srcPath)
+	}
+	compileCmd.Dir = workDir
+
+	var compileStderr strings.Builder
+	compileCmd.Stderr = &compileStderr
+	if err := compileCmd.Run(); err != nil {
+		msg := compileStderr.String()
+		if compileCtx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("Rust compilation timed out after %s", compileTimeout)
+		}
+		return "", fmt.Errorf("Rust compilation failed: %w\n%s", err, msg)
+	}
+
+	runCtx, runCancel := context.WithTimeout(ctx, timeout)
+	defer runCancel()
+
+	var runCmd *exec.Cmd
+	if bwrap, err := exec.LookPath("bwrap"); err == nil {
+		roBinds := []string{}
+		for _, p := range []string{"/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc/ld.so.cache", "/etc/alternatives"} {
+			if _, err := os.Stat(p); err == nil {
+				roBinds = append(roBinds, "--ro-bind", p, p)
+			}
+		}
+		args := []string{}
+		args = append(args, roBinds...)
+		args = append(args,
+			"--dev", "/dev",
+			"--proc", "/proc",
+			"--bind", workDir, workDir,
+			"--chdir", workDir,
+			"--unshare-all",
+		)
+		if allowNetwork {
+			args = append(args, "--share-net")
+		} else {
+			args = append(args, "--unshare-net")
+		}
+		args = append(args, "--", binPath)
+		runCmd = exec.CommandContext(runCtx, bwrap, args...)
+	} else {
+		runCmd = exec.CommandContext(runCtx, binPath)
+	}
+	runCmd.Dir = workDir
+	runCmd.Stdin = strings.NewReader(stdin)
+
+	var stdout, stderr strings.Builder
+	runCmd.Stdout = &stdout
+	runCmd.Stderr = &stderr
+
+	err := runCmd.Run()
+
+	result := ""
+	if stdoutStr := stdout.String(); stdoutStr != "" {
+		result += stdoutStr
+	}
+	if stderrStr := stderr.String(); stderrStr != "" {
+		if result != "" {
+			result += "\n"
+		}
+		result += "[stderr] " + stderrStr
+	}
+
+	if err != nil {
+		if runCtx.Err() == context.DeadlineExceeded {
+			result += fmt.Sprintf("\n[Error] Execution timed out after %s", timeout)
+		} else if result == "" {
+			return "", fmt.Errorf("code execution failed: %w", err)
+		} else {
+			result += fmt.Sprintf("\n[Error] %v", err)
+		}
+	}
+
+	return result, nil
+}
+
 func listGeneratedFiles(dir string) ([]string, error) {
 	var files []string
 	entries, err := os.ReadDir(dir)
@@ -234,7 +457,7 @@ func listGeneratedFiles(dir string) ([]string, error) {
 			continue
 		}
 		name := entry.Name()
-		if name == "script.py" {
+		if name == "script.py" || name == "script.js" || name == "main.rs" || name == "program" {
 			continue
 		}
 		files = append(files, name)

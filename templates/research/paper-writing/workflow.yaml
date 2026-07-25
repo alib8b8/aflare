@@ -1,0 +1,125 @@
+name: Academic Paper Writing
+# Structured academic paper writing with proper formatting
+# Usage: llm-box install research/paper-writing
+#        llm-box run paper-writing/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.notes_file }}"
+    id: notes
+
+  - node: supervisor
+    params:
+      strategy: agency
+      domain: research
+      specialists: researcher,creative_writer,critic,evaluator,technical_writer
+    input: |
+      Write an academic paper based on:
+
+      Research notes and data:
+      {{ .notes }}
+
+      Target venue: {{ .params.venue | default "journal" }}
+      Field: {{ .params.field }}
+      Word count target: {{ .params.word_count | default "8000" }}
+
+      Paper structure (IMRAD + extensions):
+
+      1. TITLE PAGE
+         - Clear, specific title
+         - Authors and affiliations
+         - Keywords (5-8)
+         - Word count
+
+      2. ABSTRACT (250 words)
+         - Background/context
+         - Research gap/problem
+         - Methods
+         - Key findings
+         - Implications
+
+      3. INTRODUCTION (15-20% of paper)
+         - Hook: why this topic matters
+         - Literature context and gap
+         - Research questions/hypotheses
+         - Overview of approach
+         - Contributions statement (3-5 points)
+         - Paper roadmap
+
+      4. RELATED WORK / LITERATURE REVIEW (15-20%)
+         - Thematic organization (not chronological)
+         - Critical synthesis (not just summary)
+         - Identification of research gap
+         - Positioning of this work
+
+      5. METHODOLOGY (20-25%)
+         - Research design
+         - Participants/samples with demographics
+         - Materials/apparatus
+         - Procedure (step-by-step, replicable)
+         - Data analysis approach
+         - Ethical considerations
+
+      6. RESULTS (20-25%)
+         - Present findings objectively
+         - Tables and figures properly numbered
+         - Statistical results in proper format
+         - Effect sizes alongside p-values
+         - Do not interpret here
+
+      7. DISCUSSION (15-20%)
+         - Interpretation of results
+         - Connection to literature
+         - Implications (theoretical/practical)
+         - Limitations (honest and specific)
+         - Future research directions
+         - Broader impact
+
+      8. CONCLUSION (5%)
+         - Brief summary
+         - Take-home message
+         - Final thought
+
+      9. REFERENCES
+         - Consistent citation style
+         - All in-text citations matched
+
+      Writing quality:
+      - Clear, concise, academic tone
+      - Active voice where appropriate
+      - Logical flow between paragraphs
+      - Signposting and transitions
+      - Proper hedging language
+    id: paper
+
+  - node: critic
+    params:
+      provider: ollama
+      model: llama3
+    input: |
+      Review this academic paper for:
+      1. Clarity and logical flow
+      2. Academic tone and style
+      3. Structural completeness
+      4. Citation integrity
+      5. Grammar and spelling
+      6. Argument strength
+      7. Proper hedging
+      8. Contribution clarity
+
+      Paper:
+      {{ .paper }}
+    id: review
+
+  - node: file_write
+    params:
+      path: paper-draft.md
+    input: paper
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: paper
+    id: notify

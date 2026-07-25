@@ -1,10 +1,12 @@
 package nodes
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -20,7 +22,7 @@ func (n *MultimodalNode) Name() string {
 }
 
 func (n *MultimodalNode) Description() string {
-	return "Multimodal analysis: image understanding, OCR, audio transcription (via LLM vision/audio APIs)"
+	return "Multimodal analysis: image understanding, OCR (local tesseract + LLM fallback), audio transcription (via LLM vision/audio APIs)"
 }
 
 func (n *MultimodalNode) Schema() NodeSchema {
@@ -34,6 +36,7 @@ func (n *MultimodalNode) Schema() NodeSchema {
 			{Name: "image_path", Type: "string", Description: "Path to image file (local path or URL)", Required: false},
 			{Name: "image_paths", Type: "string", Description: "Comma-separated paths for compare mode", Required: false},
 			{Name: "audio_path", Type: "string", Description: "Path to audio file for transcription", Required: false},
+			{Name: "lang", Type: "string", Description: "OCR languages for tesseract (default: eng+chi_sim)", Required: false, Default: "eng+chi_sim"},
 			{Name: "provider", Type: "string", Description: "LLM provider with vision support (default: openai)", Required: false, Default: "openai"},
 			{Name: "model", Type: "string", Description: "Vision model name (default: gpt-4o)", Required: false, Default: "gpt-4o"},
 			{Name: "api_key", Type: "string", Description: "API key", Required: false},
@@ -69,11 +72,17 @@ func (n *MultimodalNode) Execute(ctx context.Context, input string, params map[s
 	}
 
 	switch mode {
-	case "image", "describe", "ocr":
+	case "image", "describe":
 		if imagePath == "" {
 			return "", fmt.Errorf("image_path is required for mode %s", mode)
 		}
 		return n.analyzeImage(ctx, imagePath, prompt, provider, model, apiKey, endpoint, detail, mode, outputFormat)
+	case "ocr":
+		if imagePath == "" {
+			return "", fmt.Errorf("image_path is required for mode ocr")
+		}
+		lang := getParam(params, "lang", "eng+chi_sim")
+		return n.ocrImage(ctx, imagePath, prompt, lang, provider, model, apiKey, endpoint, detail, outputFormat)
 	case "compare":
 		if imagePaths == "" && imagePath == "" {
 			return "", fmt.Errorf("image_paths is required for compare mode")
@@ -113,6 +122,42 @@ func (n *MultimodalNode) analyzeImage(ctx context.Context, imagePath, prompt, pr
 	}
 
 	return formatMultimodalOutput(content, imagePath, mode, outputFormat), nil
+}
+
+func (n *MultimodalNode) ocrImage(ctx context.Context, imagePath, prompt, lang, provider, model, apiKey, endpoint, detail, outputFormat string) (string, error) {
+	safePath, err := validateReadPath(imagePath)
+	if err == nil {
+		if _, statErr := os.Stat(safePath); statErr == nil {
+			if tess, lookErr := exec.LookPath("tesseract"); lookErr == nil {
+				args := []string{safePath, "stdout", "-l", lang, "--oem", "1", "--psm", "6"}
+				cmd := exec.CommandContext(ctx, tess, args...)
+				var stdout, stderr bytes.Buffer
+				cmd.Stdout = &stdout
+				cmd.Stderr = &stderr
+				if runErr := cmd.Run(); runErr == nil {
+					result := strings.TrimSpace(stdout.String())
+					if result != "" {
+						return formatMultimodalOutput("[Local OCR via tesseract]\n\n"+result, imagePath, "ocr", outputFormat), nil
+					}
+				}
+			}
+		}
+	}
+
+	systemPrompt := "You are an OCR expert. Extract all visible text from the image accurately. Preserve formatting where possible."
+	imageURL, err := resolveImageURL(imagePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve image: %w", err)
+	}
+	ocrPrompt := prompt
+	if ocrPrompt == "" {
+		ocrPrompt = "Extract all text from this image. Return only the text content."
+	}
+	content, err := callVisionLLM(ctx, provider, model, apiKey, endpoint, imageURL, ocrPrompt, systemPrompt, detail)
+	if err != nil {
+		return "", err
+	}
+	return formatMultimodalOutput(content, imagePath, "ocr", outputFormat), nil
 }
 
 func (n *MultimodalNode) compareImages(ctx context.Context, imagePaths []string, prompt, provider, model, apiKey, endpoint, detail, outputFormat string) (string, error) {

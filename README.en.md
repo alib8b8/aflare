@@ -154,6 +154,8 @@ llm-box run btc-monitor.yaml
 | **🎯 Natural Language &rarr; YAML** | Describe your needs in one sentence, auto-generate executable workflows. AI only translates, doesn't decide |
 | **📦 Homebrew-like Experience** | One command to install, one command to create, templates at your fingertips. Install workflows like packages |
 | **⚙️ Deterministic Execution** | YAML workflows = deterministic output. No hallucinations, no randomness, same results every time |
+| **🤖 Personal AI Superintelligence** | Your private AI agent running on your laptop. Not SaaS, not cloud — yours |
+| **🔌 Fully Offline Capable** | Works with Ollama — everything runs locally. Works without internet, data never leaves your device |
 | **🔄 Scheduled Execution** | Built-in Cron scheduling. Every 10 minutes, daily, weekly — however you want it |
 | **🧩 100+ Built-in Templates** | BTC monitor, GitHub Star alerts, Arxiv paper summaries, weather reminders… ready to use |
 | **🔌 Plugin System** | Extend like Homebrew taps. `llm-box install btc-monitor` |
