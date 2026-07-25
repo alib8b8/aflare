@@ -52,7 +52,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	command, args, safeMode, dryRun, mcpServer, lang, concise := cli.ParseArgs(os.Args[1:])
+	command, args, safeMode, dryRun, mcpServer, lang, concise, initMCP, initAgent, updateChannel := cli.ParseArgs(os.Args[1:])
 
 	// Set output mode based on --concise flag
 	if concise {
@@ -69,6 +69,52 @@ func main() {
 			fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
 			os.Exit(1)
 		}
+		return
+	}
+
+	if initMCP != "" {
+		result, err := cli.SetupMCP(initMCP)
+		if err != nil {
+			fmt.Printf("❌ MCP setup failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ MCP configured for %s\n", result.Agent)
+		fmt.Printf("   Config: %s\n", result.ConfigPath)
+		fmt.Printf("   Command: %s\n", result.Command)
+		return
+	}
+
+	if initAgent != "" {
+		result, err := cli.InstallSkills(initAgent)
+		if err != nil {
+			fmt.Printf("❌ Skill installation failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ Skills installed for %s\n", result.Agent)
+		fmt.Printf("   Path: %s\n", result.SkillPath)
+		if result.Installed {
+			fmt.Println("   Status: skills copied successfully")
+		} else {
+			fmt.Println("   Status: skills directory ready (no source templates found)")
+		}
+		return
+	}
+
+	if updateChannel != "" {
+		config, err := autoupgrade.LoadConfig()
+		if err != nil {
+			fmt.Printf("❌ Failed to load config: %v\n", err)
+			os.Exit(1)
+		}
+		if err := autoupgrade.SetChannel(config, updateChannel); err != nil {
+			fmt.Printf("❌ Failed to set channel: %v\n", err)
+			os.Exit(1)
+		}
+		if err := autoupgrade.SaveConfig(config); err != nil {
+			fmt.Printf("❌ Failed to save config: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ Update channel set to: %s\n", updateChannel)
 		return
 	}
 
@@ -121,6 +167,9 @@ func main() {
 		return
 	case "autoupgrade", "au":
 		handleAutoUpgrade(args)
+		return
+	case "init":
+		handleInit(args)
 		return
 	case "-h", "--help", "help":
 		fmt.Println(cli.PrintUsage())
@@ -638,4 +687,107 @@ func updateConfigKey(config *autoupgrade.UpgradeConfig, key, value string) {
 	case "rollback", "rollback_on_failure":
 		config.RollbackOnFailure = strings.ToLower(value) == "true"
 	}
+}
+
+func handleInit(args []string) {
+	mcpTarget := ""
+	agentTarget := ""
+	channel := ""
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--mcp":
+			if i+1 < len(args) {
+				mcpTarget = args[i+1]
+				i++
+			} else {
+				mcpTarget = "all"
+			}
+		case "--agent":
+			if i+1 < len(args) {
+				agentTarget = args[i+1]
+				i++
+			} else {
+				agentTarget = "all"
+			}
+		case "--channel":
+			if i+1 < len(args) {
+				channel = args[i+1]
+				i++
+			}
+		case "--help", "-h":
+			printInitUsage()
+			return
+		default:
+			if strings.HasPrefix(args[i], "--mcp=") {
+				mcpTarget = strings.TrimPrefix(args[i], "--mcp=")
+			} else if strings.HasPrefix(args[i], "--agent=") {
+				agentTarget = strings.TrimPrefix(args[i], "--agent=")
+			} else if strings.HasPrefix(args[i], "--channel=") {
+				channel = strings.TrimPrefix(args[i], "--channel=")
+			}
+		}
+	}
+
+	if mcpTarget == "" && agentTarget == "" && channel == "" {
+		printInitUsage()
+		os.Exit(1)
+	}
+
+	if mcpTarget != "" {
+		result, err := cli.SetupMCP(mcpTarget)
+		if err != nil {
+			fmt.Printf("❌ MCP setup failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ MCP configured for %s\n", result.Agent)
+		fmt.Printf("   Config: %s\n", result.ConfigPath)
+		fmt.Printf("   Command: %s\n", result.Command)
+	}
+
+	if agentTarget != "" {
+		result, err := cli.InstallSkills(agentTarget)
+		if err != nil {
+			fmt.Printf("❌ Skill installation failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ Skills installed for %s\n", result.Agent)
+		fmt.Printf("   Path: %s\n", result.SkillPath)
+		if result.Installed {
+			fmt.Println("   Status: skills copied successfully")
+		} else {
+			fmt.Println("   Status: skills directory ready (no source templates found)")
+		}
+	}
+
+	if channel != "" {
+		config, err := autoupgrade.LoadConfig()
+		if err != nil {
+			fmt.Printf("❌ Failed to load config: %v\n", err)
+			os.Exit(1)
+		}
+		if err := autoupgrade.SetChannel(config, channel); err != nil {
+			fmt.Printf("❌ Failed to set channel: %v\n", err)
+			os.Exit(1)
+		}
+		if err := autoupgrade.SaveConfig(config); err != nil {
+			fmt.Printf("❌ Failed to save config: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ Update channel set to: %s\n", channel)
+	}
+}
+
+func printInitUsage() {
+	fmt.Println("Usage: llm-box init [options]")
+	fmt.Println("\nInitialize llm-box integration with AI agents and configure settings.")
+	fmt.Println("\nOptions:")
+	fmt.Println("  --mcp <agent>       Setup MCP server configuration (claude-code, opencode, all)")
+	fmt.Println("  --agent <agent>     Install llm-box skills to agent (claude-code, opencode, all)")
+	fmt.Println("  --channel <channel> Set update channel (stable, beta, nightly)")
+	fmt.Println("  -h, --help          Show this help message")
+	fmt.Println("\nExamples:")
+	fmt.Println("  llm-box init --mcp all")
+	fmt.Println("  llm-box init --mcp claude-code --agent all")
+	fmt.Println("  llm-box init --channel beta")
 }

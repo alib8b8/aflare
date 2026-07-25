@@ -11,7 +11,7 @@ import (
 )
 
 func TestParseArgs_BasicCommand(t *testing.T) {
-	cmd, args, safeMode, dryRun, _, _, _ := ParseArgs([]string{"run", "workflow.yaml"})
+	cmd, args, safeMode, dryRun, _, _, _, _, _, _ := ParseArgs([]string{"run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -28,7 +28,7 @@ func TestParseArgs_BasicCommand(t *testing.T) {
 }
 
 func TestParseArgs_WithSafeMode(t *testing.T) {
-	cmd, args, safeMode, _, _, _, _ := ParseArgs([]string{"--safe-mode", "run", "workflow.yaml"})
+	cmd, args, safeMode, _, _, _, _, _, _, _ := ParseArgs([]string{"--safe-mode", "run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -42,7 +42,7 @@ func TestParseArgs_WithSafeMode(t *testing.T) {
 }
 
 func TestParseArgs_SafeModeInMiddle(t *testing.T) {
-	_, args, safeMode, _, _, _, _ := ParseArgs([]string{"run", "--safe-mode", "workflow.yaml"})
+	_, args, safeMode, _, _, _, _, _, _, _ := ParseArgs([]string{"run", "--safe-mode", "workflow.yaml"})
 
 	if len(args) != 1 || args[0] != "workflow.yaml" {
 		t.Errorf("expected args ['workflow.yaml'], got %v", args)
@@ -53,7 +53,7 @@ func TestParseArgs_SafeModeInMiddle(t *testing.T) {
 }
 
 func TestParseArgs_Empty(t *testing.T) {
-	cmd, args, safeMode, _, _, _, _ := ParseArgs([]string{})
+	cmd, args, safeMode, _, _, _, _, _, _, _ := ParseArgs([]string{})
 
 	if cmd != "" {
 		t.Errorf("expected empty command, got %q", cmd)
@@ -67,7 +67,7 @@ func TestParseArgs_Empty(t *testing.T) {
 }
 
 func TestParseArgs_OnlySafeMode(t *testing.T) {
-	cmd, _, safeMode, _, _, _, _ := ParseArgs([]string{"--safe-mode"})
+	cmd, _, safeMode, _, _, _, _, _, _, _ := ParseArgs([]string{"--safe-mode"})
 
 	if cmd != "" {
 		t.Errorf("expected empty command, got %q", cmd)
@@ -78,7 +78,7 @@ func TestParseArgs_OnlySafeMode(t *testing.T) {
 }
 
 func TestParseArgs_WithDryRun(t *testing.T) {
-	cmd, args, _, dryRun, _, _, _ := ParseArgs([]string{"--dry-run", "run", "workflow.yaml"})
+	cmd, args, _, dryRun, _, _, _, _, _, _ := ParseArgs([]string{"--dry-run", "run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -92,7 +92,7 @@ func TestParseArgs_WithDryRun(t *testing.T) {
 }
 
 func TestParseArgs_WithLang(t *testing.T) {
-	cmd, args, _, _, _, lang, _ := ParseArgs([]string{"--lang", "zh", "run", "workflow.yaml"})
+	cmd, args, _, _, _, lang, _, _, _, _ := ParseArgs([]string{"--lang", "zh", "run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -106,7 +106,7 @@ func TestParseArgs_WithLang(t *testing.T) {
 }
 
 func TestParseArgs_WithLangEquals(t *testing.T) {
-	cmd, _, _, _, _, lang, _ := ParseArgs([]string{"--lang=en", "run", "workflow.yaml"})
+	cmd, _, _, _, _, lang, _, _, _, _ := ParseArgs([]string{"--lang=en", "run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -117,7 +117,7 @@ func TestParseArgs_WithLangEquals(t *testing.T) {
 }
 
 func TestParseArgs_WithMcpServer(t *testing.T) {
-	cmd, _, _, _, mcpServer, _, _ := ParseArgs([]string{"--mcp-server"})
+	cmd, _, _, _, mcpServer, _, _, _, _, _ := ParseArgs([]string{"--mcp-server"})
 
 	if cmd != "" {
 		t.Errorf("expected empty command, got %q", cmd)
@@ -140,7 +140,7 @@ func TestParseArgs_HelpFlags(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd, _, _, _, _, _, _ := ParseArgs(tc.args)
+			cmd, _, _, _, _, _, _, _, _, _ := ParseArgs(tc.args)
 			if cmd != tc.expected {
 				t.Errorf("expected command %q, got %q", tc.expected, cmd)
 			}
@@ -149,7 +149,7 @@ func TestParseArgs_HelpFlags(t *testing.T) {
 }
 
 func TestParseArgs_DryShort(t *testing.T) {
-	cmd, args, _, dryRun, _, _, _ := ParseArgs([]string{"--dry", "run", "workflow.yaml"})
+	cmd, args, _, dryRun, _, _, _, _, _, _ := ParseArgs([]string{"--dry", "run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -163,7 +163,7 @@ func TestParseArgs_DryShort(t *testing.T) {
 }
 
 func TestParseArgs_MultipleFlags(t *testing.T) {
-	cmd, args, safeMode, dryRun, mcpServer, lang, concise := ParseArgs([]string{
+	cmd, args, safeMode, dryRun, mcpServer, lang, concise, _, _, _ := ParseArgs([]string{
 		"--safe-mode", "--dry-run", "--lang=zh", "--mcp-server",
 		"run", "workflow.yaml", "arg1", "arg2",
 	})
@@ -192,7 +192,7 @@ func TestParseArgs_MultipleFlags(t *testing.T) {
 }
 
 func TestParseArgs_LangAtEnd(t *testing.T) {
-	cmd, args, _, _, _, lang, _ := ParseArgs([]string{"run", "workflow.yaml", "--lang", "en"})
+	cmd, args, _, _, _, lang, _, _, _, _ := ParseArgs([]string{"run", "workflow.yaml", "--lang", "en"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -206,7 +206,7 @@ func TestParseArgs_LangAtEnd(t *testing.T) {
 }
 
 func TestParseArgs_LangInvalidValue(t *testing.T) {
-	_, _, _, _, _, lang, _ := ParseArgs([]string{"--lang", "invalid-lang", "run", "workflow.yaml"})
+	_, _, _, _, _, lang, _, _, _, _ := ParseArgs([]string{"--lang", "invalid-lang", "run", "workflow.yaml"})
 
 	if lang != "invalid-lang" {
 		t.Errorf("expected lang 'invalid-lang', got %q", lang)
@@ -214,7 +214,7 @@ func TestParseArgs_LangInvalidValue(t *testing.T) {
 }
 
 func TestParseArgs_LangNoValue(t *testing.T) {
-	cmd, args, _, _, _, lang, _ := ParseArgs([]string{"--lang", "run", "workflow.yaml"})
+	cmd, args, _, _, _, lang, _, _, _, _ := ParseArgs([]string{"--lang", "run", "workflow.yaml"})
 
 	if cmd != "workflow.yaml" {
 		t.Errorf("expected command 'workflow.yaml', got %q", cmd)
@@ -228,7 +228,7 @@ func TestParseArgs_LangNoValue(t *testing.T) {
 }
 
 func TestParseArgs_WithConcise(t *testing.T) {
-	cmd, _, _, _, _, _, concise := ParseArgs([]string{"--concise", "run", "workflow.yaml"})
+	cmd, _, _, _, _, _, concise, _, _, _ := ParseArgs([]string{"--concise", "run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)
@@ -239,7 +239,7 @@ func TestParseArgs_WithConcise(t *testing.T) {
 }
 
 func TestParseArgs_WithQuiet(t *testing.T) {
-	cmd, _, _, _, _, _, concise := ParseArgs([]string{"-q", "run", "workflow.yaml"})
+	cmd, _, _, _, _, _, concise, _, _, _ := ParseArgs([]string{"-q", "run", "workflow.yaml"})
 
 	if cmd != "run" {
 		t.Errorf("expected command 'run', got %q", cmd)

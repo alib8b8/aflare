@@ -29,6 +29,38 @@ type UpgradeConfig struct {
 	BackupBeforeUpgrade bool        `yaml:"backup_before_upgrade,omitempty"`
 	RollbackOnFailure   bool        `yaml:"rollback_on_failure,omitempty"`
 	RepositoryURL       string      `yaml:"repository_url,omitempty"`
+	Channel             string      `yaml:"channel,omitempty"`
+}
+
+const (
+	ChannelStable  = "stable"
+	ChannelBeta    = "beta"
+	ChannelNightly = "nightly"
+)
+
+func SetChannel(config *UpgradeConfig, channel string) error {
+	switch strings.ToLower(channel) {
+	case ChannelStable, "":
+		config.Channel = ChannelStable
+	case ChannelBeta:
+		config.Channel = ChannelBeta
+	case ChannelNightly:
+		config.Channel = ChannelNightly
+	default:
+		return fmt.Errorf("unknown channel: %s (supported: stable, beta, nightly)", channel)
+	}
+	return nil
+}
+
+func GetChannelTag(channel string) string {
+	switch strings.ToLower(channel) {
+	case ChannelBeta:
+		return "beta"
+	case ChannelNightly:
+		return "nightly"
+	default:
+		return "latest"
+	}
 }
 
 type UpgradeState struct {

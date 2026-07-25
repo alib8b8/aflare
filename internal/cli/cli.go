@@ -17,12 +17,15 @@ import (
 
 // ParseArgs parses the command-line arguments and returns the command and its arguments.
 // It also detects the --safe-mode, --dry-run, --mcp-server, --lang, and --concise flags.
-func ParseArgs(args []string) (command string, commandArgs []string, safeMode bool, dryRun bool, mcpServer bool, lang string, concise bool) {
+func ParseArgs(args []string) (command string, commandArgs []string, safeMode bool, dryRun bool, mcpServer bool, lang string, concise bool, initMCP string, initAgent string, updateChannel string) {
 	safeMode = false
 	dryRun = false
 	mcpServer = false
 	lang = ""
 	concise = false
+	initMCP = ""
+	initAgent = ""
+	updateChannel = ""
 	var filtered []string
 	skipNext := false
 	for i, arg := range args {
@@ -45,6 +48,31 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 			}
 		} else if strings.HasPrefix(arg, "--lang=") {
 			lang = strings.TrimPrefix(arg, "--lang=")
+		} else if arg == "--mcp" {
+			if i+1 < len(args) {
+				initMCP = args[i+1]
+				skipNext = true
+			} else {
+				initMCP = "all"
+			}
+		} else if strings.HasPrefix(arg, "--mcp=") {
+			initMCP = strings.TrimPrefix(arg, "--mcp=")
+		} else if arg == "--agent" {
+			if i+1 < len(args) {
+				initAgent = args[i+1]
+				skipNext = true
+			} else {
+				initAgent = "all"
+			}
+		} else if strings.HasPrefix(arg, "--agent=") {
+			initAgent = strings.TrimPrefix(arg, "--agent=")
+		} else if arg == "--channel" {
+			if i+1 < len(args) {
+				updateChannel = args[i+1]
+				skipNext = true
+			}
+		} else if strings.HasPrefix(arg, "--channel=") {
+			updateChannel = strings.TrimPrefix(arg, "--channel=")
 		} else {
 			filtered = append(filtered, arg)
 		}
@@ -66,7 +94,7 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 	}
 
 	if len(filtered) == 0 {
-		return "", nil, safeMode, dryRun, mcpServer, lang, concise
+		return "", nil, safeMode, dryRun, mcpServer, lang, concise, initMCP, initAgent, updateChannel
 	}
 
 	command = filtered[0]
@@ -80,7 +108,7 @@ func ValidateCommand(command string) error {
 		return fmt.Errorf("no command provided")
 	}
 	switch command {
-	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "version", "--version", "-v", "self-update", "update", "autoupgrade", "au":
+	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "version", "--version", "-v", "self-update", "update", "autoupgrade", "au", "init", "webui":
 		return nil
 	}
 	return fmt.Errorf("unknown command: %s", command)

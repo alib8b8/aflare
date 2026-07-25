@@ -55,6 +55,7 @@ func getDefaultConfig() *UpgradeConfig {
 		BackupBeforeUpgrade: true,
 		RollbackOnFailure:   true,
 		RepositoryURL:       "https://github.com/alib8b8/llm-box",
+		Channel:             ChannelStable,
 	}
 }
 
