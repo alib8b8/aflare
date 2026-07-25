@@ -5,8 +5,9 @@
     <strong>English</strong> ·
     <a href="README.ru.md">Русский</a>
   </p>
-  <p><strong>Turn Natural Language Into Executable Workflows</strong></p>
-  <p>Agentic Workflow Engine for the Terminal &mdash; deterministic execution meets AI agents. Build self-driving workflows with autonomous agent nodes, tool use, and multi-step reasoning.</p>
+  <p><strong>GitHub Actions for your laptop.</strong></p>
+  <p>Automate your terminal with plain English. Tired of writing Bash scripts? Let AI turn your ideas into executable YAML workflows.</p>
+  <p><em>What if Bash understood English?</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/llm-box/actions/workflows/ci.yml">
@@ -48,6 +49,8 @@
 ## 📋 Table of Contents
 
 - [🚀 Quick Start](#-quick-start)
+- [💡 Why llm-box?](#-why-llm-box)
+- [📖 The Story](#-the-story)
 - [✨ Core Features](#-core-features)
 - [🤖 Agent Nodes](#-agent-nodes)
 - [📱 HarmonyOS &amp; Mobile Nodes](#-harmonyos--mobile-nodes)
@@ -85,20 +88,62 @@
 
 ---
 
-### Create &amp; run your first workflow
+### Generate Workflows in One Line
+
+Tell llm-box what you want in plain English, and it generates YAML workflows:
 
 ```bash
-# Generate a workflow from natural language
-llm-box create "Summarize today's AI news"
+# Monitor BTC price every 10 minutes
+llm-box create "monitor BTC price every 10 minutes and send telegram alert when > 70000"
 
-# Or use a built-in template
-llm-box create --template research-assistant
+# Watch GitHub repo stars and notify at threshold
+llm-box create "watch my github repo alib8b8/llm-box and notify me when star > 100"
 
-# Run it
-llm-box run ai-news-summary.yaml
+# Download and summarize arxiv AI papers daily
+llm-box create "download arxiv AI papers every day and summarize top 5"
+
+# Watch TSLA stock and send Telegram alerts
+llm-box create "watch TSLA stock and send telegram alert when price drops 5%"
+
+# Monitor Shanghai weather and email if rain
+llm-box create "monitor Shanghai weather and email me if it will rain tomorrow"
+```
+
+Then run the generated workflow:
+
+```bash
+llm-box run btc-monitor.yaml
 ```
 
 📖 [Full Getting Started Guide →](docs/getting-started.md)
+
+---
+
+## 💡 Why llm-box?
+
+> llm-box is not an AI assistant — it's a **deterministic execution engine**.
+>
+> AI understands your intent. YAML guarantees execution.
+
+| Tool | The Problem | llm-box's Approach |
+|------|-------------|-------------------|
+| **Bash** | Too hard to write, hard to maintain, error-prone | Natural language generation, YAML is readable and editable |
+| **n8n** | Too heavy — one automation task needs Docker | Single binary, works right in your terminal |
+| **Zapier** | SaaS, your data isn't yours, expensive | Local execution, fully controllable |
+| **Claude Code** | Code-focused, not great at workflow automation | General-purpose workflow engine, not just code |
+| **AI Agent** | Too unpredictable, output is all hallucination | AI only translates intent, execution is guaranteed by YAML |
+
+---
+
+## 📖 The Story
+
+> I built llm-box because I was tired of writing Bash scripts.
+>
+> Every time I wanted to automate something simple — monitor a price, scrape news, send a timed message — I'd end up writing dozens of lines of Bash, handling errors, retries, dependencies.
+>
+> What I wanted was: **tell the computer what I want, and it just does it.**
+>
+> As simple as GitHub Actions — but running on my laptop.
 
 ---
 
@@ -106,39 +151,15 @@ llm-box run ai-news-summary.yaml
 
 | Category | Features |
 |----------|----------|
-| **Workflow Generation** | Natural language &rarr; YAML via keyword matching, 100+ built-in templates across 20+ categories |
-| **Agent Nodes** | 35+ AI agent nodes with ReAct, Chain-of-Thought, tool use, and autonomous reasoning |
-| **Edge AI Engine** | ReAct reasoning loop, 3-tier persistent memory (short/working/long-term), local/cloud model routing, privacy analyzer |
-| **Skill Self-Evolution** | Agent skills improve with use &mdash; auto-tracks success rate, latency, best practices, known pitfalls; auto-optimizes prompts |
-| **HarmonyOS Adaptation** | Ability launch, atomic service, desktop widget, 7-device-type adaptation (phone/foldable/tablet/TV/car/wearable) |
-| **Phone Built-in AI** | System event listening (notification/call/SMS/location/battery), on-device LLM inference (1B-8B, INT4/INT8, including SenseNova U1), adaptive power management (eco/balanced/high, battery/thermal-aware), screen understanding, voice input (VAD+wake+ASR), voice output (TTS+voice cloning) |
-| **WAIC-Aligned** | Blockchain audit trails for agent interoperability, embodied AI robot control (humanoid/arm/drone), L3 smart agent phone capabilities |
-| **Cross-Platform Protocol** | `intent://` and `ohos://` URI schemes, W3C DID identity verification, cross-domain agent messaging |
-| **Ascend NPU Adaptation** | 7-agent pipeline (search&rarr;verify&rarr;adapt&rarr;quantize&rarr;optimize&rarr;deploy&rarr;doc), CANN/MindIE/MindStudio integration, INT8/FP8 quantization, 1-hour auto-adapt |
-| **Code Intelligence** | Code graph (AST/call graph/dependency for 158 languages), code knowledge graph (semantic vector retrieval, entity/relation/concept extraction, token-optimized), Codex/OpenCode-compatible tools (glob/grep/list_dir/apply_patch) |
-| **Subagent Architecture** | Main/sub agent prompt hierarchy (17 specialist templates), borrowed from Grok Build's prompt.md + subagent_prompt.md pattern |
-| **Distributed Resilience** | Per-node circuit breaker (Closed/Open/HalfOpen state machine), auto-isolation of failing workers, breaker stats endpoint |
-| **Privacy by Design** | Auto secret redaction (.env/keys/tokens) on file read, outbound data volume monitor with anomaly alerting (prevents Grok-Build-style 27800&times; leaks) |
-| **File Watching** | Polling-based file watch node (create/modify/delete events) for log-monitor and file-organizer workflows |
-| **TUI Rendering** | Terminal Markdown renderer (headings/code/bold/italic/lists/quotes/tables) + Mermaid-to-ASCII converter (flow/sequence diagrams) |
-| **Meta Orchestration** | Multi-model router (22+ models: OpenAI/Anthropic/Google/AndesGPT/SenseNova/AntLing/DeepSeek/Qwen), 5 strategies (auto/fastest/cheapest/best_quality/privacy_first), hierarchical agent network (supervisor&rarr;specialist&rarr;worker) |
-| **MCP Protocol** | MCP bridge client (7 operations, 5 built-in tools) + MCP server mode (HTTP/WebSocket, tool exposure, session management, auth) |
-| **Quality Guard** | Anti-AI-slop detection, 5 assessment types (AI detection/design/code/writing/overall), auto-fix with quality threshold enforcement |
-| **Engineer Skills** | 16 pre-built skills across 4 domains (frontend/backend/devops/architecture): React/TypeScript/API/Database/CI-CD/Docker/Design Patterns |
-| **Skill Distillation** | Extract methodologies from books/videos/podcasts/articles into callable skills: workflow/decision/analysis/creative/prompt/checklist |
-| **Video Editing** | AI video editing: smart_cut/merge/effects/subtitle/storyboard/upscale, 4 styles, 720p/1080p/4k |
-| **AI Gateway** | OmniRoute unified layer: 15+ providers, 6 routing strategies (auto/fastest/cheapest/best_quality/availability/custom_fallback), Claude Code/Cursor/Cline/llm-box compatibility |
-| **Agent Memory** | Three-level memory infrastructure (short/medium/long): 8 operations (store/retrieve/delete/search/summary/forget/transfer/merge), LRU eviction, cross-session long-term memory |
-| **Voice AI Toolchain** | Full voice studio: TTS + voice cloning + ASR transcription + speaker diarization + voice analysis, 11 languages, 5 ASR engines |
-| **Agent Teamization** | 200+ professional specialist roles across 12+ domains, Agency workflow (8 phases: Discovery&rarr;Strategy&rarr;Design&rarr;Development&rarr;QA&rarr;Deployment&rarr;Launch&rarr;Post-Launch) |
-| **Utility Nodes** | 40+ built-in nodes: LLM providers, fetch, execute, transform, file I/O, JSON, notify, condition, combine, call, template |
-| **Data &amp; Knowledge** | RAG retrieval, knowledge graph extraction/query/traversal, smart model router, multimodal image analysis |
-| **Code &amp; Tools** | Python code interpreter sandbox, node marketplace, MCP integration, plugin system |
-| **Distributed Execution** | Coordinator/Worker architecture, horizontal scaling, heartbeat monitoring, circuit breaker |
-| **Scheduling** | Cron-based scheduled workflows, interval triggers, CLI management |
-| **Security** | SSRF protection, path traversal prevention, command injection defense, AES-GCM secrets, audit logging, secret redaction, ANSI injection defense, data race fixes, DoS prevention (subscription limits, log rotation, memory caps), 92+ vuln audited |
-| **Ecosystem** | GitCode G-Star, HarmonyOS Agent Skills, ohpm SDK, OPPO X-OmniClaw Skill Adapter, OPPO 小布技能, AndesGPT, SenseNova, Ant Ling |
-| **Developer Experience** | Web UI editor, workflow visualizer (Mermaid/JSON/DOT/ASCII), TUI with Markdown/Mermaid rendering, 9 languages |
+| **🎯 Natural Language &rarr; YAML** | Describe your needs in one sentence, auto-generate executable workflows. AI only translates, doesn't decide |
+| **📦 Homebrew-like Experience** | One command to install, one command to create, templates at your fingertips. Install workflows like packages |
+| **⚙️ Deterministic Execution** | YAML workflows = deterministic output. No hallucinations, no randomness, same results every time |
+| **🔄 Scheduled Execution** | Built-in Cron scheduling. Every 10 minutes, daily, weekly — however you want it |
+| **🧩 100+ Built-in Templates** | BTC monitor, GitHub Star alerts, Arxiv paper summaries, weather reminders… ready to use |
+| **🔌 Plugin System** | Extend like Homebrew taps. `llm-box install btc-monitor` |
+| **🌐 Multi-Model Support** | Ollama / OpenAI / DeepSeek / Qwen / Kimi / GLM / Mistral, local and cloud |
+| **🔒 Privacy First** | Local execution by default, auto secret redaction, complete audit logs, 98+ vulnerabilities audited |
+| **🛡️ Enterprise-Grade Security** | SSRF protection, path traversal defense, command injection whitelist, AES-GCM encryption |
 
 ---
 

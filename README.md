@@ -5,8 +5,9 @@
     <a href="README.en.md">English</a> ·
     <a href="README.ru.md">Русский</a>
   </p>
-  <p><strong>将自然语言转化为可执行工作流</strong></p>
-  <p>面向终端的 Agent 工作流引擎 —— 确定性执行与 AI 智能体相结合。构建具备自主 Agent 节点、工具调用和多步推理能力的自驱动工作流。</p>
+  <p><strong>GitHub Actions for your laptop.</strong></p>
+  <p>用自然语言自动化你的终端。厌倦了写 Bash 脚本？让 AI 帮你把想法变成可执行的 YAML 工作流。</p>
+  <p><em>What if Bash understood English?</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/llm-box/actions/workflows/ci.yml">
@@ -48,6 +49,8 @@
 ## 📋 目录
 
 - [🚀 快速开始](#-快速开始)
+- [💡 为什么是 llm-box？](#-为什么是-llm-box)
+- [📖 故事](#-故事)
 - [✨ 核心特性](#-核心特性)
 - [🤖 Agent 节点](#-agent-节点)
 - [📱 鸿蒙 & 移动端节点](#-鸿蒙--移动端节点)
@@ -85,20 +88,62 @@
 
 ---
 
-### 创建并运行你的第一个工作流
+### 一句话生成工作流
+
+用自然语言告诉 llm-box 你想做什么，它会生成 YAML 工作流：
 
 ```bash
-# 从自然语言生成工作流
-llm-box create "总结今天的 AI 新闻"
+# 监控 BTC 价格，每 10 分钟检查一次
+llm-box create "monitor BTC price every 10 minutes and send telegram alert when > 70000"
 
-# 或使用内置模板
-llm-box create --template research-assistant
+# 监控 GitHub 仓库 Star 数，超过阈值提醒
+llm-box create "watch my github repo alib8b8/llm-box and notify me when star > 100"
 
-# 运行
-llm-box run ai-news-summary.yaml
+# 每天下载 arXiv AI 论文并总结
+llm-box create "download arxiv AI papers every day and summarize top 5"
+
+# 监控特斯拉股价并发送 Telegram 告警
+llm-box create "watch TSLA stock and send telegram alert when price drops 5%"
+
+# 监控上海天气并发邮件
+llm-box create "monitor Shanghai weather and email me if it will rain tomorrow"
+```
+
+然后运行生成的工作流：
+
+```bash
+llm-box run btc-monitor.yaml
 ```
 
 📖 [完整入门指南 →](docs/getting-started.md)
+
+---
+
+## 💡 为什么是 llm-box？
+
+> llm-box 不是 AI 助手 —— 它是一个**确定性执行引擎**。
+>
+> AI 负责理解你的意图，YAML 负责保证执行。
+
+| 工具 | 问题 | llm-box 的方式 |
+|------|------|----------------|
+| **Bash** | 太难写，难维护，容易出错 | 自然语言生成，YAML 可读可改 |
+| **n8n** | 太重了，一个自动化任务还要跑 Docker | 单二进制，终端里就能用 |
+| **Zapier** | SaaS，数据不在自己手里，收费贵 | 本地执行，完全可控 |
+| **Claude Code** | 偏代码，不擅长自动化工作流 | 通用工作流引擎，不只是代码 |
+| **AI Agent** | 太不可控，输出全是幻觉 | AI 只负责翻译意图，执行由 YAML 保证 |
+
+---
+
+## 📖 故事
+
+> I built llm-box because I was tired of writing Bash scripts.
+>
+> 每次想自动化一个简单的事情——监控价格、抓取新闻、定时发消息——都要写几十行 Bash，还要处理错误、重试、依赖。
+>
+> 我想要的是：**告诉电脑我想做什么，它就去做。**
+>
+> 就像 GitHub Actions 一样简单，但在我的笔记本上跑。
 
 ---
 
@@ -106,39 +151,15 @@ llm-box run ai-news-summary.yaml
 
 | 类别 | 特性 |
 |------|------|
-| **工作流生成** | 自然语言 → YAML，基于关键词匹配，20+ 分类 100+ 内置模板 |
-| **Agent 节点** | **35+** AI Agent 节点，支持 ReAct、思维链、工具调用和自主推理 |
-| **边缘 AI 引擎** | ReAct 推理循环、三层持久化记忆（短期/工作/长期）、本地/云端模型路由、隐私分析器 |
-| **技能自进化** | Agent 技能随使用自我提升 —— 自动追踪成功率、延迟、最佳实践、已知陷阱；自动优化提示词 |
-| **鸿蒙适配** | 能力启动、原子服务、桌面卡片、7 种设备类型适配（手机/折叠屏/平板/电视/车机/手表） |
-| **手机内置 AI** | 系统事件监听（通知/来电/短信/位置/电量）、端侧大模型推理（1B-8B，INT4/INT8，含 SenseNova U1）、自适应电源管理（节能/均衡/高性能，电池/温度感知）、屏幕理解、语音输入（VAD+唤醒+ASR）、语音输出（TTS+声音克隆） |
-| **WAIC 对齐** | 面向 Agent 互操作性的区块链审计追踪、具身智能机器人控制（人形/机械臂/无人机）、L3 智能体手机能力 |
-| **跨平台协议** | `intent://` 和 `ohos://` URI 协议、W3C DID 身份验证、跨域 Agent 消息 |
-| **昇腾 NPU 适配** | 7-Agent 流水线（搜索→验证→适配→量化→优化→部署→文档）、CANN/MindIE/MindStudio 集成、INT8/FP8 量化、1 小时自动适配 |
-| **代码智能** | 代码图谱（158 语言的 AST/调用图/依赖关系）、代码知识图谱（语义向量检索、实体/关系/概念提取、Token 优化）、Codex/OpenCode 兼容工具（glob/grep/list_dir/apply_patch） |
-| **子代理架构** | 主/子代理提示词层级（17 个专家模板），借鉴 Grok Build 的 prompt.md + subagent_prompt.md 模式 |
-| **分布式弹性** | 每节点熔断器（Closed/Open/HalfOpen 状态机）、故障工作节点自动隔离、熔断统计端点 |
-| **隐私设计** | 文件读取时自动脱敏秘密（.env/密钥/令牌）、出站数据量监控与异常告警（防止 Grok-Build 式 27800 倍泄漏） |
-| **文件监听** | 基于轮询的文件监听节点（创建/修改/删除事件），用于日志监控和文件整理工作流 |
-| **TUI 渲染** | 终端 Markdown 渲染器（标题/代码/加粗/斜体/列表/引用/表格）+ Mermaid 转 ASCII 转换器（流程/时序图） |
-| **元编排** | 多模型路由器（**22+ 模型**：OpenAI/Anthropic/Google/AndesGPT/SenseNova/**AntLing**/DeepSeek/Qwen）、5 种策略（自动/最快/最便宜/最佳质量/隐私优先）、层级 Agent 网络（主管→专家→工作者） |
-| **MCP 协议** | MCP 桥接客户端（7 种操作、5 个内置工具）+ MCP 服务器模式（HTTP/WebSocket、工具暴露、会话管理、认证） |
-| **质量守护** | 反 AI-slop 检测、5 种评估类型（AI 检测/设计/代码/写作/综合）、自动修复与质量阈值强制执行 |
-| **工程师技能包** | 4 个领域 16 个预置技能：React/TypeScript/API/数据库/CI-CD/Docker/设计模式 |
-| **技能蒸馏** | 从书籍/视频/播客/文章中提取方法论并转化为可调用技能：工作流/决策/分析/创意/提示词/检查清单 |
-| **视频编辑** | AI 视频编辑：智能剪辑/合并/特效/字幕/故事板/超分、4 种风格、720p/1080p/4k |
-| **AI 网关** | OmniRoute 统一层：**268+ 提供商**、6 种路由策略（自动/最快/最便宜/最佳质量/可用性/自定义降级）、健康检查机制、Claude Code/Cursor/Cline/llm-box 兼容、**Inkling MoE 原生支持** |
-| **Agent 记忆** | 三层记忆基础设施（短期/中期/长期）：10 种操作（存储/检索/删除/搜索/摘要/遗忘/转移/合并/可视化/Inkling检索）、LRU 淘汰、跨会话长期记忆、**自动过期清理** |
-| **语音 AI 工具链** | 完整语音工作室：TTS + 声音克隆 + **ASR 转录** + **说话人分离** + **语音分析** + 创作模式（播客/有声书/旁白/广告/教育）、11 种语言、5 种 ASR 引擎、**Inkling 多模态音频理解** |
-| **Agent 团队化** | **232+ 个专业角色**覆盖 12+ 领域、Agency 工作流（8 阶段）、**19 个协作模板**、**Inkling MoE 专家团队** |
-| **实用节点** | 40+ 内置节点：大模型提供商、获取、执行、转换、文件 I/O、JSON、通知、条件、组合、调用、模板 |
-| **数据与知识** | RAG 检索、知识图谱提取/查询/遍历、智能模型路由器、多模态图像分析 |
-| **代码与工具** | Python 代码解释器沙箱、节点市场、MCP 集成、插件系统 |
-| **分布式执行** | 协调器/工作者架构、水平扩展、心跳监控、熔断器 |
-| **调度** | 基于 Cron 的定时工作流、间隔触发器、CLI 管理 |
-| **安全** | SSRF 防护、路径遍历防护、命令注入防御、AES-GCM 加密、审计日志、秘密脱敏、ANSI 注入防御、数据竞争修复、DoS 防护（订阅限制、日志轮转、内存上限）、**98+ 漏洞已审计** |
-| **生态** | GitCode G-Star、鸿蒙 Agent 技能、ohpm SDK、OPPO X-OmniClaw 技能适配器、OPPO 小布技能、AndesGPT、SenseNova、**Ant Ling**、**Inkling / Thinking Machines** |
-| **开发者体验** | Web UI 编辑器、工作流可视化器（Mermaid/JSON/DOT/ASCII）、支持 Markdown/Mermaid 的 TUI、9 种语言 |
+| **🎯 自然语言 → YAML** | 用一句话描述需求，自动生成可执行工作流。AI 只负责翻译，不负责决策 |
+| **📦 Homebrew 式体验** | 一行命令安装，一条指令创建，模板一键复用。像装包一样装工作流 |
+| **⚙️ 确定性执行** | YAML 工作流 = 确定性输出。没有幻觉，没有随机，每次结果都一样 |
+| **🔄 定时调度** | 内置 Cron 调度，每 10 分钟、每天、每周——想怎么跑就怎么跑 |
+| **🧩 100+ 内置模板** | BTC 监控、GitHub Star 告警、Arxiv 论文总结、天气提醒……拿来就用 |
+| **🔌 插件系统** | 像 Homebrew tap 一样扩展。`llm-box install btc-monitor` |
+| **🌐 多模型支持** | 支持 Ollama / OpenAI / DeepSeek / Qwen / Kimi / GLM / Mistral，本地云端都能跑 |
+| **🔒 隐私优先** | 默认本地执行，秘密自动脱敏，审计日志完整，98+ 漏洞已审计 |
+| **🛡️ 企业级安全** | SSRF 防护、路径遍历防御、命令注入白名单、AES-GCM 加密 |
 
 ---
 
