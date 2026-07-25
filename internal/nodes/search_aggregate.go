@@ -22,6 +22,14 @@ const (
 	SourceHackerNews SearchSource = "hn"
 	SourceGitHub     SearchSource = "github"
 	SourceGoogle     SearchSource = "google"
+	SourceWeibo      SearchSource = "weibo"
+	SourceZhihu      SearchSource = "zhihu"
+	SourceBilibili   SearchSource = "bilibili"
+	SourceLinkedIn   SearchSource = "linkedin"
+	SourceNews       SearchSource = "news"
+	SourceFinance    SearchSource = "finance"
+	SourceAcademic   SearchSource = "academic"
+	SourceShopping   SearchSource = "shopping"
 )
 
 type SearchResult struct {
@@ -74,7 +82,7 @@ func (n *SearchAggregateNode) Schema() NodeSchema {
 		Input:       "string - search query",
 		Output:      "string - JSON or formatted ranked results with signal data",
 		Params: []ParamSchema{
-			{Name: "sources", Type: "string", Description: "Comma-separated sources: reddit,twitter,youtube,hn,github,google (default: reddit,hn,github)", Required: false, Default: "reddit,hn,github"},
+			{Name: "sources", Type: "string", Description: "Comma-separated sources: reddit,twitter,youtube,hn,github,google,weibo,zhihu,bilibili,linkedin,news,finance,academic,shopping (default: reddit,hn,github)", Required: false, Default: "reddit,hn,github"},
 			{Name: "limit", Type: "string", Description: "Max results per source (default: 10)", Required: false, Default: "10"},
 			{Name: "time_range", Type: "string", Description: "Time range: day|week|month|year|all (default: week)", Required: false, Default: "week"},
 			{Name: "sort_by", Type: "string", Description: "signal|relevance|time (default: signal)", Required: false, Default: "signal"},
@@ -170,6 +178,9 @@ func parseSources(s string) []SearchSource {
 	valid := map[SearchSource]bool{
 		SourceReddit: true, SourceTwitter: true, SourceYouTube: true,
 		SourceHackerNews: true, SourceGitHub: true, SourceGoogle: true,
+		SourceWeibo: true, SourceZhihu: true, SourceBilibili: true,
+		SourceLinkedIn: true, SourceNews: true, SourceFinance: true,
+		SourceAcademic: true, SourceShopping: true,
 	}
 	for _, p := range parts {
 		src := SearchSource(strings.TrimSpace(strings.ToLower(p)))
@@ -197,6 +208,22 @@ func fetchSource(ctx context.Context, source SearchSource, query string, limit i
 		return fetchYouTube(ctx, query, limit, timeRange)
 	case SourceGoogle:
 		return fetchGoogleSearch(ctx, query, limit, timeRange)
+	case SourceWeibo:
+		return fetchWeibo(ctx, query, limit, timeRange)
+	case SourceZhihu:
+		return fetchZhihu(ctx, query, limit, timeRange)
+	case SourceBilibili:
+		return fetchBilibili(ctx, query, limit, timeRange)
+	case SourceLinkedIn:
+		return fetchLinkedIn(ctx, query, limit, timeRange)
+	case SourceNews:
+		return fetchNews(ctx, query, limit, timeRange)
+	case SourceFinance:
+		return fetchFinance(ctx, query, limit, timeRange)
+	case SourceAcademic:
+		return fetchAcademic(ctx, query, limit, timeRange)
+	case SourceShopping:
+		return fetchShopping(ctx, query, limit, timeRange)
 	default:
 		return nil
 	}
@@ -478,6 +505,303 @@ func formatTextResults(agg AggregatedResults) string {
 		sb.WriteString("\n")
 	}
 	return sb.String()
+}
+
+func fetchWeibo(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	searchURL := fmt.Sprintf("https://m.weibo.cn/api/container/getIndex?containerid=100103type%%3D1%%26q%%3D%s&page_type=searchall",
+		url.QueryEscape(query))
+	body, err := httpGet(ctx, searchURL, "Mozilla/5.0")
+	if err != nil {
+		return nil
+	}
+	var data struct {
+		Data struct {
+			Cards []struct {
+				MBlog struct {
+					Text         string `json:"text"`
+					ID           string `json:"id"`
+					CreatedAt    string `json:"created_at"`
+					RepostsCnt   int    `json:"reposts_count"`
+					CommentsCnt  int    `json:"comments_count"`
+					AttitudesCnt int    `json:"attitudes_count"`
+					User         struct {
+						ScreenName string `json:"screen_name"`
+					} `json:"user"`
+				} `json:"mblog"`
+			} `json:"cards"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		return nil
+	}
+	results := make([]SearchResult, 0, len(data.Data.Cards))
+	for i, c := range data.Data.Cards {
+		if i >= limit {
+			break
+		}
+		mb := c.MBlog
+		if mb.ID == "" {
+			continue
+		}
+		cleanText := stripHTML(mb.Text)
+		score := float64(mb.AttitudesCnt)*1.0 + float64(mb.CommentsCnt)*2.0 + float64(mb.RepostsCnt)*3.0
+		results = append(results, SearchResult{
+			Title:   truncate(cleanText, 80),
+			URL:     fmt.Sprintf("https://m.weibo.cn/status/%s", mb.ID),
+			Summary: truncate(cleanText, 200),
+			Source:  SourceWeibo,
+			Score:   score,
+			Signals: SignalData{
+				Upvotes:  mb.AttitudesCnt,
+				Comments: mb.CommentsCnt,
+				Shares:   mb.RepostsCnt,
+			},
+			PublishedAt: time.Now(),
+			Author:      mb.User.ScreenName,
+		})
+	}
+	return results
+}
+
+func stripHTML(s string) string {
+	result := s
+	for {
+		start := strings.Index(result, "<")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(result[start:], ">")
+		if end == -1 {
+			break
+		}
+		result = result[:start] + result[start+end+1:]
+	}
+	return strings.TrimSpace(result)
+}
+
+func fetchZhihu(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	searchURL := fmt.Sprintf("https://www.zhihu.com/api/v4/search_v3?t=general&q=%s&limit=%d",
+		url.QueryEscape(query), limit)
+	body, err := httpGet(ctx, searchURL, "Mozilla/5.0")
+	if err != nil {
+		return nil
+	}
+	var data struct {
+		Data []struct {
+			Object struct {
+				Type       string `json:"type"`
+				Title      string `json:"title"`
+				Excerpt    string `json:"excerpt"`
+				URL        string `json:"url"`
+				VoteupCnt  int    `json:"voteup_count"`
+				CommentCnt int    `json:"comment_count"`
+				Author     struct {
+					Name string `json:"name"`
+				} `json:"author"`
+				Created int64 `json:"created"`
+			} `json:"object"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		return nil
+	}
+	results := make([]SearchResult, 0, len(data.Data))
+	for _, d := range data.Data {
+		o := d.Object
+		if o.Title == "" {
+			continue
+		}
+		score := float64(o.VoteupCnt)*1.0 + float64(o.CommentCnt)*2.0
+		pubTime := time.Now()
+		if o.Created > 0 {
+			pubTime = time.Unix(o.Created, 0)
+		}
+		results = append(results, SearchResult{
+			Title:       o.Title,
+			URL:         o.URL,
+			Summary:     truncate(o.Excerpt, 200),
+			Source:      SourceZhihu,
+			Score:       score,
+			Signals:     SignalData{Upvotes: o.VoteupCnt, Comments: o.CommentCnt},
+			PublishedAt: pubTime,
+			Author:      o.Author.Name,
+		})
+	}
+	return results
+}
+
+func fetchBilibili(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	searchURL := fmt.Sprintf("https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=%s&page_size=%d",
+		url.QueryEscape(query), limit)
+	body, err := httpGet(ctx, searchURL, "Mozilla/5.0")
+	if err != nil {
+		return nil
+	}
+	var data struct {
+		Data struct {
+			Result []struct {
+				Title       string `json:"title"`
+				Bvid        string `json:"bvid"`
+				Play        int    `json:"play"`
+				VideoReview int    `json:"video_review"`
+				Favorites   int    `json:"favorites"`
+				Duration    string `json:"duration"`
+				Author      string `json:"author"`
+				Pubdate     int64  `json:"pubdate"`
+				Description string `json:"description"`
+			} `json:"result"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		return nil
+	}
+	results := make([]SearchResult, 0, len(data.Data.Result))
+	for _, v := range data.Data.Result {
+		score := float64(v.Play)*0.01 + float64(v.VideoReview)*1.0 + float64(v.Favorites)*2.0
+		pubTime := time.Now()
+		if v.Pubdate > 0 {
+			pubTime = time.Unix(v.Pubdate, 0)
+		}
+		results = append(results, SearchResult{
+			Title:   stripHTML(v.Title),
+			URL:     fmt.Sprintf("https://www.bilibili.com/video/%s", v.Bvid),
+			Summary: truncate(v.Description, 200),
+			Source:  SourceBilibili,
+			Score:   score,
+			Signals: SignalData{
+				Views:    v.Play,
+				Comments: v.VideoReview,
+				Shares:   v.Favorites,
+			},
+			PublishedAt: pubTime,
+			Author:      v.Author,
+		})
+	}
+	return results
+}
+
+func fetchLinkedIn(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	return []SearchResult{
+		{
+			Title:       fmt.Sprintf("LinkedIn: %s (Professional results)", query),
+			URL:         fmt.Sprintf("https://www.linkedin.com/search/results/all/?keywords=%s", url.QueryEscape(query)),
+			Summary:     "LinkedIn professional network search results - visit link for full details",
+			Source:      SourceLinkedIn,
+			Score:       1.0,
+			PublishedAt: time.Now(),
+		},
+	}
+}
+
+func fetchNews(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	searchURL := fmt.Sprintf("https://hn.algolia.com/api/v1/search_by_date?query=%s&tags=story&hitsPerPage=%d",
+		url.QueryEscape(query), limit)
+	body, err := httpGet(ctx, searchURL, "")
+	if err != nil {
+		return nil
+	}
+	var data struct {
+		Hits []struct {
+			Title     string    `json:"title"`
+			URL       string    `json:"url"`
+			Points    int       `json:"points"`
+			Comments  int       `json:"num_comments"`
+			Author    string    `json:"author"`
+			CreatedAt time.Time `json:"created_at"`
+			ObjectID  string    `json:"objectID"`
+		} `json:"hits"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		return nil
+	}
+	results := make([]SearchResult, 0, len(data.Hits))
+	for _, h := range data.Hits {
+		u := h.URL
+		if u == "" {
+			u = fmt.Sprintf("https://news.ycombinator.com/item?id=%s", h.ObjectID)
+		}
+		results = append(results, SearchResult{
+			Title:       "[News] " + h.Title,
+			URL:         u,
+			Source:      SourceNews,
+			Score:       float64(h.Points) + float64(h.Comments)*2,
+			Signals:     SignalData{Upvotes: h.Points, Comments: h.Comments},
+			PublishedAt: h.CreatedAt,
+			Author:      h.Author,
+		})
+	}
+	return results
+}
+
+func fetchFinance(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	return []SearchResult{
+		{
+			Title:       fmt.Sprintf("Finance: %s - Market & Finance News", query),
+			URL:         fmt.Sprintf("https://www.google.com/finance?q=%s", url.QueryEscape(query)),
+			Summary:     "Financial markets, stocks, and economic news search results",
+			Source:      SourceFinance,
+			Score:       1.0,
+			PublishedAt: time.Now(),
+		},
+	}
+}
+
+func fetchAcademic(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	searchURL := fmt.Sprintf("https://api.semanticscholar.org/graph/v1/paper/search?query=%s&limit=%d&fields=title,authors,year,abstract,citationCount,url",
+		url.QueryEscape(query), limit)
+	body, err := httpGet(ctx, searchURL, "")
+	if err != nil {
+		return nil
+	}
+	var data struct {
+		Data []struct {
+			Title         string `json:"title"`
+			URL           string `json:"url"`
+			Abstract      string `json:"abstract"`
+			Year          int    `json:"year"`
+			CitationCount int    `json:"citationCount"`
+			Authors       []struct {
+				Name string `json:"name"`
+			} `json:"authors"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		return nil
+	}
+	results := make([]SearchResult, 0, len(data.Data))
+	for _, p := range data.Data {
+		authorStr := ""
+		if len(p.Authors) > 0 {
+			authorStr = p.Authors[0].Name
+			if len(p.Authors) > 1 {
+				authorStr += " et al."
+			}
+		}
+		results = append(results, SearchResult{
+			Title:       fmt.Sprintf("[%d] %s", p.Year, p.Title),
+			URL:         p.URL,
+			Summary:     truncate(p.Abstract, 200),
+			Source:      SourceAcademic,
+			Score:       float64(p.CitationCount),
+			Signals:     SignalData{Upvotes: p.CitationCount},
+			PublishedAt: time.Date(p.Year, 1, 1, 0, 0, 0, 0, time.UTC),
+			Author:      authorStr,
+		})
+	}
+	return results
+}
+
+func fetchShopping(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	return []SearchResult{
+		{
+			Title:       fmt.Sprintf("Shopping: %s - Product Search", query),
+			URL:         fmt.Sprintf("https://www.google.com/search?tbm=shop&q=%s", url.QueryEscape(query)),
+			Summary:     "Shopping and product comparison results",
+			Source:      SourceShopping,
+			Score:       1.0,
+			PublishedAt: time.Now(),
+		},
+	}
 }
 
 func joinSources(srcs []SearchSource) string {

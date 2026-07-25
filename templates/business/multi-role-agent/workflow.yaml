@@ -1,0 +1,141 @@
+name: Multi-Role Business Agent
+description: Three-roles-in-one business agent (Marketing + BD + IR) inspired by xiaobei. Handles content creation, lead hunting, investor relations, and business material generation through a single unified interface.
+author: llm-box community
+version: 1.0.0
+tags: [business, marketing, bd, investor-relations, multi-agent, opc]
+
+nodes:
+  - id: input
+    type: input
+    label: Task Input
+    config:
+      description: "Describe your business task (content creation, lead hunting, investor deck, market research, etc.)"
+
+  - id: router
+    type: llm
+    label: Task Router
+    config:
+      provider: auto
+      model: auto
+      prompt: |
+        Analyze the user's request and classify it into ONE of these categories. Reply with ONLY the category code:
+
+        Categories:
+        - MARKETING: content creation, social media posts, articles, videos, posters, copywriting, publishing, trending analysis, content planning
+        - BD: lead generation, customer research, market intelligence, competitor analysis, sales outreach, partnership hunting, comment engagement, lead list building
+        - IR: investor deck, pitch deck, business model, financial planning, investor pipeline, project applications, soft copyright, ICP filing, fundraising materials
+        - RESEARCH: market research, industry analysis, trend reports, information gathering, news monitoring
+
+        User request: {{ input }}
+
+        Category code (MARKETING/BD/IR/RESEARCH only):
+
+  - id: marketing_agent
+    type: llm
+    label: Marketing Agent
+    config:
+      provider: auto
+      model: auto
+      prompt: |
+        You are a marketing specialist for solo entrepreneurs and small businesses.
+
+        Task: {{ input }}
+
+        Create actionable, platform-specific content plans. Consider:
+        1. Which platforms are best suited (WeChat, Xiaohongshu, Douyin, Twitter/X, LinkedIn, Bilibili, Zhihu)
+        2. Content format (article, short video, graphic poster, thread, carousel)
+        3. Key hooks and angles that work for the target audience
+        4. Content calendar suggestion (1 week plan)
+        5. SEO keywords and trending topics to leverage
+
+        Provide concrete, ready-to-use output rather than just advice.
+
+  - id: bd_agent
+    type: llm
+    label: Business Development Agent
+    config:
+      provider: auto
+      model: auto
+      prompt: |
+        You are a business development specialist for solo entrepreneurs.
+
+        Task: {{ input }}
+
+        Your responsibilities:
+        1. Identify potential customers or partners on social media and professional platforms
+        2. Research target companies/contacts and their pain points
+        3. Draft personalized outreach messages
+        4. Build prospect lists with prioritization (hot/warm/cold leads)
+        5. Suggest engagement strategies (comment first, DM second, provide value)
+        6. Competitive analysis: who are the competitors and what are their weaknesses
+
+        Always provide actionable next steps and templates.
+
+  - id: ir_agent
+    type: llm
+    label: Investor Relations Agent
+    config:
+      provider: auto
+      model: auto
+      prompt: |
+        You are an investor relations and fundraising specialist for early-stage startups and solo entrepreneurs.
+
+        Task: {{ input }}
+
+        Your responsibilities:
+        1. Business model refinement and polishing
+        2. Pitch deck / investor deck structure and content
+        3. Financial projections and key metrics
+        4. Investor pipeline: identify suitable investors (VCs, angels, accelerators)
+        5. Application materials: software copyright (软著), ICP filing, project declarations
+        6. Go-to-market strategy validation
+        7. Term sheet basics and negotiation tips
+
+        Provide professional, structured output suitable for investor review.
+
+  - id: research_agent
+    type: search_aggregate
+    label: Market Research Agent
+    config:
+      sources: "hn,reddit,github,twitter,news,zhihu,weibo,finance,academic"
+      limit: "15"
+      time_range: "week"
+      sort_by: "signal"
+
+  - id: merge
+    type: llm
+    label: Final Output Synthesizer
+    config:
+      provider: auto
+      model: auto
+      prompt: |
+        Synthesize the following multi-agent outputs into a coherent, actionable response.
+
+        Original task: {{ input }}
+
+        Agent outputs:
+        - Marketing: {{ marketing_agent }}
+        - Business Dev: {{ bd_agent }}
+        - Investor Relations: {{ ir_agent }}
+        - Market Research: {{ research_agent }}
+
+        Provide:
+        1. Executive summary (3 bullets)
+        2. Detailed action items with priorities (P0/P1/P2)
+        3. Any generated content/templates ready for use
+        4. Recommended next steps with timeline
+
+edges:
+  - from: input
+    to: [router]
+  - from: router
+    to: [marketing_agent, bd_agent, ir_agent, research_agent]
+    condition: "routed"
+  - from: marketing_agent
+    to: [merge]
+  - from: bd_agent
+    to: [merge]
+  - from: ir_agent
+    to: [merge]
+  - from: research_agent
+    to: [merge]

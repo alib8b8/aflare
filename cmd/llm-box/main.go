@@ -13,6 +13,7 @@ import (
 	"github.com/alib8b8/llm-box/internal/mcp"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/output"
+	"github.com/alib8b8/llm-box/internal/paths"
 	"github.com/alib8b8/llm-box/internal/skills"
 	"github.com/alib8b8/llm-box/internal/tui"
 	"github.com/alib8b8/llm-box/internal/webui"
@@ -802,16 +803,7 @@ func handleSkills(args []string) {
 		return
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("❌ Failed to get working directory: %v\n", err)
-		os.Exit(1)
-	}
-	templatesDir := cwd + "/templates"
-	if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
-		templatesDir = "./templates"
-	}
-
+	templatesDir := paths.ResolveTemplatesPath()
 	registry := skills.NewSkillRegistry(templatesDir)
 	if err := registry.Load(); err != nil {
 		fmt.Printf("❌ Failed to load skills: %v\n", err)
