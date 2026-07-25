@@ -1,0 +1,19 @@
+{
+  "id": "productivity-personal/daily-planner",
+  "name": "daily-planner",
+  "version": "1.0.0",
+  "description": "Generate structured daily plan from goals",
+  "author": "llm-box community",
+  "category": "productivity-personal",
+  "tags": [
+    "productivity-personal",
+    "workflow"
+  ],
+  "keywords": [
+    "daily-planner",
+    "productivity-personal"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

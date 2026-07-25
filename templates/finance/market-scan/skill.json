@@ -1,0 +1,19 @@
+{
+  "id": "finance/market-scan",
+  "name": "market-scan",
+  "version": "1.0.0",
+  "description": "Financial market scanning and investment intelligence workflow.",
+  "author": "llm-box community",
+  "category": "finance",
+  "tags": [
+    "finance",
+    "workflow"
+  ],
+  "keywords": [
+    "market-scan",
+    "finance"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

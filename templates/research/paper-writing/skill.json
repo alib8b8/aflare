@@ -1,0 +1,19 @@
+{
+  "id": "research/paper-writing",
+  "name": "paper-writing",
+  "version": "1.0.0",
+  "description": "paper-writing workflow template",
+  "author": "llm-box community",
+  "category": "research",
+  "tags": [
+    "research",
+    "workflow"
+  ],
+  "keywords": [
+    "paper-writing",
+    "research"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

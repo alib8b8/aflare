@@ -1,0 +1,19 @@
+{
+  "id": "marketing/competitor-content",
+  "name": "competitor-content",
+  "version": "1.0.0",
+  "description": "Analyze competitor content strategy",
+  "author": "llm-box community",
+  "category": "marketing",
+  "tags": [
+    "marketing",
+    "workflow"
+  ],
+  "keywords": [
+    "competitor-content",
+    "marketing"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "automation/image-optimizer",
+  "name": "image-optimizer",
+  "version": "1.0.0",
+  "description": "Batch optimize images for web",
+  "author": "llm-box community",
+  "category": "automation",
+  "tags": [
+    "automation",
+    "workflow"
+  ],
+  "keywords": [
+    "image-optimizer",
+    "automation"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

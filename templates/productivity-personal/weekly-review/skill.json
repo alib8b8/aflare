@@ -1,0 +1,19 @@
+{
+  "id": "productivity-personal/weekly-review",
+  "name": "weekly-review",
+  "version": "1.0.0",
+  "description": "Review the week and plan for next",
+  "author": "llm-box community",
+  "category": "productivity-personal",
+  "tags": [
+    "productivity-personal",
+    "workflow"
+  ],
+  "keywords": [
+    "weekly-review",
+    "productivity-personal"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

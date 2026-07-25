@@ -1,0 +1,19 @@
+{
+  "id": "data-analytics/survey-analyzer",
+  "name": "survey-analyzer",
+  "version": "1.0.0",
+  "description": "Analyze survey responses and extract insights",
+  "author": "llm-box community",
+  "category": "data-analytics",
+  "tags": [
+    "data-analytics",
+    "workflow"
+  ],
+  "keywords": [
+    "survey-analyzer",
+    "data-analytics"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

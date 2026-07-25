@@ -1,0 +1,19 @@
+{
+  "id": "research/data-analysis",
+  "name": "data-analysis",
+  "version": "1.0.0",
+  "description": "data-analysis workflow template",
+  "author": "llm-box community",
+  "category": "research",
+  "tags": [
+    "research",
+    "workflow"
+  ],
+  "keywords": [
+    "data-analysis",
+    "research"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

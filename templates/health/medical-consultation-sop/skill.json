@@ -1,0 +1,19 @@
+{
+  "id": "health/medical-consultation-sop",
+  "name": "medical-consultation-sop",
+  "version": "1.0.0",
+  "description": "medical-consultation-sop workflow template",
+  "author": "llm-box community",
+  "category": "health",
+  "tags": [
+    "health",
+    "workflow"
+  ],
+  "keywords": [
+    "medical-consultation-sop",
+    "health"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

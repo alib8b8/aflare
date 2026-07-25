@@ -1,0 +1,19 @@
+{
+  "id": "networking/network-diagnostics",
+  "name": "network-diagnostics",
+  "version": "1.0.0",
+  "description": "Run network diagnostics and generate report",
+  "author": "llm-box community",
+  "category": "networking",
+  "tags": [
+    "networking",
+    "workflow"
+  ],
+  "keywords": [
+    "network-diagnostics",
+    "networking"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

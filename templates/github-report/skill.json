@@ -1,0 +1,19 @@
+{
+  "id": "github-report",
+  "name": "github-report",
+  "version": "1.0.0",
+  "description": "Generate a weekly activity report for your GitHub repository.",
+  "author": "llm-box community",
+  "category": "uncategorized",
+  "tags": [
+    "uncategorized",
+    "workflow"
+  ],
+  "keywords": [
+    "github-report",
+    "uncategorized"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "automation/batch-rename",
+  "name": "batch-rename",
+  "version": "1.0.0",
+  "description": "Batch rename files with patterns",
+  "author": "llm-box community",
+  "category": "automation",
+  "tags": [
+    "automation",
+    "workflow"
+  ],
+  "keywords": [
+    "batch-rename",
+    "automation"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

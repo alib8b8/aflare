@@ -1,0 +1,19 @@
+{
+  "id": "ascend-adapt/quick-adapt",
+  "name": "quick-adapt",
+  "version": "1.0.0",
+  "description": "quick-adapt workflow template",
+  "author": "llm-box community",
+  "category": "ascend-adapt",
+  "tags": [
+    "ascend-adapt",
+    "workflow"
+  ],
+  "keywords": [
+    "quick-adapt",
+    "ascend-adapt"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

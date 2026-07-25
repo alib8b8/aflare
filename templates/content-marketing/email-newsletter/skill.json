@@ -1,0 +1,19 @@
+{
+  "id": "content-marketing/email-newsletter",
+  "name": "email-newsletter",
+  "version": "1.0.0",
+  "description": "Generate weekly email newsletter content",
+  "author": "llm-box community",
+  "category": "content-marketing",
+  "tags": [
+    "content-marketing",
+    "workflow"
+  ],
+  "keywords": [
+    "email-newsletter",
+    "content-marketing"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

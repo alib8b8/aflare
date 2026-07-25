@@ -1,0 +1,19 @@
+{
+  "id": "ai-ml/prompt-engineering",
+  "name": "prompt-engineering",
+  "version": "1.0.0",
+  "description": "Generate optimized prompts for specific tasks",
+  "author": "llm-box community",
+  "category": "ai-ml",
+  "tags": [
+    "ai-ml",
+    "workflow"
+  ],
+  "keywords": [
+    "prompt-engineering",
+    "ai-ml"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

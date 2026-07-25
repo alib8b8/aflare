@@ -1,0 +1,19 @@
+{
+  "id": "education/course-curriculum",
+  "name": "course-curriculum",
+  "version": "1.0.0",
+  "description": "Design complete course curriculum",
+  "author": "llm-box community",
+  "category": "education",
+  "tags": [
+    "education",
+    "workflow"
+  ],
+  "keywords": [
+    "course-curriculum",
+    "education"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

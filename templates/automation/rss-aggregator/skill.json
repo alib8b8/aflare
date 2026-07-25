@@ -1,0 +1,19 @@
+{
+  "id": "automation/rss-aggregator",
+  "name": "rss-aggregator",
+  "version": "1.0.0",
+  "description": "Aggregate and summarize RSS feeds",
+  "author": "llm-box community",
+  "category": "automation",
+  "tags": [
+    "automation",
+    "workflow"
+  ],
+  "keywords": [
+    "rss-aggregator",
+    "automation"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "data-analytics/financial-analyzer",
+  "name": "financial-analyzer",
+  "version": "1.0.0",
+  "description": "Analyze financial reports and key metrics",
+  "author": "llm-box community",
+  "category": "data-analytics",
+  "tags": [
+    "data-analytics",
+    "workflow"
+  ],
+  "keywords": [
+    "financial-analyzer",
+    "data-analytics"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

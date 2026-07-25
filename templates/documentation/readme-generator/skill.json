@@ -1,0 +1,19 @@
+{
+  "id": "documentation/readme-generator",
+  "name": "readme-generator",
+  "version": "1.0.0",
+  "description": "Generate project README.md",
+  "author": "llm-box community",
+  "category": "documentation",
+  "tags": [
+    "documentation",
+    "workflow"
+  ],
+  "keywords": [
+    "readme-generator",
+    "documentation"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

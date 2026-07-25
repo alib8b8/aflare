@@ -1,0 +1,19 @@
+{
+  "id": "project-management/project-kickoff",
+  "name": "project-kickoff",
+  "version": "1.0.0",
+  "description": "Generate project kickoff document",
+  "author": "llm-box community",
+  "category": "project-management",
+  "tags": [
+    "project-management",
+    "workflow"
+  ],
+  "keywords": [
+    "project-kickoff",
+    "project-management"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "quality-assurance/test-plan",
+  "name": "test-plan",
+  "version": "1.0.0",
+  "description": "Generate comprehensive test plan",
+  "author": "llm-box community",
+  "category": "quality-assurance",
+  "tags": [
+    "quality-assurance",
+    "workflow"
+  ],
+  "keywords": [
+    "test-plan",
+    "quality-assurance"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

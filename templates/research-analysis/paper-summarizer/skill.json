@@ -1,0 +1,19 @@
+{
+  "id": "research-analysis/paper-summarizer",
+  "name": "paper-summarizer",
+  "version": "1.0.0",
+  "description": "Summarize academic papers into key insights",
+  "author": "llm-box community",
+  "category": "research-analysis",
+  "tags": [
+    "research-analysis",
+    "workflow"
+  ],
+  "keywords": [
+    "paper-summarizer",
+    "research-analysis"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

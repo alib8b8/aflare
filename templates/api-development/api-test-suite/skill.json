@@ -1,0 +1,19 @@
+{
+  "id": "api-development/api-test-suite",
+  "name": "api-test-suite",
+  "version": "1.0.0",
+  "description": "Generate API integration test suite",
+  "author": "llm-box community",
+  "category": "api-development",
+  "tags": [
+    "api-development",
+    "workflow"
+  ],
+  "keywords": [
+    "api-test-suite",
+    "api-development"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

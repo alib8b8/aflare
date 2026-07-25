@@ -1,0 +1,19 @@
+{
+  "id": "marketing/content-calendar",
+  "name": "content-calendar",
+  "version": "1.0.0",
+  "description": "Generate monthly content calendar",
+  "author": "llm-box community",
+  "category": "marketing",
+  "tags": [
+    "marketing",
+    "workflow"
+  ],
+  "keywords": [
+    "content-calendar",
+    "marketing"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

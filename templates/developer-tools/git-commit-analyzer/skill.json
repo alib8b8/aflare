@@ -1,0 +1,19 @@
+{
+  "id": "developer-tools/git-commit-analyzer",
+  "name": "git-commit-analyzer",
+  "version": "1.0.0",
+  "description": "Analyze git commit history and generate changelog",
+  "author": "llm-box community",
+  "category": "developer-tools",
+  "tags": [
+    "developer-tools",
+    "workflow"
+  ],
+  "keywords": [
+    "git-commit-analyzer",
+    "developer-tools"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

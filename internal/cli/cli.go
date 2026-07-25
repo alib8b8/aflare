@@ -108,7 +108,7 @@ func ValidateCommand(command string) error {
 		return fmt.Errorf("no command provided")
 	}
 	switch command {
-	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "version", "--version", "-v", "self-update", "update", "autoupgrade", "au", "init", "webui":
+	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "version", "--version", "-v", "self-update", "update", "autoupgrade", "au", "init", "webui", "skills":
 		return nil
 	}
 	return fmt.Errorf("unknown command: %s", command)

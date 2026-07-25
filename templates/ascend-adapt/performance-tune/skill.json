@@ -1,0 +1,19 @@
+{
+  "id": "ascend-adapt/performance-tune",
+  "name": "performance-tune",
+  "version": "1.0.0",
+  "description": "昇腾 Model-Agent 模型适配大赛 · 赛道二主力模板",
+  "author": "llm-box community",
+  "category": "ascend-adapt",
+  "tags": [
+    "ascend-adapt",
+    "workflow"
+  ],
+  "keywords": [
+    "performance-tune",
+    "ascend-adapt"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

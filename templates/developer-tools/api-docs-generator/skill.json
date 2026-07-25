@@ -1,0 +1,19 @@
+{
+  "id": "developer-tools/api-docs-generator",
+  "name": "api-docs-generator",
+  "version": "1.0.0",
+  "description": "Generate API documentation from code comments",
+  "author": "llm-box community",
+  "category": "developer-tools",
+  "tags": [
+    "developer-tools",
+    "workflow"
+  ],
+  "keywords": [
+    "api-docs-generator",
+    "developer-tools"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

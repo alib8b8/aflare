@@ -1,0 +1,19 @@
+{
+  "id": "education/study-plan",
+  "name": "study-plan",
+  "version": "1.0.0",
+  "description": "Create personalized study plan for any topic",
+  "author": "llm-box community",
+  "category": "education",
+  "tags": [
+    "education",
+    "workflow"
+  ],
+  "keywords": [
+    "study-plan",
+    "education"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

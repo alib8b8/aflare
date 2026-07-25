@@ -1,0 +1,19 @@
+{
+  "id": "devops-monitoring/nginx-access-analyzer",
+  "name": "nginx-access-analyzer",
+  "version": "1.0.0",
+  "description": "Analyze Nginx access logs for traffic patterns",
+  "author": "llm-box community",
+  "category": "devops-monitoring",
+  "tags": [
+    "devops-monitoring",
+    "workflow"
+  ],
+  "keywords": [
+    "nginx-access-analyzer",
+    "devops-monitoring"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

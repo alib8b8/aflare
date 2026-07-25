@@ -1,0 +1,19 @@
+{
+  "id": "backend/microservices-design",
+  "name": "microservices-design",
+  "version": "1.0.0",
+  "description": "Generate microservices architecture design",
+  "author": "llm-box community",
+  "category": "backend",
+  "tags": [
+    "backend",
+    "workflow"
+  ],
+  "keywords": [
+    "microservices-design",
+    "backend"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

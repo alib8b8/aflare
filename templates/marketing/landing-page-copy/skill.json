@@ -1,0 +1,19 @@
+{
+  "id": "marketing/landing-page-copy",
+  "name": "landing-page-copy",
+  "version": "1.0.0",
+  "description": "Generate high-converting landing page copy",
+  "author": "llm-box community",
+  "category": "marketing",
+  "tags": [
+    "marketing",
+    "workflow"
+  ],
+  "keywords": [
+    "landing-page-copy",
+    "marketing"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

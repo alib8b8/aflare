@@ -1,0 +1,19 @@
+{
+  "id": "research-analysis/market-research",
+  "name": "market-research",
+  "version": "1.0.0",
+  "description": "Research market trends and competitive landscape",
+  "author": "llm-box community",
+  "category": "research-analysis",
+  "tags": [
+    "research-analysis",
+    "workflow"
+  ],
+  "keywords": [
+    "market-research",
+    "research-analysis"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

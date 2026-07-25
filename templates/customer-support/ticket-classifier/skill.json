@@ -1,0 +1,19 @@
+{
+  "id": "customer-support/ticket-classifier",
+  "name": "ticket-classifier",
+  "version": "1.0.0",
+  "description": "Classify and prioritize support tickets",
+  "author": "llm-box community",
+  "category": "customer-support",
+  "tags": [
+    "customer-support",
+    "workflow"
+  ],
+  "keywords": [
+    "ticket-classifier",
+    "customer-support"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "writing-content/whitepaper",
+  "name": "whitepaper",
+  "version": "1.0.0",
+  "description": "Generate whitepaper structure and content",
+  "author": "llm-box community",
+  "category": "writing-content",
+  "tags": [
+    "writing-content",
+    "workflow"
+  ],
+  "keywords": [
+    "whitepaper",
+    "writing-content"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

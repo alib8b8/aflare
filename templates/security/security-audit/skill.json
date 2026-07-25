@@ -1,0 +1,19 @@
+{
+  "id": "security/security-audit",
+  "name": "security-audit",
+  "version": "1.0.0",
+  "description": "Run security audit checklist on a project",
+  "author": "llm-box community",
+  "category": "security",
+  "tags": [
+    "security",
+    "workflow"
+  ],
+  "keywords": [
+    "security-audit",
+    "security"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

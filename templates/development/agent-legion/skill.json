@@ -1,0 +1,19 @@
+{
+  "id": "development/agent-legion",
+  "name": "agent-legion",
+  "version": "1.0.0",
+  "description": "agent-legion workflow template",
+  "author": "llm-box community",
+  "category": "development",
+  "tags": [
+    "development",
+    "workflow"
+  ],
+  "keywords": [
+    "agent-legion",
+    "development"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

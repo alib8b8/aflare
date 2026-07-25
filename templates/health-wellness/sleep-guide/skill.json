@@ -1,0 +1,19 @@
+{
+  "id": "health-wellness/sleep-guide",
+  "name": "sleep-guide",
+  "version": "1.0.0",
+  "description": "Generate personalized sleep improvement plan",
+  "author": "llm-box community",
+  "category": "health-wellness",
+  "tags": [
+    "health-wellness",
+    "workflow"
+  ],
+  "keywords": [
+    "sleep-guide",
+    "health-wellness"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

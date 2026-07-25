@@ -1,0 +1,19 @@
+{
+  "id": "education/flashcards",
+  "name": "flashcards",
+  "version": "1.0.0",
+  "description": "Generate flashcards from study material",
+  "author": "llm-box community",
+  "category": "education",
+  "tags": [
+    "education",
+    "workflow"
+  ],
+  "keywords": [
+    "flashcards",
+    "education"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

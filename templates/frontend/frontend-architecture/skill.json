@@ -1,0 +1,19 @@
+{
+  "id": "frontend/frontend-architecture",
+  "name": "frontend-architecture",
+  "version": "1.0.0",
+  "description": "Generate frontend architecture plan",
+  "author": "llm-box community",
+  "category": "frontend",
+  "tags": [
+    "frontend",
+    "workflow"
+  ],
+  "keywords": [
+    "frontend-architecture",
+    "frontend"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

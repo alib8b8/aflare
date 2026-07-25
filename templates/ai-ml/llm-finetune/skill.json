@@ -1,0 +1,19 @@
+{
+  "id": "ai-ml/llm-finetune",
+  "name": "llm-finetune",
+  "version": "1.0.0",
+  "description": "Generate LLM fine-tuning preparation guide",
+  "author": "llm-box community",
+  "category": "ai-ml",
+  "tags": [
+    "ai-ml",
+    "workflow"
+  ],
+  "keywords": [
+    "llm-finetune",
+    "ai-ml"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

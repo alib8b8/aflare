@@ -1,0 +1,2286 @@
+{
+  "version": "1.0.0",
+  "count": 120,
+  "skills": [
+    {
+      "id": "ai-ml/data-cleaning",
+      "name": "data-cleaning",
+      "version": "1.0.0",
+      "description": "Generate data cleaning and preprocessing pipeline",
+      "author": "llm-box community",
+      "category": "ai-ml",
+      "tags": [
+        "ai-ml",
+        "workflow"
+      ],
+      "keywords": [
+        "data-cleaning",
+        "ai-ml"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ai-ml/llm-finetune",
+      "name": "llm-finetune",
+      "version": "1.0.0",
+      "description": "Generate LLM fine-tuning preparation guide",
+      "author": "llm-box community",
+      "category": "ai-ml",
+      "tags": [
+        "ai-ml",
+        "workflow"
+      ],
+      "keywords": [
+        "llm-finetune",
+        "ai-ml"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ai-ml/ml-boilerplate",
+      "name": "ml-boilerplate",
+      "version": "1.0.0",
+      "description": "Generate ML project structure and boilerplate",
+      "author": "llm-box community",
+      "category": "ai-ml",
+      "tags": [
+        "ai-ml",
+        "workflow"
+      ],
+      "keywords": [
+        "ml-boilerplate",
+        "ai-ml"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ai-ml/model-evaluation",
+      "name": "model-evaluation",
+      "version": "1.0.0",
+      "description": "Generate comprehensive model evaluation report",
+      "author": "llm-box community",
+      "category": "ai-ml",
+      "tags": [
+        "ai-ml",
+        "workflow"
+      ],
+      "keywords": [
+        "model-evaluation",
+        "ai-ml"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ai-ml/prompt-engineering",
+      "name": "prompt-engineering",
+      "version": "1.0.0",
+      "description": "Generate optimized prompts for specific tasks",
+      "author": "llm-box community",
+      "category": "ai-ml",
+      "tags": [
+        "ai-ml",
+        "workflow"
+      ],
+      "keywords": [
+        "prompt-engineering",
+        "ai-ml"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ai-news",
+      "name": "ai-news",
+      "version": "1.0.0",
+      "description": "Fetch and summarize the latest AI/ML news from Hacker News.",
+      "author": "llm-box community",
+      "category": "uncategorized",
+      "tags": [
+        "uncategorized",
+        "workflow"
+      ],
+      "keywords": [
+        "ai-news",
+        "uncategorized"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "api-development/api-design",
+      "name": "api-design",
+      "version": "1.0.0",
+      "description": "Generate RESTful API design specification",
+      "author": "llm-box community",
+      "category": "api-development",
+      "tags": [
+        "api-development",
+        "workflow"
+      ],
+      "keywords": [
+        "api-design",
+        "api-development"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "api-development/api-test-suite",
+      "name": "api-test-suite",
+      "version": "1.0.0",
+      "description": "Generate API integration test suite",
+      "author": "llm-box community",
+      "category": "api-development",
+      "tags": [
+        "api-development",
+        "workflow"
+      ],
+      "keywords": [
+        "api-test-suite",
+        "api-development"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ascend-adapt/end-to-end-adapt",
+      "name": "end-to-end-adapt",
+      "version": "1.0.0",
+      "description": "昇腾 Model-Agent 模型适配大赛 · 赛道一主力模板",
+      "author": "llm-box community",
+      "category": "ascend-adapt",
+      "tags": [
+        "ascend-adapt",
+        "workflow"
+      ],
+      "keywords": [
+        "end-to-end-adapt",
+        "ascend-adapt"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ascend-adapt/performance-tune",
+      "name": "performance-tune",
+      "version": "1.0.0",
+      "description": "昇腾 Model-Agent 模型适配大赛 · 赛道二主力模板",
+      "author": "llm-box community",
+      "category": "ascend-adapt",
+      "tags": [
+        "ascend-adapt",
+        "workflow"
+      ],
+      "keywords": [
+        "performance-tune",
+        "ascend-adapt"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ascend-adapt/quick-adapt",
+      "name": "quick-adapt",
+      "version": "1.0.0",
+      "description": "quick-adapt workflow template",
+      "author": "llm-box community",
+      "category": "ascend-adapt",
+      "tags": [
+        "ascend-adapt",
+        "workflow"
+      ],
+      "keywords": [
+        "quick-adapt",
+        "ascend-adapt"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "automation/backup-automation",
+      "name": "backup-automation",
+      "version": "1.0.0",
+      "description": "Automated backup workflow with verification",
+      "author": "llm-box community",
+      "category": "automation",
+      "tags": [
+        "automation",
+        "workflow"
+      ],
+      "keywords": [
+        "backup-automation",
+        "automation"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "automation/batch-rename",
+      "name": "batch-rename",
+      "version": "1.0.0",
+      "description": "Batch rename files with patterns",
+      "author": "llm-box community",
+      "category": "automation",
+      "tags": [
+        "automation",
+        "workflow"
+      ],
+      "keywords": [
+        "batch-rename",
+        "automation"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "automation/file-organizer",
+      "name": "file-organizer",
+      "version": "1.0.0",
+      "description": "Organize files by type, date, or extension",
+      "author": "llm-box community",
+      "category": "automation",
+      "tags": [
+        "automation",
+        "workflow"
+      ],
+      "keywords": [
+        "file-organizer",
+        "automation"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "automation/image-optimizer",
+      "name": "image-optimizer",
+      "version": "1.0.0",
+      "description": "Batch optimize images for web",
+      "author": "llm-box community",
+      "category": "automation",
+      "tags": [
+        "automation",
+        "workflow"
+      ],
+      "keywords": [
+        "image-optimizer",
+        "automation"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "automation/rss-aggregator",
+      "name": "rss-aggregator",
+      "version": "1.0.0",
+      "description": "Aggregate and summarize RSS feeds",
+      "author": "llm-box community",
+      "category": "automation",
+      "tags": [
+        "automation",
+        "workflow"
+      ],
+      "keywords": [
+        "rss-aggregator",
+        "automation"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "backend/microservices-design",
+      "name": "microservices-design",
+      "version": "1.0.0",
+      "description": "Generate microservices architecture design",
+      "author": "llm-box community",
+      "category": "backend",
+      "tags": [
+        "backend",
+        "workflow"
+      ],
+      "keywords": [
+        "microservices-design",
+        "backend"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "btc-alert",
+      "name": "btc-alert",
+      "version": "1.0.0",
+      "description": "Monitor Bitcoin price and get alerted when it crosses your threshold.",
+      "author": "llm-box community",
+      "category": "uncategorized",
+      "tags": [
+        "uncategorized",
+        "workflow"
+      ],
+      "keywords": [
+        "btc-alert",
+        "uncategorized"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "business-sales/business-plan",
+      "name": "business-plan",
+      "version": "1.0.0",
+      "description": "Generate comprehensive business plan outline",
+      "author": "llm-box community",
+      "category": "business-sales",
+      "tags": [
+        "business-sales",
+        "workflow"
+      ],
+      "keywords": [
+        "business-plan",
+        "business-sales"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "business-sales/customer-persona",
+      "name": "customer-persona",
+      "version": "1.0.0",
+      "description": "Build detailed customer personas",
+      "author": "llm-box community",
+      "category": "business-sales",
+      "tags": [
+        "business-sales",
+        "workflow"
+      ],
+      "keywords": [
+        "customer-persona",
+        "business-sales"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "business-sales/pitch-deck",
+      "name": "pitch-deck",
+      "version": "1.0.0",
+      "description": "Generate pitch deck structure and content",
+      "author": "llm-box community",
+      "category": "business-sales",
+      "tags": [
+        "business-sales",
+        "workflow"
+      ],
+      "keywords": [
+        "pitch-deck",
+        "business-sales"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "business-sales/saas-pricing",
+      "name": "saas-pricing",
+      "version": "1.0.0",
+      "description": "Design SaaS pricing strategy and tiers",
+      "author": "llm-box community",
+      "category": "business-sales",
+      "tags": [
+        "business-sales",
+        "workflow"
+      ],
+      "keywords": [
+        "saas-pricing",
+        "business-sales"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "business-sales/sales-emails",
+      "name": "sales-emails",
+      "version": "1.0.0",
+      "description": "Generate cold email sequences for sales",
+      "author": "llm-box community",
+      "category": "business-sales",
+      "tags": [
+        "business-sales",
+        "workflow"
+      ],
+      "keywords": [
+        "sales-emails",
+        "business-sales"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "cloud-infra/cloud-architecture",
+      "name": "cloud-architecture",
+      "version": "1.0.0",
+      "description": "Generate cloud architecture design",
+      "author": "llm-box community",
+      "category": "cloud-infra",
+      "tags": [
+        "cloud-infra",
+        "workflow"
+      ],
+      "keywords": [
+        "cloud-architecture",
+        "cloud-infra"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "cloud-infra/iac-template",
+      "name": "iac-template",
+      "version": "1.0.0",
+      "description": "Generate Terraform/IaC templates",
+      "author": "llm-box community",
+      "category": "cloud-infra",
+      "tags": [
+        "cloud-infra",
+        "workflow"
+      ],
+      "keywords": [
+        "iac-template",
+        "cloud-infra"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-marketing/blog-outline-generator",
+      "name": "blog-outline-generator",
+      "version": "1.0.0",
+      "description": "Generate structured blog post outlines from topics",
+      "author": "llm-box community",
+      "category": "content-marketing",
+      "tags": [
+        "content-marketing",
+        "workflow"
+      ],
+      "keywords": [
+        "blog-outline-generator",
+        "content-marketing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-marketing/email-newsletter",
+      "name": "email-newsletter",
+      "version": "1.0.0",
+      "description": "Generate weekly email newsletter content",
+      "author": "llm-box community",
+      "category": "content-marketing",
+      "tags": [
+        "content-marketing",
+        "workflow"
+      ],
+      "keywords": [
+        "email-newsletter",
+        "content-marketing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-marketing/product-description",
+      "name": "product-description",
+      "version": "1.0.0",
+      "description": "Write compelling product descriptions",
+      "author": "llm-box community",
+      "category": "content-marketing",
+      "tags": [
+        "content-marketing",
+        "workflow"
+      ],
+      "keywords": [
+        "product-description",
+        "content-marketing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-marketing/seo-keyword-research",
+      "name": "seo-keyword-research",
+      "version": "1.0.0",
+      "description": "Research and analyze SEO keywords for a topic",
+      "author": "llm-box community",
+      "category": "content-marketing",
+      "tags": [
+        "content-marketing",
+        "workflow"
+      ],
+      "keywords": [
+        "seo-keyword-research",
+        "content-marketing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-marketing/social-media-planner",
+      "name": "social-media-planner",
+      "version": "1.0.0",
+      "description": "Plan social media content for the week",
+      "author": "llm-box community",
+      "category": "content-marketing",
+      "tags": [
+        "content-marketing",
+        "workflow"
+      ],
+      "keywords": [
+        "social-media-planner",
+        "content-marketing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "creative/brand-identity",
+      "name": "brand-identity",
+      "version": "1.0.0",
+      "description": "Generate complete brand identity guide",
+      "author": "llm-box community",
+      "category": "creative",
+      "tags": [
+        "creative",
+        "workflow"
+      ],
+      "keywords": [
+        "brand-identity",
+        "creative"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "creative/song-lyrics",
+      "name": "song-lyrics",
+      "version": "1.0.0",
+      "description": "Generate song lyrics in any style",
+      "author": "llm-box community",
+      "category": "creative",
+      "tags": [
+        "creative",
+        "workflow"
+      ],
+      "keywords": [
+        "song-lyrics",
+        "creative"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "creative/story-plot",
+      "name": "story-plot",
+      "version": "1.0.0",
+      "description": "Generate story plot and character outlines",
+      "author": "llm-box community",
+      "category": "creative",
+      "tags": [
+        "creative",
+        "workflow"
+      ],
+      "keywords": [
+        "story-plot",
+        "creative"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "customer-support/churn-analyzer",
+      "name": "churn-analyzer",
+      "version": "1.0.0",
+      "description": "Analyze customer churn and retention",
+      "author": "llm-box community",
+      "category": "customer-support",
+      "tags": [
+        "customer-support",
+        "workflow"
+      ],
+      "keywords": [
+        "churn-analyzer",
+        "customer-support"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "customer-support/faq-generator",
+      "name": "faq-generator",
+      "version": "1.0.0",
+      "description": "Generate FAQ from support interactions",
+      "author": "llm-box community",
+      "category": "customer-support",
+      "tags": [
+        "customer-support",
+        "workflow"
+      ],
+      "keywords": [
+        "faq-generator",
+        "customer-support"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "customer-support/ticket-classifier",
+      "name": "ticket-classifier",
+      "version": "1.0.0",
+      "description": "Classify and prioritize support tickets",
+      "author": "llm-box community",
+      "category": "customer-support",
+      "tags": [
+        "customer-support",
+        "workflow"
+      ],
+      "keywords": [
+        "ticket-classifier",
+        "customer-support"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "data-analytics/ab-test-analyzer",
+      "name": "ab-test-analyzer",
+      "version": "1.0.0",
+      "description": "Analyze A/B test results and determine winner",
+      "author": "llm-box community",
+      "category": "data-analytics",
+      "tags": [
+        "data-analytics",
+        "workflow"
+      ],
+      "keywords": [
+        "ab-test-analyzer",
+        "data-analytics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "data-analytics/csv-analyzer",
+      "name": "csv-analyzer",
+      "version": "1.0.0",
+      "description": "Analyze CSV data files and generate insights",
+      "author": "llm-box community",
+      "category": "data-analytics",
+      "tags": [
+        "data-analytics",
+        "workflow"
+      ],
+      "keywords": [
+        "csv-analyzer",
+        "data-analytics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "data-analytics/financial-analyzer",
+      "name": "financial-analyzer",
+      "version": "1.0.0",
+      "description": "Analyze financial reports and key metrics",
+      "author": "llm-box community",
+      "category": "data-analytics",
+      "tags": [
+        "data-analytics",
+        "workflow"
+      ],
+      "keywords": [
+        "financial-analyzer",
+        "data-analytics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "data-analytics/sales-dashboard",
+      "name": "sales-dashboard",
+      "version": "1.0.0",
+      "description": "Generate sales performance dashboard",
+      "author": "llm-box community",
+      "category": "data-analytics",
+      "tags": [
+        "data-analytics",
+        "workflow"
+      ],
+      "keywords": [
+        "sales-dashboard",
+        "data-analytics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "data-analytics/survey-analyzer",
+      "name": "survey-analyzer",
+      "version": "1.0.0",
+      "description": "Analyze survey responses and extract insights",
+      "author": "llm-box community",
+      "category": "data-analytics",
+      "tags": [
+        "data-analytics",
+        "workflow"
+      ],
+      "keywords": [
+        "survey-analyzer",
+        "data-analytics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "database/db-migration",
+      "name": "db-migration",
+      "version": "1.0.0",
+      "description": "Generate database migration plan",
+      "author": "llm-box community",
+      "category": "database",
+      "tags": [
+        "database",
+        "workflow"
+      ],
+      "keywords": [
+        "db-migration",
+        "database"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "database/db-schema-docs",
+      "name": "db-schema-docs",
+      "version": "1.0.0",
+      "description": "Generate database schema documentation",
+      "author": "llm-box community",
+      "category": "database",
+      "tags": [
+        "database",
+        "workflow"
+      ],
+      "keywords": [
+        "db-schema-docs",
+        "database"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "developer-tools/api-docs-generator",
+      "name": "api-docs-generator",
+      "version": "1.0.0",
+      "description": "Generate API documentation from code comments",
+      "author": "llm-box community",
+      "category": "developer-tools",
+      "tags": [
+        "developer-tools",
+        "workflow"
+      ],
+      "keywords": [
+        "api-docs-generator",
+        "developer-tools"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "developer-tools/code-duplicate-finder",
+      "name": "code-duplicate-finder",
+      "version": "1.0.0",
+      "description": "Scan codebase for duplicated code patterns",
+      "author": "llm-box community",
+      "category": "developer-tools",
+      "tags": [
+        "developer-tools",
+        "workflow"
+      ],
+      "keywords": [
+        "code-duplicate-finder",
+        "developer-tools"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "developer-tools/dependency-checker",
+      "name": "dependency-checker",
+      "version": "1.0.0",
+      "description": "Check project dependencies for updates and vulnerabilities",
+      "author": "llm-box community",
+      "category": "developer-tools",
+      "tags": [
+        "developer-tools",
+        "workflow"
+      ],
+      "keywords": [
+        "dependency-checker",
+        "developer-tools"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "developer-tools/git-commit-analyzer",
+      "name": "git-commit-analyzer",
+      "version": "1.0.0",
+      "description": "Analyze git commit history and generate changelog",
+      "author": "llm-box community",
+      "category": "developer-tools",
+      "tags": [
+        "developer-tools",
+        "workflow"
+      ],
+      "keywords": [
+        "git-commit-analyzer",
+        "developer-tools"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "developer-tools/unit-test-generator",
+      "name": "unit-test-generator",
+      "version": "1.0.0",
+      "description": "Generate unit test skeleton for Go functions",
+      "author": "llm-box community",
+      "category": "developer-tools",
+      "tags": [
+        "developer-tools",
+        "workflow"
+      ],
+      "keywords": [
+        "unit-test-generator",
+        "developer-tools"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "development/agent-legion",
+      "name": "agent-legion",
+      "version": "1.0.0",
+      "description": "agent-legion workflow template",
+      "author": "llm-box community",
+      "category": "development",
+      "tags": [
+        "development",
+        "workflow"
+      ],
+      "keywords": [
+        "agent-legion",
+        "development"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "devops-monitoring/docker-cleaner",
+      "name": "docker-cleaner",
+      "version": "1.0.0",
+      "description": "Clean up unused Docker images and containers",
+      "author": "llm-box community",
+      "category": "devops-monitoring",
+      "tags": [
+        "devops-monitoring",
+        "workflow"
+      ],
+      "keywords": [
+        "docker-cleaner",
+        "devops-monitoring"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "devops-monitoring/log-analyzer",
+      "name": "log-analyzer",
+      "version": "1.0.0",
+      "description": "Analyze application logs for errors and patterns",
+      "author": "llm-box community",
+      "category": "devops-monitoring",
+      "tags": [
+        "devops-monitoring",
+        "workflow"
+      ],
+      "keywords": [
+        "log-analyzer",
+        "devops-monitoring"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "devops-monitoring/nginx-access-analyzer",
+      "name": "nginx-access-analyzer",
+      "version": "1.0.0",
+      "description": "Analyze Nginx access logs for traffic patterns",
+      "author": "llm-box community",
+      "category": "devops-monitoring",
+      "tags": [
+        "devops-monitoring",
+        "workflow"
+      ],
+      "keywords": [
+        "nginx-access-analyzer",
+        "devops-monitoring"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "devops-monitoring/server-health-check",
+      "name": "server-health-check",
+      "version": "1.0.0",
+      "description": "Check server health metrics and generate report",
+      "author": "llm-box community",
+      "category": "devops-monitoring",
+      "tags": [
+        "devops-monitoring",
+        "workflow"
+      ],
+      "keywords": [
+        "server-health-check",
+        "devops-monitoring"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "devops-monitoring/ssl-cert-checker",
+      "name": "ssl-cert-checker",
+      "version": "1.0.0",
+      "description": "Check SSL certificate expiry for domains",
+      "author": "llm-box community",
+      "category": "devops-monitoring",
+      "tags": [
+        "devops-monitoring",
+        "workflow"
+      ],
+      "keywords": [
+        "ssl-cert-checker",
+        "devops-monitoring"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "documentation/api-docs-builder",
+      "name": "api-docs-builder",
+      "version": "1.0.0",
+      "description": "Build API documentation from spec",
+      "author": "llm-box community",
+      "category": "documentation",
+      "tags": [
+        "documentation",
+        "workflow"
+      ],
+      "keywords": [
+        "api-docs-builder",
+        "documentation"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "documentation/readme-generator",
+      "name": "readme-generator",
+      "version": "1.0.0",
+      "description": "Generate project README.md",
+      "author": "llm-box community",
+      "category": "documentation",
+      "tags": [
+        "documentation",
+        "workflow"
+      ],
+      "keywords": [
+        "readme-generator",
+        "documentation"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/course-curriculum",
+      "name": "course-curriculum",
+      "version": "1.0.0",
+      "description": "Design complete course curriculum",
+      "author": "llm-box community",
+      "category": "education",
+      "tags": [
+        "education",
+        "workflow"
+      ],
+      "keywords": [
+        "course-curriculum",
+        "education"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/course-design-sop",
+      "name": "course-design-sop",
+      "version": "1.0.0",
+      "description": "course-design-sop workflow template",
+      "author": "llm-box community",
+      "category": "education",
+      "tags": [
+        "education",
+        "workflow"
+      ],
+      "keywords": [
+        "course-design-sop",
+        "education"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/essay-outline",
+      "name": "essay-outline",
+      "version": "1.0.0",
+      "description": "Generate structured essay outlines",
+      "author": "llm-box community",
+      "category": "education",
+      "tags": [
+        "education",
+        "workflow"
+      ],
+      "keywords": [
+        "essay-outline",
+        "education"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/flashcards",
+      "name": "flashcards",
+      "version": "1.0.0",
+      "description": "Generate flashcards from study material",
+      "author": "llm-box community",
+      "category": "education",
+      "tags": [
+        "education",
+        "workflow"
+      ],
+      "keywords": [
+        "flashcards",
+        "education"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/language-learning",
+      "name": "language-learning",
+      "version": "1.0.0",
+      "description": "Create language learning curriculum",
+      "author": "llm-box community",
+      "category": "education",
+      "tags": [
+        "education",
+        "workflow"
+      ],
+      "keywords": [
+        "language-learning",
+        "education"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/study-plan",
+      "name": "study-plan",
+      "version": "1.0.0",
+      "description": "Create personalized study plan for any topic",
+      "author": "llm-box community",
+      "category": "education",
+      "tags": [
+        "education",
+        "workflow"
+      ],
+      "keywords": [
+        "study-plan",
+        "education"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "environment-setup/dev-setup",
+      "name": "dev-setup",
+      "version": "1.0.0",
+      "description": "Automated development environment setup",
+      "author": "llm-box community",
+      "category": "environment-setup",
+      "tags": [
+        "environment-setup",
+        "workflow"
+      ],
+      "keywords": [
+        "dev-setup",
+        "environment-setup"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "environment-setup/dotfiles-manager",
+      "name": "dotfiles-manager",
+      "version": "1.0.0",
+      "description": "Manage and backup dotfiles",
+      "author": "llm-box community",
+      "category": "environment-setup",
+      "tags": [
+        "environment-setup",
+        "workflow"
+      ],
+      "keywords": [
+        "dotfiles-manager",
+        "environment-setup"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance-investing/budget-planner",
+      "name": "budget-planner",
+      "version": "1.0.0",
+      "description": "Create personal budget plan and tracker",
+      "author": "llm-box community",
+      "category": "finance-investing",
+      "tags": [
+        "finance-investing",
+        "workflow"
+      ],
+      "keywords": [
+        "budget-planner",
+        "finance-investing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance-investing/portfolio-review",
+      "name": "portfolio-review",
+      "version": "1.0.0",
+      "description": "Review and optimize investment portfolio",
+      "author": "llm-box community",
+      "category": "finance-investing",
+      "tags": [
+        "finance-investing",
+        "workflow"
+      ],
+      "keywords": [
+        "portfolio-review",
+        "finance-investing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/financial-analysis-sop",
+      "name": "financial-analysis-sop",
+      "version": "1.0.0",
+      "description": "financial-analysis-sop workflow template",
+      "author": "llm-box community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "financial-analysis-sop",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/investment-research",
+      "name": "investment-research",
+      "version": "1.0.0",
+      "description": "Comprehensive investment research: deep analysis, due diligence, and portfolio construction.",
+      "author": "llm-box community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "investment-research",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/market-scan",
+      "name": "market-scan",
+      "version": "1.0.0",
+      "description": "Financial market scanning and investment intelligence workflow.",
+      "author": "llm-box community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "market-scan",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "frontend/component-library",
+      "name": "component-library",
+      "version": "1.0.0",
+      "description": "Generate UI component library design",
+      "author": "llm-box community",
+      "category": "frontend",
+      "tags": [
+        "frontend",
+        "workflow"
+      ],
+      "keywords": [
+        "component-library",
+        "frontend"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "frontend/frontend-architecture",
+      "name": "frontend-architecture",
+      "version": "1.0.0",
+      "description": "Generate frontend architecture plan",
+      "author": "llm-box community",
+      "category": "frontend",
+      "tags": [
+        "frontend",
+        "workflow"
+      ],
+      "keywords": [
+        "frontend-architecture",
+        "frontend"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "github-report",
+      "name": "github-report",
+      "version": "1.0.0",
+      "description": "Generate a weekly activity report for your GitHub repository.",
+      "author": "llm-box community",
+      "category": "uncategorized",
+      "tags": [
+        "uncategorized",
+        "workflow"
+      ],
+      "keywords": [
+        "github-report",
+        "uncategorized"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "health-wellness/fitness-plan",
+      "name": "fitness-plan",
+      "version": "1.0.0",
+      "description": "Create personalized fitness plan",
+      "author": "llm-box community",
+      "category": "health-wellness",
+      "tags": [
+        "health-wellness",
+        "workflow"
+      ],
+      "keywords": [
+        "fitness-plan",
+        "health-wellness"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "health-wellness/meal-plan",
+      "name": "meal-plan",
+      "version": "1.0.0",
+      "description": "Generate weekly meal plan",
+      "author": "llm-box community",
+      "category": "health-wellness",
+      "tags": [
+        "health-wellness",
+        "workflow"
+      ],
+      "keywords": [
+        "meal-plan",
+        "health-wellness"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "health-wellness/sleep-guide",
+      "name": "sleep-guide",
+      "version": "1.0.0",
+      "description": "Generate personalized sleep improvement plan",
+      "author": "llm-box community",
+      "category": "health-wellness",
+      "tags": [
+        "health-wellness",
+        "workflow"
+      ],
+      "keywords": [
+        "sleep-guide",
+        "health-wellness"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "health-wellness/stress-management",
+      "name": "stress-management",
+      "version": "1.0.0",
+      "description": "Create stress management toolkit",
+      "author": "llm-box community",
+      "category": "health-wellness",
+      "tags": [
+        "health-wellness",
+        "workflow"
+      ],
+      "keywords": [
+        "stress-management",
+        "health-wellness"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "health/medical-consultation-sop",
+      "name": "medical-consultation-sop",
+      "version": "1.0.0",
+      "description": "medical-consultation-sop workflow template",
+      "author": "llm-box community",
+      "category": "health",
+      "tags": [
+        "health",
+        "workflow"
+      ],
+      "keywords": [
+        "medical-consultation-sop",
+        "health"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr-recruiting/interview-questions",
+      "name": "interview-questions",
+      "version": "1.0.0",
+      "description": "Generate interview questions for any role",
+      "author": "llm-box community",
+      "category": "hr-recruiting",
+      "tags": [
+        "hr-recruiting",
+        "workflow"
+      ],
+      "keywords": [
+        "interview-questions",
+        "hr-recruiting"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr-recruiting/job-description",
+      "name": "job-description",
+      "version": "1.0.0",
+      "description": "Generate professional job descriptions",
+      "author": "llm-box community",
+      "category": "hr-recruiting",
+      "tags": [
+        "hr-recruiting",
+        "workflow"
+      ],
+      "keywords": [
+        "job-description",
+        "hr-recruiting"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr-recruiting/onboarding-plan",
+      "name": "onboarding-plan",
+      "version": "1.0.0",
+      "description": "Create 30-60-90 day onboarding plan",
+      "author": "llm-box community",
+      "category": "hr-recruiting",
+      "tags": [
+        "hr-recruiting",
+        "workflow"
+      ],
+      "keywords": [
+        "onboarding-plan",
+        "hr-recruiting"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr-recruiting/performance-review",
+      "name": "performance-review",
+      "version": "1.0.0",
+      "description": "Generate performance review templates",
+      "author": "llm-box community",
+      "category": "hr-recruiting",
+      "tags": [
+        "hr-recruiting",
+        "workflow"
+      ],
+      "keywords": [
+        "performance-review",
+        "hr-recruiting"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/contract-review-sop",
+      "name": "contract-review-sop",
+      "version": "1.0.0",
+      "description": "contract-review-sop workflow template",
+      "author": "llm-box community",
+      "category": "legal",
+      "tags": [
+        "legal",
+        "workflow"
+      ],
+      "keywords": [
+        "contract-review-sop",
+        "legal"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/privacy-policy",
+      "name": "privacy-policy",
+      "version": "1.0.0",
+      "description": "Generate privacy policy template",
+      "author": "llm-box community",
+      "category": "legal",
+      "tags": [
+        "legal",
+        "workflow"
+      ],
+      "keywords": [
+        "privacy-policy",
+        "legal"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/terms-of-service",
+      "name": "terms-of-service",
+      "version": "1.0.0",
+      "description": "Generate terms of service agreement",
+      "author": "llm-box community",
+      "category": "legal",
+      "tags": [
+        "legal",
+        "workflow"
+      ],
+      "keywords": [
+        "terms-of-service",
+        "legal"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "marketing/competitor-content",
+      "name": "competitor-content",
+      "version": "1.0.0",
+      "description": "Analyze competitor content strategy",
+      "author": "llm-box community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow"
+      ],
+      "keywords": [
+        "competitor-content",
+        "marketing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "marketing/content-calendar",
+      "name": "content-calendar",
+      "version": "1.0.0",
+      "description": "Generate monthly content calendar",
+      "author": "llm-box community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow"
+      ],
+      "keywords": [
+        "content-calendar",
+        "marketing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "marketing/landing-page-copy",
+      "name": "landing-page-copy",
+      "version": "1.0.0",
+      "description": "Generate high-converting landing page copy",
+      "author": "llm-box community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow"
+      ],
+      "keywords": [
+        "landing-page-copy",
+        "marketing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "networking/dns-checker",
+      "name": "dns-checker",
+      "version": "1.0.0",
+      "description": "Check all DNS records for a domain",
+      "author": "llm-box community",
+      "category": "networking",
+      "tags": [
+        "networking",
+        "workflow"
+      ],
+      "keywords": [
+        "dns-checker",
+        "networking"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "networking/network-diagnostics",
+      "name": "network-diagnostics",
+      "version": "1.0.0",
+      "description": "Run network diagnostics and generate report",
+      "author": "llm-box community",
+      "category": "networking",
+      "tags": [
+        "networking",
+        "workflow"
+      ],
+      "keywords": [
+        "network-diagnostics",
+        "networking"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "productivity-personal/book-notes",
+      "name": "book-notes",
+      "version": "1.0.0",
+      "description": "Generate comprehensive book notes and key takeaways",
+      "author": "llm-box community",
+      "category": "productivity-personal",
+      "tags": [
+        "productivity-personal",
+        "workflow"
+      ],
+      "keywords": [
+        "book-notes",
+        "productivity-personal"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "productivity-personal/daily-planner",
+      "name": "daily-planner",
+      "version": "1.0.0",
+      "description": "Generate structured daily plan from goals",
+      "author": "llm-box community",
+      "category": "productivity-personal",
+      "tags": [
+        "productivity-personal",
+        "workflow"
+      ],
+      "keywords": [
+        "daily-planner",
+        "productivity-personal"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "productivity-personal/goal-setting",
+      "name": "goal-setting",
+      "version": "1.0.0",
+      "description": "Set SMART goals with action plans",
+      "author": "llm-box community",
+      "category": "productivity-personal",
+      "tags": [
+        "productivity-personal",
+        "workflow"
+      ],
+      "keywords": [
+        "goal-setting",
+        "productivity-personal"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "productivity-personal/habit-tracker",
+      "name": "habit-tracker",
+      "version": "1.0.0",
+      "description": "Track habits and generate progress reports",
+      "author": "llm-box community",
+      "category": "productivity-personal",
+      "tags": [
+        "productivity-personal",
+        "workflow"
+      ],
+      "keywords": [
+        "habit-tracker",
+        "productivity-personal"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "productivity-personal/weekly-review",
+      "name": "weekly-review",
+      "version": "1.0.0",
+      "description": "Review the week and plan for next",
+      "author": "llm-box community",
+      "category": "productivity-personal",
+      "tags": [
+        "productivity-personal",
+        "workflow"
+      ],
+      "keywords": [
+        "weekly-review",
+        "productivity-personal"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "project-management/project-kickoff",
+      "name": "project-kickoff",
+      "version": "1.0.0",
+      "description": "Generate project kickoff document",
+      "author": "llm-box community",
+      "category": "project-management",
+      "tags": [
+        "project-management",
+        "workflow"
+      ],
+      "keywords": [
+        "project-kickoff",
+        "project-management"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "project-management/retrospective",
+      "name": "retrospective",
+      "version": "1.0.0",
+      "description": "Generate sprint retrospective template",
+      "author": "llm-box community",
+      "category": "project-management",
+      "tags": [
+        "project-management",
+        "workflow"
+      ],
+      "keywords": [
+        "retrospective",
+        "project-management"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "project-management/sprint-planner",
+      "name": "sprint-planner",
+      "version": "1.0.0",
+      "description": "Plan and organize sprint tasks",
+      "author": "llm-box community",
+      "category": "project-management",
+      "tags": [
+        "project-management",
+        "workflow"
+      ],
+      "keywords": [
+        "sprint-planner",
+        "project-management"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "quality-assurance/bug-report",
+      "name": "bug-report",
+      "version": "1.0.0",
+      "description": "Generate structured bug report template",
+      "author": "llm-box community",
+      "category": "quality-assurance",
+      "tags": [
+        "quality-assurance",
+        "workflow"
+      ],
+      "keywords": [
+        "bug-report",
+        "quality-assurance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "quality-assurance/test-plan",
+      "name": "test-plan",
+      "version": "1.0.0",
+      "description": "Generate comprehensive test plan",
+      "author": "llm-box community",
+      "category": "quality-assurance",
+      "tags": [
+        "quality-assurance",
+        "workflow"
+      ],
+      "keywords": [
+        "test-plan",
+        "quality-assurance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "research-analysis/competitor-analysis",
+      "name": "competitor-analysis",
+      "version": "1.0.0",
+      "description": "Analyze competitors and their strategies",
+      "author": "llm-box community",
+      "category": "research-analysis",
+      "tags": [
+        "research-analysis",
+        "workflow"
+      ],
+      "keywords": [
+        "competitor-analysis",
+        "research-analysis"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "research-analysis/market-research",
+      "name": "market-research",
+      "version": "1.0.0",
+      "description": "Research market trends and competitive landscape",
+      "author": "llm-box community",
+      "category": "research-analysis",
+      "tags": [
+        "research-analysis",
+        "workflow"
+      ],
+      "keywords": [
+        "market-research",
+        "research-analysis"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "research-analysis/paper-summarizer",
+      "name": "paper-summarizer",
+      "version": "1.0.0",
+      "description": "Summarize academic papers into key insights",
+      "author": "llm-box community",
+      "category": "research-analysis",
+      "tags": [
+        "research-analysis",
+        "workflow"
+      ],
+      "keywords": [
+        "paper-summarizer",
+        "research-analysis"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "research-analysis/swot-analysis",
+      "name": "swot-analysis",
+      "version": "1.0.0",
+      "description": "Generate comprehensive SWOT analysis for any business",
+      "author": "llm-box community",
+      "category": "research-analysis",
+      "tags": [
+        "research-analysis",
+        "workflow"
+      ],
+      "keywords": [
+        "swot-analysis",
+        "research-analysis"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "research-analysis/trend-tracker",
+      "name": "trend-tracker",
+      "version": "1.0.0",
+      "description": "Track and analyze emerging industry trends",
+      "author": "llm-box community",
+      "category": "research-analysis",
+      "tags": [
+        "research-analysis",
+        "workflow"
+      ],
+      "keywords": [
+        "trend-tracker",
+        "research-analysis"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "research/data-analysis",
+      "name": "data-analysis",
+      "version": "1.0.0",
+      "description": "data-analysis workflow template",
+      "author": "llm-box community",
+      "category": "research",
+      "tags": [
+        "research",
+        "workflow"
+      ],
+      "keywords": [
+        "data-analysis",
+        "research"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "research/experiment-design",
+      "name": "experiment-design",
+      "version": "1.0.0",
+      "description": "experiment-design workflow template",
+      "author": "llm-box community",
+      "category": "research",
+      "tags": [
+        "research",
+        "workflow"
+      ],
+      "keywords": [
+        "experiment-design",
+        "research"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "research/literature-review",
+      "name": "literature-review",
+      "version": "1.0.0",
+      "description": "literature-review workflow template",
+      "author": "llm-box community",
+      "category": "research",
+      "tags": [
+        "research",
+        "workflow"
+      ],
+      "keywords": [
+        "literature-review",
+        "research"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "research/mindsearch-deep-research",
+      "name": "mindsearch-deep-research",
+      "version": "1.0.0",
+      "description": "mindsearch-deep-research workflow template",
+      "author": "llm-box community",
+      "category": "research",
+      "tags": [
+        "research",
+        "workflow"
+      ],
+      "keywords": [
+        "mindsearch-deep-research",
+        "research"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "research/paper-writing",
+      "name": "paper-writing",
+      "version": "1.0.0",
+      "description": "paper-writing workflow template",
+      "author": "llm-box community",
+      "category": "research",
+      "tags": [
+        "research",
+        "workflow"
+      ],
+      "keywords": [
+        "paper-writing",
+        "research"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "security/incident-response",
+      "name": "incident-response",
+      "version": "1.0.0",
+      "description": "Generate incident response playbook",
+      "author": "llm-box community",
+      "category": "security",
+      "tags": [
+        "security",
+        "workflow"
+      ],
+      "keywords": [
+        "incident-response",
+        "security"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "security/password-policy",
+      "name": "password-policy",
+      "version": "1.0.0",
+      "description": "Generate security password policy",
+      "author": "llm-box community",
+      "category": "security",
+      "tags": [
+        "security",
+        "workflow"
+      ],
+      "keywords": [
+        "password-policy",
+        "security"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "security/security-audit",
+      "name": "security-audit",
+      "version": "1.0.0",
+      "description": "Run security audit checklist on a project",
+      "author": "llm-box community",
+      "category": "security",
+      "tags": [
+        "security",
+        "workflow"
+      ],
+      "keywords": [
+        "security-audit",
+        "security"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "seo-writer",
+      "name": "seo-writer",
+      "version": "1.0.0",
+      "description": "Generate SEO-optimized articles with AI-powered research and audit.",
+      "author": "llm-box community",
+      "category": "uncategorized",
+      "tags": [
+        "uncategorized",
+        "workflow"
+      ],
+      "keywords": [
+        "seo-writer",
+        "uncategorized"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "telegram-bot",
+      "name": "telegram-bot",
+      "version": "1.0.0",
+      "description": "Send notifications to Telegram from your workflows.",
+      "author": "llm-box community",
+      "category": "uncategorized",
+      "tags": [
+        "uncategorized",
+        "workflow"
+      ],
+      "keywords": [
+        "telegram-bot",
+        "uncategorized"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "travel/travel-itinerary",
+      "name": "travel-itinerary",
+      "version": "1.0.0",
+      "description": "Generate detailed travel itinerary",
+      "author": "llm-box community",
+      "category": "travel",
+      "tags": [
+        "travel",
+        "workflow"
+      ],
+      "keywords": [
+        "travel-itinerary",
+        "travel"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "travel/trip-budget",
+      "name": "trip-budget",
+      "version": "1.0.0",
+      "description": "Calculate and plan trip budget",
+      "author": "llm-box community",
+      "category": "travel",
+      "tags": [
+        "travel",
+        "workflow"
+      ],
+      "keywords": [
+        "trip-budget",
+        "travel"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "writing-content/case-study",
+      "name": "case-study",
+      "version": "1.0.0",
+      "description": "Generate customer case study template",
+      "author": "llm-box community",
+      "category": "writing-content",
+      "tags": [
+        "writing-content",
+        "workflow"
+      ],
+      "keywords": [
+        "case-study",
+        "writing-content"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "writing-content/ebook-outline",
+      "name": "ebook-outline",
+      "version": "1.0.0",
+      "description": "Generate comprehensive ebook outline",
+      "author": "llm-box community",
+      "category": "writing-content",
+      "tags": [
+        "writing-content",
+        "workflow"
+      ],
+      "keywords": [
+        "ebook-outline",
+        "writing-content"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "writing-content/press-release",
+      "name": "press-release",
+      "version": "1.0.0",
+      "description": "Generate professional press release",
+      "author": "llm-box community",
+      "category": "writing-content",
+      "tags": [
+        "writing-content",
+        "workflow"
+      ],
+      "keywords": [
+        "press-release",
+        "writing-content"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "writing-content/whitepaper",
+      "name": "whitepaper",
+      "version": "1.0.0",
+      "description": "Generate whitepaper structure and content",
+      "author": "llm-box community",
+      "category": "writing-content",
+      "tags": [
+        "writing-content",
+        "workflow"
+      ],
+      "keywords": [
+        "whitepaper",
+        "writing-content"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    }
+  ]
+}

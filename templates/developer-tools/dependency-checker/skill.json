@@ -1,0 +1,19 @@
+{
+  "id": "developer-tools/dependency-checker",
+  "name": "dependency-checker",
+  "version": "1.0.0",
+  "description": "Check project dependencies for updates and vulnerabilities",
+  "author": "llm-box community",
+  "category": "developer-tools",
+  "tags": [
+    "developer-tools",
+    "workflow"
+  ],
+  "keywords": [
+    "dependency-checker",
+    "developer-tools"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

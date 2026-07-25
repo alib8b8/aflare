@@ -1,0 +1,19 @@
+{
+  "id": "customer-support/churn-analyzer",
+  "name": "churn-analyzer",
+  "version": "1.0.0",
+  "description": "Analyze customer churn and retention",
+  "author": "llm-box community",
+  "category": "customer-support",
+  "tags": [
+    "customer-support",
+    "workflow"
+  ],
+  "keywords": [
+    "churn-analyzer",
+    "customer-support"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

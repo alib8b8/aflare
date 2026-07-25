@@ -1,0 +1,19 @@
+{
+  "id": "hr-recruiting/onboarding-plan",
+  "name": "onboarding-plan",
+  "version": "1.0.0",
+  "description": "Create 30-60-90 day onboarding plan",
+  "author": "llm-box community",
+  "category": "hr-recruiting",
+  "tags": [
+    "hr-recruiting",
+    "workflow"
+  ],
+  "keywords": [
+    "onboarding-plan",
+    "hr-recruiting"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

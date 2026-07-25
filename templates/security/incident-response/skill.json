@@ -1,0 +1,19 @@
+{
+  "id": "security/incident-response",
+  "name": "incident-response",
+  "version": "1.0.0",
+  "description": "Generate incident response playbook",
+  "author": "llm-box community",
+  "category": "security",
+  "tags": [
+    "security",
+    "workflow"
+  ],
+  "keywords": [
+    "incident-response",
+    "security"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

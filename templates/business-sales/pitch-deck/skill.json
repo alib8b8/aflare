@@ -1,0 +1,19 @@
+{
+  "id": "business-sales/pitch-deck",
+  "name": "pitch-deck",
+  "version": "1.0.0",
+  "description": "Generate pitch deck structure and content",
+  "author": "llm-box community",
+  "category": "business-sales",
+  "tags": [
+    "business-sales",
+    "workflow"
+  ],
+  "keywords": [
+    "pitch-deck",
+    "business-sales"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

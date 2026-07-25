@@ -1,0 +1,19 @@
+{
+  "id": "content-marketing/social-media-planner",
+  "name": "social-media-planner",
+  "version": "1.0.0",
+  "description": "Plan social media content for the week",
+  "author": "llm-box community",
+  "category": "content-marketing",
+  "tags": [
+    "content-marketing",
+    "workflow"
+  ],
+  "keywords": [
+    "social-media-planner",
+    "content-marketing"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

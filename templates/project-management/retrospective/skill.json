@@ -1,0 +1,19 @@
+{
+  "id": "project-management/retrospective",
+  "name": "retrospective",
+  "version": "1.0.0",
+  "description": "Generate sprint retrospective template",
+  "author": "llm-box community",
+  "category": "project-management",
+  "tags": [
+    "project-management",
+    "workflow"
+  ],
+  "keywords": [
+    "retrospective",
+    "project-management"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

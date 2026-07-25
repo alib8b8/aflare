@@ -1,0 +1,19 @@
+{
+  "id": "finance-investing/portfolio-review",
+  "name": "portfolio-review",
+  "version": "1.0.0",
+  "description": "Review and optimize investment portfolio",
+  "author": "llm-box community",
+  "category": "finance-investing",
+  "tags": [
+    "finance-investing",
+    "workflow"
+  ],
+  "keywords": [
+    "portfolio-review",
+    "finance-investing"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

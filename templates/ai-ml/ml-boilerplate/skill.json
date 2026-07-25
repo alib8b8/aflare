@@ -1,0 +1,19 @@
+{
+  "id": "ai-ml/ml-boilerplate",
+  "name": "ml-boilerplate",
+  "version": "1.0.0",
+  "description": "Generate ML project structure and boilerplate",
+  "author": "llm-box community",
+  "category": "ai-ml",
+  "tags": [
+    "ai-ml",
+    "workflow"
+  ],
+  "keywords": [
+    "ml-boilerplate",
+    "ai-ml"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

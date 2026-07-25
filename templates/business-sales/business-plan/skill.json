@@ -1,0 +1,19 @@
+{
+  "id": "business-sales/business-plan",
+  "name": "business-plan",
+  "version": "1.0.0",
+  "description": "Generate comprehensive business plan outline",
+  "author": "llm-box community",
+  "category": "business-sales",
+  "tags": [
+    "business-sales",
+    "workflow"
+  ],
+  "keywords": [
+    "business-plan",
+    "business-sales"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

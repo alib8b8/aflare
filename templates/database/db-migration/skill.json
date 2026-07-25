@@ -1,0 +1,19 @@
+{
+  "id": "database/db-migration",
+  "name": "db-migration",
+  "version": "1.0.0",
+  "description": "Generate database migration plan",
+  "author": "llm-box community",
+  "category": "database",
+  "tags": [
+    "database",
+    "workflow"
+  ],
+  "keywords": [
+    "db-migration",
+    "database"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}
