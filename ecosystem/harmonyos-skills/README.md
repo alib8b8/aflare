@@ -80,4 +80,4 @@ ohos://workflow/harmony_device_adapt?device_type=phone_dual_fold&fold_state=half
 
 ## 许可证
 
-MIT
+GNU Affero General Public License v3.0

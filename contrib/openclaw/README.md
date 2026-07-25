@@ -16,7 +16,7 @@
     <img src="https://img.shields.io/badge/OpenClaw-Plugin-green" alt="OpenClaw Plugin"/>
   </a>
   <a href="https://github.com/alib8b8/openclaw-llmbox/blob/main/LICENSE">
-    <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License"/>
+    <img src="https://img.shields.io/badge/License-AGPL%20v3.0-yellow" alt="License"/>
   </a>
 </p>
 
@@ -249,7 +249,7 @@ $ openclaw "Summarize https://example.com/article using my kimi_summary workflow
 
 ## License
 
-MIT - See [LICENSE](LICENSE)
+GNU Affero General Public License v3.0 - See [LICENSE](LICENSE)
 
 ## Contributing
 

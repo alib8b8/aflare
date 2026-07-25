@@ -70,7 +70,7 @@ nfpms:
     package_name: llm-box
     description: Terminal-first AI workflow engine
     maintainer: alib8b8
-    license: MIT
+    license: AGPL-3.0
     formats:
       - deb
       - rpm

@@ -138,4 +138,4 @@ const result = await engine.execute(workflow, 'hello');
 
 ## 许可证
 
-MIT
+GNU Affero General Public License v3.0

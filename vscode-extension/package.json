@@ -4,7 +4,7 @@
   "description": "Build terminal workflows using plain English. Describe what you want, llm-box generates the YAML and executes it.",
   "version": "0.4.0",
   "publisher": "alib8b8",
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/alib8b8/llm-box.git"

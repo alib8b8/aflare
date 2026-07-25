@@ -20,7 +20,7 @@
       <img src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat-square" alt="Go" />
     </a>
     <a href="LICENSE">
-      <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="license" />
+      <img src="https://img.shields.io/badge/License-AGPL%20v3.0-blue.svg?style=flat-square" alt="license" />
     </a>
     <a href="https://github.com/alib8b8/llm-box/actions/workflows/release.yml">
       <img src="https://github.com/alib8b8/llm-box/actions/workflows/release.yml/badge.svg" alt="Release status" />
@@ -455,7 +455,7 @@ Currently supporting **22+ models** across mainstream providers:
 
 ### 3. Can it be used in enterprise environments?
 
-Absolutely. llm-box uses the MIT license and provides:
+Absolutely. llm-box uses the GNU Affero General Public License v3.0 and provides:
 - **Tiered security configuration** (L0-L3), supporting security gradients from development to production
 - **Secret redaction** + **outbound data monitoring** to prevent data leaks
 - **Audit logging** for traceability of all operations
@@ -522,7 +522,7 @@ New to the project? Start here:
 
 ## 📄 License
 
-MIT License &mdash; see [LICENSE](LICENSE) for details.
+GNU Affero General Public License v3.0 &mdash; see [LICENSE](LICENSE) for details.
 
 ---
 

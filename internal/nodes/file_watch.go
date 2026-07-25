@@ -1,3 +1,18 @@
+// Copyright (c) 2026 llm-box Contributors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 // file_watch.go 实现 file_watch 节点，监控文件系统变化（创建/修改/删除）。
 // 借鉴 Grok Build 的自研文件监控思路，采用轮询对比而非 fsnotify，
 // 以避免引入第三方依赖。适用于 log-monitor、file-organizer 等工作流模板。

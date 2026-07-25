@@ -19,7 +19,7 @@
       <img src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat-square" alt="Go" />
     </a>
     <a href="LICENSE">
-      <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="Лицензия" />
+      <img src="https://img.shields.io/badge/License-AGPL%20v3.0-blue.svg?style=flat-square" alt="Лицензия" />
     </a>
     <a href="https://github.com/alib8b8/llm-box/actions/workflows/release.yml">
       <img src="https://github.com/alib8b8/llm-box/actions/workflows/release.yml/badge.svg" alt="Статус релиза" />
@@ -432,7 +432,7 @@ llm-box фокусируется на **сочетании детерминир�
 
 ### 3. Можно ли использовать в корпоративной среде?
 
-Абсолютно. llm-box использует лицензию MIT и предоставляет:
+Абсолютно. llm-box использует лицензию GNU Affero General Public License v3.0 и предоставляет:
 - **Уровневую конфигурацию безопасности** (L0-L3), поддерживающую градиенты безопасности от разработки до продакшена
 - **Удаление секретов** + **мониторинг исходящих данных** для предотвращения утечек данных
 - **Журналы аудита** для отслеживаемости всех операций
@@ -499,7 +499,7 @@ llm-box синхронизируется на нескольких платфо�
 
 ## 📄 Лицензия
 
-Лицензия MIT &mdash; подробности в [LICENSE](LICENSE).
+Лицензия GNU Affero General Public License v3.0 &mdash; подробности в [LICENSE](LICENSE).
 
 ---
 

@@ -5,7 +5,7 @@ invocation: both
 allowed-tools: Read, Edit, Write, Bash, Glob, Grep, WebFetch
 version: 0.6.0
 author: llm-box
-license: MIT
+license: AGPL-3.0
 compatibility: claude-code >= 0.7.0
 tags: [workflow, automation, cli, pipeline, terminal]
 ---
@@ -159,4 +159,4 @@ steps:
 - **GitCode**: https://gitcode.com/llm-box/llm-box
 - **Documentation**: https://gitcode.com/llm-box/llm-box/blob/main/README.md
 - **Issues**: https://github.com/alib8b8/llm-box/issues
-- **License**: MIT
+- **License**: AGPL-3.0

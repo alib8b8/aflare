@@ -171,4 +171,4 @@ See the [CHANGELOG](./CHANGELOG.md) for details.
 
 ## 📄 License
 
-[MIT](https://github.com/alib8b8/llm-box/blob/main/LICENSE)
+[GNU Affero General Public License v3.0](https://github.com/alib8b8/llm-box/blob/main/LICENSE)

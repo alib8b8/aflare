@@ -20,7 +20,7 @@
       <img src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat-square" alt="Go" />
     </a>
     <a href="LICENSE">
-      <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="许可证" />
+      <img src="https://img.shields.io/badge/License-AGPL%20v3.0-blue.svg?style=flat-square" alt="许可证" />
     </a>
     <a href="https://github.com/alib8b8/llm-box/actions/workflows/release.yml">
       <img src="https://github.com/alib8b8/llm-box/actions/workflows/release.yml/badge.svg" alt="发布状态" />
@@ -455,7 +455,7 @@ llm-box 专注于**确定性工作流与 AI Agent 的结合**：工作流确保�
 
 ### 3. 可以在企业环境中使用吗？
 
-完全可以。llm-box 采用 MIT 许可证，提供：
+完全可以。llm-box 采用 GNU Affero 通用公共许可证 v3.0，提供：
 - **分级防护配置**（L0-L3），支持从开发环境到生产环境的安全梯度
 - **秘密脱敏** + **出站数据监控**，防止数据泄漏
 - **审计日志**，所有操作可追溯
@@ -522,7 +522,7 @@ llm-box 在多个平台同步，欢迎在您常用的平台关注和贡献：
 
 ## 📄 许可证
 
-MIT 许可证 —— 详见 [LICENSE](LICENSE)。
+GNU Affero 通用公共许可证 v3.0 —— 详见 [LICENSE](LICENSE)。
 
 ---
 

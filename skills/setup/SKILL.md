@@ -5,7 +5,7 @@ invocation: user
 allowed-tools: Read, Edit, Write, Bash
 version: 0.6.0
 author: llm-box
-license: MIT
+license: AGPL-3.0
 compatibility: claude-code >= 0.7.0
 tags: [setup, installation, configuration, mcp]
 ---
@@ -124,4 +124,4 @@ EOF
   - Check PATH: `which llm-box`
   - Verify version: `llm-box --version`
   - Test MCP server: `llm-box --mcp-server`
-- **License**: MIT
+- **License**: AGPL-3.0

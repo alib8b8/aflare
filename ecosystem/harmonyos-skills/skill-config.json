@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "llm-box AI workflow engine skills for HarmonyOS development",
   "author": "llm-box",
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "homepage": "https://gitcode.com/llm-box/llm-box",
   "skills": [
     {
