@@ -224,8 +224,8 @@ func (n *AgentBrowserNode) actionScreenshot(ctx context.Context, targetURL strin
 func (n *AgentBrowserNode) actionSearch(ctx context.Context, query, outputFmt string) (string, error) {
 	searchNode := &SearchAggregateNode{}
 	searchParams := map[string]string{
-		"sources":   "google,news",
-		"output":    outputFmt,
+		"sources":    "google,news",
+		"output":     outputFmt,
 		"time_range": "week",
 	}
 

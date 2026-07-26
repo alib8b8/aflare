@@ -62,11 +62,11 @@ func init() {
 }
 
 var (
-	swarmAgents    = map[string]*SwarmAgent{}
-	swarmChannels  = map[string]*SwarmChannel{}
-	swarmMessages  = []SwarmMessage{}
-	swarmMu        sync.RWMutex
-	swarmInited    bool
+	swarmAgents   = map[string]*SwarmAgent{}
+	swarmChannels = map[string]*SwarmChannel{}
+	swarmMessages = []SwarmMessage{}
+	swarmMu       sync.RWMutex
+	swarmInited   bool
 )
 
 func initSwarm() {

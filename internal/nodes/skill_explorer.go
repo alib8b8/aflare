@@ -23,14 +23,14 @@ import (
 )
 
 type SkillQualityScore struct {
-	Name         string
-	Description  string
-	Category     string
-	Completeness float64
+	Name          string
+	Description   string
+	Category      string
+	Completeness  float64
 	Documentation float64
-	Usability    float64
-	Overall      float64
-	Tags         []string
+	Usability     float64
+	Overall       float64
+	Tags          []string
 }
 
 type SkillExplorerNode struct{}
