@@ -90,6 +90,10 @@ func LoadConfig() (*Config, error) {
 				break
 			}
 		}
+		if err := cfg.Validate(); err != nil {
+			configErr = fmt.Errorf("invalid config: %w", err)
+			return
+		}
 		configMu.Lock()
 		globalConfig = cfg
 		configMu.Unlock()
@@ -257,6 +261,52 @@ func SetConfig(cfg *Config) {
 	configMu.Lock()
 	defer configMu.Unlock()
 	globalConfig = cfg
+}
+
+func (c *Config) Validate() error {
+	if c.Providers == nil {
+		c.Providers = make(map[string]LLMProviderConfig)
+	}
+
+	validLevels := map[string]bool{
+		"": true, SecurityLevelL0: true, SecurityLevelL1: true,
+		SecurityLevelL2: true, SecurityLevelL3: true,
+	}
+	if !validLevels[c.SecurityLevel] {
+		return fmt.Errorf("invalid security_level %q (must be L0, L1, L2, or L3)", c.SecurityLevel)
+	}
+
+	if c.Router.Strategy != "" {
+		validStrategies := map[string]bool{
+			RouterStrategyPriority: true, RouterStrategyCost: true,
+			RouterStrategyLatency: true, RouterStrategyRoundRobin: true,
+			RouterStrategyRandom: true,
+		}
+		if !validStrategies[c.Router.Strategy] {
+			return fmt.Errorf("invalid router strategy %q", c.Router.Strategy)
+		}
+	}
+
+	if c.Router.MaxRetries < 0 {
+		return fmt.Errorf("router max_retries must be >= 0, got %d", c.Router.MaxRetries)
+	}
+
+	for i, p := range c.Router.FallbackOrder {
+		if p.Name == "" {
+			return fmt.Errorf("router provider[%d]: name is required", i)
+		}
+		if p.Priority < 0 {
+			return fmt.Errorf("router provider[%d] %q: priority must be >= 0", i, p.Name)
+		}
+		if p.CostPer1K < 0 {
+			return fmt.Errorf("router provider[%d] %q: cost_per_1k must be >= 0", i, p.Name)
+		}
+		if p.Quota < 0 {
+			return fmt.Errorf("router provider[%d] %q: quota_daily must be >= 0", i, p.Name)
+		}
+	}
+
+	return nil
 }
 
 // resetForTesting resets the config state for unit tests.
