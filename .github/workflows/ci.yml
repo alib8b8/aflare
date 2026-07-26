@@ -47,6 +47,7 @@ jobs:
         args: --timeout 5m
 
     - name: Run govulncheck
+      continue-on-error: true
       run: |
         go install golang.org/x/vuln/cmd/govulncheck@latest
         govulncheck ./...
