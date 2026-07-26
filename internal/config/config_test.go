@@ -356,3 +356,116 @@ router:
 		t.Errorf("expected max_retries 3, got %d", cfg.MaxRetries)
 	}
 }
+
+func TestValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     *Config
+		wantErr bool
+	}{
+		{
+			name:    "nil providers",
+			cfg:     &Config{},
+			wantErr: false,
+		},
+		{
+			name:    "default config",
+			cfg:     &Config{Providers: make(map[string]LLMProviderConfig)},
+			wantErr: false,
+		},
+		{
+			name:    "valid security levels",
+			cfg:     &Config{SecurityLevel: SecurityLevelL0},
+			wantErr: false,
+		},
+		{
+			name:    "invalid security level",
+			cfg:     &Config{SecurityLevel: "invalid"},
+			wantErr: true,
+		},
+		{
+			name:    "valid router strategy priority",
+			cfg:     &Config{Router: RouterConfig{Strategy: RouterStrategyPriority}},
+			wantErr: false,
+		},
+		{
+			name:    "valid router strategy cost",
+			cfg:     &Config{Router: RouterConfig{Strategy: RouterStrategyCost}},
+			wantErr: false,
+		},
+		{
+			name:    "valid router strategy latency",
+			cfg:     &Config{Router: RouterConfig{Strategy: RouterStrategyLatency}},
+			wantErr: false,
+		},
+		{
+			name:    "valid router strategy round_robin",
+			cfg:     &Config{Router: RouterConfig{Strategy: RouterStrategyRoundRobin}},
+			wantErr: false,
+		},
+		{
+			name:    "valid router strategy random",
+			cfg:     &Config{Router: RouterConfig{Strategy: RouterStrategyRandom}},
+			wantErr: false,
+		},
+		{
+			name:    "invalid router strategy",
+			cfg:     &Config{Router: RouterConfig{Strategy: "invalid"}},
+			wantErr: true,
+		},
+		{
+			name:    "negative max_retries",
+			cfg:     &Config{Router: RouterConfig{MaxRetries: -1}},
+			wantErr: true,
+		},
+		{
+			name:    "zero max_retries",
+			cfg:     &Config{Router: RouterConfig{MaxRetries: 0}},
+			wantErr: false,
+		},
+		{
+			name: "provider missing name",
+			cfg: &Config{Router: RouterConfig{FallbackOrder: []RouterProviderEntry{
+				{Name: "", Priority: 1},
+			}}},
+			wantErr: true,
+		},
+		{
+			name: "provider negative priority",
+			cfg: &Config{Router: RouterConfig{FallbackOrder: []RouterProviderEntry{
+				{Name: "test", Priority: -1},
+			}}},
+			wantErr: true,
+		},
+		{
+			name: "provider negative cost",
+			cfg: &Config{Router: RouterConfig{FallbackOrder: []RouterProviderEntry{
+				{Name: "test", CostPer1K: -0.5},
+			}}},
+			wantErr: true,
+		},
+		{
+			name: "provider negative quota",
+			cfg: &Config{Router: RouterConfig{FallbackOrder: []RouterProviderEntry{
+				{Name: "test", Quota: -100},
+			}}},
+			wantErr: true,
+		},
+		{
+			name: "valid provider",
+			cfg: &Config{Router: RouterConfig{FallbackOrder: []RouterProviderEntry{
+				{Name: "test", Priority: 1, CostPer1K: 0.5, Quota: 1000},
+			}}},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

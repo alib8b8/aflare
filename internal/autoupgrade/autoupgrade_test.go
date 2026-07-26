@@ -871,3 +871,53 @@ func TestLoadConfig_InvalidYAML_Skip(t *testing.T) {
 		t.Errorf("expected mode auto, got %s", config.Mode)
 	}
 }
+
+func TestSetChannel(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+		wantErr  bool
+	}{
+		{"stable", ChannelStable, false},
+		{"STABLE", ChannelStable, false},
+		{"", ChannelStable, false},
+		{"beta", ChannelBeta, false},
+		{"BETA", ChannelBeta, false},
+		{"nightly", ChannelNightly, false},
+		{"NIGHTLY", ChannelNightly, false},
+		{"invalid", "", true},
+		{"rc", "", true},
+	}
+	for _, tt := range tests {
+		cfg := &UpgradeConfig{}
+		err := SetChannel(cfg, tt.input)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("SetChannel(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+		}
+		if !tt.wantErr && cfg.Channel != tt.expected {
+			t.Errorf("SetChannel(%q) channel = %q, want %q", tt.input, cfg.Channel, tt.expected)
+		}
+	}
+}
+
+func TestGetChannelTag(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"stable", "latest"},
+		{"STABLE", "latest"},
+		{"", "latest"},
+		{"beta", "beta"},
+		{"BETA", "beta"},
+		{"nightly", "nightly"},
+		{"NIGHTLY", "nightly"},
+		{"unknown", "latest"},
+	}
+	for _, tt := range tests {
+		result := GetChannelTag(tt.input)
+		if result != tt.expected {
+			t.Errorf("GetChannelTag(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
