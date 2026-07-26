@@ -31,20 +31,25 @@ import (
 type SearchSource string
 
 const (
-	SourceReddit     SearchSource = "reddit"
-	SourceTwitter    SearchSource = "twitter"
-	SourceYouTube    SearchSource = "youtube"
-	SourceHackerNews SearchSource = "hn"
-	SourceGitHub     SearchSource = "github"
-	SourceGoogle     SearchSource = "google"
-	SourceWeibo      SearchSource = "weibo"
-	SourceZhihu      SearchSource = "zhihu"
-	SourceBilibili   SearchSource = "bilibili"
-	SourceLinkedIn   SearchSource = "linkedin"
-	SourceNews       SearchSource = "news"
-	SourceFinance    SearchSource = "finance"
-	SourceAcademic   SearchSource = "academic"
-	SourceShopping   SearchSource = "shopping"
+	SourceReddit        SearchSource = "reddit"
+	SourceTwitter       SearchSource = "twitter"
+	SourceYouTube       SearchSource = "youtube"
+	SourceHackerNews    SearchSource = "hn"
+	SourceGitHub        SearchSource = "github"
+	SourceGoogle        SearchSource = "google"
+	SourceWeibo         SearchSource = "weibo"
+	SourceZhihu         SearchSource = "zhihu"
+	SourceBilibili      SearchSource = "bilibili"
+	SourceLinkedIn      SearchSource = "linkedin"
+	SourceNews          SearchSource = "news"
+	SourceFinance       SearchSource = "finance"
+	SourceAcademic      SearchSource = "academic"
+	SourceShopping      SearchSource = "shopping"
+	SourceGeopolitical  SearchSource = "geopolitical"
+	SourceInfrastructure SearchSource = "infrastructure"
+	SourceGlobalEvents  SearchSource = "globalevents"
+	SourceEnergy        SearchSource = "energy"
+	SourceSupplyChain   SearchSource = "supplychain"
 )
 
 type SearchResult struct {
@@ -97,7 +102,9 @@ func (n *SearchAggregateNode) Schema() NodeSchema {
 		Input:       "string - search query",
 		Output:      "string - JSON or formatted ranked results with signal data",
 		Params: []ParamSchema{
-			{Name: "sources", Type: "string", Description: "Comma-separated sources: reddit,twitter,youtube,hn,github,google,weibo,zhihu,bilibili,linkedin,news,finance,academic,shopping (default: reddit,hn,github)", Required: false, Default: "reddit,hn,github"},
+			{Name: "sources", Type: "string", Description: "Comma-separated sources: reddit,twitter,youtube,hn,github,google,weibo,zhihu,bilibili,linkedin,news,finance,academic,shopping,geopolitical,infrastructure,globalevents,energy,supplychain (default: reddit,hn,github,news)", Required: false, Default: "reddit,hn,github,news"},
+			{Name: "region", Type: "string", Description: "Region filter: global,us,eu,asia,cn,mena (default: global)", Required: false, Default: "global"},
+			{Name: "category", Type: "string", Description: "Category filter: politics,economy,technology,military,energy,health,all (default: all)", Required: false, Default: "all"},
 			{Name: "limit", Type: "string", Description: "Max results per source (default: 10)", Required: false, Default: "10"},
 			{Name: "time_range", Type: "string", Description: "Time range: day|week|month|year|all (default: week)", Required: false, Default: "week"},
 			{Name: "sort_by", Type: "string", Description: "signal|relevance|time (default: signal)", Required: false, Default: "signal"},
@@ -196,6 +203,8 @@ func parseSources(s string) []SearchSource {
 		SourceWeibo: true, SourceZhihu: true, SourceBilibili: true,
 		SourceLinkedIn: true, SourceNews: true, SourceFinance: true,
 		SourceAcademic: true, SourceShopping: true,
+		SourceGeopolitical: true, SourceInfrastructure: true,
+		SourceGlobalEvents: true, SourceEnergy: true, SourceSupplyChain: true,
 	}
 	for _, p := range parts {
 		src := SearchSource(strings.TrimSpace(strings.ToLower(p)))
@@ -239,6 +248,16 @@ func fetchSource(ctx context.Context, source SearchSource, query string, limit i
 		return fetchAcademic(ctx, query, limit, timeRange)
 	case SourceShopping:
 		return fetchShopping(ctx, query, limit, timeRange)
+	case SourceGeopolitical:
+		return fetchGeopolitical(ctx, query, limit, timeRange)
+	case SourceInfrastructure:
+		return fetchInfrastructure(ctx, query, limit, timeRange)
+	case SourceGlobalEvents:
+		return fetchGlobalEvents(ctx, query, limit, timeRange)
+	case SourceEnergy:
+		return fetchEnergy(ctx, query, limit, timeRange)
+	case SourceSupplyChain:
+		return fetchSupplyChain(ctx, query, limit, timeRange)
 	default:
 		return nil
 	}
@@ -825,6 +844,161 @@ func joinSources(srcs []SearchSource) string {
 		parts[i] = string(s)
 	}
 	return strings.Join(parts, ", ")
+}
+
+func fetchGeopolitical(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	searchURL := fmt.Sprintf("https://hn.algolia.com/api/v1/search?query=%s+geopolitics+war+sanctions&tags=story&hitsPerPage=%d",
+		url.QueryEscape(query), limit)
+	body, err := httpGet(ctx, searchURL, "")
+	if err != nil {
+		return nil
+	}
+	var data struct {
+		Hits []struct {
+			Title     string    `json:"title"`
+			URL       string    `json:"url"`
+			Points    int       `json:"points"`
+			Comments  int       `json:"num_comments"`
+			Author    string    `json:"author"`
+			CreatedAt time.Time `json:"created_at"`
+			ObjectID  string    `json:"objectID"`
+		} `json:"hits"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		return nil
+	}
+	results := make([]SearchResult, 0, len(data.Hits))
+	for _, h := range data.Hits {
+		u := h.URL
+		if u == "" {
+			u = fmt.Sprintf("https://news.ycombinator.com/item?id=%s", h.ObjectID)
+		}
+		results = append(results, SearchResult{
+			Title:       "[Geopolitical] " + h.Title,
+			URL:         u,
+			Source:      SourceGeopolitical,
+			Score:       float64(h.Points) + float64(h.Comments)*2,
+			Signals:     SignalData{Upvotes: h.Points, Comments: h.Comments},
+			PublishedAt: h.CreatedAt,
+			Author:      h.Author,
+		})
+	}
+	return results
+}
+
+func fetchInfrastructure(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	searchURL := fmt.Sprintf("https://hn.algolia.com/api/v1/search?query=%s+internet+outage+cloud+datacenter+subsea+cable&tags=story&hitsPerPage=%d",
+		url.QueryEscape(query), limit)
+	body, err := httpGet(ctx, searchURL, "")
+	if err != nil {
+		return nil
+	}
+	var data struct {
+		Hits []struct {
+			Title     string    `json:"title"`
+			URL       string    `json:"url"`
+			Points    int       `json:"points"`
+			Comments  int       `json:"num_comments"`
+			Author    string    `json:"author"`
+			CreatedAt time.Time `json:"created_at"`
+			ObjectID  string    `json:"objectID"`
+		} `json:"hits"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		return nil
+	}
+	results := make([]SearchResult, 0, len(data.Hits))
+	for _, h := range data.Hits {
+		u := h.URL
+		if u == "" {
+			u = fmt.Sprintf("https://news.ycombinator.com/item?id=%s", h.ObjectID)
+		}
+		results = append(results, SearchResult{
+			Title:       "[Infra] " + h.Title,
+			URL:         u,
+			Source:      SourceInfrastructure,
+			Score:       float64(h.Points) + float64(h.Comments)*2,
+			Signals:     SignalData{Upvotes: h.Points, Comments: h.Comments},
+			PublishedAt: h.CreatedAt,
+			Author:      h.Author,
+		})
+	}
+	return results
+}
+
+func fetchGlobalEvents(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	searchURL := fmt.Sprintf("https://hn.algolia.com/api/v1/search_by_date?query=%s+breaking+alert+emergency&tags=story&hitsPerPage=%d",
+		url.QueryEscape(query), limit)
+	body, err := httpGet(ctx, searchURL, "")
+	if err != nil {
+		return nil
+	}
+	var data struct {
+		Hits []struct {
+			Title     string    `json:"title"`
+			URL       string    `json:"url"`
+			Points    int       `json:"points"`
+			Comments  int       `json:"num_comments"`
+			Author    string    `json:"author"`
+			CreatedAt time.Time `json:"created_at"`
+			ObjectID  string    `json:"objectID"`
+		} `json:"hits"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		return nil
+	}
+	results := make([]SearchResult, 0, len(data.Hits))
+	for _, h := range data.Hits {
+		u := h.URL
+		if u == "" {
+			u = fmt.Sprintf("https://news.ycombinator.com/item?id=%s", h.ObjectID)
+		}
+		results = append(results, SearchResult{
+			Title:       "[Global] " + h.Title,
+			URL:         u,
+			Source:      SourceGlobalEvents,
+			Score:       float64(h.Points) + float64(h.Comments)*3,
+			Signals:     SignalData{Upvotes: h.Points, Comments: h.Comments},
+			PublishedAt: h.CreatedAt,
+			Author:      h.Author,
+		})
+	}
+	return results
+}
+
+func fetchEnergy(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	return []SearchResult{
+		{
+			Title:       fmt.Sprintf("[Energy] %s - Oil, Gas, Renewable & Nuclear News", query),
+			URL:         fmt.Sprintf("https://www.google.com/search?q=%s+energy+oil+gas+renewable+nuclear", url.QueryEscape(query)),
+			Summary:     "Energy markets, commodity prices, and infrastructure developments",
+			Source:      SourceEnergy,
+			Score:       2.0,
+			PublishedAt: time.Now(),
+		},
+	}
+}
+
+func fetchSupplyChain(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
+	return []SearchResult{
+		{
+			Title:       fmt.Sprintf("[SupplyChain] %s - Logistics, Shipping & Semiconductor Supply", query),
+			URL:         fmt.Sprintf("https://www.google.com/search?q=%s+supply+chain+shipping+logistics+semiconductor", url.QueryEscape(query)),
+			Summary:     "Global supply chain status: shipping rates, port congestion, semiconductor fab updates",
+			Source:      SourceSupplyChain,
+			Score:       2.0,
+			PublishedAt: time.Now(),
+		},
+	}
+}
+
+var globalNewsSources = map[string][]string{
+	"global": {"reuters.com", "apnews.com", "bbc.com", "cnn.com", "aljazeera.com"},
+	"us":     {"nytimes.com", "washingtonpost.com", "cnn.com", "foxnews.com"},
+	"eu":     {"dw.com", "bbc.com", "lemonde.fr", "spiegel.de"},
+	"asia":   {"scmp.com", "nikkei.com", "straitstimes.com", "thehindu.com"},
+	"cn":     {"xinhuanet.com", "people.com.cn", "caixin.com"},
+	"mena":   {"aljazeera.com", "arabnews.com", "thenationalnews.com"},
 }
 
 func httpGet(ctx context.Context, urlStr, userAgent string) (string, error) {
