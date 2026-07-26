@@ -17,10 +17,13 @@ package version
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -438,5 +441,154 @@ func TestSelfUpdate_DownloadSuccess(t *testing.T) {
 	// It will try to replace the test binary; we accept either success or a rename error
 	if err != nil {
 		t.Logf("SelfUpdate error (may be rename-related): %v", err)
+	}
+}
+
+func TestFindChecksumsURL(t *testing.T) {
+	release := &GitHubRelease{
+		Assets: []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+			Size               int64  `json:"size"`
+		}{
+			{Name: "llm-box-linux-amd64", BrowserDownloadURL: "https://example.com/linux"},
+			{Name: "sha256sums.txt", BrowserDownloadURL: "https://example.com/sha256"},
+		},
+	}
+
+	url := findChecksumsURL(release)
+	if url != "https://example.com/sha256" {
+		t.Errorf("Expected sha256 URL, got %q", url)
+	}
+}
+
+func TestFindChecksumsURL_ChecksumsSuffix(t *testing.T) {
+	release := &GitHubRelease{
+		Assets: []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+			Size               int64  `json:"size"`
+		}{
+			{Name: "llm-box-checksums.txt", BrowserDownloadURL: "https://example.com/checksums"},
+		},
+	}
+
+	url := findChecksumsURL(release)
+	if url != "https://example.com/checksums" {
+		t.Errorf("Expected checksums URL, got %q", url)
+	}
+}
+
+func TestFindChecksumsURL_None(t *testing.T) {
+	release := &GitHubRelease{
+		Assets: []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+			Size               int64  `json:"size"`
+		}{
+			{Name: "llm-box-linux-amd64", BrowserDownloadURL: "https://example.com/linux"},
+		},
+	}
+
+	url := findChecksumsURL(release)
+	if url != "" {
+		t.Errorf("Expected empty URL, got %q", url)
+	}
+}
+
+func TestVerifyChecksum(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "checksum-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	content := []byte("hello world")
+	if _, err := tmpFile.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	tmpFile.Close()
+
+	// Compute expected checksum
+	h := sha256.Sum256(content)
+	expected := hex.EncodeToString(h[:])
+
+	if err := verifyChecksum(tmpFile.Name(), expected); err != nil {
+		t.Errorf("Expected checksum to match, got error: %v", err)
+	}
+}
+
+func TestVerifyChecksum_Mismatch(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "checksum-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	tmpFile.Write([]byte("hello world"))
+	tmpFile.Close()
+
+	if err := verifyChecksum(tmpFile.Name(), "0000000000000000000000000000000000000000000000000000000000000000"); err == nil {
+		t.Error("Expected checksum mismatch error")
+	}
+}
+
+func TestVerifyChecksum_FileNotFound(t *testing.T) {
+	err := verifyChecksum("/nonexistent/file/path", "abc123")
+	if err == nil {
+		t.Error("Expected error for nonexistent file")
+	}
+}
+
+func TestDownloadChecksums(t *testing.T) {
+	checksumContent := "abc123def456  llm-box-linux-amd64\n789ghi012jkl  llm-box-darwin-amd64\n"
+	m := &mockTransport{
+		responses: map[string]*http.Response{
+			"example.com/checksums": mockResponse([]byte(checksumContent), http.StatusOK),
+		},
+	}
+	setMockTransport(t, m)
+
+	checksums, err := downloadChecksums("https://example.com/checksums")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(checksums) != 2 {
+		t.Errorf("Expected 2 checksums, got %d", len(checksums))
+	}
+	if checksums["llm-box-linux-amd64"] != "abc123def456" {
+		t.Errorf("Unexpected checksum for linux-amd64: %s", checksums["llm-box-linux-amd64"])
+	}
+}
+
+func TestDownloadChecksums_EmptyLines(t *testing.T) {
+	checksumContent := "\n\nabc123  file1\n\n  \n789def  file2\n\n"
+	m := &mockTransport{
+		responses: map[string]*http.Response{
+			"example.com/checksums2": mockResponse([]byte(checksumContent), http.StatusOK),
+		},
+	}
+	setMockTransport(t, m)
+
+	checksums, err := downloadChecksums("https://example.com/checksums2")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(checksums) != 2 {
+		t.Errorf("Expected 2 checksums, got %d", len(checksums))
+	}
+}
+
+func TestDownloadChecksums_ErrorStatus(t *testing.T) {
+	m := &mockTransport{
+		responses: map[string]*http.Response{
+			"example.com/bad": mockResponse([]byte("Not Found"), http.StatusNotFound),
+		},
+	}
+	setMockTransport(t, m)
+
+	_, err := downloadChecksums("https://example.com/bad")
+	if err == nil {
+		t.Error("Expected error for non-200 status")
 	}
 }

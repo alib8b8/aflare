@@ -173,3 +173,331 @@ func contains(s, substr string) bool {
 	}
 	return false
 }
+
+func TestGetModelPricing(t *testing.T) {
+	tests := []struct {
+		model   string
+		wantOk  bool
+		free    bool
+	}{
+		{"gpt-4o", true, false},
+		{"gpt-4o-mini", true, false},
+		{"claude-3-5-sonnet", true, false},
+		{"llama2", true, true},
+		{"llama3.1", true, true},
+		{"deepseek-r1", true, true},
+		{"nonexistent-model", false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			pricing, ok := GetModelPricing(tt.model)
+			if ok != tt.wantOk {
+				t.Errorf("GetModelPricing(%q) ok = %v, want %v", tt.model, ok, tt.wantOk)
+			}
+			if ok && tt.free {
+				if pricing.InputPricePer1K != 0 || pricing.OutputPricePer1K != 0 {
+					t.Errorf("Expected free pricing for %s, got input=%f output=%f",
+						tt.model, pricing.InputPricePer1K, pricing.OutputPricePer1K)
+				}
+			}
+		})
+	}
+}
+
+func TestRecordStepNoWorkflow(t *testing.T) {
+	collector := NewStatsCollector()
+	collector.RecordStep("step1", "ollama", "llama2", 100, 50, 100*time.Millisecond)
+
+	stats := collector.GetCurrentStats()
+	if stats != nil {
+		t.Error("Expected nil stats when no workflow started")
+	}
+}
+
+func TestGetStatsNonexistent(t *testing.T) {
+	collector := NewStatsCollector()
+	stats := collector.GetStats("nonexistent")
+	if stats != nil {
+		t.Error("Expected nil stats for nonexistent workflow")
+	}
+}
+
+func TestGetCurrentStatsNone(t *testing.T) {
+	collector := NewStatsCollector()
+	stats := collector.GetCurrentStats()
+	if stats != nil {
+		t.Error("Expected nil current stats when none active")
+	}
+}
+
+func TestFormatReportNonexistent(t *testing.T) {
+	collector := NewStatsCollector()
+	report := collector.FormatReport("nonexistent")
+	if report != "No statistics available" {
+		t.Errorf("Expected 'No statistics available', got %q", report)
+	}
+}
+
+func TestFormatCompactReportNonexistent(t *testing.T) {
+	collector := NewStatsCollector()
+	report := collector.FormatCompactReport("nonexistent")
+	if report != "" {
+		t.Errorf("Expected empty compact report, got %q", report)
+	}
+}
+
+func TestModelCallsTracking(t *testing.T) {
+	collector := NewStatsCollector()
+	collector.StartWorkflow("test-workflow")
+	collector.RecordStep("step1", "ollama", "gpt-4o", 100, 50, 10*time.Millisecond)
+	collector.RecordStep("step2", "ollama", "gpt-4o", 200, 100, 20*time.Millisecond)
+	collector.RecordStep("step3", "ollama", "llama2", 50, 25, 5*time.Millisecond)
+	collector.EndWorkflow("test-workflow")
+
+	stats := collector.GetStats("test-workflow")
+	if stats == nil {
+		t.Fatal("Expected non-nil stats")
+	}
+	if stats.ModelCalls["gpt-4o"] != 2 {
+		t.Errorf("Expected 2 calls for gpt-4o, got %d", stats.ModelCalls["gpt-4o"])
+	}
+	if stats.ModelCalls["llama2"] != 1 {
+		t.Errorf("Expected 1 call for llama2, got %d", stats.ModelCalls["llama2"])
+	}
+}
+
+func TestCostAggregation(t *testing.T) {
+	collector := NewStatsCollector()
+	collector.StartWorkflow("cost-test")
+	collector.RecordStep("s1", "ollama", "gpt-4o-mini", 1000, 500, 10*time.Millisecond)
+	collector.RecordStep("s2", "ollama", "gpt-4o-mini", 2000, 1000, 10*time.Millisecond)
+	collector.EndWorkflow("cost-test")
+
+	stats := collector.GetStats("cost-test")
+	if stats == nil {
+		t.Fatal("Expected non-nil stats")
+	}
+	if stats.TotalCost <= 0 {
+		t.Error("Expected positive total cost")
+	}
+	if stats.TotalInput != 3000 {
+		t.Errorf("Expected total input 3000, got %d", stats.TotalInput)
+	}
+	if stats.TotalOutput != 1500 {
+		t.Errorf("Expected total output 1500, got %d", stats.TotalOutput)
+	}
+}
+
+func TestGlobalFormatCompactReport(t *testing.T) {
+	StartWorkflow("compact-test")
+	RecordStep("step1", "ollama", "llama2", 100, 50, 10*time.Millisecond)
+	EndWorkflow("compact-test")
+
+	report := FormatCompactReport("compact-test")
+	if report == "" {
+		t.Error("Expected non-empty compact report from global")
+	}
+}
+
+func TestEndWorkflowNotCurrent(t *testing.T) {
+	collector := NewStatsCollector()
+	collector.StartWorkflow("wf1")
+	collector.StartWorkflow("wf2")
+	collector.EndWorkflow("wf1")
+
+	stats := collector.GetCurrentStats()
+	if stats == nil {
+		t.Fatal("Expected current stats to still be wf2")
+	}
+	if stats.WorkflowName != "wf2" {
+		t.Errorf("Expected current workflow 'wf2', got '%s'", stats.WorkflowName)
+	}
+}
+
+func TestCopyStatsNil(t *testing.T) {
+	result := copyStats(nil)
+	if result != nil {
+		t.Error("Expected nil for copyStats(nil)")
+	}
+}
+
+func TestSecurityStats(t *testing.T) {
+	stats := GetSecurityStats()
+	if stats == nil {
+		t.Fatal("Expected non-nil security stats")
+	}
+}
+
+func TestSecurityRecordBlock(t *testing.T) {
+	stats := &SecurityStats{
+		ByType:            make(map[SecurityBlockType]int64),
+		ByNode:            make(map[string]int64),
+		SecurityLevelUsed: make(map[string]int64),
+		RecentEvents:      make([]SecurityEvent, 0, 100),
+	}
+
+	stats.RecordBlock(BlockPathTraversal, "/etc/passwd attempt", "file_read")
+	stats.RecordBlock(BlockCommandInjection, "; rm -rf", "execute")
+	stats.RecordBlock(BlockSSRF, "http://169.254.169.254", "fetch_url")
+
+	if stats.TotalBlocks != 3 {
+		t.Errorf("Expected 3 total blocks, got %d", stats.TotalBlocks)
+	}
+	if stats.ByType[BlockPathTraversal] != 1 {
+		t.Errorf("Expected 1 path traversal block, got %d", stats.ByType[BlockPathTraversal])
+	}
+	if stats.ByNode["file_read"] != 1 {
+		t.Errorf("Expected 1 file_read node block, got %d", stats.ByNode["file_read"])
+	}
+	if len(stats.RecentEvents) != 3 {
+		t.Errorf("Expected 3 recent events, got %d", len(stats.RecentEvents))
+	}
+}
+
+func TestSecurityRecordBlockNoNode(t *testing.T) {
+	stats := &SecurityStats{
+		ByType:            make(map[SecurityBlockType]int64),
+		ByNode:            make(map[string]int64),
+		SecurityLevelUsed: make(map[string]int64),
+		RecentEvents:      make([]SecurityEvent, 0, 100),
+	}
+
+	stats.RecordBlock(BlockSafeMode, "action blocked by safe mode", "")
+	if stats.ByNode[""] != 0 {
+		t.Error("Expected empty node to not be tracked")
+	}
+}
+
+func TestSecurityRecordSecurityLevel(t *testing.T) {
+	stats := &SecurityStats{
+		ByType:            make(map[SecurityBlockType]int64),
+		ByNode:            make(map[string]int64),
+		SecurityLevelUsed: make(map[string]int64),
+		RecentEvents:      make([]SecurityEvent, 0, 100),
+	}
+
+	stats.RecordSecurityLevel("strict")
+	stats.RecordSecurityLevel("strict")
+	stats.RecordSecurityLevel("permissive")
+
+	if stats.SecurityLevelUsed["strict"] != 2 {
+		t.Errorf("Expected 2 strict uses, got %d", stats.SecurityLevelUsed["strict"])
+	}
+	if stats.SecurityLevelUsed["permissive"] != 1 {
+		t.Errorf("Expected 1 permissive use, got %d", stats.SecurityLevelUsed["permissive"])
+	}
+}
+
+func TestSecurityRecordCodeInterpreterRun(t *testing.T) {
+	stats := &SecurityStats{
+		ByType:            make(map[SecurityBlockType]int64),
+		ByNode:            make(map[string]int64),
+		SecurityLevelUsed: make(map[string]int64),
+		RecentEvents:      make([]SecurityEvent, 0, 100),
+	}
+
+	stats.RecordCodeInterpreterRun(100, false, false)
+	stats.RecordCodeInterpreterRun(200, true, false)
+	stats.RecordCodeInterpreterRun(150, false, true)
+
+	if stats.CodeInterpreter.TotalRuns != 3 {
+		t.Errorf("Expected 3 total runs, got %d", stats.CodeInterpreter.TotalRuns)
+	}
+	if stats.CodeInterpreter.BlockedCount != 1 {
+		t.Errorf("Expected 1 blocked, got %d", stats.CodeInterpreter.BlockedCount)
+	}
+	if stats.CodeInterpreter.TimeoutCount != 1 {
+		t.Errorf("Expected 1 timeout, got %d", stats.CodeInterpreter.TimeoutCount)
+	}
+	if stats.CodeInterpreter.AvgMs != 150 {
+		t.Errorf("Expected avg 150ms, got %d", stats.CodeInterpreter.AvgMs)
+	}
+}
+
+func TestSecurityRecordHTTPRequest(t *testing.T) {
+	stats := &SecurityStats{
+		ByType:            make(map[SecurityBlockType]int64),
+		ByNode:            make(map[string]int64),
+		SecurityLevelUsed: make(map[string]int64),
+		RecentEvents:      make([]SecurityEvent, 0, 100),
+	}
+
+	stats.RecordHTTPRequest(false, false)
+	stats.RecordHTTPRequest(true, false)
+	stats.RecordHTTPRequest(false, true)
+	stats.RecordHTTPRequest(true, true)
+
+	if stats.HTTPRequests.TotalRequests != 4 {
+		t.Errorf("Expected 4 total requests, got %d", stats.HTTPRequests.TotalRequests)
+	}
+	if stats.HTTPRequests.BlockedSSRF != 2 {
+		t.Errorf("Expected 2 SSRF blocks, got %d", stats.HTTPRequests.BlockedSSRF)
+	}
+	if stats.HTTPRequests.BlockedNonHTTP != 2 {
+		t.Errorf("Expected 2 non-HTTP blocks, got %d", stats.HTTPRequests.BlockedNonHTTP)
+	}
+}
+
+func TestSecurityToJSON(t *testing.T) {
+	stats := &SecurityStats{
+		ByType:            make(map[SecurityBlockType]int64),
+		ByNode:            make(map[string]int64),
+		SecurityLevelUsed: make(map[string]int64),
+		RecentEvents:      make([]SecurityEvent, 0, 100),
+	}
+	stats.RecordBlock(BlockPathTraversal, "test", "node1")
+
+	jsonStr, err := stats.ToJSON()
+	if err != nil {
+		t.Fatalf("ToJSON error: %v", err)
+	}
+	if jsonStr == "" {
+		t.Error("Expected non-empty JSON")
+	}
+	if !contains(jsonStr, "total_blocks") {
+		t.Error("Expected JSON to contain 'total_blocks'")
+	}
+}
+
+func TestSecurityFormatReport(t *testing.T) {
+	stats := &SecurityStats{
+		ByType:            make(map[SecurityBlockType]int64),
+		ByNode:            make(map[string]int64),
+		SecurityLevelUsed: make(map[string]int64),
+		RecentEvents:      make([]SecurityEvent, 0, 100),
+	}
+	stats.RecordBlock(BlockPathTraversal, "test", "node1")
+	stats.RecordSecurityLevel("strict")
+
+	report := stats.FormatReport()
+	if report == "" {
+		t.Error("Expected non-empty security report")
+	}
+	if !contains(report, "Security Stats Report") {
+		t.Error("Expected 'Security Stats Report' in report")
+	}
+	if !contains(report, "Code Interpreter") {
+		t.Error("Expected 'Code Interpreter' section in report")
+	}
+	if !contains(report, "HTTP Requests") {
+		t.Error("Expected 'HTTP Requests' section in report")
+	}
+}
+
+func TestSecurityRecentEventsCap(t *testing.T) {
+	stats := &SecurityStats{
+		ByType:            make(map[SecurityBlockType]int64),
+		ByNode:            make(map[string]int64),
+		SecurityLevelUsed: make(map[string]int64),
+		RecentEvents:      make([]SecurityEvent, 0, 100),
+	}
+
+	for i := 0; i < 150; i++ {
+		stats.RecordBlock(BlockSafeMode, "test", "")
+	}
+
+	if len(stats.RecentEvents) != 100 {
+		t.Errorf("Expected recent events capped at 100, got %d", len(stats.RecentEvents))
+	}
+}

@@ -115,3 +115,106 @@ func TestSkillMeta(t *testing.T) {
 		t.Error("expected no match for 'nonexistent'")
 	}
 }
+
+func TestSkillRegistryGet(t *testing.T) {
+	dir := t.TempDir()
+	sr := NewSkillRegistry(dir)
+	if err := sr.Load(); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := sr.Get("nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent skill")
+	}
+}
+
+func TestSkillRegistryListByCategory(t *testing.T) {
+	dir := t.TempDir()
+	sr := NewSkillRegistry(dir)
+	if err := sr.Load(); err != nil {
+		t.Fatal(err)
+	}
+
+	results := sr.ListByCategory("nonexistent")
+	if len(results) != 0 {
+		t.Errorf("expected 0 results for nonexistent category, got %d", len(results))
+	}
+}
+
+func TestSkillRegistryGenerateMissingMetas(t *testing.T) {
+	dir := t.TempDir()
+	sr := NewSkillRegistry(dir)
+	if err := sr.Load(); err != nil {
+		t.Fatal(err)
+	}
+
+	generated := sr.GenerateMissingMetas()
+	if generated != 0 {
+		t.Errorf("expected 0 generated metas for empty registry, got %d", generated)
+	}
+}
+
+func TestSkillRegistryList(t *testing.T) {
+	dir := t.TempDir()
+	sr := NewSkillRegistry(dir)
+	if err := sr.Load(); err != nil {
+		t.Fatal(err)
+	}
+
+	list := sr.List()
+	if list == nil {
+		t.Fatal("expected non-nil list")
+	}
+	if len(list) != 0 {
+		t.Errorf("expected 0 items in list, got %d", len(list))
+	}
+}
+
+func TestAutoGenerateMeta(t *testing.T) {
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, "coding", "my-skill")
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "workflow.yaml"), []byte("name: test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	meta := autoGenerateMeta(skillDir, "coding/my-skill", dir)
+	if meta == nil {
+		t.Fatal("expected non-nil meta")
+	}
+	if meta.ID != "coding/my-skill" {
+		t.Errorf("expected ID 'coding/my-skill', got %q", meta.ID)
+	}
+	if meta.Category != "coding" {
+		t.Errorf("expected category 'coding', got %q", meta.Category)
+	}
+	if meta.Name != "my-skill" {
+		t.Errorf("expected name 'my-skill', got %q", meta.Name)
+	}
+}
+
+func TestAutoGenerateMetaWithReadme(t *testing.T) {
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, "my-skill")
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "workflow.yaml"), []byte("name: test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	readme := "# My Skill\n\nThis is a custom description for testing.\n\nMore text here."
+	if err := os.WriteFile(filepath.Join(skillDir, "README.md"), []byte(readme), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	meta := autoGenerateMeta(skillDir, "my-skill", dir)
+	if meta == nil {
+		t.Fatal("expected non-nil meta")
+	}
+	if meta.Description != "This is a custom description for testing." {
+		t.Errorf("expected description from readme, got %q", meta.Description)
+	}
+}

@@ -1961,3 +1961,125 @@ func TestRedactSensitive_NoMatch(t *testing.T) {
 		t.Errorf("expected no change, got %q", output)
 	}
 }
+
+func TestDefaultEndpointFor(t *testing.T) {
+	tests := []struct {
+		provider string
+		want     string
+	}{
+		{"ollama", "http://localhost:11434"},
+		{"openai", "https://api.openai.com/v1"},
+		{"deepseek", "https://api.deepseek.com/v1"},
+		{"glm", "https://open.bigmodel.cn/api/paas/v4"},
+		{"kimi", "https://api.moonshot.cn/v1"},
+		{"qwen", "https://dashscope.aliyuncs.com/compatible-mode/v1"},
+		{"mistral", "https://api.mistral.ai/v1"},
+		{"yi", "https://api.lingyiwanwu.com/v1"},
+		{"anthropic", "https://api.anthropic.com/v1"},
+		{"gemini", "https://generativelanguage.googleapis.com/v1beta/openai"},
+		{"unknown", "http://localhost:11434"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.provider, func(t *testing.T) {
+			got := defaultEndpointFor(tt.provider)
+			if got != tt.want {
+				t.Errorf("defaultEndpointFor(%q) = %q, want %q", tt.provider, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseToolsList(t *testing.T) {
+	tests := []struct {
+		input    string
+		wantLen  int
+		wantName string
+	}{
+		{"fetch_url,json_parse", 2, "fetch_url"},
+		{"ollama", 1, "ollama_llm"},
+		{"invalid_tool", 2, "fetch_url"},
+		{"", 2, "fetch_url"},
+		{"  fetch_url , json_parse  ", 2, "fetch_url"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			tools := parseToolsList(tt.input)
+			if len(tools) != tt.wantLen {
+				t.Errorf("parseToolsList(%q) len = %d, want %d", tt.input, len(tools), tt.wantLen)
+			}
+			if len(tools) > 0 && tools[0].Name != tt.wantName {
+				t.Errorf("parseToolsList(%q)[0].Name = %q, want %q", tt.input, tools[0].Name, tt.wantName)
+			}
+		})
+	}
+}
+
+func TestParamInt(t *testing.T) {
+	params := map[string]string{
+		"valid":   "42",
+		"low":     "1",
+		"high":    "200",
+		"invalid": "abc",
+	}
+
+	tests := []struct {
+		key        string
+		defaultVal int
+		min        int
+		max        int
+		want       int
+	}{
+		{"valid", 10, 0, 100, 42},
+		{"low", 10, 10, 100, 10},
+		{"high", 10, 0, 100, 100},
+		{"invalid", 10, 0, 100, 10},
+		{"missing", 50, 0, 100, 50},
+		{"valid", 10, 100, 0, 42},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			got := paramInt(params, tt.key, tt.defaultVal, tt.min, tt.max)
+			if got != tt.want {
+				t.Errorf("paramInt(%q, %d, %d, %d) = %d, want %d",
+					tt.key, tt.defaultVal, tt.min, tt.max, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParamFloat(t *testing.T) {
+	params := map[string]string{
+		"valid":   "3.14",
+		"low":     "0.5",
+		"high":    "99.9",
+		"invalid": "abc",
+	}
+
+	tests := []struct {
+		key        string
+		defaultVal float64
+		min        float64
+		max        float64
+		want       float64
+	}{
+		{"valid", 1.0, 0, 100, 3.14},
+		{"low", 1.0, 1.0, 100, 1.0},
+		{"high", 1.0, 0, 50, 50},
+		{"invalid", 2.5, 0, 100, 2.5},
+		{"missing", 5.0, 0, 100, 5.0},
+		{"valid", 1.0, 100, 0, 3.14},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			got := paramFloat(params, tt.key, tt.defaultVal, tt.min, tt.max)
+			if got != tt.want {
+				t.Errorf("paramFloat(%q, %f, %f, %f) = %f, want %f",
+					tt.key, tt.defaultVal, tt.min, tt.max, got, tt.want)
+			}
+		})
+	}
+}
