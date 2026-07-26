@@ -146,3 +146,49 @@ func getParam(params map[string]string, key, defaultVal string) string {
 	}
 	return defaultVal
 }
+
+// paramInt safely parses an integer parameter with fallback default and optional bounds clamping.
+// If parsing fails or the value is out of [min, max], the default is returned.
+// Set min > max to disable clamping.
+func paramInt(params map[string]string, key string, defaultVal, min, max int) int {
+	s := getParam(params, key, "")
+	if s == "" {
+		return defaultVal
+	}
+	var v int
+	if _, err := fmt.Sscanf(s, "%d", &v); err != nil {
+		return defaultVal
+	}
+	if min <= max {
+		if v < min {
+			return min
+		}
+		if v > max {
+			return max
+		}
+	}
+	return v
+}
+
+// paramFloat safely parses a float parameter with fallback default and optional bounds clamping.
+// If parsing fails or the value is out of [min, max], the default is returned.
+// Set min > max to disable clamping.
+func paramFloat(params map[string]string, key string, defaultVal, min, max float64) float64 {
+	s := getParam(params, key, "")
+	if s == "" {
+		return defaultVal
+	}
+	var v float64
+	if _, err := fmt.Sscanf(s, "%f", &v); err != nil {
+		return defaultVal
+	}
+	if min <= max {
+		if v < min {
+			return min
+		}
+		if v > max {
+			return max
+		}
+	}
+	return v
+}

@@ -60,7 +60,6 @@ func (n *AgentBrowserNode) Execute(ctx context.Context, input string, params map
 	targetURL := getParam(params, "url", "")
 	selector := getParam(params, "selector", "")
 	outputFmt := getParam(params, "output_format", "markdown")
-	summaryLenStr := getParam(params, "summary_length", "2000")
 	renderJS := getParam(params, "render_js", "false") == "true"
 
 	if targetURL == "" {
@@ -80,13 +79,7 @@ func (n *AgentBrowserNode) Execute(ctx context.Context, input string, params map
 		}
 	}
 
-	summaryLen := 2000
-	if _, err := fmt.Sscanf(summaryLenStr, "%d", &summaryLen); err != nil {
-		summaryLen = 2000
-	}
-	if summaryLen < 100 {
-		summaryLen = 2000
-	}
+	summaryLen := paramInt(params, "summary_length", 2000, 100, 100000)
 
 	switch action {
 	case "visit":

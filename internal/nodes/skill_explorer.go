@@ -81,27 +81,9 @@ var skillCategories = []string{"development", "productivity", "research", "creat
 func (n *SkillExplorerNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	action := getParam(params, "action", "list")
 	category := getParam(params, "category", "all")
-	minQualityStr := getParam(params, "min_quality", "50")
-	limitStr := getParam(params, "limit", "20")
+	minQuality := paramFloat(params, "min_quality", 50.0, 0, 100)
+	limit := paramInt(params, "limit", 20, 1, 1000)
 	sortBy := getParam(params, "sort_by", "quality")
-
-	minQuality := 50.0
-	if _, err := fmt.Sscanf(minQualityStr, "%f", &minQuality); err != nil {
-		minQuality = 50.0
-	}
-	if minQuality < 0 {
-		minQuality = 0
-	}
-	if minQuality > 100 {
-		minQuality = 100
-	}
-	limit := 20
-	if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
-		limit = 20
-	}
-	if limit < 1 {
-		limit = 20
-	}
 
 	switch action {
 	case "categories":

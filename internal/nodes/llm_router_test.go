@@ -1,0 +1,402 @@
+// Copyright (c) 2026 llm-box Contributors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package nodes
+
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/alib8b8/llm-box/internal/config"
+)
+
+// TestLLMRouterNode_Registration verifies the llm_router node is registered in the
+// global registry under the name "llm_router".
+func TestLLMRouterNode_Registration(t *testing.T) {
+	node, ok := Get("llm_router")
+	if !ok {
+		t.Fatal("llm_router node not found in registry")
+	}
+	if node.Name() != "llm_router" {
+		t.Errorf("expected node name 'llm_router', got '%s'", node.Name())
+	}
+}
+
+// TestLLMRouterNode_Description ensures Description returns a non-empty string.
+func TestLLMRouterNode_Description(t *testing.T) {
+	node := &LLMRouterNode{}
+	if desc := node.Description(); desc == "" {
+		t.Error("Description() returned empty string")
+	}
+}
+
+// TestLLMRouterNode_Schema verifies the schema name and required params.
+func TestLLMRouterNode_Schema(t *testing.T) {
+	node := &LLMRouterNode{}
+	schema := node.Schema()
+
+	if schema.Name != "llm_router" {
+		t.Errorf("Schema().Name = %q, want %q", schema.Name, "llm_router")
+	}
+	if schema.Description == "" {
+		t.Error("Schema().Description is empty")
+	}
+	if schema.Input == "" {
+		t.Error("Schema().Input is empty")
+	}
+	if schema.Output == "" {
+		t.Error("Schema().Output is empty")
+	}
+
+	expectedParams := map[string]bool{
+		"system":        false,
+		"strategy":      false,
+		"max_retries":   false,
+		"show_provider": false,
+		"show_stats":    false,
+	}
+	for _, p := range schema.Params {
+		if _, ok := expectedParams[p.Name]; ok {
+			expectedParams[p.Name] = true
+		}
+	}
+	for name, found := range expectedParams {
+		if !found {
+			t.Errorf("expected param %q in schema, not found", name)
+		}
+	}
+}
+
+// TestLLMRouterNode_SchemaStrategyParam verifies the strategy param default value.
+func TestLLMRouterNode_SchemaStrategyParam(t *testing.T) {
+	node := &LLMRouterNode{}
+	schema := node.Schema()
+	for _, p := range schema.Params {
+		if p.Name == "strategy" {
+			if p.Default != "priority" {
+				t.Errorf("strategy param default = %q, want %q", p.Default, "priority")
+			}
+			return
+		}
+	}
+	t.Error("strategy param not found in schema")
+}
+
+// TestLLMRouterNode_SchemaMaxRetriesParam verifies the max_retries param default value.
+func TestLLMRouterNode_SchemaMaxRetriesParam(t *testing.T) {
+	node := &LLMRouterNode{}
+	schema := node.Schema()
+	for _, p := range schema.Params {
+		if p.Name == "max_retries" {
+			if p.Default != "3" {
+				t.Errorf("max_retries param default = %q, want %q", p.Default, "3")
+			}
+			return
+		}
+	}
+	t.Error("max_retries param not found in schema")
+}
+
+// TestLLMRouter_Execute_NoProviders verifies that Execute gracefully returns an
+// error when there are no active providers configured. This is the deterministic
+// error path that does not require any network calls.
+func TestLLMRouter_Execute_NoProviders(t *testing.T) {
+	r := &LLMRouter{
+		providers: []RouterProvider{},
+		stats:     make(map[string]*ProviderStats),
+		strategy:  config.RouterStrategyPriority,
+		maxRetry:  3,
+	}
+	ctx := context.Background()
+
+	tests := []struct {
+		name   string
+		input  string
+		params map[string]string
+	}{
+		{"empty_input", "", nil},
+		{"nonempty_input", "hello", nil},
+		{"with_params", "hello", map[string]string{"system": "be brief"}},
+		{"with_strategy", "hello", map[string]string{"strategy": "cost"}},
+		{"with_max_retries", "hello", map[string]string{"max_retries": "5"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := r.Execute(ctx, tt.input, tt.params)
+			if err == nil {
+				t.Fatal("expected error when no providers available, got nil")
+			}
+			if !strings.Contains(err.Error(), "no active LLM providers") {
+				t.Errorf("expected 'no active LLM providers' error, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestLLMRouter_Execute_MaxRetries tests the max_retries param parsing using
+// providers without API keys. Providers without an API key (and not named
+// "ollama") fail without making any network calls, so the number of attempted
+// providers reflects the parsed max_retries value.
+func TestLLMRouter_Execute_MaxRetries(t *testing.T) {
+	// Providers without API keys (and not named "ollama") trigger recordFailure
+	// without invoking callProvider, so no network access occurs.
+	providers := []RouterProvider{
+		{Name: "openai", Enabled: true, APIKey: "", Priority: 3},
+		{Name: "anthropic", Enabled: true, APIKey: "", Priority: 2},
+		{Name: "gemini", Enabled: true, APIKey: "", Priority: 1},
+	}
+
+	tests := []struct {
+		name       string
+		maxRetries string
+		wantTried  int
+	}{
+		{"valid_1", "1", 1},
+		{"valid_2", "2", 2},
+		{"valid_3", "3", 3},
+		{"exceeds_provider_count", "10", 3},
+		{"invalid_string_falls_back", "abc", 3},
+		{"zero_falls_back", "0", 3},
+		{"negative_falls_back", "-5", 3},
+		{"empty_uses_router_default", "", 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &LLMRouter{
+				providers: append([]RouterProvider(nil), providers...),
+				stats:     make(map[string]*ProviderStats),
+				strategy:  config.RouterStrategyPriority,
+				maxRetry:  3,
+			}
+			ctx := context.Background()
+			params := map[string]string{}
+			if tt.maxRetries != "" {
+				params["max_retries"] = tt.maxRetries
+			}
+
+			_, _, err := r.Execute(ctx, "input", params)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+
+			errStr := err.Error()
+			idx := strings.Index(errStr, "tried: ")
+			if idx < 0 {
+				t.Fatalf("expected 'tried:' in error message, got: %v", err)
+			}
+			triedPart := errStr[idx+len("tried: "):]
+			if endIdx := strings.Index(triedPart, ")"); endIdx >= 0 {
+				triedPart = triedPart[:endIdx]
+			}
+			triedCount := strings.Count(triedPart, ",") + 1
+			if triedCount != tt.wantTried {
+				t.Errorf("max_retries=%q: expected %d tried providers, got %d (%s)",
+					tt.maxRetries, tt.wantTried, triedCount, triedPart)
+			}
+		})
+	}
+}
+
+// TestLLMRouter_Strategies verifies that SelectProviders orders providers
+// according to the configured strategy. This is the deterministic core of the
+// strategy override mechanism exposed by the llm_router node's "strategy" param.
+func TestLLMRouter_Strategies(t *testing.T) {
+	providers := []RouterProvider{
+		{Name: "cheap", Enabled: true, Priority: 1, CostPer1K: 0.5, AvgLatencyMs: 500, SuccessRate: 0.9},
+		{Name: "fast", Enabled: true, Priority: 2, CostPer1K: 2.0, AvgLatencyMs: 100, SuccessRate: 0.95},
+		{Name: "prio", Enabled: true, Priority: 3, CostPer1K: 1.0, AvgLatencyMs: 300, SuccessRate: 0.99},
+	}
+
+	tests := []struct {
+		name      string
+		strategy  string
+		wantFirst string
+	}{
+		{"priority_highest_first", config.RouterStrategyPriority, "prio"},
+		{"cost_lowest_first", config.RouterStrategyCost, "cheap"},
+		{"latency_lowest_first", config.RouterStrategyLatency, "fast"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &LLMRouter{
+				providers: append([]RouterProvider(nil), providers...),
+				stats:     make(map[string]*ProviderStats),
+				strategy:  tt.strategy,
+				maxRetry:  3,
+			}
+			if got := r.GetStrategy(); got != tt.strategy {
+				t.Errorf("GetStrategy() = %q, want %q", got, tt.strategy)
+			}
+			ctx := context.Background()
+			selected := r.SelectProviders(ctx)
+			if len(selected) != len(providers) {
+				t.Fatalf("SelectProviders returned %d providers, want %d", len(selected), len(providers))
+			}
+			if selected[0].Name != tt.wantFirst {
+				t.Errorf("strategy %q: first provider = %q, want %q",
+					tt.strategy, selected[0].Name, tt.wantFirst)
+			}
+		})
+	}
+}
+
+// TestLLMRouter_StrategyOverride verifies that changing the strategy field
+// (as the llm_router node does when the "strategy" param is provided) changes
+// the ordering produced by SelectProviders.
+func TestLLMRouter_StrategyOverride(t *testing.T) {
+	providers := []RouterProvider{
+		{Name: "low_cost", Enabled: true, Priority: 1, CostPer1K: 0.1, AvgLatencyMs: 1000, SuccessRate: 0.5},
+		{Name: "high_cost", Enabled: true, Priority: 10, CostPer1K: 10.0, AvgLatencyMs: 100, SuccessRate: 0.99},
+	}
+	ctx := context.Background()
+
+	// With the priority strategy, high_cost (priority 10) comes first.
+	r := &LLMRouter{
+		providers: append([]RouterProvider(nil), providers...),
+		stats:     make(map[string]*ProviderStats),
+		strategy:  config.RouterStrategyPriority,
+		maxRetry:  3,
+	}
+	if got := r.SelectProviders(ctx)[0].Name; got != "high_cost" {
+		t.Errorf("priority strategy: expected high_cost first, got %s", got)
+	}
+
+	// Override strategy to cost: low_cost (cheaper) now comes first.
+	r.strategy = config.RouterStrategyCost
+	if got := r.SelectProviders(ctx)[0].Name; got != "low_cost" {
+		t.Errorf("cost strategy override: expected low_cost first, got %s", got)
+	}
+}
+
+// TestLLMRouter_RoundRobinStrategy verifies that the round_robin strategy
+// returns all providers and rotates the starting index across calls.
+func TestLLMRouter_RoundRobinStrategy(t *testing.T) {
+	providers := []RouterProvider{
+		{Name: "a", Enabled: true, Priority: 1},
+		{Name: "b", Enabled: true, Priority: 2},
+		{Name: "c", Enabled: true, Priority: 3},
+	}
+	r := &LLMRouter{
+		providers: append([]RouterProvider(nil), providers...),
+		stats:     make(map[string]*ProviderStats),
+		strategy:  config.RouterStrategyRoundRobin,
+		maxRetry:  3,
+	}
+	ctx := context.Background()
+
+	first := r.SelectProviders(ctx)
+	if len(first) != len(providers) {
+		t.Fatalf("round_robin: expected %d providers, got %d", len(providers), len(first))
+	}
+
+	second := r.SelectProviders(ctx)
+	if len(second) != len(providers) {
+		t.Fatalf("round_robin: expected %d providers on second call, got %d", len(providers), len(second))
+	}
+	// With more than one provider, the rotated start index should change the
+	// first element between successive calls.
+	if first[0].Name == second[0].Name {
+		t.Errorf("round_robin: expected different first provider across calls, both were %q", first[0].Name)
+	}
+}
+
+// TestLLMRouter_RandomStrategy verifies that the random strategy returns all
+// providers (contents, not order).
+func TestLLMRouter_RandomStrategy(t *testing.T) {
+	providers := []RouterProvider{
+		{Name: "a", Enabled: true, Priority: 1},
+		{Name: "b", Enabled: true, Priority: 2},
+		{Name: "c", Enabled: true, Priority: 3},
+	}
+	r := &LLMRouter{
+		providers: append([]RouterProvider(nil), providers...),
+		stats:     make(map[string]*ProviderStats),
+		strategy:  config.RouterStrategyRandom,
+		maxRetry:  3,
+	}
+	ctx := context.Background()
+	selected := r.SelectProviders(ctx)
+	if len(selected) != len(providers) {
+		t.Errorf("random: expected %d providers, got %d", len(providers), len(selected))
+	}
+}
+
+// TestLLMRouter_GetProviders verifies GetProviders returns a defensive copy.
+func TestLLMRouter_GetProviders(t *testing.T) {
+	providers := []RouterProvider{
+		{Name: "openai", Enabled: true},
+		{Name: "anthropic", Enabled: true},
+	}
+	r := &LLMRouter{
+		providers: providers,
+		stats:     make(map[string]*ProviderStats),
+		strategy:  "priority",
+		maxRetry:  3,
+	}
+	got := r.GetProviders()
+	if len(got) != 2 {
+		t.Fatalf("GetProviders() returned %d, want 2", len(got))
+	}
+	// Mutating the returned slice must not affect the router's internal state.
+	got[0].Name = "modified"
+	if r.providers[0].Name == "modified" {
+		t.Error("GetProviders() did not return a copy")
+	}
+}
+
+// TestLLMRouter_GetProviderStats verifies stats are returned for tracked providers.
+func TestLLMRouter_GetProviderStats(t *testing.T) {
+	r := &LLMRouter{
+		providers: []RouterProvider{{Name: "openai", Enabled: true}},
+		stats:     make(map[string]*ProviderStats),
+		strategy:  "priority",
+		maxRetry:  3,
+	}
+	// No calls yet, so no stats should be tracked.
+	stats := r.GetProviderStats()
+	if len(stats) != 0 {
+		t.Errorf("expected 0 stats before any calls, got %d", len(stats))
+	}
+}
+
+// TestLLMRouter_DisabledProvidersExcluded verifies that disabled providers are
+// not returned by SelectProviders.
+func TestLLMRouter_DisabledProvidersExcluded(t *testing.T) {
+	providers := []RouterProvider{
+		{Name: "enabled_a", Enabled: true, Priority: 2},
+		{Name: "disabled_b", Enabled: false, Priority: 10},
+		{Name: "enabled_c", Enabled: true, Priority: 1},
+	}
+	r := &LLMRouter{
+		providers: append([]RouterProvider(nil), providers...),
+		stats:     make(map[string]*ProviderStats),
+		strategy:  config.RouterStrategyPriority,
+		maxRetry:  3,
+	}
+	ctx := context.Background()
+	selected := r.SelectProviders(ctx)
+	if len(selected) != 2 {
+		t.Fatalf("expected 2 active providers, got %d", len(selected))
+	}
+	for _, p := range selected {
+		if p.Name == "disabled_b" {
+			t.Error("disabled provider should not be selected")
+		}
+	}
+}

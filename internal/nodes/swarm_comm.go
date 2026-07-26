@@ -133,15 +133,7 @@ func (n *SwarmCommNode) Execute(ctx context.Context, input string, params map[st
 	action := getParam(params, "action", "read")
 	agentID := getParam(params, "agent_id", "")
 	channel := getParam(params, "channel", "general")
-	limitStr := getParam(params, "limit", "50")
-
-	limit := 50
-	if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
-		limit = 50
-	}
-	if limit < 1 {
-		limit = 50
-	}
+	limit := paramInt(params, "limit", 50, 1, 1000)
 
 	switch action {
 	case "join":
@@ -302,7 +294,9 @@ func (n *SwarmCommNode) actionRead(channel, agentID string, limit int) (string, 
 		return "", fmt.Errorf("channel %s does not exist", channel)
 	}
 
-	msgs := ch.Messages
+	// Copy messages slice to avoid data race with concurrent append
+	msgs := make([]SwarmMessage, len(ch.Messages))
+	copy(msgs, ch.Messages)
 	if len(msgs) > limit {
 		msgs = msgs[len(msgs)-limit:]
 	}

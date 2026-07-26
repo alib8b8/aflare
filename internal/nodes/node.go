@@ -27,6 +27,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alib8b8/llm-box/internal/i18n"
 	"github.com/alib8b8/llm-box/internal/logger"
@@ -188,17 +189,29 @@ func (e *ExternalNode) Execute(ctx context.Context, input string, params map[str
 	return stdout.String(), nil
 }
 
+// NodeExecStats tracks execution statistics for a single node
+type NodeExecStats struct {
+	Calls       int64
+	Errors      int64
+	TotalMs     int64
+	InputBytes  int64
+	OutputBytes int64
+}
+
 // Registry keeps track of all available nodes
 type Registry struct {
 	nodes    map[string]Node
 	safeMode bool
 	mu       sync.RWMutex
+	stats    map[string]*NodeExecStats
+	statsMu  sync.RWMutex
 }
 
 // NewRegistry creates a new registry
 func NewRegistry() *Registry {
 	return &Registry{
 		nodes: make(map[string]Node),
+		stats: make(map[string]*NodeExecStats),
 	}
 }
 
@@ -269,6 +282,57 @@ func (r *Registry) IsSafeMode() bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.safeMode
+}
+
+// ExecuteWithStats runs a node and records execution metrics (calls, errors, latency, I/O size)
+func (r *Registry) ExecuteWithStats(name string, ctx context.Context, input string, params map[string]string) (string, error) {
+	node, ok := r.Get(name)
+	if !ok {
+		return "", fmt.Errorf("node %q not found", name)
+	}
+
+	start := time.Now()
+	output, err := node.Execute(ctx, input, params)
+	elapsed := time.Since(start).Milliseconds()
+
+	r.statsMu.Lock()
+	defer r.statsMu.Unlock()
+
+	if r.stats[name] == nil {
+		r.stats[name] = &NodeExecStats{}
+	}
+	s := r.stats[name]
+	s.Calls++
+	s.TotalMs += elapsed
+	s.InputBytes += int64(len(input))
+	s.OutputBytes += int64(len(output))
+	if err != nil {
+		s.Errors++
+	}
+
+	return output, err
+}
+
+// GetStats returns execution statistics for a node
+func (r *Registry) GetStats(name string) *NodeExecStats {
+	r.statsMu.RLock()
+	defer r.statsMu.RUnlock()
+	if s, ok := r.stats[name]; ok {
+		cp := *s
+		return &cp
+	}
+	return nil
+}
+
+// GetAllStats returns execution statistics for all nodes
+func (r *Registry) GetAllStats() map[string]NodeExecStats {
+	r.statsMu.RLock()
+	defer r.statsMu.RUnlock()
+	result := make(map[string]NodeExecStats, len(r.stats))
+	for name, s := range r.stats {
+		result[name] = *s
+	}
+	return result
 }
 
 // LoadExternalNodes scans a directory and loads all external nodes
