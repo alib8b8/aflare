@@ -16,6 +16,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -594,4 +595,182 @@ func contains(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestEscapeJSONString(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"hello", "hello"},
+		{`hello "world"`, `hello \"world\"`},
+		{`path\to\file`, `path\\to\\file`},
+		{`mixed "quotes" and \slashes`, `mixed \"quotes\" and \\slashes`},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := escapeJSONString(tt.input)
+			if got != tt.want {
+				t.Errorf("escapeJSONString(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMergeMCPConfigSafe_Empty(t *testing.T) {
+	result, err := mergeMCPConfigSafe([]byte("{}"), "/usr/bin/llm-box")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var cfg mcpConfig
+	if err := json.Unmarshal([]byte(result), &cfg); err != nil {
+		t.Fatalf("failed to parse result: %v", err)
+	}
+
+	if cfg.MCPServers["llm-box"].Command != "/usr/bin/llm-box" {
+		t.Errorf("expected command '/usr/bin/llm-box', got %q", cfg.MCPServers["llm-box"].Command)
+	}
+	if len(cfg.MCPServers["llm-box"].Args) != 1 || cfg.MCPServers["llm-box"].Args[0] != "--mcp-server" {
+		t.Errorf("expected args ['--mcp-server'], got %v", cfg.MCPServers["llm-box"].Args)
+	}
+}
+
+func TestMergeMCPConfigSafe_NilServers(t *testing.T) {
+	result, err := mergeMCPConfigSafe([]byte("{}"), "/usr/bin/llm-box")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == "" {
+		t.Error("expected non-empty result")
+	}
+}
+
+func TestMergeMCPConfigSafe_ExistingServer(t *testing.T) {
+	existing := `{"mcpServers":{"llm-box":{"command":"old","args":["--old"]}}}`
+	result, err := mergeMCPConfigSafe([]byte(existing), "/usr/bin/llm-box")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var cfg mcpConfig
+	if err := json.Unmarshal([]byte(result), &cfg); err != nil {
+		t.Fatalf("failed to parse result: %v", err)
+	}
+
+	if cfg.MCPServers["llm-box"].Command != "old" {
+		t.Errorf("expected existing command to be preserved 'old', got %q", cfg.MCPServers["llm-box"].Command)
+	}
+}
+
+func TestMergeMCPConfigSafe_InvalidJSON(t *testing.T) {
+	_, err := mergeMCPConfigSafe([]byte("invalid json"), "/usr/bin/llm-box")
+	if err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestGetBinaryPath(t *testing.T) {
+	path, err := GetBinaryPath()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if path == "" {
+		t.Error("expected non-empty binary path")
+	}
+}
+
+func TestCopyDir(t *testing.T) {
+	srcDir := t.TempDir()
+	dstDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(srcDir, "file1.txt"), []byte("hello"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	subDir := filepath.Join(srcDir, "sub")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(subDir, "file2.txt"), []byte("world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := copyDir(srcDir, dstDir); err != nil {
+		t.Fatalf("copyDir error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dstDir, "file1.txt"))
+	if err != nil {
+		t.Fatalf("failed to read copied file: %v", err)
+	}
+	if string(data) != "hello" {
+		t.Errorf("expected 'hello', got %q", string(data))
+	}
+
+	data, err = os.ReadFile(filepath.Join(dstDir, "sub", "file2.txt"))
+	if err != nil {
+		t.Fatalf("failed to read copied sub file: %v", err)
+	}
+	if string(data) != "world" {
+		t.Errorf("expected 'world', got %q", string(data))
+	}
+}
+
+func TestCopyDir_SourceNotExist(t *testing.T) {
+	err := copyDir("/nonexistent/source", "/tmp/dst")
+	if err == nil {
+		t.Error("expected error for nonexistent source")
+	}
+}
+
+func TestInstallSkills_Unsupported(t *testing.T) {
+	_, err := InstallSkills("unsupported-agent")
+	if err == nil {
+		t.Error("expected error for unsupported agent type")
+	}
+}
+
+func TestInstallSkillsToDir_SourceNotExist(t *testing.T) {
+	skillsDir := t.TempDir()
+	result, err := installSkillsToDir(skillsDir, "/nonexistent/source", "TestAgent")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Installed {
+		t.Error("expected Installed to be false when source doesn't exist")
+	}
+	if result.Agent != "TestAgent" {
+		t.Errorf("expected agent 'TestAgent', got %q", result.Agent)
+	}
+	if result.SkillPath != skillsDir {
+		t.Errorf("expected skill path %q, got %q", skillsDir, result.SkillPath)
+	}
+}
+
+func TestInstallSkillsToDir_WithSkills(t *testing.T) {
+	skillsDir := t.TempDir()
+	sourceDir := t.TempDir()
+
+	skillDir := filepath.Join(sourceDir, "test-skill")
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "workflow.yaml"), []byte("name: test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := installSkillsToDir(skillsDir, sourceDir, "TestAgent")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Installed {
+		t.Error("expected Installed to be true")
+	}
+
+	installedPath := filepath.Join(skillsDir, "llm-box-test-skill")
+	if _, err := os.Stat(installedPath); os.IsNotExist(err) {
+		t.Errorf("expected skill to be installed at %q", installedPath)
+	}
 }

@@ -2083,3 +2083,337 @@ func TestParamFloat(t *testing.T) {
 		})
 	}
 }
+
+func TestTruncate(t *testing.T) {
+	tests := []struct {
+		input  string
+		maxLen int
+		want   string
+	}{
+		{"hello", 10, "hello"},
+		{"hello world", 5, "hello..."},
+		{"", 10, ""},
+		{"a", 0, "..."},
+		{"abcdef", 3, "abc..."},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := truncate(tt.input, tt.maxLen)
+			if got != tt.want {
+				t.Errorf("truncate(%q, %d) = %q, want %q", tt.input, tt.maxLen, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildToolDescriptions(t *testing.T) {
+	tools := []AgentTool{
+		{Name: "fetch", Description: "Fetch a URL"},
+		{Name: "parse", Description: "Parse JSON"},
+	}
+
+	a := &ReActAgent{tools: tools}
+	result := a.buildToolDescriptions()
+
+	expected := "- fetch: Fetch a URL\n- parse: Parse JSON"
+	if result != expected {
+		t.Errorf("buildToolDescriptions() = %q, want %q", result, expected)
+	}
+}
+
+func TestBuildToolDescriptions_Empty(t *testing.T) {
+	a := &ReActAgent{tools: []AgentTool{}}
+	result := a.buildToolDescriptions()
+	if result != "" {
+		t.Errorf("expected empty result, got %q", result)
+	}
+}
+
+func TestBuildSystemPrompt(t *testing.T) {
+	a := &ReActAgent{enableThinking: false}
+	prompt := a.buildSystemPrompt("- tool1: desc")
+
+	if !strings.Contains(prompt, "tool1: desc") {
+		t.Error("expected prompt to contain tool descriptions")
+	}
+	if strings.Contains(prompt, "Thinking mode is ENABLED") {
+		t.Error("expected no thinking instruction when disabled")
+	}
+	if !strings.Contains(prompt, "ReAct (Reason + Act)") {
+		t.Error("expected prompt to contain ReAct pattern")
+	}
+}
+
+func TestBuildSystemPrompt_WithThinking(t *testing.T) {
+	a := &ReActAgent{enableThinking: true}
+	prompt := a.buildSystemPrompt("- tool1: desc")
+
+	if !strings.Contains(prompt, "Thinking mode is ENABLED") {
+		t.Error("expected thinking instruction when enabled")
+	}
+}
+
+func TestBuildSystemPrompt_WithCustom(t *testing.T) {
+	a := &ReActAgent{systemPrompt: "Custom system prompt", enableThinking: false}
+	prompt := a.buildSystemPrompt("- tool1: desc")
+
+	if !strings.HasPrefix(prompt, "Custom system prompt") {
+		t.Error("expected prompt to start with custom system prompt")
+	}
+}
+
+func TestParseReActResponse_ValidJSON(t *testing.T) {
+	response := `{"thought": "let me fetch", "action": "fetch", "action_input": "http://example.com"}`
+	thought, err := parseReActResponse(response)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if thought.Thought != "let me fetch" {
+		t.Errorf("expected thought 'let me fetch', got %q", thought.Thought)
+	}
+	if thought.Action != "fetch" {
+		t.Errorf("expected action 'fetch', got %q", thought.Action)
+	}
+	if thought.ActionInput != "http://example.com" {
+		t.Errorf("expected action_input 'http://example.com', got %q", thought.ActionInput)
+	}
+}
+
+func TestParseReActResponse_WithFinalAnswer(t *testing.T) {
+	response := `{"action": "final_answer", "final_answer": "42 is the answer"}`
+	thought, err := parseReActResponse(response)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if thought.FinalAnswer != "42 is the answer" {
+		t.Errorf("expected final_answer '42 is the answer', got %q", thought.FinalAnswer)
+	}
+}
+
+func TestParseReActResponse_WithCodeFences(t *testing.T) {
+	response := "```json\n{\"action\": \"final_answer\", \"final_answer\": \"hello\"}\n```"
+	thought, err := parseReActResponse(response)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if thought.FinalAnswer != "hello" {
+		t.Errorf("expected final_answer 'hello', got %q", thought.FinalAnswer)
+	}
+}
+
+func TestParseReActResponse_ExtractJSON(t *testing.T) {
+	response := "Some text here\n{\"action\": \"final_answer\", \"final_answer\": \"extracted\"}\nMore text"
+	thought, err := parseReActResponse(response)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if thought.FinalAnswer != "extracted" {
+		t.Errorf("expected final_answer 'extracted', got %q", thought.FinalAnswer)
+	}
+}
+
+func TestParseReActResponse_InvalidJSON(t *testing.T) {
+	_, err := parseReActResponse("not json at all")
+	if err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestParseReActResponse_MissingAction(t *testing.T) {
+	_, err := parseReActResponse(`{"thought": "no action here"}`)
+	if err == nil {
+		t.Error("expected error when neither action nor final_answer present")
+	}
+}
+
+func TestToolNames(t *testing.T) {
+	a := &ReActAgent{tools: []AgentTool{
+		{Name: "fetch"},
+		{Name: "parse"},
+		{Name: "summarize"},
+	}}
+	result := a.toolNames()
+	if result != "fetch, parse, summarize" {
+		t.Errorf("expected 'fetch, parse, summarize', got %q", result)
+	}
+}
+
+func TestBuildConversationPrompt(t *testing.T) {
+	messages := []LLMMessage{
+		{Role: "system", Content: "You are helpful"},
+		{Role: "user", Content: "Hello"},
+		{Role: "assistant", Content: "Hi there"},
+	}
+	result := buildConversationPrompt(messages)
+
+	expected := "system: You are helpful\n\nuser: Hello\n\nassistant: Hi there"
+	if result != expected {
+		t.Errorf("buildConversationPrompt() = %q, want %q", result, expected)
+	}
+}
+
+func TestNewReActAgent_DefaultMaxIters(t *testing.T) {
+	agent := NewReActAgent("ollama", "llama3", "", "", "", 0, nil, nil, false, false)
+	if agent.maxIters != defaultMaxAgentIterations {
+		t.Errorf("expected default maxIters %d, got %d", defaultMaxAgentIterations, agent.maxIters)
+	}
+}
+
+func TestNewReActAgent_CustomMaxIters(t *testing.T) {
+	agent := NewReActAgent("ollama", "llama3", "", "", "", 5, nil, nil, false, false)
+	if agent.maxIters != 5 {
+		t.Errorf("expected maxIters 5, got %d", agent.maxIters)
+	}
+}
+
+func TestNewReActAgent_AllFields(t *testing.T) {
+	tools := []AgentTool{{Name: "t1", Description: "d1", NodeName: "n1"}}
+	reg := NewRegistry()
+	agent := NewReActAgent("openai", "gpt-4", "key1", "https://api.example.com", "sys", 3, tools, reg, true, true)
+
+	if agent.provider != "openai" {
+		t.Errorf("expected provider 'openai', got %q", agent.provider)
+	}
+	if agent.model != "gpt-4" {
+		t.Errorf("expected model 'gpt-4', got %q", agent.model)
+	}
+	if agent.apiKey != "key1" {
+		t.Errorf("expected apiKey 'key1', got %q", agent.apiKey)
+	}
+	if agent.endpoint != "https://api.example.com" {
+		t.Errorf("expected endpoint 'https://api.example.com', got %q", agent.endpoint)
+	}
+	if agent.systemPrompt != "sys" {
+		t.Errorf("expected systemPrompt 'sys', got %q", agent.systemPrompt)
+	}
+	if agent.maxIters != 3 {
+		t.Errorf("expected maxIters 3, got %d", agent.maxIters)
+	}
+	if len(agent.tools) != 1 {
+		t.Errorf("expected 1 tool, got %d", len(agent.tools))
+	}
+	if agent.registry != reg {
+		t.Error("expected registry to be set")
+	}
+	if !agent.enableThinking {
+		t.Error("expected enableThinking true")
+	}
+	if !agent.showThinking {
+		t.Error("expected showThinking true")
+	}
+}
+
+func TestRegexpFindAllStringSubmatch(t *testing.T) {
+	matches := regexpFindAllStringSubmatch(`(\w+)=(\d+)`, "a=1 b=2 c=3", -1)
+	if len(matches) != 3 {
+		t.Fatalf("expected 3 matches, got %d", len(matches))
+	}
+	if matches[0][1] != "a" || matches[0][2] != "1" {
+		t.Errorf("expected first match [a, 1], got %v", matches[0])
+	}
+}
+
+func TestRegexpFindAllStringSubmatch_Limit(t *testing.T) {
+	matches := regexpFindAllStringSubmatch(`\d+`, "1 2 3 4 5", 2)
+	if len(matches) != 2 {
+		t.Errorf("expected 2 matches with limit 2, got %d", len(matches))
+	}
+}
+
+func TestRegexpFindAllStringSubmatch_InvalidPattern(t *testing.T) {
+	matches := regexpFindAllStringSubmatch(`[invalid`, "test", -1)
+	if matches != nil {
+		t.Errorf("expected nil for invalid pattern, got %v", matches)
+	}
+}
+
+func TestRegexpFindAllStringSubmatch_NoMatch(t *testing.T) {
+	matches := regexpFindAllStringSubmatch(`\d+`, "no digits here", -1)
+	if len(matches) != 0 {
+		t.Errorf("expected 0 matches, got %d", len(matches))
+	}
+}
+
+func TestExtractLinksFromText_MarkdownLinks(t *testing.T) {
+	text := "Check [Google](https://google.com) and [GitHub](https://github.com)"
+	links := extractLinksFromText(text, "")
+
+	if len(links) < 2 {
+		t.Fatalf("expected at least 2 links, got %d", len(links))
+	}
+	if links[0].Title != "Google" || links[0].URL != "https://google.com" {
+		t.Errorf("unexpected first link: %+v", links[0])
+	}
+}
+
+func TestExtractLinksFromText_RawURLs(t *testing.T) {
+	text := "Visit https://example.com for more info"
+	links := extractLinksFromText(text, "")
+
+	if len(links) != 1 {
+		t.Fatalf("expected 1 link, got %d", len(links))
+	}
+	if links[0].URL != "https://example.com" {
+		t.Errorf("expected URL https://example.com, got %q", links[0].URL)
+	}
+}
+
+func TestExtractLinksFromText_Deduplication(t *testing.T) {
+	text := "Visit https://same.com twice https://same.com"
+	links := extractLinksFromText(text, "")
+
+	if len(links) != 1 {
+		t.Errorf("expected 1 deduplicated link, got %d", len(links))
+	}
+}
+
+func TestExtractLinksFromText_LongURLTitle(t *testing.T) {
+	longURL := "https://example.com/" + strings.Repeat("a", 100)
+	text := "Check " + longURL
+	links := extractLinksFromText(text, "")
+
+	if len(links) != 1 {
+		t.Fatalf("expected 1 link, got %d", len(links))
+	}
+	if len(links[0].Title) > 83 {
+		t.Errorf("expected title truncated to 80+3 chars, got %d", len(links[0].Title))
+	}
+	if !strings.HasSuffix(links[0].Title, "...") {
+		t.Errorf("expected title to end with '...', got %q", links[0].Title)
+	}
+}
+
+func TestExtractLinksFromText_NoLinks(t *testing.T) {
+	text := "Just plain text without any links"
+	links := extractLinksFromText(text, "")
+	if len(links) != 0 {
+		t.Errorf("expected 0 links, got %d", len(links))
+	}
+}
+
+func TestBaseAgentParams(t *testing.T) {
+	params := baseAgentParams()
+
+	if len(params) != 4 {
+		t.Fatalf("expected 4 params, got %d", len(params))
+	}
+
+	names := []string{"provider", "model", "api_key", "endpoint"}
+	for i, name := range names {
+		if params[i].Name != name {
+			t.Errorf("expected param[%d].Name = %q, got %q", i, name, params[i].Name)
+		}
+	}
+
+	if params[0].Default != "ollama" {
+		t.Errorf("expected provider default 'ollama', got %q", params[0].Default)
+	}
+	if params[1].Default != "llama3" {
+		t.Errorf("expected model default 'llama3', got %q", params[1].Default)
+	}
+}

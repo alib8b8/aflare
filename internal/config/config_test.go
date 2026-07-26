@@ -18,6 +18,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -141,5 +142,217 @@ func TestSetConfig(t *testing.T) {
 	apiKey := GetAPIKey("test", "TEST_API_KEY")
 	if apiKey != "set-key" {
 		t.Errorf("expected 'set-key', got '%s'", apiKey)
+	}
+}
+
+func TestGetEndpoint_EnvVar(t *testing.T) {
+	os.Setenv("TEST_ENDPOINT", "https://custom.endpoint.com")
+	defer os.Unsetenv("TEST_ENDPOINT")
+
+	resetForTesting()
+
+	endpoint := GetEndpoint("testprovider", "TEST_ENDPOINT", "https://default.endpoint")
+	if endpoint != "https://custom.endpoint.com" {
+		t.Errorf("expected 'https://custom.endpoint.com', got '%s'", endpoint)
+	}
+}
+
+func TestGetEndpoint_ConfigFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "llm-box.yaml")
+
+	configContent := `
+providers:
+  testprovider:
+    endpoint: https://config.endpoint.com
+`
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	os.Setenv("LLM_BOX_CONFIG", configPath)
+	defer os.Unsetenv("LLM_BOX_CONFIG")
+
+	resetForTesting()
+
+	endpoint := GetEndpoint("testprovider", "NONEXISTENT_ENDPOINT", "https://default.endpoint")
+	if endpoint != "https://config.endpoint.com" {
+		t.Errorf("expected 'https://config.endpoint.com', got '%s'", endpoint)
+	}
+}
+
+func TestGetEndpoint_Default(t *testing.T) {
+	resetForTesting()
+
+	endpoint := GetEndpoint("nonexistent", "NONEXISTENT_ENDPOINT", "https://default.endpoint")
+	if endpoint != "https://default.endpoint" {
+		t.Errorf("expected 'https://default.endpoint', got '%s'", endpoint)
+	}
+}
+
+func TestIsSafeMode_FalseValues(t *testing.T) {
+	falseValues := []string{"false", "0", "no", "off", "disable", "disabled", "FALSE", "NO"}
+	for _, val := range falseValues {
+		t.Run(val, func(t *testing.T) {
+			os.Setenv("LLM_BOX_SAFE_MODE", val)
+			defer os.Unsetenv("LLM_BOX_SAFE_MODE")
+
+			resetForTesting()
+
+			if IsSafeMode() {
+				t.Errorf("expected safe mode to be disabled for value %q", val)
+			}
+		})
+	}
+}
+
+func TestIsSafeMode_TrueValues(t *testing.T) {
+	trueValues := []string{"true", "1", "yes", "on", "enable", "enabled", "TRUE", "YES"}
+	for _, val := range trueValues {
+		t.Run(val, func(t *testing.T) {
+			os.Setenv("LLM_BOX_SAFE_MODE", val)
+			defer os.Unsetenv("LLM_BOX_SAFE_MODE")
+
+			resetForTesting()
+
+			if !IsSafeMode() {
+				t.Errorf("expected safe mode to be enabled for value %q", val)
+			}
+		})
+	}
+}
+
+func TestGetSecurityLevel_EnvVar(t *testing.T) {
+	levels := []string{"L0", "L1", "L2", "L3", "l0", "l1", "l2", "l3"}
+	for _, level := range levels {
+		t.Run(level, func(t *testing.T) {
+			os.Setenv("LLM_BOX_SECURITY_LEVEL", level)
+			defer os.Unsetenv("LLM_BOX_SECURITY_LEVEL")
+
+			resetForTesting()
+
+			result := GetSecurityLevel()
+			expected := strings.ToUpper(level)
+			if result != expected {
+				t.Errorf("expected %q, got %q", expected, result)
+			}
+		})
+	}
+}
+
+func TestGetSecurityLevel_InvalidEnv(t *testing.T) {
+	os.Setenv("LLM_BOX_SECURITY_LEVEL", "INVALID")
+	defer os.Unsetenv("LLM_BOX_SECURITY_LEVEL")
+
+	resetForTesting()
+
+	result := GetSecurityLevel()
+	if result != "L1" {
+		t.Errorf("expected L1 as default for invalid env, got %q", result)
+	}
+}
+
+func TestGetSecurityLevel_ConfigFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "llm-box.yaml")
+
+	configContent := `
+security_level: L2
+`
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	os.Setenv("LLM_BOX_CONFIG", configPath)
+	defer os.Unsetenv("LLM_BOX_CONFIG")
+
+	resetForTesting()
+
+	result := GetSecurityLevel()
+	if result != "L2" {
+		t.Errorf("expected 'L2', got '%s'", result)
+	}
+}
+
+func TestGetSecurityLevel_SafeModeDefaultsToL3(t *testing.T) {
+	os.Setenv("LLM_BOX_SAFE_MODE", "1")
+	defer os.Unsetenv("LLM_BOX_SAFE_MODE")
+
+	resetForTesting()
+
+	result := GetSecurityLevel()
+	if result != "L3" {
+		t.Errorf("expected 'L3' when safe mode is on, got '%s'", result)
+	}
+}
+
+func TestSecurityLevelAtLeast(t *testing.T) {
+	tests := []struct {
+		current  string
+		required string
+		want     bool
+	}{
+		{"L0", "L0", true},
+		{"L1", "L0", true},
+		{"L2", "L1", true},
+		{"L3", "L2", true},
+		{"L3", "L3", true},
+		{"L0", "L1", false},
+		{"L1", "L2", false},
+		{"L0", "L3", false},
+		{"L1", "INVALID", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.current+"_vs_"+tt.required, func(t *testing.T) {
+			resetForTesting()
+			os.Setenv("LLM_BOX_SECURITY_LEVEL", tt.current)
+			defer os.Unsetenv("LLM_BOX_SECURITY_LEVEL")
+
+			got := SecurityLevelAtLeast(tt.required)
+			if got != tt.want {
+				t.Errorf("SecurityLevelAtLeast(%q) with current %q = %v, want %v",
+					tt.required, tt.current, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetRouterConfig_Default(t *testing.T) {
+	resetForTesting()
+
+	cfg := GetRouterConfig()
+	if cfg.Strategy != "" {
+		t.Errorf("expected empty strategy by default, got %q", cfg.Strategy)
+	}
+}
+
+func TestGetRouterConfig_ConfigFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "llm-box.yaml")
+
+	configContent := `
+router:
+  strategy: cost
+  max_retries: 3
+`
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	os.Setenv("LLM_BOX_CONFIG", configPath)
+	defer os.Unsetenv("LLM_BOX_CONFIG")
+
+	resetForTesting()
+
+	cfg := GetRouterConfig()
+	if cfg.Strategy != "cost" {
+		t.Errorf("expected strategy 'cost', got '%s'", cfg.Strategy)
+	}
+	if cfg.MaxRetries != 3 {
+		t.Errorf("expected max_retries 3, got %d", cfg.MaxRetries)
 	}
 }
