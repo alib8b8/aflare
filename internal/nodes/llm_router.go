@@ -103,10 +103,8 @@ func buildProviderList(rcfg config.RouterConfig) []RouterProvider {
 	if len(rcfg.FallbackOrder) > 0 {
 		var result []RouterProvider
 		for i, entry := range rcfg.FallbackOrder {
-			if !entry.Enabled && entry.Enabled != true {
-				if entry.Enabled == false {
-					continue
-				}
+			if entry.Enabled == false {
+				continue
 			}
 			priority := entry.Priority
 			if priority == 0 {
@@ -245,8 +243,8 @@ func (r *LLMRouter) getActiveProviders() []RouterProvider {
 	now := time.Now()
 	today := now.Format("2006-01-02")
 
-	r.statsMu.RLock()
-	defer r.statsMu.RUnlock()
+	r.statsMu.Lock()
+	defer r.statsMu.Unlock()
 
 	var active []RouterProvider
 	for _, p := range r.providers {
@@ -255,16 +253,22 @@ func (r *LLMRouter) getActiveProviders() []RouterProvider {
 		}
 
 		stats := r.stats[p.Name]
-		if stats != nil {
-			if stats.LastResetDate != today {
-				continue
-			}
-			if p.QuotaDaily > 0 && stats.DailyUsage >= p.QuotaDaily {
-				continue
-			}
-			if now.Before(stats.CooldownUntil) {
-				continue
-			}
+		if stats == nil {
+			stats = &ProviderStats{LastResetDate: today}
+			r.stats[p.Name] = stats
+		}
+
+		if stats.LastResetDate != today {
+			stats.DailyUsage = 0
+			stats.LastResetDate = today
+		}
+
+		if p.QuotaDaily > 0 && stats.DailyUsage >= p.QuotaDaily {
+			continue
+		}
+
+		if now.Before(stats.CooldownUntil) {
+			continue
 		}
 
 		active = append(active, p)
@@ -335,7 +339,9 @@ func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string
 	systemPrompt := getParam(params, "system", "")
 	maxRetries := r.maxRetry
 	if override := getParam(params, "max_retries", ""); override != "" {
-		if n, err := fmt.Sscanf(override, "%d", &maxRetries); err == nil && n == 1 {
+		if n, err := fmt.Sscanf(override, "%d", &maxRetries); err == nil && n == 1 && maxRetries > 0 {
+		} else {
+			maxRetries = r.maxRetry
 		}
 	}
 
@@ -357,7 +363,8 @@ func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string
 		latency := time.Since(start).Milliseconds()
 
 		if err == nil {
-			r.recordSuccess(provider.Name, latency)
+			tokensUsed := int64((len(input) + len(result)) / 4)
+			r.recordSuccess(provider.Name, latency, tokensUsed)
 			return result, provider.Name, nil
 		}
 
@@ -400,14 +407,23 @@ func (r *LLMRouter) callProvider(ctx context.Context, p RouterProvider, input, s
 	return compatNode.Execute(ctx, input, callParams)
 }
 
-func (r *LLMRouter) recordSuccess(name string, latencyMs int64) {
+func (r *LLMRouter) recordSuccess(name string, latencyMs int64, tokensUsed int64) {
 	r.statsMu.Lock()
 	defer r.statsMu.Unlock()
 
 	stats := r.getOrCreateStatsLocked(name)
+
+	today := time.Now().Format("2006-01-02")
+	if stats.LastResetDate != today {
+		stats.DailyUsage = 0
+		stats.LastResetDate = today
+	}
+
 	stats.TotalCalls++
 	stats.SuccessCalls++
 	stats.TotalLatency += latencyMs
+	stats.TokensUsed += tokensUsed
+	stats.DailyUsage += tokensUsed
 	stats.LastUsed = time.Now()
 
 	if stats.TotalCalls > 0 {
