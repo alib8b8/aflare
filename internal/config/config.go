@@ -31,8 +31,25 @@ type LLMProviderConfig struct {
 	Model    string `yaml:"model,omitempty"`
 }
 
+type RouterProviderEntry struct {
+	Name      string  `yaml:"name"`
+	Model     string  `yaml:"model,omitempty"`
+	Priority  int     `yaml:"priority,omitempty"`
+	CostPer1K float64 `yaml:"cost_per_1k,omitempty"`
+	Quota     int64   `yaml:"quota_daily,omitempty"`
+	Enabled   bool    `yaml:"enabled,omitempty"`
+}
+
+type RouterConfig struct {
+	Strategy       string                `yaml:"strategy,omitempty"`
+	MaxRetries     int                   `yaml:"max_retries,omitempty"`
+	FallbackOrder  []RouterProviderEntry `yaml:"providers,omitempty"`
+	EnableFallback bool                  `yaml:"enable_fallback,omitempty"`
+}
+
 type Config struct {
 	Providers     map[string]LLMProviderConfig `yaml:"providers,omitempty"`
+	Router        RouterConfig                 `yaml:"router,omitempty"`
 	SafeMode      bool                         `yaml:"safe_mode,omitempty"`
 	SecurityLevel string                       `yaml:"security_level,omitempty"`
 }
@@ -219,6 +236,22 @@ func SecurityLevelAtLeast(level string) bool {
 	}
 	return curVal >= reqVal
 }
+
+func GetRouterConfig() RouterConfig {
+	cfg, err := LoadConfig()
+	if err != nil {
+		return RouterConfig{}
+	}
+	return cfg.Router
+}
+
+const (
+	RouterStrategyPriority   = "priority"
+	RouterStrategyCost       = "cost"
+	RouterStrategyLatency    = "latency"
+	RouterStrategyRoundRobin = "round_robin"
+	RouterStrategyRandom     = "random"
+)
 
 func SetConfig(cfg *Config) {
 	configMu.Lock()
