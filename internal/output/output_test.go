@@ -117,8 +117,8 @@ func TestErrorAlwaysShown(t *testing.T) {
 
 func TestDetailOnlyNormal(t *testing.T) {
 	modes := []struct {
-		mode   Mode
-		shown  bool
+		mode  Mode
+		shown bool
 	}{
 		{ModeNormal, true},
 		{ModeConcise, false},
@@ -249,7 +249,7 @@ func TestNumbered(t *testing.T) {
 	got := outBuf.String()
 
 	for i, item := range items {
-		expected := string(rune('0' + i + 1)) + ". " + item
+		expected := string(rune('0'+i+1)) + ". " + item
 		if !strings.Contains(got, expected) {
 			t.Errorf("Numbered() should contain %q, got %q", expected, got)
 		}

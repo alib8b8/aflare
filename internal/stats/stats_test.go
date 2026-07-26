@@ -176,9 +176,9 @@ func contains(s, substr string) bool {
 
 func TestGetModelPricing(t *testing.T) {
 	tests := []struct {
-		model   string
-		wantOk  bool
-		free    bool
+		model  string
+		wantOk bool
+		free   bool
 	}{
 		{"gpt-4o", true, false},
 		{"gpt-4o-mini", true, false},
