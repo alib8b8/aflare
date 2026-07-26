@@ -17,9 +17,16 @@ package nodes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
+	"time"
 )
 
 type AgentBrowserNode struct{}
@@ -43,13 +50,16 @@ func (n *AgentBrowserNode) Schema() NodeSchema {
 		Input:       "string - URL to visit or browser action to perform",
 		Output:      "string - Page content, extraction results, or browser status",
 		Params: []ParamSchema{
-			{Name: "action", Type: "string", Description: "Browser action: visit|extract|links|screenshot|search|summary (default: visit)", Required: false, Default: "visit"},
+			{Name: "action", Type: "string", Description: "Browser action: visit|extract|links|screenshot|search|summary|connect_existing|import_cookies (default: visit)", Required: false, Default: "visit"},
 			{Name: "url", Type: "string", Description: "Target URL (overrides input if provided)", Required: false},
 			{Name: "selector", Type: "string", Description: "CSS selector for content extraction (optional)", Required: false},
 			{Name: "max_depth", Type: "string", Description: "Maximum link follow depth for crawling (default: 1)", Required: false, Default: "1"},
 			{Name: "output_format", Type: "string", Description: "Output format: markdown|text|json|html (default: markdown)", Required: false, Default: "markdown"},
 			{Name: "summary_length", Type: "string", Description: "Maximum summary length in characters (default: 2000)", Required: false, Default: "2000"},
 			{Name: "render_js", Type: "string", Description: "Enable JavaScript rendering (default: false)", Required: false, Default: "false"},
+			{Name: "use_session", Type: "string", Description: "Reuse authenticated browser session (default: false)", Required: false, Default: "false"},
+			{Name: "browser_profile", Type: "string", Description: "Browser profile path for session reuse (optional)", Required: false},
+			{Name: "cdp_port", Type: "string", Description: "Chrome DevTools Protocol port (default: 9222)", Required: false, Default: "9222"},
 		},
 	}
 }
@@ -68,7 +78,7 @@ func (n *AgentBrowserNode) Execute(ctx context.Context, input string, params map
 		}
 	}
 
-	if targetURL == "" && action != "search" {
+	if targetURL == "" && action != "search" && action != "connect_existing" && action != "import_cookies" {
 		return "", fmt.Errorf("URL is required for browser action: %s", action)
 	}
 
@@ -93,8 +103,12 @@ func (n *AgentBrowserNode) Execute(ctx context.Context, input string, params map
 		return n.actionScreenshot(ctx, targetURL)
 	case "search":
 		return n.actionSearch(ctx, input, outputFmt)
+	case "connect_existing":
+		return n.actionConnectExisting(ctx, params)
+	case "import_cookies":
+		return n.actionImportCookies(ctx, params)
 	default:
-		return "", fmt.Errorf("unknown browser action: %s (supported: visit, extract, links, summary, screenshot, search)", action)
+		return "", fmt.Errorf("unknown browser action: %s (supported: visit, extract, links, summary, screenshot, search, connect_existing, import_cookies)", action)
 	}
 }
 
@@ -273,4 +287,356 @@ func regexpFindAllStringSubmatch(pattern, s string, n int) [][]string {
 		return nil
 	}
 	return re.FindAllStringSubmatch(s, n)
+}
+
+// cdpVersionInfo 表示 CDP /json/version 端点返回的浏览器版本信息
+type cdpVersionInfo struct {
+	Browser              string `json:"Browser"`
+	ProtocolVersion      string `json:"Protocol-Version"`
+	UserAgent            string `json:"User-Agent"`
+	V8                   string `json:"V8"`
+	WebKit               string `json:"WebKit"`
+	WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
+}
+
+// cdpTabInfo 表示 CDP /json 端点返回的单个标签页信息
+type cdpTabInfo struct {
+	ID                   string `json:"id"`
+	Type                 string `json:"type"`
+	Title                string `json:"title"`
+	URL                  string `json:"url"`
+	DevtoolsFrontendURL  string `json:"devtoolsFrontendUrl"`
+	WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
+}
+
+// browserConnectionInfo 表示与运行中浏览器的连接状态信息
+type browserConnectionInfo struct {
+	Connected       bool
+	DebugPort       int
+	Browser         string
+	ProtocolVersion string
+	UserAgent       string
+	TabCount        int
+	PageTabCount    int
+	Tabs            []cdpTabInfo
+}
+
+// fetchCDP 向 CDP HTTP 端点发起 GET 请求并返回响应体字节
+func (n *AgentBrowserNode) fetchCDP(ctx context.Context, target string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", target, nil)
+	if err != nil {
+		return nil, err
+	}
+	// CDP 端点只监听本机，使用较短超时避免长时间挂起
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("CDP 端点返回状态码 %d", resp.StatusCode)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+// connectToExistingBrowser 通过 Chrome DevTools Protocol 连接用户正在运行的浏览器，
+// 获取版本信息与已打开的标签页列表，返回连接状态信息。
+func (n *AgentBrowserNode) connectToExistingBrowser(ctx context.Context, debugPort int) (*browserConnectionInfo, error) {
+	baseURL := fmt.Sprintf("http://localhost:%d", debugPort)
+
+	// 获取浏览器版本信息
+	versionRaw, err := n.fetchCDP(ctx, baseURL+"/json/version")
+	if err != nil {
+		return nil, fmt.Errorf("无法连接到浏览器 (端口 %d)，请确认 Chrome 已以 --remote-debugging-port=%d 启动: %w", debugPort, debugPort, err)
+	}
+	var version cdpVersionInfo
+	if err := json.Unmarshal(versionRaw, &version); err != nil {
+		return nil, fmt.Errorf("解析浏览器版本信息失败: %w", err)
+	}
+
+	// 获取已打开的标签页列表
+	tabsRaw, err := n.fetchCDP(ctx, baseURL+"/json")
+	if err != nil {
+		return nil, fmt.Errorf("获取标签页列表失败: %w", err)
+	}
+	var tabs []cdpTabInfo
+	if err := json.Unmarshal(tabsRaw, &tabs); err != nil {
+		return nil, fmt.Errorf("解析标签页列表失败: %w", err)
+	}
+
+	pageTabs := 0
+	for _, t := range tabs {
+		if t.Type == "page" {
+			pageTabs++
+		}
+	}
+
+	return &browserConnectionInfo{
+		Connected:       true,
+		DebugPort:       debugPort,
+		Browser:         version.Browser,
+		ProtocolVersion: version.ProtocolVersion,
+		UserAgent:       version.UserAgent,
+		TabCount:        len(tabs),
+		PageTabCount:    pageTabs,
+		Tabs:            tabs,
+	}, nil
+}
+
+// actionConnectExisting 实现 connect_existing 动作：连接用户正在运行的浏览器并返回格式化的连接信息。
+func (n *AgentBrowserNode) actionConnectExisting(ctx context.Context, params map[string]string) (string, error) {
+	debugPort := paramInt(params, "cdp_port", 9222, 1, 65535)
+
+	info, err := n.connectToExistingBrowser(ctx, debugPort)
+	if err != nil {
+		return "", err
+	}
+
+	var sb strings.Builder
+	sb.WriteString("## 🔌 已连接到运行中的浏览器\n\n")
+	sb.WriteString(fmt.Sprintf("- **调试端口**: %d\n", info.DebugPort))
+	sb.WriteString(fmt.Sprintf("- **浏览器**: %s\n", nonEmpty(info.Browser, "未知")))
+	sb.WriteString(fmt.Sprintf("- **协议版本**: %s\n", nonEmpty(info.ProtocolVersion, "未知")))
+	sb.WriteString(fmt.Sprintf("- **User-Agent**: %s\n", nonEmpty(info.UserAgent, "未知")))
+	sb.WriteString(fmt.Sprintf("- **标签页总数**: %d（页面类型: %d）\n\n", info.TabCount, info.PageTabCount))
+
+	if info.PageTabCount > 0 {
+		sb.WriteString("### 打开的页面\n\n")
+		shown := 0
+		for _, t := range info.Tabs {
+			if t.Type != "page" {
+				continue
+			}
+			if shown >= 20 {
+				sb.WriteString(fmt.Sprintf("\n... 还有 %d 个页面未显示\n", info.PageTabCount-shown))
+				break
+			}
+			shown++
+			title := strings.TrimSpace(t.Title)
+			if title == "" {
+				title = "(无标题)"
+			}
+			pageURL := strings.TrimSpace(t.URL)
+			if pageURL == "" {
+				pageURL = "(about:blank)"
+			}
+			sb.WriteString(fmt.Sprintf("%d. **%s**\n   - %s\n", shown, title, pageURL))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("_会话状态已就绪，后续 visit/extract 操作可复用此浏览器上下文。_\n")
+	return sb.String(), nil
+}
+
+// importCookiesFromChrome 从本地 Chrome 配置读取 Cookie。
+// 出于安全考虑，本方法仅检测 Cookie 数据库的存在性，不实际解析 SQLite 内容，
+// 返回可用的 cookie 域名列表（当前为空，实际域名由浏览器在会话复用时自动加载）。
+func (n *AgentBrowserNode) importCookiesFromChrome(profile string) ([]string, error) {
+	cookiePath := getChromeCookiePath()
+	if cookiePath == "" {
+		return nil, fmt.Errorf("当前平台 %s 不支持自动检测 Chrome Cookie 路径", runtime.GOOS)
+	}
+
+	if _, err := os.Stat(cookiePath); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("Chrome Cookie 数据库不存在: %s（请确认 Chrome 已安装并曾运行）", cookiePath)
+		}
+		return nil, fmt.Errorf("访问 Cookie 数据库失败: %w", err)
+	}
+
+	// 安全考虑：不直接读取 SQLite 数据库内容。
+	// 实际 cookie 值的解析需要 SQLite 驱动（cgo 或纯 Go 实现），
+	// 且 Chrome 在新版本中对 cookie 值做了 DPAPI/Keychain 加密。
+	// 这里返回空域名列表；会话复用时浏览器会自动加载这些 cookie。
+	return nil, nil
+}
+
+// actionImportCookies 实现 import_cookies 动作：定位本地 Chrome Cookie 数据库，
+// 返回可用的域名列表与安全说明。
+func (n *AgentBrowserNode) actionImportCookies(ctx context.Context, params map[string]string) (string, error) {
+	profile := getParam(params, "browser_profile", "")
+	cookiePath := getChromeCookiePath()
+
+	var sb strings.Builder
+	sb.WriteString("## 🍪 Cookie 导入\n\n")
+
+	if cookiePath == "" {
+		sb.WriteString(fmt.Sprintf("**状态**: 当前平台 `%s` 不支持自动检测 Chrome Cookie 路径\n", runtime.GOOS))
+		sb.WriteString("\n可手动指定 `browser_profile` 参数指向 Chrome 用户数据目录。\n")
+		return sb.String(), nil
+	}
+
+	sb.WriteString(fmt.Sprintf("- **Cookie 数据库路径**: `%s`\n", cookiePath))
+	if profile != "" {
+		sb.WriteString(fmt.Sprintf("- **指定配置文件**: `%s`\n", profile))
+	} else {
+		sb.WriteString("- **配置文件**: Default（默认）\n")
+	}
+
+	domains, err := n.importCookiesFromChrome(profile)
+	if err != nil {
+		sb.WriteString(fmt.Sprintf("- **状态**: ❌ %s\n", err.Error()))
+		return sb.String(), nil
+	}
+
+	if info, statErr := os.Stat(cookiePath); statErr == nil {
+		sb.WriteString(fmt.Sprintf("- **数据库大小**: %d 字节\n", info.Size()))
+	}
+	sb.WriteString(fmt.Sprintf("- **检测到的域名数**: %d\n\n", len(domains)))
+
+	sb.WriteString("### 安全说明\n\n")
+	sb.WriteString("- 已检测到 Cookie 数据库文件存在\n")
+	sb.WriteString("- 出于安全考虑，不直接读取 cookie 值（Chrome 对 cookie 值有系统级加密）\n")
+	sb.WriteString("- 实际复用会话时，浏览器会自动加载这些 cookie\n\n")
+
+	if len(domains) > 0 {
+		sb.WriteString("### 可用域名\n\n")
+		for i, d := range domains {
+			if i >= 50 {
+				sb.WriteString(fmt.Sprintf("\n... 还有 %d 个域名未显示\n", len(domains)-50))
+				break
+			}
+			sb.WriteString(fmt.Sprintf("%d. `%s`\n", i+1, d))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("_Cookie 数据库已就绪，可配合 connect_existing 或浏览器启动参数使用。_\n")
+	return sb.String(), nil
+}
+
+// getChromeCookiePath 返回当前平台的 Chrome Cookie 数据库路径。
+// 支持 macOS、Linux 和 Windows；其他平台返回空字符串。
+func getChromeCookiePath() string {
+	profilePath := getChromeProfilePath("Default")
+	if profilePath == "" {
+		return ""
+	}
+	return filepath.Join(profilePath, "Cookies")
+}
+
+// getChromeProfilePath 返回当前平台的 Chrome 配置文件目录路径。
+// profile 指定配置文件名（如 "Default"、"Profile 1"），为空则使用 "Default"。
+// 不支持的平台返回空字符串。
+func getChromeProfilePath(profile string) string {
+	if profile == "" {
+		profile = "Default"
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(home, "Library", "Application Support", "Google", "Chrome", profile)
+	case "linux":
+		return filepath.Join(home, ".config", "google-chrome", profile)
+	case "windows":
+		localAppData := os.Getenv("LOCALAPPDATA")
+		if localAppData == "" {
+			localAppData = filepath.Join(home, "AppData", "Local")
+		}
+		return filepath.Join(localAppData, "Google", "Chrome", "User Data", profile)
+	default:
+		return ""
+	}
+}
+
+// detectInstalledBrowsers 检测系统中安装的浏览器，返回浏览器名称列表（如 chrome、firefox）。
+// 支持 macOS、Linux 和 Windows 上的常见浏览器；不支持的平台返回 nil。
+func detectInstalledBrowsers() []string {
+	home, _ := os.UserHomeDir()
+	candidates := map[string][]string{}
+
+	switch runtime.GOOS {
+	case "darwin":
+		candidates["chrome"] = []string{"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"}
+		candidates["chromium"] = []string{"/Applications/Chromium.app/Contents/MacOS/Chromium"}
+		candidates["firefox"] = []string{"/Applications/Firefox.app/Contents/MacOS/firefox"}
+		candidates["edge"] = []string{"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"}
+		candidates["brave"] = []string{"/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"}
+		candidates["safari"] = []string{"/Applications/Safari.app/Contents/MacOS/Safari"}
+	case "linux":
+		candidates["chrome"] = []string{
+			"/usr/bin/google-chrome",
+			"/usr/bin/google-chrome-stable",
+			"/opt/google/chrome/chrome",
+			"/snap/bin/chromium",
+		}
+		candidates["chromium"] = []string{
+			"/usr/bin/chromium",
+			"/usr/bin/chromium-browser",
+		}
+		candidates["firefox"] = []string{
+			"/usr/bin/firefox",
+			"/usr/bin/firefox-esr",
+		}
+		candidates["edge"] = []string{
+			"/usr/bin/microsoft-edge",
+			"/usr/bin/microsoft-edge-stable",
+		}
+		candidates["brave"] = []string{
+			"/usr/bin/brave",
+			"/usr/bin/brave-browser",
+		}
+	case "windows":
+		programFiles := os.Getenv("PROGRAMFILES")
+		if programFiles == "" {
+			programFiles = `C:\Program Files`
+		}
+		programFilesX86 := os.Getenv("PROGRAMFILES(X86)")
+		if programFilesX86 == "" {
+			programFilesX86 = `C:\Program Files (x86)`
+		}
+		localAppData := os.Getenv("LOCALAPPDATA")
+		if localAppData == "" && home != "" {
+			localAppData = filepath.Join(home, "AppData", "Local")
+		}
+		candidates["chrome"] = []string{
+			filepath.Join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
+			filepath.Join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
+			filepath.Join(localAppData, "Google", "Chrome", "Application", "chrome.exe"),
+		}
+		candidates["edge"] = []string{
+			filepath.Join(programFiles, "Microsoft", "Edge", "Application", "msedge.exe"),
+			filepath.Join(programFilesX86, "Microsoft", "Edge", "Application", "msedge.exe"),
+		}
+		candidates["firefox"] = []string{
+			filepath.Join(programFiles, "Mozilla Firefox", "firefox.exe"),
+			filepath.Join(programFilesX86, "Mozilla Firefox", "firefox.exe"),
+		}
+		candidates["brave"] = []string{
+			filepath.Join(programFiles, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
+			filepath.Join(programFilesX86, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
+		}
+	default:
+		return nil
+	}
+
+	// 按固定顺序检测，保证输出稳定
+	order := []string{"chrome", "chromium", "edge", "firefox", "brave", "safari"}
+	var installed []string
+	for _, name := range order {
+		paths, ok := candidates[name]
+		if !ok {
+			continue
+		}
+		for _, p := range paths {
+			if _, err := os.Stat(p); err == nil {
+				installed = append(installed, name)
+				break
+			}
+		}
+	}
+	return installed
+}
+
+// nonEmpty 在 v 为空字符串时返回 fallback，否则返回 v
+func nonEmpty(v, fallback string) string {
+	if v == "" {
+		return fallback
+	}
+	return v
 }

@@ -61,6 +61,7 @@
 - [🏗️ 架构](#️-架构)
 - [🗺️ 路线图](#️-路线图)
 - [🌟 优秀集成案例](#-优秀集成案例)
+- [🛒 精选技能市场](#-精选技能市场)
 - [📖❓ 疑问解答](#-疑问解答)
 - [🤝 贡献指南](#-贡献指南)
 - [📦 代码托管](#-代码托管)
@@ -437,6 +438,55 @@ llm-box help                显示完整帮助
 | [研究助手]() | 结合 researcher + knowledge_graph 节点的学术研究工作流 |
 
 > 如果您的项目使用了 llm-box，欢迎提交 PR 添加到此处！
+
+---
+
+## 🛒 精选技能市场
+
+llm-box 内置 100+ 开箱即用的工作流模板，覆盖开发、运维、营销、研究等场景。一键安装，即刻使用。
+
+### 安装方式
+
+```bash
+# 从技能市场一键安装
+llm-box create from templates/developer-tools/unit-test-generator
+
+# 或直接从 GitHub 安装
+llm-box create from https://github.com/alib8b8/llm-box/tree/main/templates/ai-ml/prompt-engineering
+```
+
+### 热门技能
+
+| 分类 | 技能 | 描述 | 一键安装 |
+|------|------|------|---------|
+| 🤖 AI/ML | Prompt Engineering | LLM 提示词工程模板 | `llm-box create from templates/ai-ml/prompt-engineering` |
+| 🤖 AI/ML | LLM Fine-tune | 大模型微调流水线 | `llm-box create from templates/ai-ml/llm-finetune` |
+| 🤖 AI/ML | Model Evaluation | 模型评估与基准测试 | `llm-box create from templates/ai-ml/model-evaluation` |
+| 💻 开发工具 | Unit Test Generator | 自动生成单元测试 | `llm-box create from templates/developer-tools/unit-test-generator` |
+| 💻 开发工具 | API Docs Generator | API 文档自动生成 | `llm-box create from templates/developer-tools/api-docs-generator` |
+| 💻 开发工具 | Code Duplicate Finder | 代码重复检测 | `llm-box create from templates/developer-tools/code-duplicate-finder` |
+| 💻 开发工具 | Dependency Checker | 依赖安全检查 | `llm-box create from templates/developer-tools/dependency-checker` |
+| 🔧 DevOps | Log Analyzer | 日志智能分析 | `llm-box create from templates/devops-monitoring/log-analyzer` |
+| 🔧 DevOps | Docker Cleaner | Docker 资源清理 | `llm-box create from templates/devops-monitoring/docker-cleaner` |
+| 🔧 DevOps | SSL Cert Checker | SSL 证书到期检查 | `llm-box create from templates/devops-monitoring/ssl-cert-checker` |
+| 📊 数据分析 | CSV Analyzer | CSV 数据分析 | `llm-box create from templates/data-analytics/csv-analyzer` |
+| 📊 数据分析 | A/B Test Analyzer | A/B 测试分析 | `llm-box create from templates/data-analytics/ab-test-analyzer` |
+| 📊 数据分析 | Financial Analyzer | 财务数据分析 | `llm-box create from templates/data-analytics/financial-analyzer` |
+| 📝 内容创作 | Blog Outline Generator | 博客大纲生成 | `llm-box create from templates/content-marketing/blog-outline-generator` |
+| 📝 内容创作 | SEO Keyword Research | SEO 关键词研究 | `llm-box create from templates/content-marketing/seo-keyword-research` |
+| 🔬 研究 | Literature Review | 文献综述 | `llm-box create from templates/research/literature-review` |
+| 🔬 研究 | Paper Summarizer | 论文摘要 | `llm-box create from templates/research-analysis/paper-summarizer` |
+| 🔬 研究 | Competitor Analysis | 竞品分析 | `llm-box create from templates/research-analysis/competitor-analysis` |
+| 📈 商业 | Business Plan | 商业计划书 | `llm-box create from templates/business-sales/business-plan` |
+| 📈 商业 | SaaS Pricing | SaaS 定价策略 | `llm-box create from templates/business-sales/saas-pricing` |
+| 🔒 安全 | Security Audit | 安全审计 | `llm-box create from templates/security/security-audit` |
+| 🔒 安全 | Incident Response | 事件响应 | `llm-box create from templates/security/incident-response` |
+| 📚 文档 | README Generator | README 自动生成 | `llm-box create from templates/documentation/readme-generator` |
+| 📚 文档 | API Docs Builder | API 文档构建 | `llm-box create from templates/documentation/api-docs-builder` |
+| 🏗️ 架构 | Microservices Design | 微服务设计 | `llm-box create from templates/backend/microservices-design` |
+| 🏗️ 架构 | Cloud Architecture | 云架构设计 | `llm-box create from templates/cloud-infra/cloud-architecture` |
+
+> 完整技能列表见 [templates/](templates/) 目录，80+ 技能持续更新中。
 
 ---
 

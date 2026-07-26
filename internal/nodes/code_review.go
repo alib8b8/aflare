@@ -18,8 +18,13 @@ package nodes
 import (
 	"context"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type ReviewFinding struct {
@@ -100,6 +105,77 @@ var codeReviewRules = []DeterministicRule{
 		Title:   "Consider shorter receiver name",
 		Issue:   "Receiver name longer than 2 characters reduces readability",
 		Fix:     "Use 1-2 character receiver name matching type first letter",
+	},
+	// 新增规则集（open-code-review 启发）
+	{
+		ID: "ERR-002", Severity: "medium", Category: "bugs", Lang: "go",
+		Pattern: regexp.MustCompile(`err\.Error\(\)`),
+		Title:   "Potential nil error dereference",
+		Issue:   "err.Error() called where err may be nil without prior nil check",
+		Fix:     "Check err != nil before calling err.Error(): if err != nil { msg = err.Error() }",
+	},
+	{
+		ID: "DEFER-001", Severity: "high", Category: "bugs", Lang: "go",
+		Pattern: regexp.MustCompile(`for\s+.*\{[\s\S]*?defer\s+`),
+		Title:   "Defer inside loop",
+		Issue:   "defer in a loop accumulates deferred calls until function returns, leaking resources",
+		Fix:     "Extract loop body into a separate function so defer runs each iteration",
+	},
+	{
+		ID: "GLOBAL-001", Severity: "medium", Category: "bugs", Lang: "go",
+		Pattern: regexp.MustCompile(`^var\s+\w+\s+(map|chan|\[\]|\*)`),
+		Title:   "Mutable global variable",
+		Issue:   "Global mutable variable can be modified from anywhere, causing race conditions",
+		Fix:     "Pass state explicitly or use a struct with methods + sync.Mutex",
+	},
+	{
+		ID: "TODO-001", Severity: "low", Category: "style", Lang: "any",
+		Pattern: regexp.MustCompile(`(?i)\b(TODO|FIXME|HACK|XXX)\b`),
+		Title:   "Unresolved TODO/FIXME marker",
+		Issue:   "Code contains unfinished work marker that should be tracked or resolved",
+		Fix:     "Resolve the TODO or convert to a tracked issue",
+	},
+	{
+		ID: "DUMP-001", Severity: "low", Category: "style", Lang: "any",
+		Pattern: regexp.MustCompile(`fmt\.(Println|Printf|Print)\(`),
+		Title:   "Debug print statement left in code",
+		Issue:   "fmt.Println/Printf should be replaced with structured logging in production",
+		Fix:     "Use logger.Info/logger.Debug instead of fmt.Println",
+	},
+	{
+		ID: "EMPTY-001", Severity: "medium", Category: "bugs", Lang: "any",
+		Pattern: regexp.MustCompile(`(if|else|for|switch)\s+[^{]*\{\s*\}`),
+		Title:   "Empty control block",
+		Issue:   "Empty if/else/for/switch block suggests missing implementation or swallowed logic",
+		Fix:     "Add implementation or explicit comment explaining why block is empty",
+	},
+	{
+		ID: "CONTEXT-001", Severity: "medium", Category: "bugs", Lang: "go",
+		Pattern: regexp.MustCompile(`context\.Background\(\)`),
+		Title:   "context.Background() used instead of passed context",
+		Issue:   "Using context.Background() ignores cancellation/timeout from caller",
+		Fix:     "Accept ctx context.Context as parameter and pass it through",
+	},
+	{
+		ID: "GOROUTINE-001", Severity: "high", Category: "bugs", Lang: "go",
+		Pattern: regexp.MustCompile(`go\s+func\s*\([^)]*\)\s*\{[\s\S]*?context\.Background\(\)`),
+		Title:   "Goroutine uses context.Background()",
+		Issue:   "Goroutine creates new context, losing parent cancellation chain",
+		Fix:     "Pass parent context: ctx, cancel := context.WithCancel(parentCtx); go func(ctx context.Context){...}(ctx)",
+	},
+	{
+		ID: "SHADOW-001", Severity: "medium", Category: "bugs", Lang: "go",
+		Pattern: regexp.MustCompile(`if\s+\w+\s*:=\s*[^;]+;\s*\w+\s*!=\s*nil`),
+		Title:   "Variable shadowing in if-statement",
+		Issue:   "Variable declared in if-init shadows outer variable, may cause subtle bugs",
+		Fix:     "Use distinct variable name or assign before the if statement",
+	},
+	{
+		ID: "PWD-001", Severity: "critical", Category: "security", Lang: "any",
+		Pattern: regexp.MustCompile(`(?i)(password|passwd|pwd).{0,10}[:=].{0,10}["'][^"']{4,}["']`),
+		Title:   "Hardcoded password",
+		Issue:   "Password appears to be hardcoded in source code",
+		Fix:     "Read password from environment variable or secret store: os.Getenv(\"PASSWORD\")",
 	},
 }
 
@@ -226,6 +302,152 @@ func severityRank(sev string) int {
 	}
 }
 
+// deterministicStats 生成规则引擎扫描统计信息
+func deterministicStats(findings []ReviewFinding, rulesCount, executedCount int, elapsed time.Duration) string {
+	counts := map[string]int{"critical": 0, "high": 0, "medium": 0, "low": 0}
+	for _, f := range findings {
+		counts[f.Severity]++
+	}
+	return fmt.Sprintf("## Rule Engine Statistics\n\n- Total rules: %d\n- Rules executed: %d\n- Findings: %d (critical: %d, high: %d, medium: %d, low: %d)\n- Scan time: %dms\n",
+		rulesCount, executedCount, len(findings),
+		counts["critical"], counts["high"], counts["medium"], counts["low"],
+		elapsed.Milliseconds())
+}
+
+// runASTAnalysis 使用 go/ast 对 Go 代码做 AST 级别分析，检测正则难以覆盖的问题
+func runASTAnalysis(code string) []ReviewFinding {
+	var findings []ReviewFinding
+
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "review.go", code, parser.ParseComments)
+	if err != nil {
+		return findings
+	}
+
+	ast.Inspect(f, func(n ast.Node) bool {
+		// 检测 1: 循环中的 defer
+		if fl, ok := n.(*ast.ForStmt); ok {
+			ast.Inspect(fl.Body, func(inner ast.Node) bool {
+				if df, ok := inner.(*ast.DeferStmt); ok {
+					pos := fset.Position(df.Pos())
+					findings = append(findings, ReviewFinding{
+						Severity: "high", Category: "bugs",
+						RuleID:   "AST-DEFER-001",
+						Title:    "Defer inside loop (AST detected)",
+						Location: fmt.Sprintf("line %d", pos.Line),
+						Issue:    "defer inside for-loop defers until function return, not loop iteration",
+						Suggestion: "Extract loop body to a function so defer runs each iteration",
+					})
+				}
+				return true
+			})
+		}
+		// 检测 2: 调用返回 error 的函数但未检查返回值
+		if expr, ok := n.(*ast.ExprStmt); ok {
+			if call, ok := expr.X.(*ast.CallExpr); ok {
+				if hasErrorReturnType(fset, f, call) {
+					pos := fset.Position(call.Pos())
+					findings = append(findings, ReviewFinding{
+						Severity: "medium", Category: "bugs",
+						RuleID:     "AST-ERR-001",
+						Title:      "Unchecked error return value (AST detected)",
+						Location:   fmt.Sprintf("line %d", pos.Line),
+						Issue:      "Function returns error but caller ignores it",
+						Suggestion: "Check the error: result, err := func(); if err != nil { ... }",
+					})
+				}
+			}
+		}
+		// 检测 3: 空的 error 处理块
+		if iff, ok := n.(*ast.IfStmt); ok {
+			if isErrCheck(iff.Cond) && iff.Body != nil && len(iff.Body.List) == 0 {
+				pos := fset.Position(iff.Pos())
+				findings = append(findings, ReviewFinding{
+					Severity: "medium", Category: "bugs",
+					RuleID:     "AST-EMPTY-001",
+					Title:      "Empty error handler (AST detected)",
+					Location:   fmt.Sprintf("line %d", pos.Line),
+					Issue:      "if err != nil {} block is empty, error is swallowed",
+					Suggestion: "Log or return the error: if err != nil { return err }",
+				})
+			}
+		}
+		return true
+	})
+
+	return findings
+}
+
+// hasErrorReturnType 简单判断调用是否可能返回 error（启发式：函数名常见模式）
+func hasErrorReturnType(fset *token.FileSet, f *ast.File, call *ast.CallExpr) bool {
+	// 只关注 ExprStmt（语句形式调用，返回值被丢弃）
+	fnName := ""
+	switch fn := call.Fun.(type) {
+	case *ast.Ident:
+		fnName = fn.Name
+	case *ast.SelectorExpr:
+		fnName = fn.Sel.Name
+	}
+	// 常见返回 error 的函数命名模式
+	errorFuncPatterns := []string{"Get", "Set", "Add", "Delete", "Update", "Insert",
+		"Create", "Remove", "Save", "Load", "Read", "Write", "Open", "Close",
+		"Start", "Stop", "Run", "Execute", "Parse", "Decode", "Encode", "Marshal", "Unmarshal"}
+	for _, p := range errorFuncPatterns {
+		if strings.Contains(fnName, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// isErrCheck 判断条件是否为 err != nil 形式
+func isErrCheck(cond ast.Expr) bool {
+	if bin, ok := cond.(*ast.BinaryExpr); ok {
+		if bin.Op == token.NEQ {
+			if id, ok := bin.X.(*ast.Ident); ok && id.Name == "err" {
+				return true
+			}
+			if id, ok := bin.Y.(*ast.Ident); ok && id.Name == "err" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// customRulesFromFile 从简单 YAML 文件加载自定义规则（不引入外部依赖）
+// 格式：每行 "ID|Severity|Category|Pattern|Title|Issue|Fix|Lang"
+func customRulesFromFile(path string) []DeterministicRule {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var rules []DeterministicRule
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 8)
+		if len(parts) < 7 {
+			continue
+		}
+		re, err := regexp.Compile(parts[3])
+		if err != nil {
+			continue
+		}
+		lang := "any"
+		if len(parts) >= 8 {
+			lang = parts[7]
+		}
+		rules = append(rules, DeterministicRule{
+			ID: parts[0], Severity: parts[1], Category: parts[2],
+			Pattern: re, Title: parts[4], Issue: parts[5], Fix: parts[6], Lang: lang,
+		})
+	}
+	return rules
+}
+
 func formatFindings(findings []ReviewFinding, minSeverity string) string {
 	minRank := severityRank(minSeverity)
 	var sb strings.Builder
@@ -297,7 +519,26 @@ func (n *CodeReviewNode) Execute(ctx context.Context, input string, params map[s
 	var resultParts []string
 
 	if useRules {
+		start := time.Now()
 		findings := runDeterministicRules(input, language, focus)
+
+		// 对 Go 代码运行 AST 分析，检测正则难以覆盖的问题
+		if language == "go" {
+			astFindings := runASTAnalysis(input)
+			findings = append(findings, astFindings...)
+		}
+
+		executed := 0
+		for _, rule := range codeReviewRules {
+			if focus != "all" && focus != rule.Category {
+				continue
+			}
+			if rule.Lang != "any" && rule.Lang != language && language != "unknown" {
+				continue
+			}
+			executed++
+		}
+		resultParts = append(resultParts, deterministicStats(findings, len(codeReviewRules), executed, time.Since(start)))
 		resultParts = append(resultParts, formatFindings(findings, severity))
 	}
 
