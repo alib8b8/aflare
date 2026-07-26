@@ -81,7 +81,9 @@ func (n *AgentBrowserNode) Execute(ctx context.Context, input string, params map
 	}
 
 	summaryLen := 2000
-	fmt.Sscanf(summaryLenStr, "%d", &summaryLen)
+	if _, err := fmt.Sscanf(summaryLenStr, "%d", &summaryLen); err != nil {
+		summaryLen = 2000
+	}
 	if summaryLen < 100 {
 		summaryLen = 2000
 	}

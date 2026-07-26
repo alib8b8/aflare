@@ -201,17 +201,23 @@ func TestWorkerAuthMiddleware_InvalidToken(t *testing.T) {
 }
 
 func TestConstantTimeCompare_Usage(t *testing.T) {
-	token := "my-secret-token-12345"
-	valid := "my-secret-token-12345"
-	invalid := "my-secret-token-12346"
+	token := make([]byte, 32)
+	for i := range token {
+		token[i] = byte(i)
+	}
+	valid := make([]byte, 32)
+	copy(valid, token)
+	invalid := make([]byte, 32)
+	copy(invalid, token)
+	invalid[0] ^= 0x01
 
-	if subtle.ConstantTimeCompare([]byte(token), []byte(valid)) != 1 {
+	if subtle.ConstantTimeCompare(token, valid) != 1 {
 		t.Error("expected valid tokens to match")
 	}
-	if subtle.ConstantTimeCompare([]byte(token), []byte(invalid)) != 0 {
+	if subtle.ConstantTimeCompare(token, invalid) != 0 {
 		t.Error("expected invalid tokens to not match")
 	}
-	if subtle.ConstantTimeCompare([]byte(token), []byte("")) != 0 {
+	if subtle.ConstantTimeCompare(token, []byte("")) != 0 {
 		t.Error("expected empty token to not match")
 	}
 }

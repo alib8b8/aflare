@@ -86,9 +86,19 @@ func (n *SkillExplorerNode) Execute(ctx context.Context, input string, params ma
 	sortBy := getParam(params, "sort_by", "quality")
 
 	minQuality := 50.0
-	fmt.Sscanf(minQualityStr, "%f", &minQuality)
+	if _, err := fmt.Sscanf(minQualityStr, "%f", &minQuality); err != nil {
+		minQuality = 50.0
+	}
+	if minQuality < 0 {
+		minQuality = 0
+	}
+	if minQuality > 100 {
+		minQuality = 100
+	}
 	limit := 20
-	fmt.Sscanf(limitStr, "%d", &limit)
+	if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
+		limit = 20
+	}
 	if limit < 1 {
 		limit = 20
 	}

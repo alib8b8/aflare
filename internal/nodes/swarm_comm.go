@@ -136,7 +136,9 @@ func (n *SwarmCommNode) Execute(ctx context.Context, input string, params map[st
 	limitStr := getParam(params, "limit", "50")
 
 	limit := 50
-	fmt.Sscanf(limitStr, "%d", &limit)
+	if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
+		limit = 50
+	}
 	if limit < 1 {
 		limit = 50
 	}

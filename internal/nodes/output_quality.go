@@ -162,7 +162,15 @@ func (n *OutputQualityNode) Execute(ctx context.Context, input string, params ma
 	lang := getParam(params, "lang", "auto")
 
 	minScore := 60.0
-	fmt.Sscanf(minScoreStr, "%f", &minScore)
+	if _, err := fmt.Sscanf(minScoreStr, "%f", &minScore); err != nil {
+		minScore = 60.0
+	}
+	if minScore < 0 {
+		minScore = 0
+	}
+	if minScore > 100 {
+		minScore = 100
+	}
 
 	text := strings.TrimSpace(input)
 	if text == "" {
