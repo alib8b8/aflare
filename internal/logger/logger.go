@@ -153,7 +153,9 @@ func SetFormat(format string) {
 
 func SetOutput(output string) {
 	if logFile != nil {
-		_ = logFile.Close()
+		if err := logFile.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "logger: failed to close log file: %v\n", err)
+		}
 		logFile = nil
 	}
 	initLogger(currentLevel, currentFormat, output)
@@ -165,7 +167,9 @@ func reinitLogger() {
 		output = logFile.Name()
 	}
 	if logFile != nil {
-		_ = logFile.Close()
+		if err := logFile.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "logger: failed to close log file: %v\n", err)
+		}
 		logFile = nil
 	}
 	initLogger(currentLevel, currentFormat, output)
@@ -208,7 +212,9 @@ func With(args ...any) *slog.Logger {
 
 func Close() {
 	if logFile != nil {
-		_ = logFile.Close()
+		if err := logFile.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "logger: failed to close log file: %v\n", err)
+		}
 		logFile = nil
 	}
 }

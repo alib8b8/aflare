@@ -290,8 +290,7 @@ func (n *TCGrepNode) Execute(ctx context.Context, input string, params map[strin
 	if ignoreCase == "true" || ignoreCase == "1" {
 		pattern = "(?i)" + pattern
 	}
-	// 运行时编译用户正则（非包级预编译）
-	re, err := regexp.Compile(pattern)
+	re, err := compileRegexCached(pattern)
 	if err != nil {
 		return "", fmt.Errorf("invalid regex: %w", err)
 	}

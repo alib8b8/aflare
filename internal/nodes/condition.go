@@ -37,6 +37,38 @@ var (
 	regexSemaphore = make(chan struct{}, maxConcurrentRegex)
 )
 
+func compileRegexCached(pattern string) (*regexp.Regexp, error) {
+	if len(pattern) > maxRegexPatternLength {
+		return nil, fmt.Errorf("regex pattern too long (max %d characters)", maxRegexPatternLength)
+	}
+
+	regexCacheMu.RLock()
+	re, ok := regexCache[pattern]
+	regexCacheMu.RUnlock()
+
+	if ok {
+		return re, nil
+	}
+
+	var err error
+	re, err = regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid regex: %w", err)
+	}
+
+	regexCacheMu.Lock()
+	if len(regexCache) >= maxRegexCacheSize {
+		for k := range regexCache {
+			delete(regexCache, k)
+			break
+		}
+	}
+	regexCache[pattern] = re
+	regexCacheMu.Unlock()
+
+	return re, nil
+}
+
 func SafeRegexMatch(pattern, input string) (bool, error) {
 	if len(pattern) > maxRegexPatternLength {
 		return false, fmt.Errorf("regex pattern too long (max %d characters)", maxRegexPatternLength)
@@ -45,26 +77,9 @@ func SafeRegexMatch(pattern, input string) (bool, error) {
 		return false, fmt.Errorf("regex input too long (max %d bytes)", maxRegexInputLength)
 	}
 
-	regexCacheMu.RLock()
-	re, ok := regexCache[pattern]
-	regexCacheMu.RUnlock()
-
-	if !ok {
-		var err error
-		re, err = regexp.Compile(pattern)
-		if err != nil {
-			return false, fmt.Errorf("invalid regex: %w", err)
-		}
-		regexCacheMu.Lock()
-		if len(regexCache) >= maxRegexCacheSize {
-			// Evict one random entry to prevent unbounded growth
-			for k := range regexCache {
-				delete(regexCache, k)
-				break
-			}
-		}
-		regexCache[pattern] = re
-		regexCacheMu.Unlock()
+	re, err := compileRegexCached(pattern)
+	if err != nil {
+		return false, err
 	}
 
 	// Limit concurrent regex goroutines to prevent goroutine leak under ReDoS

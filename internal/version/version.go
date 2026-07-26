@@ -78,8 +78,12 @@ func CheckLatestRelease(repo string) (*GitHubRelease, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("github API returned %d: %s", resp.StatusCode, string(body))
+		body, readErr := io.ReadAll(resp.Body)
+		bodyStr := string(body)
+		if readErr != nil {
+			bodyStr = fmt.Sprintf("(failed to read response body: %v)", readErr)
+		}
+		return nil, fmt.Errorf("github API returned %d: %s", resp.StatusCode, bodyStr)
 	}
 
 	var release GitHubRelease

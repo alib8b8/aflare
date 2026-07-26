@@ -19,7 +19,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"regexp"
 	"strings"
 )
 
@@ -269,7 +268,7 @@ func extractLinksFromText(text, baseDomain string) []ExtractedLink {
 }
 
 func regexpFindAllStringSubmatch(pattern, s string, n int) [][]string {
-	re, err := regexp.Compile(pattern)
+	re, err := compileRegexCached(pattern)
 	if err != nil {
 		return nil
 	}
