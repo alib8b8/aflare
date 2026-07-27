@@ -381,19 +381,19 @@ func (r *Registry) LoadExternalNodes(dir string) error {
 			continue // Skip if no metadata.yaml
 		}
 		info, err := f.Stat()
-	if err != nil {
+		if err != nil {
+			_ = f.Close() // best-effort close
+			continue
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			_ = f.Close() // best-effort close
+			continue
+		}
+		metadataBytes, err := io.ReadAll(f)
 		_ = f.Close() // best-effort close
-		continue
-	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		_ = f.Close() // best-effort close
-		continue
-	}
-	metadataBytes, err := io.ReadAll(f)
-	_ = f.Close() // best-effort close
-	if err != nil {
-		continue
-	}
+		if err != nil {
+			continue
+		}
 
 		var metadata NodeMetadata
 		if err := yaml.Unmarshal(metadataBytes, &metadata); err != nil {

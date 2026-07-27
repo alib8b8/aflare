@@ -336,9 +336,9 @@ type powerAwareNode struct {
 	base core.Node
 }
 
-func (n *powerAwareNode) Name() string        { return n.base.Name() }
-func (n *powerAwareNode) Description() string { return n.base.Description() + " (power-aware)" }
-func (n *powerAwareNode) Schema() core.NodeSchema  { return n.base.Schema() }
+func (n *powerAwareNode) Name() string            { return n.base.Name() }
+func (n *powerAwareNode) Description() string     { return n.base.Description() + " (power-aware)" }
+func (n *powerAwareNode) Schema() core.NodeSchema { return n.base.Schema() }
 
 func (n *powerAwareNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	pm := GetDefaultPowerManager()

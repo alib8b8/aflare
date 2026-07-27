@@ -54,10 +54,10 @@ const (
 type BusMessage struct {
 	ID        string    `json:"id"`
 	From      string    `json:"from"`
-	To        string    `json:"to"`        // 空表示广播
-	Topic     string    `json:"topic"`     // 频道/主题
+	To        string    `json:"to"`    // 空表示广播
+	Topic     string    `json:"topic"` // 频道/主题
 	Content   string    `json:"content"`
-	Type      string    `json:"type"`      // text|task|result|status|vote
+	Type      string    `json:"type"` // text|task|result|status|vote
 	Timestamp time.Time `json:"timestamp"`
 	Signature string    `json:"signature"`
 }
@@ -74,8 +74,8 @@ type PeerInfo struct {
 type MessageBus struct {
 	nodeID      string
 	port        string
-	authToken   string                        // 可选的 auth token
-	subscribers map[string][]chan BusMessage  // topic -> subscribers
+	authToken   string                       // 可选的 auth token
+	subscribers map[string][]chan BusMessage // topic -> subscribers
 	mu          sync.RWMutex
 	httpServer  *http.Server
 	peers       map[string]string            // nodeID -> address

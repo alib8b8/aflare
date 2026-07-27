@@ -227,7 +227,7 @@ func SelfUpdate(repo string) (string, error) {
 	}
 
 	if _, err := io.Copy(out, resp.Body); err != nil {
-		_ = out.Close() // best-effort close
+		_ = out.Close()        // best-effort close
 		_ = os.Remove(tmpPath) // best-effort cleanup
 		return "", fmt.Errorf("failed to write temp file: %w", err)
 	}

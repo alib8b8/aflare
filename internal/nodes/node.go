@@ -27,15 +27,15 @@ import (
 // Re-exports of core types via aliases so existing callers can keep using
 // nodes.Node, nodes.Registry, nodes.NodeSchema, etc. without modification.
 type (
-	ParamSchema     = core.ParamSchema
-	NodeSchema      = core.NodeSchema
-	Node            = core.Node
-	StreamingNode   = core.StreamingNode
-	NodeMetadata    = core.NodeMetadata
-	ExternalNode    = core.ExternalNode
-	NodeExecStats   = core.NodeExecStats
-	Registry        = core.Registry
-	NodeInfo        = core.NodeInfo
+	ParamSchema   = core.ParamSchema
+	NodeSchema    = core.NodeSchema
+	Node          = core.Node
+	StreamingNode = core.StreamingNode
+	NodeMetadata  = core.NodeMetadata
+	ExternalNode  = core.ExternalNode
+	NodeExecStats = core.NodeExecStats
+	Registry      = core.Registry
+	NodeInfo      = core.NodeInfo
 )
 
 // NewExternalNode creates a new ExternalNode.
