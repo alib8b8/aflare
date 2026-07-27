@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
+
+import (
+	"github.com/alib8b8/llm-box/internal/nodes/core"
+)
 
 func init() {
-	Register(NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            "anthropic",
-		DefaultModel:    "claude-3-5-sonnet-latest",
-		DefaultEndpoint: "https://api.anthropic.com/v1",
-		EnvAPIKey:       "ANTHROPIC_API_KEY",
-		ProviderName:    "Anthropic",
+	core.Register(core.NewOpenAICompatibleNode(core.LLMNodeConfig{
+		Name:            "internlm",
+		DefaultModel:    "internlm3-latest",
+		DefaultEndpoint: "https://internlm-chat.intern-ai.org.cn/api/v1",
+		EnvAPIKey:       "INTERNLM_API_KEY",
+		ProviderName:    "InternLM",
 	}))
 }

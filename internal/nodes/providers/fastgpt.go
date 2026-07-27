@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
 
 import (
 	"bufio"
@@ -25,12 +25,14 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 type FastGPTNode struct{}
 
 func init() {
-	Register(&FastGPTNode{})
+	core.Register(&FastGPTNode{})
 }
 
 func (n *FastGPTNode) Name() string {
@@ -41,13 +43,13 @@ func (n *FastGPTNode) Description() string {
 	return "Call FastGPT API"
 }
 
-func (n *FastGPTNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *FastGPTNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "fastgpt",
 		Description: "Call FastGPT API",
 		Input:       "string - user message content",
 		Output:      "string - AI response content",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "api_key", Type: "string", Description: "FastGPT API key (or set FASTGPT_API_KEY env var)", Required: false},
 			{Name: "app_id", Type: "string", Description: "FastGPT app ID", Required: false},
 			{Name: "chat_id", Type: "string", Description: "Chat ID for conversation continuity", Required: false},
@@ -115,14 +117,14 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 	}
 
 	// Validate endpoint URL to prevent SSRF + API key leakage
-	if err := validateLMLEndpoint(endpoint); err != nil {
+	if err := core.ValidateLMLEndpoint(endpoint); err != nil {
 		return "", fmt.Errorf("endpoint URL validation failed: %w", err)
 	}
 
 	generateURL := fmt.Sprintf("%s/chat/completions", endpoint)
 
 	// Validate the full URL to prevent SSRF
-	if err := validateLMLEndpoint(generateURL); err != nil {
+	if err := core.ValidateLMLEndpoint(generateURL); err != nil {
 		return "", fmt.Errorf("URL validation failed: %w", err)
 	}
 
@@ -153,9 +155,9 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	client := &http.Client{
-		Timeout:       DefaultLLMTimeout,
-		Transport:     safeLLMHTTPClient.Transport,
-		CheckRedirect: httpRedirectValidator(validateLMLEndpoint),
+		Timeout:       core.DefaultLLMTimeout,
+		Transport:     core.SafeLLMHTTPClient.Transport,
+		CheckRedirect: core.HTTPRedirectValidator(core.ValidateLMLEndpoint),
 	}
 
 	resp, err := client.Do(req)
@@ -166,7 +168,7 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 
 	if resp.StatusCode != http.StatusOK {
 		var errResp fastGPTResponse
-		_ = json.NewDecoder(io.LimitReader(resp.Body, maxHTTPResponseSize)).Decode(&errResp)
+		_ = json.NewDecoder(io.LimitReader(resp.Body, core.MaxHTTPResponseSize)).Decode(&errResp)
 		if errResp.Error != nil && errResp.Error.Message != "" {
 			return "", fmt.Errorf("FastGPT API error (%d): %s", resp.StatusCode, errResp.Error.Message)
 		}

@@ -393,9 +393,9 @@ mod net_block {
 	if err := compileCmd.Run(); err != nil {
 		msg := compileStderr.String()
 		if compileCtx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("Rust compilation timed out after %s", compileTimeout)
+			return "", fmt.Errorf("rust compilation timed out after %s", compileTimeout)
 		}
-		return "", fmt.Errorf("Rust compilation failed: %w\n%s", err, msg)
+		return "", fmt.Errorf("rust compilation failed: %w\n%s", err, msg)
 	}
 
 	runCtx, runCancel := context.WithTimeout(ctx, timeout)

@@ -13,20 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
 
 import (
 	"context"
 	"os"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 type CozeNode struct {
-	compat *OpenAICompatibleNode
+	compat *core.OpenAICompatibleNode
 }
 
 func init() {
-	Register(&CozeNode{
-		compat: NewOpenAICompatibleNode(LLMNodeConfig{
+	core.Register(&CozeNode{
+		compat: core.NewOpenAICompatibleNode(core.LLMNodeConfig{
 			Name:            "coze",
 			DefaultModel:    "",
 			DefaultEndpoint: "https://api.coze.cn/v1",
@@ -44,13 +46,13 @@ func (n *CozeNode) Description() string {
 	return "WIP - Call ByteDance Coze API (not functional, API compatibility issues)"
 }
 
-func (n *CozeNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *CozeNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "coze",
 		Description: "WIP - Call ByteDance Coze API (not functional, API compatibility issues)",
 		Input:       "string - user message content",
 		Output:      "string - AI response content",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "model", Type: "string", Description: "Model name (required)", Required: true},
 			{Name: "api_key", Type: "string", Description: "Coze API key (or set COZE_API_KEY env var)", Required: false},
 			{Name: "endpoint", Type: "string", Description: "API base URL (default: https://api.coze.cn/v1)", Required: false, Default: "https://api.coze.cn/v1"},

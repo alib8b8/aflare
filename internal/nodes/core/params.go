@@ -29,8 +29,9 @@ func GetParam(params map[string]string, key, defaultVal string) string {
 	return defaultVal
 }
 
-// ParamInt safely parses an integer parameter with fallback default and optional bounds clamping.
-// If parsing fails or the value is out of [min, max], the default is returned.
+// ParamInt safely parses an integer parameter with fallback default and bounds clamping.
+// If parsing fails or the value is empty, defaultVal is returned.
+// If the parsed value is below min or above max, it is clamped to the respective bound.
 // Set min > max to disable clamping.
 func ParamInt(params map[string]string, key string, defaultVal, min, max int) int {
 	s := GetParam(params, key, "")
@@ -52,8 +53,9 @@ func ParamInt(params map[string]string, key string, defaultVal, min, max int) in
 	return v
 }
 
-// ParamFloat safely parses a float parameter with fallback default and optional bounds clamping.
-// If parsing fails or the value is out of [min, max], the default is returned.
+// ParamFloat safely parses a float parameter with fallback default and bounds clamping.
+// If parsing fails or the value is empty, defaultVal is returned.
+// If the parsed value is below min or above max, it is clamped to the respective bound.
 // Set min > max to disable clamping.
 func ParamFloat(params map[string]string, key string, defaultVal, min, max float64) float64 {
 	s := GetParam(params, key, "")

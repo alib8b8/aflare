@@ -13,20 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
 
 import (
 	"context"
 	"os"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 type OpenAINode struct {
-	compat *OpenAICompatibleNode
+	compat *core.OpenAICompatibleNode
 }
 
 func init() {
-	Register(&OpenAINode{
-		compat: NewOpenAICompatibleNode(LLMNodeConfig{
+	core.Register(&OpenAINode{
+		compat: core.NewOpenAICompatibleNode(core.LLMNodeConfig{
 			Name:            "openai",
 			DefaultModel:    "gpt-3.5-turbo",
 			DefaultEndpoint: "https://api.openai.com/v1",
@@ -44,13 +46,13 @@ func (n *OpenAINode) Description() string {
 	return "Call OpenAI API"
 }
 
-func (n *OpenAINode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *OpenAINode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "openai",
 		Description: "Call OpenAI API",
 		Input:       "string - user message content",
 		Output:      "string - AI response content",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "model", Type: "string", Description: "Model name (default: gpt-3.5-turbo)", Required: false, Default: "gpt-3.5-turbo"},
 			{Name: "api_key", Type: "string", Description: "OpenAI API key (or set OPENAI_API_KEY env var)", Required: false},
 			{Name: "endpoint", Type: "string", Description: "API base URL (or set OPENAI_API_BASE env var)", Required: false, Default: "https://api.openai.com/v1"},

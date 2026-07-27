@@ -43,11 +43,13 @@ var (
 	dataDir string
 )
 
+// HomeDir 返回程序主目录路径，受 LLM_BOX_HOME 环境变量影响。
 func HomeDir() string {
 	once.Do(initDirs)
 	return homeDir
 }
 
+// DataDir 返回数据目录路径，受 LLM_BOX_DATA 环境变量影响。
 func DataDir() string {
 	once.Do(initDirs)
 	return dataDir
@@ -75,46 +77,57 @@ func initDirs() {
 	}
 }
 
+// TemplatesDir 返回模板目录的完整路径。
 func TemplatesDir() string {
 	return filepath.Join(HomeDir(), TemplatesDirName)
 }
 
+// SkillsDir 返回技能目录的完整路径。
 func SkillsDir() string {
 	return filepath.Join(HomeDir(), SkillsDirName)
 }
 
+// BinDir 返回二进制目录的完整路径。
 func BinDir() string {
 	return filepath.Join(HomeDir(), BinDirName)
 }
 
+// ConfigDir 返回配置目录的完整路径。
 func ConfigDir() string {
 	return filepath.Join(DataDir(), ConfigDirName)
 }
 
+// LogsDir 返回日志目录的完整路径。
 func LogsDir() string {
 	return filepath.Join(DataDir(), LogsDirName)
 }
 
+// CacheDir 返回缓存目录的完整路径。
 func CacheDir() string {
 	return filepath.Join(DataDir(), CacheDirName)
 }
 
+// WorkspacesDir 返回工作区目录的完整路径。
 func WorkspacesDir() string {
 	return filepath.Join(DataDir(), WorkspacesDirName)
 }
 
+// ConfigFile 返回配置目录下指定文件名的完整路径。
 func ConfigFile(name string) string {
 	return filepath.Join(ConfigDir(), name)
 }
 
+// LogFile 返回日志目录下指定文件名的完整路径。
 func LogFile(name string) string {
 	return filepath.Join(LogsDir(), name)
 }
 
+// CacheFile 返回缓存目录下指定文件名的完整路径。
 func CacheFile(name string) string {
 	return filepath.Join(CacheDir(), name)
 }
 
+// EnsureDirs 创建所有运行所需目录，任一创建失败即返回错误。
 func EnsureDirs() error {
 	dirs := []string{
 		HomeDir(),
@@ -135,6 +148,7 @@ func EnsureDirs() error {
 	return nil
 }
 
+// ResolveTemplatesPath 解析模板目录路径：优先使用主目录下模板，其次当前工作目录。
 func ResolveTemplatesPath() string {
 	if tplDir := TemplatesDir(); dirExists(tplDir) {
 		return tplDir

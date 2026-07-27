@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
+
+import (
+	"github.com/alib8b8/llm-box/internal/nodes/core"
+)
 
 func init() {
-	Register(NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            "mistral",
-		DefaultModel:    "mistral-large-latest",
-		DefaultEndpoint: "https://api.mistral.ai/v1",
-		EnvAPIKey:       "MISTRAL_API_KEY",
-		ProviderName:    "Mistral",
+	core.Register(core.NewOpenAICompatibleNode(core.LLMNodeConfig{
+		Name:            "baichuan",
+		DefaultModel:    "Baichuan4",
+		DefaultEndpoint: "https://api.baichuan-ai.com/v1",
+		EnvAPIKey:       "BAICHUAN_API_KEY",
+		ProviderName:    "Baichuan",
 	}))
 }

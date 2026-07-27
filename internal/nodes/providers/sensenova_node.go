@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
 
 import (
 	"context"
@@ -54,13 +54,13 @@ func (n *SenseNovaNode) Description() string {
 	return "商汤SenseNova日日新大模型集成。支持U1系列多模态模型（U1-Lite/U1-Pro）、Flash系列推理模型，涵盖聊天、代码、图像、文档、数据分析等场景。"
 }
 
-func (n *SenseNovaNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *SenseNovaNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        n.Name(),
 		Description: n.Description(),
 		Input:       "string - user prompt or conversation message",
 		Output:      "string - model response with multi-modal capabilities",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "model", Type: "string", Description: "Model: u1-lite/u1-lite-moe/u1-pro/flash-lite/flash/flash-pro (default: flash-lite)", Required: false, Default: "flash-lite"},
 			{Name: "scene", Type: "string", Description: "Scene: chat/code/image/document/data/workflow (default: chat)", Required: false, Default: "chat"},
 			{Name: "api_key", Type: "string", Description: "SenseNova API key (from sensenova.cn)", Required: false},
@@ -156,5 +156,5 @@ func simulateSenseNovaResponse(input, model, scene, systemPrompt string, maxToke
 }
 
 func init() {
-	Register(&SenseNovaNode{})
+	core.Register(&SenseNovaNode{})
 }

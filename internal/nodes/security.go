@@ -46,9 +46,6 @@ const maxHTTPResponseSize = MaxHTTPResponseSize
 // safeHTTPClient is a shared HTTP client with SSRF protection at dial time.
 var safeHTTPClient = core.SafeHTTPClient
 
-// safeLLMHTTPClient is like safeHTTPClient but allows loopback for local LLMs.
-var safeLLMHTTPClient = core.SafeLLMHTTPClient
-
 // httpRedirectValidator returns a CheckRedirect function that validates
 // each redirect target with the given validator.
 func httpRedirectValidator(validator func(string) error) func(*http.Request, []*http.Request) error {

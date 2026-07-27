@@ -44,6 +44,7 @@ type TemplateManager struct {
 	templates map[string]*Template
 }
 
+// NewTemplateManager 创建模板管理器并注册内置模板。
 func NewTemplateManager() *TemplateManager {
 	tm := &TemplateManager{
 		templates: make(map[string]*Template),
@@ -70,6 +71,7 @@ func (tm *TemplateManager) registerBuiltins() {
 	}
 }
 
+// List 返回按名称排序的全部模板列表。
 func (tm *TemplateManager) List() []*Template {
 	result := make([]*Template, 0, len(tm.templates))
 	for _, t := range tm.templates {
@@ -81,6 +83,7 @@ func (tm *TemplateManager) List() []*Template {
 	return result
 }
 
+// Get 按名称获取模板，不存在时返回错误。
 func (tm *TemplateManager) Get(name string) (*Template, error) {
 	t, ok := tm.templates[name]
 	if !ok {
@@ -89,6 +92,7 @@ func (tm *TemplateManager) Get(name string) (*Template, error) {
 	return t, nil
 }
 
+// Search 在模板名称、描述、分类与标签中模糊匹配关键词，返回按名称排序的结果。
 func (tm *TemplateManager) Search(keyword string) []*Template {
 	keyword = strings.ToLower(keyword)
 	var result []*Template
@@ -112,6 +116,7 @@ func (tm *TemplateManager) Search(keyword string) []*Template {
 	return result
 }
 
+// Categories 返回去重并按字母序排序的全部模板分类。
 func (tm *TemplateManager) Categories() []string {
 	catSet := make(map[string]struct{})
 	for _, t := range tm.templates {
@@ -125,6 +130,7 @@ func (tm *TemplateManager) Categories() []string {
 	return result
 }
 
+// ListByCategory 返回属于指定分类的模板，按名称排序。
 func (tm *TemplateManager) ListByCategory(category string) []*Template {
 	var result []*Template
 	for _, t := range tm.templates {
@@ -138,6 +144,8 @@ func (tm *TemplateManager) ListByCategory(category string) []*Template {
 	return result
 }
 
+// Render 渲染指定模板，应用默认值与传入变量，并校验必填项。
+// name 指定模板名，vars 为运行时变量映射，缺失必填变量将返回错误。
 func (tm *TemplateManager) Render(name string, vars map[string]string) (string, error) {
 	t, err := tm.Get(name)
 	if err != nil {

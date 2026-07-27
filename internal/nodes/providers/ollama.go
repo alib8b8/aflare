@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
 
 import (
 	"bufio"
@@ -23,12 +23,14 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 type OllamaNode struct{}
 
 func init() {
-	Register(&OllamaNode{})
+	core.Register(&OllamaNode{})
 }
 
 func (n *OllamaNode) Name() string {
@@ -39,13 +41,13 @@ func (n *OllamaNode) Description() string {
 	return "Call Ollama local LLM server"
 }
 
-func (n *OllamaNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *OllamaNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "ollama",
 		Description: "Call Ollama local LLM server",
 		Input:       "string - user prompt content (used when prompt param is not provided)",
 		Output:      "string - model response content",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "model", Type: "string", Description: "Model name (default: llama3)", Required: false, Default: "llama3"},
 			{Name: "endpoint", Type: "string", Description: "Ollama server URL (default: http://localhost:11434)", Required: false, Default: "http://localhost:11434"},
 			{Name: "prompt", Type: "string", Description: "Prompt to send to Ollama (if not provided, uses input)", Required: false},
@@ -89,7 +91,7 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 	}
 
 	// Validate endpoint URL to prevent SSRF (localhost is allowed for Ollama)
-	if err := validateLMLEndpoint(endpoint); err != nil {
+	if err := core.ValidateLMLEndpoint(endpoint); err != nil {
 		return "", fmt.Errorf("endpoint URL validation failed: %w", err)
 	}
 
@@ -113,9 +115,9 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{
-		Timeout:       DefaultLLMTimeout,
-		Transport:     safeLLMHTTPClient.Transport,
-		CheckRedirect: httpRedirectValidator(validateLMLEndpoint),
+		Timeout:       core.DefaultLLMTimeout,
+		Transport:     core.SafeLLMHTTPClient.Transport,
+		CheckRedirect: core.HTTPRedirectValidator(core.ValidateLMLEndpoint),
 	}
 
 	resp, err := client.Do(req)

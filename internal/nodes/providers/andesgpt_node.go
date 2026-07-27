@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
 
 import (
 	"context"
@@ -22,6 +22,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 var (
@@ -49,13 +51,13 @@ func (n *AndesGPTNode) Description() string {
 	return "OPPO AndesGPT large model integration. Supports Tiny (端侧1B), Turbo (端云协同7B), Titan (云端100B+) sizes with PersonaX personalization and end-cloud collaboration."
 }
 
-func (n *AndesGPTNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *AndesGPTNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        n.Name(),
 		Description: n.Description(),
 		Input:       "string - user prompt or conversation message",
 		Output:      "string - model response with persona and collaboration metadata",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "model_size", Type: "string", Description: "Model size: tiny (端侧1B) / turbo (端云协同7B) / titan (云端100B+) (default: turbo)", Required: false, Default: "turbo"},
 			{Name: "scene", Type: "string", Description: "Application scene: life/imaging/productivity/creative/knowledge (default: life)", Required: false, Default: "life"},
 			{Name: "persona_id", Type: "string", Description: "PersonaX persona ID for personalized responses (千人千面)", Required: false},
@@ -184,5 +186,5 @@ func simulateAndesResponse(input, modelSize, scene, personaID string, useMemory 
 }
 
 func init() {
-	Register(&AndesGPTNode{})
+	core.Register(&AndesGPTNode{})
 }

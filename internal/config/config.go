@@ -61,6 +61,8 @@ var (
 	configMu     sync.RWMutex
 )
 
+// LoadConfig 加载全局配置，首次调用时按环境变量、当前目录与用户主目录顺序查找并解析 YAML。
+// 后续调用直接返回缓存的配置实例。
 func LoadConfig() (*Config, error) {
 	configMu.RLock()
 	if globalConfig != nil {
@@ -128,6 +130,7 @@ func getConfigPaths() []string {
 	return paths
 }
 
+// GetProviderConfig 返回指定 provider 的配置，未配置时返回空实例。
 func GetProviderConfig(provider string) LLMProviderConfig {
 	cfg, err := LoadConfig()
 	if err != nil {
@@ -142,6 +145,7 @@ func GetProviderConfig(provider string) LLMProviderConfig {
 	return LLMProviderConfig{}
 }
 
+// GetAPIKey 优先从环境变量获取 API Key，其次从配置文件，未找到返回空字符串。
 func GetAPIKey(provider, envVar string) string {
 	if apiKey := os.Getenv(envVar); apiKey != "" {
 		return apiKey
@@ -155,6 +159,7 @@ func GetAPIKey(provider, envVar string) string {
 	return ""
 }
 
+// GetEndpoint 依次从环境变量、配置文件、默认值获取服务端点。
 func GetEndpoint(provider, envVar, defaultEndpoint string) string {
 	if endpoint := os.Getenv(envVar); endpoint != "" {
 		return endpoint
@@ -168,6 +173,7 @@ func GetEndpoint(provider, envVar, defaultEndpoint string) string {
 	return defaultEndpoint
 }
 
+// GetDefaultModel 依次从环境变量、配置文件、默认值获取默认模型名称。
 func GetDefaultModel(provider, envVar, defaultModel string) string {
 	if model := os.Getenv(envVar); model != "" {
 		return model
@@ -181,6 +187,7 @@ func GetDefaultModel(provider, envVar, defaultModel string) string {
 	return defaultModel
 }
 
+// IsSafeMode 判断是否启用安全模式，优先读取环境变量 LLM_BOX_SAFE_MODE。
 func IsSafeMode() bool {
 	if envVal := os.Getenv("LLM_BOX_SAFE_MODE"); envVal != "" {
 		lower := strings.ToLower(strings.TrimSpace(envVal))
@@ -206,6 +213,8 @@ const (
 	SecurityLevelL3 = "L3"
 )
 
+// GetSecurityLevel 返回当前安全等级（L0/L1/L2/L3）。
+// 优先级：环境变量 > 配置文件 > 默认值（safe mode 为 L3，否则 L1）。
 func GetSecurityLevel() string {
 	if envVal := os.Getenv("LLM_BOX_SECURITY_LEVEL"); envVal != "" {
 		upper := strings.ToUpper(strings.TrimSpace(envVal))
@@ -230,6 +239,7 @@ func GetSecurityLevel() string {
 	return SecurityLevelL1
 }
 
+// SecurityLevelAtLeast 判断当前安全等级是否不低于给定等级。
 func SecurityLevelAtLeast(level string) bool {
 	current := GetSecurityLevel()
 	levels := map[string]int{SecurityLevelL0: 0, SecurityLevelL1: 1, SecurityLevelL2: 2, SecurityLevelL3: 3}
@@ -241,6 +251,7 @@ func SecurityLevelAtLeast(level string) bool {
 	return curVal >= reqVal
 }
 
+// GetRouterConfig 返回路由配置，加载失败时返回空实例。
 func GetRouterConfig() RouterConfig {
 	cfg, err := LoadConfig()
 	if err != nil {
@@ -257,12 +268,15 @@ const (
 	RouterStrategyRandom     = "random"
 )
 
+// SetConfig 替换全局配置实例，主要用于测试与运行时注入。
 func SetConfig(cfg *Config) {
 	configMu.Lock()
 	defer configMu.Unlock()
 	globalConfig = cfg
 }
 
+// Validate 校验配置字段合法性，包括安全等级、路由策略与 provider 字段约束。
+// 同时确保 Providers map 已初始化。
 func (c *Config) Validate() error {
 	if c.Providers == nil {
 		c.Providers = make(map[string]LLMProviderConfig)

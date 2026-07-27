@@ -139,11 +139,13 @@ func replaceAttr(groups []string, a slog.Attr) slog.Attr {
 	return a
 }
 
+// SetLevel 设置日志级别并重新初始化 logger。
 func SetLevel(level slog.Level) {
 	currentLevel = level
 	reinitLogger()
 }
 
+// SetFormat 设置日志输出格式（"json" 或 "text"），仅合法值会触发重新初始化。
 func SetFormat(format string) {
 	if format == "json" || format == "text" {
 		currentFormat = format
@@ -151,6 +153,7 @@ func SetFormat(format string) {
 	}
 }
 
+// SetOutput 设置日志输出目标（文件路径或 "stderr"），并关闭旧文件。
 func SetOutput(output string) {
 	if logFile != nil {
 		if err := logFile.Close(); err != nil {
@@ -175,6 +178,7 @@ func reinitLogger() {
 	initLogger(currentLevel, currentFormat, output)
 }
 
+// GetLevel 返回当前日志级别。
 func GetLevel() slog.Level {
 	return currentLevel
 }
@@ -190,26 +194,32 @@ func logger() *slog.Logger {
 	return l
 }
 
+// Debug 以 Debug 级别记录日志。
 func Debug(msg string, args ...any) {
 	logger().Debug(msg, args...)
 }
 
+// Info 以 Info 级别记录日志。
 func Info(msg string, args ...any) {
 	logger().Info(msg, args...)
 }
 
+// Warn 以 Warn 级别记录日志。
 func Warn(msg string, args ...any) {
 	logger().Warn(msg, args...)
 }
 
+// Error 以 Error 级别记录日志。
 func Error(msg string, args ...any) {
 	logger().Error(msg, args...)
 }
 
+// With 返回附带给定属性的 logger 实例。
 func With(args ...any) *slog.Logger {
 	return logger().With(args...)
 }
 
+// Close 关闭日志文件句柄，应在程序退出前调用。
 func Close() {
 	if logFile != nil {
 		if err := logFile.Close(); err != nil {

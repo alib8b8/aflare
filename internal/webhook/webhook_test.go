@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -651,5 +652,141 @@ func TestIsValidWorkflowName(t *testing.T) {
 		if got := isValidWorkflowName(tt.name); got != tt.valid {
 			t.Errorf("isValidWorkflowName(%q) = %v, want %v", tt.name, got, tt.valid)
 		}
+	}
+}
+
+// freePort returns a stringified free TCP port on 127.0.0.1 for test servers.
+// There is an inherent race between closing the listener and binding again,
+// but it is acceptable for tests.
+func freePort(t *testing.T) string {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to find free port: %v", err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	if err := l.Close(); err != nil {
+		t.Fatalf("failed to close listener: %v", err)
+	}
+	return fmt.Sprintf("%d", port)
+}
+
+// TestWebhookDefaultLocalhost 验证 authToken(secret)为空时,默认绑 127.0.0.1。
+func TestWebhookDefaultLocalhost(t *testing.T) {
+	reg := nodes.NewRegistry()
+	srv := NewWebhookServer("9090", "", reg) // 空 secret => 无认证模式
+
+	if addr := srv.resolveAddr(); addr != "127.0.0.1:9090" {
+		t.Errorf("expected 127.0.0.1:9090 when no auth secret, got %s", addr)
+	}
+}
+
+// TestWebhookCustomHost 验证用户显式设置 host 时,host 优先于默认 localhost。
+func TestWebhookCustomHost(t *testing.T) {
+	reg := nodes.NewRegistry()
+	srv := NewWebhookServer("9090", "", reg)
+	srv.SetHost("0.0.0.0")
+
+	if addr := srv.resolveAddr(); addr != "0.0.0.0:9090" {
+		t.Errorf("expected 0.0.0.0:9090 when host set, got %s", addr)
+	}
+
+	// 已配置 secret 但 host 为空时,应绑全接口(由认证保护)
+	secretSrv := NewWebhookServer("9091", "some-secret", reg)
+	if addr := secretSrv.resolveAddr(); addr != ":9091" {
+		t.Errorf("expected :9091 when secret set and host empty, got %s", addr)
+	}
+}
+
+// TestWebhookAuthToken 验证 secret(auth token)设置时,
+// 无 token 请求返回 401,正确 token 通过。
+func TestWebhookAuthToken(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	srv.secret = "test-auth-token"
+
+	wfContent := `name: auth-workflow
+steps:
+  - node: echo
+`
+	createWorkflowFile(t, tmpDir, "authwf", wfContent)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	// 无 token => 401
+	resp, err := http.Post(ts.URL+"/webhook/authwf", "application/json", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 for missing token, got %d", resp.StatusCode)
+	}
+
+	// 错误 token => 401
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/webhook/authwf", strings.NewReader("{}"))
+	req.Header.Set("X-Webhook-Secret", "wrong-token")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 for wrong token, got %d", resp.StatusCode)
+	}
+
+	// 正确 token => 202
+	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/webhook/authwf", strings.NewReader("{}"))
+	req.Header.Set("X-Webhook-Secret", "test-auth-token")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Errorf("expected 202 for correct token, got %d", resp.StatusCode)
+	}
+}
+
+// TestWebhookCleanupTasksGracefulShutdown 验证启动后立即 Stop 不阻塞、不 panic,
+// 即 cleanupTasks goroutine 已正确纳入 WaitGroup。
+func TestWebhookCleanupTasksGracefulShutdown(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&echoNode{name: "echo"})
+	port := freePort(t)
+	srv := NewWebhookServer(port, "", reg)
+
+	startErr := make(chan error, 1)
+	go func() {
+		startErr <- srv.Start()
+	}()
+
+	// 给服务器时间启动并运行 cleanupTasks goroutine
+	time.Sleep(150 * time.Millisecond)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- srv.Stop()
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Stop returned error: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop() did not complete in time (cleanupTasks wg not draining)")
+	}
+
+	// Start 应已因 Shutdown 返回(http.ErrServerClosed 是预期行为)
+	select {
+	case err := <-startErr:
+		if err != nil && err != http.ErrServerClosed {
+			t.Fatalf("Start returned unexpected error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Start goroutine did not return after Stop")
 	}
 }

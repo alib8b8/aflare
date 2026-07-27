@@ -54,13 +54,6 @@ func defaultEndpointFor(provider string) string {
 	return core.DefaultEndpointFor(provider)
 }
 
-// getMobileParam returns params[key] if it exists and is non-empty, else
-// defaultVal. Equivalent to core.GetParam; kept for backward compatibility
-// with node files that previously shared the helper from mobile_nodes.go.
-func getMobileParam(params map[string]string, key, defaultVal string) string {
-	return core.GetParam(params, key, defaultVal)
-}
-
 // parseIntSafe parses s as an int, returning defaultVal on error. Kept for
 // backward compatibility with node files that used the mobile_nodes.go helper.
 func parseIntSafe(s string, defaultVal int) int {

@@ -472,6 +472,9 @@ func (c *Coordinator) handleExecute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// fire-and-forget by design:工作流异步执行,Stop 时可能丢失在途分发。
+	// 该 goroutine 内部通过 safeHTTPClient(30s 超时)分派任务并轮询结果,
+	// 停机时未完成的工作流会被中断,调用方应通过 /api/tasks 查询最终状态。
 	go c.executeWorkflowDistributed(wf)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -561,6 +564,9 @@ func (c *Coordinator) dispatchTask(nodeID string, task *Task) {
 		"step":    task.Step,
 	})
 
+	// fire-and-forget by design:HTTP 分派异步执行,safeHTTPClient 有 30s 超时。
+	// 停机时在途的分派请求可能丢失(任务状态由 worker 通过 /api/task 回报,
+	// Coordinator 重启后可恢复跟踪),不纳入 WaitGroup 以避免 Stop 阻塞。
 	go func() {
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewBuffer(data))
 		if err != nil {
@@ -827,9 +833,8 @@ func (w *Worker) sendHeartbeats() {
 				"current_load": load,
 			})
 
-			if _, err := w.httpPost("/api/heartbeat", reqBody); err != nil {
-				// heartbeat failure is non-fatal; node will retry next cycle
-			}
+			// heartbeat failure is non-fatal; node will retry next cycle
+			_, _ = w.httpPost("/api/heartbeat", reqBody)
 		case <-w.stopCh:
 			return
 		}
@@ -886,9 +891,8 @@ func (w *Worker) updateTaskStatus(taskID string, status TaskStatus) {
 		"task_id": taskID,
 		"status":  status,
 	})
-	if _, err := w.httpPut("/api/task", reqBody); err != nil {
-		// task status update failure is non-fatal; status will be reconciled later
-	}
+	// task status update failure is non-fatal; status will be reconciled later
+	_, _ = w.httpPut("/api/task", reqBody)
 }
 
 func (w *Worker) updateTaskResult(taskID, output, errorStr string) {

@@ -338,7 +338,8 @@ func DispatchEvent(eventType string, eventData map[string]interface{}) {
 func safeCallback(cb func(event map[string]interface{}), event map[string]interface{}) {
 	defer func() {
 		if r := recover(); r != nil {
-			// Log panic but don't crash the event dispatcher
+			// 吞掉回调 panic,避免拖垮事件分发器
+			_ = r
 		}
 	}()
 	if cb != nil {

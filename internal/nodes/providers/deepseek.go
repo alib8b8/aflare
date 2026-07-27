@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
+
+import (
+	"github.com/alib8b8/llm-box/internal/nodes/core"
+)
 
 func init() {
-	Register(NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            "kimi",
-		DefaultModel:    "moonshot-v1-8k",
-		DefaultEndpoint: "https://api.moonshot.cn/v1",
-		EnvAPIKey:       "KIMI_API_KEY",
-		ProviderName:    "Kimi",
+	core.Register(core.NewOpenAICompatibleNode(core.LLMNodeConfig{
+		Name:            "deepseek",
+		DefaultModel:    "deepseek-chat",
+		DefaultEndpoint: "https://api.deepseek.com/v1",
+		EnvAPIKey:       "DEEPSEEK_API_KEY",
+		ProviderName:    "DeepSeek",
 	}))
 }

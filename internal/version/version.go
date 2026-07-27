@@ -46,15 +46,19 @@ type GitHubRelease struct {
 	} `json:"assets"`
 }
 
+// GetVersion 返回当前版本号字符串。
 func GetVersion() string {
 	return Version
 }
 
+// GetBuildInfo 返回包含版本、构建时间与运行时环境的构建信息。
 func GetBuildInfo() string {
 	return fmt.Sprintf("llm-box version %s\n  built: %s\n  go:    %s\n  os:    %s/%s",
 		Version, BuildDate, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 }
 
+// CheckLatestRelease 查询指定仓库的最新 GitHub release 信息。
+// repo 参数格式为 "owner/name"，若设置了 GITHUB_TOKEN 环境变量则会用于鉴权。
 func CheckLatestRelease(repo string) (*GitHubRelease, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -94,6 +98,7 @@ func CheckLatestRelease(repo string) (*GitHubRelease, error) {
 	return &release, nil
 }
 
+// HasUpdate 比较当前版本与最新 release 的 tag，不同则视为有更新。
 func HasUpdate(currentVersion string, latest *GitHubRelease) bool {
 	if latest == nil || latest.TagName == "" {
 		return false
@@ -103,6 +108,8 @@ func HasUpdate(currentVersion string, latest *GitHubRelease) bool {
 	return current != latestTag
 }
 
+// FindAsset 在 release 资源中查找匹配 goos/goarch 的二进制下载地址。
+// 返回值为下载 URL 与资源文件名；未找到时返回空字符串。
 func FindAsset(release *GitHubRelease, goos, goarch string) (string, string) {
 	suffix := fmt.Sprintf("%s-%s", goos, goarch)
 	if goos == "windows" {
@@ -180,6 +187,9 @@ func downloadChecksums(url string) (map[string]string, error) {
 	return checksums, nil
 }
 
+// SelfUpdate 检查并下载最新版本替换当前可执行文件。
+// 流程：查询最新 release、下载匹配资源、校验 checksum、备份并替换二进制。
+// 返回更新结果描述；若已是最新则返回 "Already up to date"。
 func SelfUpdate(repo string) (string, error) {
 	release, err := CheckLatestRelease(repo)
 	if err != nil {

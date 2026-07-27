@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
+
+import (
+	"github.com/alib8b8/llm-box/internal/nodes/core"
+)
 
 func init() {
-	Register(NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            "mimo",
-		DefaultModel:    "mimo-v2.5-pro",
-		DefaultEndpoint: "https://api.xiaomimimo.com/v1",
-		EnvAPIKey:       "MIMO_API_KEY",
-		ProviderName:    "MiMo",
+	core.Register(core.NewOpenAICompatibleNode(core.LLMNodeConfig{
+		Name:            "anthropic",
+		DefaultModel:    "claude-3-5-sonnet-latest",
+		DefaultEndpoint: "https://api.anthropic.com/v1",
+		EnvAPIKey:       "ANTHROPIC_API_KEY",
+		ProviderName:    "Anthropic",
 	}))
 }

@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
+
+import (
+	"github.com/alib8b8/llm-box/internal/nodes/core"
+)
 
 func init() {
-	Register(NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            "xverse",
-		DefaultModel:    "XVERSE-7B-Chat",
-		DefaultEndpoint: "https://api.xverse.cn/v1",
-		EnvAPIKey:       "XVERSE_API_KEY",
-		ProviderName:    "XVERSE",
+	core.Register(core.NewOpenAICompatibleNode(core.LLMNodeConfig{
+		Name:            "yi",
+		DefaultModel:    "yi-lightning",
+		DefaultEndpoint: "https://api.lingyiwanwu.com/v1",
+		EnvAPIKey:       "YI_API_KEY",
+		ProviderName:    "Yi",
 	}))
 }

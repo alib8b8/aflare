@@ -157,7 +157,7 @@ func ValidateWritePathIn(baseDir, path string) (string, error) {
 
 	ext := strings.ToLower(filepath.Ext(safePath))
 
-	// Forbidden extensions (L1+)
+	// Forbidden extensions (enforced at all security levels; L3 additionally blocks script extensions below)
 	forbiddenExts := map[string]bool{
 		".env":   true,
 		".sh":    true,

@@ -13,20 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
 
 import (
 	"context"
 	"os"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 type IMANode struct {
-	compat *OpenAICompatibleNode
+	compat *core.OpenAICompatibleNode
 }
 
 func init() {
-	Register(&IMANode{
-		compat: NewOpenAICompatibleNode(LLMNodeConfig{
+	core.Register(&IMANode{
+		compat: core.NewOpenAICompatibleNode(core.LLMNodeConfig{
 			Name:            "ima",
 			DefaultModel:    "",
 			DefaultEndpoint: "",
@@ -44,13 +46,13 @@ func (n *IMANode) Description() string {
 	return "Call IMA Copilot API"
 }
 
-func (n *IMANode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *IMANode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "ima",
 		Description: "Call IMA Copilot API",
 		Input:       "string - user message content",
 		Output:      "string - AI response content",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "model", Type: "string", Description: "Model name (required)", Required: true},
 			{Name: "api_key", Type: "string", Description: "IMA API key (or set IMA_API_KEY env var)", Required: false},
 			{Name: "endpoint", Type: "string", Description: "API base URL (or set IMA_API_BASE env var)", Required: true},

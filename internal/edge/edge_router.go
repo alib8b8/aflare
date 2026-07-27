@@ -287,8 +287,19 @@ func (r *EdgeRouter) Execute(ctx context.Context, task TaskRequest) (TaskResult,
 	}
 
 	if execErr != nil && r.config.EnableFallback && decision.Target == TargetLocal {
+		fallbackStart := time.Now()
 		output, execErr = r.executeCloud(ctx, task, r.selectBestCloudProvider())
 		result.FallbackUsed = true
+		// Fallback cloud call must update cloud stats, mirroring the
+		// TargetCloud branch. Without this, CloudCalls/CloudSuccess are
+		// undercounted and SavingsPct is skewed.
+		r.mu.Lock()
+		r.stats.CloudCalls++
+		if execErr == nil {
+			r.stats.CloudSuccess++
+			r.stats.AvgCloudLat = (r.stats.AvgCloudLat + time.Since(fallbackStart).Milliseconds()) / 2
+		}
+		r.mu.Unlock()
 	}
 
 	result.Output = output
@@ -539,27 +550,30 @@ type PrivacyAnalyzer struct {
 func NewPrivacyAnalyzer() *PrivacyAnalyzer {
 	return &PrivacyAnalyzer{
 		sensitivePatterns: []*regexp.Regexp{
-			regexp.MustCompile(`(?i)\b密码\b`),
+			// 中文敏感词不使用 \b：Go RE2 的 \b 是 ASCII 词边界，
+			// 仅在 [a-zA-Z0-9_] word 字符与非 word 字符之间匹配，
+			// 中文相邻时不存在 ASCII 词边界，\b中文\b 永远不会命中。
+			regexp.MustCompile(`(?i)密码`),
 			regexp.MustCompile(`(?i)\bpassword\b`),
 			regexp.MustCompile(`(?i)\bsecret\b`),
 			regexp.MustCompile(`(?i)\btoken\b`),
-			regexp.MustCompile(`(?i)\b身份证\b`),
+			regexp.MustCompile(`(?i)身份证`),
 			regexp.MustCompile(`(?i)\bid[_-]?card\b`),
 			regexp.MustCompile(`(?i)\bssn\b`),
 			regexp.MustCompile(`(?i)\bsocial[_-]?security\b`),
-			regexp.MustCompile(`(?i)\b银行卡\b`),
+			regexp.MustCompile(`(?i)银行卡`),
 			regexp.MustCompile(`(?i)\bcredit[_-]?card\b`),
 			regexp.MustCompile(`(?i)\bcard[_-]?number\b`),
-			regexp.MustCompile(`(?i)\b私钥\b`),
+			regexp.MustCompile(`(?i)私钥`),
 			regexp.MustCompile(`(?i)\bprivate[_-]?key\b`),
 			regexp.MustCompile(`(?i)\bapi[_-]?key\b`),
-			regexp.MustCompile(`(?i)\b地址\b`),
+			regexp.MustCompile(`(?i)地址`),
 			regexp.MustCompile(`(?i)\baddress\b`),
 			regexp.MustCompile(`(?i)\blocation\b`),
-			regexp.MustCompile(`(?i)\b手机号\b`),
+			regexp.MustCompile(`(?i)手机号`),
 			regexp.MustCompile(`(?i)\bphone\b`),
 			regexp.MustCompile(`(?i)\btelephone\b`),
-			regexp.MustCompile(`(?i)\b邮箱\b`),
+			regexp.MustCompile(`(?i)邮箱`),
 			regexp.MustCompile(`(?i)\bemail\b`),
 			regexp.MustCompile(`(?i)\bmail\b`),
 			regexp.MustCompile(`(?i)\bghp_[A-Za-z0-9]{20,}\b`),

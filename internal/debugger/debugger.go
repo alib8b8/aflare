@@ -49,6 +49,7 @@ type Debugger struct {
 	stepOutputs map[int]string
 }
 
+// NewDebugger 创建并返回一个空的调试器实例。
 func NewDebugger() *Debugger {
 	return &Debugger{
 		breakpointsByIndex: make(map[int]bool),
@@ -62,6 +63,7 @@ func NewDebugger() *Debugger {
 	}
 }
 
+// AddBreakpoint 添加断点：index 为步骤序号（>=0 有效），name 为步骤名称（非空有效）。
 func (d *Debugger) AddBreakpoint(index int, name string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -74,6 +76,7 @@ func (d *Debugger) AddBreakpoint(index int, name string) {
 	}
 }
 
+// RemoveBreakpoint 移除断点：按 index 与 name 分别删除对应条目。
 func (d *Debugger) RemoveBreakpoint(index int, name string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -86,6 +89,7 @@ func (d *Debugger) RemoveBreakpoint(index int, name string) {
 	}
 }
 
+// ListBreakpoints 返回当前已设置的全部断点列表。
 func (d *Debugger) ListBreakpoints() []Breakpoint {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
@@ -103,6 +107,7 @@ func (d *Debugger) ListBreakpoints() []Breakpoint {
 	return bps
 }
 
+// Step 在暂停状态下放行一个步骤；未暂停时为空操作。
 func (d *Debugger) Step() {
 	d.mu.Lock()
 	paused := d.state.Paused
@@ -116,6 +121,7 @@ func (d *Debugger) Step() {
 	}
 }
 
+// Continue 清除暂停标记并放行当前阻塞步骤，使后续步骤连续执行直到下一个断点。
 func (d *Debugger) Continue() {
 	d.mu.Lock()
 	d.pauseFlag = false
@@ -130,6 +136,7 @@ func (d *Debugger) Continue() {
 	}
 }
 
+// Pause 设置暂停标记，使下一个步骤进入 WaitForStep 时阻塞。
 func (d *Debugger) Pause() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -137,6 +144,8 @@ func (d *Debugger) Pause() {
 	d.pauseFlag = true
 }
 
+// WaitForStep 在执行某步骤前更新调试状态，并根据断点/暂停标记决定是否阻塞。
+// 返回 true 表示可继续执行；ctx 取消时返回 false 并清除暂停状态。
 func (d *Debugger) WaitForStep(ctx context.Context, stepIndex int, stepName string, input string, variables map[string]string) bool {
 	d.mu.Lock()
 
@@ -176,6 +185,7 @@ func (d *Debugger) WaitForStep(ctx context.Context, stepIndex int, stepName stri
 	}
 }
 
+// RecordStepOutput 记录指定步骤的输出，用于调试时回放。
 func (d *Debugger) RecordStepOutput(stepIndex int, output string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -184,6 +194,7 @@ func (d *Debugger) RecordStepOutput(stepIndex int, output string) {
 	d.state.StepOutputs[stepIndex] = output
 }
 
+// GetState 返回当前调试状态的深拷贝，调用方可安全修改。
 func (d *Debugger) GetState() DebugState {
 	d.mu.RLock()
 	defer d.mu.RUnlock()

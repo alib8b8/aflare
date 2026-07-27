@@ -503,3 +503,27 @@ func TestBusHopLimitZero(t *testing.T) {
 		t.Errorf("expected 'unlimited', got %s", got[0].Content)
 	}
 }
+
+// TestBusDefaultLocalhost 验证 authToken 为空时,默认绑 127.0.0.1(安全默认)。
+func TestBusDefaultLocalhost(t *testing.T) {
+	bus := NewMessageBus("node-1", "9100") // 无 authToken
+	if addr := bus.resolveAddr(); addr != "127.0.0.1:9100" {
+		t.Errorf("expected 127.0.0.1:9100 when no auth token, got %s", addr)
+	}
+}
+
+// TestBusCustomHost 验证用户显式设置 host 时,host 优先于默认 localhost。
+func TestBusCustomHost(t *testing.T) {
+	bus := NewMessageBus("node-1", "9101")
+	bus.SetHost("0.0.0.0")
+	if addr := bus.resolveAddr(); addr != "0.0.0.0:9101" {
+		t.Errorf("expected 0.0.0.0:9101 when host set, got %s", addr)
+	}
+
+	// 已配置 authToken 但 host 为空时,应绑全接口(由认证保护)
+	authBus := NewMessageBus("node-2", "9102")
+	authBus.SetAuthToken("some-token")
+	if addr := authBus.resolveAddr(); addr != ":9102" {
+		t.Errorf("expected :9102 when token set and host empty, got %s", addr)
+	}
+}

@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
+
+import (
+	"github.com/alib8b8/llm-box/internal/nodes/core"
+)
 
 func init() {
-	Register(NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            "baichuan",
-		DefaultModel:    "Baichuan4",
-		DefaultEndpoint: "https://api.baichuan-ai.com/v1",
-		EnvAPIKey:       "BAICHUAN_API_KEY",
-		ProviderName:    "Baichuan",
+	core.Register(core.NewOpenAICompatibleNode(core.LLMNodeConfig{
+		Name:            "gemini",
+		DefaultModel:    "gemini-2.0-flash",
+		DefaultEndpoint: "https://generativelanguage.googleapis.com/v1beta/openai",
+		EnvAPIKey:       "GEMINI_API_KEY",
+		ProviderName:    "Google Gemini",
 	}))
 }

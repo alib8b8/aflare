@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
 
 import (
 	"context"
@@ -21,11 +21,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 func TestOllamaNode(t *testing.T) {
 	// Test that ollama node is registered
-	node, ok := Get("ollama")
+	node, ok := core.Get("ollama")
 	if !ok {
 		t.Fatal("ollama node not found in registry")
 	}
@@ -72,7 +74,7 @@ func TestOllamaExecute(t *testing.T) {
 	defer mockServer.Close()
 
 	// Get ollama node
-	node, ok := Get("ollama")
+	node, ok := core.Get("ollama")
 	if !ok {
 		t.Fatal("ollama node not found")
 	}
@@ -111,7 +113,7 @@ func TestOllamaDefaultParams(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	node, ok := Get("ollama")
+	node, ok := core.Get("ollama")
 	if !ok {
 		t.Fatal("ollama node not found")
 	}
@@ -147,7 +149,7 @@ func TestOllamaPromptParamPriority(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	node, ok := Get("ollama")
+	node, ok := core.Get("ollama")
 	if !ok {
 		t.Fatal("ollama node not found")
 	}

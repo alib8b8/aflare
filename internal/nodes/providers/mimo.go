@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
+
+import (
+	"github.com/alib8b8/llm-box/internal/nodes/core"
+)
 
 func init() {
-	Register(NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            "qwen",
-		DefaultModel:    "qwen-turbo",
-		DefaultEndpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-		EnvAPIKey:       "QWEN_API_KEY",
-		ProviderName:    "Qwen",
+	core.Register(core.NewOpenAICompatibleNode(core.LLMNodeConfig{
+		Name:            "mimo",
+		DefaultModel:    "mimo-v2.5-pro",
+		DefaultEndpoint: "https://api.xiaomimimo.com/v1",
+		EnvAPIKey:       "MIMO_API_KEY",
+		ProviderName:    "MiMo",
 	}))
 }

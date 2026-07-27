@@ -467,7 +467,7 @@ func (n *AgentBrowserNode) importCookiesFromChrome(profile string) ([]string, er
 
 	if _, err := os.Stat(cookiePath); err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("Chrome Cookie 数据库不存在: %s（请确认 Chrome 已安装并曾运行）", cookiePath)
+			return nil, fmt.Errorf("chrome Cookie 数据库不存在: %s（请确认 Chrome 已安装并曾运行）", cookiePath)
 		}
 		return nil, fmt.Errorf("访问 Cookie 数据库失败: %w", err)
 	}

@@ -52,6 +52,8 @@ type Cache struct {
 	misses  int64
 }
 
+// New 根据配置创建一个带 TTL 与 LRU 淘汰的缓存实例。
+// 若 MaxEntries 未设置或非正数，默认使用 100。
 func New(config Config) *Cache {
 	if config.MaxEntries <= 0 {
 		config.MaxEntries = 100
@@ -63,6 +65,7 @@ func New(config Config) *Cache {
 	}
 }
 
+// GenerateKey 根据 prompt 与可选 params 生成稳定的 SHA256 缓存键。
 func GenerateKey(prompt string, params map[string]interface{}) string {
 	h := sha256.New()
 	h.Write([]byte(prompt))
@@ -73,6 +76,7 @@ func GenerateKey(prompt string, params map[string]interface{}) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// Get 读取缓存值。命中且未过期时返回值与 true；未启用、缺失或过期时返回空串与 false。
 func (c *Cache) Get(key string) (string, bool) {
 	if !c.config.Enabled {
 		c.mu.Lock()
@@ -103,6 +107,8 @@ func (c *Cache) Get(key string) (string, bool) {
 	return e.value, true
 }
 
+// Set 写入缓存项并刷新 TTL；超过容量时淘汰最久未访问的项。
+// 未启用缓存时为空操作。
 func (c *Cache) Set(key, value string) {
 	if !c.config.Enabled {
 		return
@@ -137,6 +143,7 @@ func (c *Cache) Set(key, value string) {
 	c.items[key] = elem
 }
 
+// Delete 删除指定键的缓存项，不存在时为空操作。
 func (c *Cache) Delete(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -147,6 +154,7 @@ func (c *Cache) Delete(key string) {
 	}
 }
 
+// Clear 清空所有缓存项并重置命中/未命中计数。
 func (c *Cache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -157,6 +165,7 @@ func (c *Cache) Clear() {
 	c.misses = 0
 }
 
+// Stats 返回当前缓存的命中、未命中、总数与命中率统计快照。
 func (c *Cache) Stats() Stats {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -175,6 +184,7 @@ func (c *Cache) Stats() Stats {
 	}
 }
 
+// Len 返回当前缓存中的条目数量。
 func (c *Cache) Len() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

@@ -41,6 +41,8 @@ var (
 	initMu   sync.Mutex
 )
 
+// Init 初始化全局 Translator 实例并设置语言；lang 为空时自动探测。
+// 仅首次调用会创建实例，后续调用仅切换语言。
 func Init(lang string) {
 	initOnce.Do(func() {
 		t := &Translator{}
@@ -55,6 +57,7 @@ func Init(lang string) {
 	}
 }
 
+// T 翻译指定 key 的消息并用 args 进行格式化；未初始化或未命中时返回 key 本身。
 func T(key string, args ...interface{}) string {
 	t := instance.Load()
 	if t == nil {
@@ -67,6 +70,7 @@ func T(key string, args ...interface{}) string {
 	return t.Translate(key, args...)
 }
 
+// HasKey 判断当前语言或 fallback 中是否存在指定 key。
 func HasKey(key string) bool {
 	t := instance.Load()
 	if t == nil {
@@ -79,6 +83,7 @@ func HasKey(key string) bool {
 	return t.HasKey(key)
 }
 
+// GetLanguage 返回当前 Translator 使用的语言代码，未初始化时返回 "en"。
 func GetLanguage() string {
 	t := instance.Load()
 	if t == nil {
@@ -89,6 +94,8 @@ func GetLanguage() string {
 	return t.lang
 }
 
+// SetLanguage 切换当前语言并加载对应 locale；lang 为空时自动探测。
+// 加载失败时回退到 fallback（English）。
 func (t *Translator) SetLanguage(lang string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -106,6 +113,7 @@ func (t *Translator) SetLanguage(lang string) {
 	t.messages = messages
 }
 
+// Translate 翻译 key 并用 args 格式化；当前语言未命中时回退到 fallback，仍缺失则返回 key。
 func (t *Translator) Translate(key string, args ...interface{}) string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -124,6 +132,7 @@ func (t *Translator) Translate(key string, args ...interface{}) string {
 	return msg
 }
 
+// HasKey 判断当前语言或 fallback 中是否包含指定 key。
 func (t *Translator) HasKey(key string) bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -209,6 +218,7 @@ func normalizeLang(lang string) string {
 	}
 }
 
+// AvailableLanguages 返回内嵌 locale 目录下可用的语言代码列表。
 func AvailableLanguages() []string {
 	entries, err := localeFS.ReadDir("locales")
 	if err != nil {

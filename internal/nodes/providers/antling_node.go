@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
 
 import (
 	"context"
@@ -25,6 +25,8 @@ import (
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 var (
@@ -52,13 +54,13 @@ func (n *AntLingNode) Description() string {
 	return "蚂蚁百灵（Ant Ling）大模型集成。支持Ling-2.6通用系列、Ring-2.6推理系列、Ming全模态系列，通过OpenAI兼容API接入，覆盖聊天、代码、分析、创意、多模态等场景。"
 }
 
-func (n *AntLingNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *AntLingNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        n.Name(),
 		Description: n.Description(),
 		Input:       "string - user prompt or task description",
 		Output:      "string - model response with reasoning and agent capabilities",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "model", Type: "string", Description: "Model: ling-2.6-flash/ling-2.6-1t/ring-2.6-1t/ming-flash-omni-2.0 (default: ling-2.6-flash)", Required: false, Default: "ling-2.6-flash"},
 			{Name: "scene", Type: "string", Description: "Scene: chat/code/analysis/creative/multimodal (default: chat)", Required: false, Default: "chat"},
 			{Name: "api_key", Type: "string", Description: "Ant Ling API key (from chat.ant-ling.com/open)", Required: false},
@@ -161,5 +163,5 @@ func simulateAntLingResponse(input, model, scene, systemPrompt string, maxTokens
 }
 
 func init() {
-	Register(&AntLingNode{})
+	core.Register(&AntLingNode{})
 }

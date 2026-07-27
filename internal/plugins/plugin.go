@@ -57,12 +57,14 @@ type PluginManager struct {
 	mu      sync.RWMutex
 }
 
+// NewPluginManager 创建并返回一个空的插件管理器。
 func NewPluginManager() *PluginManager {
 	return &PluginManager{
 		plugins: make(map[string]*pluginEntry),
 	}
 }
 
+// Register 注册插件，校验名称与类型，重复注册返回错误。
 func (pm *PluginManager) Register(plugin Plugin) error {
 	info := plugin.GetInfo()
 
@@ -88,6 +90,7 @@ func (pm *PluginManager) Register(plugin Plugin) error {
 	return nil
 }
 
+// Unregister 移除插件，若插件处于启用状态则先调用其 Shutdown。
 func (pm *PluginManager) Unregister(name string) error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
@@ -107,6 +110,7 @@ func (pm *PluginManager) Unregister(name string) error {
 	return nil
 }
 
+// Get 按名称获取插件，未找到时第二个返回值为 false。
 func (pm *PluginManager) Get(name string) (Plugin, bool) {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
@@ -117,6 +121,7 @@ func (pm *PluginManager) Get(name string) (Plugin, bool) {
 	return entry.plugin, true
 }
 
+// List 返回所有插件信息，按名称排序。
 func (pm *PluginManager) List() []PluginInfo {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
@@ -135,6 +140,7 @@ func (pm *PluginManager) List() []PluginInfo {
 	return infos
 }
 
+// ListByType 返回指定类型的插件信息，按名称排序。
 func (pm *PluginManager) ListByType(pluginType string) []PluginInfo {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
@@ -155,6 +161,7 @@ func (pm *PluginManager) ListByType(pluginType string) []PluginInfo {
 	return infos
 }
 
+// Enable 启用插件：校验依赖、调用 Init，并将其标记为已启用。
 func (pm *PluginManager) Enable(name string) error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
@@ -200,6 +207,7 @@ func (pm *PluginManager) checkDependenciesLocked(name string) error {
 	return nil
 }
 
+// Disable 禁用插件，调用其 Shutdown 并清除启用标记。
 func (pm *PluginManager) Disable(name string) error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
@@ -221,6 +229,7 @@ func (pm *PluginManager) Disable(name string) error {
 	return nil
 }
 
+// InitAll 按依赖数量升序对所有已启用插件调用 Init，遇到错误立即返回。
 func (pm *PluginManager) InitAll() error {
 	pm.mu.RLock()
 	entries := make([]*pluginEntry, 0, len(pm.plugins))
@@ -246,6 +255,7 @@ func (pm *PluginManager) InitAll() error {
 	return nil
 }
 
+// ShutdownAll 按依赖数量降序对所有已启用插件调用 Shutdown，仅返回首个错误。
 func (pm *PluginManager) ShutdownAll() error {
 	pm.mu.RLock()
 	entries := make([]*pluginEntry, 0, len(pm.plugins))
@@ -274,6 +284,7 @@ func (pm *PluginManager) ShutdownAll() error {
 	return firstErr
 }
 
+// GetNodePlugins 返回所有已启用的 NodePlugin 实例，按名称排序。
 func (pm *PluginManager) GetNodePlugins() []NodePlugin {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
@@ -302,6 +313,7 @@ type EchoPlugin struct {
 	info PluginInfo
 }
 
+// NewEchoPlugin 创建一个简单的回显节点插件实例。
 func NewEchoPlugin() *EchoPlugin {
 	return &EchoPlugin{
 		info: PluginInfo{
@@ -316,18 +328,22 @@ func NewEchoPlugin() *EchoPlugin {
 	}
 }
 
+// GetInfo 返回 EchoPlugin 的元信息。
 func (e *EchoPlugin) GetInfo() PluginInfo {
 	return e.info
 }
 
+// Init 初始化 EchoPlugin，当前为空实现。
 func (e *EchoPlugin) Init() error {
 	return nil
 }
 
+// Shutdown 关闭 EchoPlugin，当前为空实现。
 func (e *EchoPlugin) Shutdown() error {
 	return nil
 }
 
+// GetNodes 返回 EchoPlugin 提供的节点列表。
 func (e *EchoPlugin) GetNodes() []interface{} {
 	return []interface{}{"echo_node"}
 }
@@ -336,6 +352,7 @@ type ReversePlugin struct {
 	info PluginInfo
 }
 
+// NewReversePlugin 创建一个字符串反转节点插件实例，依赖 echo 插件。
 func NewReversePlugin() *ReversePlugin {
 	return &ReversePlugin{
 		info: PluginInfo{
@@ -350,18 +367,22 @@ func NewReversePlugin() *ReversePlugin {
 	}
 }
 
+// GetInfo 返回 ReversePlugin 的元信息。
 func (r *ReversePlugin) GetInfo() PluginInfo {
 	return r.info
 }
 
+// Init 初始化 ReversePlugin，当前为空实现。
 func (r *ReversePlugin) Init() error {
 	return nil
 }
 
+// Shutdown 关闭 ReversePlugin，当前为空实现。
 func (r *ReversePlugin) Shutdown() error {
 	return nil
 }
 
+// GetNodes 返回 ReversePlugin 提供的节点列表。
 func (r *ReversePlugin) GetNodes() []interface{} {
 	return []interface{}{"reverse_node"}
 }

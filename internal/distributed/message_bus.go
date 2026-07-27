@@ -80,6 +80,7 @@ type PeerInfo struct {
 type MessageBus struct {
 	nodeID          string
 	port            string
+	host            string                       // 可选的绑定 host;为空时按 resolveAddr 规则推导
 	authToken       string                       // 可选的 auth token
 	subscribers     map[string][]chan BusMessage // topic -> subscribers
 	mu              sync.RWMutex
@@ -89,8 +90,9 @@ type MessageBus struct {
 	votes           map[string]map[string]string // topic -> (nodeID -> choice)
 	stopCh          chan struct{}
 	stopOnce        sync.Once
-	defaultHopLimit int // 默认跳数限制,0 表示不限;Broadcast 时如果 msg.HopLimit==0 则用此值
-	maxPendingMsgs  int // Publish 背压阈值:待发送消息总数超过此值时拒绝新消息
+	warnOnce        sync.Once // 一次性提示无认证模式
+	defaultHopLimit int       // 默认跳数限制,0 表示不限;Broadcast 时如果 msg.HopLimit==0 则用此值
+	maxPendingMsgs  int       // Publish 背压阈值:待发送消息总数超过此值时拒绝新消息
 }
 
 // NewMessageBus 创建消息总线
@@ -134,6 +136,33 @@ func (b *MessageBus) SetAuthToken(token string) {
 	b.authToken = token
 }
 
+// SetHost 设置绑定的 host。为空时按 resolveAddr 规则推导:
+// 无 auth token 时默认绑 127.0.0.1(安全默认),有 auth token 时绑全接口。
+// 显式设置 host 总是优先(向后兼容用户意图)。
+func (b *MessageBus) SetHost(host string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.host = host
+}
+
+// resolveAddr 返回 HTTP 服务器应绑定的地址。
+//   - 若 host 非空(用户显式设置),使用 host:port(用户意图优先)。
+//   - 若 host 为空且 authToken 为空(无认证),默认绑 127.0.0.1:port(安全默认,
+//     避免无认证暴露公网)。
+//   - 若 host 为空但 authToken 已配置,使用 :port(全接口,由认证保护)。
+func (b *MessageBus) resolveAddr() string {
+	b.mu.RLock()
+	host, token := b.host, b.authToken
+	b.mu.RUnlock()
+	if host != "" {
+		return host + ":" + b.port
+	}
+	if token == "" {
+		return "127.0.0.1:" + b.port
+	}
+	return ":" + b.port
+}
+
 // Start 启动 HTTP 服务器，监听消息
 func (b *MessageBus) Start() error {
 	mux := http.NewServeMux()
@@ -143,12 +172,13 @@ func (b *MessageBus) Start() error {
 	mux.HandleFunc("/api/bus/peer", b.authMiddleware(b.handleRegisterPeer))
 	mux.HandleFunc("/health", b.handleHealth)
 
+	addr := b.resolveAddr()
 	b.httpServer = &http.Server{
-		Addr:    ":" + b.port,
+		Addr:    addr,
 		Handler: mux,
 	}
 
-	logger.Info("MessageBus started", "node_id", b.nodeID, "port", b.port)
+	logger.Info("MessageBus started", "node_id", b.nodeID, "addr", addr)
 	return b.httpServer.ListenAndServe()
 }
 
@@ -424,13 +454,17 @@ func (b *MessageBus) recordVote(topic, nodeID, choice string) {
 // HTTP 端点
 // ------------------------------------------------------------
 
-// authMiddleware 鉴权中间件。authToken 为空时跳过鉴权（开放模式）。
+// authMiddleware 鉴权中间件。authToken 为空时跳过鉴权(无认证模式),
+// 但会记录一次性 warn 日志提示已默认绑 127.0.0.1;authToken 设置时必须匹配。
 func (b *MessageBus) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		b.mu.RLock()
 		token := b.authToken
 		b.mu.RUnlock()
 		if token == "" {
+			b.warnOnce.Do(func() {
+				logger.Warn("message_bus 运行在无认证模式,已默认绑定 127.0.0.1")
+			})
 			next(w, r)
 			return
 		}

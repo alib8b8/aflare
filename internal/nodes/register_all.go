@@ -23,4 +23,9 @@ import (
 	// Register mobile/hardware nodes (OnDeviceLLM, PowerManager, Robot,
 	// Voice I/O, Screen, Video, AgentBrowser, BlockchainAudit, etc.).
 	_ "github.com/alib8b8/llm-box/internal/nodes/mobile"
+
+	// Register LLM provider nodes (OpenAI, Anthropic, Gemini, GLM, Qwen,
+	// Kimi, DeepSeek, Ollama, Mistral, MiniMax, Baichuan, InternLM, Yi,
+	// XVERSE, MiMo, Coze, FastGPT, IMA, SenseNova, AntLing, AndesGPT).
+	_ "github.com/alib8b8/llm-box/internal/nodes/providers"
 )

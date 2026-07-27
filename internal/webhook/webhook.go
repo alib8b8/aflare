@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alib8b8/llm-box/internal/logger"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/workflow"
 )
@@ -123,6 +124,7 @@ func (rl *RateLimiter) Allow(ip string) bool {
 // WebhookServer implements an HTTP server for triggering workflows via webhooks.
 type WebhookServer struct {
 	port         string
+	host         string
 	secret       string
 	registry     *nodes.Registry
 	rateLimiter  *RateLimiter
@@ -135,6 +137,7 @@ type WebhookServer struct {
 	stopOnce sync.Once
 	wg       sync.WaitGroup
 	sem      chan struct{} // Semaphore to limit concurrent task execution
+	warnOnce sync.Once     // 一次性提示无认证模式
 }
 
 // NewWebhookServer creates a new WebhookServer.
@@ -158,10 +161,32 @@ func (s *WebhookServer) SetWorkflowsDir(dir string) {
 	s.workflowsDir = dir
 }
 
+// SetHost sets the host to bind to. If empty, the server binds to 127.0.0.1
+// when no auth secret is configured (safe default), or to all interfaces when
+// an auth secret is configured. Setting a host explicitly always takes precedence.
+func (s *WebhookServer) SetHost(host string) {
+	s.host = host
+}
+
+// resolveAddr returns the address the HTTP server should bind to.
+//   - 若 host 非空(用户显式设置),使用 host:port(向后兼容,用户意图优先)。
+//   - 若 host 为空且 secret 为空(无认证),默认绑 127.0.0.1:port(安全默认,
+//     避免无认证暴露公网)。
+//   - 若 host 为空但 secret 已配置,使用 :port(全接口,由认证保护)。
+func (s *WebhookServer) resolveAddr() string {
+	if s.host != "" {
+		return s.host + ":" + s.port
+	}
+	if s.secret == "" {
+		return "127.0.0.1:" + s.port
+	}
+	return ":" + s.port
+}
+
 // Start starts the HTTP server.
 func (s *WebhookServer) Start() error {
 	srv := &http.Server{
-		Addr:         ":" + s.port,
+		Addr:         s.resolveAddr(),
 		Handler:      s.handler(),
 		ReadTimeout:  serverReadTimeout,
 		WriteTimeout: serverWriteTimeout,
@@ -171,6 +196,7 @@ func (s *WebhookServer) Start() error {
 	s.server = srv
 	s.mu.Unlock()
 
+	s.wg.Add(1)
 	go s.cleanupTasks()
 
 	return srv.ListenAndServe()
@@ -202,6 +228,13 @@ func (s *WebhookServer) handler() http.Handler {
 }
 
 func (s *WebhookServer) routeWebhook(w http.ResponseWriter, r *http.Request) {
+	// 无认证模式一次性告警:已默认绑 127.0.0.1,如需公网访问请配置 auth_token
+	if s.secret == "" {
+		s.warnOnce.Do(func() {
+			logger.Warn("webhook 运行在无认证模式,已默认绑定 127.0.0.1;如需公网访问请配置 auth_token")
+		})
+	}
+
 	path := r.URL.Path
 
 	if path == "/webhook/health" {
@@ -421,6 +454,7 @@ func (s *WebhookServer) completeTask(id string, status TaskStatus, output, errSt
 }
 
 func (s *WebhookServer) cleanupTasks() {
+	defer s.wg.Done()
 	ticker := time.NewTicker(taskCleanupInterval)
 	defer ticker.Stop()
 	for {

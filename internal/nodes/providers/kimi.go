@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
+
+import (
+	"github.com/alib8b8/llm-box/internal/nodes/core"
+)
 
 func init() {
-	Register(NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            "gemini",
-		DefaultModel:    "gemini-2.0-flash",
-		DefaultEndpoint: "https://generativelanguage.googleapis.com/v1beta/openai",
-		EnvAPIKey:       "GEMINI_API_KEY",
-		ProviderName:    "Google Gemini",
+	core.Register(core.NewOpenAICompatibleNode(core.LLMNodeConfig{
+		Name:            "kimi",
+		DefaultModel:    "moonshot-v1-8k",
+		DefaultEndpoint: "https://api.moonshot.cn/v1",
+		EnvAPIKey:       "KIMI_API_KEY",
+		ProviderName:    "Kimi",
 	}))
 }

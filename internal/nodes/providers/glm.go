@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package providers
+
+import (
+	"github.com/alib8b8/llm-box/internal/nodes/core"
+)
 
 func init() {
-	Register(NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            "minimax",
-		DefaultModel:    "abab6.5s-chat",
-		DefaultEndpoint: "https://api.minimax.chat/v1",
-		EnvAPIKey:       "MINIMAX_API_KEY",
-		ProviderName:    "MiniMax",
+	core.Register(core.NewOpenAICompatibleNode(core.LLMNodeConfig{
+		Name:            "glm",
+		DefaultModel:    "glm-4",
+		DefaultEndpoint: "https://open.bigmodel.cn/api/paas/v4",
+		EnvAPIKey:       "GLM_API_KEY",
+		ProviderName:    "GLM",
 	}))
 }
