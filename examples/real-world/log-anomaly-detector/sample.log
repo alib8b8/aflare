@@ -1,0 +1,8 @@
+2026-07-27 10:00:01 INFO  server started on :8080
+2026-07-27 10:00:02 INFO  connected to postgres://db:5432
+2026-07-27 10:01:23 WARN  slow query took 3.2s: SELECT * FROM orders
+2026-07-27 10:02:45 ERROR database connection refused: dial tcp 10.0.0.5:5432
+2026-07-27 10:02:46 FATAL panic: runtime error: invalid memory address or nil pointer dereference
+2026-07-27 10:02:46 ERROR goroutine 42 [running]: main.handleRequest(...)
+2026-07-27 10:03:01 WARN  retrying connection (attempt 1/3)
+2026-07-27 10:03:15 ERROR context deadline exceeded

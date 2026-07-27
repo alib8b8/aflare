@@ -1,0 +1,94 @@
+name: Log Anomaly Detector
+description: |
+  Detect anomalies in a log file: read logs, deterministically filter
+  error lines, branch on whether critical patterns are present. If
+  anomalies are found, an agent analyzes root cause and an alert is
+  sent; otherwise a clean bill of health is reported. Showcases the
+  if/else conditional branch with {{step.X}} condition resolution.
+
+vars:
+  log_path: examples/real-world/log-anomaly-detector/sample.log
+  critical_pattern: "panic|FATAL|OOM|out of memory|segfault"
+  provider: ollama
+  model: llama3
+  alert_channel: stdout
+  report_path: anomaly-report.md
+
+steps:
+  - node: file_read
+    name: read_log
+    params:
+      path: "{{var.log_path}}"
+      redact: "false"
+
+  - node: transform
+    name: errors
+    params:
+      operation: filter_errors
+
+  - node: condition
+    name: has_critical
+    params:
+      expr: "regex:{{var.critical_pattern}}"
+
+  - node: template_render
+    name: report
+    params:
+      template: |
+        # Log Anomaly Scan Report
+
+        **Log file:** {{var.log_path}}
+        **Critical pattern:** `{{var.critical_pattern}}`
+        **Critical hit:** {{step.has_critical}}
+
+        ---
+
+        ## Filtered Error Lines
+
+        ```
+        {{step.errors}}
+        ```
+
+  - node: file_write
+    name: save
+    params:
+      path: "{{var.report_path}}"
+
+  - node: template_render
+    name: agent_prompt
+    params:
+      template: |
+        You are an SRE anomaly analyst. Analyze the following filtered
+        error lines from {{var.log_path}} and produce a concise Markdown
+        report with three sections: Root Cause, Blast Radius, Mitigation.
+
+        Error lines:
+        {{step.errors}}
+
+  - if:
+      condition: "{{step.has_critical}}"
+      then:
+        - node: agent
+          name: root_cause
+          params:
+            provider: "{{var.provider}}"
+            model: "{{var.model}}"
+            tools: json_parse
+            max_iterations: "3"
+        - node: notify
+          name: alert
+          params:
+            channel: "{{var.alert_channel}}"
+            message: "ALERT: critical anomalies detected in {{var.log_path}}. Report at {{var.report_path}}."
+      else:
+        - node: notify
+          name: all_clear
+          params:
+            channel: "{{var.alert_channel}}"
+            message: "OK: no critical anomalies in {{var.log_path}}. Report at {{var.report_path}}."
+
+  - node: notify
+    name: log_status
+    params:
+      channel: "{{var.alert_channel}}"
+      message: "Scan complete. has_critical={{step.has_critical}}. Report written to {{var.report_path}}."

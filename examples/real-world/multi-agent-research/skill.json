@@ -1,0 +1,48 @@
+{
+  "id": "real-world/multi-agent-research",
+  "name": "multi-agent-research",
+  "version": "1.0.0",
+  "description": "Multi-agent research pipeline: Planner decomposes the question, Researcher gathers sources, Critic reviews findings, and a final step synthesizes a structured brief.",
+  "author": "llm-box community",
+  "category": "research",
+  "tags": [
+    "research",
+    "multi-agent",
+    "workflow",
+    "real-world"
+  ],
+  "keywords": [
+    "multi-agent",
+    "research",
+    "planner",
+    "researcher",
+    "critic"
+  ],
+  "inputs": [
+    {
+      "name": "topic",
+      "type": "string",
+      "required": false,
+      "default": "What are the trade-offs between RAG and fine-tuning for enterprise LLM deployment?"
+    },
+    {
+      "name": "research_urls",
+      "type": "string",
+      "required": false,
+      "default": "https://arxiv.org/abs/2005.11401,https://research.ibm.com/blog/retrieval-augmented-generation"
+    },
+    {
+      "name": "depth",
+      "type": "string",
+      "required": false,
+      "default": "detailed"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "brief",
+      "type": "string"
+    }
+  ],
+  "dependencies": null
+}

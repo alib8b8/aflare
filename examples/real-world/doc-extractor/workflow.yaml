@@ -1,0 +1,79 @@
+name: Document Extractor
+description: |
+  Fetch a web document (URL or local file), use an agent with json_parse +
+  template_render tools to extract structured fields, then validate the
+  extracted JSON and render a clean summary.
+
+vars:
+  source_url: https://raw.githubusercontent.com/alib8b8/llm-box/main/README.md
+  extraction_schema: |
+    {"title":"","summary":"","key_features":[],"install_cmd":""}
+  provider: ollama
+  model: llama3
+  output_path: extracted-doc.json
+
+steps:
+  - node: fetch_url
+    name: fetch
+    params:
+      url: "{{var.source_url}}"
+      mode: markdown
+      timeout: "30"
+
+  - node: transform
+    name: cleaned
+    params:
+      operation: remove_blank_lines
+
+  - node: agent
+    name: extract
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      tools: json_parse,template_render
+      max_iterations: "4"
+      system: |
+        You are a document extraction agent. Read the document and extract
+        the fields defined in the schema. Always respond with a single
+        valid JSON object matching the schema. Do not include prose.
+    # The agent's input is the cleaned document text (flows from previous step).
+
+  - node: json_parse
+    name: validate
+    params:
+      path: ""
+
+  - node: template_render
+    name: summary
+    params:
+      template: |
+        # Document Extraction Summary
+
+        **Source:** {{var.source_url}}
+
+        ## Extracted JSON
+
+        ```json
+        {{step.validate}}
+        ```
+
+        ## Field Highlights
+
+        - **Title:** {{step.validate.jsonpath:$.title}}
+        - **Summary:** {{step.validate.jsonpath:$.summary}}
+        - **Install command:** `{{step.validate.jsonpath:$.install_cmd}}`
+
+        ---
+
+        _Extracted by doc-extractor skill ({{var.provider}}/{{var.model}})._
+
+  - node: file_write
+    name: save
+    params:
+      path: "{{var.output_path}}"
+
+  - node: notify
+    name: notify
+    params:
+      channel: stdout
+      message: "Document extracted. JSON saved to {{var.output_path}}."

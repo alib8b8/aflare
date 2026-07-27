@@ -1,0 +1,45 @@
+{
+  "id": "real-world/knowledge-curator",
+  "name": "knowledge-curator",
+  "version": "1.0.0",
+  "description": "Curate a knowledge base from a web document: extract entities/relations into a persistent knowledge graph, visualize as Mermaid, and assemble a Markdown report.",
+  "author": "llm-box community",
+  "category": "research",
+  "tags": [
+    "research",
+    "knowledge-graph",
+    "workflow",
+    "real-world"
+  ],
+  "keywords": [
+    "knowledge-graph",
+    "entity-extraction",
+    "mermaid",
+    "curation"
+  ],
+  "inputs": [
+    {
+      "name": "source_url",
+      "type": "string",
+      "required": false,
+      "default": "https://en.wikipedia.org/wiki/Large_language_model"
+    },
+    {
+      "name": "graph_path",
+      "type": "string",
+      "required": false,
+      "default": "knowledge-graph.json"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "graph",
+      "type": "string"
+    },
+    {
+      "name": "report",
+      "type": "string"
+    }
+  ],
+  "dependencies": null
+}

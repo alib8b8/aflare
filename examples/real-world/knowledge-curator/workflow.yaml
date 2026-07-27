@@ -1,0 +1,89 @@
+name: Knowledge Curator
+description: |
+  Curate a personal knowledge base from a web document: fetch content,
+  extract entities/relations into a persistent knowledge graph, render a
+  Mermaid visualization, and assemble a Markdown report. The graph JSON
+  is saved to disk so subsequent runs can query or extend it.
+
+vars:
+  source_url: https://en.wikipedia.org/wiki/Large_language_model
+  graph_path: knowledge-graph.json
+  report_path: knowledge-report.md
+  max_depth: "2"
+  top_k: "15"
+
+steps:
+  - node: fetch_url
+    name: fetch
+    params:
+      url: "{{var.source_url}}"
+      mode: markdown
+      timeout: "30"
+
+  - node: transform
+    name: cleaned
+    params:
+      operation: remove_blank_lines
+
+  - node: knowledge_graph
+    name: extract
+    params:
+      action: extract
+      graph_path: "{{var.graph_path}}"
+      format: markdown
+      top_k: "{{var.top_k}}"
+
+  - node: knowledge_graph
+    name: visualize
+    params:
+      action: visualize
+      graph_path: "{{var.graph_path}}"
+      format: mermaid
+      max_depth: "{{var.max_depth}}"
+
+  - node: knowledge_graph
+    name: stats
+    params:
+      action: stats
+      graph_path: "{{var.graph_path}}"
+
+  - node: template_render
+    name: report
+    params:
+      template: |
+        # Knowledge Curation Report
+
+        **Source:** {{var.source_url}}
+        **Graph file:** `{{var.graph_path}}`
+
+        ---
+
+        ## Graph Statistics
+
+        {{step.stats}}
+
+        ## Extracted Entities & Relations
+
+        {{step.extract}}
+
+        ## Knowledge Graph (Mermaid)
+
+        ```mermaid
+        {{step.visualize}}
+        ```
+
+        ---
+
+        _Curated by knowledge-curator skill. Re-run with a different
+        `source_url` to extend the graph at `{{var.graph_path}}`._
+
+  - node: file_write
+    name: save_report
+    params:
+      path: "{{var.report_path}}"
+
+  - node: notify
+    name: notify
+    params:
+      channel: stdout
+      message: "Knowledge graph saved to {{var.graph_path}}; report at {{var.report_path}}."
