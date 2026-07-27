@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package mobile
 
 import (
 	"context"
@@ -24,6 +24,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 // PowerProfile defines power consumption characteristics
@@ -92,13 +94,13 @@ func (n *PowerManagerNode) Description() string {
 	return "Control power consumption for on-device AI. Supports eco/balanced/high profiles with adaptive battery and thermal management"
 }
 
-func (n *PowerManagerNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *PowerManagerNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        n.Name(),
 		Description: n.Description(),
 		Input:       "string - command or query",
 		Output:      "string - power status and recommendations",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "profile", Type: "string", Description: "Power profile: eco/balanced/high (default: balanced)", Required: false, Default: "balanced"},
 			{Name: "max_inference_hz", Type: "float", Description: "Max inference calls per second (default: 2.0)", Required: false, Default: "2.0"},
 			{Name: "min_battery_pct", Type: "int", Description: "Auto-switch to eco when battery below this % (default: 20)", Required: false, Default: "20"},
@@ -326,17 +328,17 @@ func max(a, b int) int {
 }
 
 // PowerAwareWrapper wraps any node with power management
-func PowerAwareWrapper(node Node) Node {
+func PowerAwareWrapper(node core.Node) core.Node {
 	return &powerAwareNode{base: node}
 }
 
 type powerAwareNode struct {
-	base Node
+	base core.Node
 }
 
 func (n *powerAwareNode) Name() string        { return n.base.Name() }
 func (n *powerAwareNode) Description() string { return n.base.Description() + " (power-aware)" }
-func (n *powerAwareNode) Schema() NodeSchema  { return n.base.Schema() }
+func (n *powerAwareNode) Schema() core.NodeSchema  { return n.base.Schema() }
 
 func (n *powerAwareNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	pm := GetDefaultPowerManager()
@@ -352,5 +354,5 @@ func (n *powerAwareNode) Execute(ctx context.Context, input string, params map[s
 }
 
 func init() {
-	Register(&PowerManagerNode{})
+	core.Register(&PowerManagerNode{})
 }

@@ -78,13 +78,17 @@ func (n *RAGNode) Execute(ctx context.Context, input string, params map[string]s
 	includeMetadata := getParam(params, "include_metadata", "true") == "true"
 
 	chunkSize := 1000
-	fmt.Sscanf(chunkSizeStr, "%d", &chunkSize)
+	if _, err := fmt.Sscanf(chunkSizeStr, "%d", &chunkSize); err != nil {
+		// keep default value on parse failure
+	}
 	if chunkSize < 100 {
 		chunkSize = 100
 	}
 
 	chunkOverlap := 200
-	fmt.Sscanf(chunkOverlapStr, "%d", &chunkOverlap)
+	if _, err := fmt.Sscanf(chunkOverlapStr, "%d", &chunkOverlap); err != nil {
+		// keep default value on parse failure
+	}
 	if chunkOverlap < 0 {
 		chunkOverlap = 0
 	}
@@ -93,7 +97,9 @@ func (n *RAGNode) Execute(ctx context.Context, input string, params map[string]s
 	}
 
 	topK := 5
-	fmt.Sscanf(topKStr, "%d", &topK)
+	if _, err := fmt.Sscanf(topKStr, "%d", &topK); err != nil {
+		// keep default value on parse failure
+	}
 	if topK < 1 {
 		topK = 1
 	}

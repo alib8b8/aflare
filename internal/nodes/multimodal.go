@@ -256,11 +256,6 @@ type visionMessage struct {
 	Content []visionMessageContent `json:"content"`
 }
 
-type visionRequest struct {
-	Model    string          `json:"model"`
-	Messages []visionMessage `json:"messages"`
-}
-
 func callVisionLLM(ctx context.Context, provider, model, apiKey, endpoint, imageURL, prompt, systemPrompt, detail string) (string, error) {
 	var contents []visionMessageContent
 

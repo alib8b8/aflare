@@ -449,37 +449,6 @@ func (vm *VersionManager) DeleteVersion(workflowName, versionID string) error {
 	return nil
 }
 
-// sanitizeWorkflowName replaces problematic characters in workflow names for directory usage.
-// This function is kept for potential future use but validateWorkflowName already prevents unsafe names.
-func sanitizeWorkflowName(name string) string {
-	name = strings.ReplaceAll(name, "/", "-")
-	name = strings.ReplaceAll(name, "\\", "-")
-	name = strings.ReplaceAll(name, ":", "-")
-	return name
-}
-
-// parseVersionIDTimestamp extracts the timestamp portion from a version ID for sorting.
-func parseVersionIDTimestamp(versionID string) (time.Time, error) {
-	parts := strings.Split(versionID, "-")
-	if len(parts) < 2 {
-		return time.Time{}, fmt.Errorf("invalid version ID format")
-	}
-	timestampStr := parts[0]
-	if len(timestampStr) != 14 {
-		return time.Time{}, fmt.Errorf("invalid timestamp in version ID")
-	}
-	return time.Parse("20060102150405", timestampStr)
-}
-
-// parseVersionIDHash extracts the hash portion from a version ID.
-func parseVersionIDHash(versionID string) string {
-	parts := strings.Split(versionID, "-")
-	if len(parts) < 2 {
-		return ""
-	}
-	return parts[1]
-}
-
 // ValidateVersionID checks if a version ID has the correct format.
 func ValidateVersionID(versionID string) error {
 	if versionID == "" {

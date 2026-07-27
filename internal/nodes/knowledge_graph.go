@@ -132,7 +132,9 @@ func (kg *KnowledgeGraph) Save(path string) error {
 	}
 	dir := filepath.Dir(safePath)
 	if dir != "." && dir != "" {
-		os.MkdirAll(dir, 0755)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory: %w", err)
+		}
 	}
 	return os.WriteFile(safePath, data, 0644)
 }
@@ -165,7 +167,9 @@ func (n *KnowledgeGraphNode) Execute(ctx context.Context, input string, params m
 	format := getParam(params, "format", "markdown")
 
 	maxDepth := 2
-	fmt.Sscanf(maxDepthStr, "%d", &maxDepth)
+	if _, err := fmt.Sscanf(maxDepthStr, "%d", &maxDepth); err != nil {
+		// keep default value on parse failure
+	}
 	if maxDepth < 1 {
 		maxDepth = 1
 	}
@@ -174,7 +178,9 @@ func (n *KnowledgeGraphNode) Execute(ctx context.Context, input string, params m
 	}
 
 	topK := 10
-	fmt.Sscanf(topKStr, "%d", &topK)
+	if _, err := fmt.Sscanf(topKStr, "%d", &topK); err != nil {
+		// keep default value on parse failure
+	}
 	if topK < 1 {
 		topK = 1
 	}

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package mobile
 
 import (
 	"context"
@@ -22,6 +22,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 var (
@@ -57,13 +59,13 @@ func (n *RobotControlNode) Description() string {
 	return "Plan and execute robot action sequences for embodied AI. Supports humanoid robots, mobile bases, robotic arms, drones. Decomposes natural language tasks into low-level robot commands."
 }
 
-func (n *RobotControlNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *RobotControlNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        n.Name(),
 		Description: n.Description(),
 		Input:       "string - natural language task description",
 		Output:      "string - robot action plan with safety checks",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "robot_type", Type: "string", Description: "Robot type: humanoid/mobile_base/arm/drone/dog/wheelchair (default: humanoid)", Required: false, Default: "humanoid"},
 			{Name: "robot_id", Type: "string", Description: "Unique robot identifier", Required: false},
 			{Name: "action", Type: "string", Description: "Specific action: move/pick/place/rotate/grasp/release/navigate/scan/speak/wait", Required: false},
@@ -412,5 +414,5 @@ func runSafetyChecks(plan *RobotActionPlan, safetyZone float64, visual, tactile 
 }
 
 func init() {
-	Register(&RobotControlNode{})
+	core.Register(&RobotControlNode{})
 }

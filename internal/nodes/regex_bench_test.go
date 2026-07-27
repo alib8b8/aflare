@@ -5,22 +5,6 @@ import (
 	"testing"
 )
 
-func BenchmarkRegexCache_Hit(b *testing.B) {
-	pattern := `https?://[^\s)]+`
-	text := strings.Repeat("Visit https://example.com for more info. ", 10)
-	for i := 0; i < b.N; i++ {
-		regexpFindAllStringSubmatch(pattern, text, -1)
-	}
-}
-
-func BenchmarkExtractLinksFromText(b *testing.B) {
-	text := strings.Repeat("Check [Google](https://google.com) and https://github.com for info. ", 5)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		extractLinksFromText(text, "")
-	}
-}
-
 func BenchmarkTruncate(b *testing.B) {
 	longStr := strings.Repeat("a", 10000)
 	b.ResetTimer()

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package mobile
 
 import (
 	"context"
@@ -23,6 +23,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 var (
@@ -50,13 +52,13 @@ func (n *VoiceInputNode) Description() string {
 	return "Voice input pipeline: VAD (Voice Activity Detection), wake word detection, and speech-to-text. Supports on-device recognition for privacy."
 }
 
-func (n *VoiceInputNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *VoiceInputNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        n.Name(),
 		Description: n.Description(),
 		Input:       "string - raw audio data (base64) or audio file path",
 		Output:      "string - recognized text with confidence and metadata",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "mode", Type: "string", Description: "Pipeline mode: vad_only/wake_word/full_asr (default: full_asr)", Required: false, Default: "full_asr"},
 			{Name: "wake_word", Type: "string", Description: "Wake word to detect: hey_box/hello_box/hi_box/ok_box/box_box (default: hey_box)", Required: false, Default: "hey_box"},
 			{Name: "language", Type: "string", Description: "Recognition language: zh/en/ja/ko/fr/de/es (default: zh)", Required: false, Default: "zh"},
@@ -87,11 +89,6 @@ func (n *VoiceInputNode) Execute(ctx context.Context, input string, params map[s
 	vadMode := getMobileParam(params, "vad_mode", "adaptive")
 	if !validVADModes[vadMode] {
 		return "", fmt.Errorf("invalid vad_mode: %s", vadMode)
-	}
-
-	maxDuration := parseIntSafe(getMobileParam(params, "max_duration_sec", "30"), 30)
-	if maxDuration < 1 || maxDuration > 300 {
-		maxDuration = 30
 	}
 
 	offline := strings.ToLower(getMobileParam(params, "offline", "true")) == "true"
@@ -334,5 +331,5 @@ func looksLikeBase64(s string) bool {
 }
 
 func init() {
-	Register(&VoiceInputNode{})
+	core.Register(&VoiceInputNode{})
 }

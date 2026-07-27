@@ -18,8 +18,99 @@ package nodes
 import (
 	"context"
 	"fmt"
-	"strings"
+	"math"
+	"strconv"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
+
+// AgentNode is the canonical "agent" node that runs a ReAct loop with
+// tool use. The parameter helpers (getParam/paramInt/paramFloat), the
+// default-endpoint lookup, and the tool-list parser have been moved to
+// internal/nodes/core/params.go so that sub-packages under internal/nodes
+// can share them without creating import cycles. The lowercase wrappers
+// below preserve backward compatibility for the existing node files in
+// this package.
+
+// getParam returns params[key] if it exists and is non-empty, else defaultVal.
+func getParam(params map[string]string, key, defaultVal string) string {
+	return core.GetParam(params, key, defaultVal)
+}
+
+// paramInt safely parses an integer parameter with fallback default and
+// optional bounds clamping. Set min > max to disable clamping.
+func paramInt(params map[string]string, key string, defaultVal, min, max int) int {
+	return core.ParamInt(params, key, defaultVal, min, max)
+}
+
+// paramFloat safely parses a float parameter with fallback default and
+// optional bounds clamping. Set min > max to disable clamping.
+func paramFloat(params map[string]string, key string, defaultVal, min, max float64) float64 {
+	return core.ParamFloat(params, key, defaultVal, min, max)
+}
+
+// defaultEndpointFor returns the default API endpoint for a known provider.
+func defaultEndpointFor(provider string) string {
+	return core.DefaultEndpointFor(provider)
+}
+
+// getMobileParam returns params[key] if it exists and is non-empty, else
+// defaultVal. Equivalent to core.GetParam; kept for backward compatibility
+// with node files that previously shared the helper from mobile_nodes.go.
+func getMobileParam(params map[string]string, key, defaultVal string) string {
+	return core.GetParam(params, key, defaultVal)
+}
+
+// parseIntSafe parses s as an int, returning defaultVal on error. Kept for
+// backward compatibility with node files that used the mobile_nodes.go helper.
+func parseIntSafe(s string, defaultVal int) int {
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return defaultVal
+	}
+	return v
+}
+
+// parseFloatSafe parses s as a float64, returning defaultVal on error or
+// NaN/Inf. Kept for backward compatibility with node files that used the
+// mobile_nodes.go helper.
+func parseFloatSafe(s string, defaultVal float64) float64 {
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return defaultVal
+	}
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return defaultVal
+	}
+	return v
+}
+
+// truncateInput truncates s to at most maxLen characters (by rune), appending
+// "..." if truncation occurred. Kept for backward compatibility with node files
+// that used the mobile_nodes.go helper.
+func truncateInput(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	r := []rune(s)
+	if len(r) <= maxLen {
+		return s[:maxLen]
+	}
+	return string(r[:maxLen]) + "..."
+}
+
+// AgentTool describes a tool that a ReAct agent can invoke.
+type AgentTool = core.AgentTool
+
+// parseToolsList parses a comma-separated list of tool names into AgentTools.
+func parseToolsList(toolsParam string) []AgentTool {
+	return core.ParseToolsList(toolsParam)
+}
+
+// baseAgentParams returns the common parameter schema shared by agent nodes.
+func baseAgentParams() []ParamSchema {
+	return core.BaseAgentParams()
+}
 
 type AgentNode struct{}
 
@@ -67,7 +158,9 @@ func (n *AgentNode) Execute(ctx context.Context, input string, params map[string
 	showThinking := getParam(params, "show_thinking", "true") == "true"
 
 	maxIters := 10
-	fmt.Sscanf(maxItersStr, "%d", &maxIters)
+	if _, err := fmt.Sscanf(maxItersStr, "%d", &maxIters); err != nil {
+		// keep default value on parse failure
+	}
 	if maxIters < 1 {
 		maxIters = 1
 	}
@@ -81,114 +174,4 @@ func (n *AgentNode) Execute(ctx context.Context, input string, params map[string
 
 	agent := NewReActAgent(provider, model, apiKey, endpoint, systemPrompt, maxIters, tools, reg, enableThinking, showThinking)
 	return agent.Run(ctx, input)
-}
-
-func defaultEndpointFor(provider string) string {
-	switch provider {
-	case "ollama":
-		return "http://localhost:11434"
-	case "openai":
-		return "https://api.openai.com/v1"
-	case "deepseek":
-		return "https://api.deepseek.com/v1"
-	case "glm":
-		return "https://open.bigmodel.cn/api/paas/v4"
-	case "kimi":
-		return "https://api.moonshot.cn/v1"
-	case "qwen":
-		return "https://dashscope.aliyuncs.com/compatible-mode/v1"
-	case "mistral":
-		return "https://api.mistral.ai/v1"
-	case "yi":
-		return "https://api.lingyiwanwu.com/v1"
-	case "anthropic":
-		return "https://api.anthropic.com/v1"
-	case "gemini":
-		return "https://generativelanguage.googleapis.com/v1beta/openai"
-	default:
-		return "http://localhost:11434"
-	}
-}
-
-func parseToolsList(toolsParam string) []AgentTool {
-	toolMap := map[string]AgentTool{
-		"fetch_url":        {Name: "fetch_url", Description: "Fetch content from a URL", NodeName: "fetch_url"},
-		"http_request":     {Name: "http_request", Description: "Make HTTP requests with any method, headers, body", NodeName: "http_request"},
-		"file_read":        {Name: "file_read", Description: "Read content from a file", NodeName: "file_read"},
-		"file_write":       {Name: "file_write", Description: "Write content to a file", NodeName: "file_write"},
-		"json_parse":       {Name: "json_parse", Description: "Parse and extract fields from JSON", NodeName: "json_parse"},
-		"transform":        {Name: "transform", Description: "Transform text (uppercase, lowercase, trim, replace, regex)", NodeName: "transform"},
-		"combine":          {Name: "combine", Description: "Combine multiple inputs into one", NodeName: "combine"},
-		"template":         {Name: "template", Description: "Render Go template with variables", NodeName: "template_render"},
-		"ollama":           {Name: "ollama_llm", Description: "Call Ollama LLM for analysis", NodeName: "ollama"},
-		"code_interpreter": {Name: "code_interpreter", Description: "Execute Python code in a sandbox with file I/O", NodeName: "code_interpreter"},
-		"execute":          {Name: "execute", Description: "Execute shell commands (disabled in safe mode)", NodeName: "execute"},
-	}
-
-	parts := strings.Split(toolsParam, ",")
-	var tools []AgentTool
-	for _, p := range parts {
-		name := strings.TrimSpace(p)
-		if tool, ok := toolMap[name]; ok {
-			tools = append(tools, tool)
-		}
-	}
-	if len(tools) == 0 {
-		tools = append(tools, toolMap["fetch_url"])
-		tools = append(tools, toolMap["json_parse"])
-	}
-	return tools
-}
-
-func getParam(params map[string]string, key, defaultVal string) string {
-	if v, ok := params[key]; ok && v != "" {
-		return v
-	}
-	return defaultVal
-}
-
-// paramInt safely parses an integer parameter with fallback default and optional bounds clamping.
-// If parsing fails or the value is out of [min, max], the default is returned.
-// Set min > max to disable clamping.
-func paramInt(params map[string]string, key string, defaultVal, min, max int) int {
-	s := getParam(params, key, "")
-	if s == "" {
-		return defaultVal
-	}
-	var v int
-	if _, err := fmt.Sscanf(s, "%d", &v); err != nil {
-		return defaultVal
-	}
-	if min <= max {
-		if v < min {
-			return min
-		}
-		if v > max {
-			return max
-		}
-	}
-	return v
-}
-
-// paramFloat safely parses a float parameter with fallback default and optional bounds clamping.
-// If parsing fails or the value is out of [min, max], the default is returned.
-// Set min > max to disable clamping.
-func paramFloat(params map[string]string, key string, defaultVal, min, max float64) float64 {
-	s := getParam(params, key, "")
-	if s == "" {
-		return defaultVal
-	}
-	var v float64
-	if _, err := fmt.Sscanf(s, "%f", &v); err != nil {
-		return defaultVal
-	}
-	if min <= max {
-		if v < min {
-			return min
-		}
-		if v > max {
-			return max
-		}
-	}
-	return v
 }

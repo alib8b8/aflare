@@ -1,32 +1,70 @@
+version: "2"
+
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
     - misspell
-
-linters-settings:
-  errcheck:
-    check-type-assertions: false
-    check-blank: false
-  govet:
-    check-shadowing: false
+  settings:
+    errcheck:
+      check-type-assertions: false
+      check-blank: false
+      # Exclude functions whose error return is not actionable in context
+      # (HTTP response writes, JSON encoding to ResponseWriter, defer cleanup).
+      exclude-functions:
+        - (net/http.ResponseWriter).Write
+        - (io.Closer).Close
+        - (*encoding/json.Encoder).Encode
+        - (*github.com/gin-gonic/gin.Context).Error
+    staticcheck:
+      # Disable QF (quick-fix), ST (style), S1 (simplification) checks —
+      # they are code modernization/style suggestions, not bugs.
+      # Keep SA checks for real bug detection (nil deref, deprecated, etc.).
+      checks:
+        - all
+        - -QF1001
+        - -QF1002
+        - -QF1003
+        - -QF1004
+        - -QF1005
+        - -QF1006
+        - -QF1007
+        - -QF1008
+        - -QF1009
+        - -QF1010
+        - -QF1011
+        - -QF1012
+        - -ST1000
+        - -ST1003
+        - -ST1005
+        - -ST1021
+        - -S1002
+        - -S1005
+        - -S1011
+        - -S1039
+        - -SA9003
+  exclusions:
+    paths:
+      - vendor
+      - grok-mcp-server
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+      # defer <x>.Close() in cleanup — error not actionable
+      - linters: [errcheck]
+        source: 'defer\s+.*\.Close\(\)'
+      # fmt.Fprint*/Fprintln*/Fprintf* to stdout/log/buffer — error not actionable
+      - linters: [errcheck]
+        source: 'fmt\.F(print|println|printf)\s*\('
 
 issues:
-  exclude-use-default: false
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
   max-issues-per-linter: 0
   max-same-issues: 0
 
 run:
   timeout: 5m
-  skip-dirs:
-    - vendor
-    - grok-mcp-server

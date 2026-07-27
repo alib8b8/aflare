@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package mobile
 
 import (
 	"context"
@@ -24,15 +24,18 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 type AgentBrowserNode struct{}
 
 func init() {
-	Register(&AgentBrowserNode{})
+	core.Register(&AgentBrowserNode{})
 }
 
 func (n *AgentBrowserNode) Name() string {
@@ -43,13 +46,13 @@ func (n *AgentBrowserNode) Description() string {
 	return "Agent-optimized web browser: visit pages, extract content, follow links, take screenshots (ego-lite inspired)"
 }
 
-func (n *AgentBrowserNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *AgentBrowserNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "agent_browser",
 		Description: "Agent-optimized web browser for autonomous web navigation, content extraction, and research. Inspired by CitroLabs/ego-lite - zero-cost browser state sharing.",
 		Input:       "string - URL to visit or browser action to perform",
 		Output:      "string - Page content, extraction results, or browser status",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "action", Type: "string", Description: "Browser action: visit|extract|links|screenshot|search|summary|connect_existing|import_cookies (default: visit)", Required: false, Default: "visit"},
 			{Name: "url", Type: "string", Description: "Target URL (overrides input if provided)", Required: false},
 			{Name: "selector", Type: "string", Description: "CSS selector for content extraction (optional)", Required: false},
@@ -65,11 +68,11 @@ func (n *AgentBrowserNode) Schema() NodeSchema {
 }
 
 func (n *AgentBrowserNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
-	action := getParam(params, "action", "visit")
-	targetURL := getParam(params, "url", "")
-	selector := getParam(params, "selector", "")
-	outputFmt := getParam(params, "output_format", "markdown")
-	renderJS := getParam(params, "render_js", "false") == "true"
+	action := core.GetParam(params, "action", "visit")
+	targetURL := core.GetParam(params, "url", "")
+	selector := core.GetParam(params, "selector", "")
+	outputFmt := core.GetParam(params, "output_format", "markdown")
+	renderJS := core.GetParam(params, "render_js", "false") == "true"
 
 	if targetURL == "" {
 		trimmed := strings.TrimSpace(input)
@@ -88,7 +91,7 @@ func (n *AgentBrowserNode) Execute(ctx context.Context, input string, params map
 		}
 	}
 
-	summaryLen := paramInt(params, "summary_length", 2000, 100, 100000)
+	summaryLen := core.ParamInt(params, "summary_length", 2000, 100, 100000)
 
 	switch action {
 	case "visit":
@@ -113,7 +116,7 @@ func (n *AgentBrowserNode) Execute(ctx context.Context, input string, params map
 }
 
 func (n *AgentBrowserNode) actionVisit(ctx context.Context, targetURL, outputFmt string, summaryLen int, renderJS bool) (string, error) {
-	fetchNode := &FetchURLNode{}
+	fetchNode, _ := core.Get("fetch_url")
 	fetchParams := map[string]string{
 		"url":          targetURL,
 		"output":       "markdown",
@@ -142,7 +145,7 @@ func (n *AgentBrowserNode) actionVisit(ctx context.Context, targetURL, outputFmt
 }
 
 func (n *AgentBrowserNode) actionExtract(ctx context.Context, targetURL, selector, outputFmt string, renderJS bool) (string, error) {
-	fetchNode := &FetchURLNode{}
+	fetchNode, _ := core.Get("fetch_url")
 	fetchParams := map[string]string{
 		"url":          targetURL,
 		"output":       "markdown",
@@ -168,7 +171,7 @@ func (n *AgentBrowserNode) actionExtract(ctx context.Context, targetURL, selecto
 }
 
 func (n *AgentBrowserNode) actionLinks(ctx context.Context, targetURL string, renderJS bool) (string, error) {
-	fetchNode := &FetchURLNode{}
+	fetchNode, _ := core.Get("fetch_url")
 	fetchParams := map[string]string{
 		"url":          targetURL,
 		"output":       "markdown",
@@ -204,7 +207,7 @@ func (n *AgentBrowserNode) actionLinks(ctx context.Context, targetURL string, re
 }
 
 func (n *AgentBrowserNode) actionSummary(ctx context.Context, targetURL string, summaryLen int, renderJS bool) (string, error) {
-	fetchNode := &FetchURLNode{}
+	fetchNode, _ := core.Get("fetch_url")
 	fetchParams := map[string]string{
 		"url":          targetURL,
 		"output":       "markdown",
@@ -230,7 +233,7 @@ func (n *AgentBrowserNode) actionScreenshot(ctx context.Context, targetURL strin
 }
 
 func (n *AgentBrowserNode) actionSearch(ctx context.Context, query, outputFmt string) (string, error) {
-	searchNode := &SearchAggregateNode{}
+	searchNode, _ := core.Get("search_aggregate")
 	searchParams := map[string]string{
 		"sources":    "google,news",
 		"output":     outputFmt,
@@ -282,7 +285,7 @@ func extractLinksFromText(text, baseDomain string) []ExtractedLink {
 }
 
 func regexpFindAllStringSubmatch(pattern, s string, n int) [][]string {
-	re, err := compileRegexCached(pattern)
+	re, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil
 	}
@@ -321,8 +324,30 @@ type browserConnectionInfo struct {
 	Tabs            []cdpTabInfo
 }
 
-// fetchCDP 向 CDP HTTP 端点发起 GET 请求并返回响应体字节
+// maxCDPResponseSize 限制 CDP HTTP 端点响应体大小，防止恶意/被劫持的
+// 本地服务返回超大响应导致 OOM。CDP /json/version 与 /json 端点正常
+// 输出远小于此上限。
+const maxCDPResponseSize = 4 * 1024 * 1024 // 4MB
+
+// fetchCDP 向 CDP HTTP 端点发起 GET 请求并返回响应体字节。
+// 为防止 SSRF 与本地端口扫描，target 必须指向 localhost 的非特权端口
+// （>=1024），且响应体大小受 maxCDPResponseSize 限制。
 func (n *AgentBrowserNode) fetchCDP(ctx context.Context, target string) ([]byte, error) {
+	u, err := url.Parse(target)
+	if err != nil {
+		return nil, fmt.Errorf("invalid CDP target URL: %w", err)
+	}
+	if u.Scheme != "http" {
+		return nil, fmt.Errorf("CDP target must use http scheme, got: %s", u.Scheme)
+	}
+	host := u.Hostname()
+	if host != "localhost" && host != "127.0.0.1" && host != "::1" {
+		return nil, fmt.Errorf("CDP target must point to localhost, got: %s", host)
+	}
+	if u.Port() == "" {
+		return nil, fmt.Errorf("CDP target must include an explicit port")
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", target, nil)
 	if err != nil {
 		return nil, err
@@ -337,7 +362,7 @@ func (n *AgentBrowserNode) fetchCDP(ctx context.Context, target string) ([]byte,
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("CDP 端点返回状态码 %d", resp.StatusCode)
 	}
-	return io.ReadAll(resp.Body)
+	return io.ReadAll(io.LimitReader(resp.Body, maxCDPResponseSize))
 }
 
 // connectToExistingBrowser 通过 Chrome DevTools Protocol 连接用户正在运行的浏览器，
@@ -385,8 +410,9 @@ func (n *AgentBrowserNode) connectToExistingBrowser(ctx context.Context, debugPo
 }
 
 // actionConnectExisting 实现 connect_existing 动作：连接用户正在运行的浏览器并返回格式化的连接信息。
+// cdp_port 限制为非特权端口 (>=1024) 以防止本地端口扫描攻击。
 func (n *AgentBrowserNode) actionConnectExisting(ctx context.Context, params map[string]string) (string, error) {
-	debugPort := paramInt(params, "cdp_port", 9222, 1, 65535)
+	debugPort := core.ParamInt(params, "cdp_port", 9222, 1024, 65535)
 
 	info, err := n.connectToExistingBrowser(ctx, debugPort)
 	if err != nil {
@@ -456,7 +482,7 @@ func (n *AgentBrowserNode) importCookiesFromChrome(profile string) ([]string, er
 // actionImportCookies 实现 import_cookies 动作：定位本地 Chrome Cookie 数据库，
 // 返回可用的域名列表与安全说明。
 func (n *AgentBrowserNode) actionImportCookies(ctx context.Context, params map[string]string) (string, error) {
-	profile := getParam(params, "browser_profile", "")
+	profile := core.GetParam(params, "browser_profile", "")
 	cookiePath := getChromeCookiePath()
 
 	var sb strings.Builder
@@ -542,95 +568,6 @@ func getChromeProfilePath(profile string) string {
 	default:
 		return ""
 	}
-}
-
-// detectInstalledBrowsers 检测系统中安装的浏览器，返回浏览器名称列表（如 chrome、firefox）。
-// 支持 macOS、Linux 和 Windows 上的常见浏览器；不支持的平台返回 nil。
-func detectInstalledBrowsers() []string {
-	home, _ := os.UserHomeDir()
-	candidates := map[string][]string{}
-
-	switch runtime.GOOS {
-	case "darwin":
-		candidates["chrome"] = []string{"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"}
-		candidates["chromium"] = []string{"/Applications/Chromium.app/Contents/MacOS/Chromium"}
-		candidates["firefox"] = []string{"/Applications/Firefox.app/Contents/MacOS/firefox"}
-		candidates["edge"] = []string{"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"}
-		candidates["brave"] = []string{"/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"}
-		candidates["safari"] = []string{"/Applications/Safari.app/Contents/MacOS/Safari"}
-	case "linux":
-		candidates["chrome"] = []string{
-			"/usr/bin/google-chrome",
-			"/usr/bin/google-chrome-stable",
-			"/opt/google/chrome/chrome",
-			"/snap/bin/chromium",
-		}
-		candidates["chromium"] = []string{
-			"/usr/bin/chromium",
-			"/usr/bin/chromium-browser",
-		}
-		candidates["firefox"] = []string{
-			"/usr/bin/firefox",
-			"/usr/bin/firefox-esr",
-		}
-		candidates["edge"] = []string{
-			"/usr/bin/microsoft-edge",
-			"/usr/bin/microsoft-edge-stable",
-		}
-		candidates["brave"] = []string{
-			"/usr/bin/brave",
-			"/usr/bin/brave-browser",
-		}
-	case "windows":
-		programFiles := os.Getenv("PROGRAMFILES")
-		if programFiles == "" {
-			programFiles = `C:\Program Files`
-		}
-		programFilesX86 := os.Getenv("PROGRAMFILES(X86)")
-		if programFilesX86 == "" {
-			programFilesX86 = `C:\Program Files (x86)`
-		}
-		localAppData := os.Getenv("LOCALAPPDATA")
-		if localAppData == "" && home != "" {
-			localAppData = filepath.Join(home, "AppData", "Local")
-		}
-		candidates["chrome"] = []string{
-			filepath.Join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
-			filepath.Join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
-			filepath.Join(localAppData, "Google", "Chrome", "Application", "chrome.exe"),
-		}
-		candidates["edge"] = []string{
-			filepath.Join(programFiles, "Microsoft", "Edge", "Application", "msedge.exe"),
-			filepath.Join(programFilesX86, "Microsoft", "Edge", "Application", "msedge.exe"),
-		}
-		candidates["firefox"] = []string{
-			filepath.Join(programFiles, "Mozilla Firefox", "firefox.exe"),
-			filepath.Join(programFilesX86, "Mozilla Firefox", "firefox.exe"),
-		}
-		candidates["brave"] = []string{
-			filepath.Join(programFiles, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
-			filepath.Join(programFilesX86, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
-		}
-	default:
-		return nil
-	}
-
-	// 按固定顺序检测，保证输出稳定
-	order := []string{"chrome", "chromium", "edge", "firefox", "brave", "safari"}
-	var installed []string
-	for _, name := range order {
-		paths, ok := candidates[name]
-		if !ok {
-			continue
-		}
-		for _, p := range paths {
-			if _, err := os.Stat(p); err == nil {
-				installed = append(installed, name)
-				break
-			}
-		}
-	}
-	return installed
 }
 
 // nonEmpty 在 v 为空字符串时返回 fallback，否则返回 v

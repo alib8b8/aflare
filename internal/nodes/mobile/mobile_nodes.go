@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package mobile
 
 import (
 	"context"
@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 var (
@@ -81,18 +83,18 @@ func DetectPlatform() Platform {
 }
 
 func init() {
-	Register(&AppLaunchNode{})
-	Register(&UIAutomateNode{})
-	Register(&NotificationNode{})
-	Register(&IntentRouterNode{})
-	Register(&DeviceStateNode{})
-	Register(&CrossAppActionNode{})
-	Register(&AgentMessageNode{})
-	Register(&AgentInboxNode{})
-	Register(&HarmonyAbilityNode{})
-	Register(&HarmonyAtomicServiceNode{})
-	Register(&HarmonyWidgetNode{})
-	Register(&HarmonyDeviceAdaptNode{})
+	core.Register(&AppLaunchNode{})
+	core.Register(&UIAutomateNode{})
+	core.Register(&NotificationNode{})
+	core.Register(&IntentRouterNode{})
+	core.Register(&DeviceStateNode{})
+	core.Register(&CrossAppActionNode{})
+	core.Register(&AgentMessageNode{})
+	core.Register(&AgentInboxNode{})
+	core.Register(&HarmonyAbilityNode{})
+	core.Register(&HarmonyAtomicServiceNode{})
+	core.Register(&HarmonyWidgetNode{})
+	core.Register(&HarmonyDeviceAdaptNode{})
 }
 
 type AppLaunchNode struct{}
@@ -101,13 +103,13 @@ func (n *AppLaunchNode) Name() string { return "app_launch" }
 func (n *AppLaunchNode) Description() string {
 	return "Launch a mobile/desktop app with optional parameters"
 }
-func (n *AppLaunchNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *AppLaunchNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "app_launch",
 		Description: "Launch a mobile/desktop app with optional parameters. Cross-platform app control for AI systems. Supports Android, iOS, and HarmonyOS.",
 		Input:       "string - optional input to pass to the app",
 		Output:      "string - launch result and app session info",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "app", Type: "string", Description: "App identifier: package name (Android), bundle ID (iOS), bundleName (HarmonyOS), app name (desktop)", Required: true},
 			{Name: "action", Type: "string", Description: "Deep link action: open, search, share, edit, view (default: open)", Required: false, Default: "open"},
 			{Name: "uri", Type: "string", Description: "Deep link URI or URL scheme. HarmonyOS uses ohos:// or host:// scheme", Required: false},
@@ -232,13 +234,13 @@ func (n *UIAutomateNode) Name() string { return "ui_automate" }
 func (n *UIAutomateNode) Description() string {
 	return "Automate UI interactions: click, type, scroll, swipe"
 }
-func (n *UIAutomateNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *UIAutomateNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "ui_automate",
 		Description: "Automate UI interactions: click, type, scroll, swipe. Accessibility-based automation for AI assistants.",
 		Input:       "string - text to type or context for interaction",
 		Output:      "string - UI automation result and state changes",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "action", Type: "string", Description: "UI action: click, long_click, type, scroll, swipe, pinch, drag, wait_element, screenshot", Required: true},
 			{Name: "selector", Type: "string", Description: "Element selector: id, text, content_desc, class", Required: false},
 			{Name: "x", Type: "string", Description: "X coordinate for swipe/click (0-100% of screen width)", Required: false},
@@ -304,13 +306,13 @@ type NotificationNode struct{}
 
 func (n *NotificationNode) Name() string        { return "send_notification" }
 func (n *NotificationNode) Description() string { return "Send system notification with actions" }
-func (n *NotificationNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *NotificationNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "send_notification",
 		Description: "Send system notification with actions. Cross-platform notification for AI assistants.",
 		Input:       "string - notification body text",
 		Output:      "string - notification send result",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "title", Type: "string", Description: "Notification title", Required: true},
 			{Name: "body", Type: "string", Description: "Notification body (overrides input)", Required: false},
 			{Name: "priority", Type: "string", Description: "Priority: low, default, high, max (default: default)", Required: false, Default: "default"},
@@ -380,13 +382,13 @@ type IntentRouterNode struct{}
 
 func (n *IntentRouterNode) Name() string        { return "intent_router" }
 func (n *IntentRouterNode) Description() string { return "Route user intents to appropriate handlers" }
-func (n *IntentRouterNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *IntentRouterNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "intent_router",
 		Description: "Route user intents to appropriate handlers. Central dispatch for AI assistant commands.",
 		Input:       "string - user utterance or intent text",
 		Output:      "string - routed intent with handler assignment",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "mode", Type: "string", Description: "Routing mode: classify, route, execute (default: classify)", Required: false, Default: "classify"},
 			{Name: "domains", Type: "string", Description: "Comma-separated domains: travel,food,shopping,entertainment,work,communication,system", Required: false},
 			{Name: "fallback", Type: "string", Description: "Fallback handler when no match (default: general_assistant)", Required: false, Default: "general_assistant"},
@@ -500,13 +502,13 @@ func (n *DeviceStateNode) Name() string { return "device_state" }
 func (n *DeviceStateNode) Description() string {
 	return "Query device state: battery, network, location"
 }
-func (n *DeviceStateNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *DeviceStateNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "device_state",
 		Description: "Query device state: battery, network, location, apps, storage. Context awareness for AI assistants.",
 		Input:       "string - optional query filter",
 		Output:      "string - device state information in JSON",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "query", Type: "string", Description: "State query: battery, network, location, apps, storage, all (default: all)", Required: false, Default: "all"},
 		},
 	}
@@ -538,13 +540,13 @@ type CrossAppActionNode struct{}
 
 func (n *CrossAppActionNode) Name() string        { return "cross_app_action" }
 func (n *CrossAppActionNode) Description() string { return "Execute actions across multiple apps" }
-func (n *CrossAppActionNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *CrossAppActionNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "cross_app_action",
 		Description: "Execute actions across multiple apps. Multi-app workflows for AI assistants.",
 		Input:       "string - action description or context",
 		Output:      "string - cross-app action result",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "workflow", Type: "string", Description: "Workflow name: share_content, save_for_later, compare_prices", Required: true},
 			{Name: "apps", Type: "string", Description: "Comma-separated apps involved", Required: false},
 			{Name: "data", Type: "string", Description: "JSON data to pass between apps", Required: false},
@@ -660,13 +662,13 @@ type AgentMessageNode struct{}
 
 func (n *AgentMessageNode) Name() string        { return "agent_message" }
 func (n *AgentMessageNode) Description() string { return "Send message to another agent by DID" }
-func (n *AgentMessageNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *AgentMessageNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "agent_message",
 		Description: "Send cross-domain message to another agent by DID. Inspired by awiki.ai agent-native messaging.",
 		Input:       "string - message body or payload",
 		Output:      "string - send result",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "to_did", Type: "string", Description: "Receiver agent DID (e.g. did:awiki:agent123)", Required: true},
 			{Name: "from_did", Type: "string", Description: "Sender agent DID", Required: false},
 			{Name: "subject", Type: "string", Description: "Message subject/type", Required: false},
@@ -737,7 +739,7 @@ func validateAgentEndpoint(endpoint string) error {
 		return fmt.Errorf("endpoint too long")
 	}
 	// Use the existing SSRF-safe URL validator from security.go
-	return validateURL(endpoint)
+	return core.ValidateURL(endpoint)
 }
 
 // AgentInboxNode queries or manages the local agent's message inbox.
@@ -745,13 +747,13 @@ type AgentInboxNode struct{}
 
 func (n *AgentInboxNode) Name() string        { return "agent_inbox" }
 func (n *AgentInboxNode) Description() string { return "Query agent message inbox" }
-func (n *AgentInboxNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *AgentInboxNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "agent_inbox",
 		Description: "Query agent message inbox. Retrieve and manage cross-domain messages.",
 		Input:       "string - optional filter query",
 		Output:      "string - inbox messages in JSON",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "action", Type: "string", Description: "Action: list, read, delete, mark_read (default: list)", Required: false, Default: "list"},
 			{Name: "message_id", Type: "string", Description: "Message ID for read/delete/mark_read", Required: false},
 			{Name: "from_did", Type: "string", Description: "Filter by sender DID", Required: false},
@@ -818,13 +820,13 @@ func (n *HarmonyAbilityNode) Name() string { return "harmony_ability" }
 func (n *HarmonyAbilityNode) Description() string {
 	return "Launch HarmonyOS Ability (page, slice, service, data)"
 }
-func (n *HarmonyAbilityNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *HarmonyAbilityNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "harmony_ability",
 		Description: "Launch HarmonyOS Ability with specified type. Supports page (UI), slice (partial UI), service (background), data (data provider).",
 		Input:       "string - optional input data for the ability",
 		Output:      "string - ability launch result",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "bundle_name", Type: "string", Description: "HarmonyOS bundle name (e.g. com.example.myapplication)", Required: true},
 			{Name: "ability_name", Type: "string", Description: "Ability class name (e.g. MainAbility)", Required: true},
 			{Name: "ability_type", Type: "string", Description: "Ability type: page, slice, service, data (default: page)", Required: false, Default: "page"},
@@ -906,13 +908,13 @@ func (n *HarmonyAtomicServiceNode) Name() string { return "harmony_atomic_servic
 func (n *HarmonyAtomicServiceNode) Description() string {
 	return "Launch HarmonyOS Atomic Service (card-based lightweight app)"
 }
-func (n *HarmonyAtomicServiceNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *HarmonyAtomicServiceNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "harmony_atomic_service",
 		Description: "Launch HarmonyOS Atomic Service. Lightweight, card-based services that run without installation. Supports launch, router, share, notify actions.",
 		Input:       "string - optional input data",
 		Output:      "string - atomic service launch result",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "service_id", Type: "string", Description: "Atomic service ID (e.g. com.example.service)", Required: true},
 			{Name: "action", Type: "string", Description: "Action: launch, router, share, notify (default: launch)", Required: false, Default: "launch"},
 			{Name: "card_id", Type: "string", Description: "Service card ID for widget-style display", Required: false},
@@ -983,13 +985,13 @@ func (n *HarmonyWidgetNode) Name() string { return "harmony_widget" }
 func (n *HarmonyWidgetNode) Description() string {
 	return "Manage HarmonyOS desktop widgets (cards)"
 }
-func (n *HarmonyWidgetNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *HarmonyWidgetNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "harmony_widget",
 		Description: "Manage HarmonyOS desktop widgets (service cards). Add, update, remove, or query widget state on the home screen.",
 		Input:       "string - optional widget content or query",
 		Output:      "string - widget operation result",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "action", Type: "string", Description: "Action: add, update, remove, query (default: query)", Required: false, Default: "query"},
 			{Name: "widget_id", Type: "string", Description: "Widget identifier (required for update, remove, query)", Required: false},
 			{Name: "provider_bundle", Type: "string", Description: "Provider bundle name for add action", Required: false},
@@ -1109,13 +1111,13 @@ func (n *HarmonyDeviceAdaptNode) Name() string { return "harmony_device_adapt" }
 func (n *HarmonyDeviceAdaptNode) Description() string {
 	return "Detect HarmonyOS device type and provide adaptation guidance"
 }
-func (n *HarmonyDeviceAdaptNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *HarmonyDeviceAdaptNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        "harmony_device_adapt",
 		Description: "Detect HarmonyOS device type (phone/tablet/foldable/TV/car/wearable) and generate UI adaptation guidance. Inspired by HarmonyOS Agent Skills multi-device adaptation.",
 		Input:       "string - optional adaptation requirements",
 		Output:      "string - device info and adaptation plan in JSON",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "screen_width", Type: "string", Description: "Screen width in pixels (optional, auto-detected if omitted)", Required: false},
 			{Name: "screen_height", Type: "string", Description: "Screen height in pixels (optional)", Required: false},
 			{Name: "screen_density", Type: "string", Description: "Screen density (dpi, optional)", Required: false},

@@ -104,7 +104,7 @@ func (n *CodeInterpreterNode) Execute(ctx context.Context, input string, params 
 		if err != nil {
 			return "", fmt.Errorf("failed to create temp dir: %w", err)
 		}
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }()
 		workDir = tempDir
 	} else {
 		safeWorkDir, err := validateWritePath(workDir)

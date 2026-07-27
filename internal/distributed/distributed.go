@@ -827,7 +827,9 @@ func (w *Worker) sendHeartbeats() {
 				"current_load": load,
 			})
 
-			w.httpPost("/api/heartbeat", reqBody)
+			if _, err := w.httpPost("/api/heartbeat", reqBody); err != nil {
+				// heartbeat failure is non-fatal; node will retry next cycle
+			}
 		case <-w.stopCh:
 			return
 		}
@@ -884,7 +886,9 @@ func (w *Worker) updateTaskStatus(taskID string, status TaskStatus) {
 		"task_id": taskID,
 		"status":  status,
 	})
-	w.httpPut("/api/task", reqBody)
+	if _, err := w.httpPut("/api/task", reqBody); err != nil {
+		// task status update failure is non-fatal; status will be reconciled later
+	}
 }
 
 func (w *Worker) updateTaskResult(taskID, output, errorStr string) {
@@ -894,7 +898,9 @@ func (w *Worker) updateTaskResult(taskID, output, errorStr string) {
 		"output":  output,
 		"error":   errorStr,
 	})
-	w.httpPut("/api/task", reqBody)
+	if _, err := w.httpPut("/api/task", reqBody); err != nil {
+		// task result report failure is non-fatal; result will be reconciled later
+	}
 }
 
 func executeStepLocally(step workflow.WorkflowStep) (string, error) {

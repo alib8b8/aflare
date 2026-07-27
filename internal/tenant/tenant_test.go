@@ -379,9 +379,9 @@ func TestWithTenantAndGetTenantID(t *testing.T) {
 		t.Errorf("expected tenant_1, got %q", id)
 	}
 
-	// Nil context.
-	if id := GetTenantID(nil); id != "" {
-		t.Errorf("expected empty for nil context, got %q", id)
+	// Empty context.
+	if id := GetTenantID(context.TODO()); id != "" {
+		t.Errorf("expected empty for empty context, got %q", id)
 	}
 }
 

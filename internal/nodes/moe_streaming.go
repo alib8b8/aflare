@@ -94,15 +94,6 @@ var moeModelConfigs = map[string]moeModelConfig{
 	},
 }
 
-type moeExpertInfo struct {
-	Index      int     `json:"index"`
-	Group      int     `json:"group"`
-	SizeGB     float64 `json:"size_gb"`
-	Loaded     bool    `json:"loaded"`
-	Activated  bool    `json:"activated"`
-	LoadTimeMs int64   `json:"load_time_ms"`
-}
-
 type moeLoadOrderEntry struct {
 	Layer     int    `json:"layer"`
 	ExpertIdx int    `json:"expert_idx"`

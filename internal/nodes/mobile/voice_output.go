@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package mobile
 
 import (
 	"context"
@@ -23,6 +23,8 @@ import (
 	"math/rand"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 var (
@@ -93,13 +95,13 @@ func (n *VoiceOutputNode) Description() string {
 	return "Voice AI toolchain with TTS, voice cloning, ASR speech recognition, transcription, diarization, and voice analysis. Supports SenseVoice, CosyVoice, Fish Speech, Edge TTS, Piper, Bark, Whisper, Vosk for complete voice studio capabilities."
 }
 
-func (n *VoiceOutputNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *VoiceOutputNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        n.Name(),
 		Description: n.Description(),
 		Input:       "string - text to synthesize, reference audio for cloning, or audio base64 for ASR transcription",
 		Output:      "string - JSON with audio_base64, duration, text transcript, or voice analysis results",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "engine", Type: "string", Description: "Engine: sensevoice/cosyvoice/fish-speech/edge-tts/piper/bark/whisper/vosk (default: sensevoice)", Required: false, Default: "sensevoice"},
 			{Name: "operation", Type: "string", Description: "Operation type: tts/clone/emotion/multi-speaker/asr/transcribe/diarize/voice-analyze (default: tts)", Required: false, Default: "tts"},
 			{Name: "text", Type: "string", Description: "Text to convert to speech (max 4000 chars)", Required: false},
@@ -124,8 +126,8 @@ func (n *VoiceOutputNode) Schema() NodeSchema {
 }
 
 func (n *VoiceOutputNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
-	engine := getParam(params, "engine", "sensevoice")
-	operation := getParam(params, "operation", "tts")
+	engine := core.GetParam(params, "engine", "sensevoice")
+	operation := core.GetParam(params, "operation", "tts")
 
 	if !validTTSOperations[operation] {
 		return "", fmt.Errorf("invalid operation: %s", operation)
@@ -151,7 +153,7 @@ func (n *VoiceOutputNode) Execute(ctx context.Context, input string, params map[
 		return "", fmt.Errorf("invalid engine: %s", engine)
 	}
 
-	text := getParam(params, "text", "")
+	text := core.GetParam(params, "text", "")
 	if input != "" && text == "" {
 		text = input
 	}
@@ -159,24 +161,24 @@ func (n *VoiceOutputNode) Execute(ctx context.Context, input string, params map[
 		return "", fmt.Errorf("text too long (max 4000 chars)")
 	}
 
-	voice := getParam(params, "voice", "default")
+	voice := core.GetParam(params, "voice", "default")
 
-	style := getParam(params, "style", "natural")
+	style := core.GetParam(params, "style", "natural")
 	if !validVoiceStyles[style] {
 		return "", fmt.Errorf("invalid style: %s", style)
 	}
 
-	speed := parseFloatSafe(getParam(params, "speed", "1.0"), 1.0)
+	speed := parseFloatSafe(core.GetParam(params, "speed", "1.0"), 1.0)
 	if speed < 0.5 || speed > 2.0 {
 		speed = 1.0
 	}
 
-	pitch := parseFloatSafe(getParam(params, "pitch", "1.0"), 1.0)
+	pitch := parseFloatSafe(core.GetParam(params, "pitch", "1.0"), 1.0)
 	if pitch < 0.5 || pitch > 2.0 {
 		pitch = 1.0
 	}
 
-	referenceAudio := getParam(params, "reference_audio", "")
+	referenceAudio := core.GetParam(params, "reference_audio", "")
 	if operation == "clone" && referenceAudio == "" {
 		referenceAudio = input
 	}
@@ -196,7 +198,7 @@ func (n *VoiceOutputNode) Execute(ctx context.Context, input string, params map[
 		}
 	}
 
-	outputFormat := getParam(params, "output_format", "mp3")
+	outputFormat := core.GetParam(params, "output_format", "mp3")
 	if !validTTSOutputFormats[outputFormat] {
 		return "", fmt.Errorf("invalid output_format: %s", outputFormat)
 	}
@@ -221,23 +223,23 @@ func (n *VoiceOutputNode) Execute(ctx context.Context, input string, params map[
 }
 
 func (n *VoiceOutputNode) executeASROperation(ctx context.Context, input string, params map[string]string) (string, error) {
-	engine := getParam(params, "engine", "whisper")
-	operation := getParam(params, "operation", "transcribe")
+	engine := core.GetParam(params, "engine", "whisper")
+	operation := core.GetParam(params, "operation", "transcribe")
 
 	if !validASREngines[engine] {
 		return "", fmt.Errorf("invalid ASR engine: %s (supported: sensevoice, vosk, whisper, whisper-cpp, pocketsphinx)", engine)
 	}
 
-	language := getParam(params, "language", "auto")
+	language := core.GetParam(params, "language", "auto")
 	if !validASRLanguages[language] {
 		return "", fmt.Errorf("invalid language: %s", language)
 	}
 
-	modelSize := getParam(params, "model_size", "base")
-	enableDiarization := strings.ToLower(getParam(params, "enable_diarization", "false")) == "true"
-	enableTimestamps := strings.ToLower(getParam(params, "enable_timestamps", "false")) == "true"
+	modelSize := core.GetParam(params, "model_size", "base")
+	enableDiarization := strings.ToLower(core.GetParam(params, "enable_diarization", "false")) == "true"
+	enableTimestamps := strings.ToLower(core.GetParam(params, "enable_timestamps", "false")) == "true"
 
-	audioInput := getParam(params, "audio_input", "")
+	audioInput := core.GetParam(params, "audio_input", "")
 	if audioInput == "" && input != "" {
 		audioInput = input
 	}
@@ -412,9 +414,9 @@ func simulateTTSGeneration(text, engine, operation, voice, style string, speed, 
 }
 
 func (n *VoiceOutputNode) executeCreatorOperation(ctx context.Context, input string, params map[string]string) (string, error) {
-	operation := getParam(params, "operation", "tts")
-	creatorMode := getParam(params, "creator_mode", "podcast")
-	text := getParam(params, "text", "")
+	operation := core.GetParam(params, "operation", "tts")
+	creatorMode := core.GetParam(params, "creator_mode", "podcast")
+	text := core.GetParam(params, "text", "")
 	if input != "" && text == "" {
 		text = input
 	}
@@ -422,14 +424,14 @@ func (n *VoiceOutputNode) executeCreatorOperation(ctx context.Context, input str
 		return "", fmt.Errorf("text is required for creator operations")
 	}
 
-	engine := getParam(params, "engine", "sensevoice")
-	outputFormat := getParam(params, "output_format", "mp3")
-	style := getParam(params, "style", "natural")
-	speed := parseFloatSafe(getParam(params, "speed", "1.0"), 1.0)
-	backgroundMusic := getParam(params, "background_music", "false") == "true"
-	intro := getParam(params, "intro", "false") == "true"
-	chapterCount := parseIntSafe(getParam(params, "chapter_count", "1"), 1)
-	hostVoice := getParam(params, "host_voice", "default")
+	engine := core.GetParam(params, "engine", "sensevoice")
+	outputFormat := core.GetParam(params, "output_format", "mp3")
+	style := core.GetParam(params, "style", "natural")
+	speed := parseFloatSafe(core.GetParam(params, "speed", "1.0"), 1.0)
+	backgroundMusic := core.GetParam(params, "background_music", "false") == "true"
+	intro := core.GetParam(params, "intro", "false") == "true"
+	chapterCount := parseIntSafe(core.GetParam(params, "chapter_count", "1"), 1)
+	hostVoice := core.GetParam(params, "host_voice", "default")
 
 	startTime := time.Now()
 
@@ -678,7 +680,7 @@ func (n *VoiceOutputNode) createEducation(text, style string, speed float64) ([]
 }
 
 func (n *VoiceOutputNode) executeInklingAudioOperation(ctx context.Context, input string, params map[string]string) (string, error) {
-	audioInput := getParam(params, "audio_input", "")
+	audioInput := core.GetParam(params, "audio_input", "")
 	if audioInput == "" && input != "" {
 		audioInput = input
 	}
@@ -686,7 +688,7 @@ func (n *VoiceOutputNode) executeInklingAudioOperation(ctx context.Context, inpu
 		return "", fmt.Errorf("audio_input is required for inkling_audio operation")
 	}
 
-	language := getParam(params, "language", "auto")
+	language := core.GetParam(params, "language", "auto")
 	if !validASRLanguages[language] {
 		return "", fmt.Errorf("invalid language: %s", language)
 	}
@@ -759,5 +761,5 @@ func (n *VoiceOutputNode) performInklingAudioAnalysis(audioInput, language strin
 }
 
 func init() {
-	Register(&VoiceOutputNode{})
+	core.Register(&VoiceOutputNode{})
 }

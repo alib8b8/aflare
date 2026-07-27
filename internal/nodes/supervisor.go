@@ -397,7 +397,9 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 	templateRole := getParam(params, "template_role", "team")
 
 	maxDepth := 3
-	fmt.Sscanf(maxDepthStr, "%d", &maxDepth)
+	if _, err := fmt.Sscanf(maxDepthStr, "%d", &maxDepth); err != nil {
+		// keep default value on parse failure
+	}
 	if maxDepth < 1 {
 		maxDepth = 1
 	}

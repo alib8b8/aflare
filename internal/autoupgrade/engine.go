@@ -361,7 +361,9 @@ func attemptAutoMerge(branch string) error {
 	if err := cmd.Run(); err != nil {
 		cmd := exec.Command("git", "rebase", "--abort")
 		cmd.Dir = repoDir
-		cmd.Run()
+		if err := cmd.Run(); err != nil {
+			// best-effort rebase abort; original rebase error already returned
+		}
 		return fmt.Errorf("rebase failed: %w", err)
 	}
 

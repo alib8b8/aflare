@@ -960,7 +960,9 @@ func (e *ReActEngine) Run(ctx context.Context, task string, thinkFn ThinkFunc, a
 			task, i, thought, action, actionInput, observation)
 
 		// 存入短期记忆
-		e.memory.Store(fmt.Sprintf("step_%d_observation", i), observation, MemoryLevelShortTerm)
+		if err := e.memory.Store(fmt.Sprintf("step_%d_observation", i), observation, MemoryLevelShortTerm); err != nil {
+			// short-term memory store failure is non-fatal; observation already recorded in result
+		}
 	}
 
 	// 超过最大迭代次数

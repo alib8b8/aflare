@@ -382,9 +382,13 @@ func (n *InferenceNode) Execute(ctx context.Context, input string, params map[st
 		tempStr := getParam(params, "temperature", "0.7")
 
 		maxTokens := 512
-		fmt.Sscanf(maxTokensStr, "%d", &maxTokens)
+		if _, err := fmt.Sscanf(maxTokensStr, "%d", &maxTokens); err != nil {
+			// keep default value on parse failure
+		}
 		temperature := 0.7
-		fmt.Sscanf(tempStr, "%f", &temperature)
+		if _, err := fmt.Sscanf(tempStr, "%f", &temperature); err != nil {
+			// keep default value on parse failure
+		}
 
 		req := InferenceRequest{
 			Model:       model,

@@ -419,9 +419,8 @@ var (
 		"cline":       {"openai", "anthropic", "google", "inkling"},
 		"llm_box":     {"openai", "anthropic", "sensenova", "antling", "ollama", "inkling"},
 	}
-	providerPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{2,32}$`)
-	baseURLPattern  = regexp.MustCompile(`^https?://[a-zA-Z0-9._-]+(:[0-9]+)?(/.*)?$`)
-	regionPattern   = regexp.MustCompile(`^[a-zA-Z0-9_-]{2,32}$`)
+	baseURLPattern = regexp.MustCompile(`^https?://[a-zA-Z0-9._-]+(:[0-9]+)?(/.*)?$`)
+	regionPattern  = regexp.MustCompile(`^[a-zA-Z0-9_-]{2,32}$`)
 )
 
 type OmniRouteNode struct{}
@@ -484,16 +483,6 @@ func (n *OmniRouteNode) Execute(ctx context.Context, input string, params map[st
 
 	if region != "" && !regionPattern.MatchString(region) {
 		return "", fmt.Errorf("invalid region: must be 2-32 alphanumeric characters")
-	}
-
-	maxTokens := parseIntSafe(getParam(params, "max_tokens", "2048"), 2048)
-	if maxTokens < 1 || maxTokens > 32768 {
-		maxTokens = 2048
-	}
-
-	temperature := parseFloatSafe(getParam(params, "temperature", "0.7"), 0.7)
-	if temperature < 0 || temperature > 2.0 {
-		temperature = 0.7
 	}
 
 	if provider == "" {
@@ -688,12 +677,11 @@ type providerHealth struct {
 }
 
 var (
-	providerHealthStatus  = make(map[string]providerHealth)
-	providerHealthMu      sync.RWMutex
-	healthCheckInterval   = 60 * time.Second
-	healthCleanupInterval = 5 * time.Minute
-	omniRand              = rand.New(rand.NewSource(time.Now().UnixNano()))
-	omniRandMu            sync.Mutex
+	providerHealthStatus = make(map[string]providerHealth)
+	providerHealthMu     sync.RWMutex
+	healthCheckInterval  = 60 * time.Second
+	omniRand             = rand.New(rand.NewSource(time.Now().UnixNano()))
+	omniRandMu           sync.Mutex
 )
 
 func initHealthChecker() {

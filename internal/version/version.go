@@ -227,18 +227,21 @@ func SelfUpdate(repo string) (string, error) {
 	}
 
 	if _, err := io.Copy(out, resp.Body); err != nil {
-		out.Close()
-		os.Remove(tmpPath)
+		_ = out.Close() // best-effort close
+		_ = os.Remove(tmpPath) // best-effort cleanup
 		return "", fmt.Errorf("failed to write temp file: %w", err)
 	}
-	out.Close()
+	if err := out.Close(); err != nil {
+		_ = os.Remove(tmpPath) // best-effort cleanup
+		return "", fmt.Errorf("failed to close temp file: %w", err)
+	}
 
 	if checksumsURL := findChecksumsURL(release); checksumsURL != "" {
 		checksums, err := downloadChecksums(checksumsURL)
 		if err == nil && len(checksums) > 0 {
 			if expected, ok := checksums[assetName]; ok {
 				if err := verifyChecksum(tmpPath, expected); err != nil {
-					os.Remove(tmpPath)
+					_ = os.Remove(tmpPath) // best-effort cleanup
 					return "", fmt.Errorf("checksum verification failed: %w", err)
 				}
 			}
@@ -246,14 +249,16 @@ func SelfUpdate(repo string) (string, error) {
 	}
 
 	backupPath := exePath + ".bak"
-	os.Rename(exePath, backupPath)
+	if err := os.Rename(exePath, backupPath); err != nil {
+		return "", fmt.Errorf("failed to back up current binary: %w", err)
+	}
 
 	if err := os.Rename(tmpPath, exePath); err != nil {
-		os.Rename(backupPath, exePath)
+		_ = os.Rename(backupPath, exePath) // best-effort rollback restore
 		return "", fmt.Errorf("failed to replace binary: %w", err)
 	}
 
-	os.Remove(backupPath)
+	_ = os.Remove(backupPath) // best-effort cleanup
 
 	return fmt.Sprintf("Updated to %s (was %s)", release.TagName, Version), nil
 }

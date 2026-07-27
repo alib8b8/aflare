@@ -20,6 +20,10 @@ import (
 	"fmt"
 )
 
+// runAgentLLM dispatches a single LLM call to either the local OllamaNode
+// (for provider=="ollama") or a freshly-constructed OpenAICompatibleNode
+// for any other provider. baseAgentParams has moved to
+// internal/nodes/core/params.go and is re-exported via agent_node.go.
 func runAgentLLM(ctx context.Context, provider, model, apiKey, endpoint, systemPrompt, userInput string) (string, error) {
 	llmParams := map[string]string{
 		"model":    model,
@@ -41,13 +45,4 @@ func runAgentLLM(ctx context.Context, provider, model, apiKey, endpoint, systemP
 		ProviderName:    provider,
 	})
 	return compatNode.Execute(ctx, userInput, llmParams)
-}
-
-func baseAgentParams() []ParamSchema {
-	return []ParamSchema{
-		{Name: "provider", Type: "string", Description: "LLM provider (default: ollama)", Required: false, Default: "ollama"},
-		{Name: "model", Type: "string", Description: "Model name (default: llama3)", Required: false, Default: "llama3"},
-		{Name: "api_key", Type: "string", Description: "API key", Required: false},
-		{Name: "endpoint", Type: "string", Description: "API endpoint URL", Required: false},
-	}
 }

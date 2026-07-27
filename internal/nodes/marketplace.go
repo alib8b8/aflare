@@ -21,86 +21,28 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
-type NodeCategory string
+// NodeCategory and its constants (CategoryLLM, CategoryAgent, ...) plus the
+// Registry.Search / Registry.NodesByCategory methods have been moved to
+// internal/nodes/core/registry.go so they can be defined on the local
+// *core.Registry type. They are re-exported here via type aliases so that
+// existing callers (marketplace node, CLI) keep compiling unchanged.
+type NodeCategory = core.NodeCategory
 
 const (
-	CategoryLLM       NodeCategory = "llm"
-	CategoryAgent     NodeCategory = "agent"
-	CategoryIO        NodeCategory = "io"
-	CategoryTransform NodeCategory = "transform"
-	CategoryFlow      NodeCategory = "flow"
-	CategoryData      NodeCategory = "data"
-	CategorySecurity  NodeCategory = "security"
-	CategoryUtility   NodeCategory = "utility"
+	CategoryLLM       = core.CategoryLLM
+	CategoryAgent     = core.CategoryAgent
+	CategoryIO        = core.CategoryIO
+	CategoryTransform = core.CategoryTransform
+	CategoryFlow      = core.CategoryFlow
+	CategoryData      = core.CategoryData
+	CategorySecurity  = core.CategorySecurity
+	CategoryUtility   = core.CategoryUtility
 )
-
-func (r *Registry) Search(query string) []NodeInfo {
-	queryLower := strings.ToLower(query)
-	var matched []NodeInfo
-	for _, info := range r.ListNodes() {
-		nameLower := strings.ToLower(info.Name)
-		descLower := strings.ToLower(info.Description)
-		if strings.Contains(nameLower, queryLower) || strings.Contains(descLower, queryLower) {
-			matched = append(matched, info)
-		}
-	}
-	sort.Slice(matched, func(i, j int) bool {
-		return matched[i].Name < matched[j].Name
-	})
-	return matched
-}
-
-func (r *Registry) NodesByCategory(category NodeCategory) []NodeInfo {
-	categoryMap := map[NodeCategory][]string{
-		CategoryLLM: {
-			"ollama", "openai", "deepseek", "glm", "kimi", "qwen", "mistral", "yi",
-			"anthropic", "gemini", "cohere", "together", "groq",
-		},
-		CategoryAgent: {
-			"agent", "supervisor", "planner", "researcher", "critic",
-			"evaluator", "reflector", "code_review",
-		},
-		CategoryIO: {
-			"file_read", "file_write", "file_append", "file_list",
-			"fetch_url", "http_request", "stdin", "stdout", "output",
-		},
-		CategoryTransform: {
-			"json_parse", "transform", "combine", "template_render",
-			"markdown_render", "base64_encode", "base64_decode",
-		},
-		CategoryFlow: {
-			"if", "switch", "loop", "wait", "parallel", "map",
-		},
-		CategoryData: {
-			"rag", "knowledge_graph", "smart_router", "code_interpreter",
-			"execute", "multimodal", "node_marketplace",
-		},
-		CategorySecurity: {
-			"hash", "encrypt", "decrypt", "sign", "verify",
-		},
-		CategoryUtility: {
-			"echo", "wait", "log", "env", "variable",
-		},
-	}
-
-	nodeNames, ok := categoryMap[category]
-	if !ok {
-		return nil
-	}
-
-	var result []NodeInfo
-	for _, name := range nodeNames {
-		if node, exists := r.Get(name); exists {
-			desc := node.Description()
-			result = append(result, NodeInfo{Name: name, Description: desc})
-		}
-	}
-	return result
-}
 
 type PluginInfo struct {
 	Name        string `json:"name"`

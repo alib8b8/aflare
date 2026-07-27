@@ -104,11 +104,6 @@ func (n *AntLingNode) Execute(ctx context.Context, input string, params map[stri
 		maxTokens = 2048
 	}
 
-	temperature := parseFloatSafe(getParam(params, "temperature", "0.7"), 0.7)
-	if temperature < 0 || temperature > 2.0 {
-		temperature = 0.7
-	}
-
 	systemPrompt := getParam(params, "system_prompt", "")
 	if len(systemPrompt) > 8000 {
 		return "", fmt.Errorf("system_prompt too long")

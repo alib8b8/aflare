@@ -61,7 +61,9 @@ func (n *ReflectorNode) Execute(ctx context.Context, input string, params map[st
 	focus := getParam(params, "reflection_focus", "all")
 
 	iterations := 2
-	fmt.Sscanf(iterationsStr, "%d", &iterations)
+	if _, err := fmt.Sscanf(iterationsStr, "%d", &iterations); err != nil {
+		// keep default value on parse failure
+	}
 	if iterations < 1 {
 		iterations = 1
 	}

@@ -145,7 +145,6 @@ type codeGraphResult struct {
 type codeGraphCache struct {
 	mu       sync.RWMutex
 	rootPath string
-	cacheDir string
 	data     map[string]codeGraphFile
 	loaded   bool
 }

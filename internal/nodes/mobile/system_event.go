@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package mobile
 
 import (
 	"context"
@@ -22,6 +22,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 var (
@@ -56,13 +58,13 @@ func (n *SystemEventNode) Description() string {
 	return "Listen for mobile system events (notification, call, SMS, location, battery, etc.) and trigger workflows"
 }
 
-func (n *SystemEventNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *SystemEventNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        n.Name(),
 		Description: n.Description(),
 		Input:       "string - filter pattern or event configuration JSON",
 		Output:      "string - matched event data in JSON format",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "event_type", Type: "string", Description: "Event type to listen for (notification/incoming_call/sms_received/alarm_triggered/location_changed/battery_low/battery_charging/screen_on/screen_off/app_foreground/bluetooth_connected/wifi_connected/headphone_connected)", Required: true},
 			{Name: "trigger_mode", Type: "string", Description: "Trigger mode: immediate/debounce/throttle (default: immediate)", Required: false, Default: "immediate"},
 			{Name: "debounce_ms", Type: "int", Description: "Debounce interval in milliseconds (default: 1000)", Required: false, Default: "1000"},
@@ -345,5 +347,5 @@ func safeCallback(cb func(event map[string]interface{}), event map[string]interf
 }
 
 func init() {
-	Register(&SystemEventNode{})
+	core.Register(&SystemEventNode{})
 }

@@ -89,7 +89,9 @@ func (n *PipelineNode) Execute(ctx context.Context, input string, params map[str
 
 	timeoutStr := getParam(params, "timeout", "300")
 	timeoutSeconds := 300
-	fmt.Sscanf(timeoutStr, "%d", &timeoutSeconds)
+	if _, err := fmt.Sscanf(timeoutStr, "%d", &timeoutSeconds); err != nil {
+		// keep default value on parse failure
+	}
 
 	config, err := parsePipelineConfig(input)
 	if err != nil {

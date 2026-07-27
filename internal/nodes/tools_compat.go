@@ -693,10 +693,10 @@ func (n *TCApplyPatchNode) Execute(ctx context.Context, input string, params map
 			return "", fmt.Errorf("temp path is a symlink, refusing to write: %q (no files modified)", p.origPath)
 		}
 		if err := os.WriteFile(p.tmpPath, []byte(p.newContent), 0o600); err != nil {
-			tcCleanupTemps(pending, i)
-			os.Remove(p.tmpPath)
-			return "", fmt.Errorf("stage write failed for %q: %w (no files modified)", p.origPath, err)
-		}
+		tcCleanupTemps(pending, i)
+		_ = os.Remove(p.tmpPath) // best-effort cleanup
+		return "", fmt.Errorf("stage write failed for %q: %w (no files modified)", p.origPath, err)
+	}
 	}
 
 	// 第三阶段：提交（备份 + 原子 rename 临时文件 → 最终文件）
@@ -983,7 +983,7 @@ func tcApplyHunks(origLines []string, hunks []tcHunk) ([]string, error) {
 func tcCleanupTemps(pending []tcPending, from int) {
 	for i := from; i < len(pending); i++ {
 		if pending[i].tmpPath != "" {
-			os.Remove(pending[i].tmpPath)
+			_ = os.Remove(pending[i].tmpPath) // best-effort cleanup
 		}
 	}
 }

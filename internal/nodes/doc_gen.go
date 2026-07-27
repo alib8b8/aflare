@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 var (
@@ -218,7 +220,7 @@ func generateAPIDoc(moduleName, language string, depth int, input string) string
 		if i >= depth*2 {
 			break
 		}
-		sb.WriteString(fmt.Sprintf("### %s%s\n\n", strings.Title(moduleName), fn))
+		sb.WriteString(fmt.Sprintf("### %s%s\n\n", core.TitleCase(moduleName), fn))
 		sb.WriteString(fmt.Sprintf("**描述**：%s 函数用于执行 %s 操作。\n\n", fn, strings.ToLower(fn)))
 		sb.WriteString("**签名**：\n\n")
 		sb.WriteString("```")
@@ -226,7 +228,7 @@ func generateAPIDoc(moduleName, language string, depth int, input string) string
 		sb.WriteString("\n")
 		switch language {
 		case "go":
-			sb.WriteString(fmt.Sprintf("func %s%s() error\n", strings.Title(moduleName), fn))
+			sb.WriteString(fmt.Sprintf("func %s%s() error\n", core.TitleCase(moduleName), fn))
 		case "python":
 			sb.WriteString(fmt.Sprintf("def %s_%s() -> None:\n", moduleName, strings.ToLower(fn)))
 		default:
@@ -244,7 +246,7 @@ func generateAPIDoc(moduleName, language string, depth int, input string) string
 
 func generateFunctionDoc(moduleName, language string, depth int, input string) string {
 	var sb strings.Builder
-	funcName := strings.Title(moduleName)
+	funcName := core.TitleCase(moduleName)
 	sb.WriteString(fmt.Sprintf("## %s 函数\n\n", funcName))
 	sb.WriteString("### 描述\n\n")
 	if input != "" {

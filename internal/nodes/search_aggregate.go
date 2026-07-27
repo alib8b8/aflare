@@ -128,13 +128,17 @@ func (n *SearchAggregateNode) Execute(ctx context.Context, input string, params 
 	outputFmt := getParam(params, "output", "markdown")
 
 	limit := 10
-	fmt.Sscanf(limitStr, "%d", &limit)
+	if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
+		// keep default value on parse failure
+	}
 	if limit < 1 {
 		limit = 10
 	}
 
 	minScore := 0.0
-	fmt.Sscanf(minScoreStr, "%f", &minScore)
+	if _, err := fmt.Sscanf(minScoreStr, "%f", &minScore); err != nil {
+		// keep default value on parse failure
+	}
 
 	enabledSources := parseSources(sourcesStr)
 

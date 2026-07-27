@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package mobile
 
 import (
 	"context"
@@ -22,6 +22,8 @@ import (
 	"math/rand"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 var (
@@ -60,13 +62,13 @@ func (n *VideoEditNode) Description() string {
 	return "AI-powered video editing workflow with smart cutting, merging, effects, subtitle generation, and storyboard creation."
 }
 
-func (n *VideoEditNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *VideoEditNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        n.Name(),
 		Description: n.Description(),
 		Input:       "string - input video file path or comma-separated list",
 		Output:      "string - JSON with video processing results",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "operation", Type: "string", Description: "Operation: smart_cut/merge/effects/subtitle/storyboard/upscale (default: smart_cut)", Required: false, Default: "smart_cut"},
 			{Name: "input_files", Type: "string", Description: "Comma-separated input video file paths", Required: false},
 			{Name: "output_path", Type: "string", Description: "Output file path", Required: false, Default: "./output.mp4"},
@@ -79,12 +81,12 @@ func (n *VideoEditNode) Schema() NodeSchema {
 }
 
 func (n *VideoEditNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
-	operation := getParam(params, "operation", "smart_cut")
+	operation := core.GetParam(params, "operation", "smart_cut")
 	if !validVideoOperations[operation] {
 		return "", fmt.Errorf("invalid operation: %s", operation)
 	}
 
-	inputFiles := getParam(params, "input_files", "")
+	inputFiles := core.GetParam(params, "input_files", "")
 	if input != "" && inputFiles == "" {
 		inputFiles = input
 	}
@@ -92,24 +94,24 @@ func (n *VideoEditNode) Execute(ctx context.Context, input string, params map[st
 		return "", fmt.Errorf("input_files is required")
 	}
 
-	outputPath := getParam(params, "output_path", "./output.mp4")
+	outputPath := core.GetParam(params, "output_path", "./output.mp4")
 	if err := validateFilePath(outputPath); err != nil {
 		return "", err
 	}
 
-	style := getParam(params, "style", "cinematic")
+	style := core.GetParam(params, "style", "cinematic")
 	if !validVideoStyles[style] {
 		return "", fmt.Errorf("invalid style: %s", style)
 	}
 
-	duration := parseFloatSafe(getParam(params, "duration", "0"), 0)
+	duration := parseFloatSafe(core.GetParam(params, "duration", "0"), 0)
 
-	resolution := getParam(params, "resolution", "1080p")
+	resolution := core.GetParam(params, "resolution", "1080p")
 	if !validVideoResolutions[resolution] {
 		return "", fmt.Errorf("invalid resolution: %s", resolution)
 	}
 
-	language := getParam(params, "language", "中文")
+	language := core.GetParam(params, "language", "中文")
 	if !validVideoLanguages[language] {
 		return "", fmt.Errorf("invalid language: %s", language)
 	}
@@ -236,5 +238,5 @@ func simulateVideoProcessing(operation string, inputFiles []string, style string
 }
 
 func init() {
-	Register(&VideoEditNode{})
+	core.Register(&VideoEditNode{})
 }

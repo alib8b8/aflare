@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -142,8 +141,6 @@ var (
 		"deepseek-v2", "qwen-max", "ernie-4",
 		"ling-2.6-flash", "ling-2.6-1t", "ring-2.6-1t", "ming-flash-omni-2.0",
 	}
-	hierarchyLevels = []string{"supervisor", "specialist", "worker"}
-	taskTypePattern = regexp.MustCompile(`^[a-z]+$`)
 )
 
 type MetaOrchestratorNode struct{}

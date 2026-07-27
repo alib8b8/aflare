@@ -92,11 +92,6 @@ func (n *AndesGPTNode) Execute(ctx context.Context, input string, params map[str
 		maxTokens = 1024
 	}
 
-	temperature := parseFloatSafe(getMobileParam(params, "temperature", "0.7"), 0.7)
-	if temperature < 0 || temperature > 1.0 {
-		temperature = 0.7
-	}
-
 	systemPrompt := getMobileParam(params, "system_prompt", "")
 	if len(systemPrompt) > 4000 {
 		return "", fmt.Errorf("system_prompt too long")

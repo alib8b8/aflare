@@ -21,6 +21,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 type TransformNode struct{}
@@ -381,7 +383,7 @@ func groupByCommitType(input string) string {
 	categories := []string{"features", "bugfixes", "documentation", "refactoring", "performance", "tests", "chores", "style", "other"}
 	for _, cat := range categories {
 		if items, ok := groups[cat]; ok && len(items) > 0 {
-			result += fmt.Sprintf("## %s (%d)\n\n", strings.Title(cat), len(items))
+			result += fmt.Sprintf("## %s (%d)\n\n", core.TitleCase(cat), len(items))
 			for _, item := range items {
 				result += fmt.Sprintf("- %s\n", item)
 			}

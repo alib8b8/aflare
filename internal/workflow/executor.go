@@ -46,7 +46,9 @@ const (
 )
 
 // ifDepthKey propagates the if/else nesting depth through context.
-var ifDepthKey = struct{}{}
+type ifDepthKeyType struct{}
+
+var ifDepthKey = ifDepthKeyType{}
 
 // WorkflowTimeout is the overall workflow timeout. It defaults to
 // DefaultWorkflowTimeout but can be overridden by callers to configure a
@@ -434,10 +436,6 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 		retryCount := wStep.GetRetryCount()
 		if retryCount > MaxRetry {
 			retryCount = MaxRetry
-		}
-		retryDelay := wStep.GetRetryDelay()
-		if retryDelay > MaxRetryDelay {
-			retryDelay = MaxRetryDelay
 		}
 		stepTimeout := wStep.GetTimeout()
 		if stepTimeout > MaxStepTimeout {

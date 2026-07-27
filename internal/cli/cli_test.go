@@ -381,7 +381,7 @@ steps:
 	}
 
 	if wf == nil {
-		t.Error("expected non-nil workflow")
+		t.Fatal("expected non-nil workflow")
 	}
 	if wf.Name != "Test Workflow" {
 		t.Errorf("expected workflow name 'Test Workflow', got %q", wf.Name)
@@ -429,7 +429,7 @@ steps: []
 	}
 
 	if wf == nil {
-		t.Error("expected non-nil workflow")
+		t.Fatal("expected non-nil workflow")
 	}
 	if len(wf.Steps) != 0 {
 		t.Errorf("expected 0 steps, got %d", len(wf.Steps))
@@ -462,7 +462,7 @@ steps:
 	}
 
 	if wf == nil {
-		t.Error("expected non-nil workflow")
+		t.Fatal("expected non-nil workflow")
 	}
 	if wf.Vars == nil {
 		t.Error("expected non-nil vars")

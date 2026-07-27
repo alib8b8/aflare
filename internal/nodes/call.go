@@ -32,7 +32,9 @@ const MaxCallDepth = 10
 // callDepthKey is used to propagate the recursion depth through the context
 // chain. Unlike a per-ctx map, this survives context derivation
 // (WithTimeout/WithCancel) because derived contexts inherit parent values.
-var callDepthKey = struct{}{}
+type callDepthKeyType struct{}
+
+var callDepthKey = callDepthKeyType{}
 
 var ExecuteWorkflowFunc func(ctx context.Context, wf interface{}, reg *Registry) (string, []interface{}, error)
 

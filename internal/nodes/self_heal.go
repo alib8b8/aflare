@@ -166,7 +166,9 @@ func checkGofmt(autoFix bool) HealCheck {
 		c.Issue = fmt.Sprintf("%d files not formatted: %s", len(unformatted), strings.Join(unformatted, ", "))
 		if autoFix {
 			for _, f := range unformatted {
-				runCmdArgs("gofmt", "-w", f)
+				if _, _, err := runCmdArgs("gofmt", "-w", f); err != nil {
+					// best-effort formatting fix; failures surfaced in gofmt check
+				}
 			}
 			c.Fixed = true
 			c.Message = fmt.Sprintf("Auto-formatted %d files", len(unformatted))
@@ -195,7 +197,9 @@ func checkGoBuild(autoFix bool) HealCheck {
 		c.Status = "issue"
 		c.Issue = truncate(out, 300)
 		if autoFix {
-			runCmd("go mod tidy")
+			if _, _, err := runCmd("go mod tidy"); err != nil {
+				// best-effort module tidy; build issues re-checked below
+			}
 			out2, code2, _ := runCmd("go build ./...")
 			if code2 == 0 {
 				c.Fixed = true

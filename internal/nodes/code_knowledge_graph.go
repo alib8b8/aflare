@@ -28,6 +28,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 var ckgLanguageExts = map[string]string{
@@ -200,11 +202,6 @@ var ckgModeWhitelist = map[string]bool{
 	"inkling_review":  true,
 }
 
-var (
-	ckgRand   = rand.New(rand.NewSource(time.Now().UnixNano()))
-	ckgRandMu sync.Mutex
-)
-
 var ckgQueryTypeWhitelist = map[string]bool{
 	"semantic": true,
 	"symbol":   true,
@@ -223,7 +220,6 @@ var ckgMCPToolWhitelist = map[string]bool{
 
 var ckgEntityTypes = []string{"Function", "Class", "Method", "Variable", "Type", "Interface"}
 var ckgRelationTypes = []string{"Calls", "Uses", "Implements", "Extends", "Contains", "References"}
-var ckgConceptTypes = []string{"design_pattern", "architecture_style", "tech_stack"}
 
 type ckgEntity struct {
 	Name     string  `json:"name"`
@@ -381,14 +377,6 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 	}
 	if threshold > 1.0 {
 		threshold = 1.0
-	}
-
-	vectorDim, err := strconv.Atoi(getParam(params, "vector_dim", "384"))
-	if err != nil || vectorDim < 64 {
-		vectorDim = 384
-	}
-	if vectorDim > 4096 {
-		vectorDim = 4096
 	}
 
 	tokenEfficient := strings.ToLower(getParam(params, "token_efficient", "true")) == "true"
@@ -598,9 +586,9 @@ func (n *CodeKnowledgeGraphNode) extractFromFile(path string) ([]ckgEntity, []ck
 
 	usedNames := make(map[string]bool)
 	for i := 0; i < numEntities; i++ {
-		name := fmt.Sprintf("%s_%d", strings.Title(language), i+1)
+		name := fmt.Sprintf("%s_%d", core.TitleCase(language), i+1)
 		if usedNames[name] {
-			name = fmt.Sprintf("%s_%d_%d", strings.Title(language), i+1, r.Intn(100))
+			name = fmt.Sprintf("%s_%d_%d", core.TitleCase(language), i+1, r.Intn(100))
 		}
 		usedNames[name] = true
 

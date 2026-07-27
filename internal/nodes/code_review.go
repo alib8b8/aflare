@@ -21,7 +21,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -332,10 +331,10 @@ func runASTAnalysis(code string) []ReviewFinding {
 					pos := fset.Position(df.Pos())
 					findings = append(findings, ReviewFinding{
 						Severity: "high", Category: "bugs",
-						RuleID:   "AST-DEFER-001",
-						Title:    "Defer inside loop (AST detected)",
-						Location: fmt.Sprintf("line %d", pos.Line),
-						Issue:    "defer inside for-loop defers until function return, not loop iteration",
+						RuleID:     "AST-DEFER-001",
+						Title:      "Defer inside loop (AST detected)",
+						Location:   fmt.Sprintf("line %d", pos.Line),
+						Issue:      "defer inside for-loop defers until function return, not loop iteration",
 						Suggestion: "Extract loop body to a function so defer runs each iteration",
 					})
 				}
@@ -413,39 +412,6 @@ func isErrCheck(cond ast.Expr) bool {
 		}
 	}
 	return false
-}
-
-// customRulesFromFile 从简单 YAML 文件加载自定义规则（不引入外部依赖）
-// 格式：每行 "ID|Severity|Category|Pattern|Title|Issue|Fix|Lang"
-func customRulesFromFile(path string) []DeterministicRule {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	var rules []DeterministicRule
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		parts := strings.SplitN(line, "|", 8)
-		if len(parts) < 7 {
-			continue
-		}
-		re, err := regexp.Compile(parts[3])
-		if err != nil {
-			continue
-		}
-		lang := "any"
-		if len(parts) >= 8 {
-			lang = parts[7]
-		}
-		rules = append(rules, DeterministicRule{
-			ID: parts[0], Severity: parts[1], Category: parts[2],
-			Pattern: re, Title: parts[4], Issue: parts[5], Fix: parts[6], Lang: lang,
-		})
-	}
-	return rules
 }
 
 func formatFindings(findings []ReviewFinding, minSeverity string) string {

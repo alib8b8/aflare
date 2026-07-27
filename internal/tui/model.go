@@ -109,20 +109,10 @@ var (
 			Foreground(lipgloss.Color("196")).
 			Bold(true)
 
-	stepStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("240")).
-			Padding(0, 1).
-			MarginTop(1)
-
 	previewStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("63")).
 			Padding(1, 2).
-			MarginTop(1)
-
-	footerStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
 			MarginTop(1)
 )
 

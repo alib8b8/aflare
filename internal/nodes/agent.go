@@ -24,11 +24,8 @@ import (
 
 const defaultMaxAgentIterations = 10
 
-type AgentTool struct {
-	Name        string
-	Description string
-	NodeName    string
-}
+// AgentTool is now an alias for core.AgentTool (defined in
+// internal/nodes/core/params.go and re-exported via agent_node.go).
 
 type AgentThought struct {
 	Thought     string `json:"thought"`

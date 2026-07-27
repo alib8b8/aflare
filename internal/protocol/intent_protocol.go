@@ -595,10 +595,6 @@ func GetWorkflowType(name string) *WorkflowType {
 	return nil
 }
 
-func generateID() string {
-	return generateSecureID()
-}
-
 func generateSecureID() string {
 	b := make([]byte, 16)
 	_, err := rand.Read(b)

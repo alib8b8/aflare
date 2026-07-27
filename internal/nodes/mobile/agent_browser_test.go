@@ -13,16 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package mobile
 
 import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 func TestAgentBrowser_Schema(t *testing.T) {
-	node, ok := Get("agent_browser")
+	node, ok := core.Get("agent_browser")
 	if !ok {
 		t.Fatal("agent_browser not found in registry")
 	}
@@ -41,7 +43,7 @@ func TestAgentBrowser_Schema(t *testing.T) {
 }
 
 func TestAgentBrowser_DefaultAction(t *testing.T) {
-	node, ok := Get("agent_browser")
+	node, ok := core.Get("agent_browser")
 	if !ok {
 		t.Fatal("agent_browser not found in registry")
 	}
@@ -61,7 +63,7 @@ func TestAgentBrowser_DefaultAction(t *testing.T) {
 }
 
 func TestAgentBrowser_EmptyURL(t *testing.T) {
-	node, ok := Get("agent_browser")
+	node, ok := core.Get("agent_browser")
 	if !ok {
 		t.Fatal("agent_browser not found in registry")
 	}
@@ -93,7 +95,7 @@ func TestAgentBrowser_EmptyURL(t *testing.T) {
 }
 
 func TestAgentBrowser_InvalidSummaryLen(t *testing.T) {
-	node, ok := Get("agent_browser")
+	node, ok := core.Get("agent_browser")
 	if !ok {
 		t.Fatal("agent_browser not found in registry")
 	}
@@ -118,7 +120,7 @@ func TestAgentBrowser_InvalidSummaryLen(t *testing.T) {
 }
 
 func TestAgentBrowser_SummaryLenBelowMinimum(t *testing.T) {
-	node, ok := Get("agent_browser")
+	node, ok := core.Get("agent_browser")
 	if !ok {
 		t.Fatal("agent_browser not found in registry")
 	}
@@ -141,7 +143,7 @@ func TestAgentBrowser_SummaryLenBelowMinimum(t *testing.T) {
 }
 
 func TestAgentBrowser_InvalidURL(t *testing.T) {
-	node, ok := Get("agent_browser")
+	node, ok := core.Get("agent_browser")
 	if !ok {
 		t.Fatal("agent_browser not found in registry")
 	}
@@ -169,7 +171,7 @@ func TestAgentBrowser_InvalidURL(t *testing.T) {
 }
 
 func TestAgentBrowser_UnknownAction(t *testing.T) {
-	node, ok := Get("agent_browser")
+	node, ok := core.Get("agent_browser")
 	if !ok {
 		t.Fatal("agent_browser not found in registry")
 	}

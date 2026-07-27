@@ -248,7 +248,7 @@ func isPortAvailable(host string, port int) bool {
 	if err != nil {
 		return false
 	}
-	ln.Close()
+	_ = ln.Close() // best-effort close
 	return true
 }
 

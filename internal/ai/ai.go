@@ -490,10 +490,6 @@ func (e *WorkflowExplainer) Explain(workflowYAML string) string {
 
 func describeStep(idx int, step workflow.WorkflowStep) string {
 	node := step.Node
-	name := step.Name
-	if name == "" {
-		name = fmt.Sprintf("step %d", idx)
-	}
 
 	switch node {
 	case "fetch_url":

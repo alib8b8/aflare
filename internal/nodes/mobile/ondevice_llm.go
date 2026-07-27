@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package mobile
 
 import (
 	"context"
@@ -25,6 +25,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 var (
@@ -78,13 +80,13 @@ func (n *OnDeviceLLMNode) Description() string {
 	return "Run LLM inference locally on the device (no cloud required). Supports 1B-8B models with INT4/INT8 quantization, including SenseNova U1 open-source models"
 }
 
-func (n *OnDeviceLLMNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *OnDeviceLLMNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        n.Name(),
 		Description: n.Description(),
 		Input:       "string - user prompt or conversation context",
 		Output:      "string - model response with metadata",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "model", Type: "string", Description: "Model name (e.g., qwen2-1.5b, minicpm-2b, phi-3-mini)", Required: true},
 			{Name: "model_path", Type: "string", Description: "Path to model files directory", Required: false},
 			{Name: "backend", Type: "string", Description: "Inference backend: llama.cpp/mlc-llm/onnx/ncnn/mnn/paddle-lite (default: llama.cpp)", Required: false, Default: "llama.cpp"},
@@ -289,10 +291,6 @@ type OnDeviceModelInfo struct {
 	DownloadStatus string // "not_downloaded" | "downloading" | "ready"
 }
 
-var defaultModelRegistry = &OnDeviceModelRegistry{
-	models: make(map[string]*OnDeviceModelInfo),
-}
-
 func (r *OnDeviceModelRegistry) Register(model *OnDeviceModelInfo) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -319,5 +317,5 @@ func (r *OnDeviceModelRegistry) ListReady() []string {
 }
 
 func init() {
-	Register(&OnDeviceLLMNode{})
+	core.Register(&OnDeviceLLMNode{})
 }

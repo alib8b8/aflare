@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package mobile
 
 import (
 	"context"
@@ -22,26 +22,11 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 var (
-	validScreenActions = map[string]bool{
-		"tap":        true,
-		"double_tap": true,
-		"long_press": true,
-		"swipe":      true,
-		"scroll":     true,
-		"type":       true,
-		"back":       true,
-		"home":       true,
-		"recent":     true,
-	}
-	validSwipeDirections = map[string]bool{
-		"up":    true,
-		"down":  true,
-		"left":  true,
-		"right": true,
-	}
 	uiElementPattern = regexp.MustCompile(`^[a-zA-Z0-9_\-\s]{1,100}$`)
 )
 
@@ -54,13 +39,13 @@ func (n *ScreenUnderstandingNode) Description() string {
 	return "Understand screen content like an L3 agent: parse UI elements, identify actionable items, and generate interaction plans. Supports mobile app screens, web pages, and system UIs."
 }
 
-func (n *ScreenUnderstandingNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *ScreenUnderstandingNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        n.Name(),
 		Description: n.Description(),
 		Input:       "string - screen description or OCR text dump",
 		Output:      "string - structured screen analysis with interaction plan",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "platform", Type: "string", Description: "Screen platform: android/ios/harmony/web (default: android)", Required: false, Default: "android"},
 			{Name: "action", Type: "string", Description: "Goal action: analyze/interact/navigate (default: analyze)", Required: false, Default: "analyze"},
 			{Name: "target_element", Type: "string", Description: "Target UI element to interact with", Required: false},
@@ -268,7 +253,7 @@ func generateElementsFromContent(content, platform string) []UIElement {
 			})
 		}
 	}
-	if strings.Contains(content, "tab") || strings.Contains(content, "tab") {
+	if strings.Contains(content, "tab") || strings.Contains(content, "tabs") {
 		tabs := []string{"Home", "Discover", "Me"}
 		for i, t := range tabs {
 			elements = append(elements, UIElement{
@@ -400,5 +385,5 @@ func truncateString(s string, maxLen int) string {
 }
 
 func init() {
-	Register(&ScreenUnderstandingNode{})
+	core.Register(&ScreenUnderstandingNode{})
 }

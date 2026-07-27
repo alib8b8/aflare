@@ -25,8 +25,6 @@ import (
 	"time"
 )
 
-const maxHTTPResponseSize = 10 * 1024 * 1024 // 10MB max response body
-
 type HTTPRequestNode struct{}
 
 func init() {

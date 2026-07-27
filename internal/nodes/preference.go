@@ -77,10 +77,12 @@ func (n *PreferenceNode) Execute(ctx context.Context, input string, params map[s
 			return "", fmt.Errorf("key is required for set operation")
 		}
 		confidence := 1.0
-		if c, ok := params["confidence"]; ok && c != "" {
-			fmt.Sscanf(c, "%f", &confidence)
+	if c, ok := params["confidence"]; ok && c != "" {
+		if _, err := fmt.Sscanf(c, "%f", &confidence); err != nil {
+			// keep default value on parse failure
 		}
-		profile.SetPreference(memory.PreferenceCategory(category), key, value, source, confidence)
+	}
+	profile.SetPreference(memory.PreferenceCategory(category), key, value, source, confidence)
 		pm.Save(userID)
 		return fmt.Sprintf("Set preference [%s:%s] = %s", category, key, value), nil
 
@@ -89,10 +91,12 @@ func (n *PreferenceNode) Execute(ctx context.Context, input string, params map[s
 			return "", fmt.Errorf("key is required for learn operation")
 		}
 		confidence := 0.6
-		if c, ok := params["confidence"]; ok && c != "" {
-			fmt.Sscanf(c, "%f", &confidence)
+	if c, ok := params["confidence"]; ok && c != "" {
+		if _, err := fmt.Sscanf(c, "%f", &confidence); err != nil {
+			// keep default value on parse failure
 		}
-		profile.LearnFromInteraction(userID, category, key, value, source)
+	}
+	profile.LearnFromInteraction(userID, category, key, value, source)
 		_ = confidence
 		pm.Save(userID)
 		return fmt.Sprintf("Learned preference [%s:%s] = %s", category, key, value), nil

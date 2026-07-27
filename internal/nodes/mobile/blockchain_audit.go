@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nodes
+package mobile
 
 import (
 	"context"
@@ -25,6 +25,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 const maxAuditLogEntries = 10000
@@ -57,13 +59,13 @@ func (n *BlockchainAuditNode) Description() string {
 	return "Record workflow execution on blockchain for tamper-proof audit trails. Supports Ethereum, Hyperledger Fabric, and simulated chains. Aligns with WAIC Agent Interoperability Initiative."
 }
 
-func (n *BlockchainAuditNode) Schema() NodeSchema {
-	return NodeSchema{
+func (n *BlockchainAuditNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
 		Name:        n.Name(),
 		Description: n.Description(),
 		Input:       "string - workflow execution data or action description",
 		Output:      "string - blockchain transaction receipt with hash and timestamp",
-		Params: []ParamSchema{
+		Params: []core.ParamSchema{
 			{Name: "chain_type", Type: "string", Description: "Blockchain type: ethereum/hyperledger/fabric/quorum/simulated (default: simulated)", Required: false, Default: "simulated"},
 			{Name: "audit_level", Type: "string", Description: "Audit granularity: workflow/node/parameter/full (default: workflow)", Required: false, Default: "workflow"},
 			{Name: "workflow_id", Type: "string", Description: "Unique workflow identifier", Required: true},
@@ -333,5 +335,5 @@ func QueryAuditLog(workflowID string, since time.Time) []AuditRecord {
 }
 
 func init() {
-	Register(&BlockchainAuditNode{})
+	core.Register(&BlockchainAuditNode{})
 }

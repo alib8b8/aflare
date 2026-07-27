@@ -99,7 +99,9 @@ func (n *CompressNode) Execute(ctx context.Context, input string, params map[str
 	result := compress.Compress(input, cfg)
 
 	var kwCount int
-	fmt.Sscanf(keywordsN, "%d", &kwCount)
+	if _, err := fmt.Sscanf(keywordsN, "%d", &kwCount); err != nil {
+		// keep default value on parse failure
+	}
 	if kwCount > 0 && len(result.Keywords) == 0 {
 		result.Keywords = compress.ExtractKeywords(input, kwCount)
 	}

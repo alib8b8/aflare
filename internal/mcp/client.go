@@ -144,7 +144,7 @@ func Connect(serverURL string) (*Client, error) {
 	}
 
 	if err := c.initialize(); err != nil {
-		c.Close()
+		_ = c.Close() // best-effort close
 		return nil, fmt.Errorf("failed to initialize MCP client: %w", err)
 	}
 
