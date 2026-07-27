@@ -208,6 +208,79 @@ steps:
 	}
 }
 
+// TestWebhookServer_StatusRequiresSecret 验证配置 secret 时,
+// /webhook/status/ 端点也必须校验 X-Webhook-Secret。
+func TestWebhookServer_StatusRequiresSecret(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	srv.secret = "status-secret"
+
+	wfContent := `name: status-secret-workflow
+steps:
+  - node: echo
+`
+	createWorkflowFile(t, tmpDir, "statuswf", wfContent)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	// 触发任务(带正确 secret)以获得 task_id
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/webhook/statuswf", strings.NewReader("{}"))
+	req.Header.Set("X-Webhook-Secret", "status-secret")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected status 202 for trigger, got %d", resp.StatusCode)
+	}
+	var triggerResp map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&triggerResp); err != nil {
+		t.Fatalf("failed to decode trigger response: %v", err)
+	}
+	taskID := triggerResp["task_id"]
+	if taskID == "" {
+		t.Fatal("expected task_id in response")
+	}
+	_ = waitForTask(t, srv, taskID, 5*time.Second)
+
+	// 无 secret 查询 status => 401
+	statusResp, err := http.Get(ts.URL + "/webhook/status/" + taskID)
+	if err != nil {
+		t.Fatalf("status request failed: %v", err)
+	}
+	statusResp.Body.Close()
+	if statusResp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 for status without secret, got %d", statusResp.StatusCode)
+	}
+
+	// 错误 secret => 401
+	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/webhook/status/"+taskID, nil)
+	req.Header.Set("X-Webhook-Secret", "wrong-secret")
+	statusResp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("status request failed: %v", err)
+	}
+	statusResp.Body.Close()
+	if statusResp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 for status with wrong secret, got %d", statusResp.StatusCode)
+	}
+
+	// 正确 secret => 200
+	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/webhook/status/"+taskID, nil)
+	req.Header.Set("X-Webhook-Secret", "status-secret")
+	statusResp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("status request failed: %v", err)
+	}
+	defer statusResp.Body.Close()
+	if statusResp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200 for status with correct secret, got %d", statusResp.StatusCode)
+	}
+}
+
 func TestWebhookServer_WorkflowNotFound(t *testing.T) {
 	srv, _, cleanup := setupTestServer(t)
 	defer cleanup()

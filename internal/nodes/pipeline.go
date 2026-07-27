@@ -19,9 +19,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/logger"
 )
 
 type PipelineStep struct {
@@ -192,6 +195,36 @@ func runPipeline(ctx context.Context, config PipelineConfig, timeoutSeconds int,
 			wg.Add(1)
 			go func(s *PipelineStep) {
 				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("pipeline step panicked",
+							"step", s.Name,
+							"node", s.Node,
+							"panic", r,
+							"stack", string(debug.Stack()),
+						)
+						// Ensure the step is marked as completed so the
+						// dispatcher does not deadlock waiting on it.
+						resultsMu.Lock()
+						if _, ok := results[s.Name]; !ok {
+							now := time.Now()
+							results[s.Name] = &PipelineStepResult{
+								Name:     s.Name,
+								Node:     s.Node,
+								Error:    fmt.Sprintf("panic: %v", r),
+								Started:  now,
+								Finished: now,
+							}
+						}
+						resultsMu.Unlock()
+						errorsMu.Lock()
+						allErrors = append(allErrors, fmt.Sprintf("%s: panic: %v", s.Name, r))
+						errorsMu.Unlock()
+						completedMu.Lock()
+						completed[s.Name] = true
+						completedMu.Unlock()
+					}
+				}()
 
 				stepStart := time.Now()
 				result := &PipelineStepResult{
@@ -265,6 +298,14 @@ func runPipeline(ctx context.Context, config PipelineConfig, timeoutSeconds int,
 
 	done := make(chan bool)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("pipeline dispatcher panicked",
+					"panic", r,
+					"stack", string(debug.Stack()),
+				)
+			}
+		}()
 		for {
 			select {
 			case <-ctx.Done():

@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alib8b8/llm-box/internal/logger"
@@ -91,6 +92,8 @@ type UpgradeEngine struct {
 	config   *UpgradeConfig
 	state    *UpgradeState
 	stopChan chan struct{}
+	stopOnce sync.Once
+	mu       sync.RWMutex
 }
 
 func NewUpgradeEngine(config *UpgradeConfig) *UpgradeEngine {
@@ -122,6 +125,9 @@ func (e *UpgradeEngine) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			logger.Info("auto-upgrade engine stopped")
 			return nil
+		case <-e.stopChan:
+			logger.Info("auto-upgrade engine stopped via Stop()")
+			return nil
 		case <-ticker.C:
 			e.CheckAndUpgrade(ctx)
 		}
@@ -129,11 +135,16 @@ func (e *UpgradeEngine) Start(ctx context.Context) error {
 }
 
 func (e *UpgradeEngine) Stop() {
-	close(e.stopChan)
+	e.stopOnce.Do(func() { close(e.stopChan) })
 }
 
 func (e *UpgradeEngine) CheckAndUpgrade(ctx context.Context) {
-	if e.state.UpgradeInProgress {
+	e.mu.RLock()
+	inProgress := e.state.UpgradeInProgress
+	mode := e.config.Mode
+	autoUpdate := e.config.AutoUpdateEnabled
+	e.mu.RUnlock()
+	if inProgress {
 		logger.Warn("upgrade already in progress, skipping check")
 		return
 	}
@@ -146,8 +157,10 @@ func (e *UpgradeEngine) CheckAndUpgrade(ctx context.Context) {
 		return
 	}
 
+	e.mu.Lock()
 	e.state.LastCheck = time.Now()
 	e.state.LatestVersion = release.TagName
+	e.mu.Unlock()
 
 	if !version.HasUpdate(version.GetVersion(), release) {
 		logger.Info("no update available", "current", version.GetVersion(), "latest", release.TagName)
@@ -156,12 +169,12 @@ func (e *UpgradeEngine) CheckAndUpgrade(ctx context.Context) {
 
 	logger.Info("update available", "current", version.GetVersion(), "latest", release.TagName)
 
-	if e.config.Mode == ModeMonitor {
+	if mode == ModeMonitor {
 		logger.Info("monitor mode: notification only, not upgrading")
 		return
 	}
 
-	if !e.config.AutoUpdateEnabled {
+	if !autoUpdate {
 		logger.Info("auto-update disabled, skipping upgrade")
 		return
 	}
@@ -170,12 +183,16 @@ func (e *UpgradeEngine) CheckAndUpgrade(ctx context.Context) {
 }
 
 func (e *UpgradeEngine) PerformUpgrade(ctx context.Context, release *version.GitHubRelease) {
+	e.mu.Lock()
 	e.state.UpgradeInProgress = true
 	e.state.UpgradeStatus = "in_progress"
+	backupBefore := e.config.BackupBeforeUpgrade
+	rollbackOnFailure := e.config.RollbackOnFailure
+	e.mu.Unlock()
 	logger.Info("starting upgrade", "version", release.TagName)
 
 	var backupPath string
-	if e.config.BackupBeforeUpgrade {
+	if backupBefore {
 		exePath, err := os.Executable()
 		if err == nil {
 			backupPath = exePath + ".backup." + time.Now().Format("20060102-150405")
@@ -190,11 +207,13 @@ func (e *UpgradeEngine) PerformUpgrade(ctx context.Context, release *version.Git
 
 	result, err := version.SelfUpdate("alib8b8/llm-box")
 	if err != nil {
+		e.mu.Lock()
 		e.state.UpgradeStatus = "failed"
 		e.state.UpgradeInProgress = false
+		e.mu.Unlock()
 		logger.Error("upgrade failed", "error", err)
 
-		if e.config.RollbackOnFailure && backupPath != "" {
+		if rollbackOnFailure && backupPath != "" {
 			if err := rollback(backupPath); err != nil {
 				logger.Error("rollback failed", "error", err)
 			} else {
@@ -204,10 +223,12 @@ func (e *UpgradeEngine) PerformUpgrade(ctx context.Context, release *version.Git
 		return
 	}
 
+	e.mu.Lock()
 	e.state.UpgradeStatus = "success"
 	e.state.UpgradeInProgress = false
 	e.state.LastUpgrade = time.Now()
 	e.state.CurrentVersion = release.TagName
+	e.mu.Unlock()
 
 	logger.Info("upgrade successful", "result", result)
 }
@@ -231,12 +252,16 @@ func rollback(backupPath string) error {
 	return nil
 }
 
-func (e *UpgradeEngine) GetState() *UpgradeState {
-	return e.state
+func (e *UpgradeEngine) GetState() UpgradeState {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return *e.state
 }
 
 func (e *UpgradeEngine) SetConfig(config *UpgradeConfig) {
+	e.mu.Lock()
 	e.config = config
+	e.mu.Unlock()
 }
 
 func (e *UpgradeEngine) RunSelfUpdate() (string, error) {

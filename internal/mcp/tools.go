@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
 	"github.com/alib8b8/llm-box/internal/compress"
 	"github.com/alib8b8/llm-box/internal/history"
+	"github.com/alib8b8/llm-box/internal/logger"
 	"github.com/alib8b8/llm-box/internal/memory"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/templates"
@@ -654,6 +656,16 @@ func (s *Server) callExtendedTool(params *toolCallParams) (*toolCallResult, erro
 	done := make(chan result, 1)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("tool call panicked",
+					"tool", params.Name,
+					"panic", r,
+					"stack", string(debug.Stack()),
+				)
+				done <- result{err: fmt.Errorf("tool %s panicked: %v", params.Name, r)}
+			}
+		}()
 		var r result
 		switch params.Name {
 		// Backwards-compatible tools

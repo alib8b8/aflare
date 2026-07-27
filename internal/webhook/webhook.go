@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -251,6 +252,9 @@ func (s *WebhookServer) routeWebhook(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+		if !s.requireSecret(w, r) {
+			return
+		}
 		s.handleStatus(w, r)
 		return
 	}
@@ -263,17 +267,30 @@ func (s *WebhookServer) routeWebhook(w http.ResponseWriter, r *http.Request) {
 	s.handleWebhook(w, r)
 }
 
+// requireSecret validates the X-Webhook-Secret header against s.secret when a
+// secret is configured. It writes a 401 response and returns false if the
+// request is unauthorized; returns true if the request is allowed (either no
+// secret is configured or the header matches). Comparison uses
+// subtle.ConstantTimeCompare to avoid timing side channels.
+func (s *WebhookServer) requireSecret(w http.ResponseWriter, r *http.Request) bool {
+	if s.secret == "" {
+		return true
+	}
+	if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Webhook-Secret")), []byte(s.secret)) != 1 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return false
+	}
+	return true
+}
+
 func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	if !s.rateLimiter.Allow(getClientIP(r)) {
 		http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 		return
 	}
 
-	if s.secret != "" {
-		if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Webhook-Secret")), []byte(s.secret)) != 1 {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
+	if !s.requireSecret(w, r) {
+		return
 	}
 
 	workflowName := strings.TrimPrefix(r.URL.Path, "/webhook/")
@@ -313,6 +330,17 @@ func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer s.wg.Done()
 		defer func() { <-s.sem }() // Release semaphore when done
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("webhook task panicked",
+					"task_id", task.ID,
+					"workflow", task.WorkflowName,
+					"panic", r,
+					"stack", string(debug.Stack()),
+				)
+				s.completeTask(task.ID, TaskFailed, "", fmt.Sprintf("panic: %v", r))
+			}
+		}()
 		s.runTask(task, body, r.URL.Query())
 	}()
 

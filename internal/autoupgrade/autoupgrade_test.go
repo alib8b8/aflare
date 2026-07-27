@@ -196,9 +196,6 @@ func TestStop(t *testing.T) {
 func TestGetState(t *testing.T) {
 	engine := NewUpgradeEngine(getDefaultConfig())
 	state := engine.GetState()
-	if state == nil {
-		t.Fatal("expected non-nil state")
-	}
 	if state.UpgradeInProgress {
 		t.Error("expected UpgradeInProgress to be false")
 	}

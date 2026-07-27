@@ -544,12 +544,12 @@ func TestDownloadChecksums(t *testing.T) {
 	checksumContent := "abc123def456  llm-box-linux-amd64\n789ghi012jkl  llm-box-darwin-amd64\n"
 	m := &mockTransport{
 		responses: map[string]*http.Response{
-			"example.com/checksums": mockResponse([]byte(checksumContent), http.StatusOK),
+			"objects.githubusercontent.com/checksums": mockResponse([]byte(checksumContent), http.StatusOK),
 		},
 	}
 	setMockTransport(t, m)
 
-	checksums, err := downloadChecksums("https://example.com/checksums")
+	checksums, err := downloadChecksums("https://objects.githubusercontent.com/checksums")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -565,12 +565,12 @@ func TestDownloadChecksums_EmptyLines(t *testing.T) {
 	checksumContent := "\n\nabc123  file1\n\n  \n789def  file2\n\n"
 	m := &mockTransport{
 		responses: map[string]*http.Response{
-			"example.com/checksums2": mockResponse([]byte(checksumContent), http.StatusOK),
+			"objects.githubusercontent.com/checksums2": mockResponse([]byte(checksumContent), http.StatusOK),
 		},
 	}
 	setMockTransport(t, m)
 
-	checksums, err := downloadChecksums("https://example.com/checksums2")
+	checksums, err := downloadChecksums("https://objects.githubusercontent.com/checksums2")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -582,12 +582,12 @@ func TestDownloadChecksums_EmptyLines(t *testing.T) {
 func TestDownloadChecksums_ErrorStatus(t *testing.T) {
 	m := &mockTransport{
 		responses: map[string]*http.Response{
-			"example.com/bad": mockResponse([]byte("Not Found"), http.StatusNotFound),
+			"objects.githubusercontent.com/bad": mockResponse([]byte("Not Found"), http.StatusNotFound),
 		},
 	}
 	setMockTransport(t, m)
 
-	_, err := downloadChecksums("https://example.com/bad")
+	_, err := downloadChecksums("https://objects.githubusercontent.com/bad")
 	if err == nil {
 		t.Error("Expected error for non-200 status")
 	}

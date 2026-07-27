@@ -298,7 +298,10 @@ func (m *OutboundDataMonitor) Record(bytes int) {
 				WindowActive: time.Duration(now - m.windowStart),
 			}
 			// 异步触发回调，避免阻塞记录
-			go m.onAnomaly(stats)
+			go func() {
+				defer func() { _ = recover() }()
+				m.onAnomaly(stats)
+			}()
 		}
 	}
 }

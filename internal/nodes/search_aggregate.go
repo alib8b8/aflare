@@ -22,10 +22,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/logger"
 )
 
 type SearchSource string
@@ -152,6 +155,15 @@ func (n *SearchAggregateNode) Execute(ctx context.Context, input string, params 
 		wg.Add(1)
 		go func(source SearchSource) {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("search source fetch panicked",
+						"source", string(source),
+						"panic", r,
+						"stack", string(debug.Stack()),
+					)
+				}
+			}()
 			results := fetchSource(ctx, source, query, limit, timeRange)
 			mu.Lock()
 			allResults = append(allResults, results...)

@@ -26,9 +26,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/logger"
 )
 
 // MemoryEntry represents a single memory entry.
@@ -645,13 +648,27 @@ func (mgr *SessionMemoryManager) StartAutoSave(ctx context.Context, interval tim
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
+		// saveAll wraps SaveAll with panic recovery so the auto-save
+		// loop keeps running even if a single save panics.
+		saveAll := func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("session auto-save panicked",
+						"panic", r,
+						"stack", string(debug.Stack()),
+					)
+				}
+			}()
+			mgr.SaveAll()
+		}
+
 		for {
 			select {
 			case <-ctx.Done():
-				mgr.SaveAll()
+				saveAll()
 				return
 			case <-ticker.C:
-				mgr.SaveAll()
+				saveAll()
 			}
 		}
 	}()

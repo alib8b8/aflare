@@ -19,9 +19,12 @@ package provider
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/logger"
 )
 
 // HealthStatus represents the health state of a provider.
@@ -338,14 +341,29 @@ func (pm *ProviderManager) StartHealthMonitor(ctx context.Context, interval time
 		quotaTicker := time.NewTicker(time.Minute)
 		defer quotaTicker.Stop()
 
+		// run wraps a single health-check action with panic recovery so the
+		// monitor loop survives a single failure.
+		run := func(name string, fn func()) {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("health monitor task panicked",
+						"task", name,
+						"panic", r,
+						"stack", string(debug.Stack()),
+					)
+				}
+			}()
+			fn()
+		}
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				pm.checkHealth()
+				run("checkHealth", pm.checkHealth)
 			case <-quotaTicker.C:
-				pm.resetQuotas()
+				run("resetQuotas", pm.resetQuotas)
 			}
 		}
 	}()

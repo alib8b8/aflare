@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -568,6 +569,16 @@ func (c *Coordinator) dispatchTask(nodeID string, task *Task) {
 	// 停机时在途的分派请求可能丢失(任务状态由 worker 通过 /api/task 回报,
 	// Coordinator 重启后可恢复跟踪),不纳入 WaitGroup 以避免 Stop 阻塞。
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("dispatch task panicked",
+					"node_id", nodeID,
+					"task_id", task.ID,
+					"panic", r,
+					"stack", string(debug.Stack()),
+				)
+			}
+		}()
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewBuffer(data))
 		if err != nil {
 			logger.Error("Failed to create request", "error", err)

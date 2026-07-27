@@ -114,6 +114,7 @@ type Client struct {
 	pending       map[int]chan *rpcResponse
 	pendingMu     sync.RWMutex
 	sseDone       chan struct{}
+	sseCloseOnce  sync.Once
 	sseWg         sync.WaitGroup
 	idCounter     atomic.Int32
 	isStreamable  bool
@@ -479,11 +480,13 @@ func (c *Client) CallTool(name string, args map[string]interface{}) (*toolCallRe
 
 // Close terminates the client connection and cleans up resources.
 func (c *Client) Close() error {
-	if c.sseReader != nil {
-		close(c.sseDone)
-		c.sseReader.Close()
-		c.sseWg.Wait()
-	}
+	c.sseCloseOnce.Do(func() {
+		if c.sseReader != nil {
+			close(c.sseDone)
+			c.sseReader.Close()
+			c.sseWg.Wait()
+		}
+	})
 	return nil
 }
 

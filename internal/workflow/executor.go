@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -642,6 +643,22 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 	for j, step := range wStep.Parallel {
 		pe := preEvals[j]
 		go func(j int, step Step, pe preEval) {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("parallel step panicked",
+						"step_index", stepIndex*MaxParallel+j,
+						"node", pe.nodeName,
+						"panic", r,
+						"stack", string(debug.Stack()),
+					)
+					resultsChan <- parallelResult{
+						stepIndex: stepIndex*MaxParallel + j,
+						nodeName:  pe.nodeName,
+						err:       fmt.Errorf("parallel step panicked: %v", r),
+						duration:  0,
+					}
+				}
+			}()
 			// Acquire global concurrency slot if configured
 			if globalLimiter != nil {
 				if err := globalLimiter.Acquire(ctx); err != nil {
@@ -1022,6 +1039,21 @@ func executeLoopStep(ctx context.Context, stepIndex int, wStep WorkflowStep, inp
 			sem <- struct{}{}
 			go func(idx int, item string, params map[string]string, perr error) {
 				defer func() { <-sem }()
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("loop iteration panicked",
+							"index", idx,
+							"node", wStep.Node,
+							"panic", r,
+							"stack", string(debug.Stack()),
+						)
+						resultsChan <- loopResult{
+							idx: idx,
+							err: fmt.Errorf("loop iteration panicked: %v", r),
+							dur: 0,
+						}
+					}
+				}()
 				// Acquire global concurrency slot if configured
 				if globalLimiter != nil {
 					if err := globalLimiter.Acquire(ctx); err != nil {

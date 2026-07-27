@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -33,6 +34,54 @@ var (
 	Version   = "0.6.0"
 	BuildDate = "2026-07-20"
 )
+
+const (
+	// maxAPIResponseSize bounds the GitHub API JSON response read by
+	// CheckLatestRelease. 1MB is far more than any release JSON.
+	maxAPIResponseSize = 1 << 20 // 1MB
+	// maxChecksumsSize bounds the checksums file downloaded by
+	// downloadChecksums. Checksums files are tiny.
+	maxChecksumsSize = 1 << 20 // 1MB
+	// maxBinaryDownloadSize bounds the binary downloaded by SelfUpdate.
+	// 200MB is a generous ceiling for the self-update payload.
+	maxBinaryDownloadSize = 200 << 20 // 200MB
+)
+
+// allowedGitHubHosts are the only hosts permitted for self-update HTTP
+// requests. GitHub release assets are only served from these hosts, so any
+// other host in a release response indicates either a malformed release or an
+// attempt to redirect the self-update flow to an attacker-controlled server.
+var allowedGitHubHosts = map[string]bool{
+	"api.github.com":                true,
+	"github.com":                    true,
+	"objects.githubusercontent.com": true,
+}
+
+// validateGitHubURL validates that rawURL is an https URL pointing at one of
+// the allowed GitHub hosts and carries no userinfo. It is a lightweight,
+// self-update-scoped SSRF defense; we deliberately do not import
+// internal/nodes/core (which has a richer ValidateURL) to avoid creating a
+// circular dependency from the version package.
+func validateGitHubURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "https" {
+		return fmt.Errorf("only https URLs are allowed for self-update, got scheme %q", u.Scheme)
+	}
+	if u.User != nil {
+		return fmt.Errorf("URLs with userinfo are not allowed for self-update")
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("URL has no host")
+	}
+	if !allowedGitHubHosts[host] {
+		return fmt.Errorf("host %q is not allowed for self-update", host)
+	}
+	return nil
+}
 
 type GitHubRelease struct {
 	TagName     string    `json:"tag_name"`
@@ -61,6 +110,9 @@ func GetBuildInfo() string {
 // repo 参数格式为 "owner/name"，若设置了 GITHUB_TOKEN 环境变量则会用于鉴权。
 func CheckLatestRelease(repo string) (*GitHubRelease, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
+	if err := validateGitHubURL(url); err != nil {
+		return nil, fmt.Errorf("invalid release URL: %w", err)
+	}
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -82,7 +134,7 @@ func CheckLatestRelease(repo string) (*GitHubRelease, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, readErr := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxAPIResponseSize))
 		bodyStr := string(body)
 		if readErr != nil {
 			bodyStr = fmt.Sprintf("(failed to read response body: %v)", readErr)
@@ -91,7 +143,7 @@ func CheckLatestRelease(repo string) (*GitHubRelease, error) {
 	}
 
 	var release GitHubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxAPIResponseSize)).Decode(&release); err != nil {
 		return nil, fmt.Errorf("failed to decode release: %w", err)
 	}
 
@@ -146,6 +198,9 @@ func verifyChecksum(filePath, expectedChecksum string) error {
 }
 
 func downloadChecksums(url string) (map[string]string, error) {
+	if err := validateGitHubURL(url); err != nil {
+		return nil, fmt.Errorf("invalid checksums URL: %w", err)
+	}
 	client := &http.Client{Timeout: 30 * time.Second}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -168,7 +223,7 @@ func downloadChecksums(url string) (map[string]string, error) {
 		return nil, fmt.Errorf("checksums download returned %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxChecksumsSize))
 	if err != nil {
 		return nil, err
 	}
@@ -204,6 +259,9 @@ func SelfUpdate(repo string) (string, error) {
 	if downloadURL == "" {
 		return "", fmt.Errorf("no binary found for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
+	if err := validateGitHubURL(downloadURL); err != nil {
+		return "", fmt.Errorf("invalid download URL: %w", err)
+	}
 
 	exePath, err := os.Executable()
 	if err != nil {
@@ -236,10 +294,19 @@ func SelfUpdate(repo string) (string, error) {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
 
-	if _, err := io.Copy(out, resp.Body); err != nil {
+	// Read at most maxBinaryDownloadSize+1 bytes so we can detect payloads
+	// that exceed the limit and reject them explicitly instead of silently
+	// truncating (which would only surface later as a checksum mismatch).
+	written, err := io.Copy(out, io.LimitReader(resp.Body, maxBinaryDownloadSize+1))
+	if err != nil {
 		_ = out.Close()        // best-effort close
 		_ = os.Remove(tmpPath) // best-effort cleanup
 		return "", fmt.Errorf("failed to write temp file: %w", err)
+	}
+	if written > maxBinaryDownloadSize {
+		_ = out.Close()
+		_ = os.Remove(tmpPath)
+		return "", fmt.Errorf("downloaded binary exceeds max size of %d bytes", maxBinaryDownloadSize)
 	}
 	if err := out.Close(); err != nil {
 		_ = os.Remove(tmpPath) // best-effort cleanup

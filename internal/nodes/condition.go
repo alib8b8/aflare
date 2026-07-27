@@ -19,9 +19,12 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/logger"
 )
 
 const (
@@ -93,8 +96,17 @@ func SafeRegexMatch(pattern, input string) (bool, error) {
 	done := make(chan bool, 1)
 	var matched bool
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("regex match panicked",
+					"pattern", pattern,
+					"panic", r,
+					"stack", string(debug.Stack()),
+				)
+			}
+			done <- true
+		}()
 		matched = re.MatchString(input)
-		done <- true
 	}()
 
 	select {

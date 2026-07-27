@@ -711,11 +711,10 @@ func performHealthChecks() {
 	providerHealthMu.Lock()
 	defer providerHealthMu.Unlock()
 
+	omniRandMu.Lock()
 	for provider := range providerHealthStatus {
-		omniRandMu.Lock()
 		latencyMs := omniRand.Intn(2000)
 		errorRate := omniRand.Float64() * 0.1
-		omniRandMu.Unlock()
 		isAvailable := errorRate < 0.05
 
 		status := "healthy"
@@ -734,6 +733,7 @@ func performHealthChecks() {
 			IsAvailable: isAvailable,
 		}
 	}
+	omniRandMu.Unlock()
 }
 
 func getHealthyProviders(tool string) []string {
@@ -774,6 +774,7 @@ func (n *OmniRouteNode) ExecuteHealthCheck(provider string) providerHealth {
 	latencyMs := omniRand.Intn(2000)
 	errorRate := omniRand.Float64() * 0.1
 	omniRandMu.Unlock()
+
 	isAvailable := errorRate < 0.05
 
 	status := "healthy"

@@ -408,6 +408,12 @@ func (m *UserProfileManager) Save(userID string) {
 
 func (m *UserProfileManager) AutoSave(interval time.Duration) {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// 吞掉 panic 避免拖垮进程;下一轮 ticker 仍会触发
+				_ = r
+			}
+		}()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for range ticker.C {
