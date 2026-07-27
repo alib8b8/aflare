@@ -51,6 +51,8 @@ func TestNodeMetadata(t *testing.T) {
 		{"execute", &ExecuteNode{}, "execute", 0},
 		{"call", &CallNode{}, "call", 0},
 		{"ollama", &OllamaNode{}, "ollama", 0},
+		{"context_fs", &ContextFSNode{}, "context_fs", 0},
+		{"doc_parse", &DocParseNode{}, "doc_parse", 0},
 	}
 
 	for _, tt := range tests {

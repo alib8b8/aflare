@@ -22,6 +22,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,6 +31,10 @@ import (
 
 	"github.com/alib8b8/llm-box/internal/logger"
 )
+
+// ErrBackpressure 当待发送消息超过背压阈值时返回。
+// 生产者应降速或丢弃非关键消息。
+var ErrBackpressure = errors.New("message bus backpressure: too many pending messages")
 
 // message_bus.go — 蜂群通信消息总线
 //
@@ -60,6 +65,7 @@ type BusMessage struct {
 	Type      string    `json:"type"` // text|task|result|status|vote
 	Timestamp time.Time `json:"timestamp"`
 	Signature string    `json:"signature"`
+	HopLimit  int       `json:"hop_limit"` // 消息剩余跳数,0 表示不限,>0 时每转发一次减 1,到 0 不再转发
 }
 
 // PeerInfo 节点信息
@@ -72,30 +78,52 @@ type PeerInfo struct {
 
 // MessageBus 蜂群通信消息总线
 type MessageBus struct {
-	nodeID      string
-	port        string
-	authToken   string                       // 可选的 auth token
-	subscribers map[string][]chan BusMessage // topic -> subscribers
-	mu          sync.RWMutex
-	httpServer  *http.Server
-	peers       map[string]string            // nodeID -> address
-	peerSeen    map[string]time.Time         // nodeID -> 最后见到的时间
-	votes       map[string]map[string]string // topic -> (nodeID -> choice)
-	stopCh      chan struct{}
-	stopOnce    sync.Once
+	nodeID          string
+	port            string
+	authToken       string                       // 可选的 auth token
+	subscribers     map[string][]chan BusMessage // topic -> subscribers
+	mu              sync.RWMutex
+	httpServer      *http.Server
+	peers           map[string]string            // nodeID -> address
+	peerSeen        map[string]time.Time         // nodeID -> 最后见到的时间
+	votes           map[string]map[string]string // topic -> (nodeID -> choice)
+	stopCh          chan struct{}
+	stopOnce        sync.Once
+	defaultHopLimit int // 默认跳数限制,0 表示不限;Broadcast 时如果 msg.HopLimit==0 则用此值
+	maxPendingMsgs  int // Publish 背压阈值:待发送消息总数超过此值时拒绝新消息
 }
 
 // NewMessageBus 创建消息总线
 func NewMessageBus(nodeID, port string) *MessageBus {
 	return &MessageBus{
-		nodeID:      nodeID,
-		port:        port,
-		subscribers: make(map[string][]chan BusMessage),
-		peers:       make(map[string]string),
-		peerSeen:    make(map[string]time.Time),
-		votes:       make(map[string]map[string]string),
-		stopCh:      make(chan struct{}),
+		nodeID:          nodeID,
+		port:            port,
+		subscribers:     make(map[string][]chan BusMessage),
+		peers:           make(map[string]string),
+		peerSeen:        make(map[string]time.Time),
+		votes:           make(map[string]map[string]string),
+		stopCh:          make(chan struct{}),
+		defaultHopLimit: 3,    // 默认最多 3 跳,防止消息风暴
+		maxPendingMsgs:  1000, // 默认背压阈值:所有 topic 待发送消息总数上限 1000
 	}
+}
+
+// SetHopLimit 设置默认跳数限制(0 表示不限)。
+// Broadcast 时若消息未指定 HopLimit,则使用此默认值。
+// 建议值 2-5:过小则消息传播不全,过大则可能产生风暴。
+func (b *MessageBus) SetHopLimit(limit int) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.defaultHopLimit = limit
+}
+
+// SetMaxPending 设置 Publish 背压阈值。
+// 当所有 topic 的待发送消息总数超过此值时,Publish 返回 ErrBackpressure。
+// 0 表示不限制(退化为原有行为)。
+func (b *MessageBus) SetMaxPending(max int) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.maxPendingMsgs = max
 }
 
 // SetAuthToken 设置可选的 auth token，用于 HTTP 端点鉴权。
@@ -173,6 +201,21 @@ func (b *MessageBus) Publish(msg BusMessage) error {
 		msg.Signature = signBusMessage(msg)
 	}
 
+	// 背压检查:统计所有 topic 待发送消息总数
+	if b.maxPendingMsgs > 0 {
+		b.mu.RLock()
+		pending := 0
+		for _, subs := range b.subscribers {
+			for _, ch := range subs {
+				pending += len(ch)
+			}
+		}
+		b.mu.RUnlock()
+		if pending > b.maxPendingMsgs {
+			return ErrBackpressure
+		}
+	}
+
 	// 持有读锁覆盖整个分发过程，避免与 Stop（写锁）并发导致向已关闭 channel 发送
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -191,6 +234,7 @@ func (b *MessageBus) Publish(msg BusMessage) error {
 
 // Broadcast 广播消息到所有 peer（并本地分发）。
 // msg.To 会被强制清空以表示广播。
+// HopLimit 控制转发跳数:0 表示不限(用 defaultHopLimit),>0 时每转发一次减 1,到 0 不再转发。
 func (b *MessageBus) Broadcast(msg BusMessage) error {
 	if msg.ID == "" {
 		msg.ID = b.generateMessageID()
@@ -204,11 +248,27 @@ func (b *MessageBus) Broadcast(msg BusMessage) error {
 	if msg.Signature == "" {
 		msg.Signature = signBusMessage(msg)
 	}
+
+	// 应用默认 hop limit
+	b.mu.RLock()
+	defaultHop := b.defaultHopLimit
+	b.mu.RUnlock()
+	if msg.HopLimit == 0 {
+		msg.HopLimit = defaultHop
+	}
+
 	msg.To = "" // 广播
 
 	// 本地分发
 	if err := b.Publish(msg); err != nil {
 		return err
+	}
+
+	// 跳数为 1 时只本地分发,不再网络转发(已经要减到 0 了)
+	// 跳数 > 1 时转发给 peer,转发时 HopLimit - 1
+	// 跳数 == 0 表示不限,继续转发
+	if msg.HopLimit > 0 && msg.HopLimit <= 1 {
+		return nil // 只本地,不外发
 	}
 
 	// 网络分发到所有 peer
@@ -223,7 +283,12 @@ func (b *MessageBus) Broadcast(msg BusMessage) error {
 		return nil
 	}
 
-	data, err := json.Marshal(msg)
+	// 转发时减 1
+	forwardMsg := msg
+	if forwardMsg.HopLimit > 0 {
+		forwardMsg.HopLimit--
+	}
+	data, err := json.Marshal(forwardMsg)
 	if err != nil {
 		return fmt.Errorf("marshal message: %w", err)
 	}
@@ -409,9 +474,61 @@ func (b *MessageBus) handleMessage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "publish failed", http.StatusInternalServerError)
 		return
 	}
+	// 转发到其他 peer(基于 hop_limit 控制):
+	// - msg.From == b.nodeID: 不转发(防止自己发的消息绕回来)
+	// - msg.HopLimit == 0: 无限制继续广播(向后兼容)
+	// - msg.HopLimit == 1: 只本地分发不再转发
+	// - msg.HopLimit > 1: 继续转发(HopLimit-1)
+	b.forwardReceivedMessage(msg)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// forwardReceivedMessage 将接收到的 peer 消息按 hop_limit 规则转发给其他 peer。
+// 反循环:如果 msg.From == b.nodeID 则不转发。转发失败仅记录日志,不影响主流程。
+func (b *MessageBus) forwardReceivedMessage(msg BusMessage) {
+	// 反循环:自己发的消息绕回来不转发
+	if msg.From == b.nodeID {
+		return
+	}
+	// hop_limit == 1:只本地,不再转发
+	if msg.HopLimit == 1 {
+		return
+	}
+	// hop_limit > 1:转发时减 1;hop_limit == 0:无限制转发(不变)
+	forwardMsg := msg
+	if forwardMsg.HopLimit > 0 {
+		forwardMsg.HopLimit--
+	}
+
+	b.mu.RLock()
+	peers := make(map[string]string, len(b.peers))
+	for k, v := range b.peers {
+		peers[k] = v
+	}
+	b.mu.RUnlock()
+
+	if len(peers) == 0 {
+		return
+	}
+
+	data, err := json.Marshal(forwardMsg)
+	if err != nil {
+		logger.Warn("MessageBus forward marshal failed",
+			"topic", msg.Topic, "id", msg.ID, "error", err)
+		return
+	}
+
+	for peerID, addr := range peers {
+		if peerID == b.nodeID {
+			continue
+		}
+		if err := b.postMessage(addr, data); err != nil {
+			logger.Warn("MessageBus forward to peer failed",
+				"peer", peerID, "address", addr, "error", err)
+		}
+	}
 }
 
 // handleVote POST /api/bus/vote 接收投票

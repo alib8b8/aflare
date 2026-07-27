@@ -17,6 +17,12 @@ package distributed
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -347,5 +353,153 @@ func TestMessageBus_StopClosesChannels(t *testing.T) {
 func TestMessageBus_BusMessageMaxSize(t *testing.T) {
 	if busMessageMaxSize != 1*1024*1024 {
 		t.Errorf("expected busMessageMaxSize to be 1MB, got %d", busMessageMaxSize)
+	}
+}
+
+// newTestPeerServer 创建一个模拟 peer 的 httptest.Server,记录收到的消息。
+// 返回 server 和获取已收消息列表的快照函数(线程安全)。
+func newTestPeerServer(t *testing.T) (*httptest.Server, func() []BusMessage) {
+	t.Helper()
+	var mu sync.Mutex
+	var received []BusMessage
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var msg BusMessage
+		if err := json.NewDecoder(io.LimitReader(r.Body, busMessageMaxSize)).Decode(&msg); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		mu.Lock()
+		received = append(received, msg)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
+	t.Cleanup(srv.Close)
+	return srv, func() []BusMessage {
+		mu.Lock()
+		defer mu.Unlock()
+		out := make([]BusMessage, len(received))
+		copy(out, received)
+		return out
+	}
+}
+
+// peerAddressFromURL 从 httptest.Server.URL("http://host:port")提取 "host:port"。
+func peerAddressFromURL(url string) string {
+	return strings.TrimPrefix(url, "http://")
+}
+
+// TestBusHopLimit 测试跳数限制:设置 hop_limit=1,Broadcast 后只有本地订阅者收到,peer 不应收到。
+func TestBusHopLimit(t *testing.T) {
+	bus := NewMessageBus("node-1", "0")
+	bus.SetHopLimit(1)
+
+	ch := bus.Subscribe("hop-topic")
+	peerSrv, peerReceived := newTestPeerServer(t)
+	bus.AddPeer("peer-1", peerAddressFromURL(peerSrv.URL))
+
+	msg := BusMessage{Topic: "hop-topic", Content: "local-only", Type: "text"}
+	if err := bus.Broadcast(msg); err != nil {
+		t.Fatalf("Broadcast failed: %v", err)
+	}
+
+	// 本地订阅者应收到
+	select {
+	case received := <-ch:
+		if received.Content != "local-only" {
+			t.Errorf("expected 'local-only', got %s", received.Content)
+		}
+		if received.HopLimit != 1 {
+			t.Errorf("expected HopLimit 1, got %d", received.HopLimit)
+		}
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for local message")
+	}
+
+	// peer 不应收到(hop_limit=1 时只本地分发,不网络转发)
+	if got := peerReceived(); len(got) != 0 {
+		t.Errorf("expected 0 messages at peer with hop_limit=1, got %d", len(got))
+	}
+}
+
+// TestBusHopLimitForward 测试转发时跳数递减:hop_limit=2 的消息被 peer 收到时,HopLimit 应为 1。
+func TestBusHopLimitForward(t *testing.T) {
+	bus := NewMessageBus("node-1", "0")
+	bus.SetHopLimit(2)
+
+	bus.Subscribe("hop-fwd-topic")
+	peerSrv, peerReceived := newTestPeerServer(t)
+	bus.AddPeer("peer-1", peerAddressFromURL(peerSrv.URL))
+
+	msg := BusMessage{Topic: "hop-fwd-topic", Content: "forward-me", Type: "text"}
+	if err := bus.Broadcast(msg); err != nil {
+		t.Fatalf("Broadcast failed: %v", err)
+	}
+
+	// peer 应收到 1 条消息,HopLimit 已递减为 1
+	got := peerReceived()
+	if len(got) != 1 {
+		t.Fatalf("expected 1 message at peer, got %d", len(got))
+	}
+	if got[0].HopLimit != 1 {
+		t.Errorf("expected HopLimit 1 at peer, got %d", got[0].HopLimit)
+	}
+	if got[0].Content != "forward-me" {
+		t.Errorf("expected 'forward-me', got %s", got[0].Content)
+	}
+}
+
+// TestBusBackpressure 测试背压:设置 maxPendingMsgs=2,Publish 3 条后第 4 条应返回 ErrBackpressure。
+func TestBusBackpressure(t *testing.T) {
+	bus := NewMessageBus("node-1", "0")
+	bus.SetMaxPending(2)
+
+	// 订阅但不消费,让消息堆积在 channel 中
+	bus.Subscribe("bp-topic")
+
+	// 发布 3 条,都应成功(背压检查在发布前:pending 0→1→2→3,均未超过阈值 2)
+	for i := 0; i < 3; i++ {
+		msg := BusMessage{Topic: "bp-topic", Content: "msg", Type: "text"}
+		if err := bus.Publish(msg); err != nil {
+			t.Fatalf("Publish %d should succeed, got %v", i+1, err)
+		}
+	}
+
+	// 第 4 条应返回 ErrBackpressure(pending=3 > maxPendingMsgs=2)
+	err := bus.Publish(BusMessage{Topic: "bp-topic", Content: "msg", Type: "text"})
+	if !errors.Is(err, ErrBackpressure) {
+		t.Errorf("expected ErrBackpressure on 4th publish, got %v", err)
+	}
+}
+
+// TestBusHopLimitZero 测试 hop_limit=0 不限制:默认行为下退化为无限制转发。
+func TestBusHopLimitZero(t *testing.T) {
+	bus := NewMessageBus("node-1", "0")
+	bus.SetHopLimit(0)
+
+	bus.Subscribe("hop-zero-topic")
+	peerSrv, peerReceived := newTestPeerServer(t)
+	bus.AddPeer("peer-1", peerAddressFromURL(peerSrv.URL))
+
+	msg := BusMessage{Topic: "hop-zero-topic", Content: "unlimited", Type: "text"}
+	if err := bus.Broadcast(msg); err != nil {
+		t.Fatalf("Broadcast failed: %v", err)
+	}
+
+	// peer 应收到消息,HopLimit 仍为 0(无限制,向后兼容)
+	got := peerReceived()
+	if len(got) != 1 {
+		t.Fatalf("expected 1 message at peer, got %d", len(got))
+	}
+	if got[0].HopLimit != 0 {
+		t.Errorf("expected HopLimit 0 at peer, got %d", got[0].HopLimit)
+	}
+	if got[0].Content != "unlimited" {
+		t.Errorf("expected 'unlimited', got %s", got[0].Content)
 	}
 }
