@@ -1,0 +1,70 @@
+{
+  "id": "real-world/tdd",
+  "name": "tdd",
+  "version": "1.0.0",
+  "description": "Constraint skill inspired by mattpocock/skills /tdd: enforces a strict Red-Green-Refactor loop. Write a failing test first (Red), produce the minimal implementation to make it pass (Green), then refactor without changing behavior. Each phase is a separate LLM step so the discipline cannot be skipped.",
+  "author": "llm-box community",
+  "category": "constraint",
+  "tags": [
+    "constraint",
+    "tdd",
+    "testing",
+    "agent-discipline",
+    "real-world"
+  ],
+  "keywords": [
+    "tdd",
+    "test-driven",
+    "red-green-refactor"
+  ],
+  "inputs": [
+    {
+      "name": "feature_description",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "language",
+      "type": "string",
+      "required": false,
+      "default": "go"
+    },
+    {
+      "name": "max_cycles",
+      "type": "string",
+      "required": false,
+      "default": "5"
+    },
+    {
+      "name": "provider",
+      "type": "string",
+      "required": false,
+      "default": "ollama"
+    },
+    {
+      "name": "model",
+      "type": "string",
+      "required": false,
+      "default": "llama3"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "test_code",
+      "type": "string"
+    },
+    {
+      "name": "impl_code",
+      "type": "string"
+    },
+    {
+      "name": "cycle_log",
+      "type": "string"
+    },
+    {
+      "name": "all_green",
+      "type": "string"
+    }
+  ],
+  "dependencies": null
+}

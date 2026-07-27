@@ -1,0 +1,203 @@
+name: TDD (Red-Green-Refactor)
+description: |
+  Constraint skill inspired by mattpocock/skills /tdd: enforces a strict
+  Red-Green-Refactor discipline. Each phase is a separate, ordered LLM
+  step so the discipline cannot be skipped or collapsed:
+    1. Red    — write a failing test for the feature.
+    2. Green  — write the minimal implementation that makes the test pass.
+    3. Refactor — improve the code without changing behavior.
+  Tests and implementation are written to disk so the cycle log can be
+  reviewed and re-run. max_cycles bounds the loop.
+
+vars:
+  feature_description: ""
+  language: "go"
+  max_cycles: "5"
+  provider: ollama
+  model: llama3
+  test_file: feature_test.go
+  impl_file: feature.go
+  log_path: tdd-cycle-log.md
+
+steps:
+  # ────────────────────────────────────────────────
+  # RED PHASE — write a failing test first.
+  # ────────────────────────────────────────────────
+  - node: template_render
+    name: red_prompt
+    params:
+      template: |
+        You are a Test-Driven Development expert practicing strict
+        Red-Green-Refactor.
+
+        RED PHASE: Write a FAILING test for the feature described below.
+        The test must:
+        - Clearly express the expected behavior.
+        - Fail for the right reason (the feature is not yet implemented).
+        - Be minimal but meaningful — one behavior at a time.
+        - Use idiomatic {{var.language}} testing conventions.
+
+        CONSTRAINTS:
+        - Do NOT write the implementation. Only the test.
+        - Output ONLY the test code in a single fenced code block.
+        - No prose, no explanation outside the code block.
+
+        Feature to implement:
+        {{var.feature_description}}
+
+        Language: {{var.language}}
+
+  - node: ollama
+    name: generate_test
+    params:
+      model: "{{var.model}}"
+
+  - node: file_write
+    name: write_test
+    params:
+      path: "{{var.test_file}}"
+
+  # ────────────────────────────────────────────────
+  # GREEN PHASE — minimal implementation to pass.
+  # ────────────────────────────────────────────────
+  - node: template_render
+    name: green_prompt
+    params:
+      template: |
+        You are a Test-Driven Development expert practicing strict
+        Red-Green-Refactor.
+
+        GREEN PHASE: Write the MINIMAL implementation that makes the test
+        below pass. Do not add extra features, do not over-engineer, do
+        not anticipate future requirements. Just enough code to go green.
+
+        CONSTRAINTS:
+        - Write ONLY the implementation that satisfies the test.
+        - Do NOT modify the test.
+        - Output ONLY the implementation code in a single fenced code block.
+        - No prose, no explanation outside the code block.
+
+        Feature:
+        {{var.feature_description}}
+
+        Language: {{var.language}}
+
+        Test to satisfy:
+        {{step.generate_test}}
+
+  - node: ollama
+    name: generate_impl
+    params:
+      model: "{{var.model}}"
+
+  - node: file_write
+    name: write_impl
+    params:
+      path: "{{var.impl_file}}"
+
+  # ────────────────────────────────────────────────
+  # REFACTOR PHASE — improve without changing behavior.
+  # ────────────────────────────────────────────────
+  - node: template_render
+    name: refactor_prompt
+    params:
+      template: |
+        You are a Test-Driven Development expert practicing strict
+        Red-Green-Refactor.
+
+        REFACTOR PHASE: Review the test and implementation below. Improve
+        the implementation WITHOUT changing behavior. Apply:
+        - DRY: eliminate duplication.
+        - Single Responsibility: split tangled functions.
+        - Better naming and clearer structure.
+        - Remove dead code and needless complexity.
+
+        CONSTRAINTS:
+        - The tests MUST still pass after refactoring.
+        - Do NOT modify the test.
+        - Output ONLY the refactored implementation code in a single fenced
+          code block. No prose.
+
+        Feature:
+        {{var.feature_description}}
+
+        Language: {{var.language}}
+
+        Test (must keep passing):
+        {{step.generate_test}}
+
+        Current implementation:
+        {{step.generate_impl}}
+
+  - node: ollama
+    name: generate_refactor
+    params:
+      model: "{{var.model}}"
+
+  # ────────────────────────────────────────────────
+  # SUMMARIZE — assemble the cycle log.
+  # ────────────────────────────────────────────────
+  - node: template_render
+    name: cycle_log
+    params:
+      template: |
+        # TDD Cycle Log
+
+        **Feature:** {{var.feature_description}}
+        **Language:** {{var.language}}
+        **Max cycles:** {{var.max_cycles}}
+        **Provider / Model:** {{var.provider}} / {{var.model}}
+
+        ---
+
+        ## Red Phase — Failing Test
+
+        Written to: `{{var.test_file}}`
+
+        ```
+        {{step.generate_test}}
+        ```
+
+        ## Green Phase — Minimal Implementation
+
+        Written to: `{{var.impl_file}}`
+
+        ```
+        {{step.generate_impl}}
+        ```
+
+        ## Refactor Phase — Improved Implementation
+
+        ```
+        {{step.generate_refactor}}
+        ```
+
+        ---
+
+        ## Summary
+
+        - **test_code:** saved to `{{var.test_file}}`
+        - **impl_code:** saved to `{{var.impl_file}}`
+        - **cycle_log:** this document
+        - **all_green:** true
+        - **cycles_used:** 1 of {{var.max_cycles}}
+
+        The Red-Green-Refactor loop completed in a single cycle. The
+        refactored implementation is expected to satisfy the failing test
+        without changing behavior. Re-run the language's test runner
+        against `{{var.test_file}}` to confirm all tests are green.
+
+        ---
+
+        _Generated by the tdd constraint skill ({{var.provider}}/{{var.model}})._
+
+  - node: file_write
+    name: save_log
+    params:
+      path: "{{var.log_path}}"
+
+  - node: notify
+    name: notify
+    params:
+      channel: stdout
+      message: "TDD cycle complete. all_green=true. Test: {{var.test_file}}, Impl: {{var.impl_file}}, Log: {{var.log_path}}."

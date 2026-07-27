@@ -1,0 +1,55 @@
+{
+  "id": "real-world/grill-me",
+  "name": "grill-me",
+  "version": "1.0.0",
+  "description": "Constraint skill inspired by mattpocock/skills /grill-me: forces the AI to thoroughly clarify requirements by asking at least min_questions questions across boundary conditions, error handling, performance, security, compatibility, testing and deployment dimensions before any code is written.",
+  "author": "llm-box community",
+  "category": "constraint",
+  "tags": [
+    "constraint",
+    "clarification",
+    "agent-discipline",
+    "real-world"
+  ],
+  "keywords": [
+    "grill-me",
+    "clarification",
+    "requirements"
+  ],
+  "inputs": [
+    {
+      "name": "task_description",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "min_questions",
+      "type": "string",
+      "required": false,
+      "default": "50"
+    },
+    {
+      "name": "provider",
+      "type": "string",
+      "required": false,
+      "default": "ollama"
+    },
+    {
+      "name": "model",
+      "type": "string",
+      "required": false,
+      "default": "llama3"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "clarification_log",
+      "type": "string"
+    },
+    {
+      "name": "ready_to_code",
+      "type": "string"
+    }
+  ],
+  "dependencies": null
+}
