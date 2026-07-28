@@ -1,0 +1,19 @@
+{
+  "id": "data-ai/paper-writing",
+  "name": "paper-writing",
+  "version": "1.0.0",
+  "description": "paper-writing workflow template",
+  "author": "llm-box community",
+  "category": "data-ai",
+  "tags": [
+    "data-ai",
+    "workflow"
+  ],
+  "keywords": [
+    "paper-writing",
+    "data-ai"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

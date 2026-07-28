@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/goal-setting",
+  "name": "goal-setting",
+  "version": "1.0.0",
+  "description": "Set SMART goals with action plans",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "goal-setting",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

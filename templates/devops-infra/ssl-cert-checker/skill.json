@@ -1,0 +1,19 @@
+{
+  "id": "devops-infra/ssl-cert-checker",
+  "name": "ssl-cert-checker",
+  "version": "1.0.0",
+  "description": "Check SSL certificate expiry for domains",
+  "author": "llm-box community",
+  "category": "devops-infra",
+  "tags": [
+    "devops-infra",
+    "workflow"
+  ],
+  "keywords": [
+    "ssl-cert-checker",
+    "devops-infra"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

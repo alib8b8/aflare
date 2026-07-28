@@ -211,9 +211,10 @@ func TestExecuteIfBranch_ThenBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// sub-workflow starts with empty data, so test node output is prefix + " " + ""
-	if output != "then " {
-		t.Errorf("expected 'then ', got '%s'", output)
+	// The if-step's input propagates into the branch sub-workflow, so the
+	// test node receives "yes": output = prefix + " " + input = "then yes".
+	if output != "then yes" {
+		t.Errorf("expected 'then yes', got '%s'", output)
 	}
 	if len(results) != 1 {
 		t.Errorf("expected 1 result, got %d", len(results))
@@ -241,8 +242,9 @@ func TestExecuteIfBranch_ElseBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if output != "else " {
-		t.Errorf("expected 'else ', got '%s'", output)
+	// Input "no" propagates into the else branch: "else" + " " + "no" = "else no".
+	if output != "else no" {
+		t.Errorf("expected 'else no', got '%s'", output)
 	}
 	if len(results) != 1 {
 		t.Errorf("expected 1 result, got %d", len(results))

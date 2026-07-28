@@ -1,0 +1,19 @@
+{
+  "id": "content-creative/case-study",
+  "name": "case-study",
+  "version": "1.0.0",
+  "description": "Generate customer case study template",
+  "author": "llm-box community",
+  "category": "content-creative",
+  "tags": [
+    "content-creative",
+    "workflow"
+  ],
+  "keywords": [
+    "case-study",
+    "content-creative"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

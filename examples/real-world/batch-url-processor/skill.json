@@ -1,0 +1,6 @@
+{
+  "name": "batch-url-processor",
+  "description": "批量 URL 处理器：用 map 原语对一组 URL 并发抓取 + LLM 摘要 + 失败降级。展示 map 多步子工作流、错误即数据、并发控制三件事如何组合。",
+  "category": "real-world",
+  "tags": ["map", "batch", "concurrency", "error-handling", "fetch", "llm"]
+}

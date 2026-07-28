@@ -1,0 +1,19 @@
+{
+  "id": "data-ai/swot-analysis",
+  "name": "swot-analysis",
+  "version": "1.0.0",
+  "description": "Generate comprehensive SWOT analysis for any business",
+  "author": "llm-box community",
+  "category": "data-ai",
+  "tags": [
+    "data-ai",
+    "workflow"
+  ],
+  "keywords": [
+    "swot-analysis",
+    "data-ai"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

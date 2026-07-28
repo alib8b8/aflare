@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/fitness-plan",
+  "name": "fitness-plan",
+  "version": "1.0.0",
+  "description": "Create personalized fitness plan",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "fitness-plan",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

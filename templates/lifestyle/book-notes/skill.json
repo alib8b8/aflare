@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/book-notes",
+  "name": "book-notes",
+  "version": "1.0.0",
+  "description": "Generate comprehensive book notes and key takeaways",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "book-notes",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

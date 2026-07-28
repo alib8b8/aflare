@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/course-curriculum",
+  "name": "course-curriculum",
+  "version": "1.0.0",
+  "description": "Design complete course curriculum",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "course-curriculum",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

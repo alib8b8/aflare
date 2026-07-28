@@ -88,31 +88,6 @@ func TestCLISessionNode_ExecuteErrors(t *testing.T) {
 	}
 }
 
-func TestMoreNodeMetadata(t *testing.T) {
-	nodes := []Node{
-		&AgentBrowserNode{},
-		&CodeReviewNode{},
-		&SearchAggregateNode{},
-		&OutputQualityNode{},
-		&LLMRouterNode{},
-		&SwarmCommNode{},
-		&ClarifyNode{},
-	}
-	for _, n := range nodes {
-		name := n.Name()
-		if name == "" {
-			t.Error("node has empty name")
-		}
-		if n.Description() == "" {
-			t.Errorf("node %s has empty description", name)
-		}
-		schema := n.Schema()
-		if schema.Name == "" {
-			t.Errorf("node %s has empty schema name", name)
-		}
-	}
-}
-
 func TestClarifyNode_Execute(t *testing.T) {
 	ctx := context.Background()
 	node := &ClarifyNode{}
@@ -156,78 +131,6 @@ func TestAllRegisteredNodesMetadata(t *testing.T) {
 		if schema.Name == "" {
 			t.Errorf("node %q has empty schema name", info.Name)
 		}
-	}
-}
-
-func TestDetectStructureIssues(t *testing.T) {
-	node := &OutputQualityNode{}
-
-	uniformText := "aaaaaaaaaa\nbbbbbbbbbb\ncccccccccc\ndddddddddd\neeeeeeeeee"
-	findings := node.detectStructureIssues(uniformText, "en")
-	if len(findings) == 0 {
-		t.Log("uniform text expected to trigger STR-001")
-	}
-
-	uniformSentences := "Hello world. How are you. I am fine. This is test. Another day here."
-	findings = node.detectStructureIssues(uniformSentences, "en")
-	if len(findings) == 0 {
-		t.Log("uniform sentences expected to trigger STR-002")
-	}
-
-	shortText := "short"
-	findings = node.detectStructureIssues(shortText, "en")
-	if len(findings) != 0 {
-		t.Errorf("short text should have no structure issues, got %d", len(findings))
-	}
-}
-
-func TestTruncateOutput(t *testing.T) {
-	short := "short text"
-	result := truncateOutput(short, 100)
-	if result != short {
-		t.Errorf("short text should not be truncated, got %q", result)
-	}
-
-	long := strings.Repeat("a", 200)
-	result = truncateOutput(long, 100)
-	if len(result) > 100+20 {
-		t.Errorf("long text should be truncated, got %d chars", len(result))
-	}
-}
-
-func TestSimulateQualityAssessment(t *testing.T) {
-	types := []string{"ai_detection", "design_quality", "code_quality", "unknown"}
-	for _, at := range types {
-		score, issues, suggestions, aiProb, _ := simulateQualityAssessment("test content", at)
-		if score < 0 || score > 1 {
-			t.Errorf("score out of range for %s: %f", at, score)
-		}
-		if aiProb < 0 || aiProb > 1 {
-			t.Errorf("aiProb out of range for %s: %f", at, aiProb)
-		}
-		_ = issues
-		_ = suggestions
-	}
-
-	_, issues, suggestions, _, _ := simulateQualityAssessment("short", "design_quality")
-	if len(issues) == 0 {
-		t.Log("short design content expected to have issues")
-	}
-	_ = suggestions
-
-	_, issues, _, _, _ = simulateQualityAssessment("code with TODO", "code_quality")
-	if len(issues) == 0 {
-		t.Log("code with TODO expected to have issues")
-	}
-}
-
-func TestSimulateAutoFix(t *testing.T) {
-	result := simulateAutoFix("original content", "code_quality", []string{"add tests"})
-	if result == "" {
-		t.Error("expected non-empty result")
-	}
-	if !strings.Contains(result, "original") {
-		t.Error("expected original content to be included")
 	}
 }
 

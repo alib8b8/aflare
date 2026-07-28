@@ -45,6 +45,16 @@ type ifDepthKeyType struct{}
 
 var ifDepthKey = ifDepthKeyType{}
 
+// ifInputKey carries the initial input a branch sub-workflow should start
+// from. It is set by executeIfBranch so the chosen then/else branch receives
+// the same data the if-step did (instead of starting from an empty string),
+// which lets capture_error route on the error text and lets normal if-steps
+// keep processing the flowing data. Top-level workflow executions never set
+// it, so they default to an empty initial input.
+type ifInputKeyType struct{}
+
+var ifInputKey = ifInputKeyType{}
+
 // WorkflowTimeout is the overall workflow timeout. It defaults to
 // DefaultWorkflowTimeout but can be overridden by callers to configure a
 // different workflow timeout without modifying types.go.
@@ -145,6 +155,12 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 
 	var results []StepResult
 	data := ""
+	// A branch sub-workflow (then/else of an if-step) inherits the if-step's
+	// input as its starting data so the flowing value isn't lost. Top-level
+	// executions leave data as "".
+	if v, ok := ctx.Value(ifInputKey).(string); ok {
+		data = v
+	}
 	engine := NewExpressionEngine()
 
 	// Load workflow-level vars into expression engine
@@ -302,6 +318,58 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 			trace.recordStep(StepTrace{
 				Index:           i,
 				NodeName:        wStep.Node,
+				StepName:        wStep.Name,
+				BatchIndex:      -1,
+				ConditionPassed: true,
+				Attempts:        1,
+				TotalDuration:   time.Since(stepStart),
+				InputLen:        len(data),
+				OutputLen:       len(output),
+			})
+			continue
+		}
+
+		if wStep.IsMap() {
+			mapResults, output, err := executeMapStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
+			if err != nil {
+				results = append(results, mapResults...)
+				if program != nil {
+					program.Send(tui.WorkflowEndMsg{Success: false})
+				}
+				return "", results, trace, err
+			}
+			results = append(results, mapResults...)
+			data = output
+			engine.SetStepOutput(i, wStep.Name, output)
+			trace.recordStep(StepTrace{
+				Index:           i,
+				NodeName:        "map",
+				StepName:        wStep.Name,
+				BatchIndex:      -1,
+				ConditionPassed: true,
+				Attempts:        1,
+				TotalDuration:   time.Since(stepStart),
+				InputLen:        len(data),
+				OutputLen:       len(output),
+			})
+			continue
+		}
+
+		if wStep.IsReduce() {
+			reduceResults, output, err := executeReduceStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
+			if err != nil {
+				results = append(results, reduceResults...)
+				if program != nil {
+					program.Send(tui.WorkflowEndMsg{Success: false})
+				}
+				return "", results, trace, err
+			}
+			results = append(results, reduceResults...)
+			data = output
+			engine.SetStepOutput(i, wStep.Name, output)
+			trace.recordStep(StepTrace{
+				Index:           i,
+				NodeName:        "reduce",
 				StepName:        wStep.Name,
 				BatchIndex:      -1,
 				ConditionPassed: true,
@@ -498,8 +566,23 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		resultErr := execErr
 		var recoveries []string
 		if execErr != nil {
-			// 1. Try fallback value
-			if wStep.Fallback != "" {
+			// 0. capture_error: run the error branch (treats the error as a
+			// value/branch condition rather than swallowing it). Checked first
+			// because it is the most expressive recovery primitive.
+			if wStep.HasCaptureError() {
+			branchOut, bErr := executeCaptureErrorBranch(stepBaseCtx, wStep.CaptureError, execErr.Error(), engine.SnapshotVars(), reg, program, globalLimiter)
+			if bErr == nil {
+				logger.Info("step recovered via capture_error branch", "index", i, "node", wStep.Node)
+				output = branchOut
+				execErr = nil
+				resultErr = nil
+				recoveries = append(recoveries, "capture_error")
+			} else {
+				logger.Warn("capture_error branch failed, falling through to other recovery", "index", i, "node", wStep.Node, "error", nodes.RedactSensitive(bErr.Error()))
+			}
+		}
+		// 1. Try fallback value
+		if execErr != nil && wStep.Fallback != "" {
 				fallbackVal, ferr := engine.Evaluate(wStep.Fallback, data)
 				if ferr == nil {
 					logger.Info("step recovered via fallback", "index", i, "node", wStep.Node)

@@ -24,6 +24,7 @@ import (
 	"context"
 
 	"github.com/alib8b8/llm-box/internal/nodes/core"
+	"github.com/alib8b8/llm-box/internal/nodes/providers"
 )
 
 // Re-exports of core types via aliases so existing callers can keep using
@@ -110,14 +111,20 @@ func RegisterBuiltins(reg *Registry) {
 	reg.Register(&TemplateRenderNode{})
 	reg.Register(&FileWriteNode{})
 	reg.Register(&FileReadNode{})
-	reg.Register(&OpenAINode{})
-	reg.Register(&CozeNode{})
 	reg.Register(&FastGPTNode{})
 	reg.Register(&JSONParseNode{})
-	reg.Register(&IMANode{})
 	reg.Register(&CombineNode{})
 	reg.Register(&TransformNode{})
 	reg.Register(&NotifyNode{})
 	reg.Register(&OllamaNode{})
 	reg.Register(&CallNode{})
+
+	// OpenAI-compatible providers (openai, glm, kimi, qwen, deepseek,
+	// anthropic, gemini, mistral, yi, baichuan, internlm, minimax,
+	// xverse, mimo, coze, ima) are registered from the consolidated
+	// config table in providers/openai_compatible.go so that this local
+	// registry gets real, functional nodes rather than zero-value stubs.
+	for _, cfg := range providers.OpenAICompatibleConfigs() {
+		reg.Register(core.NewOpenAICompatibleNode(cfg))
+	}
 }

@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/trip-budget",
+  "name": "trip-budget",
+  "version": "1.0.0",
+  "description": "Calculate and plan trip budget",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "trip-budget",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

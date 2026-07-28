@@ -91,6 +91,10 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 
 	globalLimiter := NewConcurrencyLimiter(wf.MaxConcurrency)
 	initialInput := ""
+	// Branch sub-workflows (if then/else) seed their initial input via context.
+	if v, ok := ctx.Value(ifInputKey).(string); ok {
+		initialInput = v
+	}
 
 	if program != nil {
 		program.Send(tui.WorkflowStartMsg{
@@ -144,7 +148,7 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 			}
 
 			// 参数求值（复合步骤的 params 不在此求值，由子执行器处理）
-			if !wStep.IsIf() && !wStep.IsLoop() && !wStep.IsParallel() {
+			if !wStep.IsIf() && !wStep.IsLoop() && !wStep.IsParallel() && !wStep.IsMap() && !wStep.IsReduce() {
 				params, err := engine.EvaluateParams(wStep.Params, input)
 				if err != nil {
 					ps.evalErr = err
@@ -448,6 +452,20 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 		attemptsMade = 1
 		return
 	}
+	if wStep.IsMap() {
+		// map 用独立 engine；{{item}}/{{index}} 在迭代内生效。
+		mapEngine := NewExpressionEngine()
+		_, output, execErr = executeMapStep(ctx, 0, wStep, input, mapEngine, reg, nil, NewConcurrencyLimiter(0))
+		attemptsMade = 1
+		return
+	}
+	if wStep.IsReduce() {
+		// reduce 用独立 engine；{{loop.acc}}/{{loop.item}} 在迭代内生效。
+		reduceEngine := NewExpressionEngine()
+		_, output, execErr = executeReduceStep(ctx, 0, wStep, input, reduceEngine, reg, nil, NewConcurrencyLimiter(0))
+		attemptsMade = 1
+		return
+	}
 
 	// 普通节点：直接执行
 	node, ok := reg.Get(wStep.Node)
@@ -510,6 +528,19 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 // 返回的 recoveries 列表记录已应用的恢复动作（用于 trace）。
 func applyErrorRecovery(ctx context.Context, wStep *WorkflowStep, output *string, execErr error, engine *ExpressionEngine, reg *nodes.Registry, input string) ([]string, error) {
 	var recoveries []string
+
+	// 0. capture_error：运行错误分支（把错误当作可分支的值而非吞掉）。
+	// 最先检查，因为它是最具表达力的恢复原语。
+	if wStep.HasCaptureError() {
+		branchOut, bErr := executeCaptureErrorBranch(ctx, wStep.CaptureError, execErr.Error(), engine.SnapshotVars(), reg, nil, nil)
+		if bErr == nil {
+			logger.Info("DAG step recovered via capture_error branch", "node", wStep.Node)
+			*output = branchOut
+			recoveries = append(recoveries, "capture_error")
+			return recoveries, nil
+		}
+		logger.Warn("DAG capture_error branch failed, falling through to other recovery", "node", wStep.Node, "error", nodes.RedactSensitive(bErr.Error()))
+	}
 
 	// 1. fallback 值
 	if wStep.Fallback != "" {

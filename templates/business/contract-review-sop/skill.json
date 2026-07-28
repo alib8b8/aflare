@@ -1,0 +1,19 @@
+{
+  "id": "business/contract-review-sop",
+  "name": "contract-review-sop",
+  "version": "1.0.0",
+  "description": "contract-review-sop workflow template",
+  "author": "llm-box community",
+  "category": "business",
+  "tags": [
+    "business",
+    "workflow"
+  ],
+  "keywords": [
+    "contract-review-sop",
+    "business"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

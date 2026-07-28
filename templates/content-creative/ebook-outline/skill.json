@@ -1,0 +1,19 @@
+{
+  "id": "content-creative/ebook-outline",
+  "name": "ebook-outline",
+  "version": "1.0.0",
+  "description": "Generate comprehensive ebook outline",
+  "author": "llm-box community",
+  "category": "content-creative",
+  "tags": [
+    "content-creative",
+    "workflow"
+  ],
+  "keywords": [
+    "ebook-outline",
+    "content-creative"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

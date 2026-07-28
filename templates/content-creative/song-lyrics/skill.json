@@ -1,0 +1,19 @@
+{
+  "id": "content-creative/song-lyrics",
+  "name": "song-lyrics",
+  "version": "1.0.0",
+  "description": "Generate song lyrics in any style",
+  "author": "llm-box community",
+  "category": "content-creative",
+  "tags": [
+    "content-creative",
+    "workflow"
+  ],
+  "keywords": [
+    "song-lyrics",
+    "content-creative"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

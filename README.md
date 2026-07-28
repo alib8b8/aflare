@@ -180,22 +180,16 @@ llm-box run btc-monitor.yaml
 | `reflector` | 反思过程并提出改进建议 |
 | `supervisor` | 监管多 Agent 工作流，支持顺序/并行/层级/MoE/MindSearch/**Agency** 策略和 **232+ 领域专家**、**19 个协作模板** |
 | `code_review` | 自动代码评审与建议 |
-| `router` | 将输入路由到合适的处理器 |
 | `human_in_loop` | 暂停等待人工审批 |
-| `meta_orchestrator` | 多模型路由器，**22+ 模型**、5 种策略、层级 Agent 网络 |
 | `code_knowledge_graph` | 语义代码知识图谱：158 种语言、向量检索、实体/关系/概念提取、**MCP 工具暴露**、**Token 高效审查**、**PR 分析**、**Inkling 代码审查** |
 | `moe_streaming` | MoE 专家流式加载：消费级硬件运行 744B 模型，按需加载 |
 | `cli_session` | 交互式终端会话，支持上下文持久化、流式输出、自动补全 |
 | `plugin_system` | 插件扩展：从本地/git/网址/市场安装/卸载/更新，沙箱隔离 |
-| `mcp_server` | MCP 服务器模式：通过 HTTP/WebSocket 暴露工具，支持会话管理和认证 |
-| `mcp_bridge` | MCP 桥接客户端：7 种操作、5 个内置工具、协议兼容 |
-| `quality_guard` | 反 AI-slop 检测：5 种评估类型、自动修复、质量阈值强制执行 |
 | `engineer_skills` | 16 个预置技能：React/TypeScript/API/数据库/CI-CD/Docker/设计模式 |
 | `skill_distill` | 从书籍/视频/播客中蒸馏方法论为可调用技能 |
 | `voice_output` | 语音 AI 工具链：TTS + 声音克隆 + **ASR 转录** + **说话人分离** + **语音分析** + 创作模式、11 种语言、5 种 ASR 引擎、**Inkling 音频理解** |
 | `doc_gen` | AI 文档生成：7 种类型（自述文件/API/函数/模块/变更日志/教程/架构） |
 | `video_edit` | AI 视频编辑：智能剪辑/合并/特效/字幕/故事板/超分 |
-| `omniroute` | **AI 网关统一层**：268+ 提供商、健康检查机制、6 种路由策略、Claude Code/Cursor/Cline 兼容、**Inkling MoE 支持** |
 | `memory` | **Agent 记忆基础设施**：三层记忆（短期/中期/长期）、10 种操作、可视化、LRU 淘汰、自动清理、**Inkling 长上下文检索** |
 
 ### 鸿蒙 & 移动端节点
@@ -222,29 +216,11 @@ llm-box run btc-monitor.yaml
 | `robot_control` | 为具身 AI 规划和执行机器人动作序列：人形/移动底盘/机械臂/无人机/机器狗/轮椅，带安全检查 |
 | `andesgpt` | OPPO AndesGPT 集成：Tiny（端侧 1B）/ Turbo（端云协同 7B）/ Titan（云端 100B+）、PersonaX 个性化、端云协同 |
 
-### 昇腾 NPU 适配节点
+### 代码智能节点
 
 | 节点 | 描述 |
 |------|-------------|
-| `ascend_model_search` | 在 AtomGit/昇腾模型库中搜索模型 |
-| `ascend_model_verify` | 验证模型清单、依赖项、许可证、昇腾兼容性 |
-| `ascend_model_adapt` | 通过 msTransplant 适配模型到昇腾 NPU，处理算子补丁 |
-| `ascend_model_quantize` | 通过 msModelSlim 进行 INT8/FP8/W8A8 量化，含精度对比 |
-| `ascend_model_optimize` | 通过 msProf/msprof-analyze 进行性能调优、瓶颈分析 |
-| `ascend_model_deploy` | MindIE Service 部署、OpenAI API 兼容性测试 |
-| `ascend_model_doc` | 自动生成基准测试报告和复现指南 |
-| `ascend_model_agent` | 端到端编排器（模式：完整/快速/调优） |
-
-### 代码智能与工具兼容节点
-
-| 节点 | 描述 |
-|------|-------------|
-| `code_graph` | 提取代码结构（导入/函数/调用），支持 Go/Python/JS/TS，输出 JSON 或 Mermaid 图 |
 | `file_watch` | 监听路径文件变化（创建/修改/删除），基于轮询，上下文感知 |
-| `glob` | 递归文件通配匹配（`**/*.go`），深度限制，Codex 兼容 |
-| `grep` | 递归内容搜索，支持正则表达式，跳过二进制文件，Codex/OpenCode 兼容 |
-| `list_dir` | 列出目录内容（可选递归），Codex 兼容 |
-| `apply_patch` | 原子化应用统一差异补丁（先验证再提交），Codex 兼容 |
 
 ---
 
@@ -267,9 +243,7 @@ llm-box 认真对待安全问题。关键防护措施：
 | **秘密脱敏** | 文件读取时自动检测并遮蔽 10+ 种秘密模式（AWS/GitHub/Slack/JWT/私钥）；`.env`/凭证默认完全遮蔽 |
 | **出站监控** | 滑动窗口数据量监控 + 异常告警（防止 Grok-Build 式 27800 倍数据泄漏） |
 | **熔断器** | 每工作者熔断器（Closed→Open→HalfOpen），故障节点自动隔离防止级联故障 |
-| **原子补丁** | `apply_patch` 先验证再提交，使用临时暂存 + 原子重命名；失败时无部分写入 |
 | **ANSI 注入** | TUI Markdown/Mermaid 渲染器从用户输入中剥离终端控制序列（CSI/OSC/DCS） |
-| **工具可移植性** | Codex/OpenCode 兼容工具（glob/grep/list_dir/apply_patch），含完整路径/符号链接/DoS 加固 |
 | **会话限制** | CLI 会话 24 小时后自动过期（最多 500 个），MCP 会话上限 1000 个并自动清理 |
 | **插件限制** | 最多 100 个插件，仅 HTTPS 网址，限制 Git 主机（GitHub/GitLab/GitCode/Gitee） |
 | **资源限制** | 代码知识图谱：最多 5000 个文件/深度 5；视频编辑：过滤 Shell 元字符 |
@@ -287,11 +261,10 @@ llm-box 参与多个开源生态：
 | 生态 | 状态 | 描述 |
 |-----------|--------|-------------|
 | **GitCode G-Star** | 已申请 | 算力支持、流量曝光、鸿蒙认证 |
-| **鸿蒙 Agent 技能** | 已发布 | 8 个技能：能力启动、原子服务、卡片、设备适配、跨应用、Agent 消息、意图路由、设备状态 |
-| **ohpm SDK** | 已发布 | `@llm-box/workflow-engine` —— ArkTS SDK，含 WorkflowEngine、30+ 节点类型、设备适配、意图协议 |
-| **昇腾 NPU 适配** | 活跃 | 7-Agent 自动适配流水线、3 种工作流模板（端到端/快速/性能调优）、CANN/MindIE 集成 |
-| **SenseNova** | 活跃 | API 集成（6 个模型）、端侧 U1-Lite 支持（8B/A3B MoE）、8 个 SenseNova 生态技能 |
+| **鸿蒙 & 移动端节点** | 内置 | 19 个节点：能力启动、原子服务、卡片、设备适配、跨应用、Agent 消息、意图路由、设备状态、UI 自动化、系统事件等 |
+| **SenseNova** | 活跃 | API 集成（6 个模型）、端侧 U1-Lite 支持（8B/A3B MoE） |
 | **Ant Ling (百灵)** | 活跃 | API 集成（4 个模型：ling-2.6-flash/ling-2.6-1t/ring-2.6-1t/ming-flash-omni-2.0）、OpenAI 兼容端点 |
+| **OPPO AndesGPT** | 活跃 | API 集成（Tiny/Turbo/Titan 三档）、PersonaX 个性化、端云协同 |
 | **GitHub** | 活跃 | CI/CD、CodeQL 安全扫描、自动发布 |
 
 ### 鸿蒙设备支持
@@ -305,18 +278,6 @@ llm-box 参与多个开源生态：
 | 智慧屏 | 语音、手势、遥控器 |
 | 车机 | 方向盘控制、HUD、语音 |
 | 穿戴 | 心率、加速度计、陀螺仪 |
-
-### 昇腾 NPU 硬件支持
-
-| 硬件 | 定位 | 模型规模 |
-|----------|----------|-------------|
-| 昇腾 910B | 训练/推理 | 7B-70B |
-| 昇腾 910C | 训练/推理 | 7B-170B |
-| Atlas 800I A2 | 推理服务器 | 7B-70B |
-| Atlas 300I Duo | 边缘推理 | <13B |
-| 310P | 边缘推理 | <7B |
-
-📖 [G-Star 申请 →](ecosystem/GSTAR_APPLICATION.md) | [鸿蒙技能 →](ecosystem/harmonyos-skills/) | [ohpm SDK →](ecosystem/ohpm/) | [昇腾适配 →](ecosystem/ascend-adaptation/ASCEND_ADAPTATION.md)
 
 ---
 
@@ -400,8 +361,6 @@ llm-box help                显示完整帮助
 - **边缘路由器** —— ReAct 推理循环、三层持久化记忆、本地/云端模型路由
 - **技能进化** —— 自我改进的 Agent 技能，追踪成功率并优化提示词
 - **意图协议** —— `intent://` 和 `ohos://` URI 协议、W3C DID 身份、跨域消息
-- **昇腾适配** —— 昇腾 NPU 模型适配 7-Agent 流水线（搜索/验证/适配/量化/优化/部署/文档）
-- **代码智能** —— 代码图谱提取、Codex/OpenCode 兼容工具节点（glob/grep/list_dir/apply_patch）
 - **子代理提示词** —— 17 个专家提示词模板、主/子代理层级（Grok Build 模式）
 - **熔断器** —— 每工作者 Closed/Open/HalfOpen 状态机，保障分布式弹性
 - **隐私层** —— 文件读取时秘密脱敏、出站数据量异常监控

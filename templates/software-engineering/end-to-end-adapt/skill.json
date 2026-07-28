@@ -1,0 +1,19 @@
+{
+  "id": "software-engineering/end-to-end-adapt",
+  "name": "end-to-end-adapt",
+  "version": "1.0.0",
+  "description": "昇腾 Model-Agent 模型适配大赛 · 赛道一主力模板",
+  "author": "llm-box community",
+  "category": "software-engineering",
+  "tags": [
+    "software-engineering",
+    "workflow"
+  ],
+  "keywords": [
+    "end-to-end-adapt",
+    "software-engineering"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

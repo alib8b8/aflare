@@ -1,0 +1,19 @@
+{
+  "id": "software-engineering/dev-setup",
+  "name": "dev-setup",
+  "version": "1.0.0",
+  "description": "Automated development environment setup",
+  "author": "llm-box community",
+  "category": "software-engineering",
+  "tags": [
+    "software-engineering",
+    "workflow"
+  ],
+  "keywords": [
+    "dev-setup",
+    "software-engineering"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

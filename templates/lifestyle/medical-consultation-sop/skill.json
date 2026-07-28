@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/medical-consultation-sop",
+  "name": "medical-consultation-sop",
+  "version": "1.0.0",
+  "description": "medical-consultation-sop workflow template",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "medical-consultation-sop",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

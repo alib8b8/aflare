@@ -1,0 +1,19 @@
+{
+  "id": "data-ai/data-cleaning",
+  "name": "data-cleaning",
+  "version": "1.0.0",
+  "description": "Generate data cleaning and preprocessing pipeline",
+  "author": "llm-box community",
+  "category": "data-ai",
+  "tags": [
+    "data-ai",
+    "workflow"
+  ],
+  "keywords": [
+    "data-cleaning",
+    "data-ai"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

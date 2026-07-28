@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 	"text/template"
+	"time"
 )
 
 type TemplateRenderNode struct{}
@@ -87,6 +88,7 @@ func (n *TemplateRenderNode) Execute(ctx context.Context, input string, params m
 		"title": strings.ToTitle,
 		"trim":  strings.TrimSpace,
 		"len":   func(s string) int { return len(s) },
+		"now":   func() string { return time.Now().Format(time.RFC3339) },
 	}
 
 	tmpl, err := template.New("template").Funcs(funcMap).Parse(templateStr)

@@ -1,0 +1,19 @@
+{
+  "id": "devops-infra/iac-template",
+  "name": "iac-template",
+  "version": "1.0.0",
+  "description": "Generate Terraform/IaC templates",
+  "author": "llm-box community",
+  "category": "devops-infra",
+  "tags": [
+    "devops-infra",
+    "workflow"
+  ],
+  "keywords": [
+    "iac-template",
+    "devops-infra"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

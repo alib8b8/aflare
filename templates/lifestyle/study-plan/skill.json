@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/study-plan",
+  "name": "study-plan",
+  "version": "1.0.0",
+  "description": "Create personalized study plan for any topic",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "study-plan",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

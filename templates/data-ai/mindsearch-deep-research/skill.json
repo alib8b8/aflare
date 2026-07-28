@@ -1,0 +1,19 @@
+{
+  "id": "data-ai/mindsearch-deep-research",
+  "name": "mindsearch-deep-research",
+  "version": "1.0.0",
+  "description": "mindsearch-deep-research workflow template",
+  "author": "llm-box community",
+  "category": "data-ai",
+  "tags": [
+    "data-ai",
+    "workflow"
+  ],
+  "keywords": [
+    "mindsearch-deep-research",
+    "data-ai"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

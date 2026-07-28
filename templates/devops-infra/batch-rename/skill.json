@@ -1,0 +1,19 @@
+{
+  "id": "devops-infra/batch-rename",
+  "name": "batch-rename",
+  "version": "1.0.0",
+  "description": "Batch rename files with patterns",
+  "author": "llm-box community",
+  "category": "devops-infra",
+  "tags": [
+    "devops-infra",
+    "workflow"
+  ],
+  "keywords": [
+    "batch-rename",
+    "devops-infra"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

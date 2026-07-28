@@ -1,0 +1,19 @@
+{
+  "id": "software-engineering/api-docs-builder",
+  "name": "api-docs-builder",
+  "version": "1.0.0",
+  "description": "Build API documentation from spec",
+  "author": "llm-box community",
+  "category": "software-engineering",
+  "tags": [
+    "software-engineering",
+    "workflow"
+  ],
+  "keywords": [
+    "api-docs-builder",
+    "software-engineering"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "devops-infra/log-analyzer",
+  "name": "log-analyzer",
+  "version": "1.0.0",
+  "description": "Analyze application logs for errors and patterns",
+  "author": "llm-box community",
+  "category": "devops-infra",
+  "tags": [
+    "devops-infra",
+    "workflow"
+  ],
+  "keywords": [
+    "log-analyzer",
+    "devops-infra"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

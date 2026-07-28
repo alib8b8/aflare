@@ -1,0 +1,19 @@
+{
+  "id": "content-creative/press-release",
+  "name": "press-release",
+  "version": "1.0.0",
+  "description": "Generate professional press release",
+  "author": "llm-box community",
+  "category": "content-creative",
+  "tags": [
+    "content-creative",
+    "workflow"
+  ],
+  "keywords": [
+    "press-release",
+    "content-creative"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

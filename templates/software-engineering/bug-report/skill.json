@@ -1,0 +1,19 @@
+{
+  "id": "software-engineering/bug-report",
+  "name": "bug-report",
+  "version": "1.0.0",
+  "description": "Generate structured bug report template",
+  "author": "llm-box community",
+  "category": "software-engineering",
+  "tags": [
+    "software-engineering",
+    "workflow"
+  ],
+  "keywords": [
+    "bug-report",
+    "software-engineering"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

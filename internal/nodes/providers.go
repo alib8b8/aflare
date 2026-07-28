@@ -26,14 +26,13 @@ import (
 
 // Type aliases for backward compatibility with code/tests that construct
 // these provider nodes directly by struct name (e.g. nodes_extra_test.go
-// and RegisterBuiltins in node.go). Providers that register an
-// OpenAI-compatible client directly (e.g. mistral, glm, qwen, kimi,
-// deepseek, baichuan, internlm, yi, xverse, minimax, mimo, anthropic,
-// gemini) do not need an alias because no caller references them by name.
+// and RegisterBuiltins in node.go). The OpenAI-compatible providers
+// (openai, anthropic, gemini, glm, kimi, qwen, deepseek, mistral, yi,
+// baichuan, internlm, minimax, xverse, mimo, coze, ima) no longer have
+// dedicated struct types — they are registered from a single config
+// table in providers/openai_compatible.go — so they have no alias here.
+// Only providers with bespoke implementations keep a struct alias.
 type (
-	OpenAINode  = providers.OpenAINode
 	OllamaNode  = providers.OllamaNode
-	CozeNode    = providers.CozeNode
 	FastGPTNode = providers.FastGPTNode
-	IMANode     = providers.IMANode
 )

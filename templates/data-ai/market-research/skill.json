@@ -1,0 +1,19 @@
+{
+  "id": "data-ai/market-research",
+  "name": "market-research",
+  "version": "1.0.0",
+  "description": "Research market trends and competitive landscape",
+  "author": "llm-box community",
+  "category": "data-ai",
+  "tags": [
+    "data-ai",
+    "workflow"
+  ],
+  "keywords": [
+    "market-research",
+    "data-ai"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/travel-itinerary",
+  "name": "travel-itinerary",
+  "version": "1.0.0",
+  "description": "Generate detailed travel itinerary",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "travel-itinerary",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

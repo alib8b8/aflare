@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/stress-management",
+  "name": "stress-management",
+  "version": "1.0.0",
+  "description": "Create stress management toolkit",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "stress-management",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "data-ai/literature-review",
+  "name": "literature-review",
+  "version": "1.0.0",
+  "description": "literature-review workflow template",
+  "author": "llm-box community",
+  "category": "data-ai",
+  "tags": [
+    "data-ai",
+    "workflow"
+  ],
+  "keywords": [
+    "literature-review",
+    "data-ai"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "data-ai/paper-summarizer",
+  "name": "paper-summarizer",
+  "version": "1.0.0",
+  "description": "Summarize academic papers into key insights",
+  "author": "llm-box community",
+  "category": "data-ai",
+  "tags": [
+    "data-ai",
+    "workflow"
+  ],
+  "keywords": [
+    "paper-summarizer",
+    "data-ai"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

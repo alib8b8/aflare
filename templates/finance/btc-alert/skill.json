@@ -1,0 +1,19 @@
+{
+  "id": "finance/btc-alert",
+  "name": "btc-alert",
+  "version": "1.0.0",
+  "description": "Monitor Bitcoin price and get alerted when it crosses your threshold.",
+  "author": "llm-box community",
+  "category": "finance",
+  "tags": [
+    "finance",
+    "workflow"
+  ],
+  "keywords": [
+    "btc-alert",
+    "finance"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

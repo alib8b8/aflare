@@ -1,0 +1,19 @@
+{
+  "id": "business/saas-pricing",
+  "name": "saas-pricing",
+  "version": "1.0.0",
+  "description": "Design SaaS pricing strategy and tiers",
+  "author": "llm-box community",
+  "category": "business",
+  "tags": [
+    "business",
+    "workflow"
+  ],
+  "keywords": [
+    "saas-pricing",
+    "business"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

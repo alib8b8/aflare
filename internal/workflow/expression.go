@@ -109,6 +109,17 @@ func (e *ExpressionEngine) GetVariable(name string) (string, bool) {
 	return v, ok
 }
 
+// SnapshotVars returns a copy of the current workflow-level variables.
+// Used by map iterations to inherit the outer context into a per-item
+// engine without sharing mutable state.
+func (e *ExpressionEngine) SnapshotVars() map[string]string {
+	out := make(map[string]string, len(e.variables))
+	for k, v := range e.variables {
+		out[k] = v
+	}
+	return out
+}
+
 // SetLoopVars sets the current loop context variables.
 func (e *ExpressionEngine) SetLoopVars(item string, index, count int) {
 	if e.loopVars == nil {
@@ -122,6 +133,21 @@ func (e *ExpressionEngine) SetLoopVars(item string, index, count int) {
 // ClearLoopVars removes the loop context.
 func (e *ExpressionEngine) ClearLoopVars() {
 	e.loopVars = nil
+}
+
+// SetReduceVars sets the reduce (fold) context variables. It populates the
+// same loopVars map used by map/loop, so {{loop.acc}} / {{loop.item}} /
+// {{loop.index}} / {{loop.count}} all resolve inside a reduce iteration.
+// acc is the running accumulator; item is the current list element; index
+// is the 0-based iteration index; count is the total number of items.
+func (e *ExpressionEngine) SetReduceVars(acc, item string, index, count int) {
+	if e.loopVars == nil {
+		e.loopVars = make(map[string]string)
+	}
+	e.loopVars["acc"] = acc
+	e.loopVars["item"] = item
+	e.loopVars["index"] = strconv.Itoa(index)
+	e.loopVars["count"] = strconv.Itoa(count)
 }
 
 // SetSecretGetter sets the function to retrieve secrets from the secret manager
@@ -154,6 +180,7 @@ var varPattern = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 //	{{loop.item}}                - current loop item
 //	{{loop.index}}               - current loop index
 //	{{loop.count}}               - total loop iterations
+//	{{loop.acc}}                 - running accumulator (reduce only)
 //
 // Unknown expressions (e.g. Go template syntax {{.foo}}) are left unchanged.
 func (e *ExpressionEngine) Evaluate(expr string, input string) (string, error) {

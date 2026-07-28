@@ -1,0 +1,19 @@
+{
+  "id": "data-ai/competitor-analysis",
+  "name": "competitor-analysis",
+  "version": "1.0.0",
+  "description": "Analyze competitors and their strategies",
+  "author": "llm-box community",
+  "category": "data-ai",
+  "tags": [
+    "data-ai",
+    "workflow"
+  ],
+  "keywords": [
+    "competitor-analysis",
+    "data-ai"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

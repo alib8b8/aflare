@@ -1,0 +1,19 @@
+{
+  "id": "business/sprint-planner",
+  "name": "sprint-planner",
+  "version": "1.0.0",
+  "description": "Plan and organize sprint tasks",
+  "author": "llm-box community",
+  "category": "business",
+  "tags": [
+    "business",
+    "workflow"
+  ],
+  "keywords": [
+    "sprint-planner",
+    "business"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "devops-infra/password-policy",
+  "name": "password-policy",
+  "version": "1.0.0",
+  "description": "Generate security password policy",
+  "author": "llm-box community",
+  "category": "devops-infra",
+  "tags": [
+    "devops-infra",
+    "workflow"
+  ],
+  "keywords": [
+    "password-policy",
+    "devops-infra"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/habit-tracker",
+  "name": "habit-tracker",
+  "version": "1.0.0",
+  "description": "Track habits and generate progress reports",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "habit-tracker",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

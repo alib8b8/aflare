@@ -1,0 +1,19 @@
+{
+  "id": "data-ai/csv-analyzer",
+  "name": "csv-analyzer",
+  "version": "1.0.0",
+  "description": "Analyze CSV data files and generate insights",
+  "author": "llm-box community",
+  "category": "data-ai",
+  "tags": [
+    "data-ai",
+    "workflow"
+  ],
+  "keywords": [
+    "csv-analyzer",
+    "data-ai"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

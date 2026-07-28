@@ -34,10 +34,7 @@ func TestNodeMetadata(t *testing.T) {
 		wantDescLen int
 	}{
 		{"test", &TestNode{}, "test_node", 0},
-		{"openai", &OpenAINode{}, "openai", 0},
-		{"coze", &CozeNode{}, "coze", 0},
 		{"fastgpt", &FastGPTNode{}, "fastgpt", 0},
-		{"ima", &IMANode{}, "ima", 0},
 		{"http_request", &HTTPRequestNode{}, "http_request", 0},
 		{"fetch_url", &FetchURLNode{}, "fetch_url", 0},
 		{"file_read", &FileReadNode{}, "file_read", 0},
@@ -1549,7 +1546,13 @@ func TestHTTPRequestNode_Execute(t *testing.T) {
 }
 
 func TestOpenAINode_Metadata(t *testing.T) {
-	node := &OpenAINode{}
+	// OpenAI is now registered from the consolidated config table; fetch
+	// the real node from the global registry instead of constructing a
+	// struct literal.
+	node, ok := Get("openai")
+	if !ok {
+		t.Fatal("openai provider not found in registry")
+	}
 	if node.Name() != "openai" {
 		t.Errorf("expected openai, got %s", node.Name())
 	}
@@ -1563,7 +1566,10 @@ func TestOpenAINode_Metadata(t *testing.T) {
 }
 
 func TestCozeNode_Metadata(t *testing.T) {
-	node := &CozeNode{}
+	node, ok := Get("coze")
+	if !ok {
+		t.Fatal("coze provider not found in registry")
+	}
 	if node.Name() != "coze" {
 		t.Errorf("expected coze, got %s", node.Name())
 	}
@@ -1583,7 +1589,10 @@ func TestFastGPTNode_Metadata(t *testing.T) {
 }
 
 func TestIMANode_Metadata(t *testing.T) {
-	node := &IMANode{}
+	node, ok := Get("ima")
+	if !ok {
+		t.Fatal("ima provider not found in registry")
+	}
 	if node.Name() != "ima" {
 		t.Errorf("expected ima, got %s", node.Name())
 	}

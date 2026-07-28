@@ -53,7 +53,7 @@ func (n *CLISessionNode) Schema() NodeSchema {
 		Input:       "string - 用户输入的命令或消息",
 		Output:      "string - JSON格式的会话响应",
 		Params: []ParamSchema{
-			{Name: "model", Type: "string", Description: "使用的模型（默认auto，由meta_orchestrator选择）", Required: false, Default: "auto"},
+			{Name: "model", Type: "string", Description: "使用的模型（默认auto，由路由层选择）", Required: false, Default: "auto"},
 			{Name: "session_id", Type: "string", Description: "会话ID（自动生成或指定）", Required: false},
 			{Name: "max_history", Type: "int", Description: "最大历史记录数（默认50）", Required: false, Default: "50"},
 			{Name: "streaming", Type: "bool", Description: "流式输出（默认true）", Required: false, Default: "true"},

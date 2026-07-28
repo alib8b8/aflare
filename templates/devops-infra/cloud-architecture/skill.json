@@ -1,0 +1,19 @@
+{
+  "id": "devops-infra/cloud-architecture",
+  "name": "cloud-architecture",
+  "version": "1.0.0",
+  "description": "Generate cloud architecture design",
+  "author": "llm-box community",
+  "category": "devops-infra",
+  "tags": [
+    "devops-infra",
+    "workflow"
+  ],
+  "keywords": [
+    "cloud-architecture",
+    "devops-infra"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "business/retrospective",
+  "name": "retrospective",
+  "version": "1.0.0",
+  "description": "Generate sprint retrospective template",
+  "author": "llm-box community",
+  "category": "business",
+  "tags": [
+    "business",
+    "workflow"
+  ],
+  "keywords": [
+    "retrospective",
+    "business"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

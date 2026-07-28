@@ -538,9 +538,9 @@ func (r *Registry) NodesByCategory(category NodeCategory) []NodeInfo {
 			"if", "switch", "loop", "wait", "parallel", "map",
 		},
 		CategoryData: {
-			"rag", "knowledge_graph", "smart_router", "code_interpreter",
-			"execute", "multimodal", "node_marketplace",
-		},
+		"rag", "knowledge_graph", "code_interpreter",
+		"execute", "multimodal", "node_marketplace",
+	},
 		CategorySecurity: {
 			"hash", "encrypt", "decrypt", "sign", "verify",
 		},

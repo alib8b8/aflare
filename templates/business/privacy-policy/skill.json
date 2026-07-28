@@ -1,0 +1,19 @@
+{
+  "id": "business/privacy-policy",
+  "name": "privacy-policy",
+  "version": "1.0.0",
+  "description": "Generate privacy policy template",
+  "author": "llm-box community",
+  "category": "business",
+  "tags": [
+    "business",
+    "workflow"
+  ],
+  "keywords": [
+    "privacy-policy",
+    "business"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

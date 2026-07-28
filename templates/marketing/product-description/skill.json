@@ -1,0 +1,19 @@
+{
+  "id": "marketing/product-description",
+  "name": "product-description",
+  "version": "1.0.0",
+  "description": "Write compelling product descriptions",
+  "author": "llm-box community",
+  "category": "marketing",
+  "tags": [
+    "marketing",
+    "workflow"
+  ],
+  "keywords": [
+    "product-description",
+    "marketing"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

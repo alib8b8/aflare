@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/meal-plan",
+  "name": "meal-plan",
+  "version": "1.0.0",
+  "description": "Generate weekly meal plan",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "meal-plan",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

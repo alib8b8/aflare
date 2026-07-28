@@ -1,0 +1,57 @@
+name: batch-url-processor
+description: |
+  批量 URL 处理器：用 map 原语对一组 URL 并发抓取 + LLM 摘要 + 失败降级。
+  这是"能解决问题的工作流"的最小范本——展示 map 多步子工作流、错误即数据、
+  并发控制三件事如何组合，而非把逻辑塞进单个节点的 operation 参数。
+
+  典型用途：监控一批文档页变更、批量总结 RSS 条目、并发审计多个 API 端点。
+vars:
+  # 默认处理 5 个 URL；可通过 -var urls='["..."]' 覆盖
+  urls: '["https://example.com/a","https://example.com/b","https://example.com/c","https://example.com/d","https://example.com/e"]'
+
+steps:
+  # Step 1: 用 map 对每个 URL 跑子工作流（fetch → summarize → tag）
+  # 子工作流是多步序列，不是单节点迭代——这是 map 与 loop 的本质区别。
+  - name: batch
+    map:
+      over: "{{var.urls}}"
+      concurrency: 3                # 并发抓取上限（int，不支持表达式）
+      stop_on_error: false          # 单个 URL 失败不终止整批
+      steps:
+        # 子步骤 1: 抓取 URL
+        - name: fetch
+          node: fetch_url
+          params:
+            url: "{{item}}"
+          retry: 2
+          backoff: { exponential: true, base: "1s", max_delay: "10s" }
+          continue_on_error: true    # 错误不抛出，留到下一步判断
+
+        # 子步骤 2: 条件分支——抓取成功则摘要，失败则降级
+        - name: classify
+          if:
+            condition: "{{step.fetch}} != ''"
+            then:
+              - name: summarize
+                node: openai
+                params:
+                  system: "用一句话总结这个网页的核心内容。"
+                retry: 1
+            else:
+              # 降级路径：抓取失败的 URL 标记为不可达，仍进入结果集
+              - name: degraded
+                node: template_render
+                params:
+                  template: "[UNREACHABLE] {{item}}"
+
+  # Step 2: 聚合输出（map 默认输出 json_array，直接可用）
+  - name: report
+    node: template_render
+    params:
+      template: |
+        # 批量处理报告
+        结果（JSON 数组，含成功摘要与降级标记）：
+
+        {{step.batch}}
+
+output: "{{step.report}}"

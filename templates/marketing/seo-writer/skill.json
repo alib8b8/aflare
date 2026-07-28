@@ -1,0 +1,19 @@
+{
+  "id": "marketing/seo-writer",
+  "name": "seo-writer",
+  "version": "1.0.0",
+  "description": "Generate SEO-optimized articles with AI-powered research and audit.",
+  "author": "llm-box community",
+  "category": "marketing",
+  "tags": [
+    "marketing",
+    "workflow"
+  ],
+  "keywords": [
+    "seo-writer",
+    "marketing"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "data-ai/model-evaluation",
+  "name": "model-evaluation",
+  "version": "1.0.0",
+  "description": "Generate comprehensive model evaluation report",
+  "author": "llm-box community",
+  "category": "data-ai",
+  "tags": [
+    "data-ai",
+    "workflow"
+  ],
+  "keywords": [
+    "model-evaluation",
+    "data-ai"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

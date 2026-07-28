@@ -179,22 +179,16 @@ Specialized AI agent nodes for autonomous reasoning:
 | `reflector` | Reflects on process and suggests improvements |
 | `supervisor` | Oversees multi-agent workflows with sequential/parallel/hierarchical/MoE/MindSearch/Agency strategies and 200+ domain specialists |
 | `code_review` | Automated code review and suggestions |
-| `router` | Routes inputs to appropriate handlers |
 | `human_in_loop` | Pauses for human approval |
-| `meta_orchestrator` | Multi-model router with 22+ models, 5 strategies, hierarchical agent network |
 | `code_knowledge_graph` | Semantic code knowledge graph: 158 languages, vector retrieval, entity/relation/concept extraction, MCP tool exposure, token-efficient review |
 | `moe_streaming` | MoE expert streaming: consumer hardware runs 744B models with on-demand loading |
 | `cli_session` | Interactive terminal session with context persistence, streaming output, auto-completion |
 | `plugin_system` | Plugin extension: install/uninstall/update from local/git/url/market with sandbox isolation |
-| `mcp_server` | MCP server mode: expose tools via HTTP/WebSocket with session management and auth |
-| `mcp_bridge` | MCP client bridge: 7 operations, 5 built-in tools, protocol-compatible |
-| `quality_guard` | Anti-AI-slop detection: 5 assessment types, auto-fix, quality threshold enforcement |
 | `engineer_skills` | 16 pre-built skills: React/TypeScript/API/Database/CI-CD/Docker/Design Patterns |
 | `skill_distill` | Distill methodologies from books/videos/podcasts into callable skills |
 | `voice_output` | Voice AI toolchain: TTS + voice cloning + ASR transcription + speaker diarization + voice analysis, 11 languages, 5 ASR engines |
 | `doc_gen` | AI document generation: 7 types (readme/api/function/module/changelog/tutorial/architecture) |
 | `video_edit` | AI video editing: smart_cut/merge/effects/subtitle/storyboard/upscale |
-| `omniroute` | AI gateway unified layer: 15+ providers, 6 routing strategies, Claude Code/Cursor/Cline compatibility |
 | `memory` | Agent memory infrastructure: three-level memory (short/medium/long), 8 operations, LRU eviction, cross-session long-term memory |
 
 ### HarmonyOS &amp; Mobile Nodes
@@ -221,29 +215,11 @@ Specialized AI agent nodes for autonomous reasoning:
 | `robot_control` | Plan and execute robot action sequences for embodied AI: humanoid/mobile_base/arm/drone/dog/wheelchair with safety checks |
 | `andesgpt` | OPPO AndesGPT integration: Tiny (on-device 1B) / Turbo (edge-cloud 7B) / Titan (cloud 100B+), PersonaX personalization, end-cloud collaboration |
 
-### Ascend NPU Adaptation Nodes
+### Code Intelligence Nodes
 
 | Node | Description |
 |------|-------------|
-| `ascend_model_search` | Search models in AtomGit/HuggingFace ModelZoo |
-| `ascend_model_verify` | Verify model manifest, dependencies, License, Ascend compatibility |
-| `ascend_model_adapt` | Adapt model to Ascend NPU via msTransplant, handle operator patches |
-| `ascend_model_quantize` | INT8/FP8/W8A8 quantization via msModelSlim with accuracy comparison |
-| `ascend_model_optimize` | Performance tuning via msProf/msprof-analyze, bottleneck analysis |
-| `ascend_model_deploy` | MindIE Service deployment, OpenAI API compatibility test |
-| `ascend_model_doc` | Auto-generate benchmark report and reproduction guide |
-| `ascend_model_agent` | End-to-end orchestrator (mode: full/quick/tune) |
-
-### Code Intelligence &amp; Tool Compatibility Nodes
-
-| Node | Description |
-|------|-------------|
-| `code_graph` | Extract code structure (imports/functions/calls) for Go/Python/JS/TS, output JSON or Mermaid graph |
 | `file_watch` | Watch a path for file changes (create/modify/delete), polling-based, context-aware |
-| `glob` | Recursive file glob matching (`**/*.go`), depth-limited, Codex-compatible |
-| `grep` | Recursive content search with regex, binary-skip, Codex/OpenCode-compatible |
-| `list_dir` | List directory contents (optional recursive), Codex-compatible |
-| `apply_patch` | Apply unified diff patches atomically (validate-then-commit), Codex-compatible |
 
 ---
 
@@ -266,9 +242,7 @@ llm-box takes security seriously. Key protections:
 | **Secret Redaction** | Auto-detect &amp; mask 10+ secret patterns (AWS/GitHub/Slack/JWT/private keys) on file read; `.env`/credentials fully masked by default |
 | **Outbound Monitoring** | Sliding-window data volume monitor with anomaly alerting (prevents Grok-Build-style 27800&times; data leaks) |
 | **Circuit Breaker** | Per-worker breaker (Closed&rarr;Open&rarr;HalfOpen), auto-isolation of failing nodes prevents cascade failures |
-| **Atomic Patches** | `apply_patch` validates-then-commits with temp staging + atomic rename; no partial writes on failure |
 | **ANSI Injection** | TUI Markdown/Mermaid renderers strip terminal control sequences (CSI/OSC/DCS) from user input |
-| **Tool Portability** | Codex/OpenCode-compatible tools (glob/grep/list_dir/apply_patch) with full path/symlink/DoS hardening |
 | **Session Limits** | CLI sessions auto-expire after 24h (max 500), MCP sessions capped at 1000 with cleanup |
 | **Plugin Limits** | Max 100 plugins, HTTPS-only URLs, restricted git hosts (GitHub/GitLab/GitCode/Gitee) |
 | **Resource Limits** | Code knowledge graph: max 5000 files/depth 5; video edit: shell metacharacter filtering |
@@ -286,11 +260,10 @@ llm-box participates in multiple open-source ecosystems:
 | Ecosystem | Status | Description |
 |-----------|--------|-------------|
 | **GitCode G-Star** | Applied | Compute support, traffic exposure, HarmonyOS certification |
-| **HarmonyOS Agent Skills** | Published | 8 skills: ability launch, atomic service, widget, device adapt, cross-app, agent message, intent router, device state |
-| **ohpm SDK** | Published | `@llm-box/workflow-engine` &mdash; ArkTS SDK with WorkflowEngine, 30+ node types, device adaptation, intent protocol |
-| **Ascend NPU Adaptation** | Active | 7-agent auto-adapt pipeline, 3 workflow templates (end-to-end/quick/performance-tune), CANN/MindIE integration |
-| **SenseNova** | Active | API integration (6 models), on-device U1-Lite support (8B/A3B MoE), 8 skills for SenseNova ecosystem |
+| **HarmonyOS &amp; Mobile Nodes** | Built-in | 19 nodes: ability launch, atomic service, widget, device adapt, cross-app, agent message, intent router, device state, UI automation, system events, etc. |
+| **SenseNova** | Active | API integration (6 models), on-device U1-Lite support (8B/A3B MoE) |
 | **Ant Ling** | Active | API integration (4 models: ling-2.6-flash/ling-2.6-1t/ring-2.6-1t/ming-flash-omni-2.0), OpenAI-compatible endpoint |
+| **OPPO AndesGPT** | Active | API integration (Tiny/Turbo/Titan tiers), PersonaX personalization, end-cloud collaboration |
 | **GitHub** | Active | CI/CD, CodeQL security scan, automated releases |
 
 ### HarmonyOS Device Support
@@ -304,18 +277,6 @@ llm-box participates in multiple open-source ecosystems:
 | Smart Screen | voice, gesture, remote_control |
 | Car | steering_wheel_control, hud, voice |
 | Wearable | heart_rate, accelerometer, gyroscope |
-
-### Ascend NPU Hardware Support
-
-| Hardware | Position | Model Scale |
-|----------|----------|-------------|
-| Ascend 910B | Training/Inference | 7B-70B |
-| Ascend 910C | Training/Inference | 7B-170B |
-| Atlas 800I A2 | Inference Server | 7B-70B |
-| Atlas 300I Duo | Edge Inference | &lt;13B |
-| 310P | Edge Inference | &lt;7B |
-
-📖 [G-Star Application →](ecosystem/GSTAR_APPLICATION.md) | [HarmonyOS Skills →](ecosystem/harmonyos-skills/) | [ohpm SDK →](ecosystem/ohpm/) | [Ascend Adaptation →](ecosystem/ascend-adaptation/ASCEND_ADAPTATION.md)
 
 ---
 
@@ -399,8 +360,6 @@ llm-box help                   Show full help
 - **Edge Router** &mdash; ReAct reasoning loop, 3-tier persistent memory, local/cloud model routing
 - **Skill Evolution** &mdash; Self-improving agent skills with success rate tracking and prompt optimization
 - **Intent Protocol** &mdash; `intent://` and `ohos://` URI schemes, W3C DID identity, cross-domain messaging
-- **Ascend Adaptation** &mdash; 7-agent pipeline for Ascend NPU model adaptation (search/verify/adapt/quantize/optimize/deploy/doc)
-- **Code Intelligence** &mdash; Code graph extraction, Codex/OpenCode-compatible tool nodes (glob/grep/list_dir/apply_patch)
 - **Subagent Prompts** &mdash; 17 specialist prompt templates, main/sub agent hierarchy (Grok Build pattern)
 - **Circuit Breaker** &mdash; Per-worker Closed/Open/HalfOpen state machine for distributed resilience
 - **Privacy Layer** &mdash; Secret redaction on file read, outbound data volume anomaly monitor

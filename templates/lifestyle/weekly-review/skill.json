@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/weekly-review",
+  "name": "weekly-review",
+  "version": "1.0.0",
+  "description": "Review the week and plan for next",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "weekly-review",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

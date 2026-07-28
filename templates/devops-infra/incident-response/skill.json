@@ -1,0 +1,19 @@
+{
+  "id": "devops-infra/incident-response",
+  "name": "incident-response",
+  "version": "1.0.0",
+  "description": "Generate incident response playbook",
+  "author": "llm-box community",
+  "category": "devops-infra",
+  "tags": [
+    "devops-infra",
+    "workflow"
+  ],
+  "keywords": [
+    "incident-response",
+    "devops-infra"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

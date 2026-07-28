@@ -1,0 +1,19 @@
+{
+  "id": "business/faq-generator",
+  "name": "faq-generator",
+  "version": "1.0.0",
+  "description": "Generate FAQ from support interactions",
+  "author": "llm-box community",
+  "category": "business",
+  "tags": [
+    "business",
+    "workflow"
+  ],
+  "keywords": [
+    "faq-generator",
+    "business"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

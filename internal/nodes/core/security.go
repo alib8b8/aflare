@@ -307,7 +307,7 @@ func ValidateURL(rawURL string) error {
 		return fmt.Errorf("URL has no host")
 	}
 
-	// Block localhost variants
+	// Block localhost variants (unless explicitly allowed for local dev/demo)
 	lowerHost := strings.ToLower(host)
 	localhostVariants := map[string]bool{
 		"localhost":             true,
@@ -315,7 +315,7 @@ func ValidateURL(rawURL string) error {
 		"ip6-localhost":         true,
 		"ip6-loopback":          true,
 	}
-	if localhostVariants[lowerHost] {
+	if localhostVariants[lowerHost] && !loopbackAllowed() {
 		GetSecurityStats().RecordBlock(BlockSSRF, "localhost: "+host, "")
 		return fmt.Errorf("access to localhost is not allowed")
 	}
@@ -323,7 +323,14 @@ func ValidateURL(rawURL string) error {
 	// Try to parse as IP first
 	ip := net.ParseIP(host)
 	if ip != nil {
-		if err := ValidateIP(ip, host); err != nil {
+		// When loopback is explicitly allowed (local dev/demo), use the
+		// LLM-endpoint IP validator which permits loopback but still
+		// blocks link-local/unspecified/multicast/reserved ranges.
+		validator := ValidateIP
+		if loopbackAllowed() {
+			validator = ValidateLMLEndpointIP
+		}
+		if err := validator(ip, host); err != nil {
 			GetSecurityStats().RecordBlock(BlockSSRF, "blocked IP: "+host, "")
 			return err
 		}
@@ -333,8 +340,12 @@ func ValidateURL(rawURL string) error {
 		if err != nil {
 			return fmt.Errorf("failed to resolve host %s: %w", host, err)
 		}
+		dnsValidator := ValidateIP
+		if loopbackAllowed() {
+			dnsValidator = ValidateLMLEndpointIP
+		}
 		for _, resolvedIP := range ips {
-			if err := ValidateIP(resolvedIP, host); err != nil {
+			if err := dnsValidator(resolvedIP, host); err != nil {
 				GetSecurityStats().RecordBlock(BlockSSRF, "blocked IP: "+resolvedIP.String(), "")
 				return err
 			}
@@ -342,6 +353,16 @@ func ValidateURL(rawURL string) error {
 	}
 
 	return nil
+}
+
+// loopbackAllowed reports whether loopback/localhost URLs are permitted by
+// the http_request node. This is OFF by default (strict SSRF protection) and
+// only enabled via the LLMBOX_ALLOW_LOOPBACK=1 env var, intended solely for
+// local development and demos that run mock services on localhost. Production
+// deployments must leave this unset.
+func loopbackAllowed() bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("LLMBOX_ALLOW_LOOPBACK")))
+	return v == "1" || v == "true" || v == "yes"
 }
 
 // ValidateIP reports whether ip is safe to connect to (blocks loopback,
@@ -384,8 +405,15 @@ var SafeHTTPClient = &http.Client{
 			if err != nil {
 				return nil, err
 			}
+			// When loopback is explicitly allowed (local dev/demo via
+			// LLMBOX_ALLOW_LOOPBACK=1), use the loopback-permitting validator
+			// at dial time too, keeping DNS-rebinding protection intact.
+			dialValidator := ValidateIP
+			if loopbackAllowed() {
+				dialValidator = ValidateLMLEndpointIPAllowLoopback
+			}
 			for _, ip := range ips {
-				if err := ValidateIP(ip.IP, host); err != nil {
+				if err := dialValidator(ip.IP, host); err != nil {
 					return nil, err
 				}
 			}

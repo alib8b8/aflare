@@ -1,0 +1,19 @@
+{
+  "id": "marketing/seo-keyword-research",
+  "name": "seo-keyword-research",
+  "version": "1.0.0",
+  "description": "Research and analyze SEO keywords for a topic",
+  "author": "llm-box community",
+  "category": "marketing",
+  "tags": [
+    "marketing",
+    "workflow"
+  ],
+  "keywords": [
+    "seo-keyword-research",
+    "marketing"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

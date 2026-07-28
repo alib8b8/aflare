@@ -1,0 +1,19 @@
+{
+  "id": "content-creative/brand-identity",
+  "name": "brand-identity",
+  "version": "1.0.0",
+  "description": "Generate complete brand identity guide",
+  "author": "llm-box community",
+  "category": "content-creative",
+  "tags": [
+    "content-creative",
+    "workflow"
+  ],
+  "keywords": [
+    "brand-identity",
+    "content-creative"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "integrations/ai-news",
+  "name": "ai-news",
+  "version": "1.0.0",
+  "description": "Fetch and summarize the latest AI/ML news from Hacker News.",
+  "author": "llm-box community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow"
+  ],
+  "keywords": [
+    "ai-news",
+    "integrations"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

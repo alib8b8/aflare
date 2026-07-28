@@ -1,0 +1,19 @@
+{
+  "id": "data-ai/survey-analyzer",
+  "name": "survey-analyzer",
+  "version": "1.0.0",
+  "description": "Analyze survey responses and extract insights",
+  "author": "llm-box community",
+  "category": "data-ai",
+  "tags": [
+    "data-ai",
+    "workflow"
+  ],
+  "keywords": [
+    "survey-analyzer",
+    "data-ai"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

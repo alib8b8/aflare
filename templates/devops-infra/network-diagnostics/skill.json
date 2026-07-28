@@ -1,0 +1,19 @@
+{
+  "id": "devops-infra/network-diagnostics",
+  "name": "network-diagnostics",
+  "version": "1.0.0",
+  "description": "Run network diagnostics and generate report",
+  "author": "llm-box community",
+  "category": "devops-infra",
+  "tags": [
+    "devops-infra",
+    "workflow"
+  ],
+  "keywords": [
+    "network-diagnostics",
+    "devops-infra"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

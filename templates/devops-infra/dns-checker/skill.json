@@ -1,0 +1,19 @@
+{
+  "id": "devops-infra/dns-checker",
+  "name": "dns-checker",
+  "version": "1.0.0",
+  "description": "Check all DNS records for a domain",
+  "author": "llm-box community",
+  "category": "devops-infra",
+  "tags": [
+    "devops-infra",
+    "workflow"
+  ],
+  "keywords": [
+    "dns-checker",
+    "devops-infra"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

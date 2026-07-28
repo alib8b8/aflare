@@ -1,36 +1,36 @@
 # Node Reference
 
-> Auto-generated from `Schema()` metadata. 103 nodes registered.
+> Auto-generated from `Schema()` metadata. 94 nodes registered.
 
 | Node | Description | Params |
 |------|-------------|--------|
 | [`agent`](#agent) | Autonomous agent node with ReAct reasoning loop and tool use capabilities | 9 |
-| [`agent_browser`](#agent_browser) | Agent-optimized web browser for autonomous web navigation, content extraction, and research. Inspired by CitroLabs/eg... | 7 |
+| [`agent_browser`](#agent_browser) | Agent-optimized web browser for autonomous web navigation, content extraction, and research. Inspired by CitroLabs/eg... | 10 |
 | [`agent_inbox`](#agent_inbox) | Query agent message inbox. Retrieve and manage cross-domain messages. | 4 |
 | [`agent_message`](#agent_message) | Send cross-domain message to another agent by DID. Inspired by awiki.ai agent-native messaging. | 5 |
 | [`andesgpt`](#andesgpt) | OPPO AndesGPT large model integration. Supports Tiny (端侧1B), Turbo (端云协同7B), Titan (云端100B+) sizes wi... | 9 |
-| [`anthropic`](#anthropic) | Call Anthropic LLM API | 4 |
+| [`anthropic`](#anthropic) | Call Anthropic LLM API | 15 |
 | [`antling`](#antling) | 蚂蚁百灵（Ant Ling）大模型集成。支持Ling-2.6通用系列、Ring-2.6推理系列、Ming全模态系列�... | 8 |
 | [`app_launch`](#app_launch) | Launch a mobile/desktop app with optional parameters. Cross-platform app control for AI systems. Supports Android, iO... | 7 |
-| [`apply_patch`](#apply_patch) | 解析并应用 unified diff 格式补丁到文件。原子语义：全部校验通过后才应用。兼容 Codex 的... | 2 |
-| [`baichuan`](#baichuan) | Call Baichuan LLM API | 4 |
+| [`baichuan`](#baichuan) | Call Baichuan LLM API | 15 |
 | [`blockchain_audit`](#blockchain_audit) | Record workflow execution on blockchain for tamper-proof audit trails. Supports Ethereum, Hyperledger Fabric, and sim... | 7 |
 | [`call`](#call) | Call another workflow file | 2 |
 | [`clarify`](#clarify) | Pre-execution ambiguity checker: identifies unclear requirements and generates clarifying questions (ACQUIRE framework) | 8 |
 | [`cli_session`](#cli_session) | 交互式CLI会话节点。支持上下文保持、命令历史、快捷键、流式输出和自动补全，提供类... | 5 |
-| [`code_graph`](#code_graph) | Parse source code files to extract function definitions, call relationships, and import dependencies, then output a c... | 8 |
 | [`code_interpreter`](#code_interpreter) | Execute Python/Node.js/Rust code in a sandboxed environment with file I/O | 6 |
 | [`code_knowledge_graph`](#code_knowledge_graph) | Semantic code knowledge graph with vector retrieval, 158 language support, MCP tool exposure, and token-efficient rev... | 13 |
 | [`code_review`](#code_review) | Hybrid code review combining deterministic rule engine (NPE, thread-safety, security) with LLM deep analysis. Inspire... | 11 |
 | [`combine`](#combine) | Combine multiple inputs into one | 1 |
 | [`compress`](#compress) | Intelligent context compression with 6 algorithms: extractive, keyword, cluster, sliding_window, hybrid (headroom-ins... | 7 |
 | [`condition`](#condition) | Evaluate conditional expressions (contains, equals, regex, empty) | 2 |
-| [`coze`](#coze) | WIP - Call ByteDance Coze API (not functional, API compatibility issues) | 4 |
+| [`context_fs`](#context_fs) | Unified context filesystem (OpenViking-inspired): ls/cat/write/rm/search over memory, profile, knowledge graph, and s... | 6 |
+| [`coze`](#coze) | Call Coze LLM API | 15 |
 | [`critic`](#critic) | Critic agent that reviews output, identifies issues, and suggests improvements | 8 |
 | [`cross_app_action`](#cross_app_action) | Execute actions across multiple apps. Multi-app workflows for AI assistants. | 3 |
-| [`deepseek`](#deepseek) | Call DeepSeek LLM API | 4 |
+| [`deepseek`](#deepseek) | Call DeepSeek LLM API | 15 |
 | [`device_state`](#device_state) | Query device state: battery, network, location, apps, storage. Context awareness for AI assistants. | 1 |
 | [`doc_gen`](#doc_gen) | AI自动文档生成节点。自动生成和更新代码库文档，支持README、API文档、函数注释、模块�... | 6 |
+| [`doc_parse`](#doc_parse) | Parse documents (PDF/images/HTML) into text, LaTeX, or HTML table format | 7 |
 | [`engineer_skills`](#engineer_skills) | Pre-built engineering skill package with TypeScript/React/Node.js expertise. Supports skill matching, application, an... | 5 |
 | [`evaluator`](#evaluator) | Evaluator agent that scores output against criteria with structured rubrics | 9 |
 | [`execute`](#execute) | Execute shell commands (disabled in safe mode) | 3 |
@@ -39,63 +39,54 @@
 | [`file_read`](#file_read) | Read content from a file. Automatically redacts secrets (API keys, tokens, .env files) by default for privacy — set... | 2 |
 | [`file_watch`](#file_watch) | Polls a file or directory for create/modify/delete events and returns them as JSON. Suitable for log-monitor and file... | 6 |
 | [`file_write`](#file_write) | Write content to a file | 2 |
-| [`gemini`](#gemini) | Call Google Gemini LLM API | 4 |
-| [`glm`](#glm) | Call GLM LLM API | 4 |
-| [`glob`](#glob) | 递归匹配文件路径，返回匹配的文件列表（每行一个）。兼容 Codex/OpenCode 的 glob 工具。 | 2 |
-| [`grep`](#grep) | 递归搜索文件内容，返回匹配行（格式：file:line:content）。兼容 Codex/OpenCode 的 grep 工具。 | 5 |
+| [`gemini`](#gemini) | Call Google Gemini LLM API | 15 |
+| [`glm`](#glm) | Call GLM LLM API | 15 |
 | [`harmony_ability`](#harmony_ability) | Launch HarmonyOS Ability with specified type. Supports page (UI), slice (partial UI), service (background), data (dat... | 5 |
 | [`harmony_atomic_service`](#harmony_atomic_service) | Launch HarmonyOS Atomic Service. Lightweight, card-based services that run without installation. Supports launch, rou... | 4 |
 | [`harmony_device_adapt`](#harmony_device_adapt) | Detect HarmonyOS device type (phone/tablet/foldable/TV/car/wearable) and generate UI adaptation guidance. Inspired by... | 6 |
 | [`harmony_widget`](#harmony_widget) | Manage HarmonyOS desktop widgets (service cards). Add, update, remove, or query widget state on the home screen. | 5 |
 | [`http_request`](#http_request) | Make HTTP requests with custom method, headers, and body | 5 |
 | [`human_in_loop`](#human_in_loop) | Human approval gate — pauses workflow for human review and approval before continuing | 5 |
-| [`ima`](#ima) | Call IMA Copilot API | 4 |
-| [`inference`](#inference) | Multi-backend local inference engine with unified interface across llama.cpp, ONNX, TensorRT, vLLM, MLC-LLM, NCNN, MN... | 6 |
+| [`ima`](#ima) | Call IMA Copilot LLM API | 15 |
 | [`intent_router`](#intent_router) | Route user intents to appropriate handlers. Central dispatch for AI assistant commands. | 3 |
-| [`internlm`](#internlm) | Call InternLM LLM API | 4 |
+| [`internlm`](#internlm) | Call InternLM LLM API | 15 |
 | [`json_parse`](#json_parse) | Parse and extract JSON data | 1 |
-| [`kimi`](#kimi) | Call Kimi LLM API | 4 |
-| [`knowledge_graph`](#knowledge_graph) | Knowledge graph node - extract entities/relations, build graph, query and traverse | 6 |
-| [`list_dir`](#list_dir) | 列出目录内容，返回 name/type/size 列表。兼容 Codex 的 list_dir 工具。 | 3 |
+| [`kimi`](#kimi) | Call Kimi LLM API | 15 |
+| [`knowledge_graph`](#knowledge_graph) | Knowledge graph node - extract entities/relations, build graph, query and traverse | 13 |
 | [`llm_router`](#llm_router) | Smart LLM router that automatically selects the best provider with fallback, quota tracking, and cost optimization | 5 |
-| [`mcp_bridge`](#mcp_bridge) | MCP（Model Context Protocol）协议桥接节点。支持工具调用和资源访问，提供标准化的MCP协议�... | 5 |
-| [`mcp_server`](#mcp_server) | MCP服务器模式节点。让llm-box作为MCP服务器被其他Agent调用，支持HTTP/WebSocket协议，提供工�... | 6 |
-| [`memory`](#memory) | AI Agent memory infrastructure with session-isolated persistent knowledge graph engine. Supports multi-session parall... | 13 |
-| [`meta_orchestrator`](#meta_orchestrator) | Multi-model meta orchestrator with unified model routing and hierarchical agent network. Supports 22+ models across O... | 5 |
-| [`mimo`](#mimo) | Call MiMo LLM API | 4 |
-| [`minimax`](#minimax) | Call MiniMax LLM API | 4 |
-| [`mistral`](#mistral) | Call Mistral LLM API | 4 |
+| [`memory`](#memory) | AI Agent memory infrastructure with session-isolated persistent knowledge graph engine. Supports multi-session parall... | 16 |
+| [`mimo`](#mimo) | Call MiMo LLM API | 15 |
+| [`minimax`](#minimax) | Call MiniMax LLM API | 15 |
+| [`mistral`](#mistral) | Call Mistral LLM API | 15 |
 | [`moe_streaming`](#moe_streaming) | MoE (Mixture of Experts) streaming expert loading for running large models on consumer hardware | 7 |
-| [`multimodal`](#multimodal) | Multimodal node for image analysis, OCR, and audio transcription using vision-capable LLMs | 11 |
+| [`multimodal`](#multimodal) | Multimodal node for image analysis, OCR, and audio transcription using vision-capable LLMs | 10 |
 | [`node_marketplace`](#node_marketplace) | Node marketplace - list, search, and categorize available workflow nodes | 4 |
 | [`notify`](#notify) | Send notifications (stdout, stderr, slack, discord, telegram, webhook) | 10 |
+| [`office`](#office) | Read .docx/.xlsx/.pptx documents (text, tables, slides) using pure-Go OOXML parsing | 5 |
 | [`ollama`](#ollama) | Call Ollama local LLM server | 3 |
-| [`omniroute`](#omniroute) | AI gateway unified layer. Single endpoint access to 268+ providers, 500+ models. Supports Claude Code, Cursor, Cline,... | 10 |
 | [`ondevice_llm`](#ondevice_llm) | Run LLM inference locally on the device (no cloud required). Supports 1B-8B models with INT4/INT8 quantization, inclu... | 10 |
-| [`openai`](#openai) | Call OpenAI API | 4 |
-| [`output_quality`](#output_quality) | Analyze output text for AI-generated traces and compute naturalness scores. Inspired by Nutlope/hallmark (57 anti-AI-... | 4 |
+| [`openai`](#openai) | Call OpenAI LLM API | 15 |
 | [`pipeline`](#pipeline) | Dependency-based parallel workflow executor: steps run as soon as their dependencies are met, no global barriers (Tun... | 2 |
 | [`planner`](#planner) | Task decomposition agent that breaks complex goals into actionable steps | 9 |
 | [`plugin_system`](#plugin_system) | 插件系统节点。支持从本地目录、Git仓库、URL和插件市场加载插件，提供安装/卸载/更新/... | 4 |
 | [`power_manager`](#power_manager) | Control power consumption for on-device AI. Supports eco/balanced/high profiles with adaptive battery and thermal man... | 7 |
 | [`preference`](#preference) | User preference memory: store, retrieve, and learn user habits across sessions (MemSlides-inspired user profiling) | 7 |
-| [`quality_guard`](#quality_guard) | AI content quality guard with detection, assessment, and enhancement capabilities. Identifies low-quality AI-generate... | 5 |
-| [`qwen`](#qwen) | Call Qwen LLM API | 4 |
+| [`qwen`](#qwen) | Call Qwen LLM API | 15 |
 | [`rag`](#rag) | Retrieval Augmented Generation node - chunk documents, search by query, and assemble context | 7 |
 | [`reflector`](#reflector) | Self-reflection agent that critiques output and iteratively improves it (Reflexion pattern) | 7 |
 | [`researcher`](#researcher) | Research agent that fetches information from URLs and summarizes findings | 7 |
+| [`robot_action`](#robot_action) | Embodied-intelligence action planner. Turns a natural-language instruction plus optional visual/proprioceptive state ... | 9 |
 | [`robot_control`](#robot_control) | Plan and execute robot action sequences for embodied AI. Supports humanoid robots, mobile bases, robotic arms, drones... | 10 |
-| [`router`](#router) | Classification agent that analyzes input and decides which processing path to take | 6 |
 | [`screen_understanding`](#screen_understanding) | Understand screen content like an L3 agent: parse UI elements, identify actionable items, and generate interaction pl... | 5 |
 | [`search_aggregate`](#search_aggregate) | Multi-platform search aggregator with real-signal ranking: Reddit/Twitter/YouTube/HN/GitHub, sorted by votes/comments... | 8 |
-| [`self_heal`](#self_heal) | Self-diagnose and attempt automatic repair of project issues: build errors, formatting, missing deps, test failures, ... | 2 |
 | [`send_notification`](#send_notification) | Send system notification with actions. Cross-platform notification for AI assistants. | 5 |
 | [`sensenova`](#sensenova) | 商汤SenseNova日日新大模型集成。支持U1系列多模态模型（U1-Lite/U1-Pro）、Flash系列推理模型... | 9 |
+| [`session_manager`](#session_manager) | Multi-session memory management. Create isolated sessions, fork a session from a parent, merge sessions, and share fa... | 11 |
 | [`skill_distill`](#skill_distill) | Distill methodologies from books, videos, podcasts, and documents into callable skills. Supports workflow, decision, ... | 6 |
 | [`skill_explorer`](#skill_explorer) | Discover, evaluate, and recommend skills from the ecosystem. Quality scoring, category browsing, and smart recommenda... | 5 |
-| [`smart_router`](#smart_router) | Smart router that selects the best model/provider based on task analysis | 6 |
+| [`sql_query`](#sql_query) | Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1)... | 8 |
+| [`structured_output`](#structured_output) | LLM-driven structured output with local JSON Schema validation and self-correction retries | 11 |
 | [`supervisor`](#supervisor) | Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates | 13 |
-| [`swarm_comm`](#swarm_comm) | Decentralized multi-agent swarm communication system with channels, agent registration, and message broadcasting. Ins... | 8 |
 | [`system_event`](#system_event) | Listen for mobile system events (notification, call, SMS, location, battery, etc.) and trigger workflows | 7 |
 | [`template_render`](#template_render) | Render Go templates with input data | 2 |
 | [`test_node`](#test_node) | Test node for development purposes | 1 |
@@ -105,8 +96,8 @@
 | [`video_edit`](#video_edit) | AI-powered video editing workflow with smart cutting, merging, effects, subtitle generation, and storyboard creation. | 7 |
 | [`voice_input`](#voice_input) | Voice input pipeline: VAD (Voice Activity Detection), wake word detection, and speech-to-text. Supports on-device rec... | 7 |
 | [`voice_output`](#voice_output) | Voice AI toolchain with TTS, voice cloning, ASR speech recognition, transcription, diarization, and voice analysis. S... | 19 |
-| [`xverse`](#xverse) | Call XVERSE LLM API | 4 |
-| [`yi`](#yi) | Call Yi LLM API | 4 |
+| [`xverse`](#xverse) | Call XVERSE LLM API | 15 |
+| [`yi`](#yi) | Call Yi LLM API | 15 |
 
 ---
 
@@ -144,13 +135,16 @@ Agent-optimized web browser for autonomous web navigation, content extraction, a
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `action` | string | No | visit | Browser action: visit|extract|links|screenshot|search|summary (default: visit) |
+| `action` | string | No | visit | Browser action: visit|extract|links|screenshot|search|summary|connect_existing|import_cookies (default: visit) |
 | `url` | string | No |  | Target URL (overrides input if provided) |
 | `selector` | string | No |  | CSS selector for content extraction (optional) |
 | `max_depth` | string | No | 1 | Maximum link follow depth for crawling (default: 1) |
 | `output_format` | string | No | markdown | Output format: markdown|text|json|html (default: markdown) |
 | `summary_length` | string | No | 2000 | Maximum summary length in characters (default: 2000) |
 | `render_js` | string | No | false | Enable JavaScript rendering (default: false) |
+| `use_session` | string | No | false | Reuse authenticated browser session (default: false) |
+| `browser_profile` | string | No |  | Browser profile path for session reuse (optional) |
+| `cdp_port` | string | No | 9222 | Chrome DevTools Protocol port (default: 9222) |
 
 ---
 
@@ -229,6 +223,17 @@ Call Anthropic LLM API
 | `api_key` | string | No |  | Anthropic API key (or set ANTHROPIC_API_KEY env var) |
 | `endpoint` | string | No | https://api.anthropic.com/v1 | API base URL (default: https://api.anthropic.com/v1) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -275,22 +280,6 @@ Launch a mobile/desktop app with optional parameters. Cross-platform app control
 
 ---
 
-## apply_patch
-
-解析并应用 unified diff 格式补丁到文件。原子语义：全部校验通过后才应用。兼容 Codex 的 apply_patch 工具。
-
-- **Input**: string - unified diff 补丁内容（也可通过 patch 参数传入）
-- **Output**: string - 应用结果摘要
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `patch` | string | No |  | unified diff 补丁内容（与 input 二选一） |
-| `backup` | string | No | true | 是否在应用前备份原文件到 .bak：true/false（默认 true） |
-
----
-
 ## baichuan
 
 Call Baichuan LLM API
@@ -306,6 +295,17 @@ Call Baichuan LLM API
 | `api_key` | string | No |  | Baichuan API key (or set BAICHUAN_API_KEY env var) |
 | `endpoint` | string | No | https://api.baichuan-ai.com/v1 | API base URL (default: https://api.baichuan-ai.com/v1) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -384,28 +384,6 @@ Pre-execution ambiguity checker: identifies unclear requirements and generates c
 | `max_history` | int | No | 50 | 最大历史记录数（默认50） |
 | `streaming` | bool | No | true | 流式输出（默认true） |
 | `theme` | string | No | dark | 主题（light/dark，默认dark） |
-
----
-
-## code_graph
-
-Parse source code files to extract function definitions, call relationships, and import dependencies, then output a code graph (JSON or Mermaid). Supports Go, Python, JavaScript, TypeScript. Features: persistent cache, incremental updates.
-
-- **Input**: string - not used
-- **Output**: string - code graph in JSON or Mermaid format
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `path` | string | Yes |  | File or directory path to analyze (relative to working directory) |
-| `language` | string | No | auto | Code language: go/python/javascript/typescript/auto (default: auto) |
-| `output_format` | string | No | json | Output format: json or mermaid (default: json) |
-| `max_files` | string | No | 100 | Max number of files to analyze (default: 100) |
-| `max_file_size` | string | No | 1048576 | Max single file size in bytes (default: 1048576 = 1MB) |
-| `use_cache` | string | No | true | Use persistent cache for incremental updates (default: true) |
-| `refresh` | string | No | false | Force refresh cache, ignore existing cache (default: false) |
-| `save_cache` | string | No | true | Save results to persistent cache (default: true) |
 
 ---
 
@@ -533,9 +511,29 @@ Evaluate conditional expressions (contains, equals, regex, empty)
 
 ---
 
+## context_fs
+
+Unified context filesystem (OpenViking-inspired): ls/cat/write/rm/search over memory, profile, knowledge graph, and skills via a single virtual path namespace.
+
+- **Input**: string - content for write op, or query for search op (used when content/query params are absent)
+- **Output**: string - file content (cat), JSON entries (ls/search), or status message (write/rm)
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `operation` | string | No | ls | ls|cat|write|rm|search (default: ls) |
+| `path` | string | No |  | Virtual path, e.g. /mem/short/note, /profile/coding_style/lang, /kg/entities/foo, /skills/bar, or / for root listing |
+| `content` | string | No |  | Content to write (defaults to input) |
+| `query` | string | No |  | Search query (defaults to input) |
+| `scope` | string | No |  | Search scope: /mem, /profile, /kg, /skills, or empty for all |
+| `top_k` | int | No | 10 | Max results for search (default: 10) |
+
+---
+
 ## coze
 
-WIP - Call ByteDance Coze API (not functional, API compatibility issues)
+Call Coze LLM API
 
 - **Input**: string - user message content
 - **Output**: string - AI response content
@@ -544,10 +542,21 @@ WIP - Call ByteDance Coze API (not functional, API compatibility issues)
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `model` | string | Yes |  | Model name (required) |
+| `model` | string | No |  | Model name (default: ) |
 | `api_key` | string | No |  | Coze API key (or set COZE_API_KEY env var) |
 | `endpoint` | string | No | https://api.coze.cn/v1 | API base URL (default: https://api.coze.cn/v1) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -605,6 +614,17 @@ Call DeepSeek LLM API
 | `api_key` | string | No |  | DeepSeek API key (or set DEEPSEEK_API_KEY env var) |
 | `endpoint` | string | No | https://api.deepseek.com/v1 | API base URL (default: https://api.deepseek.com/v1) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -640,6 +660,27 @@ AI自动文档生成节点。自动生成和更新代码库文档，支持README
 | `output_format` | string | No | markdown | 输出格式：markdown/json（默认markdown） |
 | `depth` | int | No | 3 | 文档深度1-5（默认3） |
 | `auto_update` | bool | No | false | 是否自动更新现有文档（默认false） |
+
+---
+
+## doc_parse
+
+Parse documents (PDF/images/HTML) into text, LaTeX, or HTML table format
+
+- **Input**: string - document text (source=text), base64-encoded image/PDF (source=base64), or URL (source=URL)
+- **Output**: string - parsed document content in the requested output format
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `source` | string | No | text | Input source type: text|base64|URL (default: text) |
+| `output_format` | string | No | text | Output format: text|latex|html_table (default: text) |
+| `extract_tables` | bool | No | false | Extract markdown tables and return their count/content (default: false) |
+| `extract_formulas` | bool | No | false | Extract LaTeX formulas ($...$, $$...$$) and return their list (default: false) |
+| `lang` | string | No | auto | Document language hint: zh|en|auto (default: auto, passed to OCR API) |
+| `api_endpoint` | string | No |  | OCR API endpoint URL (optional). When set with api_key, calls external OCR (e.g. OvisOCR2) |
+| `api_key` | string | No |  | OCR API key (optional) |
 
 ---
 
@@ -805,6 +846,17 @@ Call Google Gemini LLM API
 | `api_key` | string | No |  | Google Gemini API key (or set GEMINI_API_KEY env var) |
 | `endpoint` | string | No | https://generativelanguage.googleapis.com/v1beta/openai | API base URL (default: https://generativelanguage.googleapis.com/v1beta/openai) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -823,41 +875,17 @@ Call GLM LLM API
 | `api_key` | string | No |  | GLM API key (or set GLM_API_KEY env var) |
 | `endpoint` | string | No | https://open.bigmodel.cn/api/paas/v4 | API base URL (default: https://open.bigmodel.cn/api/paas/v4) |
 | `system` | string | No |  | System prompt |
-
----
-
-## glob
-
-递归匹配文件路径，返回匹配的文件列表（每行一个）。兼容 Codex/OpenCode 的 glob 工具。
-
-- **Input**: string - 未使用
-- **Output**: string - 匹配的文件路径列表（每行一个，相对搜索根目录）
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `pattern` | string | Yes |  | glob 模式，如 **/*.go 或 *.md |
-| `path` | string | No | . | 搜索根目录（默认工作目录） |
-
----
-
-## grep
-
-递归搜索文件内容，返回匹配行（格式：file:line:content）。兼容 Codex/OpenCode 的 grep 工具。
-
-- **Input**: string - 未使用
-- **Output**: string - 匹配行列表（每行一条：file:line:content）
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `pattern` | string | Yes |  | 正则表达式 |
-| `path` | string | No | . | 搜索目录（默认工作目录） |
-| `glob` | string | No |  | 文件名过滤，如 *.go |
-| `ignore_case` | string | No | false | 是否忽略大小写：true/false（默认 false） |
-| `max_matches` | string | No | 1000 | 最大匹配数（默认 1000） |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -977,7 +1005,7 @@ Human approval gate — pauses workflow for human review and approval before con
 
 ## ima
 
-Call IMA Copilot API
+Call IMA Copilot LLM API
 
 - **Input**: string - user message content
 - **Output**: string - AI response content
@@ -986,30 +1014,21 @@ Call IMA Copilot API
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `model` | string | Yes |  | Model name (required) |
-| `api_key` | string | No |  | IMA API key (or set IMA_API_KEY env var) |
-| `endpoint` | string | Yes |  | API base URL (or set IMA_API_BASE env var) |
+| `model` | string | No |  | Model name (default: ) |
+| `api_key` | string | No |  | IMA Copilot API key (or set IMA_API_KEY env var) |
+| `endpoint` | string | No |  | API base URL (default: ) |
 | `system` | string | No |  | System prompt |
-
----
-
-## inference
-
-Multi-backend local inference engine with unified interface across llama.cpp, ONNX, TensorRT, vLLM, MLC-LLM, NCNN, MNN (T-Head SAIL-inspired)
-
-- **Input**: string - prompt text for inference
-- **Output**: string - inference result text
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `operation` | string | No | infer | infer|list|status|set_backend|load_model (default: infer) |
-| `backend` | string | No | llama.cpp | Backend: llama.cpp|onnx|tensorrt|vllm|mlc-llm|ncnn|mnn|ollama (default: llama.cpp) |
-| `model` | string | No |  | Model name or path |
-| `max_tokens` | string | No | 512 | Max tokens to generate (default: 512) |
-| `temperature` | string | No | 0.7 | Temperature 0-1 (default: 0.7) |
-| `model_path` | string | No |  | Path to model file for load_model |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -1045,6 +1064,17 @@ Call InternLM LLM API
 | `api_key` | string | No |  | InternLM API key (or set INTERNLM_API_KEY env var) |
 | `endpoint` | string | No | https://internlm-chat.intern-ai.org.cn/api/v1 | API base URL (default: https://internlm-chat.intern-ai.org.cn/api/v1) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -1074,10 +1104,21 @@ Call Kimi LLM API
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `model` | string | No | moonshot-v1-8k | Model name (default: moonshot-v1-8k) |
+| `model` | string | No | kimi-k3 | Model name (default: kimi-k3) |
 | `api_key` | string | No |  | Kimi API key (or set KIMI_API_KEY env var) |
 | `endpoint` | string | No | https://api.moonshot.cn/v1 | API base URL (default: https://api.moonshot.cn/v1) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -1092,29 +1133,19 @@ Knowledge graph node - extract entities/relations, build graph, query and traver
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `action` | string | No | extract | Action: extract, query, traverse, stats, visualize (default: extract) |
+| `action` | string | No | extract | Action: extract, extract_llm, query, traverse, stats, visualize (default: extract). extract_llm calls an LLM for higher-quality entity/relation extraction. |
 | `graph_path` | string | No |  | Path to save/load the graph JSON file |
 | `query` | string | No |  | Query for search/traverse (entity name or relation type) |
 | `max_depth` | string | No | 2 | Max traversal depth (default: 2) |
 | `top_k` | string | No | 10 | Max results to return (default: 10) |
 | `format` | string | No | markdown | Output format: json, markdown, mermaid (default: markdown) |
-
----
-
-## list_dir
-
-列出目录内容，返回 name/type/size 列表。兼容 Codex 的 list_dir 工具。
-
-- **Input**: string - 未使用
-- **Output**: string - 目录条目列表（每行一条：relpath	type	size）
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `path` | string | Yes |  | 目录路径 |
-| `recursive` | string | No | false | 是否递归：true/false（默认 false） |
-| `max_entries` | string | No | 1000 | 最大条目数（默认 1000） |
+| `provider` | string | No | openai | LLM provider for extract_llm (default: openai) |
+| `model` | string | No |  | LLM model name for extract_llm |
+| `api_key` | string | No |  | LLM API key for extract_llm (or set <PROVIDER>_API_KEY env var) |
+| `endpoint` | string | No |  | LLM API base URL for extract_llm |
+| `language` | string | No | en | Prompt language hint for extract_llm: en or zh (default: en) |
+| `session_id` | string | No |  | C-3: when set with memory_key, links extracted entities to that memory entry |
+| `memory_key` | string | No |  | C-3: memory entry key to link extracted entities to |
 
 ---
 
@@ -1137,45 +1168,6 @@ Smart LLM router that automatically selects the best provider with fallback, quo
 
 ---
 
-## mcp_bridge
-
-MCP（Model Context Protocol）协议桥接节点。支持工具调用和资源访问，提供标准化的MCP协议接口，包括工具列表、工具调用、资源列表、资源读取、提示词管理和服务器信息等功能。
-
-- **Input**: string - MCP请求内容或指令
-- **Output**: string - JSON格式的MCP响应结果
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `operation` | string | Yes |  | 操作类型：tools_list/tools_call/resources_list/resources_read/prompts_list/prompts_get/server_info |
-| `tool_name` | string | No |  | 工具名称（调用工具时使用） |
-| `tool_args` | string | No |  | 工具参数（JSON字符串，调用工具时使用） |
-| `resource_uri` | string | No |  | 资源URI（读取资源时使用） |
-| `server_url` | string | No |  | MCP服务器地址（可选） |
-
----
-
-## mcp_server
-
-MCP服务器模式节点。让llm-box作为MCP服务器被其他Agent调用，支持HTTP/WebSocket协议，提供工具暴露、会话管理和权限控制功能，兼容标准MCP协议。
-
-- **Input**: string - MCP服务器相关输入（可选）
-- **Output**: string - JSON格式的服务器操作结果
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `action` | string | Yes |  | 操作：start/stop/status/restart |
-| `port` | int | No | 8080 | 端口（默认8080，范围1024-65535） |
-| `protocol` | string | No | http | 协议：http/websocket |
-| `host` | string | No | 0.0.0.0 | 主机地址（默认0.0.0.0） |
-| `expose_tools` | string | No |  | 要暴露的工具列表（逗号分隔） |
-| `auth_token` | string | No |  | 认证token（可选，长度32-256） |
-
----
-
 ## memory
 
 AI Agent memory infrastructure with session-isolated persistent knowledge graph engine. Supports multi-session parallel memory, short/medium/long term memory, cross-session long-term memory, and memory usage monitoring.
@@ -1187,38 +1179,22 @@ AI Agent memory infrastructure with session-isolated persistent knowledge graph 
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `operation` | string | No | store | Operation: store/retrieve/delete/search/summary/forget/transfer/merge/inkling_retrieve/list_sessions/session_stats/global_stats (default: store) |
+| `operation` | string | No | store | Operation: store/retrieve/delete/search/summary/forget/transfer/merge/inkling_retrieve/list_sessions/session_stats/global_stats/link_kg/expand_kg/compress (default: store) |
 | `session_id` | string | No | default | Session ID for isolated memory (default: default) |
-| `key` | string | No |  | Memory key for storage/retrieval |
+| `key` | string | No |  | Memory key for storage/retrieval/link_kg |
 | `value` | string | No |  | Memory value/content |
 | `level` | string | No | medium | Memory level: short/medium/long (default: medium) |
 | `type` | string | No | fact | Memory type: fact/concept/experience/preference/relationship/task/context (default: fact) |
 | `tags` | string | No |  | Comma-separated tags for categorization |
 | `ttl_hours` | int | No | 72 | Time to live in hours (default: 72) |
 | `confidence` | float | No | 0.8 | Confidence level 0.0-1.0 (default: 0.8) |
-| `query` | string | No |  | Search query for retrieval/search operations |
+| `query` | string | No |  | Search query for retrieval/search/expand_kg operations |
 | `top_k` | int | No | 10 | Number of results to return (1-100, default: 10) |
 | `threshold` | float | No | 0.5 | Similarity threshold 0.0-1.0 (default: 0.5) |
 | `source` | string | No |  | Source identifier for the memory |
-
----
-
-## meta_orchestrator
-
-Multi-model meta orchestrator with unified model routing and hierarchical agent network. Supports 22+ models across OpenAI, Anthropic, Google, AndesGPT, SenseNova, Ant Ling, and domestic providers.
-
-- **Input**: string - the task or prompt to process
-- **Output**: json - selected model, routing strategy, task type, hierarchy level, response, usage, latency_ms
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `model` | string | No |  | Model name (optional, overrides routing). Supported: gpt-4o, gpt-4, gpt-3.5-turbo, claude-3-opus, claude-3-sonnet, claude-3-haiku, gemini-pro, gemini-flash, andesgpt-tiny, andesgpt-turbo, andesgpt-titan, sensenova-flash-lite, sensenova-flash, sensenova-u1-lite, sensenova-u1-pro, deepseek-v2, qwen-max, ernie-4, ling-2.6-flash, ling-2.6-1t, ring-2.6-1t, ming-flash-omni-2.0 |
-| `routing_strategy` | string | No | auto | Routing strategy: auto/fastest/cheapest/best_quality/privacy_first (default: auto) |
-| `task_type` | string | No | analysis | Task type: code/writing/analysis/creative/data (default: analysis) |
-| `max_depth` | int | No | 3 | Max hierarchy depth 1-5 (default: 3) |
-| `use_hierarchy` | bool | No | true | Enable hierarchical agent network (default: true) |
+| `kg_entities` | string | No |  | link_kg: comma-separated KG entity names to link to the memory key |
+| `token_budget` | int | No | 2000 | compress: max tokens to retain after compression (default: 2000) |
+| `min_confidence` | float | No | 0.5 | compress: entries below this confidence are candidates for compression (default: 0.5) |
 
 ---
 
@@ -1237,6 +1213,17 @@ Call MiMo LLM API
 | `api_key` | string | No |  | MiMo API key (or set MIMO_API_KEY env var) |
 | `endpoint` | string | No | https://api.xiaomimimo.com/v1 | API base URL (default: https://api.xiaomimimo.com/v1) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -1255,6 +1242,17 @@ Call MiniMax LLM API
 | `api_key` | string | No |  | MiniMax API key (or set MINIMAX_API_KEY env var) |
 | `endpoint` | string | No | https://api.minimax.chat/v1 | API base URL (default: https://api.minimax.chat/v1) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -1273,6 +1271,17 @@ Call Mistral LLM API
 | `api_key` | string | No |  | Mistral API key (or set MISTRAL_API_KEY env var) |
 | `endpoint` | string | No | https://api.mistral.ai/v1 | API base URL (default: https://api.mistral.ai/v1) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -1311,7 +1320,6 @@ Multimodal node for image analysis, OCR, and audio transcription using vision-ca
 | `mode` | string | No | describe | Mode: image, ocr, describe, compare (default: describe) |
 | `image_path` | string | No |  | Path to image file (local path or URL) |
 | `image_paths` | string | No |  | Comma-separated paths for compare mode |
-| `audio_path` | string | No |  | Path to audio file for transcription |
 | `lang` | string | No | eng+chi_sim | OCR languages for tesseract (default: eng+chi_sim) |
 | `provider` | string | No | openai | LLM provider with vision support (default: openai) |
 | `model` | string | No | gpt-4o | Vision model name (default: gpt-4o) |
@@ -1364,6 +1372,25 @@ Send notifications (stdout, stderr, slack, discord, telegram, webhook)
 
 ---
 
+## office
+
+Read .docx/.xlsx/.pptx documents (text, tables, slides) using pure-Go OOXML parsing
+
+- **Input**: string - path to the office document (.docx/.xlsx/.pptx)
+- **Output**: string - extracted content in the requested output format
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `path` | string | No |  | Path to the office document (overrides input if set) |
+| `format` | string | No |  | Source format hint: docx|xlsx|pptx (default: inferred from extension) |
+| `output` | string | No | markdown | Output format: text|markdown|json (default: markdown) |
+| `sheet` | string | No |  | xlsx only: sheet name to read (default: all sheets) |
+| `max_rows` | int | No | 1000 | xlsx only: max rows per sheet (default: 1000, 0 = unlimited) |
+
+---
+
 ## ollama
 
 Call Ollama local LLM server
@@ -1378,30 +1405,6 @@ Call Ollama local LLM server
 | `model` | string | No | llama3 | Model name (default: llama3) |
 | `endpoint` | string | No | http://localhost:11434 | Ollama server URL (default: http://localhost:11434) |
 | `prompt` | string | No |  | Prompt to send to Ollama (if not provided, uses input) |
-
----
-
-## omniroute
-
-AI gateway unified layer. Single endpoint access to 268+ providers, 500+ models. Supports Claude Code, Cursor, Cline, and llm-box. Auto-routes based on speed, cost, quality, or availability.
-
-- **Input**: string - user prompt or task description
-- **Output**: string - JSON with selected provider, model, response, usage, and routing info
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `provider` | string | No |  | Target provider (optional, auto-selected if not specified) |
-| `model` | string | No |  | Target model (optional, auto-selected if not specified) |
-| `tool` | string | No | llm_box | Target tool: claude_code/cursor/cline/llm_box (default: llm_box) |
-| `strategy` | string | No | auto | Routing strategy: auto/fastest/cheapest/best_quality/availability/custom_fallback (default: auto) |
-| `api_key` | string | No |  | API key for selected provider |
-| `base_url` | string | No |  | Custom API base URL |
-| `max_tokens` | int | No | 2048 | Max output tokens (default: 2048) |
-| `temperature` | float | No | 0.7 | Sampling temperature 0.0-2.0 (default: 0.7) |
-| `fallback_providers` | string | No |  | Comma-separated fallback providers for custom_fallback strategy |
-| `region` | string | No |  | Region for cloud providers (e.g., us-east-1) |
 
 ---
 
@@ -1431,7 +1434,7 @@ Run LLM inference locally on the device (no cloud required). Supports 1B-8B mode
 
 ## openai
 
-Call OpenAI API
+Call OpenAI LLM API
 
 - **Input**: string - user message content
 - **Output**: string - AI response content
@@ -1442,26 +1445,19 @@ Call OpenAI API
 |------|------|----------|---------|-------------|
 | `model` | string | No | gpt-3.5-turbo | Model name (default: gpt-3.5-turbo) |
 | `api_key` | string | No |  | OpenAI API key (or set OPENAI_API_KEY env var) |
-| `endpoint` | string | No | https://api.openai.com/v1 | API base URL (or set OPENAI_API_BASE env var) |
+| `endpoint` | string | No | https://api.openai.com/v1 | API base URL (default: https://api.openai.com/v1) |
 | `system` | string | No |  | System prompt |
-
----
-
-## output_quality
-
-Analyze output text for AI-generated traces and compute naturalness scores. Inspired by Nutlope/hallmark (57 anti-AI-taste detection checks). Detects template phrases, robotic structure, and generic content. Provides rewrite suggestions.
-
-- **Input**: string - the text to analyze for AI traces and quality
-- **Output**: string - quality report with scores, detected issues, and suggestions
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `action` | string | No | analyze | Action: analyze|gate|suggest|checklist (default: analyze) |
-| `min_score` | string | No | 60 | Minimum pass score 0-100 for gate action (default: 60) |
-| `detail` | string | No | full | Detail level: brief|full (default: full) |
-| `lang` | string | No | auto | Language hint: auto|zh|en (default: auto) |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -1564,25 +1560,6 @@ User preference memory: store, retrieve, and learn user habits across sessions (
 
 ---
 
-## quality_guard
-
-AI content quality guard with detection, assessment, and enhancement capabilities. Identifies low-quality AI-generated content and provides quality scoring.
-
-- **Input**: string - content to assess
-- **Output**: string - JSON with quality assessment results
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `content` | string | No |  | Content to assess (max 20000 chars) |
-| `assessment_type` | string | No | overall | Assessment type: ai_detection/design_quality/code_quality/writing_quality/overall (default: overall) |
-| `quality_threshold` | float | No | 0.7 | Quality threshold 0.0-1.0 (default: 0.7) |
-| `auto_fix` | bool | No | false | Auto fix low-quality content (default: false) |
-| `verbose` | bool | No | false | Detailed report (default: false) |
-
----
-
 ## qwen
 
 Call Qwen LLM API
@@ -1598,6 +1575,17 @@ Call Qwen LLM API
 | `api_key` | string | No |  | Qwen API key (or set QWEN_API_KEY env var) |
 | `endpoint` | string | No | https://dashscope.aliyuncs.com/compatible-mode/v1 | API base URL (default: https://dashscope.aliyuncs.com/compatible-mode/v1) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -1664,6 +1652,29 @@ Research agent that fetches information from URLs and summarizes findings
 
 ---
 
+## robot_action
+
+Embodied-intelligence action planner. Turns a natural-language instruction plus optional visual/proprioceptive state into a structured action sequence. Defaults to a deterministic simulator; set backend=api to call an external VLA server.
+
+- **Input**: string - natural-language instruction (e.g. "make a sandwich")
+- **Output**: string - JSON action plan
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `backend` | string | No | simulate | simulate (default) | api |
+| `instruction` | string | No |  | Instruction text. Overrides input when set. |
+| `observation` | string | No |  | JSON describing the environment (objects, positions, sensor readings). Optional. |
+| `image_base64` | string | No |  | Base64-encoded current camera frame (api backend only). Optional. |
+| `robot_type` | string | No | arm | Robot form factor: arm | mobile | humanoid | gripper (default arm) |
+| `max_steps` | string | No | 20 | Maximum action steps to plan (default 20) |
+| `api_endpoint` | string | No |  | VLA model HTTP endpoint (api backend). Required when backend=api. |
+| `api_key` | string | No |  | Bearer token for the VLA endpoint (optional). |
+| `timeout` | string | No | 30 | Per-request timeout in seconds for the api backend (default 30) |
+
+---
+
 ## robot_control
 
 Plan and execute robot action sequences for embodied AI. Supports humanoid robots, mobile bases, robotic arms, drones. Decomposes natural language tasks into low-level robot commands.
@@ -1685,26 +1696,6 @@ Plan and execute robot action sequences for embodied AI. Supports humanoid robot
 | `safety_zone_m` | float | No | 0.5 | Safety zone radius in meters (default: 0.5) |
 | `visual_feedback` | bool | No | true | Use visual feedback for verification (default: true) |
 | `tactile_feedback` | bool | No | true | Use tactile feedback for grasping (default: true) |
-
----
-
-## router
-
-Classification agent that analyzes input and decides which processing path to take
-
-- **Input**: string - the input text to classify and route
-- **Output**: string - JSON with classification result and routing decision
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `provider` | string | No | ollama | LLM provider (default: ollama) |
-| `model` | string | No | llama3 | Model name (default: llama3) |
-| `api_key` | string | No |  | API key |
-| `endpoint` | string | No |  | API endpoint URL |
-| `categories` | string | Yes |  | Comma-separated list of routing categories (e.g. bug,feature,question,spam) |
-| `instructions` | string | No |  | Additional routing instructions or classification criteria |
 
 ---
 
@@ -1745,22 +1736,6 @@ Multi-platform search aggregator with real-signal ranking: Reddit/Twitter/YouTub
 | `time_range` | string | No | week | Time range: day|week|month|year|all (default: week) |
 | `sort_by` | string | No | signal | signal|relevance|time (default: signal) |
 | `min_score` | string | No | 0 | Minimum combined signal score filter (default: 0) |
-| `output` | string | No | markdown | json|markdown|text (default: markdown) |
-
----
-
-## self_heal
-
-Self-diagnose and attempt automatic repair of project issues: build errors, formatting, missing deps, test failures, version mismatches. Runs gofmt/go vet/go build/go test and auto-fixes where possible (xiaobei inspired autonomous repair mechanism).
-
-- **Input**: string - optional: specific area to check (build|format|deps|test|all)
-- **Output**: string - JSON or formatted heal report
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `auto_fix` | string | No | true | true|false, attempt automatic fixes (default: true) |
 | `output` | string | No | markdown | json|markdown|text (default: markdown) |
 
 ---
@@ -1807,6 +1782,31 @@ Send system notification with actions. Cross-platform notification for AI assist
 
 ---
 
+## session_manager
+
+Multi-session memory management. Create isolated sessions, fork a session from a parent, merge sessions, and share facts across sessions via the shared namespace.
+
+- **Input**: string - value to store (for shared_put action)
+- **Output**: string - JSON result of the action
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `action` | string | Yes | list | create | switch | list | delete | merge | shared_get | shared_put | recall | search |
+| `session_id` | string | No |  | Target session id (required for most actions) |
+| `parent` | string | No |  | Parent session id to inherit memory from (create action only) |
+| `src` | string | No |  | Source session id (merge action only) |
+| `dst` | string | No |  | Destination session id (merge action only) |
+| `key` | string | No |  | Memory key (shared_get/shared_put/recall actions) |
+| `value` | string | No |  | Memory value (shared_put action). Overrides input when set. |
+| `level` | string | No | short | Memory level: short|medium|long (default short) |
+| `type` | string | No | fact | Memory type tag (default fact) |
+| `query` | string | No |  | Search query (search action) |
+| `top_k` | string | No | 10 | Max search results (default 10) |
+
+---
+
 ## skill_distill
 
 Distill methodologies from books, videos, podcasts, and documents into callable skills. Supports workflow, decision, analysis, creative, prompt, and checklist skill types.
@@ -1846,23 +1846,50 @@ Discover, evaluate, and recommend skills from the ecosystem. Quality scoring, ca
 
 ---
 
-## smart_router
+## sql_query
 
-Smart router that selects the best model/provider based on task analysis
+Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1) to prevent SQL injection. Read-only by default (SELECT/SHOW/EXPLAIN/PRAGMA only); set read_only=false to allow DML/DDL. Supports a 'schema' action that lists tables and columns.
 
-- **Input**: string - the task or query to analyze and route
-- **Output**: string - the response from the selected model
+- **Input**: string - SQL query (when action=query and no `sql` param, input is used as the query)
+- **Output**: string - JSON array of rows (query), or schema description (schema action)
 
 ### Parameters
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `fast_model` | string | No | ollama:llama3 | Fast/cheap model for simple tasks (default: ollama:llama3) |
-| `medium_model` | string | No | ollama:llama3 | Medium model for average tasks (default: ollama:llama3) |
-| `strong_model` | string | No | openai:gpt-4o | Strong model for complex tasks (default: openai:gpt-4o) |
-| `system_prompt` | string | No |  | System prompt for the selected model |
-| `show_routing` | string | No | false | Show routing decision in output (default: false) |
-| `force_tier` | string | No |  | Force a specific tier: fast, medium, strong (optional) |
+| `action` | string | No | query | query (default) | schema | tables |
+| `driver` | string | Yes |  | database/sql driver name (e.g. sqlite3, postgres, mysql) |
+| `dsn` | string | Yes |  | Data source name (driver-specific). For SQLite: path to .db file. |
+| `sql` | string | No |  | SQL statement. Use ? (mysql/sqlite) or $1,$2 (postgres) placeholders for `args`. |
+| `args` | string | No |  | JSON array of bind parameters, e.g. ["foo", 42]. Optional. |
+| `read_only` | string | No | true | Reject writes if true (default). Set false to allow INSERT/UPDATE/DELETE/DDL. |
+| `max_rows` | string | No | 1000 | Max rows to return (default 1000). Protects against huge result sets. |
+| `timeout` | string | No | 30 | Query timeout in seconds (default 30). |
+
+---
+
+## structured_output
+
+LLM-driven structured output with local JSON Schema validation and self-correction retries
+
+- **Input**: string - user instruction describing what to produce
+- **Output**: string - JSON string validated against schema
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `schema` | string | Yes |  | JSON Schema (draft-07 subset) the output must conform to. Must be a JSON object with "type":"object" at the root. |
+| `schema_name` | string | No | output | Optional schema name shown to the model in the prompt (default: "output") |
+| `provider` | string | No | openai | Provider name for default model/endpoint resolution (default: openai) |
+| `model` | string | No |  | Model name (default: provider default) |
+| `api_key` | string | No |  | LLM API key (or set <PROVIDER>_API_KEY env var) |
+| `endpoint` | string | No |  | LLM API base URL (default: provider default endpoint) |
+| `system` | string | No |  | Additional system prompt prepended to the JSON instruction |
+| `temperature` | string | No | 0 | Sampling temperature 0.0-2.0 (default: 0.0 for deterministic output) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `max_retries` | string | No | 2 | Max self-correction retries on parse/validation failure (default: 2) |
+| `format_output` | string | No | false | If "true", pretty-print the JSON output (default: false, compact) |
 
 ---
 
@@ -1890,28 +1917,6 @@ Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain spec
 | `subagent_prompts` | string | No | true | Inject per-specialist subagent prompt templates into the supervisor context (default: true). Borrows Grok Build's main/subagent prompt hierarchy. |
 | `collaboration_template` | string | No |  | Collaboration template: software_development, product_design, data_science, marketing, research, legal_compliance, healthcare, education, finance, game_development, video_production, security_operations, cloud_infrastructure, content_creation, community_management, startup_acceleration, ai_development, design_system, event_management, translation_localization |
 | `template_role` | string | No | team | Template role to use: team, workflow, review_cycle (default: team) |
-
----
-
-## swarm_comm
-
-Decentralized multi-agent swarm communication system with channels, agent registration, and message broadcasting. Inspired by block/buzz (Nostr protocol) for human-AI collaborative spaces.
-
-- **Input**: string - message content or command parameters
-- **Output**: string - communication results, channel messages, or agent status
-
-### Parameters
-
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `action` | string | No | read | Action: join|leave|send|read|list_channels|list_agents|create_channel|broadcast (default: read) |
-| `agent_id` | string | No |  | Agent identifier for join/send actions |
-| `agent_name` | string | No |  | Agent display name for registration |
-| `agent_role` | string | No | agent | Agent role: researcher|developer|coordinator|reviewer|custom (default: agent) |
-| `channel` | string | No | general | Target channel: general|tasks|research|announcements (default: general) |
-| `message_type` | string | No | text | Message type: text|task|result|status|emergency (default: text) |
-| `to_agent` | string | No |  | Direct message target agent ID (optional) |
-| `limit` | string | No | 50 | Maximum messages to retrieve (default: 50) |
 
 ---
 
@@ -2117,6 +2122,17 @@ Call XVERSE LLM API
 | `api_key` | string | No |  | XVERSE API key (or set XVERSE_API_KEY env var) |
 | `endpoint` | string | No | https://api.xverse.cn/v1 | API base URL (default: https://api.xverse.cn/v1) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -2135,6 +2151,17 @@ Call Yi LLM API
 | `api_key` | string | No |  | Yi API key (or set YI_API_KEY env var) |
 | `endpoint` | string | No | https://api.lingyiwanwu.com/v1 | API base URL (default: https://api.lingyiwanwu.com/v1) |
 | `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 

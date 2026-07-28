@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -146,11 +147,17 @@ type LLMResponse struct {
 // LLMNodeConfig describes how to construct an OpenAI-compatible node:
 // the node name, default model/endpoint, and the env vars used to look
 // up the API key and endpoint if not supplied via params.
+//
+// EnvAPIBase is an optional override for the endpoint env var. When set,
+// it is consulted before the default "{EnvAPIKey}_ENDPOINT" lookup so
+// that providers whose users conventionally export a differently-named
+// base URL (e.g. OPENAI_API_BASE, IMA_API_BASE) keep working.
 type LLMNodeConfig struct {
 	Name            string
 	DefaultModel    string
 	DefaultEndpoint string
 	EnvAPIKey       string
+	EnvAPIBase      string
 	ProviderName    string
 }
 
@@ -229,7 +236,18 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 
 	endpoint, ok := params["endpoint"]
 	if !ok || endpoint == "" {
-		endpoint = config.GetEndpoint(n.config.Name, n.config.EnvAPIKey+"_ENDPOINT", n.config.DefaultEndpoint)
+		// Prefer a provider-specific base-URL env var (e.g. OPENAI_API_BASE)
+		// when configured, then fall back to the generic "{KEY}_ENDPOINT"
+		// lookup and finally the static default endpoint.
+		envEndpointVar := n.config.EnvAPIKey + "_ENDPOINT"
+		if n.config.EnvAPIBase != "" {
+			if v := os.Getenv(n.config.EnvAPIBase); v != "" {
+				endpoint = v
+			}
+		}
+		if endpoint == "" {
+			endpoint = config.GetEndpoint(n.config.Name, envEndpointVar, n.config.DefaultEndpoint)
+		}
 	}
 
 	// Validate endpoint URL to prevent SSRF + API key leakage

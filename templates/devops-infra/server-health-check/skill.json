@@ -1,0 +1,19 @@
+{
+  "id": "devops-infra/server-health-check",
+  "name": "server-health-check",
+  "version": "1.0.0",
+  "description": "Check server health metrics and generate report",
+  "author": "llm-box community",
+  "category": "devops-infra",
+  "tags": [
+    "devops-infra",
+    "workflow"
+  ],
+  "keywords": [
+    "server-health-check",
+    "devops-infra"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

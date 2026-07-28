@@ -1,0 +1,127 @@
+name: aml-transaction-review
+description: |
+  反洗钱（AML）可疑交易审查工作流。
+  对每笔交易关联方并发查询黑名单/工商/媒体，LLM 综合风险评分，
+  按风险等级分流（高风险上报/低风险放行），输出审查报告。
+  使用 map 多步子工作流 + 错误降级，单源故障不阻塞整批审查。
+
+  Demo 用本地 mock server 代替真实数据源和 LLM，无需真实 API key。
+
+vars:
+  # mock 服务地址（由 demo/mockserver 提供）
+  llm_endpoint: "http://localhost:17790"
+  data_endpoint: "http://localhost:17791"
+  transactions_file: "examples/finance/aml-review/demo/transactions.json"
+  report_file: "examples/finance/aml-review/output/report.md"
+
+steps:
+  # ── Step 1: 读取交易数据 ──
+  - name: load
+    node: file_read
+    params:
+      path: "{{var.transactions_file}}"
+      redact: "false"
+
+  # ── Step 2: 提取 items 数组（JSON 数组字符串）──
+  - name: items
+    node: json_parse
+    params:
+      path: "items"
+
+  # ── Step 3: map 对每个 (tx_id, counterparty) 跑风险审查子工作流 ──
+  - name: review
+    map:
+      over: "{{step.items}}"
+      concurrency: 3                  # 并发审查上限
+      stop_on_error: false            # 单项审查失败不终止整批
+      steps:
+        # 子步骤 1: 从当前 item（一条交易 JSON）提取 counterparty 名。
+        # item 通过 {{loop.item}} 引用；提取后存为 step.cp_name 供后续步骤复用。
+        - name: cp_name
+          node: json_parse
+          params:
+            path: "counterparty"
+
+        # 子步骤 2: 查黑名单（失败走降级，不终止）
+        # 用 POST + JSON body 传关联方名，避免 URL 编码空格问题
+        - name: blacklist
+          node: http_request
+          params:
+            url: "{{var.data_endpoint}}/blacklist"
+            method: POST
+            body: '{"name":"{{step.cp_name}}"}'
+            timeout: "5s"
+          retry: 1
+          continue_on_error: true
+
+        # 子步骤 3: 查工商（失败走降级）
+        - name: business
+          node: http_request
+          params:
+            url: "{{var.data_endpoint}}/business"
+            method: POST
+            body: '{"name":"{{step.cp_name}}"}'
+            timeout: "5s"
+          retry: 1
+          continue_on_error: true
+
+        # 子步骤 4: 查媒体负面（失败走降级）
+        - name: media
+          node: http_request
+          params:
+            url: "{{var.data_endpoint}}/media"
+            method: POST
+            body: '{"name":"{{step.cp_name}}"}'
+            timeout: "5s"
+          retry: 1
+          continue_on_error: true
+
+        # 子步骤 5: LLM 综合风险评分
+        # 三源响应通过 system prompt 注入（input 是上一步 media 响应，
+        # 但三源都已存到 step.blacklist/business/media，可全量引用）。
+        - name: risk_assess
+          node: openai
+          params:
+            endpoint: "{{var.llm_endpoint}}"
+            api_key: "mock-no-key-needed"
+            model: "mock-aml-rater"
+            system: |
+              你是反洗钱风险分析助手。基于以下三源查询结果，输出风险评分。
+              只输出 JSON，格式：{"risk_score":0-100,"risk_level":"low|medium|high","flags":[],"summary":""}
+
+              关联方：{{step.cp_name}}
+              原始交易：{{loop.item}}
+
+              黑名单查询结果：
+              {{step.blacklist}}
+
+              工商查询结果：
+              {{step.business}}
+
+              媒体负面查询结果：
+              {{step.media}}
+          retry: 1
+
+  # ── Step 4: 生成审查报告 ──
+  - name: report
+    node: template_render
+    params:
+      template: |
+        # AML 可疑交易审查报告
+
+        生成时间：{{now}}
+
+        ## 审查结果（每项含 tx_id、关联方、三源原始响应、LLM 风险评分）
+
+        {{step.review}}
+
+        ---
+        *本报告由 llm-box AML review workflow 生成，StepTrace 已记录全链路审计留痕。*
+
+  # ── Step 5: 落盘报告（供合规存档）──
+  - name: save_report
+    node: file_write
+    params:
+      path: "{{var.report_file}}"
+
+output: "{{step.report}}"

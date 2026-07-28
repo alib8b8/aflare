@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/language-learning",
+  "name": "language-learning",
+  "version": "1.0.0",
+  "description": "Create language learning curriculum",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "language-learning",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,68 @@
+# 金融业务场景 → 工作流路由表
+#
+# 场景匹配器（demo/matcher）读取本文件，对输入的业务事件做关键词命中
+# 评分，取得分最高的场景并输出对应工作流路径。这演示了"业务事件→工作流
+# 自动路由"的能力：上游系统（交易监控/客服/风控）只需抛出业务事件文本，
+# 匹配器自动选对工作流，无需硬编码调用关系。
+#
+# 评分规则：每个命中关键词 +1；同分取靠前的场景。无命中则返回 unknown。
+
+scenes:
+  - id: aml-transaction-review
+    name: 反洗钱可疑交易审查
+    industry: finance
+    keywords:
+      - 可疑交易
+      - 反洗钱
+      - AML
+      - 黑名单
+      - 关联方
+      - 大额交易
+      - 洗钱
+      - 制裁名单
+    workflow: examples/finance/aml-review/workflow.yaml
+    description: |
+      对可疑交易的关联方并发查黑名单/工商/媒体，LLM 综合风险评分，
+      按风险等级分流并生成审查报告。map 并发 + 单源降级。
+
+  - id: kyc-customer-due-diligence
+    name: 客户尽调（KYC）
+    industry: finance
+    keywords:
+      - 客户尽调
+      - KYC
+      - 开户审查
+      - 客户身份识别
+      - 受益所有人
+      - 实控人
+    workflow: examples/finance/kyc-review/workflow.yaml
+    description: |
+      新客户开户时的身份识别、受益所有人穿透与风险评级。
+      （占位条目，演示路由能力；工作流待补）
+
+  - id: credit-card-fraud
+    name: 信用卡欺诈检测
+    industry: finance
+    keywords:
+      - 信用卡欺诈
+      - 盗刷
+      - 异常消费
+      - 欺诈交易
+      - 风控规则
+    workflow: examples/finance/card-fraud-detect/workflow.yaml
+    description: |
+      基于交易时序与设备指纹的信用卡盗刷检测。
+      （占位条目，演示路由能力；工作流待补）
+
+  - id: suspicious-activity-report
+    name: 可疑交易报告（STR）生成
+    industry: finance
+    keywords:
+      - STR
+      - 可疑交易报告
+      - 监管上报
+      - 反洗钱上报
+    workflow: examples/finance/str-generation/workflow.yaml
+    description: |
+      汇总审查结论，按监管模板生成可疑交易报告。
+      （占位条目，演示路由能力；工作流待补）

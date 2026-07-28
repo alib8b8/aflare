@@ -1,0 +1,9 @@
+{
+  "items": [
+    {"tx_id": "TX-20260728-001", "amount": 850000,   "counterparty": "SHADOW HOLDINGS LTD"},
+    {"tx_id": "TX-20260728-001", "amount": 850000,   "counterparty": "SUNRISE TECH INC"},
+    {"tx_id": "TX-20260728-002", "amount": 12000,    "counterparty": "GREENLEAF RETAIL"},
+    {"tx_id": "TX-20260728-003", "amount": 2300000,  "counterparty": "CASCADE TRADING CO"},
+    {"tx_id": "TX-20260728-003", "amount": 2300000,  "counterparty": "UNKNOWN ENTITY XYZ"}
+  ]
+}

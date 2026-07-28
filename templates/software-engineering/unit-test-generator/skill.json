@@ -1,0 +1,19 @@
+{
+  "id": "software-engineering/unit-test-generator",
+  "name": "unit-test-generator",
+  "version": "1.0.0",
+  "description": "Generate unit test skeleton for Go functions",
+  "author": "llm-box community",
+  "category": "software-engineering",
+  "tags": [
+    "software-engineering",
+    "workflow"
+  ],
+  "keywords": [
+    "unit-test-generator",
+    "software-engineering"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

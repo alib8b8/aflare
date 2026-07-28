@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/flashcards",
+  "name": "flashcards",
+  "version": "1.0.0",
+  "description": "Generate flashcards from study material",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "flashcards",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

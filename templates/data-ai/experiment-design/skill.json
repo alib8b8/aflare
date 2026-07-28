@@ -1,0 +1,19 @@
+{
+  "id": "data-ai/experiment-design",
+  "name": "experiment-design",
+  "version": "1.0.0",
+  "description": "experiment-design workflow template",
+  "author": "llm-box community",
+  "category": "data-ai",
+  "tags": [
+    "data-ai",
+    "workflow"
+  ],
+  "keywords": [
+    "experiment-design",
+    "data-ai"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -132,8 +132,11 @@ func executeIfBranch(ctx context.Context, stepIndex int, ifCfg *IfConfig, input 
 		Name:  fmt.Sprintf("if-branch-%d", stepIndex),
 		Steps: branchSteps,
 	}
-	// Pass incremented depth and global limiter via context
+	// Pass incremented depth and the if-step's input via context. The input
+	// becomes the branch sub-workflow's starting data so the flowing value
+	// (e.g. an error message under capture_error) reaches the branch handlers.
 	childCtx := context.WithValue(ctx, ifDepthKey, depth+1)
+	childCtx = context.WithValue(childCtx, ifInputKey, input)
 	output, subResults, err := ExecuteWorkflowWithTUI(childCtx, subWf, reg, program)
 	if err != nil {
 		return subResults, "", err
@@ -214,4 +217,55 @@ func validateInputSchema(wf *Workflow) error {
 	// since input could be non-JSON strings (e.g., plain text for LLM processing)
 	// Full validation would require the input to be provided at parse time.
 	return nil
+}
+
+// executeCaptureErrorBranch runs a step's `capture_error` sub-workflow when the
+// step's node has failed. It treats the error as a branchable value rather
+// than swallowing it (continue_on_error) or running a single handler node
+// (on_error):
+//
+//   - The error message is the INPUT to the first sub-step, so a step
+//     condition (e.g. condition:"contains:timeout") can route on error type,
+//     and handler nodes receive the error text as their input.
+//   - The error text is also exposed as {{var.error}} inside the branch.
+//   - The branch runs on a fresh engine that inherits the parent workflow's
+//     vars; {{step.X}} inside the branch cannot see the outer workflow's
+//     steps (same limitation as `if` branches).
+//   - The branch's final output becomes the failed step's output, so later
+//     steps see a normal value and the workflow continues.
+//   - The original error is preserved in StepResult.Error for audit and a
+//     "capture_error" recovery is recorded in StepTrace.Recoveries.
+//
+// The branch steps are run inline (not via ExecuteWorkflow) so that the error
+// message can seed the initial data — ExecuteWorkflow hardcodes the initial
+// workflow input to "". executeSubStep is reused so nested if/loop/map/reduce
+// and per-step recovery all work inside the branch.
+//
+// Returns (branchOutput, nil) on success. If a branch step fails (and is not
+// itself recovered), the branch error is returned so the caller can fall
+// through to other recovery primitives.
+func executeCaptureErrorBranch(ctx context.Context, steps []WorkflowStep, errMsg string, parentVars map[string]string, reg *nodes.Registry, program *tea.Program, globalLimiter *ConcurrencyLimiter) (string, error) {
+	if len(steps) == 0 {
+		// No branch declared — surface the error text as the output so the
+		// workflow can continue with the error as a value.
+		return errMsg, nil
+	}
+	engine := NewExpressionEngine()
+	for k, v := range parentVars {
+		engine.SetVariable(k, v)
+	}
+	engine.SetVariable("error", errMsg)
+
+	// Seed the branch with the error message: it is both the first step's
+	// input (enabling condition-based routing on the error text) and the
+	// initial accumulator should the branch produce no output.
+	data := errMsg
+	for idx, sub := range steps {
+		_, out, err := executeSubStep(ctx, idx, sub, data, engine, reg, program, globalLimiter)
+		if err != nil {
+			return "", fmt.Errorf("capture_error branch step %d failed: %w", idx, err)
+		}
+		data = out
+	}
+	return data, nil
 }

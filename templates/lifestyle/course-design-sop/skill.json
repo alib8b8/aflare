@@ -1,0 +1,19 @@
+{
+  "id": "lifestyle/course-design-sop",
+  "name": "course-design-sop",
+  "version": "1.0.0",
+  "description": "course-design-sop workflow template",
+  "author": "llm-box community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "workflow"
+  ],
+  "keywords": [
+    "course-design-sop",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

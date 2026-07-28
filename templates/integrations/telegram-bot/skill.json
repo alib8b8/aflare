@@ -1,0 +1,19 @@
+{
+  "id": "integrations/telegram-bot",
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "description": "Send notifications to Telegram from your workflows.",
+  "author": "llm-box community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow"
+  ],
+  "keywords": [
+    "telegram-bot",
+    "integrations"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}
