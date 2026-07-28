@@ -96,8 +96,9 @@ func (n *PreferenceNode) Execute(ctx context.Context, input string, params map[s
 				// keep default value on parse failure
 			}
 		}
-		profile.LearnFromInteraction(userID, category, key, value, source)
-		_ = confidence
+		// LearnFromInteraction 内部硬编码 confidence=0.6;直接用 SetPreference
+		// 传入用户指定的 confidence,确保参数真正生效(此前 confidence 被丢弃)。
+		profile.SetPreference(memory.PreferenceCategory(category), key, value, source, confidence)
 		pm.Save(userID)
 		return fmt.Sprintf("Learned preference [%s:%s] = %s", category, key, value), nil
 

@@ -50,7 +50,6 @@ func (n *MultimodalNode) Schema() NodeSchema {
 			{Name: "mode", Type: "string", Description: "Mode: image, ocr, describe, compare (default: describe)", Required: false, Default: "describe"},
 			{Name: "image_path", Type: "string", Description: "Path to image file (local path or URL)", Required: false},
 			{Name: "image_paths", Type: "string", Description: "Comma-separated paths for compare mode", Required: false},
-			{Name: "audio_path", Type: "string", Description: "Path to audio file for transcription", Required: false},
 			{Name: "lang", Type: "string", Description: "OCR languages for tesseract (default: eng+chi_sim)", Required: false, Default: "eng+chi_sim"},
 			{Name: "provider", Type: "string", Description: "LLM provider with vision support (default: openai)", Required: false, Default: "openai"},
 			{Name: "model", Type: "string", Description: "Vision model name (default: gpt-4o)", Required: false, Default: "gpt-4o"},
@@ -66,7 +65,6 @@ func (n *MultimodalNode) Execute(ctx context.Context, input string, params map[s
 	mode := getParam(params, "mode", "describe")
 	imagePath := params["image_path"]
 	imagePaths := params["image_paths"]
-	_ = params["audio_path"]
 	provider := getParam(params, "provider", "openai")
 	model := getParam(params, "model", "gpt-4o")
 	apiKey := getParam(params, "api_key", "")
@@ -332,10 +330,10 @@ func callVisionAPI(ctx context.Context, provider, model, apiKey, endpoint string
 	})
 	_ = compatNode
 
-	return fallbackVisionCall(provider, model, apiKey, endpoint, messages)
+	return fallbackVisionCall(ctx, provider, model, apiKey, endpoint, messages)
 }
 
-func fallbackVisionCall(provider, model, apiKey, endpoint string, messages []visionMessage) (string, error) {
+func fallbackVisionCall(ctx context.Context, provider, model, apiKey, endpoint string, messages []visionMessage) (string, error) {
 	if apiKey == "" {
 		return "", fmt.Errorf("no API key provided for %s (set %s_API_KEY)", provider, strings.ToUpper(provider))
 	}
@@ -365,7 +363,7 @@ func fallbackVisionCall(provider, model, apiKey, endpoint string, messages []vis
 	}
 
 	warning := "[Note: Vision API direct call not implemented in this version. Using text-only mode. For full vision support, use providers with vision capability.]\n\n"
-	result, err := compatNode.Execute(context.Background(), userText, params)
+	result, err := compatNode.Execute(ctx, userText, params)
 	if err != nil {
 		return "", err
 	}

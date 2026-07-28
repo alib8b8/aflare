@@ -71,8 +71,44 @@ var globalSecurityStats = &SecurityStats{
 	RecentEvents:      make([]SecurityEvent, 0, 100),
 }
 
+// GetSecurityStats 返回全局安全统计单例的指针。
+//
+// 该指针仅供调用其加锁方法(RecordBlock / RecordSecurityLevel /
+// RecordCodeInterpreterRun / RecordHTTPRequest / ToJSON / FormatReport /
+// Snapshot)使用。不要直接读写其导出字段(ByType / ByNode / TotalBlocks 等),
+// 那样会绕过内部互斥锁构成 data race。只读场景请改用
+// GetSecurityStats().Snapshot()。
 func GetSecurityStats() *SecurityStats {
 	return globalSecurityStats
+}
+
+// Snapshot 返回当前安全统计的深拷贝,供只读场景安全访问。
+// 调用方拿到返回的指针后可自由读取其字段,无需加锁,也不会影响全局单例。
+// 不要对返回值调用 Record* 方法(那只会写快照副本,不会写全局)。
+func (s *SecurityStats) Snapshot() *SecurityStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := &SecurityStats{
+		TotalBlocks:       s.TotalBlocks,
+		ByType:            make(map[SecurityBlockType]int64, len(s.ByType)),
+		ByNode:            make(map[string]int64, len(s.ByNode)),
+		SecurityLevelUsed: make(map[string]int64, len(s.SecurityLevelUsed)),
+		CodeInterpreter:   s.CodeInterpreter,
+		HTTPRequests:      s.HTTPRequests,
+		RecentEvents:      make([]SecurityEvent, len(s.RecentEvents)),
+	}
+	for k, v := range s.ByType {
+		out.ByType[k] = v
+	}
+	for k, v := range s.ByNode {
+		out.ByNode[k] = v
+	}
+	for k, v := range s.SecurityLevelUsed {
+		out.SecurityLevelUsed[k] = v
+	}
+	copy(out.RecentEvents, s.RecentEvents)
+	return out
 }
 
 func (s *SecurityStats) RecordBlock(blockType SecurityBlockType, detail, node string) {

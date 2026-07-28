@@ -312,14 +312,60 @@ func (n *VoiceOutputNode) simulateASRTranscription(audioInput, engine, language,
 	}
 
 	if enableTimestamps {
-		result["segments"] = []map[string]interface{}{
-			{"start": 0.0, "end": 2.0, "text": strings.Split(text, " ")[0]},
-			{"start": 2.0, "end": 4.0, "text": strings.Split(text, " ")[1]},
-			{"start": 4.0, "end": 5.2, "text": strings.Join(strings.Split(text, " ")[2:], " ")},
-		}
+		result["segments"] = buildTranscriptSegments(text, 5.2)
 	}
 
 	return result
+}
+
+// buildTranscriptSegments 把转录文本拆成 3 段带时间戳的片段。
+// 当文本按空格分词不足 3 段时(如日语/中文无空格),改按 rune 长度均分,
+// 彻底避免 strings.Split(text," ")[1] 在无空格文本上的索引越界 panic。
+func buildTranscriptSegments(text string, duration float64) []map[string]interface{} {
+	const numSeg = 3
+	words := strings.Fields(text)
+
+	var texts []string
+	if len(words) >= numSeg {
+		texts = []string{
+			words[0],
+			words[1],
+			strings.Join(words[2:], " "),
+		}
+	} else {
+		// 按字符均分,兼容无空格的 CJK 文本。
+		runes := []rune(text)
+		segLen := len(runes) / numSeg
+		if segLen == 0 {
+			segLen = 1
+		}
+		texts = make([]string, 0, numSeg)
+		for i := 0; i < numSeg; i++ {
+			start := i * segLen
+			end := start + segLen
+			if i == numSeg-1 {
+				end = len(runes) // 最后一段兜底吸收余数
+			}
+			if start >= len(runes) {
+				texts = append(texts, "")
+			} else if end > len(runes) {
+				texts = append(texts, string(runes[start:]))
+			} else {
+				texts = append(texts, string(runes[start:end]))
+			}
+		}
+	}
+
+	segDur := duration / float64(numSeg)
+	segments := make([]map[string]interface{}, numSeg)
+	for i, t := range texts {
+		segments[i] = map[string]interface{}{
+			"start": float64(i) * segDur,
+			"end":   float64(i+1) * segDur,
+			"text":  t,
+		}
+	}
+	return segments
 }
 
 func (n *VoiceOutputNode) simulateSpeakerDiarization(audioInput, engine, language string, enableDiarization, enableTimestamps bool) map[string]interface{} {
