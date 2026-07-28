@@ -30,7 +30,7 @@ jobs:
       run: |
         total=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}' | sed 's/%//')
         echo "Total coverage: ${total}%"
-        threshold=30
+        threshold=60
         echo "Threshold: ${threshold}%"
         pass=$(awk -v total="$total" -v threshold="$threshold" 'BEGIN { print (total >= threshold) ? 1 : 0 }')
         if [ "$pass" -eq 0 ]; then

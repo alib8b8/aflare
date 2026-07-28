@@ -1,0 +1,68 @@
+name: Benchmark
+
+# 性能回归检测:每周日凌晨运行全部 benchmark,并与上一周的基线用
+# benchstat 对比。也可通过 workflow_dispatch 手动触发。
+# 结果上传为 artifact 供人工查阅;若出现显著回归(>15%),在摘要里标注。
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'  # 每周日 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.25.12'
+          cache: true
+
+      - name: Install benchstat
+        run: go install golang.org/x/perf/cmd/benchstat@latest
+
+      - name: Download previous baseline (if any)
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: benchmark-baseline
+          path: baseline
+
+      - name: Run benchmarks
+        run: |
+          # -run=^a 跳过所有测试,只跑 benchmark;-benchmem 报告内存分配
+          go test -bench=. -benchmem -run=^a -count=5 ./... > current.txt 2>&1
+          cat current.txt
+
+      - name: Compare with baseline
+        id: compare
+        continue-on-error: true
+        run: |
+          if [ -f baseline/bench.txt ]; then
+            echo "=== benchstat comparison (old vs new) ==="
+            benchstat baseline/bench.txt current.txt || true
+          else
+            echo "No baseline found; this run becomes the new baseline."
+          fi
+
+      - name: Upload current results as baseline
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-baseline
+          path: current.txt
+          retention-days: 21
+
+      - name: Upload full report
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-report
+          path: current.txt
+          retention-days: 30

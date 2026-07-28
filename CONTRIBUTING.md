@@ -76,7 +76,7 @@ We take code quality seriously. Here's what to expect:
    - `go vet` static analysis
    - `gosec` security scan
    - CodeQL analysis
-   - Coverage threshold check (65% minimum)
+   - Coverage threshold check (60% minimum enforced in CI; 85% aspirational goal)
 
 2. **Human review** — after CI passes:
    - A CODEOWNER will review within 48 hours (weekdays)

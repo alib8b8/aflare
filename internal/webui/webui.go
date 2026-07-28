@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"path/filepath"
 	"strings"
@@ -98,6 +99,14 @@ func (s *WebUIServer) Start() error {
 	mux.HandleFunc("/api/workflow", s.authMiddleware(s.handleWorkflow))
 	mux.HandleFunc("/api/validate", s.authMiddleware(s.handleValidate))
 
+	// pprof 调试端点:默认关闭,仅当环境变量 LLM_BOX_PPROF=1 时启用。
+	// 生产环境保持关闭以避免安全暴露;需要在线性能剖析时显式开启。
+	// 端点受 authMiddleware 保护,访问需带 X-Auth-Token(若设置了 token)。
+	if os.Getenv("LLM_BOX_PPROF") == "1" {
+		s.registerPprof(mux)
+		logger.Info("pprof endpoints enabled at /debug/pprof/ (LLM_BOX_PPROF=1)")
+	}
+
 	srv := &http.Server{
 		Addr:         s.host + ":" + s.port,
 		Handler:      mux,
@@ -111,6 +120,16 @@ func (s *WebUIServer) Start() error {
 
 	logger.Info("WebUI server started", "port", s.port)
 	return srv.ListenAndServe()
+}
+
+// registerPprof 在 mux 上注册 net/http/pprof 调试端点。
+// 所有端点经 authMiddleware 保护(若设置了 authToken 则需带 X-Auth-Token)。
+func (s *WebUIServer) registerPprof(mux *http.ServeMux) {
+	mux.HandleFunc("/debug/pprof/", s.authMiddleware(pprof.Index))
+	mux.HandleFunc("/debug/pprof/cmdline", s.authMiddleware(pprof.Cmdline))
+	mux.HandleFunc("/debug/pprof/profile", s.authMiddleware(pprof.Profile))
+	mux.HandleFunc("/debug/pprof/symbol", s.authMiddleware(pprof.Symbol))
+	mux.HandleFunc("/debug/pprof/trace", s.authMiddleware(pprof.Trace))
 }
 
 func (s *WebUIServer) Stop() error {
