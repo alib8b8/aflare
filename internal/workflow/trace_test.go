@@ -303,7 +303,7 @@ func TestTrace_SequentialConditionSkip(t *testing.T) {
 
 	wf := &Workflow{
 		Name: "seq-skip",
-		Vars:  map[string]string{"flag": "false"},
+		Vars: map[string]string{"flag": "false"},
 		Steps: []WorkflowStep{
 			{Node: "ok", Name: "skipped", Condition: "{{var.flag}}"},
 		},
@@ -566,7 +566,7 @@ func TestTrace_DAGConditionSkip(t *testing.T) {
 
 	wf := &Workflow{
 		Name: "dag-skip",
-		Vars:  map[string]string{"flag": "false"},
+		Vars: map[string]string{"flag": "false"},
 		Steps: []WorkflowStep{
 			{Node: "ok", Name: "skipped", Condition: "{{var.flag}}"},
 			{Node: "ok", Name: "runs", DependsOn: []string{"skipped"}},
@@ -656,7 +656,7 @@ func TestTrace_StepsCoverAllOutcomes(t *testing.T) {
 
 	wf := &Workflow{
 		Name: "seq-mixed",
-		Vars:  map[string]string{"skip": "false"},
+		Vars: map[string]string{"skip": "false"},
 		Steps: []WorkflowStep{
 			{Node: "ok", Name: "s1"},
 			{Node: "ok", Name: "s2-skip", Condition: "{{var.skip}}"}, // var.skip="false" → skipped

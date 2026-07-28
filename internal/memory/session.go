@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -88,6 +89,16 @@ type SessionMemory struct {
 	createdAt   time.Time
 	updatedAt   time.Time
 	lastUsedAt  time.Time
+
+	// C-1: vector retrieval state. embedder is immutable after assignment
+	// (set once by SetEmbedder); vectors is mutated under sm.mu AND its own
+	// internal lock, so callers may search vectors without holding sm.mu.
+	// We keep vectors in sync with entries: every Store adds an embedding,
+	// every Delete/Forget/evict removes one. KGNodeRefs holds the C-3
+	// memory↔graph linkage (memory key -> KG node names).
+	embedder   Embedder
+	vectors    *VectorIndex
+	KGNodeRefs map[string][]string // key -> []KG entity name
 }
 
 // NewSessionMemory creates a new isolated memory session.
@@ -103,7 +114,123 @@ func NewSessionMemory(sessionID string, maxEntries int) *SessionMemory {
 		createdAt:  now,
 		updatedAt:  now,
 		lastUsedAt: now,
+		vectors:    NewVectorIndex(),
+		KGNodeRefs: make(map[string][]string),
 	}
+}
+
+// SetEmbedder installs the embedder used for semantic search. If nil is
+// passed the session falls back to bag-of-words similarity. Once an
+// embedder is set, all subsequent Store calls will compute embeddings;
+// existing entries are NOT retroactively embedded. Call ReindexVectors
+// to embed existing entries.
+//
+// This method is safe to call before any Store; calling it after entries
+// exist without reindexing leaves those entries without vectors (they
+// will still be matched by the bag-of-words fallback in Search).
+func (sm *SessionMemory) SetEmbedder(e Embedder) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.embedder = e
+}
+
+// GetEmbedder returns the currently configured embedder (may be nil).
+func (sm *SessionMemory) GetEmbedder() Embedder {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	return sm.embedder
+}
+
+// ReindexVectors (re)embeds every existing entry using the current
+// embedder. If no embedder is set this is a no-op. This is the
+// recommended path after SetEmbedder when migrating a live session.
+func (sm *SessionMemory) ReindexVectors(ctx context.Context) error {
+	sm.mu.RLock()
+	e := sm.embedder
+	entriesCopy := make([]*MemoryEntry, 0, len(sm.entries))
+	for _, entry := range sm.entries {
+		ec := *entry
+		entriesCopy = append(entriesCopy, &ec)
+	}
+	sm.mu.RUnlock()
+
+	if e == nil {
+		return nil
+	}
+	for _, entry := range entriesCopy {
+		v, err := e.Embed(ctx, entry.Value)
+		if err != nil || len(v) == 0 {
+			continue
+		}
+		sm.vectors.Add(entry.Key, v, map[string]string{
+			"level":      entry.Level,
+			"type":       entry.Type,
+			"session_id": sm.SessionID,
+		})
+	}
+	return nil
+}
+
+// LinkKGNode associates a memory entry with one or more knowledge-graph
+// entity names (C-3). Later, ExpandKGSubgraph can be used at retrieval
+// time to fetch related entities. Returns an error if the key doesn't
+// exist so callers don't silently create dangling links.
+func (sm *SessionMemory) LinkKGNode(key string, entityNames ...string) error {
+	if len(entityNames) == 0 {
+		return nil
+	}
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if _, ok := sm.entries[key]; !ok {
+		return fmt.Errorf("cannot link KG node: memory not found: %s", key)
+	}
+	existing := sm.KGNodeRefs[key]
+	seen := make(map[string]bool, len(existing))
+	for _, n := range existing {
+		seen[n] = true
+	}
+	for _, n := range entityNames {
+		n = strings.TrimSpace(n)
+		if n == "" || seen[n] {
+			continue
+		}
+		seen[n] = true
+		sm.KGNodeRefs[key] = append(sm.KGNodeRefs[key], n)
+	}
+	return nil
+}
+
+// GetKGLinks returns the KG entity names linked to a memory key.
+func (sm *SessionMemory) GetKGLinks(key string) []string {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	refs := sm.KGNodeRefs[key]
+	out := make([]string, len(refs))
+	copy(out, refs)
+	return out
+}
+
+// ExpandKGSubgraph returns the union of KG entity names linked to any
+// of the given memory keys. It is the retrieval-time helper for C-3:
+// after a vector search returns hits, the caller passes the hit keys
+// here to find related KG nodes that should be surfaced alongside.
+func (sm *SessionMemory) ExpandKGSubgraph(keys []string) []string {
+	if len(keys) == 0 {
+		return nil
+	}
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	seen := make(map[string]bool)
+	var out []string
+	for _, k := range keys {
+		for _, n := range sm.KGNodeRefs[k] {
+			if !seen[n] {
+				seen[n] = true
+				out = append(out, n)
+			}
+		}
+	}
+	return out
 }
 
 // Touch updates the last used timestamp.
@@ -115,6 +242,30 @@ func (sm *SessionMemory) Touch() {
 
 // Store adds or updates a memory entry.
 func (sm *SessionMemory) Store(key, value, level, memType string, tags []string, ttlHours int, confidence float64, source string) (string, time.Time, error) {
+	return sm.StoreCtx(context.Background(), key, value, level, memType, tags, ttlHours, confidence, source)
+}
+
+// StoreCtx is the context-aware variant of Store. It computes the
+// embedding (if an embedder is configured) using ctx, allowing callers
+// to time-bound or cancel the embedding HTTP call. The entries map is
+// updated atomically: the embedding is computed BEFORE acquiring the
+// write lock so a slow embedder doesn't block other readers.
+func (sm *SessionMemory) StoreCtx(ctx context.Context, key, value, level, memType string, tags []string, ttlHours int, confidence float64, source string) (string, time.Time, error) {
+	// Snapshot the embedder under read lock; Embed may do network I/O.
+	sm.mu.RLock()
+	e := sm.embedder
+	sm.mu.RUnlock()
+
+	var vec Vector
+	if e != nil {
+		v, err := e.Embed(ctx, value)
+		if err == nil && len(v) > 0 {
+			vec = v
+		}
+		// On embedding error we proceed anyway: the entry will be
+		// retrievable by key and matched by the bag-of-words fallback.
+	}
+
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -146,8 +297,22 @@ func (sm *SessionMemory) Store(key, value, level, memType string, tags []string,
 		Confidence: confidence,
 	}
 
+	// If overwriting an existing key, keep its KG links intact.
 	sm.entries[key] = entry
 	sm.updatedAt = time.Now()
+
+	// Update the vector index. We do this under sm.mu (which also
+	// serialises against Delete/Forget) AND vectors' own internal lock
+	// — two locks, but always acquired in the same order elsewhere
+	// (vectors lock is only ever taken alone in its own methods), so
+	// no deadlock risk.
+	if len(vec) > 0 {
+		sm.vectors.Add(key, vec, map[string]string{
+			"level":      level,
+			"type":       memType,
+			"session_id": sm.SessionID,
+		})
+	}
 	return entry.ID, expiresAt, nil
 }
 
@@ -162,7 +327,12 @@ func (sm *SessionMemory) Retrieve(key string) (*MemoryEntry, error) {
 	}
 
 	if time.Now().After(entry.ExpiresAt) {
+		// Clean up all three indices (entries / vectors / KGNodeRefs)
+		// so expired entries don't leak memory or leave dangling refs.
+		// Matches the cleanup in Delete and cleanupExpiredLocked.
 		delete(sm.entries, key)
+		delete(sm.KGNodeRefs, key)
+		sm.vectors.Remove(key)
 		return nil, fmt.Errorf("memory expired: %s", key)
 	}
 
@@ -185,12 +355,119 @@ func (sm *SessionMemory) Delete(key string) error {
 	}
 
 	delete(sm.entries, key)
+	delete(sm.KGNodeRefs, key)
+	sm.vectors.Remove(key)
 	sm.updatedAt = time.Now()
 	return nil
 }
 
 // Search finds memory entries matching a query.
+//
+// C-1: if an embedder is configured, the query is embedded and compared
+// against stored entry vectors using cosine similarity. Entries without
+// a stored vector fall back to bag-of-words similarity. If no embedder
+// is configured, the entire search uses bag-of-words (legacy behaviour).
+//
+// The threshold is interpreted in [0,1] for both paths so existing
+// callers don't need to know which backend is active.
 func (sm *SessionMemory) Search(query, level string, topK int, threshold float64) []MemoryEntry {
+	return sm.SearchCtx(context.Background(), query, level, topK, threshold)
+}
+
+// SearchCtx is the context-aware variant of Search. The context is
+// honoured when computing the query embedding (e.g. an HTTPEmbedder).
+func (sm *SessionMemory) SearchCtx(ctx context.Context, query, level string, topK int, threshold float64) []MemoryEntry {
+	sm.mu.RLock()
+	e := sm.embedder
+	sm.mu.RUnlock()
+
+	// Try the vector path first. If we get any hits, augment them with
+	// bag-of-words fallback for entries that lack a vector, then return.
+	if e != nil {
+		qv, err := e.Embed(ctx, query)
+		if err == nil && len(qv) > 0 {
+			return sm.searchVector(qv, query, level, topK, threshold)
+		}
+		// On embed error, fall through to bag-of-words.
+	}
+	return sm.searchBagOfWords(query, level, topK, threshold)
+}
+
+// searchVector merges vector hits with bag-of-words hits for entries
+// that don't have a stored vector. This keeps recall high when some
+// entries were stored before the embedder was configured.
+func (sm *SessionMemory) searchVector(qv Vector, query, level string, topK int, threshold float64) []MemoryEntry {
+	// Collect vector hits (does NOT need sm.mu — VectorIndex has its
+	// own lock), then attach full entry data under sm.mu.
+	hits := sm.vectors.Search(qv, topK*2, threshold)
+
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	now := time.Now()
+	type scored struct {
+		entry MemoryEntry
+		score float64
+	}
+	var merged []scored
+	seen := make(map[string]bool, len(hits))
+
+	for _, h := range hits {
+		entry, ok := sm.entries[h.Key]
+		if !ok {
+			continue
+		}
+		if level != "" && entry.Level != level {
+			continue
+		}
+		if now.After(entry.ExpiresAt) {
+			continue
+		}
+		ec := *entry
+		ec.Score = h.Score * 100
+		merged = append(merged, scored{ec, h.Score})
+		seen[h.Key] = true
+	}
+
+	// Bag-of-words fallback for entries not in the vector index.
+	for key, entry := range sm.entries {
+		if seen[key] {
+			continue
+		}
+		if level != "" && entry.Level != level {
+			continue
+		}
+		if now.After(entry.ExpiresAt) {
+			continue
+		}
+		sim := calculateSimilarity(query, entry.Value)
+		if sim >= threshold {
+			ec := *entry
+			ec.Score = sim * 100
+			merged = append(merged, scored{ec, sim})
+		}
+	}
+
+	// Sort by score descending (stable on key for determinism).
+	sort.SliceStable(merged, func(i, j int) bool {
+		if merged[i].score != merged[j].score {
+			return merged[i].score > merged[j].score
+		}
+		return merged[i].entry.Key < merged[j].entry.Key
+	})
+	if len(merged) > topK {
+		merged = merged[:topK]
+	}
+	out := make([]MemoryEntry, len(merged))
+	for i, m := range merged {
+		out[i] = m.entry
+	}
+	return out
+}
+
+// searchBagOfWords is the legacy word-overlap search path, used when
+// no embedder is configured or embedding the query fails.
+func (sm *SessionMemory) searchBagOfWords(query, level string, topK int, threshold float64) []MemoryEntry {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
@@ -235,6 +512,8 @@ func (sm *SessionMemory) cleanupExpiredLocked() {
 	for key, entry := range sm.entries {
 		if now.After(entry.ExpiresAt) {
 			delete(sm.entries, key)
+			delete(sm.KGNodeRefs, key)
+			sm.vectors.Remove(key)
 		}
 	}
 }
@@ -253,6 +532,8 @@ func (sm *SessionMemory) evictLRULocked() {
 
 	if oldestKey != "" {
 		delete(sm.entries, oldestKey)
+		delete(sm.KGNodeRefs, oldestKey)
+		sm.vectors.Remove(oldestKey)
 	}
 }
 
@@ -265,6 +546,8 @@ func (sm *SessionMemory) Forget(level string) int {
 	for key, entry := range sm.entries {
 		if level == "" || entry.Level == level {
 			delete(sm.entries, key)
+			delete(sm.KGNodeRefs, key)
+			sm.vectors.Remove(key)
 			deletedCount++
 		}
 	}
@@ -563,6 +846,11 @@ type sessionData struct {
 	CreatedAt   time.Time               `json:"created_at"`
 	UpdatedAt   time.Time               `json:"updated_at"`
 	LastUsedAt  time.Time               `json:"last_used_at"`
+	// C-3: persisted memory↔KG linkage. Keyed by memory key, values
+	// are KG entity names. The vector index is NOT persisted: vectors
+	// are recomputed on load via ReindexVectors (embeddings are cheap
+	// and model versions may change).
+	KGNodeRefs map[string][]string `json:"kg_node_refs,omitempty"`
 }
 
 // SaveAll persists all active sessions to storage.
@@ -582,6 +870,17 @@ func (mgr *SessionMemoryManager) saveSessionLocked(session *SessionMemory) {
 	}
 
 	session.mu.RLock()
+	// Deep-copy KGNodeRefs AND Entries so the marshalled JSON is stable
+	// even if a concurrent writer mutates the maps while json.Marshal
+	// runs. Entries stores *MemoryEntry pointers; without copying the
+	// pointed-to struct, a concurrent Retrieve (which mutates
+	// AccessedAt under the write lock) would race with marshalling.
+	kgRefs := make(map[string][]string, len(session.KGNodeRefs))
+	for k, v := range session.KGNodeRefs {
+		cp := make([]string, len(v))
+		copy(cp, v)
+		kgRefs[k] = cp
+	}
 	data := sessionData{
 		SessionID:   session.SessionID,
 		Entries:     make(map[string]*MemoryEntry, len(session.entries)),
@@ -591,9 +890,11 @@ func (mgr *SessionMemoryManager) saveSessionLocked(session *SessionMemory) {
 		CreatedAt:   session.createdAt,
 		UpdatedAt:   session.updatedAt,
 		LastUsedAt:  session.lastUsedAt,
+		KGNodeRefs:  kgRefs,
 	}
 	for k, v := range session.entries {
-		data.Entries[k] = v
+		ec := *v // value copy so concurrent writers can't race the marshal
+		data.Entries[k] = &ec
 	}
 	session.mu.RUnlock()
 
@@ -629,6 +930,12 @@ func (mgr *SessionMemoryManager) loadSessionLocked(session *SessionMemory) {
 	session.mu.Lock()
 	defer session.mu.Unlock()
 
+	if sd.Entries == nil {
+		sd.Entries = make(map[string]*MemoryEntry)
+	}
+	if sd.KGNodeRefs == nil {
+		sd.KGNodeRefs = make(map[string][]string)
+	}
 	session.entries = sd.Entries
 	session.graph = sd.Graph
 	session.accessCount = sd.AccessCount
@@ -636,6 +943,9 @@ func (mgr *SessionMemoryManager) loadSessionLocked(session *SessionMemory) {
 	session.createdAt = sd.CreatedAt
 	session.updatedAt = sd.UpdatedAt
 	session.lastUsedAt = sd.LastUsedAt
+	session.KGNodeRefs = sd.KGNodeRefs
+	// Vectors are intentionally left empty: callers must invoke
+	// ReindexVectors after load if they want semantic search.
 }
 
 // StartAutoSave starts periodic auto-saving of sessions.

@@ -231,9 +231,7 @@ func TestOpenAICompatibleNode_Execute_Success(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &gotBody)
 		resp := LLMResponse{
-			Choices: []LLMChoice{{Message: struct {
-				Content string `json:"content"`
-			}{Content: "hello from mock"}}},
+			Choices: []LLMChoice{{Message: LLMChoiceMessage{Content: "hello from mock"}}},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
@@ -286,9 +284,7 @@ func TestOpenAICompatibleNode_Execute_DefaultModelAndEndpoint(t *testing.T) {
 		if body.Model != "test-model" {
 			t.Errorf("expected default model test-model, got %q", body.Model)
 		}
-		resp := LLMResponse{Choices: []LLMChoice{{Message: struct {
-			Content string `json:"content"`
-		}{Content: "ok"}}}}
+		resp := LLMResponse{Choices: []LLMChoice{{Message: LLMChoiceMessage{Content: "ok"}}}}
 		_ = json.NewEncoder(w).Encode(resp)
 	})
 	defer srv.Close()
@@ -422,9 +418,7 @@ func TestOpenAICompatibleNode_ExecuteStream_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		flusher, _ := w.(http.Flusher)
 		// First chunk
-		chunk1 := LLMResponse{Choices: []LLMChoice{{Delta: struct {
-			Content string `json:"content"`
-		}{Content: "Hello"}}}}
+		chunk1 := LLMResponse{Choices: []LLMChoice{{Delta: LLMChoiceDelta{Content: "Hello"}}}}
 		_, _ = w.Write([]byte("data: "))
 		enc := json.NewEncoder(w)
 		_ = enc.Encode(chunk1)
@@ -432,9 +426,7 @@ func TestOpenAICompatibleNode_ExecuteStream_Success(t *testing.T) {
 			flusher.Flush()
 		}
 		// Second chunk
-		chunk2 := LLMResponse{Choices: []LLMChoice{{Delta: struct {
-			Content string `json:"content"`
-		}{Content: " world"}}}}
+		chunk2 := LLMResponse{Choices: []LLMChoice{{Delta: LLMChoiceDelta{Content: " world"}}}}
 		_, _ = w.Write([]byte("data: "))
 		_ = enc.Encode(chunk2)
 		if flusher != nil {

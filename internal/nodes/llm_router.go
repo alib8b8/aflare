@@ -43,15 +43,19 @@ type RouterProvider struct {
 }
 
 type ProviderStats struct {
-	TotalCalls    int64
-	SuccessCalls  int64
-	FailedCalls   int64
-	TotalLatency  int64
-	TokensUsed    int64
-	DailyUsage    int64
-	LastUsed      time.Time
-	LastResetDate string
-	CooldownUntil time.Time
+	TotalCalls   int64
+	SuccessCalls int64
+	FailedCalls  int64
+	// ConsecutiveFailures is reset to 0 on any successful call. It
+	// drives the cooldown backoff so a healthy provider with occasional
+	// failures isn't punished for its lifetime cumulative failure count.
+	ConsecutiveFailures int64
+	TotalLatency        int64
+	TokensUsed          int64
+	DailyUsage          int64
+	LastUsed            time.Time
+	LastResetDate       string
+	CooldownUntil       time.Time
 }
 
 type LLMRouter struct {
@@ -333,6 +337,14 @@ func (r *LLMRouter) randomOrder(providers []RouterProvider) []RouterProvider {
 func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string]string) (string, string, error) {
 	providers := r.SelectProviders(ctx)
 	if len(providers) == 0 {
+		// B-3: publish the (empty) decision so the trace records that the
+		// router was invoked but had no candidates.
+		RouterDecisionSinkFrom(ctx).RecordRouterDecision(RouterDecision{
+			Strategy:   r.strategy,
+			Candidates: nil,
+			Selected:   "",
+			FinalError: "no active LLM providers available",
+		})
 		return "", "", fmt.Errorf("no active LLM providers available. Configure at least one provider via config or environment variables")
 	}
 
@@ -345,6 +357,13 @@ func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string
 		}
 	}
 
+	// B-3: build the candidate list and accumulate attempts for the
+	// decision record published at the end (success or all-failed).
+	candidateNames := make([]string, 0, len(providers))
+	for _, p := range providers {
+		candidateNames = append(candidateNames, p.Name)
+	}
+	var attempts []RouterAttempt
 	var lastErr error
 	var triedProviders []string
 
@@ -355,6 +374,11 @@ func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string
 		if provider.APIKey == "" && provider.Name != "ollama" {
 			lastErr = fmt.Errorf("provider %s has no API key configured", provider.Name)
 			r.recordFailure(provider.Name, 0)
+			attempts = append(attempts, RouterAttempt{
+				Provider: provider.Name,
+				Success:  false,
+				Error:    lastErr.Error(),
+			})
 			continue
 		}
 
@@ -365,11 +389,28 @@ func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string
 		if err == nil {
 			tokensUsed := int64((len(input) + len(result)) / 4)
 			r.recordSuccess(provider.Name, latency, tokensUsed)
+			attempts = append(attempts, RouterAttempt{
+				Provider:  provider.Name,
+				Success:   true,
+				LatencyMs: latency,
+			})
+			RouterDecisionSinkFrom(ctx).RecordRouterDecision(RouterDecision{
+				Strategy:   r.strategy,
+				Candidates: candidateNames,
+				Selected:   provider.Name,
+				Attempts:   attempts,
+			})
 			return result, provider.Name, nil
 		}
 
 		lastErr = err
 		r.recordFailure(provider.Name, latency)
+		attempts = append(attempts, RouterAttempt{
+			Provider:  provider.Name,
+			Success:   false,
+			Error:     err.Error(),
+			LatencyMs: latency,
+		})
 		logger.Warn("LLM provider failed, trying next",
 			"provider", provider.Name,
 			"error", err,
@@ -378,8 +419,16 @@ func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string
 		)
 	}
 
-	return "", "", fmt.Errorf("all LLM providers failed (tried: %s). Last error: %w",
+	finalErr := fmt.Errorf("all LLM providers failed (tried: %s). Last error: %w",
 		strings.Join(triedProviders, ", "), lastErr)
+	RouterDecisionSinkFrom(ctx).RecordRouterDecision(RouterDecision{
+		Strategy:   r.strategy,
+		Candidates: candidateNames,
+		Selected:   "",
+		Attempts:   attempts,
+		FinalError: finalErr.Error(),
+	})
+	return "", "", finalErr
 }
 
 func (r *LLMRouter) callProvider(ctx context.Context, p RouterProvider, input, systemPrompt string, params map[string]string) (string, error) {
@@ -425,6 +474,9 @@ func (r *LLMRouter) recordSuccess(name string, latencyMs int64, tokensUsed int64
 	stats.TokensUsed += tokensUsed
 	stats.DailyUsage += tokensUsed
 	stats.LastUsed = time.Now()
+	// A successful call breaks the failure streak: reset the consecutive
+	// counter so cooldowns reflect the CURRENT health of the provider.
+	stats.ConsecutiveFailures = 0
 
 	if stats.TotalCalls > 0 {
 		for i, p := range r.providers {
@@ -444,21 +496,24 @@ func (r *LLMRouter) recordFailure(name string, latencyMs int64) {
 	stats := r.getOrCreateStatsLocked(name)
 	stats.TotalCalls++
 	stats.FailedCalls++
+	stats.ConsecutiveFailures++
 	if latencyMs > 0 {
 		stats.TotalLatency += latencyMs
 	}
 	stats.LastUsed = time.Now()
 
-	consecutiveFailures := stats.FailedCalls
-	if consecutiveFailures >= 5 {
-		cooldownSeconds := 30 * consecutiveFailures
+	// Cooldown backoff is driven by the CONSECUTIVE failure count, not
+	// the cumulative one. A provider that fails 5 times in a row then
+	// recovers should not be cooled down forever after.
+	if stats.ConsecutiveFailures >= 5 {
+		cooldownSeconds := 30 * int(stats.ConsecutiveFailures)
 		if cooldownSeconds > 300 {
 			cooldownSeconds = 300
 		}
 		stats.CooldownUntil = time.Now().Add(time.Duration(cooldownSeconds) * time.Second)
 		logger.Warn("Provider cooldown activated",
 			"provider", name,
-			"failures", consecutiveFailures,
+			"consecutive_failures", stats.ConsecutiveFailures,
 			"cooldown_seconds", cooldownSeconds,
 		)
 	}
@@ -500,6 +555,10 @@ func (r *LLMRouter) GetProviderStats() map[string]ProviderStats {
 }
 
 func (r *LLMRouter) GetProviders() []RouterProvider {
+	r.statsMu.RLock()
+	defer r.statsMu.RUnlock()
+	// Copy under the read lock so concurrent recordSuccess/recordFailure
+	// writers can't tear a struct field mid-copy.
 	return append([]RouterProvider(nil), r.providers...)
 }
 

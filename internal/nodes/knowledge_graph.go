@@ -45,12 +45,19 @@ func (n *KnowledgeGraphNode) Schema() NodeSchema {
 		Input:       "string - text to extract knowledge from, or a query for an existing graph",
 		Output:      "string - knowledge graph data or query results",
 		Params: []ParamSchema{
-			{Name: "action", Type: "string", Description: "Action: extract, query, traverse, stats, visualize (default: extract)", Required: false, Default: "extract"},
+			{Name: "action", Type: "string", Description: "Action: extract, extract_llm, query, traverse, stats, visualize (default: extract). extract_llm calls an LLM for higher-quality entity/relation extraction.", Required: false, Default: "extract"},
 			{Name: "graph_path", Type: "string", Description: "Path to save/load the graph JSON file", Required: false},
 			{Name: "query", Type: "string", Description: "Query for search/traverse (entity name or relation type)", Required: false},
 			{Name: "max_depth", Type: "string", Description: "Max traversal depth (default: 2)", Required: false, Default: "2"},
 			{Name: "top_k", Type: "string", Description: "Max results to return (default: 10)", Required: false, Default: "10"},
 			{Name: "format", Type: "string", Description: "Output format: json, markdown, mermaid (default: markdown)", Required: false, Default: "markdown"},
+			{Name: "provider", Type: "string", Description: "LLM provider for extract_llm (default: openai)", Required: false, Default: "openai"},
+			{Name: "model", Type: "string", Description: "LLM model name for extract_llm", Required: false},
+			{Name: "api_key", Type: "string", Description: "LLM API key for extract_llm (or set <PROVIDER>_API_KEY env var)", Required: false},
+			{Name: "endpoint", Type: "string", Description: "LLM API base URL for extract_llm", Required: false},
+			{Name: "language", Type: "string", Description: "Prompt language hint for extract_llm: en or zh (default: en)", Required: false, Default: "en"},
+			{Name: "session_id", Type: "string", Description: "C-3: when set with memory_key, links extracted entities to that memory entry", Required: false},
+			{Name: "memory_key", Type: "string", Description: "C-3: memory entry key to link extracted entities to", Required: false},
 		},
 	}
 }
@@ -184,10 +191,15 @@ func (n *KnowledgeGraphNode) Execute(ctx context.Context, input string, params m
 	if topK < 1 {
 		topK = 1
 	}
+	if topK > 1000 {
+		topK = 1000
+	}
 
 	switch action {
 	case "extract":
 		return n.extractFromText(input, graphPath, format)
+	case "extract_llm":
+		return n.extractLLMFromText(ctx, input, graphPath, format, params)
 	case "query":
 		return n.queryGraph(graphPath, query, topK, format)
 	case "traverse":
@@ -197,7 +209,7 @@ func (n *KnowledgeGraphNode) Execute(ctx context.Context, input string, params m
 	case "visualize":
 		return n.visualizeGraph(graphPath, format)
 	default:
-		return "", fmt.Errorf("unknown action: %s (supported: extract, query, traverse, stats, visualize)", action)
+		return "", fmt.Errorf("unknown action: %s (supported: extract, extract_llm, query, traverse, stats, visualize)", action)
 	}
 }
 

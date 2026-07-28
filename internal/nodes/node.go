@@ -21,22 +21,38 @@
 package nodes
 
 import (
+	"context"
+
 	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 // Re-exports of core types via aliases so existing callers can keep using
 // nodes.Node, nodes.Registry, nodes.NodeSchema, etc. without modification.
 type (
-	ParamSchema   = core.ParamSchema
-	NodeSchema    = core.NodeSchema
-	Node          = core.Node
-	StreamingNode = core.StreamingNode
-	NodeMetadata  = core.NodeMetadata
-	ExternalNode  = core.ExternalNode
-	NodeExecStats = core.NodeExecStats
-	Registry      = core.Registry
-	NodeInfo      = core.NodeInfo
+	ParamSchema      = core.ParamSchema
+	NodeSchema       = core.NodeSchema
+	Node             = core.Node
+	StreamingNode    = core.StreamingNode
+	NodeMetadata     = core.NodeMetadata
+	ExternalNode     = core.ExternalNode
+	NodeExecStats    = core.NodeExecStats
+	Registry         = core.Registry
+	NodeInfo         = core.NodeInfo
+	LLMCallTelemetry = core.LLMCallTelemetry
+	LLMCallSink      = core.LLMCallSink
+	LLMUsage         = core.LLMUsage
 )
+
+// WithLLMCallSink re-exports core.WithLLMCallSink so callers in packages
+// that already depend on nodes (not core) can attach a sink to a context.
+func WithLLMCallSink(ctx context.Context, sink LLMCallSink) context.Context {
+	return core.WithLLMCallSink(ctx, sink)
+}
+
+// LLMCallSinkFrom re-exports core.LLMCallSinkFrom.
+func LLMCallSinkFrom(ctx context.Context) LLMCallSink {
+	return core.LLMCallSinkFrom(ctx)
+}
 
 // NewExternalNode creates a new ExternalNode.
 func NewExternalNode(metadata NodeMetadata, nodePath string) *ExternalNode {

@@ -50,6 +50,9 @@ var (
 		"list_sessions":    true,
 		"session_stats":    true,
 		"global_stats":     true,
+		"link_kg":          true, // C-3: link a memory entry to KG entity names
+		"expand_kg":        true, // C-3: expand KG subgraph for retrieved memory keys
+		"compress":         true, // C-4: compress long-term memory under a token budget
 	}
 	validMemoryTypes = map[string]bool{
 		"fact":         true,
@@ -83,19 +86,22 @@ func (n *MemoryNode) Schema() NodeSchema {
 		Input:       "string - memory content to store or query for retrieval",
 		Output:      "string - JSON with memory operations result, entries, or statistics",
 		Params: []ParamSchema{
-			{Name: "operation", Type: "string", Description: "Operation: store/retrieve/delete/search/summary/forget/transfer/merge/inkling_retrieve/list_sessions/session_stats/global_stats (default: store)", Required: false, Default: "store"},
+			{Name: "operation", Type: "string", Description: "Operation: store/retrieve/delete/search/summary/forget/transfer/merge/inkling_retrieve/list_sessions/session_stats/global_stats/link_kg/expand_kg/compress (default: store)", Required: false, Default: "store"},
 			{Name: "session_id", Type: "string", Description: "Session ID for isolated memory (default: default)", Required: false, Default: "default"},
-			{Name: "key", Type: "string", Description: "Memory key for storage/retrieval", Required: false},
+			{Name: "key", Type: "string", Description: "Memory key for storage/retrieval/link_kg", Required: false},
 			{Name: "value", Type: "string", Description: "Memory value/content", Required: false},
 			{Name: "level", Type: "string", Description: "Memory level: short/medium/long (default: medium)", Required: false, Default: "medium"},
 			{Name: "type", Type: "string", Description: "Memory type: fact/concept/experience/preference/relationship/task/context (default: fact)", Required: false, Default: "fact"},
 			{Name: "tags", Type: "string", Description: "Comma-separated tags for categorization", Required: false},
 			{Name: "ttl_hours", Type: "int", Description: "Time to live in hours (default: 72)", Required: false, Default: "72"},
 			{Name: "confidence", Type: "float", Description: "Confidence level 0.0-1.0 (default: 0.8)", Required: false, Default: "0.8"},
-			{Name: "query", Type: "string", Description: "Search query for retrieval/search operations", Required: false},
+			{Name: "query", Type: "string", Description: "Search query for retrieval/search/expand_kg operations", Required: false},
 			{Name: "top_k", Type: "int", Description: "Number of results to return (1-100, default: 10)", Required: false, Default: "10"},
 			{Name: "threshold", Type: "float", Description: "Similarity threshold 0.0-1.0 (default: 0.5)", Required: false, Default: "0.5"},
 			{Name: "source", Type: "string", Description: "Source identifier for the memory", Required: false},
+			{Name: "kg_entities", Type: "string", Description: "link_kg: comma-separated KG entity names to link to the memory key", Required: false},
+			{Name: "token_budget", Type: "int", Description: "compress: max tokens to retain after compression (default: 2000)", Required: false, Default: "2000"},
+			{Name: "min_confidence", Type: "float", Description: "compress: entries below this confidence are candidates for compression (default: 0.5)", Required: false, Default: "0.5"},
 		},
 	}
 }
@@ -103,7 +109,7 @@ func (n *MemoryNode) Schema() NodeSchema {
 func (n *MemoryNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	operation := getParam(params, "operation", "store")
 	if !validMemoryOperations[operation] {
-		return "", fmt.Errorf("invalid operation: %s (supported: store, retrieve, delete, search, summary, forget, transfer, merge, inkling_retrieve, list_sessions, session_stats, global_stats)", operation)
+		return "", fmt.Errorf("invalid operation: %s (supported: store, retrieve, delete, search, summary, forget, transfer, merge, visualize, inkling_retrieve, list_sessions, session_stats, global_stats, link_kg, expand_kg, compress)", operation)
 	}
 
 	sessionID := getParam(params, "session_id", "default")
@@ -147,6 +153,9 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 
 	if operation == "retrieve" && key == "" {
 		return "", fmt.Errorf("key is required for retrieve operation")
+	}
+	if operation == "link_kg" && key == "" {
+		return "", fmt.Errorf("key is required for link_kg operation")
 	}
 
 	tagsStr := getParam(params, "tags", "")
@@ -223,6 +232,20 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 		result, err = n.retrieveMemoryWithInkling(session, query, level, topK, threshold)
 	case "session_stats":
 		result, err = n.getMemorySummary(session, sessionID)
+	case "link_kg":
+		result, err = n.linkKGMemory(session, key, params)
+	case "expand_kg":
+		// expand_kg is a retrieval-time operation: by default search all
+		// levels so KG-linked context is surfaced regardless of which
+		// level the memory was originally stored at. Callers can still
+		// narrow the search by passing an explicit level param.
+		expandLevel := level
+		if _, ok := params["level"]; !ok {
+			expandLevel = ""
+		}
+		result, err = n.expandKGMemory(session, query, expandLevel, topK, threshold)
+	case "compress":
+		result, err = n.compressMemory(ctx, session, params)
 	}
 
 	if err != nil {
@@ -489,9 +512,12 @@ func (n *MemoryNode) retrieveMemoryWithInkling(session *memory.SessionMemory, qu
 }
 
 func (n *MemoryNode) performInklingAnalysis(context, query string, resultCount int) map[string]interface{} {
+	// rand.Rand is NOT goroutine-safe; hold the mutex across all r.*
+	// calls so concurrent performInklingAnalysis invocations don't race
+	// on the shared source's internal state.
 	memoryRandMu.Lock()
+	defer memoryRandMu.Unlock()
 	r := memoryRand
-	memoryRandMu.Unlock()
 
 	synthesisQuality := 85 + r.Float64()*15
 	contextRelevance := 82 + r.Float64()*18

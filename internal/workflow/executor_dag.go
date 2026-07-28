@@ -161,12 +161,14 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 
 		// ── 阶段 2：worker pool 并发执行通过 condition 的步骤 ──
 		type execResult struct {
-			idx      int
-			nodeName string
-			output   string
-			err      error
-			duration time.Duration
-			attempts int
+			idx             int
+			nodeName        string
+			output          string
+			err             error
+			duration        time.Duration
+			attempts        int
+			llmCalls        []nodes.LLMCallTelemetry
+			routerDecisions []nodes.RouterDecision
 		}
 		resultChan := make(chan execResult, len(prepared))
 
@@ -210,14 +212,16 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 					program.Send(tui.StepStartMsg{Index: ps.idx, Name: ps.wStep.Node})
 				}
 
-				output, err, attempts := executeDAGStep(timeoutCtx, ps.wStep, ps.input, ps.evaluatedParams, reg)
+				output, err, attempts, llmCalls, routerDecisions := executeDAGStep(timeoutCtx, ps.wStep, ps.input, ps.evaluatedParams, reg)
 				resultChan <- execResult{
-					idx:      ps.idx,
-					nodeName: ps.wStep.Node,
-					output:   output,
-					err:      err,
-					duration: time.Since(start),
-					attempts: attempts,
+					idx:             ps.idx,
+					nodeName:        ps.wStep.Node,
+					output:          output,
+					err:             err,
+					duration:        time.Since(start),
+					attempts:        attempts,
+					llmCalls:        llmCalls,
+					routerDecisions: routerDecisions,
 				}
 			}(ps)
 		}
@@ -254,6 +258,8 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 			var skipped bool
 			var condPassed bool = true
 			var errText string
+			var llmCalls []nodes.LLMCallTelemetry
+			var routerDecisions []nodes.RouterDecision
 
 			if ps.evalErr != nil {
 				resultErr = ps.evalErr
@@ -269,6 +275,8 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 				resultErr = res.err
 				duration = res.duration
 				attempts = res.attempts
+				llmCalls = res.llmCalls
+				routerDecisions = res.routerDecisions
 
 				// 错误恢复：fallback / on_error / continue_on_error
 				if resultErr != nil {
@@ -321,6 +329,8 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 				InputLen:        len(stepInput),
 				OutputLen:       len(output),
 				ErrorText:       errText,
+				LLM:             projectLLMTelemetry(llmCalls),
+				Router:          projectRouterDecisions(routerDecisions),
 			})
 
 			allResults = append(allResults, StepResult{
@@ -388,7 +398,20 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 // 注意：此函数不触碰 ExpressionEngine，所有求值已在主 goroutine 完成。
 // 复合步骤（if/loop/parallel）的子步骤求值在子执行器内进行，与主 engine 隔离。
 // 返回值中的 attempts 为实际尝试次数（>=1），用于 trace 记录。
-func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, params map[string]string, reg *nodes.Registry) (string, error, int) {
+// executeDAGStep executes one step's node (with retries) and returns the
+// collected LLM telemetry and router decisions so the caller can attach
+// them to StepTrace. The slices are nil when the node published nothing.
+func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, params map[string]string, reg *nodes.Registry) (output string, execErr error, attemptsMade int, llmCalls []nodes.LLMCallTelemetry, routerDecisions []nodes.RouterDecision) {
+	// B-2/B-3: per-step collector (LLM calls + router decisions), scoped
+	// to this step's calls. Drained via the deferred return so every exit
+	// path carries the telemetry gathered so far.
+	stepBaseCtx, llmCollector := withLLMCollector(ctx)
+	ctx = stepBaseCtx
+	defer func() {
+		llmCalls = llmCollector.drainCalls()
+		routerDecisions = llmCollector.drainDecisions()
+	}()
+
 	// 复合步骤：委托给现有执行器（它们内部会自建 engine，与主 engine 隔离）
 	if wStep.IsIf() {
 		// if 分支用独立 engine 求值条件，子步骤递归执行自建 engine。
@@ -397,7 +420,9 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 		subEngine := NewExpressionEngine()
 		pass, err := evaluateCondition(wStep.If.Condition, input, subEngine)
 		if err != nil {
-			return "", fmt.Errorf("if condition failed: %w", err), 1
+			execErr = fmt.Errorf("if condition failed: %w", err)
+			attemptsMade = 1
+			return
 		}
 		var branchSteps []WorkflowStep
 		if pass {
@@ -406,26 +431,31 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 			branchSteps = wStep.If.Else
 		}
 		subWf := &Workflow{Name: fmt.Sprintf("dag-if-branch"), Steps: branchSteps}
-		out, _, err := ExecuteWorkflow(ctx, subWf, reg)
-		return out, err, 1
+		output, _, execErr = ExecuteWorkflow(ctx, subWf, reg)
+		attemptsMade = 1
+		return
 	}
 	if wStep.IsLoop() {
 		// loop 用独立 engine；DAG 下 loop 的 {{step.X}} 引用无法访问主 workflow 步骤输出。
 		loopEngine := NewExpressionEngine()
-		_, output, err := executeLoopStep(ctx, 0, wStep, input, loopEngine, reg, nil, NewConcurrencyLimiter(0))
-		return output, err, 1
+		_, output, execErr = executeLoopStep(ctx, 0, wStep, input, loopEngine, reg, nil, NewConcurrencyLimiter(0))
+		attemptsMade = 1
+		return
 	}
 	if wStep.IsParallel() {
 		// parallel 自带预求值机制，用独立 engine。
 		parEngine := NewExpressionEngine()
-		_, output, err := executeParallelStep(ctx, 0, wStep, input, parEngine, reg, nil, NewConcurrencyLimiter(0))
-		return output, err, 1
+		_, output, execErr = executeParallelStep(ctx, 0, wStep, input, parEngine, reg, nil, NewConcurrencyLimiter(0))
+		attemptsMade = 1
+		return
 	}
 
 	// 普通节点：直接执行
 	node, ok := reg.Get(wStep.Node)
 	if !ok {
-		return "", fmt.Errorf("node '%s' not found in registry", wStep.Node), 1
+		execErr = fmt.Errorf("node '%s' not found in registry", wStep.Node)
+		attemptsMade = 1
+		return
 	}
 
 	retryCount := wStep.GetRetryCount()
@@ -438,9 +468,6 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 	}
 
 	maxAttempts := retryCount + 1
-	var output string
-	var execErr error
-	attemptsMade := 0
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		attemptsMade = attempt
@@ -452,8 +479,13 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 			stepCtx, stepCancel = context.WithCancel(ctx)
 		}
 
-		output, execErr = node.Execute(stepCtx, input, params)
-		stepCancel()
+		// Use defer via an immediately-invoked closure so stepCancel
+		// always runs even if node.Execute panics (the worker's recover
+		// would otherwise leave the context and its timer leaked).
+		func() {
+			defer stepCancel()
+			output, execErr = node.Execute(stepCtx, input, params)
+		}()
 
 		if execErr == nil {
 			break
@@ -464,12 +496,13 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 			select {
 			case <-time.After(retryDelay):
 			case <-ctx.Done():
-				return "", ctx.Err(), attemptsMade
+				execErr = ctx.Err()
+				return
 			}
 		}
 	}
 
-	return output, execErr, attemptsMade
+	return
 }
 
 // applyErrorRecovery 处理步骤失败后的 fallback/on_error/continue_on_error。

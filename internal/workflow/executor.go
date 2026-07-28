@@ -430,6 +430,12 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 			stepTimeout = MaxStepTimeout
 		}
 
+		// B-2: per-step LLM telemetry collector. stepBaseCtx carries the
+		// sink so every retry attempt (and any sub-call) of this step's
+		// node publishes to the same collector. Drained into StepTrace
+		// after the step finishes.
+		stepBaseCtx, llmCollector := withLLMCollector(timeoutCtx)
+
 		var output string
 		var execErr error
 		var duration time.Duration
@@ -443,9 +449,9 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 			var stepCtx context.Context
 			var stepCancel context.CancelFunc
 			if stepTimeout > 0 {
-				stepCtx, stepCancel = context.WithTimeout(timeoutCtx, stepTimeout)
+				stepCtx, stepCancel = context.WithTimeout(stepBaseCtx, stepTimeout)
 			} else {
-				stepCtx, stepCancel = context.WithCancel(timeoutCtx)
+				stepCtx, stepCancel = context.WithCancel(stepBaseCtx)
 			}
 
 			if program != nil {
@@ -509,7 +515,9 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				errParams, eerr := engine.EvaluateParams(errStep.Params, data)
 				if eerr == nil {
 					if errNode, ok := reg.Get(errStep.Node); ok {
-						errOutput, errExecErr := errNode.Execute(timeoutCtx, data, errParams)
+						// Use stepBaseCtx so the handler's LLM calls (if any)
+						// are captured by the same step collector.
+						errOutput, errExecErr := errNode.Execute(stepBaseCtx, data, errParams)
 						if errExecErr == nil {
 							logger.Info("step recovered via on_error handler", "index", i, "handler", errStep.Node)
 							output = errOutput
@@ -559,6 +567,8 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 			InputLen:        len(data),
 			OutputLen:       len(output),
 			ErrorText:       errText,
+			LLM:             projectLLMTelemetry(llmCollector.drainCalls()),
+			Router:          projectRouterDecisions(llmCollector.drainDecisions()),
 		})
 		results = append(results, result)
 
