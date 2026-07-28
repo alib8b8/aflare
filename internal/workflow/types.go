@@ -51,6 +51,13 @@ type WorkflowStep struct {
 	MaxFailures     int               `yaml:"max_failures,omitempty"`
 	If              *IfConfig         `yaml:"if,omitempty"`
 	OutputStrategy  string            `yaml:"output_strategy,omitempty"` // parallel/loop: join(default), first, last, json_array, longest, shortest
+	// DependsOn declares explicit dependencies on other steps by name or
+	// 1-based index (as a string). When any step in a workflow declares
+	// DependsOn, the executor switches to DAG scheduling: steps with all
+	// dependencies satisfied run concurrently on a worker pool. Steps
+	// without any DependsOn remain backward compatible with the original
+	// sequential execution model.
+	DependsOn []string `yaml:"depends_on,omitempty"`
 }
 
 // BackoffConfig configures exponential backoff for retries.

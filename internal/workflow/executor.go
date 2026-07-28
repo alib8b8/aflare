@@ -99,6 +99,12 @@ func ExecuteWorkflow(ctx context.Context, wf *Workflow, reg *nodes.Registry) (st
 
 // ExecuteWorkflowWithTUI executes the workflow and sends messages to a TUI program
 func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, error) {
+	// DAG 路径：当任一步骤声明了 depends_on 时，启用 DAG 调度（拓扑排序+并发执行）。
+	// 无声明则走下方原顺序 for 循环，100% 向后兼容。
+	if hasDAGDeclarations(wf.Steps) {
+		return executeWorkflowDAG(ctx, wf, reg, program)
+	}
+
 	// Validate step count
 	if len(wf.Steps) > MaxSteps {
 		return "", nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
