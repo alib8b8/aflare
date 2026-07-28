@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const maxExprFileSize = 10 * 1024 * 1024 // 10MB
@@ -131,46 +132,213 @@ func (e *ExpressionEngine) SetSecretGetter(getter func(group, key string) (strin
 // varPattern matches {{ ... }} expressions
 var varPattern = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
-// Evaluate evaluates an expression and returns the result
-// Supports:
+// Evaluate evaluates an expression and returns the result.
 //
-//	{{input}}              - the workflow's initial input
-//	{{step.N}}             - output of step N (0-indexed)
-//	{{step.name}}          - output of step by name
+// Templates are compiled to an AST on first use and cached at the package
+// level (see templateCache), so repeated evaluations of the same template —
+// common inside loops, parallel branches, and params — skip both regex
+// scanning and per-call re-parsing. Static text without any {{...}} expressions
+// takes a zero-allocation fast path. Semantics are identical to the legacy
+// regex-based implementation.
+//
+// Supported expressions:
+//
+//	{{input}}                    - the workflow's initial input
+//	{{step.N}}                   - output of step N (0-indexed)
+//	{{step.name}}                - output of step by name
 //	{{step.N.jsonpath:$..field}} - JSONPath extraction from step output
-//	{{var.NAME}}           - workflow variable
-//	{{env.NAME}}           - environment variable
-//	{{file.PATH}}          - file contents
-//	{{secret.GROUP.KEY}}   - secret from secret manager (e.g. {{secret.llm.openai}})
-//	{{loop.item}}          - current loop item
-//	{{loop.index}}         - current loop index
-//	{{loop.count}}         - total loop iterations
+//	{{var.NAME}}                 - workflow variable
+//	{{env.NAME}}                 - environment variable
+//	{{file.PATH}}                - file contents
+//	{{secret.GROUP.KEY}}         - secret from secret manager (e.g. {{secret.llm.openai}})
+//	{{loop.item}}                - current loop item
+//	{{loop.index}}               - current loop index
+//	{{loop.count}}               - total loop iterations
 //
 // Unknown expressions (e.g. Go template syntax {{.foo}}) are left unchanged.
 func (e *ExpressionEngine) Evaluate(expr string, input string) (string, error) {
 	if expr == "" {
 		return "", nil
 	}
-
-	var firstErr error
-	result := varPattern.ReplaceAllStringFunc(expr, func(match string) string {
-		inner := strings.TrimSpace(match[2 : len(match)-2])
-		value, err := e.evalSingle(inner, input)
-		if err != nil {
-			if isKnownExpressionPrefix(inner) {
-				if firstErr == nil {
-					firstErr = fmt.Errorf("expression '{{%s}}': %w", inner, err)
-				}
-			}
-			return match
-		}
-		return value
-	})
-
-	if firstErr != nil {
-		return result, firstErr
+	tmpl := compileTemplate(expr)
+	if !tmpl.hasExpr {
+		// Fast path: no expressions — return the literal verbatim.
+		return tmpl.literal, nil
 	}
-	return result, nil
+
+	var sb strings.Builder
+	var firstErr error
+	for i := range tmpl.parts {
+		p := &tmpl.parts[i]
+		if p.isLiteral {
+			sb.WriteString(p.literal)
+			continue
+		}
+		val, err := p.node.eval(e, input)
+		if err != nil {
+			// Mirror the legacy regex behaviour: expressions with a known
+			// prefix surface their first error; unknown expressions (e.g.
+			// Go templates) are left verbatim and do not fail evaluation.
+			if p.node.knownPrefix() && firstErr == nil {
+				firstErr = fmt.Errorf("expression '{{%s}}': %w", p.inner, err)
+			}
+			sb.WriteString(p.fullMatch)
+			continue
+		}
+		sb.WriteString(val)
+	}
+	if firstErr != nil {
+		return sb.String(), firstErr
+	}
+	return sb.String(), nil
+}
+
+// ── AST expression engine ──
+//
+// The legacy engine ran a compiled regex (varPattern) over every input string
+// and re-parsed each {{...}} inner expression (SplitN/Index/TrimSpace) on every
+// call. The AST engine compiles a template once into an immutable
+// *compiledTemplate (memoised in templateCache) and evaluates it by walking
+// nodes that dispatch directly to the relevant resolver, eliminating per-call
+// parsing cost. Evaluation semantics are identical to the legacy implementation.
+
+// exprNode is a compiled single {{...}} expression.
+type exprNode interface {
+	// eval resolves the expression against the engine state.
+	eval(e *ExpressionEngine, input string) (string, error)
+	// knownPrefix reports whether the expression uses a recognised prefix
+	// (step/var/env/file/input/loop/secret). Used to decide whether an
+	// evaluation error should be surfaced or the expression left verbatim,
+	// matching isKnownExpressionPrefix.
+	knownPrefix() bool
+}
+
+// compiledTemplate is the parsed form of a template string.
+type compiledTemplate struct {
+	// literal holds the entire template when it contains no expressions;
+	// hasExpr is false and parts is empty. This is the fast path.
+	literal string
+	hasExpr bool
+	parts   []templatePart
+}
+
+// templatePart is either a literal segment or a compiled expression.
+type templatePart struct {
+	isLiteral bool
+	literal   string // valid when isLiteral
+	node      exprNode
+	fullMatch string // original "{{...}}" text, for verbatim fallback
+	inner     string // trimmed inner text, for error messages
+}
+
+// templateCache memoises compiled templates by source text. Templates are
+// immutable after construction, so concurrent reads are safe; sync.Map handles
+// concurrent inserts from worker goroutines (e.g. parallel/loop sub-engines).
+var templateCache sync.Map
+
+// compileTemplate returns a cached compiled template for expr, parsing it on
+// first encounter.
+func compileTemplate(expr string) *compiledTemplate {
+	if v, ok := templateCache.Load(expr); ok {
+		return v.(*compiledTemplate)
+	}
+	tmpl := parseTemplate(expr)
+	actual, _ := templateCache.LoadOrStore(expr, tmpl)
+	return actual.(*compiledTemplate)
+}
+
+// parseTemplate scans s for {{...}} expressions, mirroring the legacy varPattern
+// (`\{\{([^}]+)\}\}`): an expression is "{{" + one-or-more non-'}' chars + "}}",
+// with the closing "}}" being the first '}' encountered. Non-matching text
+// becomes literal segments.
+func parseTemplate(s string) *compiledTemplate {
+	// Fast path: no opening brace-pair, so no expression is possible.
+	if strings.Index(s, "{{") < 0 {
+		return &compiledTemplate{literal: s}
+	}
+
+	var parts []templatePart
+	var lit strings.Builder
+	n := len(s)
+	i := 0
+	flushLit := func() {
+		if lit.Len() > 0 {
+			parts = append(parts, templatePart{isLiteral: true, literal: lit.String()})
+			lit.Reset()
+		}
+	}
+
+	for i < n {
+		if s[i] == '{' && i+1 < n && s[i+1] == '{' {
+			contentStart := i + 2
+			k := contentStart
+			for k < n && s[k] != '}' {
+				k++
+			}
+			// Match requires ≥1 non-'}' content char immediately followed by "}}".
+			if k > contentStart && k+1 < n && s[k] == '}' && s[k+1] == '}' {
+				flushLit()
+				inner := strings.TrimSpace(s[contentStart:k])
+				parts = append(parts, templatePart{
+					node:      compileExpr(inner),
+					fullMatch: s[i : k+2],
+					inner:     inner,
+				})
+				i = k + 2
+				continue
+			}
+		}
+		lit.WriteByte(s[i])
+		i++
+	}
+	flushLit()
+
+	// If no expression part was produced, the whole string is literal.
+	for i := range parts {
+		if !parts[i].isLiteral {
+			return &compiledTemplate{hasExpr: true, parts: parts}
+		}
+	}
+	return &compiledTemplate{literal: s}
+}
+
+// compileExpr compiles a trimmed inner expression (the text between {{ and }})
+// into an exprNode. The dispatch mirrors the legacy evalSingle exactly.
+func compileExpr(inner string) exprNode {
+	known := isKnownExpressionPrefix(inner)
+
+	// jsonpath modifier: <ref>.jsonpath:<path>
+	if idx := strings.Index(inner, ".jsonpath:"); idx > 0 {
+		refPart := inner[:idx]
+		jsonPath := inner[idx+len(".jsonpath:"):]
+		return &jsonpathExpr{ref: compileExpr(refPart), path: jsonPath, known: known}
+	}
+
+	parts := strings.SplitN(inner, ".", 2)
+	if len(parts) < 2 {
+		// Bare name: a workflow variable, or the literal token "input".
+		return &bareNameExpr{name: inner, known: known}
+	}
+	prefix := strings.TrimSpace(parts[0])
+	name := strings.TrimSpace(parts[1])
+	switch prefix {
+	case "input":
+		return &inputExpr{known: known}
+	case "step":
+		return &stepExpr{name: name, known: known}
+	case "var":
+		return &varExpr{name: name, known: known}
+	case "env":
+		return &envExpr{name: name, known: known}
+	case "file":
+		return &fileExpr{name: name, known: known}
+	case "loop":
+		return &loopExpr{name: name, known: known}
+	case "secret":
+		return &secretExpr{name: name, known: known}
+	default:
+		return &unknownExpr{inner: inner, known: known}
+	}
 }
 
 func isKnownExpressionPrefix(expr string) bool {
@@ -186,93 +354,177 @@ func isKnownExpressionPrefix(expr string) bool {
 	return false
 }
 
-// evalSingle evaluates a single expression like "step.0" or "var.name"
-func (e *ExpressionEngine) evalSingle(expr string, input string) (string, error) {
-	// Check for jsonpath modifier: step.N.jsonpath:$..field or step.name.json:$..field
-	if idx := strings.Index(expr, ".jsonpath:"); idx > 0 {
-		refPart := expr[:idx]
-		jsonPath := expr[idx+len(".jsonpath:"):]
-		// Resolve the reference (e.g. "step.0" or "step.name")
-		refValue, err := e.evalSingle(refPart, input)
-		if err != nil {
-			return "", err
-		}
-		return extractJSONPath(refValue, jsonPath)
-	}
+// ── Node implementations ──
 
-	parts := strings.SplitN(expr, ".", 2)
-	if len(parts) < 2 {
-		if v, ok := e.variables[expr]; ok {
-			return v, nil
-		}
-		if expr == "input" {
-			return input, nil
-		}
-		return "", fmt.Errorf("unknown expression: %s", expr)
-	}
-
-	prefix := strings.TrimSpace(parts[0])
-	name := strings.TrimSpace(parts[1])
-
-	switch prefix {
-	case "input":
-		return input, nil
-	case "step":
-		return e.evalStepRef(name)
-	case "var":
-		if v, ok := e.variables[name]; ok {
-			return v, nil
-		}
-		return "", fmt.Errorf("variable not found: %s", name)
-	case "env":
-		if !isAllowedEnvVar(name) {
-			return "", fmt.Errorf("access to environment variable %q is not allowed", name)
-		}
-		if v, ok := os.LookupEnv(name); ok {
-			return v, nil
-		}
-		return "", fmt.Errorf("environment variable not found: %s", name)
-	case "file":
-		// Security: validate path to prevent arbitrary file read
-		safePath, err := validateExprFilePath(name)
-		if err != nil {
-			return "", fmt.Errorf("file path validation failed: %w", err)
-		}
-		info, err := os.Stat(safePath)
-		if err != nil {
-			return "", fmt.Errorf("failed to stat file '%s': %w", name, err)
-		}
-		if info.Size() > maxExprFileSize {
-			return "", fmt.Errorf("file '%s' too large (max %d bytes)", name, maxExprFileSize)
-		}
-		content, err := os.ReadFile(safePath) // #nosec G304 -- path validated by safeJoinPath
-		if err != nil {
-			return "", fmt.Errorf("failed to read file '%s': %w", name, err)
-		}
-		return string(content), nil
-	case "loop":
-		if e.loopVars == nil {
-			return "", fmt.Errorf("not in a loop context")
-		}
-		if v, ok := e.loopVars[name]; ok {
-			return v, nil
-		}
-		return "", fmt.Errorf("loop variable not found: %s", name)
-	case "secret":
-		if e.secretGetter == nil {
-			return "", fmt.Errorf("secrets not available - use 'llm-box secrets add' to store secrets first")
-		}
-		secretParts := strings.SplitN(name, ".", 2)
-		if len(secretParts) < 2 {
-			return "", fmt.Errorf("secret expression requires format: secret.GROUP.KEY")
-		}
-		group := strings.TrimSpace(secretParts[0])
-		key := strings.TrimSpace(secretParts[1])
-		return e.secretGetter(group, key)
-	default:
-		return "", fmt.Errorf("unknown expression: %s", expr)
-	}
+// bareNameExpr handles expressions without a dot: {{input}} or {{varname}}.
+// A bare name first checks workflow variables (so a variable named "input"
+// shadows the input token, preserving legacy behaviour), then falls back to the
+// input token.
+type bareNameExpr struct {
+	name  string
+	known bool
 }
+
+func (n *bareNameExpr) eval(e *ExpressionEngine, input string) (string, error) {
+	if v, ok := e.variables[n.name]; ok {
+		return v, nil
+	}
+	if n.name == "input" {
+		return input, nil
+	}
+	return "", fmt.Errorf("unknown expression: %s", n.name)
+}
+
+func (n *bareNameExpr) knownPrefix() bool { return n.known }
+
+// inputExpr handles {{input.X}} (any dotted input reference resolves to the
+// raw input, matching the legacy switch case).
+type inputExpr struct{ known bool }
+
+func (n *inputExpr) eval(e *ExpressionEngine, input string) (string, error) {
+	return input, nil
+}
+
+func (n *inputExpr) knownPrefix() bool { return n.known }
+
+type stepExpr struct {
+	name  string
+	known bool
+}
+
+func (n *stepExpr) eval(e *ExpressionEngine, input string) (string, error) {
+	return e.evalStepRef(n.name)
+}
+
+func (n *stepExpr) knownPrefix() bool { return n.known }
+
+type varExpr struct {
+	name  string
+	known bool
+}
+
+func (n *varExpr) eval(e *ExpressionEngine, input string) (string, error) {
+	if v, ok := e.variables[n.name]; ok {
+		return v, nil
+	}
+	return "", fmt.Errorf("variable not found: %s", n.name)
+}
+
+func (n *varExpr) knownPrefix() bool { return n.known }
+
+type envExpr struct {
+	name  string
+	known bool
+}
+
+func (n *envExpr) eval(e *ExpressionEngine, input string) (string, error) {
+	if !isAllowedEnvVar(n.name) {
+		return "", fmt.Errorf("access to environment variable %q is not allowed", n.name)
+	}
+	if v, ok := os.LookupEnv(n.name); ok {
+		return v, nil
+	}
+	return "", fmt.Errorf("environment variable not found: %s", n.name)
+}
+
+func (n *envExpr) knownPrefix() bool { return n.known }
+
+type fileExpr struct {
+	name  string
+	known bool
+}
+
+func (n *fileExpr) eval(e *ExpressionEngine, input string) (string, error) {
+	safePath, err := validateExprFilePath(n.name)
+	if err != nil {
+		return "", fmt.Errorf("file path validation failed: %w", err)
+	}
+	info, err := os.Stat(safePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to stat file '%s': %w", n.name, err)
+	}
+	if info.Size() > maxExprFileSize {
+		return "", fmt.Errorf("file '%s' too large (max %d bytes)", n.name, maxExprFileSize)
+	}
+	content, err := os.ReadFile(safePath) // #nosec G304 -- path validated by validateExprFilePath
+	if err != nil {
+		return "", fmt.Errorf("failed to read file '%s': %w", n.name, err)
+	}
+	return string(content), nil
+}
+
+func (n *fileExpr) knownPrefix() bool { return n.known }
+
+type loopExpr struct {
+	name  string
+	known bool
+}
+
+func (n *loopExpr) eval(e *ExpressionEngine, input string) (string, error) {
+	if e.loopVars == nil {
+		return "", fmt.Errorf("not in a loop context")
+	}
+	if v, ok := e.loopVars[n.name]; ok {
+		return v, nil
+	}
+	return "", fmt.Errorf("loop variable not found: %s", n.name)
+}
+
+func (n *loopExpr) knownPrefix() bool { return n.known }
+
+// secretExpr handles {{secret.GROUP.KEY}}. The remainder after "secret." is
+// split into GROUP.KEY at evaluation time (matching legacy behaviour).
+type secretExpr struct {
+	name  string // "GROUP.KEY"
+	known bool
+}
+
+func (n *secretExpr) eval(e *ExpressionEngine, input string) (string, error) {
+	if e.secretGetter == nil {
+		return "", fmt.Errorf("secrets not available - use 'llm-box secrets add' to store secrets first")
+	}
+	secretParts := strings.SplitN(n.name, ".", 2)
+	if len(secretParts) < 2 {
+		return "", fmt.Errorf("secret expression requires format: secret.GROUP.KEY")
+	}
+	group := strings.TrimSpace(secretParts[0])
+	key := strings.TrimSpace(secretParts[1])
+	return e.secretGetter(group, key)
+}
+
+func (n *secretExpr) knownPrefix() bool { return n.known }
+
+// jsonpathExpr wraps a reference expression and applies a JSONPath extraction
+// to its resolved value.
+type jsonpathExpr struct {
+	ref   exprNode
+	path  string
+	known bool
+}
+
+func (n *jsonpathExpr) eval(e *ExpressionEngine, input string) (string, error) {
+	refValue, err := n.ref.eval(e, input)
+	if err != nil {
+		return "", err
+	}
+	return extractJSONPath(refValue, n.path)
+}
+
+func (n *jsonpathExpr) knownPrefix() bool { return n.known }
+
+// unknownExpr covers expressions with an unrecognised prefix. Its error is
+// never surfaced (knownPrefix is false), so the template leaves the original
+// {{...}} text verbatim — matching the legacy treatment of e.g. Go templates.
+type unknownExpr struct {
+	inner string
+	known bool
+}
+
+func (n *unknownExpr) eval(e *ExpressionEngine, input string) (string, error) {
+	return "", fmt.Errorf("unknown expression: %s", n.inner)
+}
+
+func (n *unknownExpr) knownPrefix() bool { return n.known }
 
 // evalStepRef resolves a step reference by index or name
 func (e *ExpressionEngine) evalStepRef(name string) (string, error) {
