@@ -382,7 +382,7 @@ func parseHeadingLevel(val string) int {
 	}
 	rest := strings.TrimSpace(strings.TrimPrefix(val, "heading"))
 	var n int
-	fmt.Sscanf(rest, "%d", &n)
+	_, _ = fmt.Sscanf(rest, "%d", &n)
 	if n < 1 || n > 9 {
 		return 0
 	}
@@ -801,7 +801,7 @@ func parseXlsxCell(dec *xml.Decoder, cellType string, shared []string) (string, 
 				if cellType == "s" {
 					// shared string index
 					var idx int
-					fmt.Sscanf(s, "%d", &idx)
+					_, _ = fmt.Sscanf(s, "%d", &idx)
 					if idx >= 0 && idx < len(shared) {
 						return shared[idx], nil
 					}

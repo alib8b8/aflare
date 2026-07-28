@@ -32,7 +32,6 @@
 package memory
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -374,30 +373,4 @@ func (idx *VectorIndex) StreamVectors(fn func(key string, v Vector, meta map[str
 		}
 	}
 	return nil
-}
-
-// readEmbeddingsStream reads an SSE-style /embeddings stream where some
-// providers (notably when batching) emit one JSON object per line. We
-// keep this helper for future use; the current HTTPEmbedder uses a single
-// non-streaming POST. It is exported so tests can exercise it directly.
-func readEmbeddingsStream(r io.Reader) ([]Vector, error) {
-	var out []Vector
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" {
-			continue
-		}
-		var parsed struct {
-			Embedding Vector `json:"embedding"`
-		}
-		if err := json.Unmarshal([]byte(line), &parsed); err != nil {
-			return nil, err
-		}
-		if len(parsed.Embedding) > 0 {
-			out = append(out, parsed.Embedding)
-		}
-	}
-	return out, sc.Err()
 }

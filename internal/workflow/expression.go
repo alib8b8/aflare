@@ -253,7 +253,7 @@ func compileTemplate(expr string) *compiledTemplate {
 // becomes literal segments.
 func parseTemplate(s string) *compiledTemplate {
 	// Fast path: no opening brace-pair, so no expression is possible.
-	if strings.Index(s, "{{") < 0 {
+	if !strings.Contains(s, "{{") {
 		return &compiledTemplate{literal: s}
 	}
 

@@ -113,7 +113,6 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 			wStep           WorkflowStep
 			input           string
 			evaluatedParams map[string]string
-			condPass        bool
 			evalErr         error
 			skipped         bool // condition 为 false，跳过执行
 			evalDuration    time.Duration
@@ -212,7 +211,7 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 					program.Send(tui.StepStartMsg{Index: ps.idx, Name: ps.wStep.Node})
 				}
 
-				output, err, attempts, llmCalls, routerDecisions := executeDAGStep(timeoutCtx, ps.wStep, ps.input, ps.evaluatedParams, reg)
+				output, attempts, llmCalls, routerDecisions, err := executeDAGStep(timeoutCtx, ps.wStep, ps.input, ps.evaluatedParams, reg)
 				resultChan <- execResult{
 					idx:             ps.idx,
 					nodeName:        ps.wStep.Node,
@@ -252,11 +251,11 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 			var output string
 			var resultErr error
 			var duration time.Duration
-			var stepInput string = ps.input
+			var stepInput = ps.input
 			var attempts int
 			var recoveries []string
 			var skipped bool
-			var condPassed bool = true
+			var condPassed = true
 			var errText string
 			var llmCalls []nodes.LLMCallTelemetry
 			var routerDecisions []nodes.RouterDecision
@@ -280,7 +279,7 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 
 				// 错误恢复：fallback / on_error / continue_on_error
 				if resultErr != nil {
-					resultErr, recoveries = applyErrorRecovery(timeoutCtx, &wStep, &output, resultErr, engine, reg, stepInput)
+					recoveries, resultErr = applyErrorRecovery(timeoutCtx, &wStep, &output, resultErr, engine, reg, stepInput)
 					if resultErr != nil {
 						errText = resultErr.Error()
 					}
@@ -401,7 +400,7 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 // executeDAGStep executes one step's node (with retries) and returns the
 // collected LLM telemetry and router decisions so the caller can attach
 // them to StepTrace. The slices are nil when the node published nothing.
-func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, params map[string]string, reg *nodes.Registry) (output string, execErr error, attemptsMade int, llmCalls []nodes.LLMCallTelemetry, routerDecisions []nodes.RouterDecision) {
+func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, params map[string]string, reg *nodes.Registry) (output string, attemptsMade int, llmCalls []nodes.LLMCallTelemetry, routerDecisions []nodes.RouterDecision, execErr error) {
 	// B-2/B-3: per-step collector (LLM calls + router decisions), scoped
 	// to this step's calls. Drained via the deferred return so every exit
 	// path carries the telemetry gathered so far.
@@ -509,7 +508,7 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 // 逻辑与 executor.go 中的错误恢复一致，抽取为函数供 DAG 路径复用。
 // 返回处理后的 resultErr：恢复成功返回 nil，否则返回原错误。
 // 返回的 recoveries 列表记录已应用的恢复动作（用于 trace）。
-func applyErrorRecovery(ctx context.Context, wStep *WorkflowStep, output *string, execErr error, engine *ExpressionEngine, reg *nodes.Registry, input string) (error, []string) {
+func applyErrorRecovery(ctx context.Context, wStep *WorkflowStep, output *string, execErr error, engine *ExpressionEngine, reg *nodes.Registry, input string) ([]string, error) {
 	var recoveries []string
 
 	// 1. fallback 值
@@ -518,7 +517,7 @@ func applyErrorRecovery(ctx context.Context, wStep *WorkflowStep, output *string
 			logger.Info("DAG step recovered via fallback", "node", wStep.Node)
 			*output = fallbackVal
 			recoveries = append(recoveries, "fallback")
-			return nil, recoveries
+			return recoveries, nil
 		}
 	}
 
@@ -532,7 +531,7 @@ func applyErrorRecovery(ctx context.Context, wStep *WorkflowStep, output *string
 					logger.Info("DAG step recovered via on_error handler", "node", wStep.Node, "handler", errStep.Node)
 					*output = errOut
 					recoveries = append(recoveries, "on_error")
-					return nil, recoveries
+					return recoveries, nil
 				}
 			}
 		}
@@ -543,8 +542,8 @@ func applyErrorRecovery(ctx context.Context, wStep *WorkflowStep, output *string
 		logger.Warn("DAG step failed but continue_on_error set, continuing", "node", wStep.Node, "error", nodes.RedactSensitive(execErr.Error()))
 		*output = ""
 		recoveries = append(recoveries, "continue_on_error")
-		return nil, recoveries
+		return recoveries, nil
 	}
 
-	return execErr, recoveries
+	return recoveries, execErr
 }

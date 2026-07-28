@@ -456,26 +456,6 @@ func (n *AgentBrowserNode) actionConnectExisting(ctx context.Context, params map
 	return sb.String(), nil
 }
 
-// importCookiesFromChrome 从本地 Chrome 配置读取 Cookie 域名清单。
-// 实际解析通过 sqlite3 CLI 读取 cookies 表的 host_key/name 列（明文存储），
-// 不读取加密的 value/encrypted_value（Chrome 用 OS keychain 加密，解密需平台原生调用）。
-// 返回去重后的域名列表，供 Agent 判断"哪些站点已登录"。
-func (n *AgentBrowserNode) importCookiesFromChrome(ctx context.Context, profile string) ([]string, error) {
-	cookiePath := getChromeCookiePath()
-	if profile != "" {
-		cookiePath = filepath.Join(getChromeProfilePath(profile), "Cookies")
-	}
-	if cookiePath == "" {
-		return nil, fmt.Errorf("当前平台 %s 不支持自动检测 Chrome Cookie 路径", runtime.GOOS)
-	}
-
-	entries, err := readChromeCookieDomains(ctx, cookiePath)
-	if err != nil {
-		return nil, err
-	}
-	return uniqueHosts(entries), nil
-}
-
 // actionImportCookies 实现 import_cookies 动作：解析本地 Chrome Cookie
 // SQLite 数据库，返回已登录的域名清单及每个域名的 cookie 数量。
 func (n *AgentBrowserNode) actionImportCookies(ctx context.Context, params map[string]string) (string, error) {
