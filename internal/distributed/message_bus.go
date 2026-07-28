@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -90,10 +91,18 @@ type MessageBus struct {
 	votes           map[string]map[string]string // topic -> (nodeID -> choice)
 	stopCh          chan struct{}
 	stopOnce        sync.Once
-	warnOnce        sync.Once // 一次性提示无认证模式
-	defaultHopLimit int       // 默认跳数限制,0 表示不限;Broadcast 时如果 msg.HopLimit==0 则用此值
-	maxPendingMsgs  int       // Publish 背压阈值:待发送消息总数超过此值时拒绝新消息
+	warnOnce        sync.Once    // 一次性提示无认证模式
+	defaultHopLimit int          // 默认跳数限制,0 表示不限;Broadcast 时如果 msg.HopLimit==0 则用此值
+	maxPendingMsgs  int          // Publish 背压阈值:待发送消息总数超过此值时拒绝新消息
+	serveListener   net.Listener // 非空时 Start 用 Serve 而非 ListenAndServe(测试复用已 bind 的 listener,消除端口竞争)
 }
+
+// SetServeListener 设置一个已 bind 的 listener 供 Start 使用。
+// 设置后 Start 会以 http.Server.Serve 在该 listener 上服务,而不是
+// 调用 ListenAndServe 自行绑定端口。主要用于测试:复用已 bind 的
+// listener 可彻底消除 freeTestPort 那种 Listen→Close→重绑 的 TOCTOU
+// 端口竞争。生产代码一般无需调用。
+func (b *MessageBus) SetServeListener(l net.Listener) { b.serveListener = l }
 
 // NewMessageBus 创建消息总线
 func NewMessageBus(nodeID, port string) *MessageBus {
@@ -179,6 +188,9 @@ func (b *MessageBus) Start() error {
 	}
 
 	logger.Info("MessageBus started", "node_id", b.nodeID, "addr", addr)
+	if b.serveListener != nil {
+		return b.httpServer.Serve(b.serveListener)
+	}
 	return b.httpServer.ListenAndServe()
 }
 

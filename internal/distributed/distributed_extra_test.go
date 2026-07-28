@@ -34,16 +34,19 @@ import (
 
 // ─── 共享测试辅助 ───
 
-// freeTestPort 获取一个可用端口号(存在 TOCTOU 竞态,但在测试环境中足够可靠)。
-func freeTestPort(t *testing.T) string {
+// newTestListener 在 127.0.0.1 上 bind 一个随机端口并返回该 listener
+// 及其端口号字符串。listener 保持已 bind 状态(不 Close),供
+// SetServeListener 复用,从而彻底消除旧 freeTestPort 那种
+// Listen→Close→重新 Listen 的 TOCTOU 端口竞争:多个并行测试不会再
+// 抢到同一端口,请求也不会串到错误的 bus 上。
+func newTestListener(t *testing.T) (net.Listener, string) {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("failed to get free port: %v", err)
+		t.Fatalf("failed to bind test listener: %v", err)
 	}
 	port := strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
-	l.Close()
-	return port
+	return l, port
 }
 
 // waitForHTTPReady 轮询 URL 直到返回 HTTP 响应或超时。
@@ -754,8 +757,9 @@ func TestCoordinator_HandleExecute(t *testing.T) {
 // ─── Start/Stop 测试 ───
 
 func TestCoordinator_StartStop(t *testing.T) {
-	port := freeTestPort(t)
+	l, port := newTestListener(t)
 	c := NewCoordinator(port, "token")
+	c.SetServeListener(l)
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- c.Start() }()
@@ -784,8 +788,9 @@ func TestCoordinator_StopWithoutStart(t *testing.T) {
 }
 
 func TestCoordinator_StopIdempotent(t *testing.T) {
-	port := freeTestPort(t)
+	l, port := newTestListener(t)
 	c := NewCoordinator(port, "token")
+	c.SetServeListener(l)
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- c.Start() }()
@@ -1021,11 +1026,12 @@ func TestWorker_StartStop(t *testing.T) {
 	}))
 	defer coordSrv.Close()
 
-	port := freeTestPort(t)
+	l, port := newTestListener(t)
 	w, err := NewWorker(port, coordSrv.URL, "token", 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	w.SetServeListener(l)
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- w.Start() }()

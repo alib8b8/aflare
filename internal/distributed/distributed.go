@@ -121,7 +121,15 @@ type Coordinator struct {
 	stopCh        chan struct{}
 	stopOnce      sync.Once
 	breakers      *BreakerRegistry // 节点级熔断器
+	serveListener net.Listener     // 非空时 Start 用 Serve 而非 ListenAndServe(测试复用已 bind 的 listener,消除端口竞争)
 }
+
+// SetServeListener 设置一个已 bind 的 listener 供 Start 使用。
+// 设置后 Start 会以 http.Server.Serve 在该 listener 上服务,而不是
+// 调用 ListenAndServe 自行绑定端口。主要用于测试:复用已 bind 的
+// listener 可彻底消除 freeTestPort 那种 Listen→Close→重绑 的 TOCTOU
+// 端口竞争。生产代码一般无需调用。
+func (c *Coordinator) SetServeListener(l net.Listener) { c.serveListener = l }
 
 func NewCoordinator(port, authToken string) *Coordinator {
 	if port == "" {
@@ -159,6 +167,9 @@ func (c *Coordinator) Start() error {
 	go c.cleanupOfflineNodes()
 
 	logger.Info("Coordinator started", "port", c.port)
+	if c.serveListener != nil {
+		return c.httpServer.Serve(c.serveListener)
+	}
 	return c.httpServer.ListenAndServe()
 }
 
@@ -666,7 +677,15 @@ type Worker struct {
 	httpServer     *http.Server
 	stopCh         chan struct{}
 	stopOnce       sync.Once
+	serveListener  net.Listener // 非空时 Start 用 Serve 而非 ListenAndServe(测试复用已 bind 的 listener,消除端口竞争)
 }
+
+// SetServeListener 设置一个已 bind 的 listener 供 Start 使用。
+// 设置后 Start 会以 http.Server.Serve 在该 listener 上服务,而不是
+// 调用 ListenAndServe 自行绑定端口。主要用于测试:复用已 bind 的
+// listener 可彻底消除 freeTestPort 那种 Listen→Close→重绑 的 TOCTOU
+// 端口竞争。生产代码一般无需调用。
+func (w *Worker) SetServeListener(l net.Listener) { w.serveListener = l }
 
 func NewWorker(port, coordinatorURL, authToken string, capacity int) (*Worker, error) {
 	if port == "" {
@@ -757,6 +776,9 @@ func (w *Worker) Start() error {
 	go w.sendHeartbeats()
 
 	logger.Info("Worker started", "port", w.port, "coordinator", w.coordinatorURL)
+	if w.serveListener != nil {
+		return w.httpServer.Serve(w.serveListener)
+	}
 	return w.httpServer.ListenAndServe()
 }
 

@@ -598,7 +598,9 @@ func TestMessageBus_AuthMiddleware(t *testing.T) {
 
 func TestMessageBus_StartAndServe(t *testing.T) {
 	t.Parallel()
-	bus := NewMessageBus("start-node", freeTestPort(t))
+	l, port := newTestListener(t)
+	bus := NewMessageBus("start-node", port)
+	bus.SetServeListener(l)
 
 	// 启动服务器(在 goroutine 中,因为 ListenAndServe 阻塞)
 	errCh := make(chan error, 1)
@@ -678,8 +680,10 @@ func TestMessageBus_StartAndServe(t *testing.T) {
 
 func TestMessageBus_StartWithAuth(t *testing.T) {
 	t.Parallel()
-	bus := NewMessageBus("auth-start-node", freeTestPort(t))
+	l, port := newTestListener(t)
+	bus := NewMessageBus("auth-start-node", port)
 	bus.SetAuthToken("secret-token")
+	bus.SetServeListener(l)
 
 	errCh := make(chan error, 1)
 	go func() {
