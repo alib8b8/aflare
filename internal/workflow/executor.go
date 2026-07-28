@@ -58,6 +58,10 @@ type StepResult struct {
 	Output    string
 	Error     error
 	Duration  time.Duration
+	// Trace holds detailed per-step telemetry (eval/exec timings, retries,
+	// recoveries, DAG batch/dependencies). It is nil when tracing is not
+	// requested via ExecuteWorkflowWithTrace.
+	Trace *StepTrace
 }
 
 func init() {
@@ -97,25 +101,44 @@ func ExecuteWorkflow(ctx context.Context, wf *Workflow, reg *nodes.Registry) (st
 	return ExecuteWorkflowWithTUI(ctx, wf, reg, nil)
 }
 
-// ExecuteWorkflowWithTUI executes the workflow and sends messages to a TUI program
+// ExecuteWorkflowWithTUI executes the workflow and sends messages to a TUI program.
+// It is a thin wrapper around ExecuteWorkflowWithTrace that discards the trace.
 func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, error) {
-	// DAG 路径：当任一步骤声明了 depends_on 时，启用 DAG 调度（拓扑排序+并发执行）。
-	// 无声明则走下方原顺序 for 循环，100% 向后兼容。
+	output, results, _, err := ExecuteWorkflowWithTrace(ctx, wf, reg, program)
+	return output, results, err
+}
+
+// ExecuteWorkflowWithTrace executes the workflow and returns a detailed per-step
+// WorkflowTrace alongside the standard results.
+//
+// Routing: when any step declares depends_on, the DAG scheduling path is used
+// (topological batching + concurrent execution); otherwise the legacy sequential
+// for-loop path runs. Both paths populate the trace with the same StepTrace
+// schema — BatchIndex is -1 and Dependencies is nil in sequential mode.
+func ExecuteWorkflowWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, *WorkflowTrace, error) {
 	if hasDAGDeclarations(wf.Steps) {
 		return executeWorkflowDAG(ctx, wf, reg, program)
 	}
+	return executeWorkflowSequential(ctx, wf, reg, program)
+}
 
+// executeWorkflowSequential runs the workflow step-by-step in declaration order
+// and records per-step telemetry into a WorkflowTrace (Mode="sequential").
+func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, *WorkflowTrace, error) {
 	// Validate step count
 	if len(wf.Steps) > MaxSteps {
-		return "", nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
+		return "", nil, nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
 	}
 
 	// Validate input schema if defined
 	if err := validateInputSchema(wf); err != nil {
-		return "", nil, fmt.Errorf("input validation failed: %w", err)
+		return "", nil, nil, fmt.Errorf("input validation failed: %w", err)
 	}
 
 	logger.Info("workflow execution started", "name", wf.Name, "steps", len(wf.Steps))
+
+	trace := newTrace(wf.Name, "sequential", time.Now(), len(wf.Steps))
+	defer func() { trace.finish(time.Now()) }()
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, WorkflowTimeout)
 	defer cancel()
@@ -152,6 +175,8 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 	}
 
 	for i, wStep := range wf.Steps {
+		stepStart := time.Now()
+
 		// ── Handle if/else branch ──
 		if wStep.IsIf() {
 			branchResults, output, err := executeIfBranch(timeoutCtx, i, wStep.If, data, engine, reg, program, globalLimiter)
@@ -160,17 +185,31 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 				if program != nil {
 					program.Send(tui.WorkflowEndMsg{Success: false})
 				}
-				return "", results, err
+				return "", results, trace, err
 			}
 			results = append(results, branchResults...)
 			data = output
 			engine.SetStepOutput(i, wStep.Name, output)
+			// Compound steps record a coarse-grained trace entry.
+			trace.recordStep(StepTrace{
+				Index:           i,
+				NodeName:        wStep.Node,
+				StepName:        wStep.Name,
+				BatchIndex:      -1,
+				ConditionPassed: true,
+				Attempts:        1,
+				TotalDuration:   time.Since(stepStart),
+				InputLen:        len(data),
+				OutputLen:       len(output),
+			})
 			continue
 		}
 
 		// Check condition - skip step if condition evaluates to false
 		if wStep.Condition != "" {
+			evalStart := time.Now()
 			pass, err := evaluateCondition(wStep.Condition, data, engine)
+			evalDuration := time.Since(evalStart)
 			if err != nil {
 				logger.Error("condition evaluation failed", "index", i, "error", err)
 				result := StepResult{
@@ -180,6 +219,18 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 					Error:     fmt.Errorf("condition evaluation failed: %w", err),
 					Duration:  0,
 				}
+				result.Trace = trace.recordStep(StepTrace{
+					Index:           i,
+					NodeName:        wStep.Node,
+					StepName:        wStep.Name,
+					BatchIndex:      -1,
+					ConditionExpr:   wStep.Condition,
+					ConditionPassed: false,
+					EvalDuration:    evalDuration,
+					TotalDuration:   time.Since(stepStart),
+					InputLen:        len(data),
+					ErrorText:       err.Error(),
+				})
 				results = append(results, result)
 				if program != nil {
 					program.Send(tui.StepStartMsg{
@@ -193,7 +244,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 					})
 					program.Send(tui.WorkflowEndMsg{Success: false})
 				}
-				return "", results, err
+				return "", results, trace, err
 			}
 			if !pass {
 				logger.Info("step skipped by condition", "index", i, "node", wStep.Node)
@@ -207,6 +258,18 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 					Error:     nil,
 					Duration:  0,
 				}
+				result.Trace = trace.recordStep(StepTrace{
+					Index:           i,
+					NodeName:        wStep.Node,
+					StepName:        wStep.Name,
+					BatchIndex:      -1,
+					Skipped:         true,
+					ConditionExpr:   wStep.Condition,
+					ConditionPassed: false,
+					EvalDuration:    evalDuration,
+					TotalDuration:   time.Since(stepStart),
+					InputLen:        len(data),
+				})
 				results = append(results, result)
 				if program != nil {
 					program.Send(tui.StepStartMsg{
@@ -231,11 +294,22 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 				if program != nil {
 					program.Send(tui.WorkflowEndMsg{Success: false})
 				}
-				return "", results, err
+				return "", results, trace, err
 			}
 			results = append(results, loopResults...)
 			data = applyOutputStrategy(output, wStep.OutputStrategy)
 			engine.SetStepOutput(i, wStep.Name, output)
+			trace.recordStep(StepTrace{
+				Index:           i,
+				NodeName:        wStep.Node,
+				StepName:        wStep.Name,
+				BatchIndex:      -1,
+				ConditionPassed: true,
+				Attempts:        1,
+				TotalDuration:   time.Since(stepStart),
+				InputLen:        len(data),
+				OutputLen:       len(output),
+			})
 			continue
 		}
 
@@ -246,15 +320,25 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 				if program != nil {
 					program.Send(tui.WorkflowEndMsg{Success: false})
 				}
-				return "", results, err
+				return "", results, trace, err
 			}
 			results = append(results, parallelResults...)
 			data = applyOutputStrategy(output, wStep.OutputStrategy)
 			engine.SetStepOutput(i, wStep.Name, output)
+			trace.recordStep(StepTrace{
+				Index:           i,
+				NodeName:        wStep.Node,
+				StepName:        wStep.Name,
+				BatchIndex:      -1,
+				ConditionPassed: true,
+				Attempts:        1,
+				TotalDuration:   time.Since(stepStart),
+				InputLen:        len(data),
+				OutputLen:       len(output),
+			})
 			continue
 		}
 
-		stepStart := time.Now()
 		logger.Info("step started", "index", i, "node", wStep.Node)
 
 		if program != nil {
@@ -264,7 +348,9 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 			})
 		}
 
+		evalStart := time.Now()
 		evaluatedParams, err := engine.EvaluateParams(wStep.Params, data)
+		evalDuration := time.Since(evalStart)
 		if err != nil {
 			logger.Error("expression evaluation failed", "index", i, "error", err)
 			result := StepResult{
@@ -274,6 +360,17 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 				Error:     err,
 				Duration:  time.Since(stepStart),
 			}
+			result.Trace = trace.recordStep(StepTrace{
+				Index:           i,
+				NodeName:        wStep.Node,
+				StepName:        wStep.Name,
+				BatchIndex:      -1,
+				ConditionPassed: true,
+				EvalDuration:    evalDuration,
+				TotalDuration:   time.Since(stepStart),
+				InputLen:        len(data),
+				ErrorText:       err.Error(),
+			})
 			results = append(results, result)
 			if program != nil {
 				program.Send(tui.StepEndMsg{
@@ -284,7 +381,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 				})
 				program.Send(tui.WorkflowEndMsg{Success: false})
 			}
-			return "", results, err
+			return "", results, trace, err
 		}
 
 		node, ok := reg.Get(wStep.Node)
@@ -298,6 +395,17 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 				Error:     err,
 				Duration:  time.Since(stepStart),
 			}
+			result.Trace = trace.recordStep(StepTrace{
+				Index:           i,
+				NodeName:        wStep.Node,
+				StepName:        wStep.Name,
+				BatchIndex:      -1,
+				ConditionPassed: true,
+				EvalDuration:    evalDuration,
+				TotalDuration:   time.Since(stepStart),
+				InputLen:        len(data),
+				ErrorText:       err.Error(),
+			})
 			results = append(results, result)
 
 			if program != nil {
@@ -310,7 +418,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 				program.Send(tui.WorkflowEndMsg{Success: false})
 			}
 
-			return "", results, err
+			return "", results, trace, err
 		}
 
 		retryCount := wStep.GetRetryCount()
@@ -326,8 +434,10 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 		var execErr error
 		var duration time.Duration
 		maxAttempts := retryCount + 1
+		attemptsMade := 0
 
 		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			attemptsMade = attempt
 			attemptStart := time.Now()
 
 			var stepCtx context.Context
@@ -370,7 +480,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 				select {
 				case <-time.After(retryDelayActual):
 				case <-timeoutCtx.Done():
-					return "", results, fmt.Errorf("workflow timed out during retry delay")
+					return "", results, trace, fmt.Errorf("workflow timed out during retry delay")
 				}
 			}
 		}
@@ -380,6 +490,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 		// the step is recovered so resultErr is cleared. For continue_on_error,
 		// the step genuinely failed so resultErr is preserved.
 		resultErr := execErr
+		var recoveries []string
 		if execErr != nil {
 			// 1. Try fallback value
 			if wStep.Fallback != "" {
@@ -389,6 +500,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 					output = fallbackVal
 					execErr = nil
 					resultErr = nil
+					recoveries = append(recoveries, "fallback")
 				}
 			}
 			// 2. Try on_error handler node
@@ -403,6 +515,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 							output = errOutput
 							execErr = nil
 							resultErr = nil
+							recoveries = append(recoveries, "on_error")
 						}
 					}
 				}
@@ -413,11 +526,16 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 				logger.Warn("step failed but continue_on_error is set, continuing", "index", i, "node", wStep.Node, "error", nodes.RedactSensitive(execErr.Error()))
 				output = ""
 				execErr = nil
+				recoveries = append(recoveries, "continue_on_error")
 			}
 		}
 
-		engine.SetStepOutput(i, wStep.Node, output)
+		engine.SetStepOutput(i, wStep.Name, output)
 
+		errText := ""
+		if resultErr != nil {
+			errText = resultErr.Error()
+		}
 		result := StepResult{
 			StepIndex: i,
 			NodeName:  wStep.Node,
@@ -426,6 +544,22 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 			Error:     resultErr,
 			Duration:  duration,
 		}
+		result.Trace = trace.recordStep(StepTrace{
+			Index:           i,
+			NodeName:        wStep.Node,
+			StepName:        wStep.Name,
+			BatchIndex:      -1,
+			ConditionExpr:   wStep.Condition,
+			ConditionPassed: true,
+			Attempts:        attemptsMade,
+			Recoveries:      recoveries,
+			EvalDuration:    evalDuration,
+			ExecuteDuration: duration,
+			TotalDuration:   time.Since(stepStart),
+			InputLen:        len(data),
+			OutputLen:       len(output),
+			ErrorText:       errText,
+		})
 		results = append(results, result)
 
 		if resultErr != nil {
@@ -449,7 +583,7 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 				program.Send(tui.WorkflowEndMsg{Success: false})
 			}
 			logger.Error("workflow failed", "name", wf.Name, "failed_step", i, "node", wStep.Node, "error", execErr)
-			return "", results, fmt.Errorf("step %d (%s) failed: %w", i+1, wStep.Node, execErr)
+			return "", results, trace, fmt.Errorf("step %d (%s) failed: %w", i+1, wStep.Node, execErr)
 		}
 
 		data = output
@@ -471,5 +605,5 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 		}
 	}
 
-	return data, results, nil
+	return data, results, trace, nil
 }

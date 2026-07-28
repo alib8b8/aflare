@@ -43,27 +43,30 @@ import (
 //   - 若 wf.Output 有表达式，求值它。
 //   - 否则取最后一个完成的步骤输出。
 //   - 建议 DAG 模式用 wf.output 显式指定，语义最清晰。
-func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, error) {
+func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, *WorkflowTrace, error) {
 	if len(wf.Steps) > MaxSteps {
-		return "", nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
+		return "", nil, nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
 	}
 	if err := validateInputSchema(wf); err != nil {
-		return "", nil, fmt.Errorf("input validation failed: %w", err)
+		return "", nil, nil, fmt.Errorf("input validation failed: %w", err)
 	}
 
 	// 构建依赖图（含环检测）
 	graph, err := buildDepGraph(wf.Steps)
 	if err != nil {
-		return "", nil, fmt.Errorf("DAG build failed: %w", err)
+		return "", nil, nil, fmt.Errorf("DAG build failed: %w", err)
 	}
 
 	// 拓扑分批：每批内的步骤互不依赖，可并发执行
 	batches, err := graph.topoBatches()
 	if err != nil {
-		return "", nil, fmt.Errorf("DAG scheduling failed: %w", err)
+		return "", nil, nil, fmt.Errorf("DAG scheduling failed: %w", err)
 	}
 
 	logger.Info("DAG workflow started", "name", wf.Name, "steps", len(wf.Steps), "batches", len(batches))
+
+	trace := newTrace(wf.Name, "dag", time.Now(), len(wf.Steps))
+	defer func() { trace.finish(time.Now()) }()
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, WorkflowTimeout)
 	defer cancel()
@@ -101,6 +104,7 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 	lastOutput := ""
 
 	for batchIdx, batch := range batches {
+		batchStart := time.Now()
 		logger.Info("DAG batch started", "batch", batchIdx, "steps", len(batch))
 
 		// ── 阶段 1：主 goroutine 预求值（独占 engine，线程安全）──
@@ -112,6 +116,7 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 			condPass        bool
 			evalErr         error
 			skipped         bool // condition 为 false，跳过执行
+			evalDuration    time.Duration
 		}
 		prepared := make([]preparedStep, len(batch))
 
@@ -121,16 +126,19 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 
 			ps := preparedStep{idx: stepIdx, wStep: wStep, input: input}
 
+			evalStart := time.Now()
 			// 条件求值
 			if wStep.Condition != "" {
 				pass, err := evaluateCondition(wStep.Condition, input, engine)
 				if err != nil {
 					ps.evalErr = fmt.Errorf("condition evaluation failed: %w", err)
+					ps.evalDuration = time.Since(evalStart)
 					prepared[j] = ps
 					continue
 				}
 				if !pass {
 					ps.skipped = true
+					ps.evalDuration = time.Since(evalStart)
 					prepared[j] = ps
 					continue
 				}
@@ -141,11 +149,13 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 				params, err := engine.EvaluateParams(wStep.Params, input)
 				if err != nil {
 					ps.evalErr = err
+					ps.evalDuration = time.Since(evalStart)
 					prepared[j] = ps
 					continue
 				}
 				ps.evaluatedParams = params
 			}
+			ps.evalDuration = time.Since(evalStart)
 			prepared[j] = ps
 		}
 
@@ -156,6 +166,7 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 			output   string
 			err      error
 			duration time.Duration
+			attempts int
 		}
 		resultChan := make(chan execResult, len(prepared))
 
@@ -180,13 +191,14 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 							idx:      ps.idx,
 							nodeName: ps.wStep.Node,
 							err:      fmt.Errorf("step panicked: %v", r),
+							attempts: 1,
 						}
 					}
 				}()
 
 				if globalLimiter != nil {
 					if err := globalLimiter.Acquire(timeoutCtx); err != nil {
-						resultChan <- execResult{idx: ps.idx, nodeName: ps.wStep.Node, err: err}
+						resultChan <- execResult{idx: ps.idx, nodeName: ps.wStep.Node, err: err, attempts: 1}
 						return
 					}
 					defer globalLimiter.Release()
@@ -198,13 +210,14 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 					program.Send(tui.StepStartMsg{Index: ps.idx, Name: ps.wStep.Node})
 				}
 
-				output, err := executeDAGStep(timeoutCtx, ps.wStep, ps.input, ps.evaluatedParams, reg)
+				output, err, attempts := executeDAGStep(timeoutCtx, ps.wStep, ps.input, ps.evaluatedParams, reg)
 				resultChan <- execResult{
 					idx:      ps.idx,
 					nodeName: ps.wStep.Node,
 					output:   output,
 					err:      err,
 					duration: time.Since(start),
+					attempts: attempts,
 				}
 			}(ps)
 		}
@@ -236,21 +249,33 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 			var resultErr error
 			var duration time.Duration
 			var stepInput string = ps.input
+			var attempts int
+			var recoveries []string
+			var skipped bool
+			var condPassed bool = true
+			var errText string
 
 			if ps.evalErr != nil {
 				resultErr = ps.evalErr
+				errText = resultErr.Error()
 			} else if ps.skipped {
 				output = ""
+				skipped = true
+				condPassed = false
 				logger.Info("DAG step skipped by condition", "index", stepIdx, "node", wStep.Node)
 			} else {
 				res := batchOutputs[stepIdx]
 				output = res.output
 				resultErr = res.err
 				duration = res.duration
+				attempts = res.attempts
 
 				// 错误恢复：fallback / on_error / continue_on_error
 				if resultErr != nil {
-					resultErr = applyErrorRecovery(timeoutCtx, &wStep, &output, resultErr, engine, reg, stepInput)
+					resultErr, recoveries = applyErrorRecovery(timeoutCtx, &wStep, &output, resultErr, engine, reg, stepInput)
+					if resultErr != nil {
+						errText = resultErr.Error()
+					}
 				}
 
 				if program != nil {
@@ -268,6 +293,36 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 			engine.SetStepOutput(stepIdx, wStep.Name, output)
 			resolver.set(stepIdx, output)
 
+			// 收集依赖索引（DAG 专属信息），按索引排序保证稳定顺序
+			deps := make([]int, 0, len(graph.deps[stepIdx]))
+			for d := range graph.deps[stepIdx] {
+				deps = append(deps, d)
+			}
+			for i := 1; i < len(deps); i++ {
+				for j := i; j > 0 && deps[j] < deps[j-1]; j-- {
+					deps[j], deps[j-1] = deps[j-1], deps[j]
+				}
+			}
+
+			tracePtr := trace.recordStep(StepTrace{
+				Index:           stepIdx,
+				NodeName:        wStep.Node,
+				StepName:        wStep.Name,
+				BatchIndex:      batchIdx,
+				Dependencies:    deps,
+				Skipped:         skipped,
+				ConditionExpr:   wStep.Condition,
+				ConditionPassed: condPassed,
+				Attempts:        attempts,
+				Recoveries:      recoveries,
+				EvalDuration:    ps.evalDuration,
+				ExecuteDuration: duration,
+				TotalDuration:   ps.evalDuration + duration,
+				InputLen:        len(stepInput),
+				OutputLen:       len(output),
+				ErrorText:       errText,
+			})
+
 			allResults = append(allResults, StepResult{
 				StepIndex: stepIdx,
 				NodeName:  wStep.Node,
@@ -275,6 +330,7 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 				Output:    output,
 				Error:     resultErr,
 				Duration:  duration,
+				Trace:     tracePtr,
 			})
 
 			if resultErr == nil && output != "" {
@@ -291,13 +347,21 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 			}
 		}
 
+		// 记录本批次 trace
+		trace.Batches = append(trace.Batches, BatchTrace{
+			Index:       batchIdx,
+			StepIndices: append([]int(nil), batch...),
+			StartedAt:   batchStart,
+			Duration:    time.Since(batchStart),
+		})
+
 		// 批次内任一步骤失败则终止整个工作流（与顺序模式语义一致）。
 		// continue_on_error 已在 applyErrorRecovery 中处理（resultErr 被清零）。
 		if batchFirstErr != nil {
 			if program != nil {
 				program.Send(tui.WorkflowEndMsg{Success: false})
 			}
-			return "", allResults, fmt.Errorf("DAG batch %d failed: %w", batchIdx, batchFirstErr)
+			return "", allResults, trace, fmt.Errorf("DAG batch %d failed: %w", batchIdx, batchFirstErr)
 		}
 	}
 
@@ -317,13 +381,14 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 		}
 	}
 
-	return finalOutput, allResults, nil
+	return finalOutput, allResults, trace, nil
 }
 
 // executeDAGStep 执行单个步骤（普通节点或复合步骤），供 worker goroutine 调用。
 // 注意：此函数不触碰 ExpressionEngine，所有求值已在主 goroutine 完成。
 // 复合步骤（if/loop/parallel）的子步骤求值在子执行器内进行，与主 engine 隔离。
-func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, params map[string]string, reg *nodes.Registry) (string, error) {
+// 返回值中的 attempts 为实际尝试次数（>=1），用于 trace 记录。
+func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, params map[string]string, reg *nodes.Registry) (string, error, int) {
 	// 复合步骤：委托给现有执行器（它们内部会自建 engine，与主 engine 隔离）
 	if wStep.IsIf() {
 		// if 分支用独立 engine 求值条件，子步骤递归执行自建 engine。
@@ -332,7 +397,7 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 		subEngine := NewExpressionEngine()
 		pass, err := evaluateCondition(wStep.If.Condition, input, subEngine)
 		if err != nil {
-			return "", fmt.Errorf("if condition failed: %w", err)
+			return "", fmt.Errorf("if condition failed: %w", err), 1
 		}
 		var branchSteps []WorkflowStep
 		if pass {
@@ -342,25 +407,25 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 		}
 		subWf := &Workflow{Name: fmt.Sprintf("dag-if-branch"), Steps: branchSteps}
 		out, _, err := ExecuteWorkflow(ctx, subWf, reg)
-		return out, err
+		return out, err, 1
 	}
 	if wStep.IsLoop() {
 		// loop 用独立 engine；DAG 下 loop 的 {{step.X}} 引用无法访问主 workflow 步骤输出。
 		loopEngine := NewExpressionEngine()
 		_, output, err := executeLoopStep(ctx, 0, wStep, input, loopEngine, reg, nil, NewConcurrencyLimiter(0))
-		return output, err
+		return output, err, 1
 	}
 	if wStep.IsParallel() {
 		// parallel 自带预求值机制，用独立 engine。
 		parEngine := NewExpressionEngine()
 		_, output, err := executeParallelStep(ctx, 0, wStep, input, parEngine, reg, nil, NewConcurrencyLimiter(0))
-		return output, err
+		return output, err, 1
 	}
 
 	// 普通节点：直接执行
 	node, ok := reg.Get(wStep.Node)
 	if !ok {
-		return "", fmt.Errorf("node '%s' not found in registry", wStep.Node)
+		return "", fmt.Errorf("node '%s' not found in registry", wStep.Node), 1
 	}
 
 	retryCount := wStep.GetRetryCount()
@@ -375,8 +440,10 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 	maxAttempts := retryCount + 1
 	var output string
 	var execErr error
+	attemptsMade := 0
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		attemptsMade = attempt
 		var stepCtx context.Context
 		var stepCancel context.CancelFunc
 		if stepTimeout > 0 {
@@ -397,24 +464,28 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 			select {
 			case <-time.After(retryDelay):
 			case <-ctx.Done():
-				return "", ctx.Err()
+				return "", ctx.Err(), attemptsMade
 			}
 		}
 	}
 
-	return output, execErr
+	return output, execErr, attemptsMade
 }
 
 // applyErrorRecovery 处理步骤失败后的 fallback/on_error/continue_on_error。
 // 逻辑与 executor.go 中的错误恢复一致，抽取为函数供 DAG 路径复用。
 // 返回处理后的 resultErr：恢复成功返回 nil，否则返回原错误。
-func applyErrorRecovery(ctx context.Context, wStep *WorkflowStep, output *string, execErr error, engine *ExpressionEngine, reg *nodes.Registry, input string) error {
+// 返回的 recoveries 列表记录已应用的恢复动作（用于 trace）。
+func applyErrorRecovery(ctx context.Context, wStep *WorkflowStep, output *string, execErr error, engine *ExpressionEngine, reg *nodes.Registry, input string) (error, []string) {
+	var recoveries []string
+
 	// 1. fallback 值
 	if wStep.Fallback != "" {
 		if fallbackVal, ferr := engine.Evaluate(wStep.Fallback, input); ferr == nil {
 			logger.Info("DAG step recovered via fallback", "node", wStep.Node)
 			*output = fallbackVal
-			return nil
+			recoveries = append(recoveries, "fallback")
+			return nil, recoveries
 		}
 	}
 
@@ -427,7 +498,8 @@ func applyErrorRecovery(ctx context.Context, wStep *WorkflowStep, output *string
 				if errOut, err := errNode.Execute(ctx, input, errParams); err == nil {
 					logger.Info("DAG step recovered via on_error handler", "node", wStep.Node, "handler", errStep.Node)
 					*output = errOut
-					return nil
+					recoveries = append(recoveries, "on_error")
+					return nil, recoveries
 				}
 			}
 		}
@@ -437,8 +509,9 @@ func applyErrorRecovery(ctx context.Context, wStep *WorkflowStep, output *string
 	if wStep.ContinueOnError {
 		logger.Warn("DAG step failed but continue_on_error set, continuing", "node", wStep.Node, "error", nodes.RedactSensitive(execErr.Error()))
 		*output = ""
-		return nil
+		recoveries = append(recoveries, "continue_on_error")
+		return nil, recoveries
 	}
 
-	return execErr
+	return execErr, recoveries
 }
