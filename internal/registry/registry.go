@@ -89,7 +89,7 @@ func GetRegistryPath() string {
 
 func LoadRegistry() (*Registry, error) {
 	path := GetRegistryPath()
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- internally generated config path
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("registry not found, run 'llm-box registry sync' first")

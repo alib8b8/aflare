@@ -70,7 +70,7 @@ func (n *FileReadNode) Execute(ctx context.Context, input string, params map[str
 		return "", fmt.Errorf("file too large (max %d bytes)", maxFileReadSize)
 	}
 
-	data, err := os.ReadFile(safePath)
+	data, err := os.ReadFile(safePath) // #nosec G304 -- path validated by validateReadPath
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}

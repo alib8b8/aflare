@@ -24,7 +24,7 @@ func init() {
 		Name:            "baichuan",
 		DefaultModel:    "Baichuan4",
 		DefaultEndpoint: "https://api.baichuan-ai.com/v1",
-		EnvAPIKey:       "BAICHUAN_API_KEY",
+		EnvAPIKey:       "BAICHUAN_API_KEY", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "Baichuan",
 	}))
 }

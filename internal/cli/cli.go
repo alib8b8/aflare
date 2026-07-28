@@ -24,9 +24,9 @@ import (
 
 	"github.com/alib8b8/llm-box/internal/i18n"
 	"github.com/alib8b8/llm-box/internal/logger"
+	"github.com/alib8b8/llm-box/internal/meta"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/registry"
-	"github.com/alib8b8/llm-box/internal/version"
 	"github.com/alib8b8/llm-box/internal/workflow"
 )
 
@@ -232,19 +232,19 @@ func ListInstalledNodes() ([]string, error) {
 }
 
 func PrintVersion() string {
-	return version.GetBuildInfo()
+	return meta.GetBuildInfo()
 }
 
 func SelfUpdate(repo string) (string, error) {
-	return version.SelfUpdate(repo)
+	return meta.SelfUpdate(repo)
 }
 
 func CheckUpdate(repo string) (string, bool, error) {
-	release, err := version.CheckLatestRelease(repo)
+	release, err := meta.CheckLatestRelease(repo)
 	if err != nil {
 		return "", false, err
 	}
-	hasUpdate := version.HasUpdate(version.GetVersion(), release)
+	hasUpdate := meta.HasUpdate(meta.GetVersion(), release)
 	return release.TagName, hasUpdate, nil
 }
 

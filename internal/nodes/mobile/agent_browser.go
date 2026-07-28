@@ -456,34 +456,34 @@ func (n *AgentBrowserNode) actionConnectExisting(ctx context.Context, params map
 	return sb.String(), nil
 }
 
-// importCookiesFromChrome 从本地 Chrome 配置读取 Cookie。
-// 出于安全考虑，本方法仅检测 Cookie 数据库的存在性，不实际解析 SQLite 内容，
-// 返回可用的 cookie 域名列表（当前为空，实际域名由浏览器在会话复用时自动加载）。
-func (n *AgentBrowserNode) importCookiesFromChrome(profile string) ([]string, error) {
+// importCookiesFromChrome 从本地 Chrome 配置读取 Cookie 域名清单。
+// 实际解析通过 sqlite3 CLI 读取 cookies 表的 host_key/name 列（明文存储），
+// 不读取加密的 value/encrypted_value（Chrome 用 OS keychain 加密，解密需平台原生调用）。
+// 返回去重后的域名列表，供 Agent 判断"哪些站点已登录"。
+func (n *AgentBrowserNode) importCookiesFromChrome(ctx context.Context, profile string) ([]string, error) {
 	cookiePath := getChromeCookiePath()
+	if profile != "" {
+		cookiePath = filepath.Join(getChromeProfilePath(profile), "Cookies")
+	}
 	if cookiePath == "" {
 		return nil, fmt.Errorf("当前平台 %s 不支持自动检测 Chrome Cookie 路径", runtime.GOOS)
 	}
 
-	if _, err := os.Stat(cookiePath); err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("chrome Cookie 数据库不存在: %s（请确认 Chrome 已安装并曾运行）", cookiePath)
-		}
-		return nil, fmt.Errorf("访问 Cookie 数据库失败: %w", err)
+	entries, err := readChromeCookieDomains(ctx, cookiePath)
+	if err != nil {
+		return nil, err
 	}
-
-	// 安全考虑：不直接读取 SQLite 数据库内容。
-	// 实际 cookie 值的解析需要 SQLite 驱动（cgo 或纯 Go 实现），
-	// 且 Chrome 在新版本中对 cookie 值做了 DPAPI/Keychain 加密。
-	// 这里返回空域名列表；会话复用时浏览器会自动加载这些 cookie。
-	return nil, nil
+	return uniqueHosts(entries), nil
 }
 
-// actionImportCookies 实现 import_cookies 动作：定位本地 Chrome Cookie 数据库，
-// 返回可用的域名列表与安全说明。
+// actionImportCookies 实现 import_cookies 动作：解析本地 Chrome Cookie
+// SQLite 数据库，返回已登录的域名清单及每个域名的 cookie 数量。
 func (n *AgentBrowserNode) actionImportCookies(ctx context.Context, params map[string]string) (string, error) {
 	profile := core.GetParam(params, "browser_profile", "")
 	cookiePath := getChromeCookiePath()
+	if profile != "" {
+		cookiePath = filepath.Join(getChromeProfilePath(profile), "Cookies")
+	}
 
 	var sb strings.Builder
 	sb.WriteString("## 🍪 Cookie 导入\n\n")
@@ -501,35 +501,46 @@ func (n *AgentBrowserNode) actionImportCookies(ctx context.Context, params map[s
 		sb.WriteString("- **配置文件**: Default（默认）\n")
 	}
 
-	domains, err := n.importCookiesFromChrome(profile)
+	// 读取完整条目（host+name），用于同时报告域名数与每域名 cookie 数。
+	entries, err := readChromeCookieDomains(ctx, cookiePath)
 	if err != nil {
 		sb.WriteString(fmt.Sprintf("- **状态**: ❌ %s\n", err.Error()))
+		sb.WriteString("\n**排障建议**:\n")
+		sb.WriteString("- 若提示 sqlite3 未找到：请安装 sqlite3（Linux: `apt install sqlite3`，macOS: 自带）\n")
+		sb.WriteString("- 若提示超时/锁定：请先关闭正在运行的 Chrome，它持有数据库写锁\n")
 		return sb.String(), nil
 	}
 
+	domains := uniqueHosts(entries)
 	if info, statErr := os.Stat(cookiePath); statErr == nil {
 		sb.WriteString(fmt.Sprintf("- **数据库大小**: %d 字节\n", info.Size()))
 	}
-	sb.WriteString(fmt.Sprintf("- **检测到的域名数**: %d\n\n", len(domains)))
+	sb.WriteString(fmt.Sprintf("- **Cookie 总条数**: %d\n", len(entries)))
+	sb.WriteString(fmt.Sprintf("- **已登录域名数**: %d\n\n", len(domains)))
 
 	sb.WriteString("### 安全说明\n\n")
-	sb.WriteString("- 已检测到 Cookie 数据库文件存在\n")
-	sb.WriteString("- 出于安全考虑，不直接读取 cookie 值（Chrome 对 cookie 值有系统级加密）\n")
-	sb.WriteString("- 实际复用会话时，浏览器会自动加载这些 cookie\n\n")
+	sb.WriteString("- 已通过 `sqlite3 -readonly` 只读读取 host_key/name 列（明文存储）\n")
+	sb.WriteString("- 不读取 cookie 值：Chrome 用 OS keychain（DPAPI/Keychain/kwallet）加密，需平台原生调用解密\n")
+	sb.WriteString("- 会话复用时，浏览器会自动从原 profile 加载完整 cookie 值\n\n")
 
 	if len(domains) > 0 {
+		namesByHost := cookieNamesByHost(entries)
 		sb.WriteString("### 可用域名\n\n")
+		sb.WriteString("| # | 域名 | Cookie 数 |\n")
+		sb.WriteString("|---|------|----------|\n")
 		for i, d := range domains {
-			if i >= 50 {
-				sb.WriteString(fmt.Sprintf("\n... 还有 %d 个域名未显示\n", len(domains)-50))
+			if i >= 100 {
+				sb.WriteString(fmt.Sprintf("\n... 还有 %d 个域名未显示\n", len(domains)-100))
 				break
 			}
-			sb.WriteString(fmt.Sprintf("%d. `%s`\n", i+1, d))
+			sb.WriteString(fmt.Sprintf("| %d | `%s` | %d |\n", i+1, d, len(namesByHost[d])))
 		}
 		sb.WriteString("\n")
+	} else {
+		sb.WriteString("_未检测到任何 cookie（Chrome 可能从未运行或使用无痕模式）_\n\n")
 	}
 
-	sb.WriteString("_Cookie 数据库已就绪，可配合 connect_existing 或浏览器启动参数使用。_\n")
+	sb.WriteString("_Cookie 数据库已解析完毕，可配合 connect_existing 或浏览器启动参数复用登录态。_\n")
 	return sb.String(), nil
 }
 

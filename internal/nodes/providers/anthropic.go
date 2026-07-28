@@ -24,7 +24,7 @@ func init() {
 		Name:            "anthropic",
 		DefaultModel:    "claude-3-5-sonnet-latest",
 		DefaultEndpoint: "https://api.anthropic.com/v1",
-		EnvAPIKey:       "ANTHROPIC_API_KEY",
+		EnvAPIKey:       "ANTHROPIC_API_KEY", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "Anthropic",
 	}))
 }

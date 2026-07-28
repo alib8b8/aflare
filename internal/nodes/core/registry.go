@@ -173,9 +173,9 @@ func (e *ExternalNode) Execute(ctx context.Context, input string, params map[str
 	var cmd *exec.Cmd
 
 	if strings.HasSuffix(entryPath, ".py") {
-		cmd = exec.CommandContext(ctx, "python3", entryPath)
+		cmd = exec.CommandContext(ctx, "python3", entryPath) // #nosec G204 -- entryPath validated against path traversal and symlink
 	} else if strings.HasSuffix(entryPath, ".sh") {
-		cmd = exec.CommandContext(ctx, "bash", entryPath)
+		cmd = exec.CommandContext(ctx, "bash", entryPath) // #nosec G204 -- entryPath validated against path traversal and symlink
 	} else {
 		return "", fmt.Errorf("only .py and .sh entry files are allowed")
 	}
@@ -389,7 +389,7 @@ func (r *Registry) LoadExternalNodes(dir string) error {
 		}
 		// Open the file and fstat the fd to avoid TOCTOU race (symlink swap
 		// between path validation and read).
-		f, err := os.Open(safePath)
+		f, err := os.Open(safePath) // #nosec G304 -- path validated by SafeJoinPath
 		if err != nil {
 			continue // Skip if no metadata.yaml
 		}

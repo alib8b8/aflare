@@ -24,7 +24,7 @@ func init() {
 		Name:            "qwen",
 		DefaultModel:    "qwen-turbo",
 		DefaultEndpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-		EnvAPIKey:       "QWEN_API_KEY",
+		EnvAPIKey:       "QWEN_API_KEY", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "Qwen",
 	}))
 }

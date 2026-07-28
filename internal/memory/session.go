@@ -616,7 +616,7 @@ func (mgr *SessionMemoryManager) saveSessionLocked(session *SessionMemory) {
 func (mgr *SessionMemoryManager) loadSessionLocked(session *SessionMemory) {
 	path := mgr.sessionFilePath(session.SessionID)
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- internally generated session path
 	if err != nil {
 		return // File doesn't exist, start fresh
 	}

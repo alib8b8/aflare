@@ -24,7 +24,7 @@ func init() {
 		Name:            "gemini",
 		DefaultModel:    "gemini-2.0-flash",
 		DefaultEndpoint: "https://generativelanguage.googleapis.com/v1beta/openai",
-		EnvAPIKey:       "GEMINI_API_KEY",
+		EnvAPIKey:       "GEMINI_API_KEY", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "Google Gemini",
 	}))
 }

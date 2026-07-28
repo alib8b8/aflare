@@ -71,7 +71,7 @@ func (sr *SkillRegistry) Load() error {
 	defer sr.mu.Unlock()
 
 	registryPath := filepath.Join(sr.baseDir, RegistryFileName)
-	if data, err := os.ReadFile(registryPath); err == nil {
+	if data, err := os.ReadFile(registryPath); err == nil { // #nosec G304 -- internally generated path
 		var registry struct {
 			Skills []*SkillMeta `json:"skills"`
 		}
@@ -101,7 +101,7 @@ func (sr *SkillRegistry) scanDirectory() error {
 		}
 
 		metaPath := filepath.Join(path, SkillMetaFile)
-		if data, err := os.ReadFile(metaPath); err == nil {
+		if data, err := os.ReadFile(metaPath); err == nil { // #nosec G304 -- internally generated path
 			var meta SkillMeta
 			if err := json.Unmarshal(data, &meta); err == nil {
 				if meta.ID != "" {
@@ -139,7 +139,7 @@ func autoGenerateMeta(dirPath, id, baseDir string) *SkillMeta {
 
 	readmePath := filepath.Join(dirPath, "README.md")
 	description := ""
-	if data, err := os.ReadFile(readmePath); err == nil {
+	if data, err := os.ReadFile(readmePath); err == nil { // #nosec G304 -- internally generated path
 		lines := strings.SplitN(string(data), "\n", 10)
 		for _, line := range lines {
 			line = strings.TrimSpace(line)

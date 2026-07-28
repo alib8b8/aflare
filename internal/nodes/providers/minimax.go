@@ -24,7 +24,7 @@ func init() {
 		Name:            "minimax",
 		DefaultModel:    "abab6.5s-chat",
 		DefaultEndpoint: "https://api.minimax.chat/v1",
-		EnvAPIKey:       "MINIMAX_API_KEY",
+		EnvAPIKey:       "MINIMAX_API_KEY", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "MiniMax",
 	}))
 }

@@ -95,7 +95,7 @@ func (n *CallNode) Execute(ctx context.Context, input string, params map[string]
 	}
 	childCtx := context.WithValue(ctx, callDepthKey, depth+1)
 
-	data, err := os.ReadFile(workflowPath)
+	data, err := os.ReadFile(workflowPath) // #nosec G304 -- workflow path from trusted config
 	if err != nil {
 		return "", fmt.Errorf("failed to read workflow file %q: %w", workflowPath, err)
 	}

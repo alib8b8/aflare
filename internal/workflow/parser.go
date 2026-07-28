@@ -72,7 +72,7 @@ func ParseWorkflow(path string) (*Workflow, error) {
 		return nil, fmt.Errorf("invalid workflow file path: %w", err)
 	}
 
-	file, err := os.Open(safePath)
+	file, err := os.Open(safePath) // #nosec G304 -- path validated
 	if err != nil {
 		return nil, fmt.Errorf("failed to open workflow file: %w", err)
 	}

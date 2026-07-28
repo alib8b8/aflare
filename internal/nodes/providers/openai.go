@@ -32,7 +32,7 @@ func init() {
 			Name:            "openai",
 			DefaultModel:    "gpt-3.5-turbo",
 			DefaultEndpoint: "https://api.openai.com/v1",
-			EnvAPIKey:       "OPENAI_API_KEY",
+			EnvAPIKey:       "OPENAI_API_KEY", // #nosec G101 -- env var name, not a credential value
 			ProviderName:    "OpenAI",
 		}),
 	})

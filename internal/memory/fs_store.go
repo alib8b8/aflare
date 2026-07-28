@@ -549,7 +549,7 @@ func (fs *FSStore) ensureKGLocked() *kgFile {
 		Relations: make([]kgRelation, 0),
 	}
 	if fs.kgPath != "" {
-		if data, err := os.ReadFile(fs.kgPath); err == nil {
+		if data, err := os.ReadFile(fs.kgPath); err == nil { // #nosec G304 -- internally generated storage path
 			if err := json.Unmarshal(data, fs.kgCache); err == nil {
 				if fs.kgCache.Entities == nil {
 					fs.kgCache.Entities = make(map[string]kgEntity)
@@ -777,7 +777,7 @@ func (fs *FSStore) readSkill(parts []string) (string, error) {
 	if len(name) > maxFSKeyLength {
 		return "", fmt.Errorf("name too long (max %d)", maxFSKeyLength)
 	}
-	data, err := os.ReadFile(fs.skillFilePath(name))
+	data, err := os.ReadFile(fs.skillFilePath(name)) // #nosec G304 -- internally generated storage path
 	if err != nil {
 		return "", fmt.Errorf("skill not found: %s", name)
 	}

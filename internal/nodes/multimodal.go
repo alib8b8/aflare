@@ -143,7 +143,7 @@ func (n *MultimodalNode) ocrImage(ctx context.Context, imagePath, prompt, lang, 
 		if _, statErr := os.Stat(safePath); statErr == nil {
 			if tess, lookErr := exec.LookPath("tesseract"); lookErr == nil {
 				args := []string{safePath, "stdout", "-l", lang, "--oem", "1", "--psm", "6"}
-				cmd := exec.CommandContext(ctx, tess, args...)
+				cmd := exec.CommandContext(ctx, tess, args...) // #nosec G204 -- tess from LookPath, args are standard OCR flags
 				var stdout, stderr bytes.Buffer
 				cmd.Stdout = &stdout
 				cmd.Stderr = &stderr

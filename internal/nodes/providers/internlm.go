@@ -24,7 +24,7 @@ func init() {
 		Name:            "internlm",
 		DefaultModel:    "internlm3-latest",
 		DefaultEndpoint: "https://internlm-chat.intern-ai.org.cn/api/v1",
-		EnvAPIKey:       "INTERNLM_API_KEY",
+		EnvAPIKey:       "INTERNLM_API_KEY", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "InternLM",
 	}))
 }

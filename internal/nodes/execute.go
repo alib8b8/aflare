@@ -142,9 +142,9 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		cmd = exec.CommandContext(ctx, "cmd.exe", "/c", command)
+		cmd = exec.CommandContext(ctx, "cmd.exe", "/c", command) // #nosec G204 -- command is audited and timeout-capped
 	} else {
-		cmd = exec.CommandContext(ctx, "sh", "-c", command)
+		cmd = exec.CommandContext(ctx, "sh", "-c", command) // #nosec G204 -- command is audited and timeout-capped
 	}
 
 	output, err := cmd.CombinedOutput()

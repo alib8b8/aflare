@@ -26,9 +26,9 @@ import (
 	"github.com/alib8b8/llm-box/internal/cli"
 	"github.com/alib8b8/llm-box/internal/i18n"
 	"github.com/alib8b8/llm-box/internal/mcp"
+	"github.com/alib8b8/llm-box/internal/meta"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/output"
-	"github.com/alib8b8/llm-box/internal/paths"
 	"github.com/alib8b8/llm-box/internal/skills"
 	"github.com/alib8b8/llm-box/internal/tui"
 	"github.com/alib8b8/llm-box/internal/webui"
@@ -821,7 +821,7 @@ func handleSkills(args []string) {
 		return
 	}
 
-	templatesDir := paths.ResolveTemplatesPath()
+	templatesDir := meta.ResolveTemplatesPath()
 	registry := skills.NewSkillRegistry(templatesDir)
 	if err := registry.Load(); err != nil {
 		fmt.Printf("❌ Failed to load skills: %v\n", err)

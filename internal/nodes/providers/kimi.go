@@ -24,7 +24,7 @@ func init() {
 		Name:            "kimi",
 		DefaultModel:    "kimi-k3",
 		DefaultEndpoint: "https://api.moonshot.cn/v1",
-		EnvAPIKey:       "KIMI_API_KEY",
+		EnvAPIKey:       "KIMI_API_KEY", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "Kimi",
 	}))
 }

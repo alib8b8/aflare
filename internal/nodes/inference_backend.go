@@ -128,7 +128,7 @@ func (b *BaseBackendAdapter) checkBinary(binaryName string) bool {
 }
 
 func (b *BaseBackendAdapter) getVersion(binaryName string) string {
-	cmd := exec.Command(binaryName, "--version")
+	cmd := exec.Command(binaryName, "--version") // #nosec G204 -- binaryName is a trusted inference backend name
 	out, err := cmd.Output()
 	if err != nil {
 		return "unknown"

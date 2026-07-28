@@ -32,7 +32,7 @@ func init() {
 			Name:            "coze",
 			DefaultModel:    "",
 			DefaultEndpoint: "https://api.coze.cn/v1",
-			EnvAPIKey:       "COZE_API_KEY",
+			EnvAPIKey:       "COZE_API_KEY", // #nosec G101 -- env var name, not a credential value
 			ProviderName:    "Coze",
 		}),
 	})

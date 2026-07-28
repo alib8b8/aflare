@@ -79,7 +79,7 @@ func LoadConfig() (*Config, error) {
 		configPaths := getConfigPaths()
 		for _, path := range configPaths {
 			if _, err := os.Stat(path); err == nil {
-				data, err := os.ReadFile(path)
+				data, err := os.ReadFile(path) // #nosec G304 -- path from internal config search list
 				if err != nil {
 					// File exists but is not readable (e.g. permission denied);
 					// skip it and try the next path. Only format errors abort loading.

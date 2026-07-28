@@ -79,7 +79,7 @@ func setupClaudeCodeMCP(exePath string) (*MCPSetupResult, error) {
   }
 }`, escapeJSONString(exePath))
 
-	existing, err := os.ReadFile(configFile)
+	existing, err := os.ReadFile(configFile) // #nosec G304 -- internally generated config path
 	if err == nil && len(existing) > 0 {
 		merged, mergeErr := mergeMCPConfigSafe(existing, exePath)
 		if mergeErr == nil {
@@ -129,7 +129,7 @@ func setupOpenCodeMCP(exePath string) (*MCPSetupResult, error) {
   }
 }`, escapeJSONString(exePath))
 
-	existing, err := os.ReadFile(configFile)
+	existing, err := os.ReadFile(configFile) // #nosec G304 -- internally generated config path
 	if err == nil && len(existing) > 0 {
 		merged, mergeErr := mergeMCPConfigSafe(existing, exePath)
 		if mergeErr == nil {
@@ -305,7 +305,7 @@ func copyDir(src, dst string) error {
 				return err
 			}
 		} else {
-			data, err := os.ReadFile(srcPath)
+			data, err := os.ReadFile(srcPath) // #nosec G304 -- internally generated config path
 			if err != nil {
 				return err
 			}
@@ -326,7 +326,7 @@ func GetBinaryPath() (string, error) {
 }
 
 func RunCommand(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
+	cmd := exec.Command(name, args...) // #nosec G204 -- trusted binary invocation in CLI init
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

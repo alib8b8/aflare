@@ -173,7 +173,7 @@ func (c *codeGraphCache) Load(root string) error {
 	defer c.mu.Unlock()
 
 	cachePath := c.cachePath(root)
-	data, err := os.ReadFile(cachePath)
+	data, err := os.ReadFile(cachePath) // #nosec G304 -- internally generated path
 	if err != nil {
 		if os.IsNotExist(err) {
 			c.rootPath = root
@@ -537,7 +537,7 @@ func (n *CodeGraphNode) parseFile(absPath string, language string, maxFileSize i
 		return codeGraphFile{}, fmt.Errorf("file too large (size: %d, max: %d)", fi.Size(), maxFileSize)
 	}
 
-	data, err := os.ReadFile(absPath)
+	data, err := os.ReadFile(absPath) // #nosec G304 -- internally generated path
 	if err != nil {
 		return codeGraphFile{}, fmt.Errorf("failed to read file: %w", err)
 	}

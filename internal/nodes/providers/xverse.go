@@ -24,7 +24,7 @@ func init() {
 		Name:            "xverse",
 		DefaultModel:    "XVERSE-7B-Chat",
 		DefaultEndpoint: "https://api.xverse.cn/v1",
-		EnvAPIKey:       "XVERSE_API_KEY",
+		EnvAPIKey:       "XVERSE_API_KEY", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "XVERSE",
 	}))
 }

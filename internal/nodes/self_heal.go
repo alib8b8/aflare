@@ -138,7 +138,7 @@ func runCmd(cmdStr string) (string, int, error) {
 func runCmdArgs(name string, args ...string) (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204 -- name is a hardcoded trusted dev tool
 	out, err := cmd.CombinedOutput()
 	exitCode := 0
 	if err != nil {

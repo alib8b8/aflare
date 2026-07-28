@@ -32,7 +32,7 @@ func init() {
 			Name:            "ima",
 			DefaultModel:    "",
 			DefaultEndpoint: "",
-			EnvAPIKey:       "IMA_API_KEY",
+			EnvAPIKey:       "IMA_API_KEY", // #nosec G101 -- env var name, not a credential value
 			ProviderName:    "IMA Copilot",
 		}),
 	})

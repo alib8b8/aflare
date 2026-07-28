@@ -245,7 +245,7 @@ func (e *ExpressionEngine) evalSingle(expr string, input string) (string, error)
 		if info.Size() > maxExprFileSize {
 			return "", fmt.Errorf("file '%s' too large (max %d bytes)", name, maxExprFileSize)
 		}
-		content, err := os.ReadFile(safePath)
+		content, err := os.ReadFile(safePath) // #nosec G304 -- path validated by safeJoinPath
 		if err != nil {
 			return "", fmt.Errorf("failed to read file '%s': %w", name, err)
 		}

@@ -375,7 +375,7 @@ func (m *UserProfileManager) loadAllProfiles() {
 			continue
 		}
 
-		data, err := os.ReadFile(filePath)
+		data, err := os.ReadFile(filePath) // #nosec G304 -- internally generated path
 		if err != nil {
 			continue
 		}

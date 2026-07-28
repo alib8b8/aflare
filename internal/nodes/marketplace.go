@@ -92,7 +92,7 @@ func (m *NodeMarketplace) scanPlugin(path string) *PluginInfo {
 	}
 
 	manifestPath := filepath.Join(path, "plugin.json")
-	if data, err := os.ReadFile(manifestPath); err == nil {
+	if data, err := os.ReadFile(manifestPath); err == nil { // #nosec G304 -- internally generated manifest path
 		var manifest struct {
 			Name        string `json:"name"`
 			Version     string `json:"version"`

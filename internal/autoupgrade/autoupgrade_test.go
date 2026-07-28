@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/version"
+	"github.com/alib8b8/llm-box/internal/meta"
 )
 
 func TestNewUpgradeEngine(t *testing.T) {
@@ -37,8 +37,8 @@ func TestNewUpgradeEngine(t *testing.T) {
 	if engine.state == nil {
 		t.Fatal("expected non-nil state")
 	}
-	if engine.state.CurrentVersion != version.GetVersion() {
-		t.Errorf("expected current version %s, got %s", version.GetVersion(), engine.state.CurrentVersion)
+	if engine.state.CurrentVersion != meta.GetVersion() {
+		t.Errorf("expected current version %s, got %s", meta.GetVersion(), engine.state.CurrentVersion)
 	}
 }
 
@@ -496,7 +496,7 @@ func TestPerformUpgrade_BackupDisabled(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		release := &version.GitHubRelease{TagName: "v999.999.999"}
+		release := &meta.GitHubRelease{TagName: "v999.999.999"}
 		engine.PerformUpgrade(ctx, release)
 	}()
 
@@ -521,7 +521,7 @@ func TestPerformUpgrade_WithBackup(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		release := &version.GitHubRelease{TagName: "v999.999.999"}
+		release := &meta.GitHubRelease{TagName: "v999.999.999"}
 		engine.PerformUpgrade(ctx, release)
 	}()
 
@@ -547,7 +547,7 @@ func TestPerformUpgrade_FailWithRollback(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		release := &version.GitHubRelease{TagName: "v999.999.999"}
+		release := &meta.GitHubRelease{TagName: "v999.999.999"}
 		engine.PerformUpgrade(ctx, release)
 	}()
 

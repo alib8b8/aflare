@@ -264,7 +264,7 @@ func (s *WebUIServer) handleGetWorkflow(w http.ResponseWriter, r *http.Request) 
 	}
 
 	path := s.getWorkflowPath(name)
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- internally generated webui asset path
 	if err != nil {
 		http.Error(w, "workflow not found", http.StatusNotFound)
 		return

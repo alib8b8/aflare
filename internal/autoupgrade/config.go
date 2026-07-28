@@ -27,7 +27,7 @@ func LoadConfig() (*UpgradeConfig, error) {
 	paths := getConfigPaths()
 	for _, path := range paths {
 		if _, err := os.Stat(path); err == nil {
-			data, err := os.ReadFile(path)
+			data, err := os.ReadFile(path) // #nosec G304 -- path from internal config search list
 			if err != nil {
 				continue
 			}

@@ -86,7 +86,7 @@ func (n *FileWriteNode) Execute(ctx context.Context, input string, params map[st
 }
 
 func appendToFile(path string, data []byte) error {
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600) // #nosec G304 -- path validated by validateWritePath
 	if err != nil {
 		return err
 	}

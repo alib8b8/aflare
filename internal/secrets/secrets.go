@@ -36,7 +36,7 @@ import (
 
 const (
 	SecretTypeNormal = "normal"
-	SecretTypeSecret = "secret"
+	SecretTypeSecret = "secret" // #nosec G101 -- type label constant, not a credential value
 	pbkdf2Iterations = 600000
 	pbkdf2SaltSize   = 16
 	pbkdf2KeySize    = 32
@@ -112,7 +112,7 @@ func NewSecretManager(masterPassword string) (*SecretManager, error) {
 }
 
 func LoadFromFile(path, masterPassword string) (*SecretManager, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- internally generated secrets path
 	if err != nil {
 		if os.IsNotExist(err) {
 			return NewSecretManager(masterPassword)

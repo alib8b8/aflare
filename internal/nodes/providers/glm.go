@@ -24,7 +24,7 @@ func init() {
 		Name:            "glm",
 		DefaultModel:    "glm-4",
 		DefaultEndpoint: "https://open.bigmodel.cn/api/paas/v4",
-		EnvAPIKey:       "GLM_API_KEY",
+		EnvAPIKey:       "GLM_API_KEY", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "GLM",
 	}))
 }

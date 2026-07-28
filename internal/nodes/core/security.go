@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/alib8b8/llm-box/internal/config"
-	"github.com/alib8b8/llm-box/internal/stats"
 )
 
 var (
@@ -70,7 +69,7 @@ func SafeJoinPath(baseDir, userPath string) (string, error) {
 
 	cleanPath := filepath.Clean(userPath)
 	if strings.HasPrefix(cleanPath, "/") || strings.HasPrefix(cleanPath, "\\") {
-		stats.GetSecurityStats().RecordBlock(stats.BlockPathTraversal, "absolute path: "+userPath, "")
+		GetSecurityStats().RecordBlock(BlockPathTraversal, "absolute path: "+userPath, "")
 		return "", fmt.Errorf("absolute paths are not allowed, use relative paths within the working directory")
 	}
 
@@ -90,7 +89,7 @@ func SafeJoinPath(baseDir, userPath string) (string, error) {
 		return "", fmt.Errorf("path validation failed: %w", err)
 	}
 	if strings.HasPrefix(relPath, "..") || relPath == ".." {
-		stats.GetSecurityStats().RecordBlock(stats.BlockPathTraversal, "path escapes: "+userPath, "")
+		GetSecurityStats().RecordBlock(BlockPathTraversal, "path escapes: "+userPath, "")
 		return "", fmt.Errorf("path escapes the allowed directory")
 	}
 
@@ -100,7 +99,7 @@ func SafeJoinPath(baseDir, userPath string) (string, error) {
 		if err == nil {
 			resolvedRel, err := filepath.Rel(absBase, resolvedPath)
 			if err != nil || strings.HasPrefix(resolvedRel, "..") {
-				stats.GetSecurityStats().RecordBlock(stats.BlockSymlinkBypass, "symlink escape: "+userPath, "")
+				GetSecurityStats().RecordBlock(BlockSymlinkBypass, "symlink escape: "+userPath, "")
 				return "", fmt.Errorf("path escapes the allowed directory (symlink)")
 			}
 			return resolvedPath, nil
@@ -150,7 +149,7 @@ func ValidateWritePathIn(baseDir, path string) (string, error) {
 	if config.SecurityLevelAtLeast(config.SecurityLevelL1) {
 		baseName := filepath.Base(safePath)
 		if strings.HasPrefix(baseName, ".") {
-			stats.GetSecurityStats().RecordBlock(stats.BlockSensitiveFile, "dotfile: "+path, "")
+			GetSecurityStats().RecordBlock(BlockSensitiveFile, "dotfile: "+path, "")
 			return "", fmt.Errorf("dotfiles are not allowed for writing")
 		}
 	}
@@ -184,7 +183,7 @@ func ValidateWritePathIn(baseDir, path string) (string, error) {
 		forbiddenExts[".pl"] = true
 	}
 	if forbiddenExts[ext] {
-		stats.GetSecurityStats().RecordBlock(stats.BlockUnsafeExtension, "forbidden ext: "+ext, "")
+		GetSecurityStats().RecordBlock(BlockUnsafeExtension, "forbidden ext: "+ext, "")
 		return "", fmt.Errorf("writing to %s files is not allowed (security risk)", ext)
 	}
 
@@ -224,7 +223,7 @@ func ValidateWritePathIn(baseDir, path string) (string, error) {
 			".gz":   true,
 		}
 		if ext != "" && !allowedExts[ext] {
-			stats.GetSecurityStats().RecordBlock(stats.BlockUnsafeExtension, "ext not allowed: "+ext, "")
+			GetSecurityStats().RecordBlock(BlockUnsafeExtension, "ext not allowed: "+ext, "")
 			return "", fmt.Errorf("file extension '%s' is not allowed for writing at L3 security level", ext)
 		}
 	}
@@ -294,7 +293,7 @@ func ValidateURL(rawURL string) error {
 	}
 
 	if u.Scheme != "http" && u.Scheme != "https" {
-		stats.GetSecurityStats().RecordBlock(stats.BlockNetwork, "non-http scheme: "+u.Scheme, "")
+		GetSecurityStats().RecordBlock(BlockNetwork, "non-http scheme: "+u.Scheme, "")
 		return fmt.Errorf("only http and https URLs are allowed, got: %s", u.Scheme)
 	}
 
@@ -317,7 +316,7 @@ func ValidateURL(rawURL string) error {
 		"ip6-loopback":          true,
 	}
 	if localhostVariants[lowerHost] {
-		stats.GetSecurityStats().RecordBlock(stats.BlockSSRF, "localhost: "+host, "")
+		GetSecurityStats().RecordBlock(BlockSSRF, "localhost: "+host, "")
 		return fmt.Errorf("access to localhost is not allowed")
 	}
 
@@ -325,7 +324,7 @@ func ValidateURL(rawURL string) error {
 	ip := net.ParseIP(host)
 	if ip != nil {
 		if err := ValidateIP(ip, host); err != nil {
-			stats.GetSecurityStats().RecordBlock(stats.BlockSSRF, "blocked IP: "+host, "")
+			GetSecurityStats().RecordBlock(BlockSSRF, "blocked IP: "+host, "")
 			return err
 		}
 	} else {
@@ -336,7 +335,7 @@ func ValidateURL(rawURL string) error {
 		}
 		for _, resolvedIP := range ips {
 			if err := ValidateIP(resolvedIP, host); err != nil {
-				stats.GetSecurityStats().RecordBlock(stats.BlockSSRF, "blocked IP: "+resolvedIP.String(), "")
+				GetSecurityStats().RecordBlock(BlockSSRF, "blocked IP: "+resolvedIP.String(), "")
 				return err
 			}
 		}

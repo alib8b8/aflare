@@ -142,7 +142,7 @@ func ListRecords() ([]Record, error) {
 		}
 
 		path := filepath.Join(dir, entry.Name())
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) // #nosec G304 -- internally generated history path
 		if err != nil {
 			continue
 		}
@@ -179,7 +179,7 @@ func GetRecord(id string) (*Record, error) {
 	}
 
 	path := filepath.Join(dir, id+".json")
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- internally generated history path
 	if err != nil {
 		return nil, fmt.Errorf("failed to read record: %w", err)
 	}
@@ -337,7 +337,7 @@ func AppendAuditLog(log AuditLog) error {
 	}
 
 	auditPath := filepath.Join(dir, auditLogFileName)
-	f, err := os.OpenFile(auditPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(auditPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600) // #nosec G304 -- internally generated history path
 	if err != nil {
 		return fmt.Errorf("failed to open audit log file: %w", err)
 	}
@@ -453,7 +453,7 @@ func ReadAuditLogs() ([]AuditLog, error) {
 	}
 
 	auditPath := filepath.Join(dir, auditLogFileName)
-	data, err := os.ReadFile(auditPath)
+	data, err := os.ReadFile(auditPath) // #nosec G304 -- internally generated history path
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []AuditLog{}, nil
