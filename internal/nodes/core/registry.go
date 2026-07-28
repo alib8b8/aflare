@@ -289,32 +289,45 @@ func (r *Registry) IsSafeMode() bool {
 	return r.safeMode
 }
 
-// ExecuteWithStats runs a node and records execution metrics (calls, errors, latency, I/O size)
-func (r *Registry) ExecuteWithStats(name string, ctx context.Context, input string, params map[string]string) (string, error) {
+// ExecuteWithStats runs a node and records execution metrics (calls, errors, latency, I/O size).
+// It recovers from panics raised by node.Execute so a single buggy node cannot
+// crash the whole caller (e.g. a workflow run). A recovered panic is recorded
+// as an error and returned to the caller.
+func (r *Registry) ExecuteWithStats(name string, ctx context.Context, input string, params map[string]string) (output string, err error) {
 	node, ok := r.Get(name)
 	if !ok {
 		return "", fmt.Errorf("node %q not found", name)
 	}
 
 	start := time.Now()
-	output, err := node.Execute(ctx, input, params)
-	elapsed := time.Since(start).Milliseconds()
-
-	r.statsMu.Lock()
-	defer r.statsMu.Unlock()
-
-	if r.stats[name] == nil {
-		r.stats[name] = &NodeExecStats{}
-	}
-	s := r.stats[name]
-	s.Calls++
-	s.TotalMs += elapsed
-	s.InputBytes += int64(len(input))
-	s.OutputBytes += int64(len(output))
-	if err != nil {
-		s.Errors++
-	}
-
+	// recover from node panics (nil deref, index out of range, etc.) so an
+	// individual node bug does not bring down the whole process. The panic
+	// value is surfaced as an error and counted in stats.
+	defer func() {
+		if rv := recover(); rv != nil {
+			err = fmt.Errorf("node %q panicked: %v", name, rv)
+			logger.Error("node panic recovered",
+				"node", name,
+				"panic", fmt.Sprint(rv))
+			output = ""
+		}
+		// 统计写入放在 defer 末尾,确保 panic 路径也被记录。
+		elapsed := time.Since(start).Milliseconds()
+		r.statsMu.Lock()
+		if r.stats[name] == nil {
+			r.stats[name] = &NodeExecStats{}
+		}
+		s := r.stats[name]
+		s.Calls++
+		s.TotalMs += elapsed
+		s.InputBytes += int64(len(input))
+		s.OutputBytes += int64(len(output))
+		if err != nil {
+			s.Errors++
+		}
+		r.statsMu.Unlock()
+	}()
+	output, err = node.Execute(ctx, input, params)
 	return output, err
 }
 

@@ -321,15 +321,6 @@ func callVisionAPI(ctx context.Context, provider, model, apiKey, endpoint string
 		apiKey = os.Getenv(envKey)
 	}
 
-	compatNode := NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            provider,
-		DefaultModel:    model,
-		DefaultEndpoint: endpoint,
-		EnvAPIKey:       strings.ToUpper(provider) + "_API_KEY",
-		ProviderName:    provider,
-	})
-	_ = compatNode
-
 	return fallbackVisionCall(ctx, provider, model, apiKey, endpoint, messages)
 }
 

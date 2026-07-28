@@ -643,3 +643,87 @@ func equalStringSlices(a, b []string) bool {
 	}
 	return true
 }
+
+// --- panic recovery tests (ExecuteWithStats should not let a node panic
+// crash the caller) ---
+
+// recoverPanicNode panics on Execute, used to verify recover.
+type recoverPanicNode struct{}
+
+func (n *recoverPanicNode) Name() string        { return "recover_test_panic" }
+func (n *recoverPanicNode) Description() string { return "panics on execute" }
+func (n *recoverPanicNode) Schema() NodeSchema  { return NodeSchema{Name: n.Name()} }
+
+func (n *recoverPanicNode) Execute(_ context.Context, _ string, _ map[string]string) (string, error) {
+	panic("intentional test panic: index out of range")
+}
+
+// recoverOkNode succeeds; used to verify the registry still works after a panic.
+type recoverOkNode struct{}
+
+func (n *recoverOkNode) Name() string        { return "recover_test_ok" }
+func (n *recoverOkNode) Description() string { return "always succeeds" }
+func (n *recoverOkNode) Schema() NodeSchema  { return NodeSchema{Name: n.Name()} }
+
+func (n *recoverOkNode) Execute(_ context.Context, input string, _ map[string]string) (string, error) {
+	return "echo:" + input, nil
+}
+
+func newRecoverTestRegistry() *Registry {
+	r := NewRegistry()
+	r.Register(&recoverPanicNode{})
+	r.Register(&recoverOkNode{})
+	return r
+}
+
+// TestExecuteWithStats_PanicRecovered 验证节点 panic 被 recover,
+// 转为 error 返回,调用方不崩溃,且统计记录了 errors++。
+func TestExecuteWithStats_PanicRecovered(t *testing.T) {
+	r := newRecoverTestRegistry()
+
+	// 关键断言:不应该 panic 冒泡(若 recover 失效,这一行会 t.Fatal)
+	output, err := r.ExecuteWithStats("recover_test_panic", context.Background(), "hello", nil)
+
+	if err == nil {
+		t.Fatal("expected error from panicked node, got nil")
+	}
+	if !strings.Contains(err.Error(), "panicked") {
+		t.Fatalf("error should mention panic, got: %v", err)
+	}
+	if output != "" {
+		t.Fatalf("output should be empty after panic, got: %q", output)
+	}
+
+	// 统计应记录 1 次调用 + 1 次错误
+	stats := r.GetStats("recover_test_panic")
+	if stats == nil {
+		t.Fatal("expected stats for recover_test_panic")
+	}
+	if stats.Calls != 1 {
+		t.Errorf("Calls = %d, want 1", stats.Calls)
+	}
+	if stats.Errors != 1 {
+		t.Errorf("Errors = %d, want 1", stats.Errors)
+	}
+}
+
+// TestExecuteWithStats_PanicDoesNotAffectOtherNodes 验证一个节点 panic
+// 后,Registry 仍能正常执行其他节点(recover 没有破坏内部状态)。
+func TestExecuteWithStats_PanicDoesNotAffectOtherNodes(t *testing.T) {
+	r := newRecoverTestRegistry()
+
+	// 先触发 panic
+	_, err := r.ExecuteWithStats("recover_test_panic", context.Background(), "", nil)
+	if err == nil {
+		t.Fatal("expected error from panic node")
+	}
+
+	// 紧接着执行正常节点,应成功
+	output, err := r.ExecuteWithStats("recover_test_ok", context.Background(), "after-panic", nil)
+	if err != nil {
+		t.Fatalf("normal node should work after a panic: %v", err)
+	}
+	if output != "echo:after-panic" {
+		t.Errorf("output = %q, want %q", output, "echo:after-panic")
+	}
+}
