@@ -111,7 +111,9 @@ func (m *SessionManager) fork(parent, child string) error {
 				ttl = int(remaining)
 			}
 		}
-		cSession.Store(e.Key, e.Value, e.Level, e.Type, e.Tags, ttl, e.Confidence, e.Source)
+		// Ignore per-entry store errors during fork: we want to copy as
+		// many entries as possible rather than fail the whole fork.
+		_, _, _ = cSession.Store(e.Key, e.Value, e.Level, e.Type, e.Tags, ttl, e.Confidence, e.Source)
 	}
 	m.mu.Lock()
 	m.parentLinks[child] = parent

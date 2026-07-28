@@ -172,10 +172,10 @@ func (n *SessionManagerNode) actionMerge(mgr *memory.SessionManager, params map[
 		return "", err
 	}
 	out, _ := json.MarshalIndent(map[string]interface{}{
-		"action":        "merge",
-		"src":           src,
-		"dst":           dst,
-		"merged_count":  count,
+		"action":       "merge",
+		"src":          src,
+		"dst":          dst,
+		"merged_count": count,
 	}, "", "  ")
 	return string(out), nil
 }
@@ -209,9 +209,9 @@ func (n *SessionManagerNode) actionSharedPut(mgr *memory.SessionManager, input s
 		return "", err
 	}
 	out, _ := json.MarshalIndent(map[string]interface{}{
-		"action": "shared_put",
-		"key":    key,
-		"id":     id,
+		"action":     "shared_put",
+		"key":        key,
+		"id":         id,
 		"expires_at": expires,
 	}, "", "  ")
 	return string(out), nil

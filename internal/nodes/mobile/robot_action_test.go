@@ -44,7 +44,7 @@ func TestRobotActionNode_Registered(t *testing.T) {
 func TestRobotActionNode_SimulateSandwich(t *testing.T) {
 	n := &RobotActionNode{}
 	out, err := n.Execute(t.Context(), "make a sandwich", map[string]string{
-		"backend":   "simulate",
+		"backend":    "simulate",
 		"robot_type": "arm",
 	})
 	if err != nil {
