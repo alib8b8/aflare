@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -207,7 +208,7 @@ func collectText(dec *xml.Decoder) (string, error) {
 	depth := 0
 	for {
 		tok, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -272,7 +273,7 @@ func parseDocxBlocks(data []byte) ([]docxBlock, error) {
 	depth := 0
 	for {
 		tok, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -320,7 +321,7 @@ func parseDocxParagraph(dec *xml.Decoder) (*docxBlock, error) {
 	depth := 1 // we're inside <w:p>
 	for {
 		tok, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -397,7 +398,7 @@ func parseDocxTable(dec *xml.Decoder) ([][]string, error) {
 	var curRow []string
 	for {
 		tok, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -632,7 +633,7 @@ func loadSharedStrings(r *zip.Reader) ([]string, error) {
 	var items []string
 	for {
 		tok, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -700,7 +701,7 @@ func parseWorkbookSheetNames(data []byte) ([]string, error) {
 	var names []string
 	for {
 		tok, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -732,7 +733,7 @@ func parseXlsxSheetRows(data []byte, shared []string) ([][]string, error) {
 	depth := 0
 	for {
 		tok, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -783,7 +784,7 @@ func parseXlsxCell(dec *xml.Decoder, cellType string, shared []string) (string, 
 	depth := 1
 	for {
 		tok, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -881,7 +882,7 @@ func parsePptxSlide(data []byte) (string, error) {
 	var lines []string
 	for {
 		tok, err := dec.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

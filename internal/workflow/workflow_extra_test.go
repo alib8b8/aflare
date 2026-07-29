@@ -17,6 +17,7 @@ package workflow
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -579,7 +580,7 @@ func TestConcurrencyLimiter_ContextCancel(t *testing.T) {
 	cancel()
 
 	err := limiter.Acquire(ctx)
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got %v", err)
 	}
 	limiter.Release()

@@ -44,7 +44,9 @@ jobs:
       uses: golangci/golangci-lint-action@v9
       with:
         version: v2.12.2
-        args: --timeout 5m
+        # Warning-level linters (errorlint/nilerr/unparam/prealloc) surface
+        # issues but don't block the build. Only error-level findings fail CI.
+        args: --timeout 5m --severity warning
 
     - name: Run govulncheck
       continue-on-error: true

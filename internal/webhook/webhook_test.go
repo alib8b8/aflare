@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -103,9 +104,9 @@ func createWorkflowFile(t *testing.T, dir, name, content string) {
 	}
 }
 
-func waitForTask(t *testing.T, srv *WebhookServer, taskID string, timeout time.Duration) *Task {
+func waitForTask(t *testing.T, srv *WebhookServer, taskID string) *Task {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		if task, ok := srv.getTask(taskID); ok && (task.Status == TaskCompleted || task.Status == TaskFailed) {
 			return task
@@ -177,7 +178,7 @@ steps:
 		t.Fatal("expected task_id in response")
 	}
 
-	task := waitForTask(t, srv, taskID, 5*time.Second)
+	task := waitForTask(t, srv, taskID)
 	if task.Status != TaskCompleted {
 		t.Errorf("expected task completed, got %s", task.Status)
 	}
@@ -244,7 +245,7 @@ steps:
 	if taskID == "" {
 		t.Fatal("expected task_id in response")
 	}
-	_ = waitForTask(t, srv, taskID, 5*time.Second)
+	_ = waitForTask(t, srv, taskID)
 
 	// 无 secret 查询 status => 401
 	statusResp, err := http.Get(ts.URL + "/webhook/status/" + taskID)
@@ -304,7 +305,7 @@ func TestWebhookServer_WorkflowNotFound(t *testing.T) {
 	}
 	taskID := triggerResp["task_id"]
 
-	task := waitForTask(t, srv, taskID, 5*time.Second)
+	task := waitForTask(t, srv, taskID)
 	if task.Status != TaskFailed {
 		t.Errorf("expected task failed, got %s", task.Status)
 	}
@@ -437,7 +438,7 @@ steps:
 	}
 	taskID := triggerResp["task_id"]
 
-	task := waitForTask(t, srv, taskID, 5*time.Second)
+	task := waitForTask(t, srv, taskID)
 	if task.Status != TaskCompleted {
 		t.Errorf("expected task completed, got %s", task.Status)
 	}
@@ -590,7 +591,7 @@ steps:
 	}
 	taskID := triggerResp["task_id"]
 
-	task := waitForTask(t, srv, taskID, 5*time.Second)
+	task := waitForTask(t, srv, taskID)
 	if task.Status != TaskFailed {
 		t.Errorf("expected task failed, got %s", task.Status)
 	}
@@ -856,7 +857,7 @@ func TestWebhookCleanupTasksGracefulShutdown(t *testing.T) {
 	// Start 应已因 Shutdown 返回(http.ErrServerClosed 是预期行为)
 	select {
 	case err := <-startErr:
-		if err != nil && err != http.ErrServerClosed {
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			t.Fatalf("Start returned unexpected error: %v", err)
 		}
 	case <-time.After(2 * time.Second):
