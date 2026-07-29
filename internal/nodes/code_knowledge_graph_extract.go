@@ -32,7 +32,7 @@ func (n *CodeKnowledgeGraphNode) collectFiles(root string) ([]string, error) {
 	const maxDepth = 5
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // Walk callback: skip on error, continue traversal
 		}
 		if len(files) >= maxFiles {
 			return filepath.SkipDir
@@ -141,7 +141,7 @@ func (n *CodeKnowledgeGraphNode) collectChangedFiles(root string) ([]string, err
 	cutoff := now.Add(-24 * time.Hour)
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // Walk callback: skip on error, continue traversal
 		}
 		if len(files) >= maxFiles {
 			return filepath.SkipDir

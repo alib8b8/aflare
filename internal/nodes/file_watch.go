@@ -274,7 +274,7 @@ func snapshotPath(rootPath, userPath, pattern string) (map[string]fileMeta, erro
 	// 目录递归（WalkDir 内部使用 Lstat，不跟踪符号链接）
 	err = filepath.WalkDir(rootPath, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil // 跳过单条目的访问错误
+			return nil //nolint:nilerr // WalkDir callback: skip access error, continue traversal
 		}
 		// 不跟踪符号链接
 		if d.Type()&os.ModeSymlink != 0 {
@@ -290,7 +290,7 @@ func snapshotPath(rootPath, userPath, pattern string) (map[string]fileMeta, erro
 		// 计算相对路径与深度
 		rel, err := filepath.Rel(rootPath, p)
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // WalkDir callback: skip on error, continue traversal
 		}
 		relSlash := filepath.ToSlash(rel)
 		depthCount := strings.Count(relSlash, "/")
@@ -316,7 +316,7 @@ func snapshotPath(rootPath, userPath, pattern string) (map[string]fileMeta, erro
 		// 获取详细的 modtime/size
 		fi, err := d.Info()
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // WalkDir callback: skip on error, continue traversal
 		}
 		// 键 = userPath + "/" + rel（用户可读的相对路径）
 		key := sanitizePath(filepath.ToSlash(filepath.Join(userPath, rel)))

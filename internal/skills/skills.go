@@ -94,7 +94,7 @@ func (sr *SkillRegistry) scanDirectory() error {
 
 	return filepath.Walk(sr.baseDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // Walk callback: skip on error, continue traversal
 		}
 		if !info.IsDir() {
 			return nil

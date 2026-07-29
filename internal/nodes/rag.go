@@ -233,7 +233,7 @@ func loadDirectory(dirPath string) ([]struct {
 
 		content, err := os.ReadFile(path)
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // Walk callback: skip unreadable file, continue traversal
 		}
 		documents = append(documents, struct {
 			Text   string

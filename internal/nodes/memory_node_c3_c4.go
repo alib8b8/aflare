@@ -261,7 +261,7 @@ func (n *MemoryNode) compressMemory(ctx context.Context, session *memory.Session
 			"error":     storeErr.Error(),
 			"deleted":   []string{},
 			"message":   "compression failed; originals preserved",
-		}, nil
+		}, storeErr
 	}
 
 	// Now safe to delete the originals.
