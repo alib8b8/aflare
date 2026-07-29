@@ -10,11 +10,9 @@ linters:
     - staticcheck
     - unused
     - misspell
-    # Additional linters (reported as warnings, see issues.severity below).
+    # Additional bug-finding linters (blocking).
     - errorlint  # erroneous error-handling (== instead of errors.Is, %w misuse)
     - nilerr     # returning nil while err != nil
-    - unparam    # unused function parameters / always-same argument values
-    - prealloc   # slice preallocation suggestions for hot loops
   settings:
     errcheck:
       check-type-assertions: false
@@ -58,11 +56,6 @@ linters:
       errorf: true      # flag fmt.Errorf without %w where wrapping is likely
       asserts: true     # flag err == target comparisons
       comparison: true  # flag direct error-value comparisons
-    # prealloc: only suggest for simple loops to keep noise low.
-    prealloc:
-      simple: true
-      range-loops: true
-      for-loops: true
   exclusions:
     paths:
       - vendor
@@ -81,15 +74,6 @@ linters:
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
-
-# The four linters below are real bug/perf finders but were added after the
-# codebase matured, so existing findings are surfaced as warnings rather than
-# blocking the build. New code is expected to keep them clean.
-severity:
-  default: error
-  rules:
-    - linters: [errorlint, nilerr, unparam, prealloc]
-      severity: warning
 
 run:
   timeout: 5m

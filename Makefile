@@ -11,7 +11,7 @@ LDFLAGS=-ldflags "-s -w -X github.com/alib8b8/llm-box/internal/version.Version=$
 # out of the blocking `make ci` gate so existing findings don't break the build;
 # new code should still keep them clean. Core linters (errcheck, govet,
 # ineffassign, staticcheck, unused, misspell) always block.
-GOLANGCI_WARN_LINTERS := errorlint,nilerr,unparam,prealloc
+GOLANGCI_WARN_LINTERS := errorlint,nilerr
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) $(CMD)
@@ -97,10 +97,11 @@ fmt-check:
 		echo "::error::gofmt would reformat:"; echo "$$out"; exit 1; \
 	fi
 
-# lint-blocking runs only the core (error-level) linters so the gate fails on
-# real issues but not on the warning-level backlog.
+# lint-blocking runs the full golangci-lint config (all enabled linters are
+# blocking). Core linters (errcheck, govet, ineffassign, staticcheck, unused,
+# misspell, errorlint, nilerr) always block.
 lint-blocking:
-	golangci-lint run --disable $(GOLANGCI_WARN_LINTERS) ./...
+	golangci-lint run ./...
 
 # cover-check enforces the same 60% coverage threshold as CI.
 cover-check: cover
