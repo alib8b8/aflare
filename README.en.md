@@ -2,8 +2,7 @@
   <h1>llm-box</h1>
   <p>🌍
     <a href="README.md">中文</a> ·
-    <strong>English</strong> ·
-    <a href="README.ru.md">Русский</a>
+    <strong>English</strong>
   </p>
   <p><strong>GitHub Actions for your laptop.</strong></p>
   <p>Automate your terminal with plain English. Tired of writing Bash scripts? Let AI turn your ideas into executable YAML workflows.</p>

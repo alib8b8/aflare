@@ -5,8 +5,7 @@ import sys
 
 README_FILES = {
     'zh': 'README.md',
-    'en': 'README.en.md',
-    'ru': 'README.ru.md'
+    'en': 'README.en.md'
 }
 
 def parse_headings(content):

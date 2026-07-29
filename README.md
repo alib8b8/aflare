@@ -2,8 +2,7 @@
   <h1>llm-box</h1>
   <p>🌍
     <strong>中文</strong> ·
-    <a href="README.en.md">English</a> ·
-    <a href="README.ru.md">Русский</a>
+    <a href="README.en.md">English</a>
   </p>
   <p><strong>GitHub Actions for your laptop.</strong></p>
   <p>用自然语言自动化你的终端。厌倦了写 Bash 脚本？让 AI 帮你把想法变成可执行的 YAML 工作流。</p>
