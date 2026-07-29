@@ -31,8 +31,8 @@ type mapTestNode struct {
 	name string
 }
 
-func (n *mapTestNode) Name() string         { return n.name }
-func (n *mapTestNode) Description() string  { return "map test node" }
+func (n *mapTestNode) Name() string        { return n.name }
+func (n *mapTestNode) Description() string { return "map test node" }
 func (n *mapTestNode) Schema() nodes.NodeSchema {
 	return nodes.NodeSchema{Name: n.name, Description: "map test node", Input: "string", Output: "string"}
 }
@@ -191,7 +191,7 @@ func TestMap_Concurrent(t *testing.T) {
 			{
 				Name: "batch",
 				Map: &MapConfig{
-					Over:       itemsStr,
+					Over:        itemsStr,
 					Concurrency: 10,
 					Steps: []WorkflowStep{
 						{Node: "count"},
@@ -268,8 +268,8 @@ func TestMap_ContinueOnError(t *testing.T) {
 			{
 				Name: "batch",
 				Map: &MapConfig{
-					Over:         "one\ntwo\nthree",
-					StopOnError:  &falsePtr,
+					Over:        "one\ntwo\nthree",
+					StopOnError: &falsePtr,
 					Steps: []WorkflowStep{
 						{Node: "fail"},
 					},

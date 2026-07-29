@@ -570,19 +570,19 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 			// value/branch condition rather than swallowing it). Checked first
 			// because it is the most expressive recovery primitive.
 			if wStep.HasCaptureError() {
-			branchOut, bErr := executeCaptureErrorBranch(stepBaseCtx, wStep.CaptureError, execErr.Error(), engine.SnapshotVars(), reg, program, globalLimiter)
-			if bErr == nil {
-				logger.Info("step recovered via capture_error branch", "index", i, "node", wStep.Node)
-				output = branchOut
-				execErr = nil
-				resultErr = nil
-				recoveries = append(recoveries, "capture_error")
-			} else {
-				logger.Warn("capture_error branch failed, falling through to other recovery", "index", i, "node", wStep.Node, "error", nodes.RedactSensitive(bErr.Error()))
+				branchOut, bErr := executeCaptureErrorBranch(stepBaseCtx, wStep.CaptureError, execErr.Error(), engine.SnapshotVars(), reg, program, globalLimiter)
+				if bErr == nil {
+					logger.Info("step recovered via capture_error branch", "index", i, "node", wStep.Node)
+					output = branchOut
+					execErr = nil
+					resultErr = nil
+					recoveries = append(recoveries, "capture_error")
+				} else {
+					logger.Warn("capture_error branch failed, falling through to other recovery", "index", i, "node", wStep.Node, "error", nodes.RedactSensitive(bErr.Error()))
+				}
 			}
-		}
-		// 1. Try fallback value
-		if execErr != nil && wStep.Fallback != "" {
+			// 1. Try fallback value
+			if execErr != nil && wStep.Fallback != "" {
 				fallbackVal, ferr := engine.Evaluate(wStep.Fallback, data)
 				if ferr == nil {
 					logger.Info("step recovered via fallback", "index", i, "node", wStep.Node)

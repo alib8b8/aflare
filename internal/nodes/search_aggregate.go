@@ -16,17 +16,17 @@
 package nodes
 
 import (
-"context"
-"encoding/json"
-"fmt"
-"github.com/alib8b8/llm-box/internal/logger"
-"io"
-"net/http"
-"runtime/debug"
-"sort"
-"strings"
-"sync"
-"time"
+	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/alib8b8/llm-box/internal/logger"
+	"io"
+	"net/http"
+	"runtime/debug"
+	"sort"
+	"strings"
+	"sync"
+	"time"
 )
 
 type SearchSource string
@@ -208,8 +208,6 @@ func (n *SearchAggregateNode) Execute(ctx context.Context, input string, params 
 	}
 }
 
-
-
 func rankResults(results []SearchResult, sortBy string) []SearchResult {
 	switch sortBy {
 	case "time":
@@ -290,8 +288,6 @@ func joinSources(srcs []SearchSource) string {
 	}
 	return strings.Join(parts, ", ")
 }
-
-
 
 func parseSources(s string) []SearchSource {
 	parts := strings.Split(s, ",")

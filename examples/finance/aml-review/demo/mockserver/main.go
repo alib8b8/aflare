@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	llmAddr   = ":17790"
-	dataAddr  = ":17791"
+	llmAddr  = ":17790"
+	dataAddr = ":17791"
 )
 
 // ── Mock data sources ──

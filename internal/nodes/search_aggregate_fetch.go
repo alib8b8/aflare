@@ -16,12 +16,12 @@
 package nodes
 
 import (
-"context"
-"encoding/json"
-"fmt"
-"net/url"
-"strings"
-"time"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/url"
+	"strings"
+	"time"
 )
 
 func fetchWeibo(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
@@ -196,7 +196,6 @@ func fetchBilibili(ctx context.Context, query string, limit int, timeRange strin
 	}
 	return results
 }
-
 
 func fetchHN(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
 	searchURL := fmt.Sprintf("https://hn.algolia.com/api/v1/search?query=%s&tags=story&hitsPerPage=%d",
@@ -409,7 +408,6 @@ func fetchNews(ctx context.Context, query string, limit int, timeRange string) [
 	}
 	return results
 }
-
 
 func fetchTwitter(ctx context.Context, query string, limit int, timeRange string) []SearchResult {
 	return []SearchResult{

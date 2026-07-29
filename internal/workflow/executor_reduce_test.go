@@ -223,8 +223,8 @@ func TestReduce_IndexAndCount(t *testing.T) {
 					Steps: []WorkflowStep{
 						{Node: "echo", Params: map[string]string{
 							// item is passed as the sub-step input (map semantics),
-						// so the prefix only needs acc + index/count metadata.
-						"prefix": "{{loop.acc}}[{{loop.index}}/{{loop.count}}]",
+							// so the prefix only needs acc + index/count metadata.
+							"prefix": "{{loop.acc}}[{{loop.index}}/{{loop.count}}]",
 						}},
 					},
 				},

@@ -44,8 +44,8 @@ import (
 //   - DefaultEndpoint: base URL when no env var / param overrides it
 //   - EnvAPIKey:       env var read for the API key
 //   - EnvAPIBase:      optional env var read for the base URL (e.g.
-//                       OPENAI_API_BASE / IMA_API_BASE); takes precedence
-//                       over the generic "{EnvAPIKey}_ENDPOINT" lookup
+//     OPENAI_API_BASE / IMA_API_BASE); takes precedence
+//     over the generic "{EnvAPIKey}_ENDPOINT" lookup
 //   - ProviderName:    human-readable label used in descriptions/errors
 var openAICompatibleConfigs = []core.LLMNodeConfig{
 	{
@@ -158,7 +158,7 @@ var openAICompatibleConfigs = []core.LLMNodeConfig{
 		Name:            "ima",
 		DefaultModel:    "",
 		DefaultEndpoint: "",
-		EnvAPIKey:       "IMA_API_KEY", // #nosec G101 -- env var name, not a credential value
+		EnvAPIKey:       "IMA_API_KEY",  // #nosec G101 -- env var name, not a credential value
 		EnvAPIBase:      "IMA_API_BASE", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "IMA Copilot",
 	},

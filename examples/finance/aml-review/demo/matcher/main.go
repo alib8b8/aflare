@@ -40,11 +40,11 @@ type registry struct {
 }
 
 type matchResult struct {
-	SceneID  string `json:"scene_id"`
+	SceneID   string `json:"scene_id"`
 	SceneName string `json:"scene_name,omitempty"`
-	Score    int    `json:"score"`
-	Workflow string `json:"workflow"`
-	Event    string `json:"event"`
+	Score     int    `json:"score"`
+	Workflow  string `json:"workflow"`
+	Event     string `json:"event"`
 }
 
 func main() {
