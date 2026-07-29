@@ -1,5 +1,12 @@
 # Distributed Execution
 
+> **⚠️ Status: Not Implemented (Design Document Only)**
+>
+> The Coordinator/Worker architecture described below is a design proposal.
+> No code exists under `internal/distributed/`, and the `llm-box coordinator`
+> / `llm-box worker` CLI commands are not available. This document is retained
+> as a design reference for future implementation.
+
 llm-box supports distributed workflow execution across multiple machines using a Coordinator/Worker architecture.
 
 ## Architecture

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -351,9 +352,10 @@ func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string
 	systemPrompt := getParam(params, "system", "")
 	maxRetries := r.maxRetry
 	if override := getParam(params, "max_retries", ""); override != "" {
-		if n, err := fmt.Sscanf(override, "%d", &maxRetries); err == nil && n == 1 && maxRetries > 0 {
-		} else {
-			maxRetries = r.maxRetry
+		// Parse the override: a positive int is used verbatim; any parse
+		// error or non-positive value falls back to the router default.
+		if parsed, err := strconv.Atoi(strings.TrimSpace(override)); err == nil && parsed > 0 {
+			maxRetries = parsed
 		}
 	}
 

@@ -119,6 +119,67 @@ curl -X POST "http://localhost:8081/api/visualize?format=mermaid" \
 | `LLM_BOX_WEBUI_HOST` | Default host |
 | `LLM_BOX_WEBUI_PORT` | Default port |
 | `LLM_BOX_WORKFLOWS_DIR` | Default workflows directory |
+| `LLM_BOX_METRICS` | Set to `1` to enable the Prometheus `/metrics` endpoint (disabled by default) |
+| `LLM_BOX_PPROF` | Set to `1` to enable the `/debug/pprof/` profiling endpoints (disabled by default) |
+
+## Prometheus Metrics
+
+The Web UI server can expose a Prometheus `/metrics` endpoint that scrapes
+llm-box's internal statistics (node/workflow execution, security blocks, LLM
+calls, cache hits). The endpoint is **disabled by default** for security: it is
+unauthenticated (Prometheus scrapers usually carry no auth token) and exposes
+runtime statistics, so it should only be enabled on a trusted network or behind
+a reverse proxy.
+
+### Enabling the endpoint
+
+Set `LLM_BOX_METRICS=1` before starting the server:
+
+```bash
+LLM_BOX_METRICS=1 llm-box webui --host 0.0.0.0 --port 8081
+```
+
+The endpoint is then available at `http://localhost:8081/metrics`. It is
+rate-limited (token bucket, ~5 req/s) to protect against scraper floods and is
+**not** behind the `X-Auth-Token` middleware, matching the Prometheus scrape
+convention.
+
+### Prometheus scrape config
+
+```yaml
+scrape_configs:
+  - job_name: "llm-box"
+    static_configs:
+      - targets: ["localhost:8081"]
+    metrics_path: /metrics
+```
+
+### Exposed metrics
+
+| Metric | Type | Labels | Source |
+|--------|------|--------|--------|
+| `llmbox_node_executions_total` | counter | `node_name`, `status` | `Registry.ExecuteWithStats` |
+| `llmbox_node_execution_duration_seconds` | histogram | `node_name` | `Registry.ExecuteWithStats` |
+| `llmbox_workflow_executions_total` | counter | `status` | workflow executor |
+| `llmbox_workflow_execution_duration_seconds` | histogram | — | workflow executor |
+| `llmbox_security_blocks_total` | counter | `block_type` | `SecurityStats.RecordBlock` |
+| `llmbox_cache_hits_total` | counter | — | `CacheStats` (pull via `CollectSnapshot`) |
+| `llmbox_cache_misses_total` | counter | — | `CacheStats` (pull via `CollectSnapshot`) |
+| `llmbox_llm_calls_total` | counter | `provider`, `model`, `status` | workflow LLM trace |
+| `llmbox_llm_tokens_total` | counter | `provider`, `model`, `type` | workflow LLM trace |
+| `llmbox_llm_cost_usd_total` | counter | `provider`, `model` | workflow LLM trace |
+| `llmbox_node_calls` | gauge | `node_name` | `Registry` stats snapshot |
+| `llmbox_node_errors` | gauge | `node_name` | `Registry` stats snapshot |
+| `llmbox_security_blocks` | gauge | `block_type` | `SecurityStats` snapshot |
+
+Hot-path counters (node/workflow/security/LLM) are incremented inline at the
+execution sites. Cache counters and the snapshot gauges are pulled on each
+scrape from the existing internal stats accumulators via `CollectSnapshot`.
+
+> **Note:** Labelled counters only appear in the output once a label
+> combination has been touched (e.g. `llmbox_node_executions_total` shows up
+> after the first node execution). Plain counters (cache hits/misses) are
+> always emitted, even at zero.
 
 ## Usage Tips
 

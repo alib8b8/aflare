@@ -66,6 +66,14 @@ type ToolFunction struct {
 // We expose it as a raw json.RawMessage so callers can pass any shape.
 type ToolChoice = json.RawMessage
 
+// StreamOptions controls streaming-specific options for an OpenAI-compatible
+// /chat/completions request. Today only IncludeUsage is supported: when true
+// the provider emits a final chunk carrying token usage (prompt_tokens,
+// completion_tokens, total_tokens) before the terminating [DONE] marker.
+type StreamOptions struct {
+	IncludeUsage bool `json:"include_usage"`
+}
+
 // LLMRequest is the body sent to an OpenAI-compatible /chat/completions endpoint.
 //
 // Field policy: fields present before B-1 (Model/Messages/Temperature/
@@ -90,6 +98,10 @@ type LLMRequest struct {
 	Tools            []ToolDefinition `json:"tools,omitempty"`
 	ToolChoice       ToolChoice       `json:"tool_choice,omitempty"`
 	User             string           `json:"user,omitempty"`
+
+	// StreamOptions is sent only when Stream is true. When nil, no
+	// stream_options key is serialized, preserving the pre-B-2 wire format.
+	StreamOptions *StreamOptions `json:"stream_options,omitempty"`
 }
 
 // LLMChoiceMessage is the message returned in a non-streaming choice.
@@ -273,6 +285,14 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		return "", err
 	}
 
+	// For streaming requests, ask the provider to emit a final usage chunk.
+	// Most OpenAI-compatible providers honour stream_options.include_usage;
+	// providers that ignore it simply omit usage, which readStreamResponse
+	// tolerates (tel.Usage stays nil).
+	if stream {
+		reqBody.StreamOptions = &StreamOptions{IncludeUsage: true}
+	}
+
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
@@ -332,13 +352,17 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 	}
 
 	if stream {
-		out, err := n.readStreamResponse(resp, onChunk)
+		out, usage, err := n.readStreamResponse(resp, onChunk)
 		if err != nil {
 			tel.ErrText = err.Error()
 		}
-		// Streaming responses do not surface token usage in our current
-		// SSE parser; tel.Usage stays nil. Future work: parse the final
-		// usage chunk when stream_options.include_usage is set.
+		// Streaming usage is only populated when the provider emits a
+		// usage chunk (requires stream_options.include_usage). Tolerant:
+		// providers that omit usage leave tel.Usage nil, mirroring the
+		// non-streaming path where Usage is nil if the provider omits it.
+		if usage != nil {
+			tel.Usage = usage
+		}
 		return out, err
 	}
 
@@ -357,12 +381,13 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 	return llmResp.Choices[0].Message.Content, nil
 }
 
-func (n *OpenAICompatibleNode) readStreamResponse(resp *http.Response, onChunk func(chunk string)) (string, error) {
+func (n *OpenAICompatibleNode) readStreamResponse(resp *http.Response, onChunk func(chunk string)) (string, *LLMUsage, error) {
 	scanner := bufio.NewScanner(resp.Body)
 	buf := make([]byte, 0, 256*1024) // 256KB initial buffer
 	scanner.Buffer(buf, 1024*1024)   // 1MB max buffer
 	var fullContent strings.Builder
 	var parseErrors int
+	var usage *LLMUsage
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -379,16 +404,26 @@ func (n *OpenAICompatibleNode) readStreamResponse(resp *http.Response, onChunk f
 		if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
 			parseErrors++
 			if parseErrors > 10 {
-				return fullContent.String(), fmt.Errorf("too many stream JSON parse errors (last error: %w)", err)
+				return fullContent.String(), usage, fmt.Errorf("too many stream JSON parse errors (last error: %w)", err)
 			}
 			continue
+		}
+
+		// OpenAI-compatible providers emit a final chunk carrying token
+		// usage when stream_options.include_usage is set. The chunk may
+		// arrive with an empty choices array (OpenAI) or alongside the
+		// last delta (some providers), so capture usage on every chunk
+		// and let the last non-nil value win. Providers that omit usage
+		// entirely leave usage nil — tolerant by design.
+		if streamResp.Usage != nil {
+			usage = streamResp.Usage
 		}
 
 		if len(streamResp.Choices) > 0 {
 			chunk := streamResp.Choices[0].Delta.Content
 			if chunk != "" {
 				if fullContent.Len()+len(chunk) > maxStreamResponseSize {
-					return fullContent.String(), fmt.Errorf("stream response exceeded max size %d bytes", maxStreamResponseSize)
+					return fullContent.String(), usage, fmt.Errorf("stream response exceeded max size %d bytes", maxStreamResponseSize)
 				}
 				fullContent.WriteString(chunk)
 				if onChunk != nil {
@@ -399,10 +434,10 @@ func (n *OpenAICompatibleNode) readStreamResponse(resp *http.Response, onChunk f
 	}
 
 	if err := scanner.Err(); err != nil {
-		return fullContent.String(), fmt.Errorf("error reading stream: %w", err)
+		return fullContent.String(), usage, fmt.Errorf("error reading stream: %w", err)
 	}
 
-	return fullContent.String(), nil
+	return fullContent.String(), usage, nil
 }
 
 // applyLLMRequestParams populates the B-1 extended fields of req from the

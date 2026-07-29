@@ -16,14 +16,22 @@
 package history
 
 import (
+	"bufio"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/logger"
+	"golang.org/x/crypto/pbkdf2"
 )
 
 // TriggerType represents the type of trigger that started the workflow
@@ -309,11 +317,147 @@ type AuditLog struct {
 	Success   bool        `json:"success"`
 	IP        string      `json:"ip,omitempty"`
 	UserAgent string      `json:"user_agent,omitempty"`
+	// PrevHash is the curr_hash of the previous record in the hash chain.
+	// It is the 64-char hex zero hash for the first record.
+	PrevHash string `json:"prev_hash,omitempty"`
+	// CurrHash is the HMAC-SHA256 of (prev_hash || record_content) for this record.
+	CurrHash string `json:"curr_hash,omitempty"`
 }
 
 const auditLogFileName = "audit.log.jsonl"
 
-// AppendAuditLog appends an audit log entry to the audit log file
+// auditZeroHash is the 32-byte zero value encoded as 64 hex chars, used as the
+// prev_hash of the first record in the chain.
+const auditZeroHash = "0000000000000000000000000000000000000000000000000000000000000000"
+
+// Audit HMAC key configuration. Priority:
+//  1. LLM_BOX_AUDIT_HMAC_KEY environment variable (raw bytes)
+//  2. PBKDF2 derivation from LLM_BOX_SECRETS_PASSWORD
+//  3. Insecure built-in default (logged once at warn level)
+const (
+	auditEnvHMACKey       = "LLM_BOX_AUDIT_HMAC_KEY"
+	auditEnvSecretsPasswd = "LLM_BOX_SECRETS_PASSWORD"
+	auditPBKDF2Salt       = "llm-box-audit-hmac-salt-v1"
+	auditPBKDF2Iterations = 100000
+	auditPBKDF2KeyLen     = 32
+	// auditDefaultKey is an insecure fallback used only when no key is configured.
+	auditDefaultKey = "llm-box-default-audit-hmac-key-v1"
+)
+
+var (
+	auditWriteMu sync.Mutex
+	// auditKeyCache caches the PBKDF2 result keyed by the input password so the
+	// expensive derivation runs at most once per password value.
+	auditKeyCacheMu   sync.Mutex
+	auditKeyCachePass string
+	auditKeyCacheKey  []byte
+	// warnDefaultKeyOnce ensures the default-key warning is logged only once.
+	warnDefaultKeyOnce sync.Once
+)
+
+// getAuditHMACKey returns the HMAC key used to bind audit records into a chain.
+// The key is resolved on every call so environment changes are picked up; the
+// PBKDF2 derivation result is cached per password.
+func getAuditHMACKey() []byte {
+	if key := os.Getenv(auditEnvHMACKey); key != "" {
+		return []byte(key)
+	}
+	if password := os.Getenv(auditEnvSecretsPasswd); password != "" {
+		return deriveAuditKeyFromPassword(password)
+	}
+	warnDefaultKeyOnce.Do(func() {
+		logger.Warn("audit HMAC key not configured; using insecure default. Set LLM_BOX_AUDIT_HMAC_KEY for production use.")
+	})
+	return []byte(auditDefaultKey)
+}
+
+// deriveAuditKeyFromPassword derives a 32-byte HMAC key from the secrets master
+// password using PBKDF2-SHA256. The result is cached per password.
+func deriveAuditKeyFromPassword(password string) []byte {
+	auditKeyCacheMu.Lock()
+	defer auditKeyCacheMu.Unlock()
+	if auditKeyCachePass == password && len(auditKeyCacheKey) > 0 {
+		return auditKeyCacheKey
+	}
+	key := pbkdf2.Key([]byte(password), []byte(auditPBKDF2Salt), auditPBKDF2Iterations, auditPBKDF2KeyLen, sha256.New)
+	auditKeyCachePass = password
+	auditKeyCacheKey = key
+	return key
+}
+
+// computeAuditHash returns curr_hash = hex(HMAC-SHA256(secret, prev_hash || record_content)).
+// record_content is the JSON encoding of the entry with CurrHash cleared. The caller
+// must ensure entry.CurrHash is empty before calling.
+func computeAuditHash(secret []byte, entry AuditLog) (string, error) {
+	if entry.CurrHash != "" {
+		return "", fmt.Errorf("entry must not have CurrHash set when computing hash")
+	}
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal entry for hashing: %w", err)
+	}
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(entry.PrevHash))
+	mac.Write(data)
+	return hex.EncodeToString(mac.Sum(nil)), nil
+}
+
+// readLastAuditHash returns the curr_hash of the last non-empty line in the audit
+// log file. It seeks near the end of the file rather than reading the whole file.
+// Returns auditZeroHash when the file is missing or empty.
+func readLastAuditHash(path string) (string, error) {
+	f, err := os.Open(path) // #nosec G304 -- internally generated history path
+	if err != nil {
+		if os.IsNotExist(err) {
+			return auditZeroHash, nil
+		}
+		return "", err
+	}
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		return "", err
+	}
+	size := stat.Size()
+	if size == 0 {
+		return auditZeroHash, nil
+	}
+
+	// Read a trailing chunk large enough to contain the last record. Audit
+	// entries are small JSON lines; 8 KiB is ample for typical records.
+	bufSize := int64(8192)
+	if bufSize > size {
+		bufSize = size
+	}
+	buf := make([]byte, bufSize)
+	if _, err := f.ReadAt(buf, size-bufSize); err != nil && err != io.EOF {
+		return "", fmt.Errorf("failed to read tail of audit log: %w", err)
+	}
+
+	// Walk the trailing lines backwards to find the last non-empty record.
+	lines := strings.Split(string(buf), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+		var entry AuditLog
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			return "", fmt.Errorf("failed to parse last audit log line: %w", err)
+		}
+		if entry.CurrHash == "" {
+			// Legacy record without a hash: treat as the start of a new chain.
+			return auditZeroHash, nil
+		}
+		return entry.CurrHash, nil
+	}
+	return auditZeroHash, nil
+}
+
+// AppendAuditLog appends an audit log entry to the audit log file. Each entry is
+// bound to the previous one via an HMAC-SHA256 hash chain so that tampering or
+// deletion can be detected by VerifyAuditChain.
 func AppendAuditLog(log AuditLog) error {
 	dir := getHistoryDir()
 	if dir == "" {
@@ -331,12 +475,32 @@ func AppendAuditLog(log AuditLog) error {
 		log.Timestamp = time.Now()
 	}
 
+	auditPath := filepath.Join(dir, auditLogFileName)
+
+	// Serialize the read-then-write append under a mutex so concurrent callers
+	// within this process extend the chain rather than corrupting it.
+	auditWriteMu.Lock()
+	defer auditWriteMu.Unlock()
+
+	prevHash, err := readLastAuditHash(auditPath)
+	if err != nil {
+		return fmt.Errorf("failed to read previous audit hash: %w", err)
+	}
+	log.PrevHash = prevHash
+
+	// CurrHash must be empty while computing the hash; it is set afterwards.
+	log.CurrHash = ""
+	currHash, err := computeAuditHash(getAuditHMACKey(), log)
+	if err != nil {
+		return fmt.Errorf("failed to compute audit hash: %w", err)
+	}
+	log.CurrHash = currHash
+
 	data, err := json.Marshal(log)
 	if err != nil {
 		return fmt.Errorf("failed to marshal audit log: %w", err)
 	}
 
-	auditPath := filepath.Join(dir, auditLogFileName)
 	f, err := os.OpenFile(auditPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600) // #nosec G304 -- internally generated history path
 	if err != nil {
 		return fmt.Errorf("failed to open audit log file: %w", err)
@@ -348,6 +512,73 @@ func AppendAuditLog(log AuditLog) error {
 	}
 
 	return nil
+}
+
+// GetAuditLogPath returns the path to the audit log file in the current history
+// directory. The directory may be empty if history is unavailable.
+func GetAuditLogPath() string {
+	dir := getHistoryDir()
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, auditLogFileName)
+}
+
+// VerifyAuditChain validates the HMAC hash chain of the audit log at path.
+// It returns valid=true when every record's prev_hash links to the previous
+// record's curr_hash and each curr_hash matches the recomputed HMAC.
+// brokenAtLine is the 1-based file line number of the first broken record (0
+// when the file is empty or the whole chain is valid). err is non-nil for I/O
+// or format errors, including legacy records that lack hash fields.
+func VerifyAuditChain(path string) (valid bool, brokenAtLine int, err error) {
+	f, err := os.Open(path) // #nosec G304 -- caller-supplied path
+	if err != nil {
+		if os.IsNotExist(err) {
+			// An absent audit log is trivially intact.
+			return true, 0, nil
+		}
+		return false, 0, fmt.Errorf("failed to open audit log: %w", err)
+	}
+	defer f.Close()
+
+	secret := getAuditHMACKey()
+	expectedPrev := auditZeroHash
+	lineNum := 0
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		lineNum++
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var entry AuditLog
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			return false, lineNum, fmt.Errorf("line %d: failed to parse record: %w", lineNum, err)
+		}
+		// Backwards compatibility: legacy records without hash fields cannot be
+		// verified and must be reported explicitly rather than crashing.
+		if entry.PrevHash == "" && entry.CurrHash == "" {
+			return false, lineNum, fmt.Errorf("line %d: incompatible format (missing prev_hash/curr_hash fields)", lineNum)
+		}
+		if entry.PrevHash != expectedPrev {
+			return false, lineNum, nil
+		}
+		savedHash := entry.CurrHash
+		entry.CurrHash = ""
+		computedHash, err := computeAuditHash(secret, entry)
+		if err != nil {
+			return false, lineNum, fmt.Errorf("line %d: %w", lineNum, err)
+		}
+		if !hmac.Equal([]byte(computedHash), []byte(savedHash)) {
+			return false, lineNum, nil
+		}
+		expectedPrev = savedHash
+	}
+	if err := scanner.Err(); err != nil {
+		return false, lineNum, fmt.Errorf("failed to read audit log: %w", err)
+	}
+	return true, 0, nil
 }
 
 // RecordFilter defines filters for listing records

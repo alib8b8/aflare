@@ -515,3 +515,62 @@ func TestIsAllowedEnvVar(t *testing.T) {
 		t.Error("SECRET should not be allowed")
 	}
 }
+
+// TestTemplateLRU_Eviction verifies the template cache evicts the
+// least-recently-used entry once capacity is exceeded, and that a read
+// promotes an entry so it is not evicted next.
+func TestTemplateLRU_Eviction(t *testing.T) {
+	c := newTemplateLRU(3)
+
+	mk := func(s string) *compiledTemplate { return &compiledTemplate{literal: s} }
+
+	// Fill to capacity: order is a(MRU) .. c(LRU).
+	c.loadOrStore("a", mk("A"))
+	c.loadOrStore("b", mk("B"))
+	c.loadOrStore("c", mk("C"))
+
+	if v, ok := c.load("a"); !ok || v.literal != "A" {
+		t.Fatalf("expected a present, got %v ok=%v", v, ok)
+	}
+	if v, ok := c.load("c"); !ok || v.literal != "C" {
+		t.Fatalf("expected c present, got %v ok=%v", v, ok)
+	}
+
+	// Promote "c" to MRU by reading it, so "b" becomes the LRU candidate.
+	if _, ok := c.load("c"); !ok {
+		t.Fatal("expected c present before promotion")
+	}
+
+	// Inserting a 4th entry must evict the LRU ("b"), not "c".
+	c.loadOrStore("d", mk("D"))
+
+	if _, ok := c.load("b"); ok {
+		t.Error("expected b to be evicted as the least-recently-used entry")
+	}
+	if v, ok := c.load("c"); !ok || v.literal != "C" {
+		t.Errorf("expected c to survive after promotion, got %v ok=%v", v, ok)
+	}
+	if v, ok := c.load("d"); !ok || v.literal != "D" {
+		t.Errorf("expected d present, got %v ok=%v", v, ok)
+	}
+	if c.order.Len() > c.cap {
+		t.Errorf("cache size %d exceeds capacity %d", c.order.Len(), c.cap)
+	}
+}
+
+// TestTemplateLRU_LoadOrStore_Dedup ensures a second store of the same key
+// returns the originally-cached value rather than replacing it (matching the
+// original sync.Map.LoadOrStore semantics).
+func TestTemplateLRU_LoadOrStore_Dedup(t *testing.T) {
+	c := newTemplateLRU(4)
+	first := &compiledTemplate{literal: "first"}
+	got := c.loadOrStore("k", first)
+	if got != first {
+		t.Fatal("first store should return the stored value")
+	}
+	second := &compiledTemplate{literal: "second"}
+	got = c.loadOrStore("k", second)
+	if got != first {
+		t.Errorf("dedup should return original value; got %v want %v", got, first)
+	}
+}

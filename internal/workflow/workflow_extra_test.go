@@ -17,6 +17,7 @@ package workflow
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +25,7 @@ import (
 	"time"
 
 	"github.com/alib8b8/llm-box/internal/nodes"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // ── evaluateCondition tests ──
@@ -609,9 +611,9 @@ func (n *slowNode) Execute(ctx context.Context, input string, params map[string]
 }
 
 func TestWorkflowTimeout(t *testing.T) {
-	origTimeout := WorkflowTimeout
-	WorkflowTimeout = 50 * time.Millisecond
-	t.Cleanup(func() { WorkflowTimeout = origTimeout })
+	// Configure the timeout per-Executor instead of mutating the package-level
+	// WorkflowTimeout global, which would race with parallel tests.
+	exec := NewExecutor().WithTimeout(50 * time.Millisecond)
 
 	reg := nodes.NewRegistry()
 	reg.Register(&slowNode{})
@@ -622,7 +624,7 @@ func TestWorkflowTimeout(t *testing.T) {
 		},
 	}
 
-	_, _, err := ExecuteWorkflow(context.Background(), wf, reg)
+	_, _, err := exec.Execute(context.Background(), wf, reg)
 	if err == nil {
 		t.Error("expected timeout error")
 	}
@@ -1030,5 +1032,140 @@ func TestBackoffConfig_InvalidMaxDelay(t *testing.T) {
 	d := step.GetBackoffDelay(100)
 	if d != MaxRetryDelay {
 		t.Errorf("expected MaxRetryDelay, got %v", d)
+	}
+}
+
+// ── streamSink tests ──
+
+// TestStreamSinkOnChunkFillsBuffer verifies onChunk writes succeed without
+// drops while the buffer has capacity. The forwarding goroutine is NOT started
+// so the channel is not drained, isolating the write/drop logic from any
+// program.Send interaction.
+func TestStreamSinkOnChunkFillsBuffer(t *testing.T) {
+	s := &streamSink{
+		idx:      7,
+		nodeName: "test-node",
+		ch:       make(chan string, streamChunkBufferSize),
+		done:     make(chan struct{}),
+	}
+	for i := 0; i < streamChunkBufferSize; i++ {
+		s.onChunk(fmt.Sprintf("chunk-%d", i))
+	}
+	if dropped := s.dropped.Load(); dropped != 0 {
+		t.Errorf("expected 0 drops when buffer has capacity, got %d", dropped)
+	}
+	if len(s.ch) != streamChunkBufferSize {
+		t.Errorf("expected buffer to be full (%d items), got %d", streamChunkBufferSize, len(s.ch))
+	}
+	close(s.ch)
+}
+
+// TestStreamSinkOnChunkDropsOldest verifies that writing past the buffer
+// capacity drops the oldest pending chunk and increments the drop counter.
+func TestStreamSinkOnChunkDropsOldest(t *testing.T) {
+	s := &streamSink{
+		idx:      3,
+		nodeName: "slow-node",
+		ch:       make(chan string, streamChunkBufferSize),
+		done:     make(chan struct{}),
+	}
+	// Fill the buffer exactly.
+	for i := 0; i < streamChunkBufferSize; i++ {
+		s.onChunk(fmt.Sprintf("chunk-%d", i))
+	}
+	// Write K more; each should drop the oldest and append the new one.
+	extra := 5
+	for i := 0; i < extra; i++ {
+		s.onChunk(fmt.Sprintf("extra-%d", i))
+	}
+	if dropped := s.dropped.Load(); dropped != int64(extra) {
+		t.Errorf("expected %d drops, got %d", extra, dropped)
+	}
+	if len(s.ch) != streamChunkBufferSize {
+		t.Errorf("expected buffer to still be full (%d items), got %d", streamChunkBufferSize, len(s.ch))
+	}
+	// The oldest `extra` chunks (chunk-0 .. chunk-4) should have been dropped;
+	// the first item in the channel should now be chunk-5.
+	first := <-s.ch
+	want := "chunk-5"
+	if first != want {
+		t.Errorf("expected first item to be %s (oldest %d dropped), got %s", want, extra, first)
+	}
+	// The last item should be the most recent extra chunk.
+	remaining := streamChunkBufferSize - 1
+	for i := 0; i < remaining-1; i++ {
+		<-s.ch
+	}
+	last := <-s.ch
+	if last != "extra-4" {
+		t.Errorf("expected last item to be extra-4, got %s", last)
+	}
+	close(s.ch)
+}
+
+// streamProbeModel is a minimal bubbletea model used to verify a tea.Program
+// is actively consuming messages. It signals receipt of the first message via
+// the ready channel so tests can safely proceed to call program.Send-backed
+// code without deadlocking.
+type streamProbeModel struct {
+	ready chan struct{}
+}
+
+func (m streamProbeModel) Init() tea.Cmd { return nil }
+func (m streamProbeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	select {
+	case m.ready <- struct{}{}:
+	default:
+	}
+	return m, nil
+}
+func (streamProbeModel) View() string { return "" }
+
+// streamProbeMsg is an arbitrary message type used to probe whether Run() has
+// entered its event loop.
+type streamProbeMsg struct{}
+
+// TestStreamSinkFlushDrainsAndExits verifies that flush closes the chunk
+// channel, drains queued chunks through program.Send, and lets the forwarding
+// goroutine exit cleanly (the done channel is closed).
+func TestStreamSinkFlushDrainsAndExits(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ready := make(chan struct{}, 1)
+	program := tea.NewProgram(
+		streamProbeModel{ready: ready},
+		tea.WithContext(ctx),
+		tea.WithoutRenderer(),
+		tea.WithInput(nil),
+		tea.WithoutSignalHandler(),
+	)
+	go func() {
+		_, _ = program.Run()
+	}()
+
+	// Probe: wait until Run() is actively consuming messages so program.Send
+	// inside the sink's forwarding goroutine does not block forever.
+	program.Send(streamProbeMsg{})
+	select {
+	case <-ready:
+	case <-time.After(2 * time.Second):
+		t.Fatal("program.Run() did not start consuming within 2s")
+	}
+
+	sink := newStreamSink(program, 0, "test-node")
+	for i := 0; i < 10; i++ {
+		sink.onChunk(fmt.Sprintf("chunk-%d", i))
+	}
+	sink.flush()
+
+	select {
+	case <-sink.done:
+		// good: forwarding goroutine exited
+	default:
+		t.Error("expected done channel to be closed after flush")
+	}
+	if dropped := sink.dropped.Load(); dropped != 0 {
+		t.Errorf("expected 0 drops with a consuming program, got %d", dropped)
 	}
 }

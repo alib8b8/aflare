@@ -242,7 +242,7 @@ llm-box 认真对待安全问题。关键防护措施：
 | **提示词注入** | 技能进化在注入提示词前对最佳实践/陷阱进行消毒 |
 | **秘密脱敏** | 文件读取时自动检测并遮蔽 10+ 种秘密模式（AWS/GitHub/Slack/JWT/私钥）；`.env`/凭证默认完全遮蔽 |
 | **出站监控** | 滑动窗口数据量监控 + 异常告警（防止 Grok-Build 式 27800 倍数据泄漏） |
-| **熔断器** | 每工作者熔断器（Closed→Open→HalfOpen），故障节点自动隔离防止级联故障 |
+| **熔断器** | 每节点熔断器（Closed→Open→HalfOpen），故障节点自动隔离防止级联故障 |
 | **ANSI 注入** | TUI Markdown/Mermaid 渲染器从用户输入中剥离终端控制序列（CSI/OSC/DCS） |
 | **会话限制** | CLI 会话 24 小时后自动过期（最多 500 个），MCP 会话上限 1000 个并自动清理 |
 | **插件限制** | 最多 100 个插件，仅 HTTPS 网址，限制 Git 主机（GitHub/GitLab/GitCode/Gitee） |
@@ -291,7 +291,7 @@ llm-box 参与多个开源生态：
 ### 核心概念
 
 - [数据流与变量](docs/dataflow.md) —— 步骤间数据传递、`{{input}}`、`{{step.N}}`、`{{var.NAME}}`、`{{secret.GROUP.KEY}}`
-- [分布式执行](docs/distributed.md) —— 协调器/工作者设置、配置、扩展
+- [分布式执行](docs/distributed.md) —— 协调器/工作者架构（设计文档，尚未实现）
 - [调度](docs/scheduling.md) —— Cron 工作流、调度管理
 - [MCP 集成](docs/mcp.md) —— 通过模型上下文协议连接外部工具
 - [插件](docs/plugins.md) —— 安装和管理社区插件
@@ -318,12 +318,13 @@ llm-box 参与多个开源生态：
 ```bash
 llm-box create [描述]      从描述生成工作流
 llm-box run <文件>          运行工作流
+llm-box run --resume <文件> 从上次中断处恢复工作流
 llm-box secrets add         存储加密秘密
 llm-box secrets list        列出分组中的秘密
-llm-box schedule create     创建定时工作流
-llm-box schedule list       列出定时工作流
-llm-box coordinator         启动分布式协调器
-llm-box worker              启动分布式工作者
+llm-box schedule add        添加定时任务
+llm-box schedule list       列出定时任务
+llm-box schedule remove     移除定时任务
+llm-box schedule start      启动调度器
 llm-box ui                  启动 Web UI 编辑器
 llm-box visualize <文件>    可视化工作流
 llm-box validate <文件>     验证工作流文件
@@ -362,9 +363,9 @@ llm-box help                显示完整帮助
 - **技能进化** —— 自我改进的 Agent 技能，追踪成功率并优化提示词
 - **意图协议** —— `intent://` 和 `ohos://` URI 协议、W3C DID 身份、跨域消息
 - **子代理提示词** —— 17 个专家提示词模板、主/子代理层级（Grok Build 模式）
-- **熔断器** —— 每工作者 Closed/Open/HalfOpen 状态机，保障分布式弹性
+- **熔断器** —— 每节点 Closed/Open/HalfOpen 状态机，故障自动隔离防止级联失败
 - **隐私层** —— 文件读取时秘密脱敏、出站数据量异常监控
-- **协调器/工作者** —— 带熔断器保护的分布式任务调度和执行
+- **Checkpoint/Resume** —— 工作流每步自动保存状态，`--resume` 从中断处恢复
 
 ---
 
@@ -374,7 +375,7 @@ llm-box help                显示完整帮助
 |---------|--------|----------|
 | **v0.1** | ✅ 已发布 | 核心工作流引擎、10 个实用节点 |
 | **v0.2** | ✅ 已发布 | 大模型节点、MCP 集成、外部节点 |
-| **v0.3** | ✅ 已发布 | Agent 节点、分布式执行、Web UI、调度 |
+| **v0.3** | ✅ 已发布 | Agent 节点、Web UI、调度 |
 | **v0.4** | ✅ 已发布 | 代码解释器、RAG、知识图谱、智能路由器、多模态、节点市场、100+ 模板、16 个专家、思维链 |
 | **v0.5** | ✅ 已发布 | ReAct 引擎、分层记忆、技能自进化、鸿蒙适配（7 种设备）、跨平台协议（intent:// + ohos://）、W3C DID 身份、跨域 Agent 消息、GitCode G-Star + ohpm 生态 |
 | **v0.5.1** | ✅ 已发布 | 昇腾 NPU 适配（7-Agent 流水线、3 种工作流模板、CANN/MindIE 集成） |
@@ -468,7 +469,7 @@ llm-box 专注于**确定性工作流与 AI Agent 的结合**：工作流确保�
 - **分级防护配置**（L0-L3），支持从开发环境到生产环境的安全梯度
 - **秘密脱敏** + **出站数据监控**，防止数据泄漏
 - **审计日志**，所有操作可追溯
-- **分布式熔断器**，保障系统稳定性
+- **节点级熔断器**，保障系统稳定性
 
 ### 4. 如何扩展自定义节点？
 

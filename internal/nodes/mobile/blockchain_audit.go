@@ -137,7 +137,7 @@ func (n *BlockchainAuditNode) Execute(ctx context.Context, input string, params 
 	// Submit to blockchain (simulated or real)
 	receipt, err := submitToChain(ctx, chainType, record)
 	if err != nil {
-		return "", fmt.Errorf("blockchain submission failed: %v", err)
+		return "", fmt.Errorf("blockchain submission failed: %w", err)
 	}
 
 	// Store in local audit log with rotation

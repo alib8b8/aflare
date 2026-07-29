@@ -241,7 +241,7 @@ llm-box takes security seriously. Key protections:
 | **Prompt Injection** | Skill evolution sanitizes best practices/pitfalls before injecting into prompts |
 | **Secret Redaction** | Auto-detect &amp; mask 10+ secret patterns (AWS/GitHub/Slack/JWT/private keys) on file read; `.env`/credentials fully masked by default |
 | **Outbound Monitoring** | Sliding-window data volume monitor with anomaly alerting (prevents Grok-Build-style 27800&times; data leaks) |
-| **Circuit Breaker** | Per-worker breaker (Closed&rarr;Open&rarr;HalfOpen), auto-isolation of failing nodes prevents cascade failures |
+| **Circuit Breaker** | Per-node breaker (Closed&rarr;Open&rarr;HalfOpen), auto-isolation of failing nodes prevents cascade failures |
 | **ANSI Injection** | TUI Markdown/Mermaid renderers strip terminal control sequences (CSI/OSC/DCS) from user input |
 | **Session Limits** | CLI sessions auto-expire after 24h (max 500), MCP sessions capped at 1000 with cleanup |
 | **Plugin Limits** | Max 100 plugins, HTTPS-only URLs, restricted git hosts (GitHub/GitLab/GitCode/Gitee) |
@@ -290,7 +290,7 @@ llm-box participates in multiple open-source ecosystems:
 ### Core Concepts
 
 - [Dataflow &amp; Variables](docs/dataflow.md) &mdash; Step-to-step data passing, `{{input}}`, `{{step.N}}`, `{{var.NAME}}`, `{{secret.GROUP.KEY}}`
-- [Distributed Execution](docs/distributed.md) &mdash; Coordinator/Worker setup, configuration, scaling
+- [Distributed Execution](docs/distributed.md) &mdash; Coordinator/Worker architecture (design doc, not yet implemented)
 - [Scheduling](docs/scheduling.md) &mdash; Cron workflows, schedule management
 - [MCP Integration](docs/mcp.md) &mdash; Connect external tools via Model Context Protocol
 - [Plugins](docs/plugins.md) &mdash; Install and manage community plugins
@@ -317,12 +317,13 @@ llm-box participates in multiple open-source ecosystems:
 ```bash
 llm-box create [description]    Generate workflow from description
 llm-box run <file>             Run a workflow
+llm-box run --resume <file>    Resume workflow from last checkpoint
 llm-box secrets add            Store an encrypted secret
 llm-box secrets list           List secrets in a group
-llm-box schedule create        Create a scheduled workflow
-llm-box schedule list          List scheduled workflows
-llm-box coordinator            Start distributed coordinator
-llm-box worker                 Start distributed worker
+llm-box schedule add           Add a scheduled task
+llm-box schedule list          List scheduled tasks
+llm-box schedule remove        Remove a scheduled task
+llm-box schedule start         Start the scheduler
 llm-box ui                     Start web UI editor
 llm-box visualize <file>       Visualize a workflow
 llm-box validate <file>        Validate a workflow file
@@ -361,9 +362,9 @@ llm-box help                   Show full help
 - **Skill Evolution** &mdash; Self-improving agent skills with success rate tracking and prompt optimization
 - **Intent Protocol** &mdash; `intent://` and `ohos://` URI schemes, W3C DID identity, cross-domain messaging
 - **Subagent Prompts** &mdash; 17 specialist prompt templates, main/sub agent hierarchy (Grok Build pattern)
-- **Circuit Breaker** &mdash; Per-worker Closed/Open/HalfOpen state machine for distributed resilience
+- **Circuit Breaker** &mdash; Per-node Closed/Open/HalfOpen state machine, auto-isolation prevents cascade failures
 - **Privacy Layer** &mdash; Secret redaction on file read, outbound data volume anomaly monitor
-- **Coordinator/Worker** &mdash; Distributed task scheduling and execution with circuit breaker protection
+- **Checkpoint/Resume** &mdash; Per-step state persistence, `--resume` recovers from interruption
 
 ---
 
@@ -373,7 +374,7 @@ llm-box help                   Show full help
 |---------|--------|----------|
 | **v0.1** | ✅ Released | Core workflow engine, 10 utility nodes |
 | **v0.2** | ✅ Released | LLM nodes, MCP integration, external nodes |
-| **v0.3** | ✅ Released | Agent nodes, distributed execution, Web UI, scheduling |
+| **v0.3** | ✅ Released | Agent nodes, Web UI, scheduling |
 | **v0.4** | ✅ Released | Code interpreter, RAG, knowledge graph, smart router, multimodal, node marketplace, 100+ templates, 16 specialists, Chain-of-Thought |
 | **v0.5** | ✅ Released | ReAct engine, layered memory, skill self-evolution, HarmonyOS adaptation (7 device types), cross-platform protocol (intent:// + ohos://), W3C DID identity, cross-domain agent messaging, GitCode G-Star + ohpm ecosystem |
 | **v0.5.1** | ✅ Released | Ascend NPU adaptation (7-agent pipeline, 3 workflow templates, CANN/MindIE integration) |
@@ -418,7 +419,7 @@ Absolutely. llm-box uses the GNU Affero General Public License v3.0 and provides
 - **Tiered security configuration** (L0-L3), supporting security gradients from development to production
 - **Secret redaction** + **outbound data monitoring** to prevent data leaks
 - **Audit logging** for traceability of all operations
-- **Distributed circuit breakers** for system stability
+- **Node-level circuit breakers** for system stability
 
 ### 4. How do I extend with custom nodes?
 

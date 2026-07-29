@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/metrics"
 )
 
 type SecurityBlockType string
@@ -131,6 +133,9 @@ func (s *SecurityStats) RecordBlock(blockType SecurityBlockType, detail, node st
 	if len(s.RecentEvents) > 100 {
 		s.RecentEvents = s.RecentEvents[1:]
 	}
+
+	// Prometheus counter: a single atomic Inc, does not block the main path.
+	metrics.IncSecurityBlock(string(blockType))
 }
 
 func (s *SecurityStats) RecordSecurityLevel(level string) {

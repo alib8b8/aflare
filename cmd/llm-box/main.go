@@ -20,15 +20,20 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/alib8b8/llm-box/internal/autoupgrade"
 	"github.com/alib8b8/llm-box/internal/cli"
+	"github.com/alib8b8/llm-box/internal/history"
 	"github.com/alib8b8/llm-box/internal/i18n"
 	"github.com/alib8b8/llm-box/internal/mcp"
 	"github.com/alib8b8/llm-box/internal/meta"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/output"
+	"github.com/alib8b8/llm-box/internal/scheduler"
 	"github.com/alib8b8/llm-box/internal/skills"
 	"github.com/alib8b8/llm-box/internal/tui"
 	"github.com/alib8b8/llm-box/internal/webui"
@@ -197,8 +202,17 @@ func main() {
 	case "webui":
 		handleWebUI(args)
 		return
+	case "schedule":
+		handleSchedule(args)
+		return
+	case "audit":
+		handleAudit(args)
+		return
 	default:
-		handleRunFile(command, dryRun)
+		// Known subcommands are handled above; anything else is treated as a
+		// workflow file path. "schedule" is handled by its own case above and
+		// must never reach handleRunFile.
+		handleRunFile(command, dryRun, false, "")
 	}
 }
 
@@ -400,14 +414,41 @@ func handleCreate(args []string) {
 }
 
 func handleRun(args []string, dryRun bool) {
-	if len(args) < 1 {
+	// Parse --resume flag. Two forms are supported:
+	//   llm-box run --resume my-workflow.yaml
+	//     → boolean flag; checkpoint defaults to ~/.llm-box/checkpoints/<name>.json
+	//   llm-box run --resume /path/to/state.json my-workflow.yaml
+	//   llm-box run --resume=/path/to/state.json my-workflow.yaml
+	//     → explicit checkpoint path
+	resumeEnabled := false
+	resumePath := ""
+	var filtered []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--resume" {
+			resumeEnabled = true
+			// If at least two args remain after --resume, the first is the
+			// checkpoint path and the second is the workflow file.
+			remaining := len(args) - i - 1
+			if remaining >= 2 {
+				resumePath = args[i+1]
+				i++
+			}
+		} else if strings.HasPrefix(arg, "--resume=") {
+			resumeEnabled = true
+			resumePath = strings.TrimPrefix(arg, "--resume=")
+		} else {
+			filtered = append(filtered, arg)
+		}
+	}
+	if len(filtered) < 1 {
 		fmt.Println(i18n.T("run.usage"))
 		os.Exit(1)
 	}
-	handleRunFile(args[0], dryRun)
+	handleRunFile(filtered[0], dryRun, resumeEnabled, resumePath)
 }
 
-func handleRunFile(wfPath string, dryRun bool) {
+func handleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath string) {
 	wf, reg, err := cli.PrepareWorkflow(wfPath)
 	if err != nil {
 		fmt.Printf("Error preparing workflow: %v\n", err)
@@ -426,21 +467,43 @@ func handleRunFile(wfPath string, dryRun bool) {
 		return
 	}
 
+	// Compute the checkpoint state path.
+	statePath := ""
+	if resumeEnabled {
+		if resumePath != "" {
+			statePath = resumePath
+		} else {
+			// Default: ~/.llm-box/checkpoints/<workflow-name>.json
+			name := wf.Name
+			if name == "" {
+				name = strings.TrimSuffix(filepath.Base(wfPath), filepath.Ext(wfPath))
+			}
+			statePath = filepath.Join(meta.DataDir(), "checkpoints", name+".json")
+		}
+	}
+
 	if isatty.IsTerminal(os.Stdout.Fd()) {
-		runTUI(wfPath, wf, reg)
+		runTUI(wfPath, wf, reg, statePath)
 	} else {
-		runCLI(wf, reg)
+		runCLI(wf, reg, statePath)
 	}
 }
 
-func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry) {
+func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string) {
 	model := tui.NewModel(wf.Name, wfPath, len(wf.Steps))
 	program := tea.NewProgram(model, tea.WithAltScreen())
 
 	go func() {
 		ctx := context.Background()
-		if _, _, err := workflow.ExecuteWorkflowWithTUI(ctx, wf, reg, program); err != nil {
-			log.Printf("Workflow execution error: %v", err)
+		if statePath != "" {
+			exec := workflow.NewExecutor().WithCheckpoint(statePath)
+			if _, _, _, err := exec.ExecuteWithTrace(ctx, wf, reg, program); err != nil {
+				log.Printf("Workflow execution error: %v", err)
+			}
+		} else {
+			if _, _, err := workflow.ExecuteWorkflowWithTUI(ctx, wf, reg, program); err != nil {
+				log.Printf("Workflow execution error: %v", err)
+			}
 		}
 	}()
 
@@ -450,7 +513,7 @@ func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry) {
 	}
 }
 
-func runCLI(wf *workflow.Workflow, reg *nodes.Registry) {
+func runCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string) {
 	if wf.Name != "" {
 		fmt.Printf("%s\n", i18n.T("workflow.name", wf.Name))
 	}
@@ -467,7 +530,15 @@ func runCLI(wf *workflow.Workflow, reg *nodes.Registry) {
 
 	fmt.Printf("\n=== %s ===\n", i18n.T("workflow.executing"))
 
-	finalOutput, stepResults, err := cli.RunWorkflow(wf, reg)
+	var finalOutput string
+	var stepResults []workflow.StepResult
+	var execErr error
+	if statePath != "" {
+		exec := workflow.NewExecutor().WithCheckpoint(statePath)
+		finalOutput, stepResults, execErr = exec.Execute(context.Background(), wf, reg)
+	} else {
+		finalOutput, stepResults, execErr = cli.RunWorkflow(wf, reg)
+	}
 
 	for _, result := range stepResults {
 		status := "✅"
@@ -479,8 +550,8 @@ func runCLI(wf *workflow.Workflow, reg *nodes.Registry) {
 		}
 	}
 
-	if err != nil {
-		fmt.Printf("\n%s\n", i18n.T("workflow.failed", err))
+	if execErr != nil {
+		fmt.Printf("\n%s\n", i18n.T("workflow.failed", execErr))
 		os.Exit(1)
 	}
 
@@ -928,4 +999,330 @@ func printSkillsUsage() {
 	fmt.Println("  llm-box skills list")
 	fmt.Println("  llm-box skills search security")
 	fmt.Println("  llm-box skills category development")
+}
+
+func handleSchedule(args []string) {
+	if len(args) == 0 {
+		printScheduleUsage()
+		os.Exit(1)
+	}
+
+	subCmd := args[0]
+	switch subCmd {
+	case "add":
+		handleScheduleAdd(args[1:])
+	case "list":
+		handleScheduleList()
+	case "remove":
+		handleScheduleRemove(args[1:])
+	case "start":
+		handleScheduleStart()
+	case "-h", "--help", "help":
+		printScheduleUsage()
+	default:
+		fmt.Printf("Unknown schedule subcommand: %s\n\n", subCmd)
+		printScheduleUsage()
+		os.Exit(1)
+	}
+}
+
+func handleScheduleAdd(args []string) {
+	var cronExpr, taskID, wfPath string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--cron":
+			if i+1 >= len(args) {
+				fmt.Println("❌ --cron requires a value")
+				os.Exit(1)
+			}
+			cronExpr = args[i+1]
+			i++
+		case "--id":
+			if i+1 >= len(args) {
+				fmt.Println("❌ --id requires a value")
+				os.Exit(1)
+			}
+			taskID = args[i+1]
+			i++
+		case "--help", "-h":
+			printScheduleUsage()
+			return
+		default:
+			if strings.HasPrefix(args[i], "--cron=") {
+				cronExpr = strings.TrimPrefix(args[i], "--cron=")
+			} else if strings.HasPrefix(args[i], "--id=") {
+				taskID = strings.TrimPrefix(args[i], "--id=")
+			} else if !strings.HasPrefix(args[i], "-") && wfPath == "" {
+				wfPath = args[i]
+			} else {
+				fmt.Printf("❌ Unknown argument: %s\n", args[i])
+				os.Exit(1)
+			}
+		}
+	}
+
+	if cronExpr == "" {
+		fmt.Println("❌ --cron is required")
+		printScheduleUsage()
+		os.Exit(1)
+	}
+	if wfPath == "" {
+		fmt.Println("❌ workflow file path is required")
+		printScheduleUsage()
+		os.Exit(1)
+	}
+
+	// Resolve to an absolute path so the schedule survives directory changes.
+	absPath, err := filepath.Abs(wfPath)
+	if err != nil {
+		fmt.Printf("❌ Failed to resolve workflow path: %v\n", err)
+		os.Exit(1)
+	}
+	if _, err := os.Stat(absPath); err != nil {
+		fmt.Printf("❌ Workflow file not found: %s\n", absPath)
+		os.Exit(1)
+	}
+	wfPath = absPath
+
+	// Default task ID: workflow filename stem.
+	if taskID == "" {
+		base := filepath.Base(wfPath)
+		taskID = strings.TrimSuffix(base, filepath.Ext(base))
+	}
+
+	// Validate the cron expression using a throwaway scheduler.
+	validateSched := scheduler.New()
+	if err := validateSched.AddTask(taskID, cronExpr, func() {}); err != nil {
+		fmt.Printf("❌ Invalid cron expression: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Load existing schedules and check for duplicate ID.
+	path := scheduler.DefaultSchedulesPath()
+	entries, err := scheduler.LoadSchedules(path)
+	if err != nil {
+		fmt.Printf("❌ Failed to load schedules: %v\n", err)
+		os.Exit(1)
+	}
+	for _, e := range entries {
+		if e.ID == taskID {
+			fmt.Printf("❌ Task with id %q already exists (use --id to specify a different id)\n", taskID)
+			os.Exit(1)
+		}
+	}
+
+	entries = append(entries, scheduler.ScheduleEntry{
+		ID:           taskID,
+		Cron:         cronExpr,
+		WorkflowPath: wfPath,
+	})
+	if err := scheduler.SaveSchedules(path, entries); err != nil {
+		fmt.Printf("❌ Failed to save schedule: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✅ Scheduled task %q added\n", taskID)
+	fmt.Printf("   Cron:     %s\n", cronExpr)
+	fmt.Printf("   Workflow: %s\n", wfPath)
+	fmt.Printf("   Run 'llm-box schedule start' to begin executing on schedule.\n")
+}
+
+func handleScheduleList() {
+	path := scheduler.DefaultSchedulesPath()
+	entries, err := scheduler.LoadSchedules(path)
+	if err != nil {
+		fmt.Printf("❌ Failed to load schedules: %v\n", err)
+		os.Exit(1)
+	}
+	if len(entries) == 0 {
+		fmt.Println("No scheduled tasks. Use 'llm-box schedule add' to add one.")
+		return
+	}
+
+	fmt.Printf("Scheduled tasks (%d):\n", len(entries))
+	fmt.Println("-" + strings.Repeat("-", 78))
+	fmt.Printf("  %-20s %-20s %s\n", "ID", "CRON", "WORKFLOW")
+	fmt.Println("-" + strings.Repeat("-", 78))
+	for _, e := range entries {
+		fmt.Printf("  %-20s %-20s %s\n", e.ID, e.Cron, e.WorkflowPath)
+	}
+}
+
+func handleScheduleRemove(args []string) {
+	if len(args) < 1 {
+		fmt.Println("Usage: llm-box schedule remove <id>")
+		os.Exit(1)
+	}
+	id := args[0]
+
+	path := scheduler.DefaultSchedulesPath()
+	entries, err := scheduler.LoadSchedules(path)
+	if err != nil {
+		fmt.Printf("❌ Failed to load schedules: %v\n", err)
+		os.Exit(1)
+	}
+
+	found := false
+	updated := make([]scheduler.ScheduleEntry, 0, len(entries))
+	for _, e := range entries {
+		if e.ID == id {
+			found = true
+			continue
+		}
+		updated = append(updated, e)
+	}
+	if !found {
+		fmt.Printf("❌ Task with id %q not found\n", id)
+		os.Exit(1)
+	}
+
+	if err := scheduler.SaveSchedules(path, updated); err != nil {
+		fmt.Printf("❌ Failed to save schedules: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("✅ Removed task %q\n", id)
+}
+
+func handleScheduleStart() {
+	path := scheduler.DefaultSchedulesPath()
+	entries, err := scheduler.LoadSchedules(path)
+	if err != nil {
+		fmt.Printf("❌ Failed to load schedules: %v\n", err)
+		os.Exit(1)
+	}
+	if len(entries) == 0 {
+		fmt.Println("No scheduled tasks. Use 'llm-box schedule add' to add one.")
+		os.Exit(1)
+	}
+
+	sched := scheduler.New()
+	for _, e := range entries {
+		entry := e // capture for closure
+		wf, reg, err := cli.PrepareWorkflow(entry.WorkflowPath)
+		if err != nil {
+			fmt.Printf("❌ Failed to prepare workflow %q: %v\n", entry.WorkflowPath, err)
+			os.Exit(1)
+		}
+		taskFunc := func() {
+			ctx := context.Background()
+			if _, _, err := workflow.ExecuteWorkflow(ctx, wf, reg); err != nil {
+				log.Printf("scheduled workflow %q execution failed: %v", entry.ID, err)
+			}
+		}
+		if err := sched.AddTask(entry.ID, entry.Cron, taskFunc); err != nil {
+			fmt.Printf("❌ Failed to add task %q: %v\n", entry.ID, err)
+			os.Exit(1)
+		}
+		fmt.Printf("📋 Loaded task %q (%s -> %s)\n", entry.ID, entry.Cron, entry.WorkflowPath)
+	}
+
+	sched.Start()
+	fmt.Printf("\n🚀 Scheduler started with %d task(s). Press Ctrl+C to stop.\n", len(entries))
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	<-sigCh
+
+	fmt.Println("\n⏹  Stopping scheduler...")
+	sched.Stop()
+	fmt.Println("✅ Scheduler stopped.")
+}
+
+func printScheduleUsage() {
+	fmt.Println("Usage: llm-box schedule <command> [options]")
+	fmt.Println("\nSchedule workflows to run at specified times using cron expressions.")
+	fmt.Println("\nCommands:")
+	fmt.Println("  add --cron \"<expr>\" [--id <id>] <workflow.yaml>  Add a scheduled task")
+	fmt.Println("  list                                            List all scheduled tasks")
+	fmt.Println("  remove <id>                                     Remove a scheduled task")
+	fmt.Println("  start                                           Start the scheduler (foreground)")
+	fmt.Println("  -h, --help                                      Show this help message")
+	fmt.Println("\nCron expression (5 fields): minute hour day-of-month month day-of-week")
+	fmt.Println("  e.g. \"0 9 * * *\"      - daily at 09:00")
+	fmt.Println("       \"*/15 * * * *\"   - every 15 minutes")
+	fmt.Println("       \"0 9 * * 1-5\"    - weekdays at 09:00")
+	fmt.Println("\nExamples:")
+	fmt.Println("  llm-box schedule add --cron \"0 9 * * *\" my-workflow.yaml")
+	fmt.Println("  llm-box schedule add --id daily-report --cron \"0 9 * * *\" report.yaml")
+	fmt.Println("  llm-box schedule list")
+	fmt.Println("  llm-box schedule remove daily-report")
+	fmt.Println("  llm-box schedule start")
+}
+
+func handleAudit(args []string) {
+	if len(args) == 0 {
+		printAuditUsage()
+		os.Exit(1)
+	}
+
+	subCmd := args[0]
+	switch subCmd {
+	case "verify":
+		handleAuditVerify(args[1:])
+	case "-h", "--help", "help":
+		printAuditUsage()
+	default:
+		fmt.Printf("Unknown audit subcommand: %s\n\n", subCmd)
+		printAuditUsage()
+		os.Exit(1)
+	}
+}
+
+func handleAuditVerify(args []string) {
+	auditPath := ""
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--file", "-f":
+			if i+1 < len(args) {
+				auditPath = args[i+1]
+				i++
+			} else {
+				fmt.Println("❌ --file requires a value")
+				os.Exit(1)
+			}
+		case "--help", "-h":
+			fmt.Println("Usage: llm-box audit verify [--file <path>]")
+			return
+		default:
+			if strings.HasPrefix(args[i], "--file=") {
+				auditPath = strings.TrimPrefix(args[i], "--file=")
+			} else {
+				fmt.Printf("❌ Unknown argument: %s\n", args[i])
+				os.Exit(1)
+			}
+		}
+	}
+
+	if auditPath == "" {
+		auditPath = history.GetAuditLogPath()
+		if auditPath == "" {
+			fmt.Println("❌ Could not resolve audit log path. Specify one with --file.")
+			os.Exit(1)
+		}
+	}
+
+	valid, brokenAt, err := history.VerifyAuditChain(auditPath)
+	if err != nil {
+		fmt.Printf("❌ Audit log verification error in %s: %v\n", auditPath, err)
+		os.Exit(1)
+	}
+	if valid {
+		fmt.Printf("✅ Audit log chain is valid: %s\n", auditPath)
+		return
+	}
+	fmt.Printf("❌ Audit log chain is BROKEN at line %d: %s\n", brokenAt, auditPath)
+	os.Exit(1)
+}
+
+func printAuditUsage() {
+	fmt.Println("Usage: llm-box audit <command> [options]")
+	fmt.Println("\nVerify the integrity of the tamper-evident audit log hash chain.")
+	fmt.Println("\nCommands:")
+	fmt.Println("  verify [--file <path>]   Verify the audit log HMAC hash chain")
+	fmt.Println("  -h, --help               Show this help message")
+	fmt.Println("\nOptions:")
+	fmt.Println("  --file, -f <path>   Path to the audit log file (defaults to the standard location)")
+	fmt.Println("\nExamples:")
+	fmt.Println("  llm-box audit verify")
+	fmt.Println("  llm-box audit verify --file /path/to/audit.log.jsonl")
 }

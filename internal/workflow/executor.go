@@ -17,10 +17,13 @@ package workflow
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/alib8b8/llm-box/internal/logger"
+	"github.com/alib8b8/llm-box/internal/metrics"
 	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/secrets"
 	"github.com/alib8b8/llm-box/internal/tui"
@@ -58,6 +61,12 @@ var ifInputKey = ifInputKeyType{}
 // WorkflowTimeout is the overall workflow timeout. It defaults to
 // DefaultWorkflowTimeout but can be overridden by callers to configure a
 // different workflow timeout without modifying types.go.
+//
+// Deprecated: this is a package-level mutable global and is unsafe under
+// parallel tests (t.Parallel). New code should configure the timeout per
+// Executor via NewExecutor().WithTimeout(d) instead. It is still read by
+// the legacy ExecuteWorkflowWithTrace global entry point, which does not go
+// through an Executor.
 var WorkflowTimeout = DefaultWorkflowTimeout
 
 // StepResult stores the result of executing a single step
@@ -125,16 +134,42 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 // (topological batching + concurrent execution); otherwise the legacy sequential
 // for-loop path runs. Both paths populate the trace with the same StepTrace
 // schema — BatchIndex is -1 and Dependencies is nil in sequential mode.
+//
+// This entry point does not use checkpoint/resume. To enable per-step
+// checkpointing and resume, build an Executor via NewExecutor().WithCheckpoint(...).
+//
+// This legacy entry point reads the package-level WorkflowTimeout global. New
+// code should prefer NewExecutor().WithTimeout(d) to configure the timeout
+// per-executor and avoid the global mutable state.
 func ExecuteWorkflowWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, *WorkflowTrace, error) {
 	if hasDAGDeclarations(wf.Steps) {
-		return executeWorkflowDAG(ctx, wf, reg, program)
+		out, results, trace, err := executeWorkflowDAG(ctx, wf, reg, program, WorkflowTimeout)
+		recordWorkflowMetrics(trace, err)
+		return out, results, trace, err
 	}
-	return executeWorkflowSequential(ctx, wf, reg, program)
+	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, "", WorkflowTimeout)
+	recordWorkflowMetrics(trace, err)
+	return out, results, trace, err
 }
 
 // executeWorkflowSequential runs the workflow step-by-step in declaration order
 // and records per-step telemetry into a WorkflowTrace (Mode="sequential").
-func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, *WorkflowTrace, error) {
+//
+// When statePath is non-empty, the sequential path enables checkpoint/resume:
+//   - Resume: if a checkpoint file already exists at statePath, the engine
+//     state (step outputs, variables, flowing data) is restored and execution
+//     continues from the step after the one recorded in the checkpoint.
+//   - Checkpoint: after each step completes successfully, a new snapshot is
+//     written to statePath so a subsequent run can resume from there.
+//
+// Checkpoint I/O failures are logged but never interrupt the workflow.
+// statePath is ignored by the DAG path; checkpoint/resume is sequential-only.
+//
+// timeout is the overall workflow timeout applied to the derived context.
+// Callers that go through an Executor pass e.workflowTimeout; the legacy
+// ExecuteWorkflowWithTrace global entry point passes the package-level
+// WorkflowTimeout.
+func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, statePath string, timeout time.Duration) (string, []StepResult, *WorkflowTrace, error) {
 	// Validate step count
 	if len(wf.Steps) > MaxSteps {
 		return "", nil, nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
@@ -150,7 +185,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 	trace := newTrace(wf.Name, "sequential", time.Now(), len(wf.Steps))
 	defer func() { trace.finish(time.Now()) }()
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, WorkflowTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	var results []StepResult
@@ -190,7 +225,48 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		})
 	}
 
+	// ── Resume support ──
+	// If a checkpoint file exists at statePath, restore the engine state
+	// (step outputs, variables, flowing data) and continue execution from
+	// the step after the one recorded in the checkpoint.
+	resumeFromStep := 0
+	if statePath != "" {
+		if state, err := loadCheckpoint(statePath); err == nil && state != nil {
+			data = RestoreState(state, engine)
+			// state.StepIndex is the last successfully-completed step; resume
+			// from the step after it. Clamp to a valid range.
+			resumeFromStep = state.StepIndex + 1
+			if resumeFromStep < 0 {
+				resumeFromStep = 0
+			}
+			if resumeFromStep > len(wf.Steps) {
+				resumeFromStep = len(wf.Steps)
+			}
+			logger.Info("Resuming workflow from step", "name", wf.Name, "step", resumeFromStep, "checkpoint", statePath)
+		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+			// A corrupt/unreadable checkpoint is logged but non-fatal: we
+			// start a fresh run rather than blocking the user.
+			logger.Warn("failed to load checkpoint, starting fresh", "path", statePath, "error", err)
+		}
+	}
+
+	// saveCheckpointIfEnabled writes a per-step checkpoint when statePath is
+	// set. Failures are logged but never interrupt the workflow.
+	saveCheckpointIfEnabled := func(stepIndex int) {
+		if statePath == "" {
+			return
+		}
+		state := SaveCurrentState(wf, stepIndex, data, engine)
+		if err := saveCheckpoint(statePath, state); err != nil {
+			logger.Warn("failed to save checkpoint, continuing without", "path", statePath, "step", stepIndex, "error", err)
+		}
+	}
+
 	for i, wStep := range wf.Steps {
+		// Skip steps already completed in a prior (checkpointed) run.
+		if i < resumeFromStep {
+			continue
+		}
 		stepStart := time.Now()
 
 		// ── Handle if/else branch ──
@@ -218,6 +294,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				InputLen:        len(data),
 				OutputLen:       len(output),
 			})
+			saveCheckpointIfEnabled(i)
 			continue
 		}
 
@@ -326,6 +403,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				InputLen:        len(data),
 				OutputLen:       len(output),
 			})
+			saveCheckpointIfEnabled(i)
 			continue
 		}
 
@@ -352,6 +430,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				InputLen:        len(data),
 				OutputLen:       len(output),
 			})
+			saveCheckpointIfEnabled(i)
 			continue
 		}
 
@@ -378,6 +457,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				InputLen:        len(data),
 				OutputLen:       len(output),
 			})
+			saveCheckpointIfEnabled(i)
 			continue
 		}
 
@@ -404,6 +484,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				InputLen:        len(data),
 				OutputLen:       len(output),
 			})
+			saveCheckpointIfEnabled(i)
 			continue
 		}
 
@@ -524,14 +605,13 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 
 			if program != nil {
 				if streamingNode, ok := node.(nodes.StreamingNode); ok {
-					onChunk := func(chunk string) {
-						program.Send(tui.StepStreamMsg{
-							Index: i,
-							Name:  wStep.Node,
-							Chunk: chunk,
-						})
-					}
-					output, execErr = streamingNode.ExecuteStream(stepCtx, data, evaluatedParams, onChunk)
+					// Decouple the streaming producer (HTTP reader inside
+					// ExecuteStream) from the TUI consumer via a buffered
+					// channel: program.Send blocks on an unbuffered channel,
+					// so a slow TUI would otherwise stall the stream.
+					sink := newStreamSink(program, i, wStep.Node)
+					output, execErr = streamingNode.ExecuteStream(stepCtx, data, evaluatedParams, sink.onChunk)
+					sink.flush()
 				} else {
 					output, execErr = node.Execute(stepCtx, data, evaluatedParams)
 				}
@@ -680,6 +760,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		}
 
 		data = output
+		saveCheckpointIfEnabled(i)
 	}
 
 	if program != nil {
@@ -699,4 +780,98 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 	}
 
 	return data, results, trace, nil
+}
+
+// Executor is a configurable workflow runner. It wraps the package-level
+// ExecuteWorkflow* functions and adds optional checkpoint/resume support.
+//
+// Build one with NewExecutor and chain WithCheckpoint to enable persistence:
+//
+//	exec := NewExecutor().WithCheckpoint("~/.llm-box/checkpoints/wf.json")
+//	out, results, err := exec.Execute(ctx, wf, reg)
+//
+// When statePath is set and a checkpoint file already exists, execution
+// resumes from the step after the one recorded in the checkpoint. After each
+// sequential step completes, a fresh snapshot is written to statePath.
+//
+// Checkpoint/resume is only supported on the sequential execution path.
+// Workflows that declare depends_on (DAG mode) ignore statePath.
+type Executor struct {
+	statePath       string
+	workflowTimeout time.Duration
+}
+
+// NewExecutor returns an Executor with no checkpoint configured and the
+// workflow timeout initialized to DefaultWorkflowTimeout. Use WithTimeout to
+// override the timeout and WithCheckpoint to enable checkpoint/resume.
+func NewExecutor() *Executor {
+	return &Executor{
+		workflowTimeout: DefaultWorkflowTimeout,
+	}
+}
+
+// WithCheckpoint configures the Executor to persist per-step checkpoints to
+// the given path and resume from it on the next run if it exists. Returns the
+// receiver for chaining.
+func (e *Executor) WithCheckpoint(path string) *Executor {
+	e.statePath = path
+	return e
+}
+
+// WithTimeout configures the overall workflow timeout applied to the derived
+// context for this Executor's runs. Returns the receiver for chaining.
+//
+// Use this instead of mutating the package-level WorkflowTimeout global,
+// which is unsafe under parallel tests (t.Parallel) and deprecated.
+func (e *Executor) WithTimeout(d time.Duration) *Executor {
+	e.workflowTimeout = d
+	return e
+}
+
+// Execute runs the workflow without a TUI program. It is the checkpoint-aware
+// equivalent of ExecuteWorkflow.
+func (e *Executor) Execute(ctx context.Context, wf *Workflow, reg *nodes.Registry) (string, []StepResult, error) {
+	output, results, _, err := e.ExecuteWithTrace(ctx, wf, reg, nil)
+	return output, results, err
+}
+
+// ExecuteWithTrace runs the workflow and returns a detailed per-step trace.
+// It is the checkpoint-aware equivalent of ExecuteWorkflowWithTrace.
+func (e *Executor) ExecuteWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, *WorkflowTrace, error) {
+	if hasDAGDeclarations(wf.Steps) {
+		// DAG mode does not support checkpoint/resume; fall through to the
+		// standard DAG executor which ignores statePath.
+		if e.statePath != "" {
+			logger.Warn("checkpoint/resume is not supported in DAG mode, ignoring statePath", "path", e.statePath)
+		}
+		out, results, trace, err := executeWorkflowDAG(ctx, wf, reg, program, e.workflowTimeout)
+		recordWorkflowMetrics(trace, err)
+		return out, results, trace, err
+	}
+	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, e.statePath, e.workflowTimeout)
+	recordWorkflowMetrics(trace, err)
+	return out, results, trace, err
+}
+
+// recordWorkflowMetrics publishes Prometheus metrics for a completed workflow
+// run: the overall execution counter/duration and the per-call LLM telemetry
+// aggregated in trace.Steps[*].LLM (provider/model/tokens/cost). It is
+// lightweight — direct Inc/Observe calls, no goroutine — and safe to call with
+// a nil trace (only the workflow counter is updated, with zero duration).
+func recordWorkflowMetrics(trace *WorkflowTrace, runErr error) {
+	var duration time.Duration
+	if trace != nil {
+		duration = trace.Duration
+		for _, step := range trace.Steps {
+			for _, call := range step.LLM {
+				var callErr error
+				if call.ErrText != "" {
+					callErr = errors.New(call.ErrText)
+				}
+				metrics.RecordLLMCall(call.Provider, call.Model, callErr,
+					call.PromptTokens, call.CompletionTokens, call.CostUSD)
+			}
+		}
+	}
+	metrics.RecordWorkflowExecution(duration, runErr)
 }

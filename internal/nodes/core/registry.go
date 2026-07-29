@@ -36,6 +36,7 @@ import (
 
 	"github.com/alib8b8/llm-box/internal/i18n"
 	"github.com/alib8b8/llm-box/internal/logger"
+	"github.com/alib8b8/llm-box/internal/metrics"
 	"gopkg.in/yaml.v3"
 )
 
@@ -326,6 +327,10 @@ func (r *Registry) ExecuteWithStats(name string, ctx context.Context, input stri
 			s.Errors++
 		}
 		r.statsMu.Unlock()
+		// Prometheus metric: direct Inc/Observe, a couple of atomic ops that
+		// do not block the main path. Safe even if metrics.Register() was
+		// never called (counters exist as package-level vars).
+		metrics.RecordNodeExecution(name, time.Since(start), err)
 	}()
 	output, err = node.Execute(ctx, input, params)
 	return output, err

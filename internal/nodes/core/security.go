@@ -422,6 +422,14 @@ var SafeHTTPClient = &http.Client{
 			}
 			return (&net.Dialer{}).DialContext(ctx, network, addr)
 		},
+		// Connection-pool tuning. The defaults (MaxIdleConnsPerHost==2) starve
+		// high-fan-out workflows and LLM streaming under concurrent load, while
+		// unbounded idle conns leak sockets on long-running processes.
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
 	},
 }
 
@@ -450,6 +458,13 @@ var SafeLLMHTTPClient = &http.Client{
 			}
 			return (&net.Dialer{}).DialContext(ctx, network, addr)
 		},
+		// Same pool tuning as SafeHTTPClient; LLM endpoints benefit even more
+		// because requests are long-lived and reuse is high.
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
 	},
 }
 

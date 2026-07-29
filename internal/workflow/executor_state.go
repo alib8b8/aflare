@@ -13,6 +13,32 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// This file implements workflow state persistence for checkpoint/resume.
+//
+// The Executor (see executor.go) uses these primitives to support resuming a
+// partially-completed sequential workflow run:
+//
+//   - SaveCurrentState / RestoreState move the in-memory engine state
+//     (step outputs, variables, flowing data) into and out of a WorkflowState
+//     snapshot. These are now called from the Executor's sequential path.
+//   - saveCheckpoint / loadCheckpoint persist that snapshot to disk so a
+//     crashed or interrupted run can be resumed later from the last
+//     successfully-completed step.
+//
+// Checkpoint semantics:
+//   - Checkpoints are per-step: a new snapshot is written after each step in
+//     the sequential execution path completes successfully.
+//   - Only the sequential execution path supports checkpoint/resume. The DAG
+//     scheduling path (used when any step declares depends_on) does NOT
+//     support checkpoints, because steps run concurrently and there is no
+//     single linear "progress" cursor to persist.
+//   - Checkpoint failures are non-fatal: the Executor logs the error and
+//     continues executing the workflow without interrupting it.
+//
+// SaveState / LoadState remain available as strict, sandboxed utilities
+// (they reject absolute paths and paths outside the working directory) and are
+// exercised by workflow_extra_test.go.
+
 package workflow
 
 import (
@@ -52,6 +78,57 @@ func SaveState(path string, state *WorkflowState) error {
 		return err
 	}
 	return os.WriteFile(safePath, data, 0600)
+}
+
+// saveCheckpoint persists a WorkflowState snapshot to the given path.
+//
+// Unlike SaveState, this is intended for the Executor's checkpoint feature and
+// accepts absolute paths (e.g. ~/.llm-box/checkpoints/<name>.json). It creates
+// the parent directory (mode 0700) if it does not yet exist. The file itself
+// is written with mode 0600.
+func saveCheckpoint(path string, state *WorkflowState) error {
+	if path == "" {
+		return nil
+	}
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal checkpoint state: %w", err)
+	}
+	if dir := filepath.Dir(path); dir != "" {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return fmt.Errorf("failed to create checkpoint directory %s: %w", dir, err)
+		}
+	}
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		return fmt.Errorf("failed to write checkpoint file %s: %w", path, err)
+	}
+	return nil
+}
+
+// loadCheckpoint reads a previously saved WorkflowState snapshot from the
+// given path. It accepts absolute paths (unlike LoadState) and is intended
+// for the Executor's resume feature. A missing file is reported as an error
+// so the caller can distinguish "no checkpoint" from a corrupted one.
+func loadCheckpoint(path string) (*WorkflowState, error) {
+	if path == "" {
+		return nil, nil
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat checkpoint file: %w", err)
+	}
+	if info.Size() > MaxFileSize {
+		return nil, fmt.Errorf("checkpoint file too large (max %d bytes)", MaxFileSize)
+	}
+	data, err := os.ReadFile(path) // #nosec G304 -- path is caller-controlled (CLI flag)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read checkpoint file: %w", err)
+	}
+	var state WorkflowState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, fmt.Errorf("failed to parse checkpoint file: %w", err)
+	}
+	return &state, nil
 }
 
 // LoadState reads a previously saved workflow state from a file.

@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -31,7 +32,14 @@ var (
 	once          sync.Once
 	currentLevel  = slog.LevelInfo
 	currentFormat = "text"
-	logFile       *os.File
+	// rotWriter is non-nil when logging to a file. It owns the underlying
+	// *os.File and performs size-based rotation.
+	rotWriter *rotatingWriter
+)
+
+const (
+	defaultLogMaxMB      = 100
+	defaultLogMaxBackups = 3
 )
 
 func init() {
@@ -75,25 +83,159 @@ func getOutputFromEnv() string {
 	return "stderr"
 }
 
+// getLogMaxMB reads LLM_BOX_LOG_MAX_MB and returns the rotation threshold in
+// bytes. A value of 0 disables rotation. Invalid values fall back to the
+// default.
+func getLogMaxMB() int64 {
+	raw := strings.TrimSpace(os.Getenv("LLM_BOX_LOG_MAX_MB"))
+	if raw == "" {
+		return int64(defaultLogMaxMB) * 1024 * 1024
+	}
+	n, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || n < 0 {
+		return int64(defaultLogMaxMB) * 1024 * 1024
+	}
+	return n * 1024 * 1024
+}
+
+// getLogMaxBackups reads LLM_BOX_LOG_MAX_BACKUPS and returns the number of
+// rotated backup files to retain. Invalid values fall back to the default.
+func getLogMaxBackups() int {
+	raw := strings.TrimSpace(os.Getenv("LLM_BOX_LOG_MAX_BACKUPS"))
+	if raw == "" {
+		return defaultLogMaxBackups
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
+		return defaultLogMaxBackups
+	}
+	return n
+}
+
+// rotatingWriter is an io.Writer that appends to a file and rotates it by
+// size. When a Write would push the current file past maxSize, the writer
+// closes the file, shifts existing backups (.1 -> .2, .2 -> .3, ...), deletes
+// the oldest backup beyond maxBackups, and opens a fresh file. Rotation is
+// guarded by a mutex so concurrent Write calls are safe.
+type rotatingWriter struct {
+	mu         sync.Mutex
+	filename   string
+	f          *os.File
+	maxSize    int64
+	maxBackups int
+}
+
+// newRotatingWriter opens filename in append mode (creating it if missing)
+// and returns a writer that will rotate once the file exceeds maxSize.
+func newRotatingWriter(filename string, maxSize int64, maxBackups int) (*rotatingWriter, error) {
+	dir := filepath.Dir(filename)
+	if dir != "" && dir != "." {
+		_ = os.MkdirAll(dir, 0750)
+	}
+	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return nil, err
+	}
+	return &rotatingWriter{
+		filename:   filename,
+		f:          f,
+		maxSize:    maxSize,
+		maxBackups: maxBackups,
+	}, nil
+}
+
+// Write writes p to the current file, rotating first if the write would
+// exceed maxSize. The rotation threshold is best-effort: a single Write
+// larger than maxSize still lands in a fresh file (no chunking).
+func (w *rotatingWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.maxSize > 0 && w.f != nil {
+		if fi, err := w.f.Stat(); err == nil {
+			if fi.Size()+int64(len(p)) > w.maxSize {
+				w.rotateLocked()
+			}
+		}
+	}
+	if w.f == nil {
+		return 0, fmt.Errorf("logger: rotating writer closed")
+	}
+	return w.f.Write(p)
+}
+
+// rotateLocked performs the file rotation. Caller must hold w.mu.
+func (w *rotatingWriter) rotateLocked() {
+	if w.f != nil {
+		_ = w.f.Close()
+		w.f = nil
+	}
+
+	if w.maxBackups <= 0 {
+		// No backups retained: just remove the current file.
+		_ = os.Remove(w.filename)
+	} else {
+		// Drop the oldest backup, then shift .(N-1) -> .N, ..., .1 -> .2.
+		for i := w.maxBackups; i >= 1; i-- {
+			src := fmt.Sprintf("%s.%d", w.filename, i)
+			if i == w.maxBackups {
+				_ = os.Remove(src)
+				continue
+			}
+			dst := fmt.Sprintf("%s.%d", w.filename, i+1)
+			_ = os.Rename(src, dst)
+		}
+		// Promote the current file to .1.
+		_ = os.Rename(w.filename, fmt.Sprintf("%s.1", w.filename))
+	}
+
+	f, err := os.OpenFile(w.filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "logger: failed to reopen log file after rotation: %v\n", err)
+		return
+	}
+	w.f = f
+}
+
+// Name returns the base log file path (the one rotation keeps reopening).
+func (w *rotatingWriter) Name() string {
+	return w.filename
+}
+
+// Close closes the underlying file. Subsequent Write calls return an error.
+func (w *rotatingWriter) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.f == nil {
+		return nil
+	}
+	err := w.f.Close()
+	w.f = nil
+	return err
+}
+
 func initLogger(level slog.Level, format string, output string) {
 	currentLevel = level
 	currentFormat = format
+
+	// Close any previously-opened rotating writer so re-init does not leak
+	// file descriptors.
+	if rotWriter != nil {
+		_ = rotWriter.Close()
+		rotWriter = nil
+	}
 
 	var writer io.Writer
 	if output == "stderr" || output == "" {
 		writer = os.Stderr
 	} else {
-		dir := filepath.Dir(output)
-		if dir != "" && dir != "." {
-			_ = os.MkdirAll(dir, 0750)
-		}
-		f, err := os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		rw, err := newRotatingWriter(output, getLogMaxMB(), getLogMaxBackups())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to open log file %s: %v, falling back to stderr\n", output, err)
 			writer = os.Stderr
 		} else {
-			logFile = f
-			writer = io.MultiWriter(os.Stderr, f)
+			rotWriter = rw
+			writer = io.MultiWriter(os.Stderr, rw)
 		}
 	}
 
@@ -155,25 +297,25 @@ func SetFormat(format string) {
 
 // SetOutput 设置日志输出目标（文件路径或 "stderr"），并关闭旧文件。
 func SetOutput(output string) {
-	if logFile != nil {
-		if err := logFile.Close(); err != nil {
+	if rotWriter != nil {
+		if err := rotWriter.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "logger: failed to close log file: %v\n", err)
 		}
-		logFile = nil
+		rotWriter = nil
 	}
 	initLogger(currentLevel, currentFormat, output)
 }
 
 func reinitLogger() {
 	output := "stderr"
-	if logFile != nil {
-		output = logFile.Name()
+	if rotWriter != nil {
+		output = rotWriter.Name()
 	}
-	if logFile != nil {
-		if err := logFile.Close(); err != nil {
+	if rotWriter != nil {
+		if err := rotWriter.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "logger: failed to close log file: %v\n", err)
 		}
-		logFile = nil
+		rotWriter = nil
 	}
 	initLogger(currentLevel, currentFormat, output)
 }
@@ -221,10 +363,10 @@ func With(args ...any) *slog.Logger {
 
 // Close 关闭日志文件句柄，应在程序退出前调用。
 func Close() {
-	if logFile != nil {
-		if err := logFile.Close(); err != nil {
+	if rotWriter != nil {
+		if err := rotWriter.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "logger: failed to close log file: %v\n", err)
 		}
-		logFile = nil
+		rotWriter = nil
 	}
 }

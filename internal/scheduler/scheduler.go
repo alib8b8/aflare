@@ -17,10 +17,13 @@ package scheduler
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/logger"
 )
 
 type TaskFunc func()
@@ -31,6 +34,13 @@ type Task struct {
 	Func     TaskFunc
 	schedule *cronSchedule
 	nextRun  time.Time
+}
+
+// TaskInfo is a read-only snapshot of a scheduled task, exposed via ListTasks.
+type TaskInfo struct {
+	ID      string
+	Expr    string
+	NextRun time.Time
 }
 
 type Scheduler struct {
@@ -92,6 +102,32 @@ func (s *Scheduler) RemoveTask(id string) error {
 	return nil
 }
 
+// ListTasks returns a snapshot of all registered tasks sorted by ID.
+// It is safe for concurrent use.
+func (s *Scheduler) ListTasks() []TaskInfo {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	tasks := make([]TaskInfo, 0, len(s.tasks))
+	for _, task := range s.tasks {
+		tasks = append(tasks, TaskInfo{
+			ID:      task.ID,
+			Expr:    task.Expr,
+			NextRun: task.nextRun,
+		})
+	}
+	sortTasksByID(tasks)
+	return tasks
+}
+
+func sortTasksByID(tasks []TaskInfo) {
+	for i := 1; i < len(tasks); i++ {
+		for j := i; j > 0 && tasks[j-1].ID > tasks[j].ID; j-- {
+			tasks[j-1], tasks[j] = tasks[j], tasks[j-1]
+		}
+	}
+}
+
 func (s *Scheduler) Start() {
 	s.mu.Lock()
 	if s.running {
@@ -146,7 +182,19 @@ func (s *Scheduler) checkAndRunTasks(now time.Time) {
 	s.mu.RUnlock()
 
 	for _, task := range tasksToRun {
-		go task.Func()
+		go func(t *Task) {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("scheduled task panicked",
+						"task_id", t.ID,
+						"cron", t.Expr,
+						"panic", r,
+						"stack", string(debug.Stack()),
+					)
+				}
+			}()
+			t.Func()
+		}(task)
 		s.mu.Lock()
 		if t, ok := s.tasks[task.ID]; ok {
 			t.nextRun = nextRunTime(t.schedule, now.Add(time.Minute))

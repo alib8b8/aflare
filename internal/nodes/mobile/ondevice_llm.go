@@ -152,7 +152,7 @@ func (n *OnDeviceLLMNode) Execute(ctx context.Context, input string, params map[
 		}
 		absPath, err := filepath.Abs(modelPath)
 		if err != nil {
-			return "", fmt.Errorf("invalid model_path: %v", err)
+			return "", fmt.Errorf("invalid model_path: %w", err)
 		}
 		// Prevent path traversal outside home directory
 		homeDir, _ := os.UserHomeDir()

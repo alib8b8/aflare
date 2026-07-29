@@ -16,6 +16,7 @@
 package workflow
 
 import (
+	"container/list"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -61,7 +62,16 @@ func validateExprFilePath(name string) (string, error) {
 	return resolved, nil
 }
 
-// ExpressionEngine handles template variable substitution
+// ExpressionEngine evaluates {{...}} template expressions.
+//
+// WARNING: ExpressionEngine is NOT thread-safe. It holds mutable state
+// (stepOutputs, variables, loopVars). All Evaluate/Set*/Clear* calls
+// must be serialized on a single goroutine. The DAG executor enforces
+// this by pre-evaluating all expressions on the main goroutine before
+// dispatching to workers (see executor_dag.go "阶段 1").
+//
+// If you need concurrent evaluation, create separate Engine instances
+// per goroutine (see SnapshotVars for deep-copying variables).
 type ExpressionEngine struct {
 	// Outputs from previous steps, keyed by step name
 	stepOutputs map[string]string
@@ -84,7 +94,8 @@ func NewExpressionEngine() *ExpressionEngine {
 	}
 }
 
-// SetStepOutput stores the output of a step for later reference
+// SetStepOutput stores the output of a step for later reference.
+// NOT thread-safe: must be called from the same goroutine that owns the engine.
 func (e *ExpressionEngine) SetStepOutput(stepIndex int, stepName, output string) {
 	key := fmt.Sprintf("idx:%d", stepIndex)
 	e.stepNames[stepIndex] = stepName
@@ -98,7 +109,8 @@ func (e *ExpressionEngine) SetStepOutput(stepIndex int, stepName, output string)
 	}
 }
 
-// SetVariable sets a workflow-level variable
+// SetVariable sets a workflow-level variable.
+// NOT thread-safe: must be called from the same goroutine that owns the engine.
 func (e *ExpressionEngine) SetVariable(name, value string) {
 	e.variables[name] = value
 }
@@ -121,6 +133,7 @@ func (e *ExpressionEngine) SnapshotVars() map[string]string {
 }
 
 // SetLoopVars sets the current loop context variables.
+// NOT thread-safe: must be called from the same goroutine that owns the engine.
 func (e *ExpressionEngine) SetLoopVars(item string, index, count int) {
 	if e.loopVars == nil {
 		e.loopVars = make(map[string]string)
@@ -131,6 +144,7 @@ func (e *ExpressionEngine) SetLoopVars(item string, index, count int) {
 }
 
 // ClearLoopVars removes the loop context.
+// NOT thread-safe: must be called from the same goroutine that owns the engine.
 func (e *ExpressionEngine) ClearLoopVars() {
 	e.loopVars = nil
 }
@@ -140,6 +154,7 @@ func (e *ExpressionEngine) ClearLoopVars() {
 // {{loop.index}} / {{loop.count}} all resolve inside a reduce iteration.
 // acc is the running accumulator; item is the current list element; index
 // is the 0-based iteration index; count is the total number of items.
+// NOT thread-safe: must be called from the same goroutine that owns the engine.
 func (e *ExpressionEngine) SetReduceVars(acc, item string, index, count int) {
 	if e.loopVars == nil {
 		e.loopVars = make(map[string]string)
@@ -150,7 +165,8 @@ func (e *ExpressionEngine) SetReduceVars(acc, item string, index, count int) {
 	e.loopVars["count"] = strconv.Itoa(count)
 }
 
-// SetSecretGetter sets the function to retrieve secrets from the secret manager
+// SetSecretGetter sets the function to retrieve secrets from the secret manager.
+// NOT thread-safe: must be called from the same goroutine that owns the engine.
 func (e *ExpressionEngine) SetSecretGetter(getter func(group, key string) (string, error)) {
 	e.secretGetter = getter
 }
@@ -183,6 +199,8 @@ var varPattern = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 //	{{loop.acc}}                 - running accumulator (reduce only)
 //
 // Unknown expressions (e.g. Go template syntax {{.foo}}) are left unchanged.
+//
+// NOT thread-safe: must be called from the same goroutine that owns the engine.
 func (e *ExpressionEngine) Evaluate(expr string, input string) (string, error) {
 	if expr == "" {
 		return "", nil
@@ -193,12 +211,19 @@ func (e *ExpressionEngine) Evaluate(expr string, input string) (string, error) {
 		return tmpl.literal, nil
 	}
 
-	var sb strings.Builder
+	// Build the result into a pooled buffer. The backing []byte is reused
+	// across calls; only the final string escapes to the heap.
+	bufp := exprBufPool.Get().(*[]byte)
+	buf := (*bufp)[:0]
+	defer func() {
+		*bufp = buf
+		exprBufPool.Put(bufp)
+	}()
 	var firstErr error
 	for i := range tmpl.parts {
 		p := &tmpl.parts[i]
 		if p.isLiteral {
-			sb.WriteString(p.literal)
+			buf = append(buf, p.literal...)
 			continue
 		}
 		val, err := p.node.eval(e, input)
@@ -209,15 +234,15 @@ func (e *ExpressionEngine) Evaluate(expr string, input string) (string, error) {
 			if p.node.knownPrefix() && firstErr == nil {
 				firstErr = fmt.Errorf("expression '{{%s}}': %w", p.inner, err)
 			}
-			sb.WriteString(p.fullMatch)
+			buf = append(buf, p.fullMatch...)
 			continue
 		}
-		sb.WriteString(val)
+		buf = append(buf, val...)
 	}
 	if firstErr != nil {
-		return sb.String(), firstErr
+		return string(buf), firstErr
 	}
-	return sb.String(), nil
+	return string(buf), nil
 }
 
 // ── AST expression engine ──
@@ -259,19 +284,92 @@ type templatePart struct {
 }
 
 // templateCache memoises compiled templates by source text. Templates are
-// immutable after construction, so concurrent reads are safe; sync.Map handles
-// concurrent inserts from worker goroutines (e.g. parallel/loop sub-engines).
-var templateCache sync.Map
+// immutable after construction; the cache is bounded (templateCacheCap) so a
+// long-running process cannot grow without limit as distinct template strings
+// accumulate. The bound is large enough that evictions are rare under normal
+// use. The mutex-based LRU is safe for concurrent access from worker
+// goroutines (e.g. parallel/loop sub-engines).
+const templateCacheCap = 10000
+
+var templateCache = newTemplateLRU(templateCacheCap)
+
+// exprBufPool reuses the backing []byte of the Evaluate result buffer across
+// calls. The result string is the only per-call allocation (strings are
+// immutable), while the working buffer — which grows with every WriteString in
+// the original strings.Builder path — is recycled. Pooling a *[]byte (rather
+// than *strings.Builder) is required because strings.Builder.Reset() drops its
+// backing array, defeating reuse.
+var exprBufPool = sync.Pool{
+	New: func() any { b := make([]byte, 0, 64); return &b },
+}
 
 // compileTemplate returns a cached compiled template for expr, parsing it on
 // first encounter.
 func compileTemplate(expr string) *compiledTemplate {
-	if v, ok := templateCache.Load(expr); ok {
-		return v.(*compiledTemplate)
+	if v, ok := templateCache.load(expr); ok {
+		return v
 	}
 	tmpl := parseTemplate(expr)
-	actual, _ := templateCache.LoadOrStore(expr, tmpl)
-	return actual.(*compiledTemplate)
+	return templateCache.loadOrStore(expr, tmpl)
+}
+
+// templateLRU is a capacity-bounded LRU cache of compiled templates. It
+// replaces the unbounded sync.Map so long-running processes don't leak memory.
+type templateLRU struct {
+	mu    sync.Mutex
+	items map[string]*list.Element
+	order *list.List // most-recently-used at the front
+	cap   int
+}
+
+type templateLRUEntry struct {
+	key   string
+	value *compiledTemplate
+}
+
+func newTemplateLRU(cap int) *templateLRU {
+	if cap <= 0 {
+		cap = 1
+	}
+	return &templateLRU{
+		items: make(map[string]*list.Element),
+		order: list.New(),
+		cap:   cap,
+	}
+}
+
+// load returns the cached template for key (if present), promoting it to
+// most-recently-used. Safe for concurrent use.
+func (c *templateLRU) load(key string) (*compiledTemplate, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	elem, ok := c.items[key]
+	if !ok {
+		return nil, false
+	}
+	c.order.MoveToFront(elem)
+	return elem.Value.(*templateLRUEntry).value, true
+}
+
+// loadOrStore returns the existing entry for key if present (promoting it),
+// otherwise stores value and evicts the least-recently-used entry when over
+// capacity. Safe for concurrent use.
+func (c *templateLRU) loadOrStore(key string, value *compiledTemplate) *compiledTemplate {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if elem, ok := c.items[key]; ok {
+		c.order.MoveToFront(elem)
+		return elem.Value.(*templateLRUEntry).value
+	}
+	elem := c.order.PushFront(&templateLRUEntry{key: key, value: value})
+	c.items[key] = elem
+	if c.order.Len() > c.cap {
+		if oldest := c.order.Back(); oldest != nil {
+			entry := c.order.Remove(oldest).(*templateLRUEntry)
+			delete(c.items, entry.key)
+		}
+	}
+	return value
 }
 
 // parseTemplate scans s for {{...}} expressions, mirroring the legacy varPattern
@@ -821,7 +919,8 @@ func jsonPathResultToString(result interface{}) (string, error) {
 	}
 }
 
-// EvaluateParams evaluates all string values in a params map
+// EvaluateParams evaluates all string values in a params map.
+// NOT thread-safe: must be called from the same goroutine that owns the engine.
 func (e *ExpressionEngine) EvaluateParams(params map[string]string, input string) (map[string]string, error) {
 	if params == nil {
 		return nil, nil

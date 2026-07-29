@@ -20,9 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/alib8b8/llm-box/internal/logger"
 	"github.com/alib8b8/llm-box/internal/nodes"
+	"github.com/alib8b8/llm-box/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -268,4 +270,104 @@ func executeCaptureErrorBranch(ctx context.Context, steps []WorkflowStep, errMsg
 		data = out
 	}
 	return data, nil
+}
+
+// streamChunkBufferSize is the per-step buffer between a streaming node's
+// onChunk callback and the TUI program. The Bubble Tea program.Send blocks on
+// an unbuffered channel (tea.go: Program.Send), so without this buffer a slow
+// TUI render loop would back-pressure the streaming HTTP reader inside
+// ExecuteStream, stalling the upstream producer.
+const streamChunkBufferSize = 256
+
+// streamSink decouples the streaming node's onChunk callback from the TUI
+// program. A forwarding goroutine drains a buffered channel and invokes
+// program.Send for each chunk. When the buffer fills (TUI slower than the
+// producer), the oldest pending chunk is dropped to keep the stream flowing,
+// and a warning is logged with the running drop count.
+//
+// Lifecycle: the caller creates a sink per ExecuteStream attempt, passes
+// sink.onChunk to ExecuteStream, and calls sink.flush() once ExecuteStream
+// returns. flush closes the channel and waits for the goroutine to finish
+// draining queued chunks, so StepEndMsg is never sent before prior chunks.
+//
+// onChunk and flush are NOT concurrent: onChunk is only invoked from inside
+// ExecuteStream (synchronous), and flush is called after ExecuteStream returns.
+type streamSink struct {
+	program  *tea.Program
+	idx      int
+	nodeName string
+	ch       chan string
+	done     chan struct{}
+	dropped  atomic.Int64
+}
+
+// newStreamSink starts a forwarding goroutine that drains chunks into program.
+func newStreamSink(program *tea.Program, idx int, nodeName string) *streamSink {
+	s := &streamSink{
+		program:  program,
+		idx:      idx,
+		nodeName: nodeName,
+		ch:       make(chan string, streamChunkBufferSize),
+		done:     make(chan struct{}),
+	}
+	go s.run()
+	return s
+}
+
+// run is the forwarding goroutine: it ranges over the chunk channel and sends
+// a StepStreamMsg for each chunk until the channel is closed and drained.
+func (s *streamSink) run() {
+	defer close(s.done)
+	for chunk := range s.ch {
+		s.program.Send(tui.StepStreamMsg{
+			Index: s.idx,
+			Name:  s.nodeName,
+			Chunk: chunk,
+		})
+	}
+}
+
+// onChunk is the callback handed to StreamingNode.ExecuteStream. It performs a
+// non-blocking write; on a full buffer it drops the oldest pending chunk
+// (making room for the new one) so the stream keeps flowing at the cost of a
+// gap in the TUI display. Drops are counted and warned about.
+func (s *streamSink) onChunk(chunk string) {
+	select {
+	case s.ch <- chunk:
+		return
+	default:
+	}
+	// Buffer full: drop the oldest pending chunk to make room for the new one.
+	select {
+	case <-s.ch:
+		s.warnDrop()
+	default:
+		// Consumer drained between selects; fall through to retry the write.
+	}
+	select {
+	case s.ch <- chunk:
+	default:
+		// Still full (producer faster than consumer): drop the new chunk.
+		s.warnDrop()
+	}
+}
+
+// warnDrop increments the drop counter and logs a backpressure warning.
+func (s *streamSink) warnDrop() {
+	n := s.dropped.Add(1)
+	logger.Warn("stream chunk dropped due to TUI backpressure",
+		"index", s.idx, "node", s.nodeName, "dropped_total", n)
+}
+
+// flush closes the chunk channel and waits for the forwarding goroutine to
+// finish draining any queued chunks into the TUI program. After flush
+// returns, no more StepStreamMsgs will be sent for this sink, so the caller
+// is free to send StepEndMsg.
+func (s *streamSink) flush() {
+	close(s.ch)
+	<-s.done
+	if n := s.dropped.Load(); n > 0 {
+		logger.Warn("streaming step completed with dropped chunks",
+			"index", s.idx, "node", s.nodeName, "dropped_total", n)
+	}
 }

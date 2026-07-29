@@ -43,7 +43,12 @@ import (
 //   - 若 wf.Output 有表达式，求值它。
 //   - 否则取最后一个完成的步骤输出。
 //   - 建议 DAG 模式用 wf.output 显式指定，语义最清晰。
-func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, *WorkflowTrace, error) {
+//
+// timeout is the overall workflow timeout applied to the derived context.
+// Callers that go through an Executor pass e.workflowTimeout; the legacy
+// ExecuteWorkflowWithTrace global entry point passes the package-level
+// WorkflowTimeout.
+func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, timeout time.Duration) (string, []StepResult, *WorkflowTrace, error) {
 	if len(wf.Steps) > MaxSteps {
 		return "", nil, nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
 	}
@@ -68,7 +73,7 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 	trace := newTrace(wf.Name, "dag", time.Now(), len(wf.Steps))
 	defer func() { trace.finish(time.Now()) }()
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, WorkflowTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	var allResults []StepResult
@@ -112,6 +117,13 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 		logger.Info("DAG batch started", "batch", batchIdx, "steps", len(batch))
 
 		// ── 阶段 1：主 goroutine 预求值（独占 engine，线程安全）──
+		// ExpressionEngine is NOT thread-safe (see its doc comment): it holds
+		// mutable stepOutputs/variables/loopVars. We pre-evaluate every step's
+		// condition and params here, on the main goroutine, BEFORE dispatching
+		// node.Execute to worker goroutines in 阶段 2. Workers therefore never
+		// touch the engine, which is the structural invariant that keeps the
+		// DAG executor race-free. Breaking this split (e.g. evaluating inside
+		// a worker) would introduce a data race on engine state.
 		type preparedStep struct {
 			idx             int
 			wStep           WorkflowStep

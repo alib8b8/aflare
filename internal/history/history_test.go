@@ -16,7 +16,10 @@
 package history
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -645,5 +648,249 @@ func TestAuditActions(t *testing.T) {
 		if string(a) != expected[i] {
 			t.Errorf("action %d: expected '%s', got '%s'", i, expected[i], a)
 		}
+	}
+}
+
+// appendAuditLogsForChain appends count audit log entries with distinct detail
+// values and returns the audit log file path. It is a helper for hash-chain tests.
+func appendAuditLogsForChain(t *testing.T, count int) string {
+	t.Helper()
+	for i := 0; i < count; i++ {
+		log := AuditLog{
+			Action: AuditActionConfigChange,
+			User:   "alice",
+			Detail: fmt.Sprintf("change-%d", i),
+		}
+		if err := AppendAuditLog(log); err != nil {
+			t.Fatalf("failed to append audit log %d: %v", i, err)
+		}
+	}
+	path := GetAuditLogPath()
+	if path == "" {
+		t.Fatal("audit log path is empty")
+	}
+	return path
+}
+
+// readAuditLines reads the audit log file and returns its non-empty lines.
+func readAuditLines(t *testing.T, path string) []string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read audit log: %v", err)
+	}
+	return strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+}
+
+func writeAuditLines(t *testing.T, path string, lines []string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0600); err != nil {
+		t.Fatalf("failed to write audit log: %v", err)
+	}
+}
+
+func TestAppendAuditLog_HashChainLinkage(t *testing.T) {
+	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	path := appendAuditLogsForChain(t, 3)
+	lines := readAuditLines(t, path)
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d", len(lines))
+	}
+
+	prevCurr := auditZeroHash
+	for i, line := range lines {
+		var entry AuditLog
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatalf("failed to parse line %d: %v", i+1, err)
+		}
+		if entry.PrevHash != prevCurr {
+			t.Errorf("line %d: prev_hash mismatch (expected %s, got %s)", i+1, prevCurr, entry.PrevHash)
+		}
+		if entry.CurrHash == "" {
+			t.Errorf("line %d: expected non-empty curr_hash", i+1)
+		}
+		if entry.PrevHash == entry.CurrHash {
+			t.Errorf("line %d: prev_hash should differ from curr_hash", i+1)
+		}
+		prevCurr = entry.CurrHash
+	}
+}
+
+func TestVerifyAuditChain_Valid(t *testing.T) {
+	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	path := appendAuditLogsForChain(t, 5)
+
+	valid, brokenAt, err := VerifyAuditChain(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !valid {
+		t.Errorf("expected valid chain, broken at line %d", brokenAt)
+	}
+	if brokenAt != 0 {
+		t.Errorf("expected brokenAtLine 0, got %d", brokenAt)
+	}
+}
+
+func TestVerifyAuditChain_Tampered(t *testing.T) {
+	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	path := appendAuditLogsForChain(t, 4)
+	lines := readAuditLines(t, path)
+	if len(lines) != 4 {
+		t.Fatalf("expected 4 lines, got %d", len(lines))
+	}
+
+	// Tamper with line 2 (index 1): change the detail value but leave curr_hash
+	// unchanged so the recomputed HMAC no longer matches.
+	tampered := strings.Replace(lines[1], "change-1", "change-EVIL", 1)
+	if tampered == lines[1] {
+		t.Fatal("tampering did not modify the line")
+	}
+	lines[1] = tampered
+	writeAuditLines(t, path, lines)
+
+	valid, brokenAt, err := VerifyAuditChain(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if valid {
+		t.Error("expected chain to be invalid after tampering")
+	}
+	if brokenAt != 2 {
+		t.Errorf("expected broken at line 2, got %d", brokenAt)
+	}
+}
+
+func TestVerifyAuditChain_Deleted(t *testing.T) {
+	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	path := appendAuditLogsForChain(t, 4)
+	lines := readAuditLines(t, path)
+	if len(lines) != 4 {
+		t.Fatalf("expected 4 lines, got %d", len(lines))
+	}
+
+	// Delete line 2 (index 1). The following record's prev_hash will no longer
+	// link to line 1's curr_hash.
+	remaining := append(lines[:1], lines[2:]...)
+	writeAuditLines(t, path, remaining)
+
+	valid, brokenAt, err := VerifyAuditChain(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if valid {
+		t.Error("expected chain to be invalid after deletion")
+	}
+	// After deletion, line 2 (former line 3) has a prev_hash that doesn't match
+	// line 1's curr_hash.
+	if brokenAt != 2 {
+		t.Errorf("expected broken at line 2, got %d", brokenAt)
+	}
+}
+
+func TestVerifyAuditChain_Empty(t *testing.T) {
+	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	// The audit log file does not exist yet in a fresh temp directory.
+	path := GetAuditLogPath()
+	if path == "" {
+		t.Fatal("audit log path is empty")
+	}
+
+	valid, brokenAt, err := VerifyAuditChain(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !valid {
+		t.Errorf("expected valid chain for non-existent file, broken at %d", brokenAt)
+	}
+	if brokenAt != 0 {
+		t.Errorf("expected brokenAtLine 0, got %d", brokenAt)
+	}
+}
+
+func TestVerifyAuditChain_LegacyFormat(t *testing.T) {
+	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	path := GetAuditLogPath()
+	// Write a legacy record that lacks prev_hash/curr_hash fields.
+	legacy := map[string]interface{}{
+		"id":        "legacy-1",
+		"timestamp": time.Now().Format(time.RFC3339Nano),
+		"action":    "login",
+		"success":   true,
+	}
+	data, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatalf("failed to marshal legacy record: %v", err)
+	}
+	if err := os.WriteFile(path, append(data, '\n'), 0600); err != nil {
+		t.Fatalf("failed to write legacy audit log: %v", err)
+	}
+
+	valid, brokenAt, err := VerifyAuditChain(path)
+	if valid {
+		t.Error("expected invalid chain for legacy format")
+	}
+	if brokenAt != 1 {
+		t.Errorf("expected broken at line 1, got %d", brokenAt)
+	}
+	if err == nil {
+		t.Fatal("expected error for legacy format, got nil")
+	}
+	if !strings.Contains(err.Error(), "incompatible format") {
+		t.Errorf("expected 'incompatible format' in error, got: %v", err)
+	}
+}
+
+func TestAppendAuditLog_ExtendsExistingChain(t *testing.T) {
+	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	tmpDir := t.TempDir()
+	SetHistoryDir(tmpDir)
+
+	// Build an initial chain, then append one more and verify the new tail links.
+	path := appendAuditLogsForChain(t, 2)
+	if err := AppendAuditLog(AuditLog{Action: AuditActionLogin, User: "bob", Detail: "extra"}); err != nil {
+		t.Fatalf("failed to append extra log: %v", err)
+	}
+
+	lines := readAuditLines(t, path)
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d", len(lines))
+	}
+
+	var last, secondLast AuditLog
+	if err := json.Unmarshal([]byte(lines[2]), &last); err != nil {
+		t.Fatalf("failed to parse last line: %v", err)
+	}
+	if err := json.Unmarshal([]byte(lines[1]), &secondLast); err != nil {
+		t.Fatalf("failed to parse second-to-last line: %v", err)
+	}
+	if last.PrevHash != secondLast.CurrHash {
+		t.Errorf("new record prev_hash (%s) does not match previous curr_hash (%s)", last.PrevHash, secondLast.CurrHash)
+	}
+
+	valid, _, err := VerifyAuditChain(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !valid {
+		t.Error("expected chain to remain valid after extending")
 	}
 }

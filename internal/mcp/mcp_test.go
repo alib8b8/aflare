@@ -758,6 +758,13 @@ func TestClient_Close_WithoutSSE(t *testing.T) {
 }
 
 func TestClient_SendRequest_Timeout(t *testing.T) {
+	// This test exercises the request-timeout path. The server stalls the
+	// tools/list response for 3s while the client uses a 1s per-request
+	// timeout, so the call fails fast instead of waiting on the default 30s
+	// client timeout. Skip under -short to keep slow CI from running it.
+	if testing.Short() {
+		t.Skip("requires timeout behavior")
+	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req rpcRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
@@ -770,7 +777,9 @@ func TestClient_SendRequest_Timeout(t *testing.T) {
 		} else if req.Method == "notifications/initialized" {
 			w.WriteHeader(http.StatusAccepted)
 		} else {
-			time.Sleep(time.Second * 35)
+			// Stall longer than the client's 1s timeout (below) but short
+			// enough that the deferred server.Close() doesn't hang the test.
+			time.Sleep(3 * time.Second)
 		}
 	}))
 	defer server.Close()
@@ -780,6 +789,14 @@ func TestClient_SendRequest_Timeout(t *testing.T) {
 		t.Fatalf("failed to connect: %v", err)
 	}
 	defer client.Close()
+
+	// Override the shared 30s client with a 1s-timeout client that keeps the
+	// SSRF-protecting Transport. initialize already succeeded, so only the
+	// tools/list request is bound by this short timeout.
+	client.httpClient = &http.Client{
+		Timeout:   1 * time.Second,
+		Transport: client.httpClient.Transport,
+	}
 
 	_, err = client.ListTools()
 	if err == nil {

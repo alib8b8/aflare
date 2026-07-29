@@ -19,6 +19,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -139,8 +140,8 @@ func TestInitLogger(t *testing.T) {
 		if currentFormat != tt.format {
 			t.Errorf("currentFormat = %v, want %v", currentFormat, tt.format)
 		}
-		if tt.output != "stderr" && logFile == nil {
-			t.Error("expected logFile to be set for file output")
+		if tt.output != "stderr" && rotWriter == nil {
+			t.Error("expected rotWriter to be set for file output")
 		}
 	}
 }
@@ -150,8 +151,8 @@ func TestInitLoggerInvalidFile(t *testing.T) {
 	defer restoreState(origLevel, origFormat, origLogger)
 
 	initLogger(slog.LevelInfo, "text", "/dev/null/invalid/file.log")
-	if logFile != nil {
-		t.Error("expected logFile to be nil after fallback to stderr")
+	if rotWriter != nil {
+		t.Error("expected rotWriter to be nil after fallback to stderr")
 	}
 	Info("should work with stderr fallback")
 }
@@ -275,14 +276,14 @@ func TestSetOutput(t *testing.T) {
 	}
 
 	SetOutput("stderr")
-	if logFile != nil {
-		t.Error("expected logFile to be nil when output is stderr")
+	if rotWriter != nil {
+		t.Error("expected rotWriter to be nil when output is stderr")
 	}
 
 	SetOutput(logPath)
 	SetOutput("")
-	if logFile != nil {
-		t.Error("expected logFile to be nil when output is empty")
+	if rotWriter != nil {
+		t.Error("expected rotWriter to be nil when output is empty")
 	}
 }
 
@@ -296,8 +297,8 @@ func TestClose(t *testing.T) {
 	SetOutput(logPath)
 	Close()
 
-	if logFile != nil {
-		t.Error("expected logFile to be nil after Close")
+	if rotWriter != nil {
+		t.Error("expected rotWriter to be nil after Close")
 	}
 
 	Info("after close")
@@ -378,5 +379,182 @@ func TestReplaceAttr(t *testing.T) {
 	result = replaceAttr(nil, timeAttr)
 	if result.Key != slog.TimeKey {
 		t.Error("expected replaceAttr to preserve time key")
+	}
+}
+
+func TestGetLogMaxMB(t *testing.T) {
+	origLevel, origFormat, origLogger := saveState()
+	defer restoreState(origLevel, origFormat, origLogger)
+
+	t.Setenv("LLM_BOX_LOG_MAX_MB", "")
+	if got := getLogMaxMB(); got != int64(defaultLogMaxMB)*1024*1024 {
+		t.Errorf("default maxSize = %d, want %d", got, int64(defaultLogMaxMB)*1024*1024)
+	}
+
+	t.Setenv("LLM_BOX_LOG_MAX_MB", "0")
+	if got := getLogMaxMB(); got != 0 {
+		t.Errorf("maxSize with 0 = %d, want 0 (rotation disabled)", got)
+	}
+
+	t.Setenv("LLM_BOX_LOG_MAX_MB", "2")
+	if got := getLogMaxMB(); got != 2*1024*1024 {
+		t.Errorf("maxSize with 2 = %d, want %d", got, 2*1024*1024)
+	}
+
+	t.Setenv("LLM_BOX_LOG_MAX_MB", "not-a-number")
+	if got := getLogMaxMB(); got != int64(defaultLogMaxMB)*1024*1024 {
+		t.Errorf("invalid maxSize = %d, want default %d", got, int64(defaultLogMaxMB)*1024*1024)
+	}
+
+	t.Setenv("LLM_BOX_LOG_MAX_MB", "-5")
+	if got := getLogMaxMB(); got != int64(defaultLogMaxMB)*1024*1024 {
+		t.Errorf("negative maxSize = %d, want default %d", got, int64(defaultLogMaxMB)*1024*1024)
+	}
+}
+
+func TestGetLogMaxBackups(t *testing.T) {
+	origLevel, origFormat, origLogger := saveState()
+	defer restoreState(origLevel, origFormat, origLogger)
+
+	t.Setenv("LLM_BOX_LOG_MAX_BACKUPS", "")
+	if got := getLogMaxBackups(); got != defaultLogMaxBackups {
+		t.Errorf("default maxBackups = %d, want %d", got, defaultLogMaxBackups)
+	}
+
+	t.Setenv("LLM_BOX_LOG_MAX_BACKUPS", "5")
+	if got := getLogMaxBackups(); got != 5 {
+		t.Errorf("maxBackups with 5 = %d, want 5", got)
+	}
+
+	t.Setenv("LLM_BOX_LOG_MAX_BACKUPS", "0")
+	if got := getLogMaxBackups(); got != 0 {
+		t.Errorf("maxBackups with 0 = %d, want 0", got)
+	}
+
+	t.Setenv("LLM_BOX_LOG_MAX_BACKUPS", "garbage")
+	if got := getLogMaxBackups(); got != defaultLogMaxBackups {
+		t.Errorf("invalid maxBackups = %d, want default %d", got, defaultLogMaxBackups)
+	}
+}
+
+// TestRotatingWriterRotation verifies that exceeding maxSize triggers a
+// rotation, that the old file is moved to .1, and that repeated rotations
+// shift backups up to maxBackups and drop the oldest.
+func TestRotatingWriterRotation(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "app.log")
+
+	rw, err := newRotatingWriter(logPath, 100, 3)
+	if err != nil {
+		t.Fatalf("newRotatingWriter failed: %v", err)
+	}
+	defer rw.Close()
+
+	// First write: fits within maxSize, no rotation yet.
+	if _, err := rw.Write([]byte(strings.Repeat("a", 50))); err != nil {
+		t.Fatalf("write 1 failed: %v", err)
+	}
+	if _, err := os.Stat(logPath + ".1"); !os.IsNotExist(err) {
+		t.Errorf("expected no backup yet, got err=%v", err)
+	}
+
+	// Second write: pushes past 100 bytes -> rotation.
+	if _, err := rw.Write([]byte(strings.Repeat("b", 60))); err != nil {
+		t.Fatalf("write 2 failed: %v", err)
+	}
+	if _, err := os.Stat(logPath + ".1"); err != nil {
+		t.Errorf("expected .1 backup to exist after rotation: %v", err)
+	}
+	content, err := os.ReadFile(logPath + ".1")
+	if err != nil {
+		t.Fatalf("read .1 failed: %v", err)
+	}
+	if string(content) != strings.Repeat("a", 50) {
+		t.Errorf("backup .1 content = %q, want 50 'a's", string(content))
+	}
+
+	// Current file should hold only the second write.
+	content, err = os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read current failed: %v", err)
+	}
+	if string(content) != strings.Repeat("b", 60) {
+		t.Errorf("current content = %q, want 60 'b's", string(content))
+	}
+
+	// Two more rotations to fill up the 3 backups.
+	for k := 0; k < 2; k++ {
+		// Force a rotation by writing more than maxSize.
+		if _, err := rw.Write([]byte(strings.Repeat("c", 110))); err != nil {
+			t.Fatalf("write loop %d failed: %v", k, err)
+		}
+	}
+
+	for i := 1; i <= 3; i++ {
+		if _, err := os.Stat(logPath + "." + strconv.Itoa(i)); err != nil {
+			t.Errorf("expected %s.%d to exist: %v", logPath, i, err)
+		}
+	}
+	// .4 must not exist (maxBackups=3).
+	if _, err := os.Stat(logPath + ".4"); !os.IsNotExist(err) {
+		t.Errorf("expected .4 to be pruned, got err=%v", err)
+	}
+}
+
+// TestRotatingWriterMaxBackupsZero verifies that maxBackups=0 prunes all
+// backups and only ever keeps the current file.
+func TestRotatingWriterMaxBackupsZero(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "rotate0.log")
+
+	rw, err := newRotatingWriter(logPath, 20, 0)
+	if err != nil {
+		t.Fatalf("newRotatingWriter failed: %v", err)
+	}
+	defer rw.Close()
+
+	if _, err := rw.Write([]byte(strings.Repeat("x", 10))); err != nil {
+		t.Fatalf("write 1 failed: %v", err)
+	}
+	if _, err := rw.Write([]byte(strings.Repeat("y", 15))); err != nil {
+		t.Fatalf("write 2 failed: %v", err)
+	}
+	if _, err := os.Stat(logPath + ".1"); !os.IsNotExist(err) {
+		t.Errorf("expected no .1 backup with maxBackups=0, got err=%v", err)
+	}
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read current failed: %v", err)
+	}
+	if string(content) != strings.Repeat("y", 15) {
+		t.Errorf("current content = %q, want 15 'y's", string(content))
+	}
+}
+
+// TestRotatingWriterThroughInitLogger exercises the full initLogger path with
+// a small LLM_BOX_LOG_MAX_MB so rotation happens end-to-end.
+func TestRotatingWriterThroughInitLogger(t *testing.T) {
+	origLevel, origFormat, origLogger := saveState()
+	defer restoreState(origLevel, origFormat, origLogger)
+
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "init_rotate.log")
+
+	t.Setenv("LLM_BOX_LOG_MAX_MB", "1")
+	t.Setenv("LLM_BOX_LOG_MAX_BACKUPS", "2")
+
+	initLogger(slog.LevelInfo, "text", logPath)
+	if rotWriter == nil {
+		t.Fatal("expected rotWriter to be set")
+	}
+
+	// Write ~1.2 MB in chunks. Rotation should trigger once we cross 1 MB.
+	big := strings.Repeat("z", 64*1024)
+	for i := 0; i < 19; i++ {
+		Info("chunk", "n", i, "payload", big)
+	}
+
+	if _, err := os.Stat(logPath + ".1"); err != nil {
+		t.Errorf("expected .1 backup to exist after exceeding 1 MB: %v", err)
 	}
 }
