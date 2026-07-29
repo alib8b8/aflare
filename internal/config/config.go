@@ -266,6 +266,7 @@ const (
 	RouterStrategyLatency    = "latency"
 	RouterStrategyRoundRobin = "round_robin"
 	RouterStrategyRandom     = "random"
+	RouterStrategyPareto     = "pareto"
 )
 
 // SetConfig 替换全局配置实例，主要用于测试与运行时注入。
@@ -294,7 +295,7 @@ func (c *Config) Validate() error {
 		validStrategies := map[string]bool{
 			RouterStrategyPriority: true, RouterStrategyCost: true,
 			RouterStrategyLatency: true, RouterStrategyRoundRobin: true,
-			RouterStrategyRandom: true,
+			RouterStrategyRandom: true, RouterStrategyPareto: true,
 		}
 		if !validStrategies[c.Router.Strategy] {
 			return fmt.Errorf("invalid router strategy %q", c.Router.Strategy)

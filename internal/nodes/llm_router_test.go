@@ -546,3 +546,159 @@ func TestLLMRouter_Execute_ReturnsMultiError(t *testing.T) {
 		t.Errorf("did not expect context.Canceled in no-key failure path")
 	}
 }
+
+// TestLLMRouter_ParetoStrategy verifies the pareto strategy ranks
+// Pareto-optimal providers (no other provider is both cheaper AND faster)
+// ahead of dominated ones. With:
+//   - A: cost=1, latency=100 (optimal: nothing beats it on both axes)
+//   - B: cost=2, latency=200 (dominated by A: A is cheaper AND faster)
+//   - C: cost=3, latency=50  (optimal: nothing is both cheaper and faster)
+//
+// The expected order is optimal-first sorted by cost: A, C, then B.
+func TestLLMRouter_ParetoStrategy(t *testing.T) {
+	providers := []RouterProvider{
+		{Name: "B", Enabled: true, CostPer1K: 2.0, AvgLatencyMs: 200, SuccessRate: 0.9},
+		{Name: "A", Enabled: true, CostPer1K: 1.0, AvgLatencyMs: 100, SuccessRate: 0.9},
+		{Name: "C", Enabled: true, CostPer1K: 3.0, AvgLatencyMs: 50, SuccessRate: 0.9},
+	}
+	r := &LLMRouter{
+		providers: append([]RouterProvider(nil), providers...),
+		stats:     make(map[string]*ProviderStats),
+		strategy:  config.RouterStrategyPareto,
+		maxRetry:  3,
+	}
+	ctx := context.Background()
+	selected := r.SelectProviders(ctx)
+	if len(selected) != 3 {
+		t.Fatalf("pareto: expected 3 providers, got %d", len(selected))
+	}
+	// A (optimal, cheapest) first, C (optimal) second, B (dominated) last.
+	wantOrder := []string{"A", "C", "B"}
+	for i, want := range wantOrder {
+		if selected[i].Name != want {
+			t.Errorf("pareto position %d = %q, want %q (full order: %v)",
+				i, selected[i].Name, want, namesOf(selected))
+		}
+	}
+}
+
+// TestLLMRouter_ParetoStrategy_UsesEWMA verifies that when EWMA observations
+// exist, pareto ranking uses the EWMA prediction rather than the static
+// AvgLatencyMs.
+func TestLLMRouter_ParetoStrategy_UsesEWMA(t *testing.T) {
+	providers := []RouterProvider{
+		{Name: "X", Enabled: true, CostPer1K: 1.0, AvgLatencyMs: 100, SuccessRate: 0.9},
+		{Name: "Y", Enabled: true, CostPer1K: 2.0, AvgLatencyMs: 500, SuccessRate: 0.9},
+	}
+	r := &LLMRouter{
+		providers: append([]RouterProvider(nil), providers...),
+		stats:     make(map[string]*ProviderStats),
+		strategy:  config.RouterStrategyPareto,
+		maxRetry:  3,
+	}
+	// Seed EWMA: X is actually slow (300ms), Y is actually fast (50ms).
+	// With EWMA, Y (cost=2, lat=50) dominates nothing but is optimal;
+	// X (cost=1, lat=300) is also optimal (cheaper). Both optimal, so
+	// sorted by cost: X first. But the latency used should be EWMA, not
+	// AvgLatencyMs. Verify by making X dominated: give X high EWMA so
+	// Y is both... no, Y is more expensive. Let's just verify the order
+	// reflects EWMA by making X's EWMA very high and Y's very low with
+	// equal costs so the latency tiebreaker decides.
+	r.providers[0].CostPer1K = 1.0
+	r.providers[1].CostPer1K = 1.0
+	rStats := newProviderStats()
+	rStats.EwmaLatency.Observe(300) // X observed slow
+	rStats.EwmaLatency.Observe(300)
+	yStats := newProviderStats()
+	yStats.EwmaLatency.Observe(50) // Y observed fast
+	yStats.EwmaLatency.Observe(50)
+	r.stats["X"] = rStats
+	r.stats["Y"] = yStats
+
+	ctx := context.Background()
+	selected := r.SelectProviders(ctx)
+	// Equal cost => both optimal; within optimal tier sorted by cost
+	// (equal) then latency. EWMA: Y=50 < X=300, so Y first.
+	if selected[0].Name != "Y" {
+		t.Errorf("pareto with EWMA: first = %q, want Y (EWMA 50ms < X 300ms); order: %v",
+			selected[0].Name, namesOf(selected))
+	}
+}
+
+// TestLLMRouter_LatencyStrategy_UsesEWMA verifies the latency strategy prefers
+// the EWMA prediction over the static AvgLatencyMs when observations exist.
+func TestLLMRouter_LatencyStrategy_UsesEWMA(t *testing.T) {
+	providers := []RouterProvider{
+		{Name: "slow_static", Enabled: true, AvgLatencyMs: 1000, SuccessRate: 0.9},
+		{Name: "fast_static", Enabled: true, AvgLatencyMs: 50, SuccessRate: 0.9},
+	}
+	r := &LLMRouter{
+		providers: append([]RouterProvider(nil), providers...),
+		stats:     make(map[string]*ProviderStats),
+		strategy:  config.RouterStrategyLatency,
+		maxRetry:  3,
+	}
+	// Seed EWMA that INVERTS the static ordering: slow_static is actually
+	// fast (20ms), fast_static is actually slow (800ms).
+	slowStats := newProviderStats()
+	slowStats.EwmaLatency.Observe(20)
+	slowStats.EwmaLatency.Observe(20)
+	fastStats := newProviderStats()
+	fastStats.EwmaLatency.Observe(800)
+	fastStats.EwmaLatency.Observe(800)
+	r.stats["slow_static"] = slowStats
+	r.stats["fast_static"] = fastStats
+
+	ctx := context.Background()
+	selected := r.SelectProviders(ctx)
+	// EWMA: slow_static=20 < fast_static=800, so slow_static first despite
+	// its high static AvgLatencyMs.
+	if selected[0].Name != "slow_static" {
+		t.Errorf("latency with EWMA: first = %q, want slow_static (EWMA 20ms); order: %v",
+			selected[0].Name, namesOf(selected))
+	}
+}
+
+// TestLLMRouter_CircuitBreakerExcludesProvider verifies that a provider whose
+// circuit breaker is Open is excluded from the active provider list.
+func TestLLMRouter_CircuitBreakerExcludesProvider(t *testing.T) {
+	providers := []RouterProvider{
+		{Name: "healthy", Enabled: true, Priority: 1},
+		{Name: "tripped", Enabled: true, Priority: 2},
+	}
+	r := &LLMRouter{
+		providers: append([]RouterProvider(nil), providers...),
+		stats:     make(map[string]*ProviderStats),
+		strategy:  config.RouterStrategyPriority,
+		maxRetry:  3,
+	}
+	// Force "tripped" into Open by exceeding the failure threshold.
+	trippedStats := newProviderStats()
+	for i := 0; i < 10; i++ { // default threshold is 5
+		trippedStats.Breaker.RecordFailure()
+	}
+	if trippedStats.Breaker.State() != CircuitOpen {
+		t.Fatalf("expected tripped breaker to be Open, got %s", trippedStats.Breaker.State())
+	}
+	r.stats["tripped"] = trippedStats
+
+	ctx := context.Background()
+	selected := r.SelectProviders(ctx)
+	for _, p := range selected {
+		if p.Name == "tripped" {
+			t.Error("tripped provider (Open breaker) should be excluded from selection")
+		}
+	}
+	if len(selected) != 1 || selected[0].Name != "healthy" {
+		t.Errorf("expected only healthy provider, got %v", namesOf(selected))
+	}
+}
+
+// namesOf returns a comma-joined list of provider names for assertion messages.
+func namesOf(providers []RouterProvider) string {
+	names := make([]string, len(providers))
+	for i, p := range providers {
+		names[i] = p.Name
+	}
+	return strings.Join(names, ", ")
+}

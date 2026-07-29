@@ -50,6 +50,8 @@ type ProviderStats struct {
 	// ConsecutiveFailures is reset to 0 on any successful call. It
 	// drives the cooldown backoff so a healthy provider with occasional
 	// failures isn't punished for its lifetime cumulative failure count.
+	// Retained for backward compatibility / stats display; routing now
+	// relies on the circuit breaker (Breaker) instead.
 	ConsecutiveFailures int64
 	TotalLatency        int64
 	TokensUsed          int64
@@ -57,6 +59,13 @@ type ProviderStats struct {
 	LastUsed            time.Time
 	LastResetDate       string
 	CooldownUntil       time.Time
+	// EwmaLatency is the EWMA latency predictor used for routing decisions.
+	// It replaces the arithmetic AvgLatencyMs mean which never decays old
+	// observations. Nil-safe: callers must guard with a nil check.
+	EwmaLatency *EWMAPredictor
+	// Breaker is the per-provider circuit breaker (CLOSED/OPEN/HALF_OPEN).
+	// Replaces the old ConsecutiveFailures>=5 cooldown logic. Nil-safe.
+	Breaker *CircuitBreaker
 }
 
 // ProviderMultiError is returned by LLMRouter.Execute when every candidate
@@ -315,6 +324,8 @@ func (r *LLMRouter) selectProviders(strategy string) []RouterProvider {
 		return r.sortByCost(providers)
 	case config.RouterStrategyLatency:
 		return r.sortByLatency(providers)
+	case config.RouterStrategyPareto:
+		return sortByPareto(providers, r.stats)
 	case config.RouterStrategyRoundRobin:
 		return r.roundRobin(providers)
 	case config.RouterStrategyRandom:
@@ -336,6 +347,7 @@ func (r *LLMRouter) resolveStrategy(params map[string]string) string {
 		case config.RouterStrategyPriority,
 			config.RouterStrategyCost,
 			config.RouterStrategyLatency,
+			config.RouterStrategyPareto,
 			config.RouterStrategyRoundRobin,
 			config.RouterStrategyRandom:
 			return override
@@ -359,7 +371,7 @@ func (r *LLMRouter) getActiveProviders() []RouterProvider {
 
 		stats := r.stats[p.Name]
 		if stats == nil {
-			stats = &ProviderStats{LastResetDate: today}
+			stats = newProviderStats()
 			r.stats[p.Name] = stats
 		}
 
@@ -372,7 +384,10 @@ func (r *LLMRouter) getActiveProviders() []RouterProvider {
 			continue
 		}
 
-		if now.Before(stats.CooldownUntil) {
+		// Circuit breaker gates admission: an Open breaker excludes the
+		// provider; HalfOpen allows a limited number of probe requests.
+		// Replaces the old CooldownUntil time-based check.
+		if stats.Breaker != nil && !stats.Breaker.AllowRequest() {
 			continue
 		}
 
@@ -403,13 +418,99 @@ func (r *LLMRouter) sortByCost(providers []RouterProvider) []RouterProvider {
 }
 
 func (r *LLMRouter) sortByLatency(providers []RouterProvider) []RouterProvider {
+	// Snapshot the EWMA predictor pointer for each provider under the read
+	// lock. Predict() has its own mutex, so we call it outside the statsMu
+	// critical section to avoid nested locks.
+	predictors := make(map[string]*EWMAPredictor, len(providers))
+	r.statsMu.RLock()
+	for _, p := range providers {
+		if s := r.stats[p.Name]; s != nil {
+			predictors[p.Name] = s.EwmaLatency
+		}
+	}
+	r.statsMu.RUnlock()
+
+	// latencyFor resolves the effective latency for a provider: the EWMA
+	// prediction when available (and non-zero), falling back to the
+	// arithmetic AvgLatencyMs so fresh providers without observations are
+	// still rankable.
+	latencyFor := func(p RouterProvider) float64 {
+		if ep := predictors[p.Name]; ep != nil {
+			if pred := ep.Predict(); pred > 0 {
+				return pred
+			}
+		}
+		return float64(p.AvgLatencyMs)
+	}
+
 	sort.SliceStable(providers, func(i, j int) bool {
-		if providers[i].AvgLatencyMs != providers[j].AvgLatencyMs {
-			return providers[i].AvgLatencyMs < providers[j].AvgLatencyMs
+		li := latencyFor(providers[i])
+		lj := latencyFor(providers[j])
+		if li != lj {
+			return li < lj
 		}
 		return providers[i].SuccessRate > providers[j].SuccessRate
 	})
 	return providers
+}
+
+// sortByPareto orders providers by cost-quality Pareto efficiency.
+// A provider is Pareto-optimal if no other provider is both cheaper AND
+// faster. Non-optimal providers are ranked after optimal ones.
+// This balances cost and latency better than sorting by a single dimension.
+func sortByPareto(providers []RouterProvider, stats map[string]*ProviderStats) []RouterProvider {
+	// Compute (cost, latency) for each provider
+	type provCost struct {
+		idx     int
+		cost    float64
+		latency float64
+		optimal bool
+	}
+	costs := make([]provCost, len(providers))
+	for i := range providers {
+		name := providers[i].Name
+		lat := float64(providers[i].AvgLatencyMs)
+		if s, ok := stats[name]; ok && s != nil && s.EwmaLatency != nil {
+			if p := s.EwmaLatency.Predict(); p > 0 {
+				lat = p
+			}
+		}
+		costs[i] = provCost{
+			idx:     i,
+			cost:    providers[i].CostPer1K,
+			latency: lat,
+		}
+	}
+	// Mark Pareto-optimal: a provider is optimal if no other is both
+	// cheaper AND faster.
+	for i := range costs {
+		costs[i].optimal = true
+		for j := range costs {
+			if i == j {
+				continue
+			}
+			if costs[j].cost < costs[i].cost && costs[j].latency < costs[i].latency {
+				costs[i].optimal = false
+				break
+			}
+		}
+	}
+	// Sort: optimal first (sorted by cost), then non-optimal (sorted by cost)
+	sort.SliceStable(costs, func(i, j int) bool {
+		if costs[i].optimal != costs[j].optimal {
+			return costs[i].optimal // optimal providers first
+		}
+		// Within same optimality tier, sort by cost
+		if costs[i].cost != costs[j].cost {
+			return costs[i].cost < costs[j].cost
+		}
+		return costs[i].latency < costs[j].latency
+	})
+	result := make([]RouterProvider, len(providers))
+	for i, c := range costs {
+		result[i] = providers[c.idx]
+	}
+	return result
 }
 
 func (r *LLMRouter) roundRobin(providers []RouterProvider) []RouterProvider {
@@ -612,6 +713,16 @@ func (r *LLMRouter) recordSuccess(name string, latencyMs int64, tokensUsed int64
 	// counter so cooldowns reflect the CURRENT health of the provider.
 	stats.ConsecutiveFailures = 0
 
+	// EWMA latency prediction: recent observations weigh more than old
+	// ones, so the predictor adapts quickly to performance changes.
+	if stats.EwmaLatency != nil {
+		stats.EwmaLatency.Observe(float64(latencyMs))
+	}
+	// Circuit breaker: a success may close the circuit from HalfOpen.
+	if stats.Breaker != nil {
+		stats.Breaker.RecordSuccess()
+	}
+
 	if stats.TotalCalls > 0 {
 		for i, p := range r.providers {
 			if p.Name == name {
@@ -636,20 +747,18 @@ func (r *LLMRouter) recordFailure(name string, latencyMs int64) {
 	}
 	stats.LastUsed = time.Now()
 
-	// Cooldown backoff is driven by the CONSECUTIVE failure count, not
-	// the cumulative one. A provider that fails 5 times in a row then
-	// recovers should not be cooled down forever after.
-	if stats.ConsecutiveFailures >= 5 {
-		cooldownSeconds := 30 * int(stats.ConsecutiveFailures)
-		if cooldownSeconds > 300 {
-			cooldownSeconds = 300
+	// Circuit breaker: a failure may trip Closed->Open or re-open from
+	// HalfOpen. This replaces the old ConsecutiveFailures>=5 cooldown
+	// block, which lacked a HalfOpen probe state.
+	if stats.Breaker != nil {
+		prevState := stats.Breaker.State()
+		stats.Breaker.RecordFailure()
+		if prevState != CircuitOpen && stats.Breaker.State() == CircuitOpen {
+			logger.Warn("Provider circuit breaker opened",
+				"provider", name,
+				"failures", stats.Breaker.FailureCount(),
+			)
 		}
-		stats.CooldownUntil = time.Now().Add(time.Duration(cooldownSeconds) * time.Second)
-		logger.Warn("Provider cooldown activated",
-			"provider", name,
-			"consecutive_failures", stats.ConsecutiveFailures,
-			"cooldown_seconds", cooldownSeconds,
-		)
 	}
 
 	if stats.TotalCalls > 0 {
@@ -668,13 +777,22 @@ func (r *LLMRouter) recordFailure(name string, latencyMs int64) {
 func (r *LLMRouter) getOrCreateStatsLocked(name string) *ProviderStats {
 	stats, ok := r.stats[name]
 	if !ok {
-		today := time.Now().Format("2006-01-02")
-		stats = &ProviderStats{
-			LastResetDate: today,
-		}
+		stats = newProviderStats()
 		r.stats[name] = stats
 	}
 	return stats
+}
+
+// newProviderStats constructs a fully-initialized ProviderStats with an EWMA
+// latency predictor and a circuit breaker. All ProviderStats must be created
+// through this constructor so the routing logic can assume non-nil
+// EwmaLatency/Breaker fields.
+func newProviderStats() *ProviderStats {
+	return &ProviderStats{
+		LastResetDate: time.Now().Format("2006-01-02"),
+		EwmaLatency:   NewEWMAPredictor(0.3),
+		Breaker:       NewCircuitBreaker(DefaultCircuitBreakerConfig()),
+	}
 }
 
 func (r *LLMRouter) GetProviderStats() map[string]ProviderStats {

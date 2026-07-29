@@ -198,6 +198,221 @@ func TestEvaluateParams_Nil(t *testing.T) {
 	}
 }
 
+// TestEvaluateParamsVectorized_MatchesSerial verifies that for error-free
+// params the vectorised batch path produces results identical to the serial
+// EvaluateParams, across a mix of literals, single-expression, and
+// multi-expression templates.
+func TestEvaluateParamsVectorized_MatchesSerial(t *testing.T) {
+	engine := NewExpressionEngine()
+	engine.SetStepOutput(0, "fetch", "fetched data")
+	engine.SetStepOutput(1, "process", `{"name":"Alice"}`)
+	engine.SetVariable("api_key", "secret123")
+	engine.SetVariable("model", "gpt-4")
+
+	params := map[string]string{
+		"url":     "{{step.0}}",
+		"headers": "Authorization: Bearer {{var.api_key}}",
+		"plain":   "static value",
+		"input":   "{{input}}",
+		"multi":   "{{var.model}} calls {{step.0}} with {{input}}",
+		"jp":      "{{step.1.jsonpath:$.name}}",
+	}
+	input := "the workflow input"
+
+	serial, err := engine.EvaluateParams(params, input)
+	if err != nil {
+		t.Fatalf("serial EvaluateParams errored: %v", err)
+	}
+	vec, err := engine.EvaluateParamsVectorized(params, input)
+	if err != nil {
+		t.Fatalf("vectorized errored on error-free params: %v", err)
+	}
+	if len(vec) != len(serial) {
+		t.Fatalf("length mismatch: serial=%d vec=%d", len(serial), len(vec))
+	}
+	for k, want := range serial {
+		if got := vec[k]; got != want {
+			t.Errorf("param %q: vectorized=%q serial=%q", k, got, want)
+		}
+	}
+}
+
+// TestEvaluateParamsVectorized_Empty covers the empty-params fast path: it
+// must return a non-nil empty map and no error.
+func TestEvaluateParamsVectorized_Empty(t *testing.T) {
+	engine := NewExpressionEngine()
+	got, err := engine.EvaluateParamsVectorized(map[string]string{}, "input")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected non-nil map for empty params")
+	}
+	if len(got) != 0 {
+		t.Errorf("expected empty map, got %v", got)
+	}
+}
+
+// TestEvaluateParamsVectorized_NilParams covers a nil params map: len(nil)==0,
+// so the empty fast path applies and a non-nil empty map is returned.
+func TestEvaluateParamsVectorized_NilParams(t *testing.T) {
+	engine := NewExpressionEngine()
+	got, err := engine.EvaluateParamsVectorized(nil, "input")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected non-nil map for nil params")
+	}
+	if len(got) != 0 {
+		t.Errorf("expected empty map, got %v", got)
+	}
+}
+
+// TestEvaluateParamsVectorized_SingleParam covers a one-entry map (the
+// minimal batch) and checks the result matches the serial path.
+func TestEvaluateParamsVectorized_SingleParam(t *testing.T) {
+	engine := NewExpressionEngine()
+	engine.SetVariable("k", "v")
+	params := map[string]string{"only": "value={{var.k}}"}
+
+	serial, err := engine.EvaluateParams(params, "in")
+	if err != nil {
+		t.Fatalf("serial: %v", err)
+	}
+	vec, err := engine.EvaluateParamsVectorized(params, "in")
+	if err != nil {
+		t.Fatalf("vectorized: %v", err)
+	}
+	if vec["only"] != serial["only"] {
+		t.Errorf("got %q want %q", vec["only"], serial["only"])
+	}
+	if vec["only"] != "value=v" {
+		t.Errorf("expected 'value=v', got %q", vec["only"])
+	}
+}
+
+// TestEvaluateParamsVectorized_MixedLiteralAndExpression verifies a batch
+// mixing pure literals (no {{}}) with expressions resolves each correctly,
+// exercising the literal-only fast path inside evaluateInto.
+func TestEvaluateParamsVectorized_MixedLiteralAndExpression(t *testing.T) {
+	engine := NewExpressionEngine()
+	engine.SetVariable("name", "world")
+	params := map[string]string{
+		"lit1":    "plain text",
+		"lit2":    "no expressions here at all",
+		"expr1":   "Hello {{var.name}}",
+		"expr2":   "{{var.name}}!",
+		"complex": "a={{var.name}} b=plain",
+	}
+	vec, err := engine.EvaluateParamsVectorized(params, "in")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := map[string]string{
+		"lit1":    "plain text",
+		"lit2":    "no expressions here at all",
+		"expr1":   "Hello world",
+		"expr2":   "world!",
+		"complex": "a=world b=plain",
+	}
+	for k, w := range want {
+		if vec[k] != w {
+			t.Errorf("param %q: got %q want %q", k, vec[k], w)
+		}
+	}
+}
+
+// TestEvaluateParamsVectorized_PartialResultsOnError verifies the error
+// semantics that differ from the serial path: when one param fails, the
+// vectorised path still evaluates every param (returning partial results with
+// verbatim {{...}} fallbacks for the failed expression) and reports the first
+// error in deterministic (sorted) key order. The serial path instead returns
+// (nil, err) on the first failure.
+func TestEvaluateParamsVectorized_PartialResultsOnError(t *testing.T) {
+	engine := NewExpressionEngine()
+	engine.SetVariable("name", "world")
+	params := map[string]string{
+		"good_a": "{{var.name}}",
+		"good_b": "literal-{{var.name}}",
+		"bad":    "{{step.99}}", // known prefix, missing step -> error
+		"good_c": "{{var.name}} again",
+	}
+
+	vec, err := engine.EvaluateParamsVectorized(params, "any-input")
+	if err == nil {
+		t.Fatal("expected an error from the failing param, got nil")
+	}
+
+	// Partial results: every key is present, the failed expression falls back
+	// to its verbatim {{...}} text.
+	if len(vec) != len(params) {
+		t.Fatalf("expected %d partial results, got %d", len(params), len(vec))
+	}
+	if vec["good_a"] != "world" {
+		t.Errorf("good_a: got %q want %q", vec["good_a"], "world")
+	}
+	if vec["good_b"] != "literal-world" {
+		t.Errorf("good_b: got %q want %q", vec["good_b"], "literal-world")
+	}
+	if vec["good_c"] != "world again" {
+		t.Errorf("good_c: got %q want %q", vec["good_c"], "world again")
+	}
+	if vec["bad"] != "{{step.99}}" {
+		t.Errorf("bad: expected verbatim fallback %q, got %q", "{{step.99}}", vec["bad"])
+	}
+
+	// The error must reference the failing param.
+	if !strings.Contains(err.Error(), "bad") {
+		t.Errorf("error should reference the failing param 'bad', got: %v", err)
+	}
+}
+
+// TestEvaluateParamsVectorized_FirstErrorInSortedOrder verifies that when
+// multiple params fail, the reported error is the first one in deterministic
+// (sorted) key order, not whatever the non-deterministic map iteration visits
+// first.
+func TestEvaluateParamsVectorized_FirstErrorInSortedOrder(t *testing.T) {
+	engine := NewExpressionEngine()
+	params := map[string]string{
+		"zeta": "{{step.99}}", // would be last by insertion, but sorted last
+		"alpha": "{{step.98}}", // sorted first -> this error should win
+		"mid":   "{{step.97}}",
+	}
+
+	// Run repeatedly to expose any non-determinism from map iteration order.
+	for i := 0; i < 50; i++ {
+		_, err := engine.EvaluateParamsVectorized(params, "in")
+		if err == nil {
+			t.Fatalf("iter %d: expected error, got nil", i)
+		}
+		if !strings.Contains(err.Error(), "alpha") {
+			t.Fatalf("iter %d: expected first error to reference 'alpha' (sorted first), got: %v", i, err)
+		}
+	}
+}
+
+// TestEvaluateParamsVectorized_UnknownPrefixNoError verifies that an unknown
+// expression prefix (e.g. Go template syntax) is left verbatim and does NOT
+// surface an error, mirroring Evaluate's known-prefix policy.
+func TestEvaluateParamsVectorized_UnknownPrefixNoError(t *testing.T) {
+	engine := NewExpressionEngine()
+	params := map[string]string{
+		"go_tmpl": "Hello {{.Name}} - {{unknown.thing}}",
+		"good":    "{{input}}",
+	}
+	vec, err := engine.EvaluateParamsVectorized(params, "IN")
+	if err != nil {
+		t.Fatalf("unknown-prefix expressions must not error, got: %v", err)
+	}
+	if vec["go_tmpl"] != "Hello {{.Name}} - {{unknown.thing}}" {
+		t.Errorf("unknown expr should be verbatim, got %q", vec["go_tmpl"])
+	}
+	if vec["good"] != "IN" {
+		t.Errorf("good param: got %q want %q", vec["good"], "IN")
+	}
+}
+
 func TestContainsExpression(t *testing.T) {
 	tests := []struct {
 		input    string

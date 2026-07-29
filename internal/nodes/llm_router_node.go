@@ -43,7 +43,7 @@ func (n *LLMRouterNode) Schema() NodeSchema {
 		Output:      "string - AI response from the selected provider",
 		Params: []ParamSchema{
 			{Name: "system", Type: "string", Description: "System prompt for the LLM", Required: false},
-			{Name: "strategy", Type: "string", Description: "Routing strategy: priority, cost, latency, round_robin, random (default: priority)", Required: false, Default: "priority"},
+			{Name: "strategy", Type: "string", Description: "Routing strategy: priority, cost, latency, pareto, round_robin, random (default: priority)", Required: false, Default: "priority"},
 			{Name: "max_retries", Type: "string", Description: "Maximum number of fallback attempts (default: 3)", Required: false, Default: "3"},
 			{Name: "show_provider", Type: "string", Description: "Show which provider was used in output (default: false)", Required: false, Default: "false"},
 			{Name: "show_stats", Type: "string", Description: "Show router statistics in output (default: false)", Required: false, Default: "false"},

@@ -141,30 +141,10 @@ func BenchmarkAST_CacheBenefit(b *testing.B) {
 
 	// evalCompiled walks a compiled template against the engine, mirroring the
 	// post-compile half of Evaluate. Defined here so the benchmark can apply it
-	// to a freshly-parsed template (bypassing the cache).
+	// to a freshly-parsed template (bypassing the cache). Delegates to
+	// evalBytecode (same inline-switch dispatch as production Evaluate).
 	evalCompiled := func(tmpl *compiledTemplate, input string) (string, error) {
-		if !tmpl.hasExpr {
-			return tmpl.literal, nil
-		}
-		var sb strings.Builder
-		var firstErr error
-		for i := range tmpl.parts {
-			p := &tmpl.parts[i]
-			if p.isLiteral {
-				sb.WriteString(p.literal)
-				continue
-			}
-			val, err := p.node.eval(engine, input)
-			if err != nil {
-				if p.node.knownPrefix() && firstErr == nil {
-					firstErr = fmt.Errorf("expression '{{%s}}': %w", p.inner, err)
-				}
-				sb.WriteString(p.fullMatch)
-				continue
-			}
-			sb.WriteString(val)
-		}
-		return sb.String(), firstErr
+		return evalBytecode(engine, tmpl, input)
 	}
 
 	b.Run("WarmCache", func(b *testing.B) {
@@ -250,4 +230,248 @@ func legacyEvaluateParams(e *ExpressionEngine, params map[string]string, input s
 		out[k] = resolved
 	}
 	return out, nil
+}
+
+// ── Bytecode (switch dispatch) vs AST (interface dispatch) ──
+//
+// BenchmarkBytecode_vs_AST isolates the dispatch-mechanism overhead. Both
+// paths consume a PRE-COMPILED template (no per-call cache lookup) and build
+// the result with strings.Builder (no sync.Pool). The only difference is the
+// dispatch: Bytecode calls evalInstr (switch on opcode), AST calls
+// node.eval (interface dispatch). This isolates exactly what the bytecode
+// optimisation improves.
+
+// astTemplate mirrors the pre-bytecode compiledTemplate shape: a slice of
+// templatePart where each expression carries an exprNode. Built once per
+// expression (outside the timed loop) so the benchmark measures dispatch cost,
+// not parse cost.
+type astTemplate struct {
+	literal string
+	hasExpr bool
+	parts   []templatePart
+}
+
+// compileASTTemplate builds the AST form of a template by reusing the bytecode
+// parse (for literal/expr splitting) and converting each expression instruction
+// into an exprNode via the retained compileExpr oracle.
+func compileASTTemplate(expr string) *astTemplate {
+	bc := compileTemplate(expr)
+	if !bc.hasExpr {
+		return &astTemplate{literal: bc.literal}
+	}
+	parts := make([]templatePart, 0, len(bc.instrs))
+	for i := range bc.instrs {
+		ins := &bc.instrs[i]
+		if ins.op == opLiteral {
+			parts = append(parts, templatePart{isLiteral: true, literal: ins.strArg})
+			continue
+		}
+		parts = append(parts, templatePart{
+			node:      compileExpr(ins.inner),
+			fullMatch: ins.fullMatch,
+			inner:     ins.inner,
+		})
+	}
+	return &astTemplate{hasExpr: true, parts: parts}
+}
+
+// evalAST walks an astTemplate dispatching each expression through the
+// exprNode interface — exactly the pre-bytecode Evaluate hot loop. Uses a
+// raw []byte buffer (matching evalBytecode) so the only difference is the
+// dispatch mechanism.
+func evalAST(e *ExpressionEngine, tmpl *astTemplate, input string) (string, error) {
+	if !tmpl.hasExpr {
+		return tmpl.literal, nil
+	}
+	var buf []byte
+	var firstErr error
+	for i := range tmpl.parts {
+		p := &tmpl.parts[i]
+		if p.isLiteral {
+			buf = append(buf, p.literal...)
+			continue
+		}
+		val, err := p.node.eval(e, input)
+		if err != nil {
+			if p.node.knownPrefix() && firstErr == nil {
+				firstErr = fmt.Errorf("expression '{{%s}}': %w", p.inner, err)
+			}
+			buf = append(buf, p.fullMatch...)
+			continue
+		}
+		buf = append(buf, val...)
+	}
+	return string(buf), firstErr
+}
+
+// evalBytecode walks a pre-compiled bytecode template with the SAME inline
+// switch dispatch as production Evaluate, but uses strings.Builder (no pool,
+// no cache lookup) so the only difference from evalAST is the dispatch
+// mechanism. This function must mirror Evaluate's switch exactly to keep the
+// benchmark comparison fair.
+func evalBytecode(e *ExpressionEngine, tmpl *compiledTemplate, input string) (string, error) {
+	if !tmpl.hasExpr {
+		return tmpl.literal, nil
+	}
+	var sb strings.Builder
+	var firstErr error
+	for i := range tmpl.instrs {
+		ins := &tmpl.instrs[i]
+		switch ins.op {
+		case opLiteral:
+			sb.WriteString(ins.strArg)
+		case opInput:
+			sb.WriteString(input)
+		case opStep:
+			if v, err := e.evalStepRef(ins.strArg); err != nil {
+				setFirstExprError(ins, &firstErr, err)
+				sb.WriteString(ins.fullMatch)
+			} else {
+				sb.WriteString(v)
+			}
+		case opVar:
+			if v, ok := e.variables[ins.strArg]; ok {
+				sb.WriteString(v)
+			} else {
+				setFirstExprError(ins, &firstErr, fmt.Errorf("variable not found: %s", ins.strArg))
+				sb.WriteString(ins.fullMatch)
+			}
+		case opEnv:
+			if v, err := evalEnvVar(ins.strArg); err != nil {
+				setFirstExprError(ins, &firstErr, err)
+				sb.WriteString(ins.fullMatch)
+			} else {
+				sb.WriteString(v)
+			}
+		case opFile:
+			if v, err := evalFileContents(ins.strArg); err != nil {
+				setFirstExprError(ins, &firstErr, err)
+				sb.WriteString(ins.fullMatch)
+			} else {
+				sb.WriteString(v)
+			}
+		case opLoop:
+			if e.loopVars == nil {
+				setFirstExprError(ins, &firstErr, fmt.Errorf("not in a loop context"))
+				sb.WriteString(ins.fullMatch)
+			} else if v, ok := e.loopVars[ins.strArg]; ok {
+				sb.WriteString(v)
+			} else {
+				setFirstExprError(ins, &firstErr, fmt.Errorf("loop variable not found: %s", ins.strArg))
+				sb.WriteString(ins.fullMatch)
+			}
+		case opSecret:
+			if v, err := evalSecretRef(e, ins.strArg); err != nil {
+				setFirstExprError(ins, &firstErr, err)
+				sb.WriteString(ins.fullMatch)
+			} else {
+				sb.WriteString(v)
+			}
+		case opBareName:
+			if v, ok := e.variables[ins.strArg]; ok {
+				sb.WriteString(v)
+			} else if ins.strArg == "input" {
+				sb.WriteString(input)
+			} else {
+				setFirstExprError(ins, &firstErr, fmt.Errorf("unknown expression: %s", ins.strArg))
+				sb.WriteString(ins.fullMatch)
+			}
+		case opJSONPath:
+			if rv, rerr := ins.refNode.eval(e, input); rerr != nil {
+				setFirstExprError(ins, &firstErr, rerr)
+				sb.WriteString(ins.fullMatch)
+			} else if v, err := extractJSONPath(rv, ins.strArg2); err != nil {
+				setFirstExprError(ins, &firstErr, err)
+				sb.WriteString(ins.fullMatch)
+			} else {
+				sb.WriteString(v)
+			}
+		case opUnknown:
+			setFirstExprError(ins, &firstErr, fmt.Errorf("unknown expression: %s", ins.inner))
+			sb.WriteString(ins.fullMatch)
+		}
+	}
+	return sb.String(), firstErr
+}
+
+func BenchmarkBytecode_vs_AST(b *testing.B) {
+	engine := benchExprEngine()
+
+	cases := []struct {
+		name string
+		expr string
+	}{
+		{"SingleInput", "{{input}}"},
+		{"SingleStep", "{{step.0}}"},
+		{"SingleVar", "{{var.api_key}}"},
+		{"SingleLoop", "{{loop.item}}"},
+		{"PrefixSuffix", "prefix-{{input}}-suffix"},
+		{"MultiExpr", "first={{step.0}}&second={{step.1}}&key={{var.api_key}}"},
+		{"RepeatedExpr", "{{step.0}} {{step.0}} {{var.api_key}}"},
+		{"SingleJsonpath", "{{step.0.jsonpath:$.users[0].name}}"},
+		{"ManyExpr", "{{step.0}}{{var.api_key}}{{loop.item}}{{input}}{{var.api_url}}{{step.1}}{{loop.index}}{{var.model}}{{step.2}}{{loop.count}}"},
+	}
+
+	const callsPerIter = 1000
+	input := "benchmark-input"
+
+	for _, c := range cases {
+		// Pre-compile both forms once so the inner loop measures dispatch
+		// cost only — neither path does cache lookup or parsing per call.
+		bcTmpl := compileTemplate(c.expr)
+		astTmpl := compileASTTemplate(c.expr)
+
+		b.Run(c.name+"/Bytecode", func(b *testing.B) {
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				for k := 0; k < callsPerIter; k++ {
+					_, _ = evalBytecode(engine, bcTmpl, input)
+				}
+			}
+		})
+		b.Run(c.name+"/AST", func(b *testing.B) {
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				for k := 0; k < callsPerIter; k++ {
+					_, _ = evalAST(engine, astTmpl, input)
+				}
+			}
+		})
+	}
+}
+
+// BenchmarkEvaluateParams_Vectorized_vs_Serial compares the serial
+// EvaluateParams (one Evaluate call — and one pooled-buffer round-trip — per
+// param) against EvaluateParamsVectorized, which compiles all templates up
+// front and evaluates them into a single shared buffer in one pass. The
+// vectorised path amortises buffer growth and per-expression pool Get/Put
+// overhead across the whole batch, so it should show fewer allocations.
+func BenchmarkEvaluateParams_Vectorized_vs_Serial(b *testing.B) {
+	engine := NewExpressionEngine()
+	engine.SetVariable("name", "world")
+	engine.SetVariable("count", "42")
+	engine.SetStepOutput(0, "step0", "step-output")
+
+	params := map[string]string{
+		"a": "{{var.name}}",
+		"b": "{{step.0}}",
+		"c": "{{input}}",
+		"d": "literal text",
+		"e": "{{var.count}} and {{var.name}}",
+	}
+	input := "test-input"
+
+	b.Run("Serial", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			_, _ = engine.EvaluateParams(params, input)
+		}
+	})
+
+	b.Run("Vectorized", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			_, _ = engine.EvaluateParamsVectorized(params, input)
+		}
+	})
 }

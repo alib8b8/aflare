@@ -249,8 +249,8 @@ func TestAST_StaticTextFastPath(t *testing.T) {
 	if tmpl.literal != "plain text without expressions" {
 		t.Errorf("expected literal preserved, got %q", tmpl.literal)
 	}
-	if len(tmpl.parts) != 0 {
-		t.Errorf("expected no parts for static text, got %d", len(tmpl.parts))
+	if len(tmpl.instrs) != 0 {
+		t.Errorf("expected no instrs for static text, got %d", len(tmpl.instrs))
 	}
 }
 
@@ -271,7 +271,7 @@ func TestAST_ParseTemplateEdgeCases(t *testing.T) {
 	for _, s := range []string{"{{}}", "{{x}", "{{x}y}}"} {
 		tmpl := compileTemplate(s)
 		if tmpl.hasExpr {
-			t.Errorf("expected %q to have no valid expressions, got hasExpr=true parts=%d", s, len(tmpl.parts))
+			t.Errorf("expected %q to have no valid expressions, got hasExpr=true instrs=%d", s, len(tmpl.instrs))
 		}
 	}
 	// "{{ }}" is a valid match (space is a non-'}' char) but resolves to unknown.
@@ -279,17 +279,17 @@ func TestAST_ParseTemplateEdgeCases(t *testing.T) {
 	if !tmpl.hasExpr {
 		t.Fatal("expected {{ }} to contain a (zero-content) expression")
 	}
-	if len(tmpl.parts) != 1 || tmpl.parts[0].isLiteral {
-		t.Fatalf("expected one expr part for {{ }}, got %+v", tmpl.parts)
+	if len(tmpl.instrs) != 1 || tmpl.instrs[0].op == opLiteral {
+		t.Fatalf("expected one expr instr for {{ }}, got %+v", tmpl.instrs)
 	}
-	// Multiple expressions split into parts correctly.
+	// Multiple expressions split into instrs correctly.
 	tmpl = compileTemplate("{{a}}{{b}}")
-	if len(tmpl.parts) != 2 {
-		t.Fatalf("expected 2 parts for {{a}}{{b}}, got %d", len(tmpl.parts))
+	if len(tmpl.instrs) != 2 {
+		t.Fatalf("expected 2 instrs for {{a}}{{b}}, got %d", len(tmpl.instrs))
 	}
 	tmpl = compileTemplate("{{a}}b{{c}}")
-	if len(tmpl.parts) != 3 {
-		t.Fatalf("expected 3 parts for {{a}}b{{c}}, got %d", len(tmpl.parts))
+	if len(tmpl.instrs) != 3 {
+		t.Fatalf("expected 3 instrs for {{a}}b{{c}}, got %d", len(tmpl.instrs))
 	}
 }
 

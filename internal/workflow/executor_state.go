@@ -229,6 +229,50 @@ func RestoreState(state *WorkflowState, engine *ExpressionEngine) string {
 	return state.Data
 }
 
+// SaveStateWAL appends the current workflow state to a WAL. This replaces
+// the non-atomic os.WriteFile in saveCheckpoint with a durable append-only
+// log that survives crashes. After appending it opportunistically compacts
+// the log if it has grown past the configured threshold.
+func SaveStateWAL(wal *WAL, wf *Workflow, stepIndex int, data string, engine *ExpressionEngine) error {
+	state := SaveCurrentState(wf, stepIndex, data, engine)
+	rec := WALRecord{
+		StepIndex:   state.StepIndex,
+		Data:        state.Data,
+		StepOutputs: state.StepOutputs,
+		Variables:   state.Variables,
+		Timestamp:   time.Now().UTC(),
+	}
+	if stepIndex >= 0 && stepIndex < len(wf.Steps) {
+		rec.StepName = wf.Steps[stepIndex].Name
+		rec.NodeName = wf.Steps[stepIndex].Node
+	}
+	if err := wal.Append(rec); err != nil {
+		return err
+	}
+	return wal.MaybeCompact()
+}
+
+// LoadStateWAL replays a WAL and returns the latest state (for crash
+// recovery). It returns (nil, nil) when the log contains no records.
+func LoadStateWAL(walPath string) (*WorkflowState, error) {
+	var latest *WorkflowState
+	err := ReplayWAL(walPath, func(r WALRecord) error {
+		latest = &WorkflowState{
+			WorkflowName: "",
+			StepIndex:    r.StepIndex,
+			Data:         r.Data,
+			StepOutputs:  r.StepOutputs,
+			Variables:    r.Variables,
+			SavedAt:      r.Timestamp,
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return latest, nil // nil if no records
+}
+
 // ConcurrencyLimiter provides a global semaphore for limiting concurrent operations.
 type ConcurrencyLimiter struct {
 	sem chan struct{}

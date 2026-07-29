@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -220,29 +221,142 @@ func (e *ExpressionEngine) Evaluate(expr string, input string) (string, error) {
 		exprBufPool.Put(bufp)
 	}()
 	var firstErr error
-	for i := range tmpl.parts {
-		p := &tmpl.parts[i]
-		if p.isLiteral {
-			buf = append(buf, p.literal...)
-			continue
+	for i := range tmpl.instrs {
+		ins := &tmpl.instrs[i]
+		// resolveInstr is the shared dispatch core (also used by the
+		// vectorised batch path). It returns the resolved value without
+		// touching buf; the caller appends it, or — in the vectorised
+		// single-expression fast path — stores it directly with no copy.
+		// On error the caller records it via setFirstExprError and appends
+		// the verbatim {{...}} fallback, mirroring the legacy semantics.
+		if v, err := e.resolveInstr(ins, input); err != nil {
+			setFirstExprError(ins, &firstErr, err)
+			buf = append(buf, ins.fullMatch...)
+		} else {
+			buf = append(buf, v...)
 		}
-		val, err := p.node.eval(e, input)
-		if err != nil {
-			// Mirror the legacy regex behaviour: expressions with a known
-			// prefix surface their first error; unknown expressions (e.g.
-			// Go templates) are left verbatim and do not fail evaluation.
-			if p.node.knownPrefix() && firstErr == nil {
-				firstErr = fmt.Errorf("expression '{{%s}}': %w", p.inner, err)
-			}
-			buf = append(buf, p.fullMatch...)
-			continue
-		}
-		buf = append(buf, val...)
 	}
 	if firstErr != nil {
 		return string(buf), firstErr
 	}
 	return string(buf), nil
+}
+
+// setFirstExprError records the first error from a known-prefix expression,
+// mirroring the legacy behaviour where only known prefixes surface errors.
+// Called only on the failure path; the happy path never calls it.
+func setFirstExprError(ins *instruction, firstErr *error, err error) {
+	if ins.known && *firstErr == nil {
+		*firstErr = fmt.Errorf("expression '{{%s}}': %w", ins.inner, err)
+	}
+}
+
+// resolveInstr resolves a single instruction to its string value. It is the
+// shared dispatch core of Evaluate, evaluateInto, and the vectorised batch
+// path's single-expression fast path: returning the value (rather than
+// appending to a buffer) lets the vectorised path hand back an already-existing
+// string — a workflow variable, a step output, or the input — without copying
+// it through a buffer, which is the allocation the scalar Evaluate always pays.
+//
+// On the happy path it returns (value, nil); on the failure path (value is
+// then meaningless) it returns ("", err) and the caller records the error via
+// setFirstExprError and appends the verbatim {{...}} fallback. The switch
+// mirrors the original inline Evaluate dispatch exactly, preserving semantics
+// (including known-prefix error surfacing and the bare-name var/input fallback).
+func (e *ExpressionEngine) resolveInstr(ins *instruction, input string) (string, error) {
+	switch ins.op {
+	case opLiteral:
+		return ins.strArg, nil
+	case opInput:
+		return input, nil
+	case opStep:
+		return e.evalStepRef(ins.strArg)
+	case opVar:
+		if v, ok := e.variables[ins.strArg]; ok {
+			return v, nil
+		}
+		return "", fmt.Errorf("variable not found: %s", ins.strArg)
+	case opEnv:
+		return evalEnvVar(ins.strArg)
+	case opFile:
+		return evalFileContents(ins.strArg)
+	case opLoop:
+		if e.loopVars == nil {
+			return "", fmt.Errorf("not in a loop context")
+		}
+		if v, ok := e.loopVars[ins.strArg]; ok {
+			return v, nil
+		}
+		return "", fmt.Errorf("loop variable not found: %s", ins.strArg)
+	case opSecret:
+		return evalSecretRef(e, ins.strArg)
+	case opBareName:
+		if v, ok := e.variables[ins.strArg]; ok {
+			return v, nil
+		}
+		if ins.strArg == "input" {
+			return input, nil
+		}
+		return "", fmt.Errorf("unknown expression: %s", ins.strArg)
+	case opJSONPath:
+		// The reference was pre-compiled at template-compile time
+		// (refNode), so this is a single interface call with no per-eval
+		// allocation. extractJSONPath's JSON parsing dwarfs this dispatch.
+		rv, rerr := ins.refNode.eval(e, input)
+		if rerr != nil {
+			return "", rerr
+		}
+		return extractJSONPath(rv, ins.strArg2)
+	case opUnknown:
+		return "", fmt.Errorf("unknown expression: %s", ins.inner)
+	}
+	return "", nil
+}
+
+// evalEnvVar resolves a {{env.NAME}} expression against the allow-list.
+func evalEnvVar(name string) (string, error) {
+	if !isAllowedEnvVar(name) {
+		return "", fmt.Errorf("access to environment variable %q is not allowed", name)
+	}
+	if v, ok := os.LookupEnv(name); ok {
+		return v, nil
+	}
+	return "", fmt.Errorf("environment variable not found: %s", name)
+}
+
+// evalFileContents resolves a {{file.PATH}} expression: validates the path,
+// checks the size limit, and reads the contents. Extracted from the inline
+// switch so the file-I/O case (rare and slow) does not bloat the hot loop.
+func evalFileContents(name string) (string, error) {
+	safePath, err := validateExprFilePath(name)
+	if err != nil {
+		return "", fmt.Errorf("file path validation failed: %w", err)
+	}
+	info, err := os.Stat(safePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to stat file '%s': %w", name, err)
+	}
+	if info.Size() > maxExprFileSize {
+		return "", fmt.Errorf("file '%s' too large (max %d bytes)", name, maxExprFileSize)
+	}
+	content, err := os.ReadFile(safePath) // #nosec G304 -- path validated by validateExprFilePath
+	if err != nil {
+		return "", fmt.Errorf("failed to read file '%s': %w", name, err)
+	}
+	return string(content), nil
+}
+
+// evalSecretRef resolves a {{secret.GROUP.KEY}} expression via the engine's
+// secret getter. Extracted from the inline switch to keep the hot loop compact.
+func evalSecretRef(e *ExpressionEngine, name string) (string, error) {
+	if e.secretGetter == nil {
+		return "", fmt.Errorf("secrets not available - use 'llm-box secrets add' to store secrets first")
+	}
+	secretParts := strings.SplitN(name, ".", 2)
+	if len(secretParts) < 2 {
+		return "", fmt.Errorf("secret expression requires format: secret.GROUP.KEY")
+	}
+	return e.secretGetter(strings.TrimSpace(secretParts[0]), strings.TrimSpace(secretParts[1]))
 }
 
 // ── AST expression engine ──
@@ -265,16 +379,48 @@ type exprNode interface {
 	knownPrefix() bool
 }
 
+// opcode is a single flat instruction in the compiled bytecode. The switch
+// dispatch in evalInstr replaces interface calls (exprNode.eval), enabling
+// branch prediction and eliminating virtual call overhead.
+type opcode uint8
+
+const (
+	opLiteral    opcode = iota // append string literal (strArg)
+	opInput                    // append workflow input
+	opStep                     // append step output (strArg: name)
+	opVar                      // append workflow variable (strArg: name)
+	opEnv                      // append env var (strArg: name)
+	opFile                     // append file contents (strArg: name)
+	opLoop                     // append loop var (strArg: name)
+	opSecret                   // append secret (strArg: GROUP.KEY)
+	opBareName                 // bare name: var or input (strArg: name)
+	opJSONPath                 // jsonpath extraction (strArg: ref inner, strArg2: path)
+	opUnknown                  // unknown prefix, leave verbatim (inner)
+)
+
+// instruction is a single bytecode operation with its operands.
+type instruction struct {
+	op        opcode
+	strArg    string // string operand (literal text, variable name, ref inner, etc.)
+	strArg2   string // second string operand (for opJSONPath: the path)
+	known     bool   // whether this is a known-prefix expression (for error handling)
+	fullMatch string // original {{...}} text for verbatim fallback
+	inner     string // trimmed inner text for error messages
+	refNode   exprNode // for opJSONPath: pre-compiled reference expression (avoids per-call alloc)
+}
+
 // compiledTemplate is the parsed form of a template string.
 type compiledTemplate struct {
 	// literal holds the entire template when it contains no expressions;
-	// hasExpr is false and parts is empty. This is the fast path.
+	// hasExpr is false and instrs is empty. This is the fast path.
 	literal string
 	hasExpr bool
-	parts   []templatePart
+	instrs  []instruction // flat bytecode (replaces parts)
 }
 
-// templatePart is either a literal segment or a compiled expression.
+// templatePart is either a literal segment or a compiled expression. Retained
+// for the AST oracle (compileExpr + exprNode) used by differential tests and
+// benchmarks; compiledTemplate now uses instrs []instruction instead.
 type templatePart struct {
 	isLiteral bool
 	literal   string // valid when isLiteral
@@ -375,20 +521,22 @@ func (c *templateLRU) loadOrStore(key string, value *compiledTemplate) *compiled
 // parseTemplate scans s for {{...}} expressions, mirroring the legacy varPattern
 // (`\{\{([^}]+)\}\}`): an expression is "{{" + one-or-more non-'}' chars + "}}",
 // with the closing "}}" being the first '}' encountered. Non-matching text
-// becomes literal segments.
+// becomes literal segments. The result is a flat []instruction (bytecode)
+// rather than []templatePart (AST nodes), so evaluation uses switch dispatch
+// instead of interface dispatch.
 func parseTemplate(s string) *compiledTemplate {
 	// Fast path: no opening brace-pair, so no expression is possible.
 	if !strings.Contains(s, "{{") {
 		return &compiledTemplate{literal: s}
 	}
 
-	var parts []templatePart
+	var instrs []instruction
 	var lit strings.Builder
 	n := len(s)
 	i := 0
 	flushLit := func() {
 		if lit.Len() > 0 {
-			parts = append(parts, templatePart{isLiteral: true, literal: lit.String()})
+			instrs = append(instrs, instruction{op: opLiteral, strArg: lit.String()})
 			lit.Reset()
 		}
 	}
@@ -404,11 +552,10 @@ func parseTemplate(s string) *compiledTemplate {
 			if k > contentStart && k+1 < n && s[k] == '}' && s[k+1] == '}' {
 				flushLit()
 				inner := strings.TrimSpace(s[contentStart:k])
-				parts = append(parts, templatePart{
-					node:      compileExpr(inner),
-					fullMatch: s[i : k+2],
-					inner:     inner,
-				})
+				ins := compileExprToInstr(inner)
+				ins.fullMatch = s[i : k+2]
+				ins.inner = inner
+				instrs = append(instrs, ins)
 				i = k + 2
 				continue
 			}
@@ -419,9 +566,9 @@ func parseTemplate(s string) *compiledTemplate {
 	flushLit()
 
 	// If no expression part was produced, the whole string is literal.
-	for i := range parts {
-		if !parts[i].isLiteral {
-			return &compiledTemplate{hasExpr: true, parts: parts}
+	for i := range instrs {
+		if instrs[i].op != opLiteral {
+			return &compiledTemplate{hasExpr: true, instrs: instrs}
 		}
 	}
 	return &compiledTemplate{literal: s}
@@ -463,6 +610,54 @@ func compileExpr(inner string) exprNode {
 		return &secretExpr{name: name, known: known}
 	default:
 		return &unknownExpr{inner: inner, known: known}
+	}
+}
+
+// compileExprToInstr compiles a trimmed inner expression (the text between {{
+// and }}) into a flat instruction. The dispatch mirrors compileExpr exactly;
+// the resulting instruction is evaluated by evalInstr's switch at runtime,
+// replacing the virtual call through exprNode.eval. fullMatch and inner are
+// filled in by parseTemplate after this returns.
+func compileExprToInstr(inner string) instruction {
+	known := isKnownExpressionPrefix(inner)
+
+	// jsonpath modifier: <ref>.jsonpath:<path>
+	if idx := strings.Index(inner, ".jsonpath:"); idx > 0 {
+		refPart := inner[:idx]
+		jsonPath := inner[idx+len(".jsonpath:"):]
+		return instruction{
+			op:      opJSONPath,
+			strArg:  refPart,
+			strArg2: jsonPath,
+			known:   known,
+			refNode: compileExpr(refPart), // pre-compile ref to avoid per-eval allocation
+		}
+	}
+
+	parts := strings.SplitN(inner, ".", 2)
+	if len(parts) < 2 {
+		// Bare name: a workflow variable, or the literal token "input".
+		return instruction{op: opBareName, strArg: inner, known: known}
+	}
+	prefix := strings.TrimSpace(parts[0])
+	name := strings.TrimSpace(parts[1])
+	switch prefix {
+	case "input":
+		return instruction{op: opInput, known: known}
+	case "step":
+		return instruction{op: opStep, strArg: name, known: known}
+	case "var":
+		return instruction{op: opVar, strArg: name, known: known}
+	case "env":
+		return instruction{op: opEnv, strArg: name, known: known}
+	case "file":
+		return instruction{op: opFile, strArg: name, known: known}
+	case "loop":
+		return instruction{op: opLoop, strArg: name, known: known}
+	case "secret":
+		return instruction{op: opSecret, strArg: name, known: known}
+	default:
+		return instruction{op: opUnknown, known: known}
 	}
 }
 
@@ -935,6 +1130,148 @@ func (e *ExpressionEngine) EvaluateParams(params map[string]string, input string
 		result[k] = evaluated
 	}
 	return result, nil
+}
+
+// EvaluateParamsVectorized batch-evaluates a map of expressions against the
+// same engine state and input. It compiles all expressions up front and
+// evaluates them in one pass over a single shared pooled buffer, amortising
+// buffer growth and sync.Pool round-trips across the whole batch (one buffer
+// Get/Put vs N) and letting the CPU prefetcher / branch predictor warm up
+// across expressions — the columnar-batch idea from Apache Arrow applied to
+// template evaluation.
+//
+// Two per-expression fast paths avoid the buffer copy that the scalar Evaluate
+// always pays, which is what lets the batch path allocate strictly less than
+// the serial EvaluateParams:
+//   - Literal-only templates return the cached literal directly (no copy).
+//   - Single-expression templates (e.g. {{var.x}}, {{step.0}}, {{input}})
+//     return the already-resolved string — a variable, a step output, or the
+//     input — directly, without copying it through a buffer.
+//
+// Multi-expression templates are assembled into the shared buffer.
+//
+// Returns a new map with the same keys, where each value is the evaluated
+// result. If any expression fails, its error is recorded (not returned
+// immediately); the function continues evaluating the remaining expressions so
+// callers get partial results. The returned error (if non-nil) is the first
+// error encountered, in deterministic (sorted) key order. This differs from
+// EvaluateParams, which aborts on the first error and returns a nil map.
+//
+// For error-free params the result is identical to EvaluateParams.
+//
+// NOT thread-safe: must be called from the same goroutine that owns the engine.
+func (e *ExpressionEngine) EvaluateParamsVectorized(params map[string]string, input string) (map[string]string, error) {
+	if len(params) == 0 {
+		return map[string]string{}, nil
+	}
+	n := len(params)
+
+	// Deterministic key order for stable error reporting and reproducible
+	// buffer layout across map-iteration orders. A stack array backs the
+	// common small-batch case (≤ 16 params) to avoid a heap allocation.
+	const smallBatch = 16
+	var stackKeys [smallBatch]string
+	keys := stackKeys[:0]
+	if n > cap(stackKeys) {
+		keys = make([]string, 0, n)
+	}
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Shared pooled buffer for multi-expression results. Pooling the backing
+	// []byte (like Evaluate) avoids a per-call buffer allocation; a single
+	// buffer for the whole batch amortises growth (one grow vs N grows).
+	bufp := exprBufPool.Get().(*[]byte)
+	buf := (*bufp)[:0]
+	defer func() {
+		*bufp = buf
+		exprBufPool.Put(bufp)
+	}()
+
+	// Per-param result slot. Literal-only and single-expression templates
+	// store their result directly in `literal` (no buffer copy); multi-
+	// expression templates record (start, end) offsets into buf. Using "" as
+	// the literal sentinel is safe: an empty literal and an expression that
+	// evaluates to "" both yield "" via the buf slice (buf[0:0] or
+	// buf[start:end] with start==end), and string() of a zero-length slice
+	// allocates nothing. A stack array backs the common small-batch case.
+	type vecSlot struct {
+		literal    string
+		start, end int
+	}
+	var stackSlots [smallBatch]vecSlot
+	slots := stackSlots[:n]
+	if n > len(stackSlots) {
+		slots = make([]vecSlot, n)
+	}
+
+	var firstErr error
+	for i, key := range keys {
+		tmpl := compileTemplate(params[key])
+		var paramErr error
+		switch {
+		case !tmpl.hasExpr:
+			// Literal-only fast path: return the cached literal verbatim.
+			slots[i].literal = tmpl.literal
+		case len(tmpl.instrs) == 1:
+			// Single-expression fast path: resolve the one instruction and
+			// store its value directly — no buffer copy. On error, fall back
+			// to the verbatim {{...}} text (also no copy).
+			ins := &tmpl.instrs[0]
+			if v, err := e.resolveInstr(ins, input); err != nil {
+				setFirstExprError(ins, &paramErr, err)
+				slots[i].literal = ins.fullMatch
+			} else {
+				slots[i].literal = v
+			}
+		default:
+			// Multi-expression: assemble into the shared buffer.
+			slots[i].start = len(buf)
+			paramErr = e.evaluateInto(tmpl, input, &buf)
+			slots[i].end = len(buf)
+		}
+		if paramErr != nil && firstErr == nil {
+			firstErr = fmt.Errorf("param %q: %w", key, paramErr)
+		}
+	}
+
+	// Materialise result strings. Direct/empty results take the `literal`
+	// path (no allocation); assembled results copy out of the shared buffer.
+	result := make(map[string]string, n)
+	for i, key := range keys {
+		if s := slots[i].literal; s != "" {
+			result[key] = s
+		} else {
+			result[key] = string(buf[slots[i].start:slots[i].end])
+		}
+	}
+
+	return result, firstErr
+}
+
+// evaluateInto evaluates tmpl and appends the result to *buf, returning the
+// first error encountered (if any). It is the multi-expression core of the
+// vectorised batch path: by writing into a caller-provided shared buffer it
+// avoids per-expression buffer allocation. Semantics match Evaluate exactly
+// (including known-prefix error surfacing and verbatim {{...}} fallback).
+func (e *ExpressionEngine) evaluateInto(tmpl *compiledTemplate, input string, buf *[]byte) error {
+	if !tmpl.hasExpr {
+		*buf = append(*buf, tmpl.literal...)
+		return nil
+	}
+	var firstErr error
+	for i := range tmpl.instrs {
+		ins := &tmpl.instrs[i]
+		if v, err := e.resolveInstr(ins, input); err != nil {
+			setFirstExprError(ins, &firstErr, err)
+			*buf = append(*buf, ins.fullMatch...)
+		} else {
+			*buf = append(*buf, v...)
+		}
+	}
+	return firstErr
 }
 
 // ContainsExpression reports whether a string contains any {{ ... }} expressions
