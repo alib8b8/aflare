@@ -60,6 +60,7 @@
 - [🏗️ Architecture](#-architecture)
 - [🗺️ Roadmap](#-roadmap)
 - [🌟 Featured Integrations](#-featured-integrations)
+- [🛒 Featured Skills Marketplace](#-featured-skills-marketplace)
 - [📖❓ FAQ](#-faq)
 - [🤝 Contributing](#-contributing)
 - [📦 Code Hosting](#-code-hosting)
@@ -176,7 +177,7 @@ Specialized AI agent nodes for autonomous reasoning:
 | `critic` | Reviews and provides constructive feedback |
 | `evaluator` | Evaluates outputs against criteria |
 | `reflector` | Reflects on process and suggests improvements |
-| `supervisor` | Oversees multi-agent workflows with sequential/parallel/hierarchical/MoE/MindSearch/Agency strategies and 200+ domain specialists |
+| `supervisor` | Oversees multi-agent workflows with sequential/parallel/hierarchical/MoE/MindSearch/Agency strategies and **195 domain specialists**, **9 collaboration templates** |
 | `code_review` | Automated code review and suggestions |
 | `human_in_loop` | Pauses for human approval |
 | `code_knowledge_graph` | Semantic code knowledge graph: 158 languages, vector retrieval, entity/relation/concept extraction, MCP tool exposure, token-efficient review |
@@ -188,7 +189,7 @@ Specialized AI agent nodes for autonomous reasoning:
 | `voice_output` | Voice AI toolchain: TTS + voice cloning + ASR transcription + speaker diarization + voice analysis, 11 languages, 5 ASR engines |
 | `doc_gen` | AI document generation: 7 types (readme/api/function/module/changelog/tutorial/architecture) |
 | `video_edit` | AI video editing: smart_cut/merge/effects/subtitle/storyboard/upscale |
-| `memory` | Agent memory infrastructure: three-level memory (short/medium/long), 8 operations, LRU eviction, cross-session long-term memory |
+| `memory` | Agent memory infrastructure: three-level memory (short/medium/long), 16 operations, LRU eviction, cross-session long-term memory |
 
 ### HarmonyOS &amp; Mobile Nodes
 
@@ -234,7 +235,7 @@ llm-box takes security seriously. Key protections:
 | **Secrets Management** | AES-GCM encryption with PBKDF2 (600K iterations), file permissions `0600` |
 | **Timing Attack** | `subtle.ConstantTimeCompare` for authentication tokens |
 | **Fail-Closed Auth** | Empty token = request rejected (503) |
-| **Audit Logging** | All commands logged with redacted secrets, `0600` permissions |
+| **Audit Logging** | All commands logged with redacted secrets, `0600` permissions, **HMAC hash chain tamper-proofing** |
 | **DID Identity** | W3C DID format validation, signature verification, cross-domain message auth |
 | **Memory Safety** | Layered memory with LRU eviction, symlink-resistant persistence, 0600 file perms |
 | **Prompt Injection** | Skill evolution sanitizes best practices/pitfalls before injecting into prompts |
@@ -364,6 +365,10 @@ llm-box help                   Show full help
 - **Circuit Breaker** &mdash; Per-node Closed/Open/HalfOpen state machine, auto-isolation prevents cascade failures
 - **Privacy Layer** &mdash; Secret redaction on file read, outbound data volume anomaly monitor
 - **Checkpoint/Resume** &mdash; Per-step state persistence, `--resume` recovers from interruption
+- **Shared HTTP Client** &mdash; Unified connection-pool tuning and SSRF defense, proxy env passthrough
+- **DAG Parallel Execution** &mdash; Topological-sort dependency scheduling, concurrent execution of independent steps
+- **Multi-Error Aggregation** &mdash; `ProviderMultiError` aggregates all provider failures, supports `errors.Is/As` traversal
+- **Observability** &mdash; Prometheus metrics endpoint, audit-log HMAC hash chain tamper-proofing, log rotation
 
 ---
 
@@ -377,7 +382,7 @@ llm-box help                   Show full help
 | **v0.4** | ✅ Released | Code interpreter, RAG, knowledge graph, smart router, multimodal, node marketplace, 100+ templates, 16 specialists, Chain-of-Thought |
 | **v0.5** | ✅ Released | ReAct engine, layered memory, skill self-evolution, HarmonyOS adaptation (7 device types), cross-platform protocol (intent:// + ohos://), W3C DID identity, cross-domain agent messaging, GitCode G-Star + ohpm ecosystem |
 | **v0.5.1** | ✅ Released | Ascend NPU adaptation (7-agent pipeline, 3 workflow templates, CANN/MindIE integration) |
-| **v0.5.2** | ✅ Released | Grok Build-inspired capabilities: code graph, subagent prompt hierarchy, circuit breaker, secret redaction, file watch, Codex/OpenCode tool compat, TUI Markdown/Mermaid rendering (15-vuln audited) |
+| **v0.5.2** | ✅ Released | Grok Build-inspired capabilities: code graph, subagent prompt hierarchy, circuit breaker, secret redaction, file watch, TUI Markdown/Mermaid rendering (15-vuln audited), unified LLM routing (3 consolidated to 1) |
 | **v0.6.0** | **Current** | **Ant Ling ecosystem, AI Gateway (OmniRoute), Agent Memory Infrastructure, Voice AI Toolchain (ASR/diarization/analysis), Agent Teamization (200+ roles + Agency workflow)** |
 | **v1.0** | 📅 Q3 2026 | Stable API, full documentation, LTS |
 
@@ -396,6 +401,55 @@ Excellent open-source projects built with llm-box:
 | [Research Assistant]() | Academic research workflow combining researcher + knowledge_graph nodes |
 
 > If your project uses llm-box, feel free to submit a PR to add it here!
+
+---
+
+## 🛒 Featured Skills Marketplace
+
+llm-box ships with 100+ ready-to-use workflow templates covering development, ops, marketing, research, and more. One command to install and use.
+
+### Installation
+
+```bash
+# Install from the skills marketplace
+llm-box create from templates/software-engineering/unit-test-generator
+
+# Or install directly from GitHub
+llm-box create from https://github.com/alib8b8/llm-box/tree/main/templates/data-ai/prompt-engineering
+```
+
+### Popular Skills
+
+| Category | Skill | Description | Install |
+|----------|-------|-------------|---------|
+| 🤖 AI/ML | Prompt Engineering | LLM prompt engineering template | `llm-box create from templates/data-ai/prompt-engineering` |
+| 🤖 AI/ML | LLM Fine-tune | Large model fine-tuning pipeline | `llm-box create from templates/data-ai/llm-finetune` |
+| 🤖 AI/ML | Model Evaluation | Model evaluation and benchmarking | `llm-box create from templates/data-ai/model-evaluation` |
+| 💻 Dev Tools | Unit Test Generator | Auto-generate unit tests | `llm-box create from templates/software-engineering/unit-test-generator` |
+| 💻 Dev Tools | API Docs Generator | Auto-generate API docs | `llm-box create from templates/software-engineering/api-docs-generator` |
+| 💻 Dev Tools | Code Duplicate Finder | Code duplication detection | `llm-box create from templates/software-engineering/code-duplicate-finder` |
+| 💻 Dev Tools | Dependency Checker | Dependency security check | `llm-box create from templates/software-engineering/dependency-checker` |
+| 🔧 DevOps | Log Analyzer | Intelligent log analysis | `llm-box create from templates/devops-infra/log-analyzer` |
+| 🔧 DevOps | Docker Cleaner | Docker resource cleanup | `llm-box create from templates/devops-infra/docker-cleaner` |
+| 🔧 DevOps | SSL Cert Checker | SSL certificate expiry check | `llm-box create from templates/devops-infra/ssl-cert-checker` |
+| 📊 Data | CSV Analyzer | CSV data analysis | `llm-box create from templates/data-ai/csv-analyzer` |
+| 📊 Data | A/B Test Analyzer | A/B test analysis | `llm-box create from templates/data-ai/ab-test-analyzer` |
+| 📊 Data | Financial Analyzer | Financial data analysis | `llm-box create from templates/data-ai/financial-analyzer` |
+| 📝 Content | Blog Outline Generator | Blog outline generation | `llm-box create from templates/marketing/blog-outline-generator` |
+| 📝 Content | SEO Keyword Research | SEO keyword research | `llm-box create from templates/marketing/seo-keyword-research` |
+| 🔬 Research | Literature Review | Literature review | `llm-box create from templates/data-ai/literature-review` |
+| 🔬 Research | Paper Summarizer | Paper summarization | `llm-box create from templates/data-ai/paper-summarizer` |
+| 🔬 Research | Competitor Analysis | Competitor analysis | `llm-box create from templates/data-ai/competitor-analysis` |
+| 📈 Business | Business Plan | Business plan writing | `llm-box create from templates/business/business-plan` |
+| 📈 Business | SaaS Pricing | SaaS pricing strategy | `llm-box create from templates/business/saas-pricing` |
+| 🔒 Security | Security Audit | Security auditing | `llm-box create from templates/devops-infra/security-audit` |
+| 🔒 Security | Incident Response | Incident response | `llm-box create from templates/devops-infra/incident-response` |
+| 📚 Docs | README Generator | README auto-generation | `llm-box create from templates/software-engineering/readme-generator` |
+| 📚 Docs | API Docs Builder | API docs builder | `llm-box create from templates/software-engineering/api-docs-builder` |
+| 🏗️ Arch | Microservices Design | Microservices design | `llm-box create from templates/software-engineering/microservices-design` |
+| 🏗️ Arch | Cloud Architecture | Cloud architecture design | `llm-box create from templates/devops-infra/cloud-architecture` |
+
+> See the [templates/](templates/) directory for the full list — 120+ skills and growing.
 
 ---
 

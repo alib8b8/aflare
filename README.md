@@ -177,7 +177,7 @@ llm-box run btc-monitor.yaml
 | `critic` | 评审并提供建设性反馈 |
 | `evaluator` | 根据标准评估输出 |
 | `reflector` | 反思过程并提出改进建议 |
-| `supervisor` | 监管多 Agent 工作流，支持顺序/并行/层级/MoE/MindSearch/**Agency** 策略和 **232+ 领域专家**、**19 个协作模板** |
+| `supervisor` | 监管多 Agent 工作流，支持顺序/并行/层级/MoE/MindSearch/**Agency** 策略和 **195 个领域专家**、**9 个协作模板** |
 | `code_review` | 自动代码评审与建议 |
 | `human_in_loop` | 暂停等待人工审批 |
 | `code_knowledge_graph` | 语义代码知识图谱：158 种语言、向量检索、实体/关系/概念提取、**MCP 工具暴露**、**Token 高效审查**、**PR 分析**、**Inkling 代码审查** |
@@ -189,7 +189,7 @@ llm-box run btc-monitor.yaml
 | `voice_output` | 语音 AI 工具链：TTS + 声音克隆 + **ASR 转录** + **说话人分离** + **语音分析** + 创作模式、11 种语言、5 种 ASR 引擎、**Inkling 音频理解** |
 | `doc_gen` | AI 文档生成：7 种类型（自述文件/API/函数/模块/变更日志/教程/架构） |
 | `video_edit` | AI 视频编辑：智能剪辑/合并/特效/字幕/故事板/超分 |
-| `memory` | **Agent 记忆基础设施**：三层记忆（短期/中期/长期）、10 种操作、可视化、LRU 淘汰、自动清理、**Inkling 长上下文检索** |
+| `memory` | **Agent 记忆基础设施**：三层记忆（短期/中期/长期）、16 种操作、可视化、LRU 淘汰、自动清理、**Inkling 长上下文检索** |
 
 ### 鸿蒙 & 移动端节点
 
@@ -235,7 +235,7 @@ llm-box 认真对待安全问题。关键防护措施：
 | **秘密管理** | AES-GCM 加密，PBKDF2（60 万次迭代），文件权限 `0600` |
 | **定时攻击** | 使用 `subtle.ConstantTimeCompare` 比较认证令牌 |
 | **故障关闭认证** | 空令牌 = 请求被拒绝（503） |
-| **审计日志** | 所有命令带脱敏秘密记录，权限 `0600` |
+| **审计日志** | 所有命令带脱敏秘密记录，权限 `0600`，**HMAC 哈希链防篡改** |
 | **DID 身份** | W3C DID 格式验证、签名验证、跨域消息认证 |
 | **内存安全** | 分层记忆 + LRU 淘汰、抗符号链接持久化、`0600` 文件权限 |
 | **提示词注入** | 技能进化在注入提示词前对最佳实践/陷阱进行消毒 |
@@ -365,6 +365,10 @@ llm-box help                显示完整帮助
 - **熔断器** —— 每节点 Closed/Open/HalfOpen 状态机，故障自动隔离防止级联失败
 - **隐私层** —— 文件读取时秘密脱敏、出站数据量异常监控
 - **Checkpoint/Resume** —— 工作流每步自动保存状态，`--resume` 从中断处恢复
+- **共享 HTTP 客户端** —— 统一连接池调优与 SSRF 防护，代理环境变量透传
+- **DAG 并行执行** —— 拓扑排序依赖调度，无依赖步骤并发执行
+- **多错误聚合** —— `ProviderMultiError` 聚合所有 provider 失败，支持 `errors.Is/As` 遍历
+- **可观测性** —— Prometheus 指标端点、审计日志 HMAC 哈希链防篡改、日志轮转
 
 ---
 
@@ -378,7 +382,7 @@ llm-box help                显示完整帮助
 | **v0.4** | ✅ 已发布 | 代码解释器、RAG、知识图谱、智能路由器、多模态、节点市场、100+ 模板、16 个专家、思维链 |
 | **v0.5** | ✅ 已发布 | ReAct 引擎、分层记忆、技能自进化、鸿蒙适配（7 种设备）、跨平台协议（intent:// + ohos://）、W3C DID 身份、跨域 Agent 消息、GitCode G-Star + ohpm 生态 |
 | **v0.5.1** | ✅ 已发布 | 昇腾 NPU 适配（7-Agent 流水线、3 种工作流模板、CANN/MindIE 集成） |
-| **v0.5.2** | ✅ 已发布 | Grok Build 启发能力：代码图谱、子代理提示词层级、熔断器、秘密脱敏、文件监听、Codex/OpenCode 工具兼容、TUI Markdown/Mermaid 渲染（审计 15 个漏洞） |
+| **v0.5.2** | ✅ 已发布 | Grok Build 启发能力：代码图谱、子代理提示词层级、熔断器、秘密脱敏、文件监听、TUI Markdown/Mermaid 渲染（审计 15 个漏洞）、LLM 路由统一（3 套合并为 1） |
 | **v0.6.0** | **当前** | **百灵生态集成、AI 网关（OmniRoute）、Agent 记忆基础设施、语音 AI 工具链（ASR/分离/分析）、Agent 团队化（200+ 角色 + Agency 工作流）** |
 | **v1.0** | 📅 2026 Q3 | 稳定 API、完整文档、LTS |
 
@@ -408,44 +412,44 @@ llm-box 内置 100+ 开箱即用的工作流模板，覆盖开发、运维、营
 
 ```bash
 # 从技能市场一键安装
-llm-box create from templates/developer-tools/unit-test-generator
+llm-box create from templates/software-engineering/unit-test-generator
 
 # 或直接从 GitHub 安装
-llm-box create from https://github.com/alib8b8/llm-box/tree/main/templates/ai-ml/prompt-engineering
+llm-box create from https://github.com/alib8b8/llm-box/tree/main/templates/data-ai/prompt-engineering
 ```
 
 ### 热门技能
 
 | 分类 | 技能 | 描述 | 一键安装 |
 |------|------|------|---------|
-| 🤖 AI/ML | Prompt Engineering | LLM 提示词工程模板 | `llm-box create from templates/ai-ml/prompt-engineering` |
-| 🤖 AI/ML | LLM Fine-tune | 大模型微调流水线 | `llm-box create from templates/ai-ml/llm-finetune` |
-| 🤖 AI/ML | Model Evaluation | 模型评估与基准测试 | `llm-box create from templates/ai-ml/model-evaluation` |
-| 💻 开发工具 | Unit Test Generator | 自动生成单元测试 | `llm-box create from templates/developer-tools/unit-test-generator` |
-| 💻 开发工具 | API Docs Generator | API 文档自动生成 | `llm-box create from templates/developer-tools/api-docs-generator` |
-| 💻 开发工具 | Code Duplicate Finder | 代码重复检测 | `llm-box create from templates/developer-tools/code-duplicate-finder` |
-| 💻 开发工具 | Dependency Checker | 依赖安全检查 | `llm-box create from templates/developer-tools/dependency-checker` |
-| 🔧 DevOps | Log Analyzer | 日志智能分析 | `llm-box create from templates/devops-monitoring/log-analyzer` |
-| 🔧 DevOps | Docker Cleaner | Docker 资源清理 | `llm-box create from templates/devops-monitoring/docker-cleaner` |
-| 🔧 DevOps | SSL Cert Checker | SSL 证书到期检查 | `llm-box create from templates/devops-monitoring/ssl-cert-checker` |
-| 📊 数据分析 | CSV Analyzer | CSV 数据分析 | `llm-box create from templates/data-analytics/csv-analyzer` |
-| 📊 数据分析 | A/B Test Analyzer | A/B 测试分析 | `llm-box create from templates/data-analytics/ab-test-analyzer` |
-| 📊 数据分析 | Financial Analyzer | 财务数据分析 | `llm-box create from templates/data-analytics/financial-analyzer` |
-| 📝 内容创作 | Blog Outline Generator | 博客大纲生成 | `llm-box create from templates/content-marketing/blog-outline-generator` |
-| 📝 内容创作 | SEO Keyword Research | SEO 关键词研究 | `llm-box create from templates/content-marketing/seo-keyword-research` |
-| 🔬 研究 | Literature Review | 文献综述 | `llm-box create from templates/research/literature-review` |
-| 🔬 研究 | Paper Summarizer | 论文摘要 | `llm-box create from templates/research-analysis/paper-summarizer` |
-| 🔬 研究 | Competitor Analysis | 竞品分析 | `llm-box create from templates/research-analysis/competitor-analysis` |
-| 📈 商业 | Business Plan | 商业计划书 | `llm-box create from templates/business-sales/business-plan` |
-| 📈 商业 | SaaS Pricing | SaaS 定价策略 | `llm-box create from templates/business-sales/saas-pricing` |
-| 🔒 安全 | Security Audit | 安全审计 | `llm-box create from templates/security/security-audit` |
-| 🔒 安全 | Incident Response | 事件响应 | `llm-box create from templates/security/incident-response` |
-| 📚 文档 | README Generator | README 自动生成 | `llm-box create from templates/documentation/readme-generator` |
-| 📚 文档 | API Docs Builder | API 文档构建 | `llm-box create from templates/documentation/api-docs-builder` |
-| 🏗️ 架构 | Microservices Design | 微服务设计 | `llm-box create from templates/backend/microservices-design` |
-| 🏗️ 架构 | Cloud Architecture | 云架构设计 | `llm-box create from templates/cloud-infra/cloud-architecture` |
+| 🤖 AI/ML | Prompt Engineering | LLM 提示词工程模板 | `llm-box create from templates/data-ai/prompt-engineering` |
+| 🤖 AI/ML | LLM Fine-tune | 大模型微调流水线 | `llm-box create from templates/data-ai/llm-finetune` |
+| 🤖 AI/ML | Model Evaluation | 模型评估与基准测试 | `llm-box create from templates/data-ai/model-evaluation` |
+| 💻 开发工具 | Unit Test Generator | 自动生成单元测试 | `llm-box create from templates/software-engineering/unit-test-generator` |
+| 💻 开发工具 | API Docs Generator | API 文档自动生成 | `llm-box create from templates/software-engineering/api-docs-generator` |
+| 💻 开发工具 | Code Duplicate Finder | 代码重复检测 | `llm-box create from templates/software-engineering/code-duplicate-finder` |
+| 💻 开发工具 | Dependency Checker | 依赖安全检查 | `llm-box create from templates/software-engineering/dependency-checker` |
+| 🔧 DevOps | Log Analyzer | 日志智能分析 | `llm-box create from templates/devops-infra/log-analyzer` |
+| 🔧 DevOps | Docker Cleaner | Docker 资源清理 | `llm-box create from templates/devops-infra/docker-cleaner` |
+| 🔧 DevOps | SSL Cert Checker | SSL 证书到期检查 | `llm-box create from templates/devops-infra/ssl-cert-checker` |
+| 📊 数据分析 | CSV Analyzer | CSV 数据分析 | `llm-box create from templates/data-ai/csv-analyzer` |
+| 📊 数据分析 | A/B Test Analyzer | A/B 测试分析 | `llm-box create from templates/data-ai/ab-test-analyzer` |
+| 📊 数据分析 | Financial Analyzer | 财务数据分析 | `llm-box create from templates/data-ai/financial-analyzer` |
+| 📝 内容创作 | Blog Outline Generator | 博客大纲生成 | `llm-box create from templates/marketing/blog-outline-generator` |
+| 📝 内容创作 | SEO Keyword Research | SEO 关键词研究 | `llm-box create from templates/marketing/seo-keyword-research` |
+| 🔬 研究 | Literature Review | 文献综述 | `llm-box create from templates/data-ai/literature-review` |
+| 🔬 研究 | Paper Summarizer | 论文摘要 | `llm-box create from templates/data-ai/paper-summarizer` |
+| 🔬 研究 | Competitor Analysis | 竞品分析 | `llm-box create from templates/data-ai/competitor-analysis` |
+| 📈 商业 | Business Plan | 商业计划书 | `llm-box create from templates/business/business-plan` |
+| 📈 商业 | SaaS Pricing | SaaS 定价策略 | `llm-box create from templates/business/saas-pricing` |
+| 🔒 安全 | Security Audit | 安全审计 | `llm-box create from templates/devops-infra/security-audit` |
+| 🔒 安全 | Incident Response | 事件响应 | `llm-box create from templates/devops-infra/incident-response` |
+| 📚 文档 | README Generator | README 自动生成 | `llm-box create from templates/software-engineering/readme-generator` |
+| 📚 文档 | API Docs Builder | API 文档构建 | `llm-box create from templates/software-engineering/api-docs-builder` |
+| 🏗️ 架构 | Microservices Design | 微服务设计 | `llm-box create from templates/software-engineering/microservices-design` |
+| 🏗️ 架构 | Cloud Architecture | 云架构设计 | `llm-box create from templates/devops-infra/cloud-architecture` |
 
-> 完整技能列表见 [templates/](templates/) 目录，80+ 技能持续更新中。
+> 完整技能列表见 [templates/](templates/) 目录，120+ 技能持续更新中。
 
 ---
 
