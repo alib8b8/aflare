@@ -101,7 +101,7 @@ func NewClient(opts Options) *http.Client {
 	return &http.Client{
 		Timeout:       opts.Timeout,
 		CheckRedirect: opts.CheckRedirect,
-		Transport: newTransport(validator),
+		Transport:     newTransport(validator),
 	}
 }
 
@@ -111,8 +111,15 @@ func NewClient(opts Options) *http.Client {
 // but *before* the TCP connect defeats DNS rebinding, where an attacker
 // flips a hostname from a public IP (passes pre-request validation) to a
 // private IP (would be dialed) between the two steps.
+//
+// Proxy is set to http.ProxyFromEnvironment so HTTP_PROXY/HTTPS_PROXY/NO_PROXY
+// are honored. This matters both for production (corporate egress proxies)
+// and for tests that force a dial failure by pointing the proxy at a closed
+// port. A custom DialContext alone would otherwise bypass the proxy and dial
+// the target host directly, silently defeating both use cases.
 func newTransport(validator Validator) *http.Transport {
 	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			host, port, err := net.SplitHostPort(addr)
 			if err != nil {

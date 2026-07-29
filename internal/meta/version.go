@@ -51,9 +51,9 @@ import (
 // if it weren't on the list, because the release JSON could otherwise
 // redirect us to an arbitrary public host).
 var (
-	githubAPIClient   = httpclient.NewClient(httpclient.Options{Timeout: 10 * time.Second, Validator: httpclient.ValidatePublic})
-	githubFileClient  = httpclient.NewClient(httpclient.Options{Timeout: 30 * time.Second, Validator: httpclient.ValidatePublic})
-	githubDLClient    = httpclient.NewClient(httpclient.Options{Timeout: 5 * time.Minute, Validator: httpclient.ValidatePublic})
+	githubAPIClient  = httpclient.NewClient(httpclient.Options{Timeout: 10 * time.Second, Validator: httpclient.ValidatePublic})
+	githubFileClient = httpclient.NewClient(httpclient.Options{Timeout: 30 * time.Second, Validator: httpclient.ValidatePublic})
+	githubDLClient   = httpclient.NewClient(httpclient.Options{Timeout: 5 * time.Minute, Validator: httpclient.ValidatePublic})
 )
 
 var (

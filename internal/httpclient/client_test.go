@@ -70,17 +70,17 @@ func TestBothValidators_RejectDangerousRanges(t *testing.T) {
 	// Private, link-local, unspecified, multicast, and reserved ranges
 	// must be rejected regardless of loopback policy.
 	dangerous := []string{
-		"10.0.0.1",          // private RFC1918
-		"172.16.0.1",        // private RFC1918
-		"192.168.1.1",       // private RFC1918
-		"169.254.1.1",       // link-local
-		"0.0.0.0",           // unspecified
-		"224.0.0.1",         // multicast
-		"192.0.2.1",         // TEST-NET-1 reserved
-		"198.51.100.1",      // TEST-NET-2 reserved
-		"203.0.113.1",       // TEST-NET-3 reserved
-		"100.64.0.1",        // CGNAT reserved
-		"fc00::1",           // IPv6 ULA reserved
+		"10.0.0.1",     // private RFC1918
+		"172.16.0.1",   // private RFC1918
+		"192.168.1.1",  // private RFC1918
+		"169.254.1.1",  // link-local
+		"0.0.0.0",      // unspecified
+		"224.0.0.1",    // multicast
+		"192.0.2.1",    // TEST-NET-1 reserved
+		"198.51.100.1", // TEST-NET-2 reserved
+		"203.0.113.1",  // TEST-NET-3 reserved
+		"100.64.0.1",   // CGNAT reserved
+		"fc00::1",      // IPv6 ULA reserved
 	}
 	for _, v := range []Validator{ValidatePublic, ValidateAllowLoopback} {
 		for _, s := range dangerous {
