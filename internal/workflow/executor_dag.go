@@ -46,8 +46,7 @@ import (
 //
 // timeout is the overall workflow timeout applied to the derived context.
 // Callers that go through an Executor pass e.workflowTimeout; the legacy
-// ExecuteWorkflowWithTrace global entry point passes the package-level
-// WorkflowTimeout.
+// ExecuteWorkflowWithTrace global entry point passes DefaultWorkflowTimeout.
 func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, timeout time.Duration) (string, []StepResult, *WorkflowTrace, error) {
 	if len(wf.Steps) > MaxSteps {
 		return "", nil, nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
@@ -265,7 +264,15 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 			ps := preparedByIdx[stepIdx]
 			wStep := wf.Steps[stepIdx]
 			var output string
+			// resultErr is the TRACE error: recorded in StepResult/trace and
+			// used for logging. For continue_on_error it keeps the original
+			// error so the trace honestly reflects the failure.
 			var resultErr error
+			// abortErr is the ABORT error: non-nil only when no recovery
+			// applied and the workflow must stop. Separated from resultErr so
+			// continue_on_error can keep resultErr (for trace) while clearing
+			// abortErr (so the batch proceeds).
+			var abortErr error
 			var duration time.Duration
 			var stepInput = ps.input
 			var attempts int
@@ -278,6 +285,7 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 
 			if ps.evalErr != nil {
 				resultErr = ps.evalErr
+				abortErr = ps.evalErr
 				errText = resultErr.Error()
 			} else if ps.skipped {
 				output = ""
@@ -288,16 +296,26 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 				res := batchOutputs[stepIdx]
 				output = res.output
 				resultErr = res.err
+				abortErr = res.err
 				duration = res.duration
 				attempts = res.attempts
 				llmCalls = res.llmCalls
 				routerDecisions = res.routerDecisions
 
-				// 错误恢复：fallback / on_error / continue_on_error
+				// 错误恢复：capture_error / fallback / on_error /
+				// continue_on_error. applyErrorRecovery returns abortErr
+				// (controls whether the batch stops) separately from traceErr
+				// (recorded in StepResult/trace). For continue_on_error,
+				// abortErr is nil but traceErr keeps the original error.
 				if resultErr != nil {
-					recoveries, resultErr = applyErrorRecovery(timeoutCtx, &wStep, &output, resultErr, engine, reg, stepInput)
+					var rec []string
+					rec, abortErr, resultErr = applyErrorRecovery(timeoutCtx, &wStep, &output, resultErr, engine, reg, stepInput, nil, nil, "DAG step")
+					recoveries = rec
+					// Sync errText with the post-recovery trace error.
 					if resultErr != nil {
 						errText = resultErr.Error()
+					} else {
+						errText = ""
 					}
 				}
 
@@ -362,13 +380,19 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 				lastOutput = output
 			}
 
+			// resultErr is the trace error (non-nil for continue_on_error
+			// even when the batch should proceed). Log it when present so
+			// operators see the failure in the trace-oriented log line, but
+			// drive the batch-abort decision from abortErr: continue_on_error
+			// clears abortErr so the batch continues, while still logging
+			// the original failure via resultErr.
 			if resultErr != nil {
 				logger.Error("DAG step failed", "index", stepIdx, "node", wStep.Node, "error", nodes.RedactSensitive(resultErr.Error()))
-				if batchFirstErr == nil {
-					batchFirstErr = resultErr
-				}
 			} else {
 				logger.Info("DAG step completed", "index", stepIdx, "node", wStep.Node, "duration", duration)
+			}
+			if abortErr != nil && batchFirstErr == nil {
+				batchFirstErr = abortErr
 			}
 		}
 
@@ -534,59 +558,80 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 	return
 }
 
-// applyErrorRecovery 处理步骤失败后的 fallback/on_error/continue_on_error。
-// 逻辑与 executor.go 中的错误恢复一致，抽取为函数供 DAG 路径复用。
-// 返回处理后的 resultErr：恢复成功返回 nil，否则返回原错误。
-// 返回的 recoveries 列表记录已应用的恢复动作（用于 trace）。
-func applyErrorRecovery(ctx context.Context, wStep *WorkflowStep, output *string, execErr error, engine *ExpressionEngine, reg *nodes.Registry, input string) ([]string, error) {
+// applyErrorRecovery evaluates a step's recovery primitives in priority
+// order — capture_error → fallback → on_error → continue_on_error — and is
+// the single implementation shared by the sequential, DAG, and map
+// executors. Centralizing it here prevents the three paths from drifting
+// (previously the DAG path cleared the trace error on continue_on_error
+// while sequential/map kept it, and map lacked on_error support entirely).
+//
+// Returns:
+//   - recoveries: labels of recovery actions applied (for trace)
+//   - abortErr:   nil if the workflow should continue past this step;
+//     non-nil if no recovery applied and the workflow must abort
+//   - traceErr:   the error to record in StepResult/trace. nil only on a
+//     full recovery (capture_error/fallback/on_error success);
+//     for continue_on_error this is the ORIGINAL error so the
+//     trace honestly reflects that the step failed even though
+//     the workflow proceeds.
+//
+// output is updated in place with the recovered output (if any). program
+// and globalLimiter are forwarded to executeCaptureErrorBranch so the
+// capture_error sub-workflow gets TUI output and concurrency limiting;
+// pass nil when running outside a TUI/limiter context. label prefixes log
+// messages ("step", "DAG step", "map sub-step") for caller identification.
+func applyErrorRecovery(ctx context.Context, wStep *WorkflowStep, output *string, execErr error, engine *ExpressionEngine, reg *nodes.Registry, input string, program *tea.Program, globalLimiter *ConcurrencyLimiter, label string) ([]string, error, error) {
 	var recoveries []string
 
-	// 0. capture_error：运行错误分支（把错误当作可分支的值而非吞掉）。
-	// 最先检查，因为它是最具表达力的恢复原语。
+	// 0. capture_error: run the error branch (treats the error as a
+	// value/branch condition rather than swallowing it). Checked first
+	// because it is the most expressive recovery primitive.
 	if wStep.HasCaptureError() {
-		branchOut, bErr := executeCaptureErrorBranch(ctx, wStep.CaptureError, execErr.Error(), engine.SnapshotVars(), reg, nil, nil)
+		branchOut, bErr := executeCaptureErrorBranch(ctx, wStep.CaptureError, execErr.Error(), engine.SnapshotVars(), reg, program, globalLimiter)
 		if bErr == nil {
-			logger.Info("DAG step recovered via capture_error branch", "node", wStep.Node)
+			logger.Info(label+" recovered via capture_error branch", "node", wStep.Node)
 			*output = branchOut
 			recoveries = append(recoveries, "capture_error")
-			return recoveries, nil
+			return recoveries, nil, nil
 		}
-		logger.Warn("DAG capture_error branch failed, falling through to other recovery", "node", wStep.Node, "error", nodes.RedactSensitive(bErr.Error()))
+		logger.Warn(label+" capture_error branch failed, falling through to other recovery", "node", wStep.Node, "error", nodes.RedactSensitive(bErr.Error()))
 	}
 
-	// 1. fallback 值
+	// 1. fallback value
 	if wStep.Fallback != "" {
 		if fallbackVal, ferr := engine.Evaluate(wStep.Fallback, input); ferr == nil {
-			logger.Info("DAG step recovered via fallback", "node", wStep.Node)
+			logger.Info(label+" recovered via fallback", "node", wStep.Node)
 			*output = fallbackVal
 			recoveries = append(recoveries, "fallback")
-			return recoveries, nil
+			return recoveries, nil, nil
 		}
 	}
 
-	// 2. on_error 处理节点
+	// 2. on_error handler node
 	if wStep.OnError != nil {
 		errStep := *wStep.OnError
 		errParams, eerr := engine.EvaluateParams(errStep.Params, input)
 		if eerr == nil {
 			if errNode, ok := reg.Get(errStep.Node); ok {
 				if errOut, err := errNode.Execute(ctx, input, errParams); err == nil {
-					logger.Info("DAG step recovered via on_error handler", "node", wStep.Node, "handler", errStep.Node)
+					logger.Info(label+" recovered via on_error handler", "node", wStep.Node, "handler", errStep.Node)
 					*output = errOut
 					recoveries = append(recoveries, "on_error")
-					return recoveries, nil
+					return recoveries, nil, nil
 				}
 			}
 		}
 	}
 
-	// 3. continue_on_error：清零错误使工作流继续
+	// 3. continue_on_error: clear the abort error so the workflow
+	// continues, but return the original error as traceErr so the
+	// StepResult/trace honestly records that this step failed.
 	if wStep.ContinueOnError {
-		logger.Warn("DAG step failed but continue_on_error set, continuing", "node", wStep.Node, "error", nodes.RedactSensitive(execErr.Error()))
+		logger.Warn(label+" failed but continue_on_error is set, continuing", "node", wStep.Node, "error", nodes.RedactSensitive(execErr.Error()))
 		*output = ""
 		recoveries = append(recoveries, "continue_on_error")
-		return recoveries, nil
+		return recoveries, nil, execErr
 	}
 
-	return recoveries, execErr
+	return recoveries, execErr, execErr
 }

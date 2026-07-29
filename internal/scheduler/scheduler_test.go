@@ -16,6 +16,7 @@
 package scheduler
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -221,12 +222,12 @@ func TestNextRunTime_NextDay(t *testing.T) {
 func TestScheduler_AddRemoveTask(t *testing.T) {
 	s := New()
 
-	err := s.AddTask("test1", "* * * * *", func() {})
+	err := s.AddTask("test1", "* * * * *", func(context.Context) {})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	err = s.AddTask("test1", "* * * * *", func() {})
+	err = s.AddTask("test1", "* * * * *", func(context.Context) {})
 	if err == nil {
 		t.Error("expected error for duplicate task")
 	}
@@ -244,7 +245,7 @@ func TestScheduler_AddRemoveTask(t *testing.T) {
 
 func TestScheduler_AddTask_InvalidExpr(t *testing.T) {
 	s := New()
-	err := s.AddTask("bad", "invalid expr", func() {})
+	err := s.AddTask("bad", "invalid expr", func(context.Context) {})
 	if err == nil {
 		t.Error("expected error for invalid expression")
 	}
@@ -254,13 +255,67 @@ func TestScheduler_StartStop(t *testing.T) {
 	s := New()
 
 	var count int64
-	s.AddTask("test", "* * * * *", func() {
+	s.AddTask("test", "* * * * *", func(context.Context) {
 		atomic.AddInt64(&count, 1)
 	})
 
 	s.Start()
 	time.Sleep(100 * time.Millisecond)
 	s.Stop()
+}
+
+// TestScheduler_StopWaitsAndCancelsInFlightTask verifies that Stop() (1)
+// cancels the context handed to a running task so it can abort, and (2) waits
+// for that task goroutine to actually return before Stop() returns. This is
+// the regression guard for the old fire-and-forget behavior where in-flight
+// task goroutines outlived the scheduler.
+func TestScheduler_StopWaitsAndCancelsInFlightTask(t *testing.T) {
+	s := New()
+
+	taskStarted := make(chan struct{})
+	taskCtxCancelled := make(chan struct{})
+
+	_ = s.AddTask("blocking", "* * * * *", func(ctx context.Context) {
+		close(taskStarted)
+		<-ctx.Done() // block until Stop cancels the task context
+		close(taskCtxCancelled)
+	})
+
+	// Force the task to be due now so the next 1s tick fires it immediately
+	// (AddTask otherwise schedules it for the next minute boundary).
+	s.mu.Lock()
+	if task, ok := s.tasks["blocking"]; ok {
+		task.nextRun = time.Now().Add(-time.Second)
+	}
+	s.mu.Unlock()
+
+	s.Start()
+
+	select {
+	case <-taskStarted:
+	case <-time.After(3 * time.Second):
+		t.Fatal("scheduled task did not start in time")
+	}
+
+	// Stop() should cancel the task context (unblocking the task) and then
+	// wait on taskWg until the task goroutine returns.
+	stopDone := make(chan struct{})
+	go func() {
+		s.Stop()
+		close(stopDone)
+	}()
+	select {
+	case <-taskCtxCancelled:
+		// task observed its context being cancelled
+	case <-time.After(3 * time.Second):
+		t.Fatal("task context was not cancelled on Stop")
+	}
+	select {
+	case <-stopDone:
+		// Stop returned → it waited for the in-flight task goroutine
+	case <-time.After(3 * time.Second):
+		t.Fatal("Stop did not return after cancelling in-flight task (taskWg not waited)")
+	}
 }
 
 func TestScheduler_StartTwice(t *testing.T) {
@@ -287,7 +342,7 @@ func TestScheduler_ThreadSafety(t *testing.T) {
 		wg.Add(2)
 		go func(i int) {
 			defer wg.Done()
-			_ = s.AddTask(string(rune('a'+i%26))+string(rune('0'+i/26)), "* * * * *", func() {})
+			_ = s.AddTask(string(rune('a'+i%26))+string(rune('0'+i/26)), "* * * * *", func(context.Context) {})
 		}(i)
 		go func(i int) {
 			defer wg.Done()

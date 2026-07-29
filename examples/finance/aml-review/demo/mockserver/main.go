@@ -95,7 +95,7 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 			"headlines":      negatives,
 		})
 	default:
-		http.Error(w, "not found", 404)
+		http.Error(w, "not found", http.StatusNotFound)
 	}
 }
 
@@ -110,12 +110,12 @@ type chatReq struct {
 
 func llmHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/chat/completions" {
-		http.Error(w, "not found", 404)
+		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 	var req chatReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), 400)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 

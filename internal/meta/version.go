@@ -32,6 +32,28 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/httpclient"
+)
+
+// Three shared clients for the self-update flow, built once via the
+// httpclient factory so they share connection-pool tuning and SSRF
+// dial-time validation with every other outbound client in llm-box.
+//
+// We deliberately do NOT use nodes/core.ValidateURL here — that would
+// create a circular dependency from the version package into nodes/core.
+// httpclient is a leaf package (stdlib only), so it is safe to import.
+//
+// GitHub release assets are served only from the public hosts in
+// allowedGitHubHosts; loopback/private ranges are never legitimate
+// targets, so we use ValidatePublic. validateGitHubURL still enforces
+// the host allow-list (a superset of SSRF: even a public IP we'd reject
+// if it weren't on the list, because the release JSON could otherwise
+// redirect us to an arbitrary public host).
+var (
+	githubAPIClient   = httpclient.NewClient(httpclient.Options{Timeout: 10 * time.Second, Validator: httpclient.ValidatePublic})
+	githubFileClient  = httpclient.NewClient(httpclient.Options{Timeout: 30 * time.Second, Validator: httpclient.ValidatePublic})
+	githubDLClient    = httpclient.NewClient(httpclient.Options{Timeout: 5 * time.Minute, Validator: httpclient.ValidatePublic})
 )
 
 var (
@@ -117,12 +139,11 @@ func CheckLatestRelease(repo string) (*GitHubRelease, error) {
 	if err := validateGitHubURL(url); err != nil {
 		return nil, fmt.Errorf("invalid release URL: %w", err)
 	}
-	client := &http.Client{Timeout: 10 * time.Second}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -131,7 +152,7 @@ func CheckLatestRelease(repo string) (*GitHubRelease, error) {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := githubAPIClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch latest release: %w", err)
 	}
@@ -205,11 +226,10 @@ func downloadChecksums(url string) (map[string]string, error) {
 	if err := validateGitHubURL(url); err != nil {
 		return nil, fmt.Errorf("invalid checksums URL: %w", err)
 	}
-	client := &http.Client{Timeout: 30 * time.Second}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +237,7 @@ func downloadChecksums(url string) (map[string]string, error) {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := githubFileClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -277,13 +297,12 @@ func SelfUpdate(repo string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*60*time.Second)
 	defer cancel()
 
-	client := &http.Client{Timeout: 5 * 60 * time.Second}
-	req, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create download request: %w", err)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := githubDLClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to download update: %w", err)
 	}

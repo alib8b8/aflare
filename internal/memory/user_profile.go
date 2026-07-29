@@ -16,16 +16,20 @@
 package memory
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/logger"
 )
 
 type PreferenceCategory string
@@ -406,17 +410,34 @@ func (m *UserProfileManager) Save(userID string) {
 	m.saveProfile(userID)
 }
 
-func (m *UserProfileManager) AutoSave(interval time.Duration) {
+// StartAutoSave periodically persists all loaded user profiles to disk until
+// ctx is cancelled, then performs a final flush. Callers should pass a
+// context that is cancelled at shutdown (e.g. the app's root context) so the
+// goroutine does not outlive the process needlessly.
+//
+// The panic recovery is per-iteration (not wrapping the whole loop): a panic
+// in one saveProfile call is logged and the loop continues, so a single bad
+// profile cannot permanently silence auto-save. This mirrors
+// SessionMemoryManager.StartAutoSave's structure for API and semantics
+// consistency across the memory package.
+//
+// It replaces the old AutoSave(interval) helper, which had no stop mechanism
+// (the goroutine ran for the whole process lifetime) and recovered panics at
+// the goroutine level (so one panic killed every future auto-save).
+func (m *UserProfileManager) StartAutoSave(ctx context.Context, interval time.Duration) {
 	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				// 吞掉 panic 避免拖垮进程;下一轮 ticker 仍会触发
-				_ = r
-			}
-		}()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
-		for range ticker.C {
+
+		saveAll := func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("user profile auto-save panicked",
+						"panic", r,
+						"stack", string(debug.Stack()),
+					)
+				}
+			}()
 			m.mu.RLock()
 			ids := make([]string, 0, len(m.profiles))
 			for id := range m.profiles {
@@ -425,6 +446,16 @@ func (m *UserProfileManager) AutoSave(interval time.Duration) {
 			m.mu.RUnlock()
 			for _, id := range ids {
 				m.saveProfile(id)
+			}
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				saveAll()
+				return
+			case <-ticker.C:
+				saveAll()
 			}
 		}
 	}()

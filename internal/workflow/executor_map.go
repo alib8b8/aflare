@@ -315,43 +315,20 @@ func executeSubStep(ctx context.Context, baseIdx int, subStep WorkflowStep, inpu
 		Duration:  time.Since(start),
 	}
 	if execErr != nil {
-		// Error recovery mirrors the top-level executor so that map/reduce
-		// sub-workflows support the same degradation primitives:
-		//   0. capture_error — run an error branch (error as a value)
-		//   1. fallback — substitute a literal/evaluated value
-		//   2. continue_on_error — clear execErr so the iteration's
-		//      subsequent steps still run; the StepResult keeps the
-		//      original error for audit traceability.
-		if subStep.HasCaptureError() {
-			branchOut, bErr := executeCaptureErrorBranch(ctx, subStep.CaptureError, execErr.Error(), engine.SnapshotVars(), reg, program, globalLimiter)
-			if bErr == nil {
-				logger.Info("map sub-step recovered via capture_error branch", "node", subStep.Node)
-				output = branchOut
-				execErr = nil
-				sr.Output = output
-				sr.Error = nil
-			} else {
-				logger.Warn("map sub-step capture_error branch failed, falling through",
-					"node", subStep.Node, "error", nodes.RedactSensitive(bErr.Error()))
-			}
-		}
-		if execErr != nil && subStep.Fallback != "" {
-			if fallbackVal, ferr := engine.Evaluate(subStep.Fallback, input); ferr == nil {
-				logger.Info("map sub-step recovered via fallback", "node", subStep.Node)
-				output = fallbackVal
-				execErr = nil
-				sr.Output = output
-				sr.Error = nil
-			}
-		}
-		if execErr != nil && subStep.ContinueOnError {
-			logger.Warn("map sub-step failed but continue_on_error is set, continuing",
-				"node", subStep.Node, "error", nodes.RedactSensitive(execErr.Error()))
-			output = ""
-			execErr = nil
-			sr.Output = output
-			// sr.Error stays set: the step genuinely failed, audit shows it.
-		}
+		// Error recovery is delegated to applyErrorRecovery (shared with the
+		// sequential and DAG executors) so map/reduce sub-workflows support
+		// the same four primitives — capture_error, fallback, on_error,
+		// continue_on_error — with identical semantics. Previously this was
+		// a third copy that silently dropped on_error and could drift from
+		// the other paths. traceErr keeps the StepResult error for audit
+		// traceability on continue_on_error; abortErr controls whether the
+		// iteration fails. (Recoveries are not recorded in the map sub-step
+		// trace because sr.Trace is populated by the caller, not here.)
+		var abortErr, traceErr error
+		_, abortErr, traceErr = applyErrorRecovery(ctx, &subStep, &output, execErr, engine, reg, input, program, globalLimiter, "map sub-step")
+		sr.Output = output
+		sr.Error = traceErr
+		execErr = abortErr
 	}
 	if execErr != nil {
 		return []StepResult{sr}, "", fmt.Errorf("sub-step node '%s' failed: %w", subStep.Node, execErr)

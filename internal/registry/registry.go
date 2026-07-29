@@ -16,7 +16,6 @@
 package registry
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,39 +28,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alib8b8/llm-box/internal/httpclient"
 	"github.com/alib8b8/llm-box/internal/logger"
 )
 
-// safeHTTPClient is a shared HTTP client with a timeout to prevent
-// slowloris-style hangs against the registry sync / node download endpoints.
-// It uses a custom DialContext that re-validates the resolved IP at connect
-// time to close the TOCTOU window (DNS rebinding) that exists when validation
-// is done before the request and the dial happens later.
-var safeHTTPClient = &http.Client{
-	Timeout: 30 * time.Second,
-	Transport: &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, err
-			}
-			ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-			if err != nil {
-				return nil, err
-			}
-			for _, ip := range ips {
-				if err := validatePublicIP(ip.IP, host); err != nil {
-					return nil, err
-				}
-			}
-			// Use the first resolved IP to dial
-			if len(ips) > 0 {
-				addr = net.JoinHostPort(ips[0].IP.String(), port)
-			}
-			return (&net.Dialer{}).DialContext(ctx, network, addr)
-		},
-	},
-}
+// safeHTTPClient is the registry's shared HTTP client. It uses the
+// httpclient factory so that SSRF defense (re-resolve + validate at dial
+// time, closing the DNS-rebinding TOCTOU window) and connection-pool
+// tuning (MaxIdleConns / MaxIdleConnsPerHost / IdleConnTimeout) are
+// shared with every other outbound client in llm-box rather than
+// re-implemented here. Registry endpoints are public-only, so we use
+// ValidatePublic (loopback blocked).
+var safeHTTPClient = httpclient.NewClient(httpclient.Options{
+	Timeout:   30 * time.Second,
+	Validator: httpclient.ValidatePublic,
+})
 
 type NodeInfo struct {
 	Name        string   `json:"name"`
@@ -315,25 +296,15 @@ func isLocalhost(host string) bool {
 	return false
 }
 
-// validatePublicIP rejects loopback / private / link-local / unspecified /
-// multicast / reserved IPs to prevent SSRF against internal services.
+// validatePublicIP delegates to the shared httpclient validator so the
+// IP-range policy (loopback/private/link-local/unspecified/multicast/
+// reserved) lives in exactly one place. validateRegistryURL still does
+// the URL-scheme/host checks that httpclient cannot (HTTPS-only, block
+// userinfo, block localhost-by-name); the IP-literal fast path here
+// covers the case where the URL host is already an IP, while the
+// DialContext on safeHTTPClient covers the hostname case at connect time.
 func validatePublicIP(ip net.IP, displayHost string) error {
-	if ip.IsLoopback() {
-		return fmt.Errorf("access to loopback address %s is not allowed", displayHost)
-	}
-	if ip.IsPrivate() {
-		return fmt.Errorf("access to private address %s is not allowed", displayHost)
-	}
-	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-		return fmt.Errorf("access to link-local address %s is not allowed", displayHost)
-	}
-	if ip.IsUnspecified() {
-		return fmt.Errorf("access to unspecified address %s is not allowed", displayHost)
-	}
-	if ip.IsMulticast() {
-		return fmt.Errorf("access to multicast address %s is not allowed", displayHost)
-	}
-	return nil
+	return httpclient.ValidatePublic(ip, displayHost)
 }
 
 func GetNodesDir() (string, error) {

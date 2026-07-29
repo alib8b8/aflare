@@ -291,7 +291,7 @@ func (n *RobotActionNode) callVAAPI(ctx context.Context, endpoint, apiKey, instr
 		return nil, fmt.Errorf("VLA API call failed: %w", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("VLA API returned status %d", resp.StatusCode)
 	}
 

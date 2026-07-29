@@ -26,12 +26,37 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alib8b8/llm-box/internal/config"
 )
 
 const maxStreamResponseSize = 10 * 1024 * 1024 // 10MB max stream content
+
+// streamBufPool reuses the 256KB read buffer handed to bufio.Scanner in
+// readStreamResponse. Every streaming LLM call previously allocated a
+// fresh 256KB buffer (make([]byte, 0, 256*1024)); under a map node
+// fanning out N concurrent LLM calls that is N×256KB of allocator
+// pressure per step, directly visible in GC profiles.
+//
+// We store *[]byte (a pointer to the slice header) rather than []byte so
+// the pool item itself does not escape into an interface{}/cause the
+// header to be heap-allocated — the standard sync.Pool idiom.
+//
+// Safety: the buffer is returned to the pool only after scanner.Scan()
+// has returned false (the scan loop is over), so no reader touches it
+// after Put. The scanner may internally allocate a larger buffer when a
+// single SSE line exceeds 256KB (up to the 1MB cap passed to
+// Scanner.Buffer); in that case our original 256KB slice is untouched
+// and still returnable, and the grown buffer is GC'd. Pool reuse covers
+// the common case; large-line streams simply don't benefit.
+var streamBufPool = sync.Pool{
+	New: func() interface{} {
+		b := make([]byte, 0, 256*1024)
+		return &b
+	},
+}
 
 // LLMMessage is a single chat message in an OpenAI-compatible request.
 type LLMMessage struct {
@@ -298,7 +323,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", generateURL, bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, generateURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -382,9 +407,27 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 }
 
 func (n *OpenAICompatibleNode) readStreamResponse(resp *http.Response, onChunk func(chunk string)) (string, *LLMUsage, error) {
+	// Pull a 256KB read buffer from the pool instead of allocating one
+	// per call. bufPtr is a *[]byte so the slice header itself is reused
+	// rather than heap-allocated by sync.Pool's interface{} boxing. We
+	// reset to length 0 (preserving capacity) so the scanner starts with
+	// a clean working slice; bufio.Scanner.Buffer then takes ownership
+	// for the duration of the scan loop.
+	bufPtr := streamBufPool.Get().(*[]byte)
+	buf := (*bufPtr)[:0]
+	// Return the buffer to the pool when we exit, whichever path taken.
+	// By this point scanner.Scan() has returned false (loop over) so the
+	// scanner no longer touches buf; the pooled slice is safe to hand to
+	// another goroutine. We reset to length 0 again before Put to avoid
+	// retaining references to SSE payload bytes that could otherwise
+	// delay their collection.
+	defer func() {
+		*bufPtr = buf[:0]
+		streamBufPool.Put(bufPtr)
+	}()
+
 	scanner := bufio.NewScanner(resp.Body)
-	buf := make([]byte, 0, 256*1024) // 256KB initial buffer
-	scanner.Buffer(buf, 1024*1024)   // 1MB max buffer
+	scanner.Buffer(buf, 1024*1024) // 1MB max buffer
 	var fullContent strings.Builder
 	var parseErrors int
 	var usage *LLMUsage

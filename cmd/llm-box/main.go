@@ -493,8 +493,15 @@ func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 	model := tui.NewModel(wf.Name, wfPath, len(wf.Steps))
 	program := tea.NewProgram(model, tea.WithAltScreen())
 
+	// Derive a cancellable context so that when the TUI exits (program.Run
+	// returns), the in-flight workflow goroutine receives a cancellation
+	// signal instead of running on under context.Background() after the
+	// user has already left. The Executor derives its step timeout from
+	// this ctx, so nodes that honor ctx will abort promptly.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	go func() {
-		ctx := context.Background()
 		if statePath != "" {
 			exec := workflow.NewExecutor().WithCheckpoint(statePath)
 			if _, _, _, err := exec.ExecuteWithTrace(ctx, wf, reg, program); err != nil {
@@ -1092,7 +1099,7 @@ func handleScheduleAdd(args []string) {
 
 	// Validate the cron expression using a throwaway scheduler.
 	validateSched := scheduler.New()
-	if err := validateSched.AddTask(taskID, cronExpr, func() {}); err != nil {
+	if err := validateSched.AddTask(taskID, cronExpr, func(context.Context) {}); err != nil {
 		fmt.Printf("❌ Invalid cron expression: %v\n", err)
 		os.Exit(1)
 	}
@@ -1203,8 +1210,10 @@ func handleScheduleStart() {
 			fmt.Printf("❌ Failed to prepare workflow %q: %v\n", entry.WorkflowPath, err)
 			os.Exit(1)
 		}
-		taskFunc := func() {
-			ctx := context.Background()
+		taskFunc := func(ctx context.Context) {
+			// ctx is cancelled when the scheduler stops, so a scheduled
+			// workflow in flight at shutdown can abort via its normal
+			// context-propagation path instead of running to completion.
 			if _, _, err := workflow.ExecuteWorkflow(ctx, wf, reg); err != nil {
 				log.Printf("scheduled workflow %q execution failed: %v", entry.ID, err)
 			}

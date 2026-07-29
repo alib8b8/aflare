@@ -17,6 +17,8 @@ package nodes
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -398,5 +400,149 @@ func TestLLMRouter_DisabledProvidersExcluded(t *testing.T) {
 		if p.Name == "disabled_b" {
 			t.Error("disabled provider should not be selected")
 		}
+	}
+}
+
+// statusErr is a test-only error type carrying an HTTP-style status code.
+// It is declared at package level so it can have an Error() method (Go does
+// not allow methods on types declared inside function bodies) and so
+// errors.As can extract a *statusErr from an []error.
+type statusErr struct{ code int }
+
+func (e *statusErr) Error() string { return fmt.Sprintf("status %d", e.code) }
+
+// TestProviderMultiError_Unwrap verifies that errors.Is / errors.As traverse
+// every wrapped provider error, not just the last one. This is the core
+// correctness property of the multi-error: a caller must be able to detect
+// context.Cancellation (or any other sentinel/typed error) even when it
+// occurred on an earlier provider attempt and a later attempt produced a
+// different, unrelated error. Before the multi-error fix, only the last
+// provider's error was wrapped, so a cancellation on provider #1 hidden
+// behind a network error on provider #2 was undetectable.
+func TestProviderMultiError_Unwrap(t *testing.T) {
+	// Simulate three provider failures: a 5xx, a context cancellation
+	// (the "real" cause the caller cares about), and a connection error.
+	sentinel := fmt.Errorf("upstream returned 500")
+	multi := &ProviderMultiError{
+		Providers: []string{"openai", "anthropic", "gemini"},
+		Errors: []error{
+			sentinel,
+			context.Canceled,
+			fmt.Errorf("connection refused"),
+		},
+	}
+
+	// errors.Is must find context.Canceled even though it is the SECOND
+	// of three wrapped errors (not the last).
+	if !errors.Is(multi, context.Canceled) {
+		t.Errorf("errors.Is(multi, context.Canceled) = false, want true; "+
+			"multi-error must expose every wrapped error for inspection: %v", multi)
+	}
+
+	// errors.As must find a typed error from the first provider, even
+	// though the second provider's error is a different type. Use a
+	// concrete pointer-typed sentinel that errors.As can extract.
+	wrappedSentinel := &statusErr{code: 500}
+	multi2 := &ProviderMultiError{
+		Providers: []string{"a", "b"},
+		Errors: []error{
+			wrappedSentinel,
+			fmt.Errorf("unrelated"),
+		},
+	}
+	var found *statusErr
+	if !errors.As(multi2, &found) {
+		t.Fatalf("errors.As failed to find *statusErr across multi-error")
+	}
+	if found.code != 500 {
+		t.Errorf("errors.As found code=%d, want 500", found.code)
+	}
+
+	// A sentinel that is NOT in the batch must not match.
+	if errors.Is(multi, context.DeadlineExceeded) {
+		t.Errorf("errors.Is(multi, context.DeadlineExceeded) = true, want false")
+	}
+}
+
+// TestProviderMultiError_ErrorFormat verifies the human-readable message
+// lists every tried provider and caps verbose per-error text so a single
+// chatty provider can't dominate the log line.
+func TestProviderMultiError_ErrorFormat(t *testing.T) {
+	t.Run("lists_all_providers", func(t *testing.T) {
+		multi := &ProviderMultiError{
+			Providers: []string{"openai", "anthropic"},
+			Errors:    []error{fmt.Errorf("e1"), fmt.Errorf("e2")},
+		}
+		msg := multi.Error()
+		if !strings.Contains(msg, "tried: openai, anthropic") {
+			t.Errorf("message %q missing provider list", msg)
+		}
+		if !strings.Contains(msg, "openai: e1") {
+			t.Errorf("message %q missing per-provider annotation", msg)
+		}
+	})
+
+	t.Run("caps_long_error_text", func(t *testing.T) {
+		long := strings.Repeat("x", 500)
+		multi := &ProviderMultiError{
+			Providers: []string{"p"},
+			Errors:    []error{fmt.Errorf("%s", long)},
+		}
+		msg := multi.Error()
+		// The per-error annotation is capped at 200 chars (197 + "...").
+		if strings.Contains(msg, strings.Repeat("x", 201)) {
+			t.Errorf("message did not cap long error text; got %d x's in a row", 201)
+		}
+		if !strings.Contains(msg, "...") {
+			t.Errorf("expected truncation marker '...' in message, got: %s", msg)
+		}
+	})
+
+	t.Run("nil_safe", func(t *testing.T) {
+		var multi *ProviderMultiError
+		if msg := multi.Error(); msg != "all LLM providers failed" {
+			t.Errorf("nil multi-error message = %q, want fallback", msg)
+		}
+		if unwrap := multi.Unwrap(); unwrap != nil {
+			t.Errorf("nil multi-error Unwrap = %v, want nil", unwrap)
+		}
+	})
+}
+
+// TestLLMRouter_Execute_ReturnsMultiError verifies that the all-providers-failed
+// path returns a *ProviderMultiError that callers can type-assert on (and that
+// errors.Is traverses the accumulated per-provider errors).
+func TestLLMRouter_Execute_ReturnsMultiError(t *testing.T) {
+	// Providers without API keys fail deterministically without network.
+	providers := []RouterProvider{
+		{Name: "openai", Enabled: true, APIKey: "", Priority: 1},
+		{Name: "anthropic", Enabled: true, APIKey: "", Priority: 2},
+	}
+	r := &LLMRouter{
+		providers: append([]RouterProvider(nil), providers...),
+		stats:     make(map[string]*ProviderStats),
+		strategy:  config.RouterStrategyPriority,
+		maxRetry:  3,
+	}
+
+	_, _, err := r.Execute(context.Background(), "input", nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var multi *ProviderMultiError
+	if !errors.As(err, &multi) {
+		t.Fatalf("expected *ProviderMultiError, got %T: %v", err, err)
+	}
+	if len(multi.Providers) != 2 {
+		t.Errorf("expected 2 tried providers, got %d", len(multi.Providers))
+	}
+	if len(multi.Errors) != 2 {
+		t.Errorf("expected 2 accumulated errors, got %d", len(multi.Errors))
+	}
+	// The "no API key configured" error is a wrapped fmt error; verify
+	// we can detect its absence/presence to confirm Unwrap traversal works.
+	if errors.Is(err, context.Canceled) {
+		t.Errorf("did not expect context.Canceled in no-key failure path")
 	}
 }

@@ -21,6 +21,8 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+
+	"github.com/alib8b8/llm-box/internal/logger"
 )
 
 type TemplateVar struct {
@@ -38,6 +40,12 @@ type Template struct {
 	Version     string
 	Variables   []TemplateVar
 	Content     string
+	// parsed is the pre-compiled form of Content. text/template is safe for
+	// concurrent Execute calls once parsed (the parsed tree is read-only), so
+	// caching it avoids re-parsing the immutable builtin content on every
+	// Render. nil for templates that failed to pre-parse; Render falls back
+	// to lazy parsing in that case so the error is surfaced to the caller.
+	parsed *template.Template
 }
 
 type TemplateManager struct {
@@ -67,6 +75,16 @@ func (tm *TemplateManager) registerBuiltins() {
 		buildSecurityCommandInjectionTestTemplate(),
 	}
 	for _, t := range builtins {
+		// Pre-parse immutable builtin content once so Render avoids
+		// re-parsing on every call. A parse failure here indicates a bug in
+		// a builtin template; we log it and leave parsed nil so Render
+		// surfaces the error to the caller rather than panicking at startup.
+		if pt, err := template.New(t.Name).Parse(t.Content); err == nil {
+			t.parsed = pt
+		} else {
+			logger.Error("failed to pre-parse builtin template; Render will lazy-parse and surface the error",
+				"template", t.Name, "error", err)
+		}
 		tm.templates[t.Name] = t
 	}
 }
@@ -170,9 +188,16 @@ func (tm *TemplateManager) Render(name string, vars map[string]string) (string, 
 		}
 	}
 
-	tmpl, err := template.New(name).Parse(t.Content)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %w", err)
+	// Use the pre-parsed template when available (builtin content is
+	// immutable and text/template is safe for concurrent Execute). Fall
+	// back to lazy parsing only if pre-parse failed at registration.
+	tmpl := t.parsed
+	if tmpl == nil {
+		var err error
+		tmpl, err = template.New(name).Parse(t.Content)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse template: %w", err)
+		}
 	}
 
 	var buf bytes.Buffer

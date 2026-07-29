@@ -59,6 +59,65 @@ type ProviderStats struct {
 	CooldownUntil       time.Time
 }
 
+// ProviderMultiError is returned by LLMRouter.Execute when every candidate
+// provider failed. It wraps every per-provider error so callers can use
+// errors.Is / errors.As to detect a specific failure mode across the whole
+// batch — most importantly, whether context cancellation was the real cause
+// (a caller whose deadline expired should not be told "all providers
+// failed" when the truthful diagnosis is "you cancelled").
+//
+// Unwrap() []error is the multi-unwrap protocol introduced in Go 1.20:
+// errors.Is and errors.As traverse every error in the returned slice, so
+// e.g. errors.Is(multiErr, context.Canceled) is true if ANY provider
+// attempt returned context.Canceled. This matters because the router
+// tries providers sequentially; without multi-unwrap, only the LAST
+// provider's error would be inspectable, and a cancellation that
+// happened on an earlier provider (before a later provider produced a
+// different error) would be silently hidden.
+type ProviderMultiError struct {
+	// Providers is the ordered list of provider names that were tried,
+	// matching the order of Errors.
+	Providers []string
+	// Errors is the per-provider error, parallel to Providers.
+	Errors []error
+}
+
+func (e *ProviderMultiError) Error() string {
+	if e == nil {
+		return "all LLM providers failed"
+	}
+	var b strings.Builder
+	b.WriteString("all LLM providers failed (tried: ")
+	b.WriteString(strings.Join(e.Providers, ", "))
+	b.WriteString(")")
+	// Annotate with each provider's error so the message is actionable
+	// without the caller having to Unwrap. We cap the per-error text so
+	// a single verbose provider error can't dominate the log line.
+	for i, p := range e.Providers {
+		if i >= len(e.Errors) {
+			break
+		}
+		msg := e.Errors[i].Error()
+		if len(msg) > 200 {
+			msg = msg[:197] + "..."
+		}
+		fmt.Fprintf(&b, "\n  - %s: %s", p, msg)
+	}
+	return b.String()
+}
+
+// Unwrap returns the per-provider errors so errors.Is / errors.As traverse
+// all of them. Returns nil when the multi-error carries no wrapped errors
+// (should not happen in practice — Execute only constructs a multi-error
+// after at least one failure — but defending against it keeps Unwrap's
+// contract honest).
+func (e *ProviderMultiError) Unwrap() []error {
+	if e == nil {
+		return nil
+	}
+	return e.Errors
+}
+
 type LLMRouter struct {
 	providers []RouterProvider
 	stats     map[string]*ProviderStats
@@ -71,9 +130,19 @@ type LLMRouter struct {
 var (
 	globalRouter *LLMRouter
 	routerOnce   sync.Once
-	routerMu     sync.Mutex
 )
 
+// GetGlobalRouter lazily initializes and returns the process-wide LLM router.
+//
+// sync.Once establishes the happens-before edge between the write to
+// globalRouter inside Do and every subsequent read, so concurrent callers
+// always observe a fully-initialized *LLMRouter. There is intentionally no
+// ResetGlobalRouter: tearing down a shared singleton under concurrent access
+// cannot be done safely without an atomic-pointer swap (a plain
+// `globalRouter = nil; routerOnce = sync.Once{}` sequence opens a nil-deref
+// window between the two assignments and races with unlocked readers). If
+// test isolation is ever needed, build a fresh *LLMRouter via
+// NewLLMRouterFromConfig and inject it instead of mutating the global.
 func GetGlobalRouter() *LLMRouter {
 	routerOnce.Do(func() {
 		globalRouter = NewLLMRouterFromConfig()
@@ -221,14 +290,27 @@ func defaultModelFor(provider string) string {
 	}
 }
 
+// SelectProviders orders the router's active providers according to its
+// configured strategy. It is preserved for callers (and tests) that select
+// against the router's default strategy; per-call strategy overrides should
+// go through Execute, which resolves the strategy from params without
+// mutating router state.
 func (r *LLMRouter) SelectProviders(ctx context.Context) []RouterProvider {
+	return r.selectProviders(r.strategy)
+}
+
+// selectProviders applies the given strategy to the active provider set.
+// Splitting this out from SelectProviders lets Execute honor a per-call
+// strategy override without touching the shared router.strategy field
+// (which would leak across concurrent workflows sharing the global router).
+func (r *LLMRouter) selectProviders(strategy string) []RouterProvider {
 	providers := r.getActiveProviders()
 
 	if len(providers) == 0 {
 		return providers
 	}
 
-	switch r.strategy {
+	switch strategy {
 	case config.RouterStrategyCost:
 		return r.sortByCost(providers)
 	case config.RouterStrategyLatency:
@@ -242,6 +324,24 @@ func (r *LLMRouter) SelectProviders(ctx context.Context) []RouterProvider {
 	default:
 		return r.sortByPriority(providers)
 	}
+}
+
+// resolveStrategy returns the effective strategy for a call: the per-call
+// override from params when valid, otherwise the router's configured default.
+// Mirrors the max_retries override handling so neither field mutates shared
+// router state.
+func (r *LLMRouter) resolveStrategy(params map[string]string) string {
+	if override := getParam(params, "strategy", ""); override != "" {
+		switch override {
+		case config.RouterStrategyPriority,
+			config.RouterStrategyCost,
+			config.RouterStrategyLatency,
+			config.RouterStrategyRoundRobin,
+			config.RouterStrategyRandom:
+			return override
+		}
+	}
+	return r.strategy
 }
 
 func (r *LLMRouter) getActiveProviders() []RouterProvider {
@@ -336,12 +436,16 @@ func (r *LLMRouter) randomOrder(providers []RouterProvider) []RouterProvider {
 }
 
 func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string]string) (string, string, error) {
-	providers := r.SelectProviders(ctx)
+	// Resolve strategy per-call from params so a workflow's strategy
+	// override never leaks into the shared global router.strategy field
+	// (which would affect concurrent workflows).
+	strategy := r.resolveStrategy(params)
+	providers := r.selectProviders(strategy)
 	if len(providers) == 0 {
 		// B-3: publish the (empty) decision so the trace records that the
 		// router was invoked but had no candidates.
 		RouterDecisionSinkFrom(ctx).RecordRouterDecision(RouterDecision{
-			Strategy:   r.strategy,
+			Strategy:   strategy,
 			Candidates: nil,
 			Selected:   "",
 			FinalError: "no active LLM providers available",
@@ -366,20 +470,46 @@ func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string
 		candidateNames = append(candidateNames, p.Name)
 	}
 	var attempts []RouterAttempt
-	var lastErr error
+	// Accumulate EVERY per-provider error (not just the last) so the
+	// final ProviderMultiError can expose all of them via Unwrap() []error.
+	// This lets errors.Is(err, context.Canceled) succeed when cancellation
+	// happened on any provider attempt, not just the final one — the
+	// previous code wrapped only lastErr with %w, hiding earlier
+	// cancellations behind a later, unrelated provider error.
 	var triedProviders []string
+	var providerErrors []error
 
 	for attempt := 0; attempt < maxRetries && attempt < len(providers); attempt++ {
+		// Honor cancellation between provider attempts. Without this, a
+		// caller whose deadline already expired would still pay for N more
+		// provider round-trips, and the eventual "all providers failed"
+		// error would mask the real cause (context cancellation). The
+		// non-blocking select keeps the happy path zero-overhead.
+		select {
+		case <-ctx.Done():
+			cancelErr := ctx.Err()
+			RouterDecisionSinkFrom(ctx).RecordRouterDecision(RouterDecision{
+				Strategy:   strategy,
+				Candidates: candidateNames,
+				Selected:   "",
+				Attempts:   attempts,
+				FinalError: cancelErr.Error(),
+			})
+			return "", "", cancelErr
+		default:
+		}
+
 		provider := providers[attempt]
 		triedProviders = append(triedProviders, provider.Name)
 
 		if provider.APIKey == "" && provider.Name != "ollama" {
-			lastErr = fmt.Errorf("provider %s has no API key configured", provider.Name)
+			err := fmt.Errorf("provider %s has no API key configured", provider.Name)
+			providerErrors = append(providerErrors, err)
 			r.recordFailure(provider.Name, 0)
 			attempts = append(attempts, RouterAttempt{
 				Provider: provider.Name,
 				Success:  false,
-				Error:    lastErr.Error(),
+				Error:    err.Error(),
 			})
 			continue
 		}
@@ -397,7 +527,7 @@ func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string
 				LatencyMs: latency,
 			})
 			RouterDecisionSinkFrom(ctx).RecordRouterDecision(RouterDecision{
-				Strategy:   r.strategy,
+				Strategy:   strategy,
 				Candidates: candidateNames,
 				Selected:   provider.Name,
 				Attempts:   attempts,
@@ -405,7 +535,7 @@ func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string
 			return result, provider.Name, nil
 		}
 
-		lastErr = err
+		providerErrors = append(providerErrors, err)
 		r.recordFailure(provider.Name, latency)
 		attempts = append(attempts, RouterAttempt{
 			Provider:  provider.Name,
@@ -421,10 +551,12 @@ func (r *LLMRouter) Execute(ctx context.Context, input string, params map[string
 		)
 	}
 
-	finalErr := fmt.Errorf("all LLM providers failed (tried: %s). Last error: %w",
-		strings.Join(triedProviders, ", "), lastErr)
+	finalErr := &ProviderMultiError{
+		Providers: triedProviders,
+		Errors:    providerErrors,
+	}
 	RouterDecisionSinkFrom(ctx).RecordRouterDecision(RouterDecision{
-		Strategy:   r.strategy,
+		Strategy:   strategy,
 		Candidates: candidateNames,
 		Selected:   "",
 		Attempts:   attempts,
@@ -566,11 +698,4 @@ func (r *LLMRouter) GetProviders() []RouterProvider {
 
 func (r *LLMRouter) GetStrategy() string {
 	return r.strategy
-}
-
-func ResetGlobalRouter() {
-	routerMu.Lock()
-	defer routerMu.Unlock()
-	globalRouter = nil
-	routerOnce = sync.Once{}
 }

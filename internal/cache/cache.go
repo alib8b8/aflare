@@ -17,6 +17,7 @@ package cache
 
 import (
 	"container/list"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -189,4 +190,58 @@ func (c *Cache) Len() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.lruList.Len()
+}
+
+// cleanupExpired 移除所有已过期的缓存项。调用方必须持有 c.mu 写锁。
+//
+// 从 LRU 链表尾部（最久未访问）向前扫描：过期项越多越集中在尾部，
+// 因此从尾部开始可在常见工作负载下提前结束扫描（未过期即可停止）。
+// 这里仍完整扫描以保证正确性——TTL 相近时过期项可能散布在链表任意位置。
+func (c *Cache) cleanupExpired() {
+	now := time.Now()
+	for elem := c.lruList.Back(); elem != nil; {
+		next := elem.Prev()
+		e := elem.Value.(*entry)
+		if now.After(e.expiresAt) {
+			delete(c.items, e.key)
+			c.lruList.Remove(elem)
+		}
+		elem = next
+	}
+}
+
+// StartCleanup 启动后台 goroutine 定期清理过期缓存项，直到 ctx 被取消。
+// 调用方应以 `go c.StartCleanup(ctx, interval)` 形式启动，并通过取消 ctx
+// 来停止清理（例如在应用关闭时）。
+//
+// 未启用缓存时为空操作直接返回，避免空转 goroutine。
+//
+// interval 控制清理频率；建议设为 TTL 的 1/4 ~ 1/2，在内存滞留与 CPU 开销
+// 间取得平衡。interval<=0 时使用 TTL（若 TTL 也<=0 则不清理）。
+//
+// 注意：本方法会阻塞直到 ctx.Done()。仅依靠懒清理（Get 命中过期项时删除）
+// 会导致冷 key 永久驻留 map/lruList 直到 LRU 容量满被挤出，形成内存滞留；
+// 后台定期清理弥补这一缺口。
+func (c *Cache) StartCleanup(ctx context.Context, interval time.Duration) {
+	if !c.config.Enabled {
+		return
+	}
+	if interval <= 0 {
+		interval = c.config.TTL
+	}
+	if interval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			c.mu.Lock()
+			c.cleanupExpired()
+			c.mu.Unlock()
+		}
+	}
 }

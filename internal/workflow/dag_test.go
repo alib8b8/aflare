@@ -124,6 +124,48 @@ func TestBuildDepGraph_CycleDetected(t *testing.T) {
 	}
 }
 
+// TestBuildDepGraph_CyclePathAfterBacktrack exercises the DFS backtracking
+// path where the first dependency subtree is cycle-free and the second
+// contains a cycle back to the root. This forces detectCycle's internal
+// `path` slice to be reused across backtracks (shared backing array) before
+// the cycle is found on the second branch. The test locks in that the
+// reported cycle path is correct and not corrupted by stale backing data.
+//
+// Graph (depends_on semantics — X depends on Y means Y must run first):
+//
+//	root → {safe, cyc}   (root depends on safe and cyc)
+//	safe → {}            (leaf, no cycle)
+//	cyc  → {root}        (cycle: root → cyc → root)
+//
+// DFS visits root, recurses into safe (no cycle, backtracks), then into cyc
+// where it finds root on the gray stack. The reported path must be the
+// root→cyc→root cycle, not a corrupted root→safe→cyc→root.
+func TestBuildDepGraph_CyclePathAfterBacktrack(t *testing.T) {
+	steps := []WorkflowStep{
+		{Node: "root", Name: "root", DependsOn: []string{"safe", "cyc"}},
+		{Node: "safe", Name: "safe"}, // no deps; forces a backtrack before the cycle
+		{Node: "cyc", Name: "cyc", DependsOn: []string{"root"}},
+	}
+	_, err := buildDepGraph(steps)
+	if err == nil {
+		t.Fatal("expected cycle detection error, got nil")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "cycle") {
+		t.Fatalf("error should mention cycle, got: %v", err)
+	}
+	// The cycle is root → cyc → root (steps 1 and 3 in 1-based indexing).
+	// `safe` (step 2) must NOT appear in the reported cycle path: if it did,
+	// the shared backing array would be corrupting the path on backtrack.
+	if strings.Contains(msg, "2") {
+		t.Errorf("cycle path should not include the non-cyclic step 'safe' (2), got: %s", msg)
+	}
+	// Both cycle members (root=1, cyc=3) must be present.
+	if !strings.Contains(msg, "1") || !strings.Contains(msg, "3") {
+		t.Errorf("cycle path should include both root (1) and cyc (3), got: %s", msg)
+	}
+}
+
 func TestBuildDepGraph_SelfDep(t *testing.T) {
 	steps := []WorkflowStep{
 		{Node: "a", Name: "a", DependsOn: []string{"a"}},

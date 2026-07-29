@@ -58,17 +58,6 @@ type ifInputKeyType struct{}
 
 var ifInputKey = ifInputKeyType{}
 
-// WorkflowTimeout is the overall workflow timeout. It defaults to
-// DefaultWorkflowTimeout but can be overridden by callers to configure a
-// different workflow timeout without modifying types.go.
-//
-// Deprecated: this is a package-level mutable global and is unsafe under
-// parallel tests (t.Parallel). New code should configure the timeout per
-// Executor via NewExecutor().WithTimeout(d) instead. It is still read by
-// the legacy ExecuteWorkflowWithTrace global entry point, which does not go
-// through an Executor.
-var WorkflowTimeout = DefaultWorkflowTimeout
-
 // StepResult stores the result of executing a single step
 type StepResult struct {
 	StepIndex int
@@ -138,16 +127,16 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 // This entry point does not use checkpoint/resume. To enable per-step
 // checkpointing and resume, build an Executor via NewExecutor().WithCheckpoint(...).
 //
-// This legacy entry point reads the package-level WorkflowTimeout global. New
-// code should prefer NewExecutor().WithTimeout(d) to configure the timeout
-// per-executor and avoid the global mutable state.
+// This legacy entry point applies DefaultWorkflowTimeout. To configure a
+// different timeout, build an Executor via NewExecutor().WithTimeout(d)
+// (per-executor, no global mutable state).
 func ExecuteWorkflowWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, *WorkflowTrace, error) {
 	if hasDAGDeclarations(wf.Steps) {
-		out, results, trace, err := executeWorkflowDAG(ctx, wf, reg, program, WorkflowTimeout)
+		out, results, trace, err := executeWorkflowDAG(ctx, wf, reg, program, DefaultWorkflowTimeout)
 		recordWorkflowMetrics(trace, err)
 		return out, results, trace, err
 	}
-	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, "", WorkflowTimeout)
+	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, "", DefaultWorkflowTimeout)
 	recordWorkflowMetrics(trace, err)
 	return out, results, trace, err
 }
@@ -609,9 +598,18 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 					// ExecuteStream) from the TUI consumer via a buffered
 					// channel: program.Send blocks on an unbuffered channel,
 					// so a slow TUI would otherwise stall the stream.
-					sink := newStreamSink(program, i, wStep.Node)
-					output, execErr = streamingNode.ExecuteStream(stepCtx, data, evaluatedParams, sink.onChunk)
-					sink.flush()
+					//
+					// Wrapped in an IIFE so sink.flush runs via defer at the
+					// end of each attempt: if ExecuteStream panics the
+					// forwarding goroutine would otherwise leak (it blocks on
+					// range s.ch until the channel is closed). onChunk is only
+					// invoked synchronously from inside ExecuteStream, so no
+					// concurrent senders exist by the time flush runs.
+					output, execErr = func() (string, error) {
+						sink := newStreamSink(program, i, wStep.Node)
+						defer sink.flush()
+						return streamingNode.ExecuteStream(stepCtx, data, evaluatedParams, sink.onChunk)
+					}()
 				} else {
 					output, execErr = node.Execute(stepCtx, data, evaluatedParams)
 				}
@@ -640,65 +638,21 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		}
 
 		// ── Error recovery ──
-		// resultErr tracks the error shown in StepResult. For fallback/on_error,
-		// the step is recovered so resultErr is cleared. For continue_on_error,
-		// the step genuinely failed so resultErr is preserved.
+		// Delegated to applyErrorRecovery (shared with the DAG and map
+		// executors) so the four recovery primitives — capture_error,
+		// fallback, on_error, continue_on_error — have one implementation.
+		// abortErr controls whether the workflow stops (mapped to execErr);
+		// traceErr is recorded in StepResult so continue_on_error still
+		// honestly reflects the failure in the trace.
+		// stepBaseCtx is passed so the capture_error branch and on_error
+		// handler run under the same step-scoped context (LLM calls are
+		// captured by the step collector, step timeout still applies).
 		resultErr := execErr
 		var recoveries []string
 		if execErr != nil {
-			// 0. capture_error: run the error branch (treats the error as a
-			// value/branch condition rather than swallowing it). Checked first
-			// because it is the most expressive recovery primitive.
-			if wStep.HasCaptureError() {
-				branchOut, bErr := executeCaptureErrorBranch(stepBaseCtx, wStep.CaptureError, execErr.Error(), engine.SnapshotVars(), reg, program, globalLimiter)
-				if bErr == nil {
-					logger.Info("step recovered via capture_error branch", "index", i, "node", wStep.Node)
-					output = branchOut
-					execErr = nil
-					resultErr = nil
-					recoveries = append(recoveries, "capture_error")
-				} else {
-					logger.Warn("capture_error branch failed, falling through to other recovery", "index", i, "node", wStep.Node, "error", nodes.RedactSensitive(bErr.Error()))
-				}
-			}
-			// 1. Try fallback value
-			if execErr != nil && wStep.Fallback != "" {
-				fallbackVal, ferr := engine.Evaluate(wStep.Fallback, data)
-				if ferr == nil {
-					logger.Info("step recovered via fallback", "index", i, "node", wStep.Node)
-					output = fallbackVal
-					execErr = nil
-					resultErr = nil
-					recoveries = append(recoveries, "fallback")
-				}
-			}
-			// 2. Try on_error handler node
-			if execErr != nil && wStep.OnError != nil {
-				errStep := *wStep.OnError
-				errParams, eerr := engine.EvaluateParams(errStep.Params, data)
-				if eerr == nil {
-					if errNode, ok := reg.Get(errStep.Node); ok {
-						// Use stepBaseCtx so the handler's LLM calls (if any)
-						// are captured by the same step collector.
-						errOutput, errExecErr := errNode.Execute(stepBaseCtx, data, errParams)
-						if errExecErr == nil {
-							logger.Info("step recovered via on_error handler", "index", i, "handler", errStep.Node)
-							output = errOutput
-							execErr = nil
-							resultErr = nil
-							recoveries = append(recoveries, "on_error")
-						}
-					}
-				}
-			}
-			// 3. Check continue_on_error: clear execErr so workflow continues,
-			// but keep resultErr so StepResult reflects the actual failure.
-			if execErr != nil && wStep.ContinueOnError {
-				logger.Warn("step failed but continue_on_error is set, continuing", "index", i, "node", wStep.Node, "error", nodes.RedactSensitive(execErr.Error()))
-				output = ""
-				execErr = nil
-				recoveries = append(recoveries, "continue_on_error")
-			}
+			var abortErr error
+			recoveries, abortErr, resultErr = applyErrorRecovery(stepBaseCtx, &wStep, &output, execErr, engine, reg, data, program, globalLimiter, "step")
+			execErr = abortErr
 		}
 
 		engine.SetStepOutput(i, wStep.Name, output)
@@ -853,6 +807,22 @@ func (e *Executor) ExecuteWithTrace(ctx context.Context, wf *Workflow, reg *node
 	return out, results, trace, err
 }
 
+// traceLLMError is the error reconstructed from an LLMStepTrace.ErrText
+// when recording per-call metrics. The original error object is not
+// preserved in the trace (traces are JSON-serialised, so they carry only
+// the error's text), so this type cannot Unwrap the real error — it
+// intentionally has no Unwrap method to avoid implying a chain that
+// doesn't exist. Carrying StatusCode lets future metrics distinguish
+// provider HTTP errors (5xx) from client-side failures (status 0,
+// e.g. context cancellation / connection refused) without re-parsing
+// the error text.
+type traceLLMError struct {
+	text       string
+	statusCode int
+}
+
+func (e *traceLLMError) Error() string { return e.text }
+
 // recordWorkflowMetrics publishes Prometheus metrics for a completed workflow
 // run: the overall execution counter/duration and the per-call LLM telemetry
 // aggregated in trace.Steps[*].LLM (provider/model/tokens/cost). It is
@@ -866,7 +836,15 @@ func recordWorkflowMetrics(trace *WorkflowTrace, runErr error) {
 			for _, call := range step.LLM {
 				var callErr error
 				if call.ErrText != "" {
-					callErr = errors.New(call.ErrText)
+					// Reconstruct a typed error rather than a bare
+					// errors.New(string): the typed form carries the
+					// HTTP status code and is identifiable as a
+					// trace-originated error. metrics.RecordLLMCall
+					// currently only checks err != nil, but the typed
+					// form means a future metrics evolution (e.g.
+					// counting 5xx vs client-side failures separately)
+					// can switch on the type without re-stringifying.
+					callErr = &traceLLMError{text: call.ErrText, statusCode: call.StatusCode}
 				}
 				metrics.RecordLLMCall(call.Provider, call.Model, callErr,
 					call.PromptTokens, call.CompletionTokens, call.CostUSD)

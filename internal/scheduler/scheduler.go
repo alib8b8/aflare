@@ -16,6 +16,7 @@
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"runtime/debug"
 	"strconv"
@@ -26,7 +27,10 @@ import (
 	"github.com/alib8b8/llm-box/internal/logger"
 )
 
-type TaskFunc func()
+// TaskFunc is the body of a scheduled task. The context is cancelled when the
+// scheduler stops, so long-running tasks can abort promptly on shutdown
+// rather than blocking Stop() indefinitely.
+type TaskFunc func(context.Context)
 
 type Task struct {
 	ID       string
@@ -49,6 +53,12 @@ type Scheduler struct {
 	running bool
 	stop    chan struct{}
 	done    chan struct{}
+	// taskWg tracks in-flight task goroutines so Stop() can wait for them
+	// (and, via taskCancel, signal them to abort) instead of leaving them
+	// running after the scheduler has supposedly shut down.
+	taskWg     sync.WaitGroup
+	taskCtx    context.Context
+	taskCancel context.CancelFunc
 }
 
 type cronSchedule struct {
@@ -137,6 +147,7 @@ func (s *Scheduler) Start() {
 	s.running = true
 	s.stop = make(chan struct{})
 	s.done = make(chan struct{})
+	s.taskCtx, s.taskCancel = context.WithCancel(context.Background())
 	s.mu.Unlock()
 
 	go s.run()
@@ -150,13 +161,27 @@ func (s *Scheduler) Stop() {
 	}
 	s.running = false
 	close(s.stop)
+	taskCancel := s.taskCancel
 	s.mu.Unlock()
 
+	// Wait for the main tick loop to exit, then cancel the task context so
+	// in-flight tasks observe shutdown, and finally wait for those task
+	// goroutines to actually return. Ordering matters: cancel after <-s.done
+	// so no new task can be spawned (checkAndRunTasks only runs inside run)
+	// while we wait on taskWg.
 	<-s.done
+	taskCancel()
+	s.taskWg.Wait()
 }
 
 func (s *Scheduler) run() {
 	defer close(s.done)
+
+	// taskCtx is written once in Start() before this goroutine is launched,
+	// so reading it here is race-free (goroutine creation establishes
+	// happens-before). Capturing it locally also keeps the hot loop off the
+	// shared field.
+	taskCtx := s.taskCtx
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -166,12 +191,12 @@ func (s *Scheduler) run() {
 		case <-s.stop:
 			return
 		case now := <-ticker.C:
-			s.checkAndRunTasks(now)
+			s.checkAndRunTasks(now, taskCtx)
 		}
 	}
 }
 
-func (s *Scheduler) checkAndRunTasks(now time.Time) {
+func (s *Scheduler) checkAndRunTasks(now time.Time, taskCtx context.Context) {
 	s.mu.RLock()
 	var tasksToRun []*Task
 	for _, task := range s.tasks {
@@ -182,7 +207,13 @@ func (s *Scheduler) checkAndRunTasks(now time.Time) {
 	s.mu.RUnlock()
 
 	for _, task := range tasksToRun {
+		// Track each task goroutine so Stop() can wait for in-flight work
+		// and cancel it via taskCtx. Add before the goroutine starts so the
+		// Done() is always paired with an Add() (no race where Stop sees a
+		// zero counter and returns early).
+		s.taskWg.Add(1)
 		go func(t *Task) {
+			defer s.taskWg.Done()
 			defer func() {
 				if r := recover(); r != nil {
 					logger.Error("scheduled task panicked",
@@ -193,7 +224,7 @@ func (s *Scheduler) checkAndRunTasks(now time.Time) {
 					)
 				}
 			}()
-			t.Func()
+			t.Func(taskCtx)
 		}(task)
 		s.mu.Lock()
 		if t, ok := s.tasks[task.ID]; ok {

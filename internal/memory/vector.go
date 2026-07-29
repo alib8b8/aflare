@@ -45,6 +45,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/httpclient"
 )
 
 // Vector is a dense float32 embedding. We use float32 (not float64) because
@@ -158,6 +160,16 @@ type HTTPEmbedder struct {
 // NewHTTPEmbedder returns an HTTPEmbedder. dim is the dimensionality the
 // server is expected to return; if a response's vector has a different
 // length the embedder returns an error so callers can detect config drift.
+//
+// The embedder talks to an OpenAI-compatible /embeddings endpoint, which
+// may be a remote provider (OpenAI, DeepSeek, …) or a local server
+// (Ollama, text-embeddings-inference on localhost). We therefore use the
+// httpclient factory with ValidateAllowLoopback so local embedders work
+// while private/link-local/reserved ranges stay blocked, and so the
+// connection pool is tuned consistently with every other outbound client
+// in llm-box (the previous bare &http.Client{} used the stdlib default of
+// MaxIdleConnsPerHost==2, which serialized concurrent embedder calls
+// against the same host).
 func NewHTTPEmbedder(endpoint, apiKey, model string, dim int) *HTTPEmbedder {
 	if dim <= 0 {
 		dim = 1536 // OpenAI text-embedding-3-small default
@@ -167,7 +179,10 @@ func NewHTTPEmbedder(endpoint, apiKey, model string, dim int) *HTTPEmbedder {
 		apiKey:   apiKey,
 		model:    model,
 		dim:      dim,
-		client:   &http.Client{Timeout: 30 * time.Second},
+		client: httpclient.NewClient(httpclient.Options{
+			Timeout:   30 * time.Second,
+			Validator: httpclient.ValidateAllowLoopback,
+		}),
 	}
 }
 
@@ -186,7 +201,7 @@ func (e *HTTPEmbedder) Embed(ctx context.Context, text string) (Vector, error) {
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, "POST", e.endpoint+"/embeddings", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, e.endpoint+"/embeddings", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

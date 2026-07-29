@@ -13,6 +13,10 @@ linters:
     # Additional bug-finding linters (blocking).
     - errorlint  # erroneous error-handling (== instead of errors.Is, %w misuse)
     - nilerr     # returning nil while err != nil
+    # Resource & correctness linters (blocking).
+    - bodyclose      # unclosed http.Response.Body — real resource leak detection
+    - unconvert      # unnecessary type conversions — zero-noise, already clean
+    - usestdlibvars  # use net/http constants instead of string literals
   settings:
     errcheck:
       check-type-assertions: false
@@ -64,6 +68,12 @@ linters:
       - path: _test\.go
         linters:
           - errcheck
+          # bodyclose can't track response-body closure across mock
+          # transport boundaries: test mocks return http.Response values
+          # whose bodies are closed by the production code under test, not
+          # the test itself. Excluding tests keeps real production leaks
+          # blocking while avoiding false positives in test mocks.
+          - bodyclose
       # defer <x>.Close() in cleanup — error not actionable
       - linters: [errcheck]
         source: 'defer\s+.*\.Close\(\)'

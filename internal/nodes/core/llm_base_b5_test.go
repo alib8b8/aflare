@@ -163,7 +163,7 @@ func TestLLMClient_MultiProviderShapesEquivalence(t *testing.T) {
 				t.Fatalf("expected 1 telemetry call, got %d", len(calls))
 			}
 			c := calls[0]
-			if c.StatusCode != 200 {
+			if c.StatusCode != http.StatusOK {
 				t.Errorf("StatusCode=%d want 200", c.StatusCode)
 			}
 			if c.ErrText != "" {
@@ -402,7 +402,7 @@ func TestLLMClient_ErrorResponsePropagates(t *testing.T) {
 		t.Fatalf("expected 1 call record even on error, got %d", len(calls))
 	}
 	c := calls[0]
-	if c.StatusCode != 429 {
+	if c.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("StatusCode=%d want 429", c.StatusCode)
 	}
 	if !strings.Contains(c.ErrText, "rate limited") {
@@ -570,4 +570,80 @@ func BenchmarkLLMResponse_Unmarshal_WithUsage(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+// newSSEBenchServer returns a test server that emits a small SSE stream
+// (5 content chunks + [DONE]), suitable for benchmarking the streaming
+// read path including the streamBufPool.
+func newSSEBenchServer(b *testing.B) *httptest.Server {
+	b.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		enc := json.NewEncoder(w)
+		for i := 0; i < 5; i++ {
+			_, _ = w.Write([]byte("data: "))
+			_ = enc.Encode(LLMResponse{Choices: []LLMChoice{{Delta: LLMChoiceDelta{Content: "chunk-"}}}})
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		_, _ = w.Write([]byte("data: [DONE]\n"))
+	}))
+}
+
+// BenchmarkLLMClient_ExecuteStream measures the streaming read path. The
+// streamBufPool should keep the per-call 256KB scanner buffer allocation
+// near zero in steady state (run with -benchmem to verify).
+func BenchmarkLLMClient_ExecuteStream(b *testing.B) {
+	srv := newSSEBenchServer(b)
+	defer srv.Close()
+
+	node := NewOpenAICompatibleNode(LLMNodeConfig{
+		Name:            "benchstream",
+		DefaultModel:    "m",
+		DefaultEndpoint: srv.URL,
+		EnvAPIKey:       "LLMBOX_B5_NEVER_SET10",
+		ProviderName:    "benchstream",
+	})
+	ctx := context.Background()
+	params := map[string]string{"api_key": "sk-test", "stream": "true"}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := node.ExecuteStream(ctx, "hello", params, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkLLMClient_ExecuteStream_Parallel exercises the streamBufPool
+// under concurrent fan-out (the map node's workload). The pool must not
+// corrupt buffers across goroutines; -race in combination with this
+// benchmark is the primary correctness check for the pool.
+func BenchmarkLLMClient_ExecuteStream_Parallel(b *testing.B) {
+	srv := newSSEBenchServer(b)
+	defer srv.Close()
+
+	node := NewOpenAICompatibleNode(LLMNodeConfig{
+		Name:            "benchstreampar",
+		DefaultModel:    "m",
+		DefaultEndpoint: srv.URL,
+		EnvAPIKey:       "LLMBOX_B5_NEVER_SET11",
+		ProviderName:    "benchstreampar",
+	})
+	ctx := context.Background()
+	params := map[string]string{"api_key": "sk-test", "stream": "true"}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, err := node.ExecuteStream(ctx, "hello", params, nil)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }

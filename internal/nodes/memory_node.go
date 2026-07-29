@@ -243,7 +243,7 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 		if _, ok := params["level"]; !ok {
 			expandLevel = ""
 		}
-		result, err = n.expandKGMemory(session, query, expandLevel, topK, threshold)
+		result, err = n.expandKGMemory(ctx, session, query, expandLevel, topK, threshold)
 	case "compress":
 		result, err = n.compressMemory(ctx, session, params)
 	}

@@ -241,7 +241,7 @@ func (n *DocParseNode) callOCRAPI(ctx context.Context, endpoint, apiKey, imageBa
 		return "", fmt.Errorf("failed to marshal OCR request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(bodyJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyJSON))
 	if err != nil {
 		return "", fmt.Errorf("failed to create OCR request: %w", err)
 	}
@@ -312,7 +312,7 @@ func downloadAsBase64(ctx context.Context, rawURL string) (string, error) {
 		return "", fmt.Errorf("URL validation failed: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create download request: %w", err)
 	}

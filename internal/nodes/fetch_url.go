@@ -109,7 +109,7 @@ func (n *FetchURLNode) Execute(ctx context.Context, input string, params map[str
 	}
 
 	// Create HTTP request
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}

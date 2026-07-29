@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Test all node Name/Description/Schema methods to quickly boost coverage.
@@ -148,7 +149,7 @@ func TestIsSensitiveKey(t *testing.T) {
 
 func TestHttpRedirectValidator(t *testing.T) {
 	validator := httpRedirectValidator(func(string) error { return nil })
-	req, _ := http.NewRequest("GET", "https://example.com", nil)
+	req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
 	// 9 redirects should be fine
 	via := make([]*http.Request, 9)
 	for i := range via {
@@ -626,6 +627,21 @@ func TestConditionNode_SafeRegexMatch(t *testing.T) {
 	matched, err = SafeRegexMatch(`\d+`, "abc")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The semaphore slot is released from INSIDE the regex goroutine's defer,
+	// so after a normal (non-timing-out) match returns the slot must be free
+	// again. Poll briefly because the goroutine may not have run its defer
+	// before the caller's select unblocks on `done`.
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if len(regexSemaphore) == 0 {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if len(regexSemaphore) != 0 {
+		t.Errorf("expected semaphore slot to be released after match, %d held", len(regexSemaphore))
 	}
 	if matched {
 		t.Error("expected no match")

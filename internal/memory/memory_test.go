@@ -16,6 +16,10 @@
 package memory
 
 import (
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -412,4 +416,69 @@ func TestUserProfileLearnFromInteraction(t *testing.T) {
 	if conf != 0.6 {
 		t.Errorf("expected confidence 0.6 from LearnFromInteraction, got %f", conf)
 	}
+}
+
+// TestUserProfileStartAutoSave_FlushOnCancel verifies that cancelling the
+// context triggers a final flush, persisting in-memory profile state to disk
+// before the goroutine exits. This is the key behavior that lets callers use
+// StartAutoSave as a "save on shutdown" hook.
+func TestUserProfileStartAutoSave_FlushOnCancel(t *testing.T) {
+	dir := t.TempDir()
+	mgr := &UserProfileManager{
+		profiles:   make(map[string]*UserProfile),
+		storageDir: dir,
+		mu:         sync.RWMutex{},
+		maxPerUser: defaultMaxPrefsPerUser,
+	}
+
+	path := filepath.Join(dir, sanitizeUserID("user1")+".json")
+
+	// GetProfile persists the (empty) profile on creation. SetPreference
+	// mutates in memory only — so on disk the preference is absent until a
+	// save fires.
+	p := mgr.GetProfile("user1")
+	p.SetPreference(PrefCodingStyle, "language", "go", "test", 0.9)
+
+	if preferenceOnDisk(t, path, "go") {
+		t.Fatal("precondition: preference should NOT be on disk before flush")
+	}
+
+	// Long interval so no periodic tick fires — only the cancellation flush
+	// should write the updated state.
+	ctx, cancel := context.WithCancel(context.Background())
+	mgr.StartAutoSave(ctx, time.Hour)
+	cancel()
+
+	// Poll for the flush to land; it happens synchronously inside the
+	// goroutine's ctx.Done() branch right before return.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if preferenceOnDisk(t, path, "go") {
+			return // flush confirmed
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Error("expected updated profile to be flushed to disk on ctx cancellation")
+}
+
+// preferenceOnDisk reports whether the persisted profile file at path contains
+// the given preference value. Returns false on any read/parse error.
+func preferenceOnDisk(t *testing.T, path, want string) bool {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var temp struct {
+		Preferences map[string]*PreferenceEntry `json:"preferences"`
+	}
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return false
+	}
+	for _, e := range temp.Preferences {
+		if e.Value == want {
+			return true
+		}
+	}
+	return false
 }

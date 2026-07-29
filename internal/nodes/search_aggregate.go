@@ -377,7 +377,7 @@ func httpGet(ctx context.Context, urlStr, userAgent string) (string, error) {
 		Transport:     safeHTTPClient.Transport,
 		CheckRedirect: httpRedirectValidator(validateURL),
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
 	if err != nil {
 		return "", err
 	}

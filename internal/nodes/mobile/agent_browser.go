@@ -29,8 +29,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alib8b8/llm-box/internal/httpclient"
 	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
+
+// cdpHTTPClient is the shared client for Chrome DevTools Protocol calls.
+// CDP only ever listens on localhost, so we use ValidateAllowLoopback;
+// the httpclient factory also gives us connection-pool tuning (the
+// previous bare &http.Client{} on every fetchCDP call created a fresh
+// Transport each time, defeating keep-alive across the version/tab
+// probes that connectToExistingBrowser fires in quick succession).
+var cdpHTTPClient = httpclient.NewClient(httpclient.Options{
+	Timeout:   5 * time.Second,
+	Validator: httpclient.ValidateAllowLoopback,
+})
 
 type AgentBrowserNode struct{}
 
@@ -348,13 +360,15 @@ func (n *AgentBrowserNode) fetchCDP(ctx context.Context, target string) ([]byte,
 		return nil, fmt.Errorf("CDP target must include an explicit port")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", target, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return nil, err
 	}
-	// CDP 端点只监听本机，使用较短超时避免长时间挂起
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
+	// cdpHTTPClient is package-level so its connection pool is reused
+	// across the multiple fetchCDP calls connectToExistingBrowser makes
+	// (version probe + tab list), instead of opening a fresh TLS/TCP
+	// connection each time.
+	resp, err := cdpHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -85,10 +85,17 @@ func SafeRegexMatch(pattern, input string) (bool, error) {
 		return false, err
 	}
 
-	// Limit concurrent regex goroutines to prevent goroutine leak under ReDoS
+	// Limit concurrent regex goroutines. The slot is released INSIDE the
+	// goroutine (not via a caller defer) so it stays held until the match
+	// truly terminates — even when the caller times out at the 2s select
+	// below and returns. regexp has no cancellation API, so a ReDoS-prone
+	// pattern can run indefinitely; releasing the slot on caller-timeout
+	// would let new calls keep entering and leak goroutines without bound.
+	// Holding the slot until goroutine exit bounds leaked goroutines to
+	// maxConcurrentRegex (100); once exhausted, new calls fail fast with
+	// "concurrency limit reached" instead of growing toward OOM.
 	select {
 	case regexSemaphore <- struct{}{}:
-		defer func() { <-regexSemaphore }()
 	case <-time.After(3 * time.Second):
 		return false, fmt.Errorf("regex concurrency limit reached, try again later")
 	}
@@ -97,6 +104,9 @@ func SafeRegexMatch(pattern, input string) (bool, error) {
 	var matched bool
 	go func() {
 		defer func() {
+			// Release the slot only when the match has actually finished
+			// (success, panic, or runaway ReDoS finally returning).
+			<-regexSemaphore
 			if r := recover(); r != nil {
 				logger.Error("regex match panicked",
 					"pattern", pattern,
@@ -104,6 +114,8 @@ func SafeRegexMatch(pattern, input string) (bool, error) {
 					"stack", string(debug.Stack()),
 				)
 			}
+			// done is buffered (cap 1) so this send never blocks even if
+			// the caller already timed out and returned.
 			done <- true
 		}()
 		matched = re.MatchString(input)

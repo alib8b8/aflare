@@ -400,8 +400,8 @@ func (s *WebhookServer) runTask(task *Task, body []byte, query map[string][]stri
 		}
 	}
 
-	// Use the immutable default timeout constant rather than the deprecated
-	// mutable WorkflowTimeout global, which is unsafe under parallel tests.
+	// Use the immutable default timeout constant. (There is no mutable global
+	// timeout anymore — it was removed to avoid racing under parallel tests.)
 	ctx, cancel := context.WithTimeout(context.Background(), workflow.DefaultWorkflowTimeout)
 	defer cancel()
 

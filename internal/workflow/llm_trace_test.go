@@ -118,7 +118,7 @@ func TestLLMTelemetry_SequentialStepCaptured(t *testing.T) {
 	if c.Attempt != 1 {
 		t.Errorf("Attempt=%d want 1", c.Attempt)
 	}
-	if c.StatusCode != 200 {
+	if c.StatusCode != http.StatusOK {
 		t.Errorf("StatusCode=%d want 200", c.StatusCode)
 	}
 	if c.PromptTokens != 12 || c.CompletionTokens != 8 || c.TotalTokens != 20 {
@@ -174,13 +174,13 @@ func TestLLMTelemetry_RetriesProduceMultipleCalls(t *testing.T) {
 	if len(st.LLM) != 2 {
 		t.Fatalf("expected 2 LLM calls (1 fail + 1 success), got %d", len(st.LLM))
 	}
-	if st.LLM[0].StatusCode != 500 {
+	if st.LLM[0].StatusCode != http.StatusInternalServerError {
 		t.Errorf("first call StatusCode=%d want 500", st.LLM[0].StatusCode)
 	}
 	if !strings.Contains(st.LLM[0].ErrText, "transient") {
 		t.Errorf("first call ErrText=%q should mention transient", st.LLM[0].ErrText)
 	}
-	if st.LLM[1].StatusCode != 200 {
+	if st.LLM[1].StatusCode != http.StatusOK {
 		t.Errorf("second call StatusCode=%d want 200", st.LLM[1].StatusCode)
 	}
 	if st.LLM[1].PromptTokens != 5 {

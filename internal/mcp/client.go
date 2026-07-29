@@ -18,7 +18,6 @@ package mcp
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,57 +28,31 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/alib8b8/llm-box/internal/httpclient"
 )
 
-// safeHTTPClient is a shared HTTP client with SSRF protection for MCP connections.
-// It uses a custom DialContext that re-validates resolved IPs at connect time
-// to prevent DNS rebinding attacks. Loopback addresses are allowed because
-// MCP servers commonly run on localhost.
-var safeHTTPClient = &http.Client{
-	Timeout: 30 * time.Second,
-	Transport: &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, err
-			}
-			ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-			if err != nil {
-				return nil, err
-			}
-			for _, ip := range ips {
-				if err := validateMCPIP(ip.IP, host); err != nil {
-					return nil, err
-				}
-			}
-			if len(ips) > 0 {
-				addr = net.JoinHostPort(ips[0].IP.String(), port)
-			}
-			return (&net.Dialer{}).DialContext(ctx, network, addr)
-		},
-	},
-}
+// safeHTTPClient is the MCP client's shared HTTP client. It uses the
+// httpclient factory so that SSRF defense (re-resolve + validate at dial
+// time, closing the DNS-rebinding TOCTOU window) and connection-pool
+// tuning are shared with every other outbound client in llm-box rather
+// than re-implemented here. MCP servers commonly run on localhost, so we
+// use ValidateAllowLoopback (loopback permitted, all other dangerous
+// ranges blocked).
+var safeHTTPClient = httpclient.NewClient(httpclient.Options{
+	Timeout:   30 * time.Second,
+	Validator: httpclient.ValidateAllowLoopback,
+})
 
-// validateMCPIP validates an IP address for MCP connections.
-// Loopback is allowed (local MCP servers are common), but private,
-// link-local, multicast, and reserved ranges are blocked.
+// validateMCPIP validates an IP address for MCP connections. It delegates
+// to the shared httpclient validator so the IP-range policy lives in one
+// place. validateMCPURL still does the URL-scheme/host checks that
+// httpclient cannot (http/https only, block userinfo, host present); the
+// IP-literal fast path covers the case where the URL host is already an
+// IP, while the DialContext on safeHTTPClient covers the hostname case at
+// connect time.
 func validateMCPIP(ip net.IP, displayHost string) error {
-	if ip.IsLoopback() {
-		return nil
-	}
-	if ip.IsPrivate() {
-		return fmt.Errorf("access to private address %s is not allowed for MCP", displayHost)
-	}
-	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-		return fmt.Errorf("access to link-local address %s is not allowed for MCP", displayHost)
-	}
-	if ip.IsUnspecified() {
-		return fmt.Errorf("access to unspecified address %s is not allowed for MCP", displayHost)
-	}
-	if ip.IsMulticast() {
-		return fmt.Errorf("access to multicast address %s is not allowed for MCP", displayHost)
-	}
-	return nil
+	return httpclient.ValidateAllowLoopback(ip, displayHost)
 }
 
 // validateMCPURL validates an MCP server URL.

@@ -16,6 +16,7 @@
 package cache
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -304,5 +305,89 @@ func TestDefaultMaxEntries(t *testing.T) {
 
 	if c.Len() > 100 {
 		t.Errorf("expected at most 100 entries (default), got %d", c.Len())
+	}
+}
+
+// TestStartCleanup_RemovesExpired verifies the background goroutine evicts
+// expired entries even when they are never accessed again (the lazy-cleanup
+// path in Get would otherwise leave them resident until LRU pressure evicts
+// them — the exact memory-retention gap StartCleanup closes).
+func TestStartCleanup_RemovesExpired(t *testing.T) {
+	c := New(Config{
+		Enabled:    true,
+		MaxEntries: 100,
+		TTL:        40 * time.Millisecond,
+	})
+
+	c.Set("key1", "value1")
+	c.Set("key2", "value2")
+	if c.Len() != 2 {
+		t.Fatalf("expected 2 entries, got %d", c.Len())
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go c.StartCleanup(ctx, 20*time.Millisecond)
+
+	// Wait past TTL plus at least one cleanup tick. Poll rather than fixed
+	// sleep to keep the test fast on quick hosts while staying robust on
+	// slow CI (ticker resolution is coarse under load).
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if c.Len() == 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if c.Len() != 0 {
+		t.Errorf("expected all expired entries to be cleaned up, got %d remaining", c.Len())
+	}
+}
+
+// TestStartCleanup_StopsOnCancel verifies the goroutine exits when ctx is
+// cancelled, so it does not leak for the lifetime of the process.
+func TestStartCleanup_StopsOnCancel(t *testing.T) {
+	c := New(Config{
+		Enabled:    true,
+		MaxEntries: 10,
+		TTL:        time.Minute,
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		c.StartCleanup(ctx, 10*time.Millisecond)
+		close(done)
+	}()
+
+	cancel()
+	select {
+	case <-done:
+		// goroutine exited as expected
+	case <-time.After(2 * time.Second):
+		t.Error("StartCleanup did not stop after ctx cancellation")
+	}
+}
+
+// TestStartCleanup_DisabledNoop verifies StartCleanup returns immediately
+// when the cache is disabled, so no goroutine is left running.
+func TestStartCleanup_DisabledNoop(t *testing.T) {
+	c := New(Config{
+		Enabled:    false,
+		MaxEntries: 10,
+		TTL:        time.Minute,
+	})
+
+	done := make(chan struct{})
+	go func() {
+		c.StartCleanup(context.Background(), 10*time.Millisecond)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// returned immediately as expected
+	case <-time.After(time.Second):
+		t.Error("StartCleanup should return immediately when cache is disabled")
 	}
 }

@@ -16,7 +16,6 @@
 package core
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -28,6 +27,7 @@ import (
 	"time"
 
 	"github.com/alib8b8/llm-box/internal/config"
+	"github.com/alib8b8/llm-box/internal/httpclient"
 )
 
 var (
@@ -366,107 +366,47 @@ func loopbackAllowed() bool {
 }
 
 // ValidateIP reports whether ip is safe to connect to (blocks loopback,
-// private, link-local, unspecified, multicast, and reserved ranges).
+// private, link-local, unspecified, multicast, and reserved ranges). It
+// delegates to httpclient.ValidatePublic so the IP-range policy lives in
+// exactly one place. Kept as a thin wrapper for backward compatibility
+// with callers that already import nodes/core.
 func ValidateIP(ip net.IP, displayHost string) error {
-	if ip.IsLoopback() {
-		return fmt.Errorf("access to loopback address %s is not allowed", displayHost)
-	}
-	if ip.IsPrivate() {
-		return fmt.Errorf("access to private address %s is not allowed", displayHost)
-	}
-	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-		return fmt.Errorf("access to link-local address %s is not allowed", displayHost)
-	}
-	if ip.IsUnspecified() {
-		return fmt.Errorf("access to unspecified address %s is not allowed", displayHost)
-	}
-	if ip.IsMulticast() {
-		return fmt.Errorf("access to multicast address %s is not allowed", displayHost)
-	}
-	if IsReservedIP(ip) {
-		return fmt.Errorf("access to reserved address %s is not allowed", displayHost)
-	}
-	return nil
+	return httpclient.ValidatePublic(ip, displayHost)
 }
 
-// SafeHTTPClient is a shared HTTP client with a custom DialContext that
-// re-validates the resolved IP at connect time to close the TOCTOU window
-// (DNS rebinding) that exists when validation is done before the request
-// and the dial happens later.
-var SafeHTTPClient = &http.Client{
+// SafeHTTPClient is the shared HTTP client for general outbound traffic
+// (fetch_url, http_request, webhooks, etc.). It is built via the
+// httpclient factory so the dial-time SSRF re-validation and the
+// connection-pool tuning (MaxIdleConns / MaxIdleConnsPerHost /
+// IdleConnTimeout) live in one place rather than being copy-pasted.
+//
+// The validator is a closure (not a pre-built httpclient.Validator) on
+// purpose: SafeHTTPClient honors LLMBOX_ALLOW_LOOPBACK at *dial* time,
+// not at init time, so flipping the env var takes effect for the next
+// connection without restarting the process. The closure dispatches to
+// ValidateIP (loopback blocked) or ValidateLMLEndpointIPAllowLoopback
+// (loopback allowed) accordingly, keeping DNS-rebinding protection
+// intact in both modes.
+var SafeHTTPClient = httpclient.NewClient(httpclient.Options{
 	Timeout: 30 * time.Second,
-	Transport: &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, err
-			}
-			ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-			if err != nil {
-				return nil, err
-			}
-			// When loopback is explicitly allowed (local dev/demo via
-			// LLMBOX_ALLOW_LOOPBACK=1), use the loopback-permitting validator
-			// at dial time too, keeping DNS-rebinding protection intact.
-			dialValidator := ValidateIP
-			if loopbackAllowed() {
-				dialValidator = ValidateLMLEndpointIPAllowLoopback
-			}
-			for _, ip := range ips {
-				if err := dialValidator(ip.IP, host); err != nil {
-					return nil, err
-				}
-			}
-			if len(ips) > 0 {
-				addr = net.JoinHostPort(ips[0].IP.String(), port)
-			}
-			return (&net.Dialer{}).DialContext(ctx, network, addr)
-		},
-		// Connection-pool tuning. The defaults (MaxIdleConnsPerHost==2) starve
-		// high-fan-out workflows and LLM streaming under concurrent load, while
-		// unbounded idle conns leak sockets on long-running processes.
-		MaxIdleConns:          100,
-		MaxIdleConnsPerHost:   10,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
+	Validator: func(ip net.IP, displayHost string) error {
+		if loopbackAllowed() {
+			return ValidateLMLEndpointIPAllowLoopback(ip, displayHost)
+		}
+		return ValidateIP(ip, displayHost)
 	},
-}
+})
 
-// SafeLLMHTTPClient is like SafeHTTPClient but allows loopback addresses
-// (for local LLM servers like Ollama). It still blocks private non-loopback,
-// link-local, and other dangerous IP ranges at dial time.
-var SafeLLMHTTPClient = &http.Client{
-	Timeout: 120 * time.Second,
-	Transport: &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, err
-			}
-			ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-			if err != nil {
-				return nil, err
-			}
-			for _, ip := range ips {
-				if err := ValidateLMLEndpointIPAllowLoopback(ip.IP, host); err != nil {
-					return nil, err
-				}
-			}
-			if len(ips) > 0 {
-				addr = net.JoinHostPort(ips[0].IP.String(), port)
-			}
-			return (&net.Dialer{}).DialContext(ctx, network, addr)
-		},
-		// Same pool tuning as SafeHTTPClient; LLM endpoints benefit even more
-		// because requests are long-lived and reuse is high.
-		MaxIdleConns:          100,
-		MaxIdleConnsPerHost:   10,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	},
-}
+// SafeLLMHTTPClient is like SafeHTTPClient but allows loopback and
+// private addresses (for local/LAN LLM servers like Ollama on
+// 127.0.0.1 or a self-hosted model on 10.0.0.5). It still blocks
+// link-local, unspecified, multicast, and reserved ranges at dial time.
+// Built via the httpclient factory for the same pool-tuning and
+// dial-time-SSRF reasons as SafeHTTPClient.
+var SafeLLMHTTPClient = httpclient.NewClient(httpclient.Options{
+	Timeout:   120 * time.Second,
+	Validator: ValidateLMLEndpointIPAllowLoopback,
+})
 
 // ValidateLMLEndpointIPAllowLoopback validates an IP for LLM endpoints, allowing loopback.
 func ValidateLMLEndpointIPAllowLoopback(ip net.IP, displayHost string) error {
@@ -565,45 +505,13 @@ func ValidateLMLEndpointIP(ip net.IP, displayHost string) error {
 	return nil
 }
 
-// IsReservedIP reports whether ip falls in a reserved range that should not
-// be reachable from production code (TEST-NET, CGNAT, 0.0.0.0/8, etc.).
+// IsReservedIP reports whether ip falls in a reserved range that should
+// not be reachable from production code (TEST-NET, CGNAT, 0.0.0.0/8,
+// IPv6 ULA, etc.). It delegates to httpclient.IsReservedIP so the range
+// table lives in exactly one place. Kept as a thin wrapper for backward
+// compatibility with callers that already import nodes/core.
 func IsReservedIP(ip net.IP) bool {
-	// Use To4() to handle both IPv4 and IPv4-mapped IPv6 addresses
-	ip4 := ip.To4()
-	if ip4 == nil {
-		// Pure IPv6 - block ULA (fc00::/7)
-		if len(ip) == 16 && ip[0]&0xfe == 0xfc {
-			return true
-		}
-		return false
-	}
-
-	// 0.0.0.0/8
-	if ip4[0] == 0 {
-		return true
-	}
-	// 169.254.0.0/16 (link-local, also caught by IsLinkLocalUnicast but double-check)
-	if ip4[0] == 169 && ip4[1] == 254 {
-		return true
-	}
-	// 192.0.2.0/24 (TEST-NET-1)
-	if ip4[0] == 192 && ip4[1] == 0 && ip4[2] == 2 {
-		return true
-	}
-	// 198.51.100.0/24 (TEST-NET-2)
-	if ip4[0] == 198 && ip4[1] == 51 && ip4[2] == 100 {
-		return true
-	}
-	// 203.0.113.0/24 (TEST-NET-3)
-	if ip4[0] == 203 && ip4[1] == 0 && ip4[2] == 113 {
-		return true
-	}
-	// 100.64.0.0/10 (CGNAT)
-	if ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 {
-		return true
-	}
-
-	return false
+	return httpclient.IsReservedIP(ip)
 }
 
 // MaxHTTPResponseSize bounds how much of an HTTP response body the nodes

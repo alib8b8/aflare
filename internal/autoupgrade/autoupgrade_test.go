@@ -557,8 +557,12 @@ func TestPerformUpgrade_FailWithRollback(t *testing.T) {
 		t.Log("PerformUpgrade network call timed out")
 	}
 
-	if engine.state.UpgradeStatus != "failed" {
-		t.Logf("expected status failed, got %s (may be timeout)", engine.state.UpgradeStatus)
+	// Read state through the thread-safe accessor. The upgrade goroutine
+	// may still be running (SelfUpdate ignores ctx and makes a real network
+	// call that outlives the 3s timeout), so a direct field read would race
+	// with concurrent writes under e.mu in PerformUpgrade.
+	if status := engine.GetState().UpgradeStatus; status != "failed" {
+		t.Logf("expected status failed, got %s (may be timeout)", status)
 	}
 }
 

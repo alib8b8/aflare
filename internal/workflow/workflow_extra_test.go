@@ -612,8 +612,8 @@ func (n *slowNode) Execute(ctx context.Context, input string, params map[string]
 }
 
 func TestWorkflowTimeout(t *testing.T) {
-	// Configure the timeout per-Executor instead of mutating the package-level
-	// WorkflowTimeout global, which would race with parallel tests.
+	// Configure the timeout per-Executor. There is no package-level mutable
+	// timeout global (it was removed to avoid racing under t.Parallel).
 	exec := NewExecutor().WithTimeout(50 * time.Millisecond)
 
 	reg := nodes.NewRegistry()

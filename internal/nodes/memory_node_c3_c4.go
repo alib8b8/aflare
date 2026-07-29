@@ -76,8 +76,11 @@ func (n *MemoryNode) linkKGMemory(session *memory.SessionMemory, key string, par
 // expandKGMemory implements operation=expand_kg. It performs a search
 // and then expands the KG subgraph for the hit keys. The result
 // includes both the memory hits and the related KG entity names.
-func (n *MemoryNode) expandKGMemory(session *memory.SessionMemory, query, level string, topK int, threshold float64) (map[string]interface{}, error) {
-	results := session.Search(query, level, topK, threshold)
+func (n *MemoryNode) expandKGMemory(ctx context.Context, session *memory.SessionMemory, query, level string, topK int, threshold float64) (map[string]interface{}, error) {
+	// Use the Ctx variant so the workflow's deadline/cancellation reaches
+	// the embedder HTTP call inside Search (a vector search may issue a
+	// network request to compute the query embedding).
+	results := session.SearchCtx(ctx, query, level, topK, threshold)
 
 	keys := make([]string, 0, len(results))
 	for _, r := range results {
@@ -134,9 +137,9 @@ func (n *MemoryNode) compressMemory(ctx context.Context, session *memory.Session
 	// Gather candidate entries: low-confidence long-term (and optionally
 	// medium-term). We pull a broad set via Search("", ...) which returns
 	// all non-expired entries when threshold=0.
-	candidates := session.Search("", targetLevel, 10000, 0)
+	candidates := session.SearchCtx(ctx, "", targetLevel, 10000, 0)
 	if includeMedium {
-		candidates = append(candidates, session.Search("", "medium", 10000, 0)...)
+		candidates = append(candidates, session.SearchCtx(ctx, "", "medium", 10000, 0)...)
 	}
 
 	// Filter by confidence and deduplicate by key.
@@ -251,7 +254,7 @@ func (n *MemoryNode) compressMemory(ctx context.Context, session *memory.Session
 	// Store the compressed replacement FIRST, then delete the originals.
 	// This ordering avoids data loss if Store fails (e.g. embedder error,
 	// context cancellation): the originals survive and the caller can retry.
-	_, expiresAt, storeErr := session.Store(newKey, compressedText, targetLevel, "concept", mergedTags, 24*365, compressedConfidence, "compress")
+	_, expiresAt, storeErr := session.StoreCtx(ctx, newKey, compressedText, targetLevel, "concept", mergedTags, 24*365, compressedConfidence, "compress")
 	if storeErr != nil {
 		// Store failed: keep the originals intact and surface the error
 		// so the caller can decide whether to retry. No data is lost.

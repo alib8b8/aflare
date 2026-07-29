@@ -295,11 +295,33 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return nil, http.ErrAbortHandler
 }
 
+// setMockTransport installs m as the process-wide default HTTP transport
+// and also swaps the three package-level self-update clients so that
+// tests can exercise CheckLatestRelease / downloadChecksums / SelfUpdate
+// without hitting the network.
+//
+// Swapping the clients themselves is necessary because they are built
+// via httpclient.NewClient, which gives each its own *http.Transport
+// (with a custom SSRF DialContext) instead of falling back to
+// http.DefaultTransport. Restoring happens via t.Cleanup so a failing
+// test cannot leak the mock into other tests.
 func setMockTransport(t *testing.T, m *mockTransport) {
 	t.Helper()
 	old := http.DefaultTransport
 	http.DefaultTransport = m
-	t.Cleanup(func() { http.DefaultTransport = old })
+	oldAPI, oldFile, oldDL := githubAPIClient, githubFileClient, githubDLClient
+	// Build mock clients with no SSRF DialContext — the mock responds
+	// purely on URL host+path, so dial-time validation would only get
+	// in the way (and the mock URLs are not real resolvable hosts).
+	githubAPIClient = &http.Client{Transport: m, Timeout: oldAPI.Timeout}
+	githubFileClient = &http.Client{Transport: m, Timeout: oldFile.Timeout}
+	githubDLClient = &http.Client{Transport: m, Timeout: oldDL.Timeout}
+	t.Cleanup(func() {
+		http.DefaultTransport = old
+		githubAPIClient = oldAPI
+		githubFileClient = oldFile
+		githubDLClient = oldDL
+	})
 }
 
 func makeMockReleaseJSON(tag string) []byte {

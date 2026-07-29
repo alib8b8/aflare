@@ -531,6 +531,14 @@ func TestTrace_DAGContinueOnError(t *testing.T) {
 	if len(failerStep.Recoveries) != 1 || failerStep.Recoveries[0] != "continue_on_error" {
 		t.Errorf("Recoveries=%v want [continue_on_error]", failerStep.Recoveries)
 	}
+	// The trace must honestly record the failure even though the workflow
+	// continued: continue_on_error clears the abort error but the StepResult/
+	// trace ErrorText should still describe the original failure. Previously
+	// the DAG path cleared the trace error entirely (dishonest); the shared
+	// applyErrorRecovery now returns the original error as traceErr.
+	if failerStep.ErrorText == "" {
+		t.Errorf("ErrorText should be non-empty for a continue_on_error step that genuinely failed, got empty")
+	}
 }
 
 func TestTrace_DAGRetrySuccess(t *testing.T) {
