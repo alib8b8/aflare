@@ -5,7 +5,7 @@ go 1.25.12
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/mattn/go-isatty v0.0.23
+	github.com/mattn/go-isatty v0.0.24
 	github.com/prometheus/client_golang v1.24.1
 	golang.org/x/crypto v0.54.0
 	golang.org/x/text v0.40.0
