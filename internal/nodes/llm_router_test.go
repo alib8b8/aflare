@@ -606,10 +606,10 @@ func TestLLMRouter_ParetoStrategy_UsesEWMA(t *testing.T) {
 	// equal costs so the latency tiebreaker decides.
 	r.providers[0].CostPer1K = 1.0
 	r.providers[1].CostPer1K = 1.0
-	rStats := newProviderStats()
+	rStats := newProviderStats("")
 	rStats.EwmaLatency.Observe(300) // X observed slow
 	rStats.EwmaLatency.Observe(300)
-	yStats := newProviderStats()
+	yStats := newProviderStats("")
 	yStats.EwmaLatency.Observe(50) // Y observed fast
 	yStats.EwmaLatency.Observe(50)
 	r.stats["X"] = rStats
@@ -640,10 +640,10 @@ func TestLLMRouter_LatencyStrategy_UsesEWMA(t *testing.T) {
 	}
 	// Seed EWMA that INVERTS the static ordering: slow_static is actually
 	// fast (20ms), fast_static is actually slow (800ms).
-	slowStats := newProviderStats()
+	slowStats := newProviderStats("")
 	slowStats.EwmaLatency.Observe(20)
 	slowStats.EwmaLatency.Observe(20)
-	fastStats := newProviderStats()
+	fastStats := newProviderStats("")
 	fastStats.EwmaLatency.Observe(800)
 	fastStats.EwmaLatency.Observe(800)
 	r.stats["slow_static"] = slowStats
@@ -673,7 +673,7 @@ func TestLLMRouter_CircuitBreakerExcludesProvider(t *testing.T) {
 		maxRetry:  3,
 	}
 	// Force "tripped" into Open by exceeding the failure threshold.
-	trippedStats := newProviderStats()
+	trippedStats := newProviderStats("")
 	for i := 0; i < 10; i++ { // default threshold is 5
 		trippedStats.Breaker.RecordFailure()
 	}

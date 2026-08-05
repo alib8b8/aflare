@@ -17,10 +17,100 @@ package workflow
 
 import (
 	"context"
+	"os"
+	"regexp"
 	"sync"
 
+	"github.com/alib8b8/llm-box/internal/logger"
 	"github.com/alib8b8/llm-box/internal/nodes"
 )
+
+// traceRedactExtras holds secret patterns that core.RedactSensitive does not
+// yet cover (JWT, PEM private key blocks). These are applied BEFORE
+// nodes.RedactSensitive so the secret is scrubbed across the full input;
+// nodes.RedactSensitive then runs its own patterns and truncates the result.
+// Adding them here (rather than in security.go) keeps the change local to the
+// trace-persistence path and avoids modifying the core security surface.
+var traceRedactExtras = []struct {
+	pattern *regexp.Regexp
+	replace string
+}{
+	// JWT: three dot-separated base64url segments, the first two starting
+	// with "eyJ" (base64url for `{"`).
+	{regexp.MustCompile(`eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+`), "[REDACTED:JWT]"},
+	// PEM private key block (RSA / EC / OPENSSH / GENERIC ... PRIVATE KEY).
+	// [\s\S] matches newlines so the whole block is captured non-greedily.
+	{regexp.MustCompile(`-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----`), "[REDACTED:PRIVATE_KEY]"},
+}
+
+// redactForTrace scrubs s of known secret patterns before it is persisted
+// into a StepTrace. It delegates the bulk of the work to
+// nodes.RedactSensitive (which handles Bearer tokens, API keys, GitHub/Slack
+// tokens, URL credentials, etc., and truncates output to 1000 chars), and
+// additionally covers JWT and PEM private key blocks that the core helper
+// does not yet recognise.
+//
+// Redaction is on by default (it is a safety control). Bypassing it requires
+// BOTH LLM_BOX_TRACE_NO_REDACT=1 AND LLM_BOX_DEBUG_MODE=1 — a dual control so
+// a single misconfigured env var in production cannot leak prompts (which may
+// carry PII, API keys, or card numbers) into trace files. This is intended
+// only for local debugging of trace content; never enable in production.
+func redactForTrace(s string) string {
+	if s == "" {
+		return s
+	}
+	traceNoRedactWarnOnce.Do(warnTraceNoRedactIfEnabled)
+	if traceRedactDisabled() {
+		return s
+	}
+	for _, p := range traceRedactExtras {
+		s = p.pattern.ReplaceAllString(s, p.replace)
+	}
+	return nodes.RedactSensitive(s)
+}
+
+// traceRedactDisabled reports whether the LLM_BOX_TRACE_NO_REDACT escape
+// hatch is active. As a production-safety dual control, BOTH
+// LLM_BOX_TRACE_NO_REDACT=1 AND LLM_BOX_DEBUG_MODE=1 must be set to bypass
+// redaction; if either is missing, redaction stays on. A production
+// environment typically would not set both, so an accidentally-set
+// LLM_BOX_TRACE_NO_REDACT alone does not leak sensitive data.
+//
+// Read on every call (not cached) so tests that flip the env var via
+// t.Setenv take effect immediately.
+func traceRedactDisabled() bool {
+	if os.Getenv("LLM_BOX_TRACE_NO_REDACT") != "1" {
+		return false
+	}
+	if os.Getenv("LLM_BOX_DEBUG_MODE") != "1" {
+		return false // dual control: debug mode must also be on
+	}
+	return true
+}
+
+// traceNoRedactWarnOnce ensures the LLM_BOX_TRACE_NO_REDACT safety warning is
+// emitted at most once per process, on the first redactForTrace call. Using
+// sync.Once (rather than init) means tests that flip the env var via t.Setenv
+// and then call redactForTrace trigger the warning based on the env value at
+// first-call time, while production gets exactly one prominent heads-up per
+// startup.
+var traceNoRedactWarnOnce sync.Once
+
+// warnTraceNoRedactIfEnabled logs a prominent warning when the trace redaction
+// escape hatch is (or would be) active. When LLM_BOX_TRACE_NO_REDACT=1 is set
+// but LLM_BOX_DEBUG_MODE!=1, redaction remains enabled (the dual control held)
+// and the operator is told so; when both are set, redaction is actually
+// disabled and the operator is warned that sensitive data will be logged.
+func warnTraceNoRedactIfEnabled() {
+	if os.Getenv("LLM_BOX_TRACE_NO_REDACT") != "1" {
+		return
+	}
+	if os.Getenv("LLM_BOX_DEBUG_MODE") != "1" {
+		logger.Warn("LLM_BOX_TRACE_NO_REDACT=1 set but LLM_BOX_DEBUG_MODE!=1, redaction remains enabled (production safety)")
+		return
+	}
+	logger.Warn("LLM_BOX_TRACE_NO_REDACT=1 AND LLM_BOX_DEBUG_MODE=1 — SENSITIVE DATA WILL BE LOGGED, DO NOT USE IN PRODUCTION")
+}
 
 // llmCallCollector is both an LLMCallSink (B-2) and a RouterDecisionSink
 // (B-3). It accumulates every telemetry record and routing decision
@@ -102,13 +192,25 @@ func projectLLMTelemetry(calls []nodes.LLMCallTelemetry) []LLMStepTrace {
 			ct = c.Usage.CompletionTokens
 			tt = c.Usage.TotalTokens
 		}
+		// Prefer the upstream Attempt (stamped by the router/executor
+		// retry loop) over the slice position i+1. Under parallel LLM
+		// calls (e.g. a map node fanning out, or a router trying multiple
+		// providers concurrently) the slice order is non-deterministic, so
+		// i+1 would mislabel which attempt a telemetry record belongs to.
+		// Fall back to i+1 only when the upstream left Attempt at 0 (the
+		// single-call case that never set it) so existing traces keep a
+		// sensible 1-based index (M-11).
+		attempt := c.Attempt
+		if attempt == 0 {
+			attempt = i + 1
+		}
 		out[i] = LLMStepTrace{
 			NodeName:         c.NodeName,
 			Provider:         c.Provider,
 			Model:            c.Model,
 			Endpoint:         c.Endpoint,
 			Latency:          c.Latency,
-			Attempt:          i + 1,
+			Attempt:          attempt,
 			Stream:           c.Stream,
 			StatusCode:       c.StatusCode,
 			ErrText:          c.ErrText,
@@ -116,6 +218,8 @@ func projectLLMTelemetry(calls []nodes.LLMCallTelemetry) []LLMStepTrace {
 			CompletionTokens: ct,
 			TotalTokens:      tt,
 			CostUSD:          c.CostUSD,
+			Prompt:           redactForTrace(c.Prompt),
+			Response:         redactForTrace(c.Response),
 		}
 	}
 	return out

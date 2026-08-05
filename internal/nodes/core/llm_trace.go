@@ -43,6 +43,15 @@ type LLMCallTelemetry struct {
 	// populate this from a price table keyed by Model. Kept here so the
 	// trace carries a single cost field regardless of who computed it.
 	CostUSD float64
+	// Prompt is the raw user prompt text sent to the provider for this
+	// call. The workflow executor redacts it (via RedactSensitive) before
+	// persisting it into StepTrace, so callers that publish telemetry
+	// should set the unredacted value — redaction happens downstream.
+	Prompt string
+	// Response is the raw response content received from the provider.
+	// Like Prompt, it is redacted by the workflow executor before
+	// persistence into StepTrace.
+	Response string
 }
 
 // LLMCallSink receives LLMCallTelemetry records. Implementations must be

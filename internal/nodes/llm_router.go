@@ -134,6 +134,22 @@ type LLMRouter struct {
 	rrCounter uint64
 	strategy  string
 	maxRetry  int
+
+	// Quota persistence + multi-tenancy (see router_quota.go).
+	// All four fields default to zero/nil, which makes the router
+	// memory-only and single-tenant — identical to pre-quota-store
+	// behavior. They are wired up by NewLLMRouter + With* options or
+	// by calling initQuotaPersistence on a manually-constructed router.
+	tenantID      string           // normalized to "default" when empty
+	quotaStore    QuotaStore       // nil = memory-only
+	tenantQuota   map[string]int64 // per-provider override; nil = use QuotaDaily
+	quotaSaver    *quotaSaver      // nil when quotaStore is nil
+	quotaDebounce time.Duration    // 0 = defaultQuotaDebounce
+	// timeZone drives the daily quota reset boundary via todayUTC(). nil
+	// means UTC (the default), so resets happen at a consistent instant
+	// across deployments regardless of host TZ. Configure via WithTimeZone
+	// for business-day resets in a specific trading-center timezone.
+	timeZone *time.Location
 }
 
 var (
@@ -356,9 +372,23 @@ func (r *LLMRouter) resolveStrategy(params map[string]string) string {
 	return r.strategy
 }
 
+// todayUTC returns the current date in the router's configured timezone,
+// formatted as YYYY-MM-DD. The name is retained for backward compatibility;
+// the value is "today" in the configured timezone (default UTC, overridable
+// via WithTimeZone) — NOT necessarily the host's local date. Daily quota
+// resets compare against this string, so cross-timezone financial
+// deployments reset at a consistent instant instead of each host's local
+// midnight.
+func (r *LLMRouter) todayUTC() string {
+	loc := r.timeZone
+	if loc == nil {
+		loc = time.UTC
+	}
+	return time.Now().In(loc).Format("2006-01-02")
+}
+
 func (r *LLMRouter) getActiveProviders() []RouterProvider {
-	now := time.Now()
-	today := now.Format("2006-01-02")
+	today := r.todayUTC()
 
 	r.statsMu.Lock()
 	defer r.statsMu.Unlock()
@@ -371,16 +401,18 @@ func (r *LLMRouter) getActiveProviders() []RouterProvider {
 
 		stats := r.stats[p.Name]
 		if stats == nil {
-			stats = newProviderStats()
+			stats = newProviderStats(r.todayUTC())
+			r.loadQuotaLocked(p.Name, stats)
 			r.stats[p.Name] = stats
 		}
 
 		if stats.LastResetDate != today {
 			stats.DailyUsage = 0
 			stats.LastResetDate = today
+			r.clearQuotaLocked(p.Name)
 		}
 
-		if p.QuotaDaily > 0 && stats.DailyUsage >= p.QuotaDaily {
+		if quota := r.quotaFor(p); quota > 0 && stats.DailyUsage >= quota {
 			continue
 		}
 
@@ -697,10 +729,11 @@ func (r *LLMRouter) recordSuccess(name string, latencyMs int64, tokensUsed int64
 
 	stats := r.getOrCreateStatsLocked(name)
 
-	today := time.Now().Format("2006-01-02")
+	today := r.todayUTC()
 	if stats.LastResetDate != today {
 		stats.DailyUsage = 0
 		stats.LastResetDate = today
+		r.clearQuotaLocked(name)
 	}
 
 	stats.TotalCalls++
@@ -722,6 +755,10 @@ func (r *LLMRouter) recordSuccess(name string, latencyMs int64, tokensUsed int64
 	if stats.Breaker != nil {
 		stats.Breaker.RecordSuccess()
 	}
+
+	// Persist the updated daily usage (debounced) so a restart resumes
+	// from the correct count instead of zero.
+	r.scheduleQuotaSaveLocked(name, stats)
 
 	if stats.TotalCalls > 0 {
 		for i, p := range r.providers {
@@ -777,7 +814,8 @@ func (r *LLMRouter) recordFailure(name string, latencyMs int64) {
 func (r *LLMRouter) getOrCreateStatsLocked(name string) *ProviderStats {
 	stats, ok := r.stats[name]
 	if !ok {
-		stats = newProviderStats()
+		stats = newProviderStats(r.todayUTC())
+		r.loadQuotaLocked(name, stats)
 		r.stats[name] = stats
 	}
 	return stats
@@ -786,10 +824,13 @@ func (r *LLMRouter) getOrCreateStatsLocked(name string) *ProviderStats {
 // newProviderStats constructs a fully-initialized ProviderStats with an EWMA
 // latency predictor and a circuit breaker. All ProviderStats must be created
 // through this constructor so the routing logic can assume non-nil
-// EwmaLatency/Breaker fields.
-func newProviderStats() *ProviderStats {
+// EwmaLatency/Breaker fields. today is the date string (in the router's
+// configured timezone) used to seed LastResetDate; pass "" when the caller
+// does not track a date (the day-reset check in getActiveProviders /
+// recordSuccess will reconcile it on first use).
+func newProviderStats(today string) *ProviderStats {
 	return &ProviderStats{
-		LastResetDate: time.Now().Format("2006-01-02"),
+		LastResetDate: today,
 		EwmaLatency:   NewEWMAPredictor(0.3),
 		Breaker:       NewCircuitBreaker(DefaultCircuitBreakerConfig()),
 	}

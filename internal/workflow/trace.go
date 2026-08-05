@@ -29,12 +29,22 @@ import (
 // per-step telemetry from whichever structure they already hold.
 type WorkflowTrace struct {
 	Name      string        // workflow name
-	Mode      string        // "sequential" or "dag"
+	Mode      string        // "sequential", "dag", or "idempotent" (cache hit)
 	StartedAt time.Time     // run start
 	EndedAt   time.Time     // run end
 	Duration  time.Duration // total wall-clock duration
 	Steps     []StepTrace   // one entry per recorded step result
 	Batches   []BatchTrace  // DAG topological batches; nil for sequential mode
+	// RunID is the idempotency run identifier when idempotency is enabled
+	// (Executor.WithIdempotencyKey). Empty when idempotency is off. On a
+	// cache hit it carries the original run's ID; on a fresh execution it
+	// carries the newly-generated ID. Callers combining idempotency with
+	// WAL should name WAL files with this ID for crash-resume correlation.
+	RunID string `json:"run_id,omitempty"`
+	// IdempotencyHit is true when this trace represents an idempotency cache
+	// hit: no steps were executed and the cached final output was returned
+	// alongside ErrIdempotencyHit. False for all real executions.
+	IdempotencyHit bool `json:"idempotency_hit,omitempty"`
 }
 
 // BatchTrace records one topological batch of a DAG run. Steps within a batch
@@ -117,6 +127,15 @@ type LLMStepTrace struct {
 	CompletionTokens int           // from provider usage, 0 if omitted
 	TotalTokens      int           // from provider usage, 0 if omitted
 	CostUSD          float64       // optional cost estimate, 0 if not computed
+	// Prompt is the redacted prompt text for this LLM call. Redaction
+	// (via core.RedactSensitive) is applied before persistence so that
+	// API keys, tokens, private keys and other secrets never reach disk.
+	// Empty when the call produced no prompt or when redaction is disabled
+	// via LLM_BOX_TRACE_NO_REDACT=1.
+	Prompt string `json:"prompt,omitempty"`
+	// Response is the redacted response text for this LLM call, subject
+	// to the same redaction as Prompt.
+	Response string `json:"response,omitempty"`
 }
 
 // newTrace creates a WorkflowTrace initialised with the given mode and start

@@ -29,7 +29,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alib8b8/llm-box/internal/cache"
 	"github.com/alib8b8/llm-box/internal/config"
+	"github.com/alib8b8/llm-box/internal/logger"
 )
 
 const maxStreamResponseSize = 10 * 1024 * 1024 // 10MB max stream content
@@ -202,11 +204,150 @@ type LLMNodeConfig struct {
 // /chat/completions endpoint (DeepSeek, Qwen, Kimi, GLM, etc.).
 type OpenAICompatibleNode struct {
 	config LLMNodeConfig
+
+	// cacheEnabled is the master switch for LLM response caching. It is set
+	// at construction from the LLM_BOX_LLM_CACHE env var, or explicitly via
+	// SetCache. When false (the default) Execute bypasses the cache
+	// entirely, preserving the pre-cache behaviour so existing tests and
+	// dev workflows are unaffected.
+	cacheEnabled bool
+	// cache is an optional per-node cache instance. When non-nil it takes
+	// precedence over the env-var-driven shared cache. nil means "fall back
+	// to the shared cache" (which is itself nil unless LLM_BOX_LLM_CACHE=1).
+	cache *cache.Cache
 }
 
 // NewOpenAICompatibleNode constructs an OpenAICompatibleNode from config.
+// Caching is disabled unless the LLM_BOX_LLM_CACHE env var opts in.
 func NewOpenAICompatibleNode(config LLMNodeConfig) *OpenAICompatibleNode {
-	return &OpenAICompatibleNode{config: config}
+	return &OpenAICompatibleNode{
+		config:       config,
+		cacheEnabled: llmCacheEnabledFromEnv(),
+	}
+}
+
+// --- LLM response caching -------------------------------------------------
+//
+// Caching makes non-streaming LLM decisions reproducible within a
+// configurable TTL window — a regulatory requirement in financial
+// scenarios where an auditor must be able to re-derive a prior decision
+// from the same inputs. Caching is OFF by default so existing tests and
+// dev workflows are unaffected; it is opted into via the LLM_BOX_LLM_CACHE
+// env var, or by injecting a cache instance with SetCache. Only the final
+// non-streaming response string is cached; streaming responses are never
+// cached (SSE chunk boundaries are not byte-reproducible).
+
+const (
+	// envLLMCacheEnable opts into the shared LLM response cache when set to
+	// "1" or "true". Evaluated at node construction.
+	envLLMCacheEnable = "LLM_BOX_LLM_CACHE"
+	// envLLMCacheTTL overrides the shared cache TTL (Go duration string,
+	// e.g. "24h", "30m"). Defaults to defaultLLMCacheTTL.
+	envLLMCacheTTL = "LLM_BOX_LLM_CACHE_TTL"
+	// envLLMCacheSize overrides the shared cache max entry count.
+	envLLMCacheSize = "LLM_BOX_LLM_CACHE_SIZE"
+
+	defaultLLMCacheTTL  = 24 * time.Hour
+	defaultLLMCacheSize = 1000
+)
+
+var (
+	sharedLLMCacheOnce sync.Once
+	sharedLLMCacheInst *cache.Cache
+)
+
+// llmCacheEnabledFromEnv reports whether the LLM_BOX_LLM_CACHE env var
+// opts into the shared response cache. Recognised truthy values are "1"
+// and "true" (case-insensitive).
+func llmCacheEnabledFromEnv() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(envLLMCacheEnable))) {
+	case "1", "true":
+		return true
+	}
+	return false
+}
+
+// sharedLLMCache returns a process-wide cache instance built from the
+// LLM_BOX_LLM_CACHE* env vars, or nil if caching is not enabled via env.
+// The instance is built lazily on first use and shared by every
+// OpenAICompatibleNode that has no cache of its own. Env vars are read at
+// most once (sync.Once); set them before process start.
+func sharedLLMCache() *cache.Cache {
+	sharedLLMCacheOnce.Do(func() {
+		if !llmCacheEnabledFromEnv() {
+			return
+		}
+		ttl := defaultLLMCacheTTL
+		if raw := os.Getenv(envLLMCacheTTL); raw != "" {
+			if d, err := time.ParseDuration(raw); err == nil && d > 0 {
+				ttl = d
+			}
+		}
+		size := defaultLLMCacheSize
+		if raw := os.Getenv(envLLMCacheSize); raw != "" {
+			if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+				size = n
+			}
+		}
+		sharedLLMCacheInst = cache.New(cache.Config{
+			Enabled:    true,
+			MaxEntries: size,
+			TTL:        ttl,
+		})
+	})
+	return sharedLLMCacheInst
+}
+
+// SetCache attaches a cache instance to this node, enabling LLM response
+// caching for non-streaming Execute calls. Passing nil disables caching on
+// this node and overrides the LLM_BOX_LLM_CACHE env var. SetCache must be
+// called before the first Execute; it is not safe to call concurrently
+// with Execute.
+func (n *OpenAICompatibleNode) SetCache(c *cache.Cache) {
+	n.cache = c
+	n.cacheEnabled = c != nil
+}
+
+// effectiveCache returns the cache to consult for this call, or nil when
+// caching is disabled. An explicitly injected cache (SetCache) takes
+// precedence; otherwise the env-var-driven shared cache is used.
+func (n *OpenAICompatibleNode) effectiveCache() *cache.Cache {
+	if !n.cacheEnabled {
+		return nil
+	}
+	if n.cache != nil {
+		return n.cache
+	}
+	return sharedLLMCache()
+}
+
+// llmCacheKey derives a stable SHA256 cache key for a non-streaming LLM
+// request. The key covers every request field that influences the model's
+// output: model, messages (system + user), temperature, max_tokens, top_p,
+// frequency_penalty, presence_penalty, stop sequences, seed,
+// response_format, tools, tool_choice, and user. The API key and endpoint
+// are deliberately excluded — the API key must never enter the cache, and
+// the same model+seed is expected to be reproducible regardless of which
+// compatible endpoint served it.
+func llmCacheKey(reqBody LLMRequest) string {
+	promptBytes, _ := json.Marshal(reqBody.Messages)
+	params := map[string]interface{}{
+		"model":             reqBody.Model,
+		"temperature":       reqBody.Temperature,
+		"max_tokens":        reqBody.MaxTokens,
+		"top_p":             reqBody.TopP,
+		"frequency_penalty": reqBody.FrequencyPenalty,
+		"presence_penalty":  reqBody.PresencePenalty,
+		"stop":              reqBody.Stop,
+		"response_format":   reqBody.ResponseFormat,
+		"tools":             reqBody.Tools,
+		"tool_choice":       reqBody.ToolChoice,
+		"user":              reqBody.User,
+	}
+	if reqBody.Seed != nil {
+		params["seed"] = *reqBody.Seed
+	}
+	return cache.GenerateKey(string(promptBytes), params)
 }
 
 // Name implements the Node interface.
@@ -318,6 +459,40 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		reqBody.StreamOptions = &StreamOptions{IncludeUsage: true}
 	}
 
+	// LLM response cache — non-streaming only.
+	//
+	// Streaming responses are intentionally not cached: SSE chunk
+	// boundaries and timing are not byte-reproducible, and replaying a
+	// cached assembled string as a single chunk would violate the
+	// streaming contract. For non-streaming calls, caching the final
+	// content makes LLM decisions reproducible within the TTL window — a
+	// regulatory requirement in financial scenarios. The cache key (see
+	// llmCacheKey) covers every output-influencing field but never the
+	// API key. A cache hit returns immediately without touching the
+	// network; a miss falls through to the upstream call and the result
+	// is written back after success.
+	var cacheKey string
+	var llmCache *cache.Cache
+	if !stream {
+		llmCache = n.effectiveCache()
+		if llmCache != nil {
+			cacheKey = llmCacheKey(reqBody)
+			if cached, ok := llmCache.Get(cacheKey); ok {
+				logger.Debug("[cache hit] LLM response served from cache",
+					"node", n.config.Name,
+					"provider", n.config.ProviderName,
+					"model", model,
+				)
+				return cached, nil
+			}
+			logger.Debug("[cache miss] LLM response not cached, calling upstream",
+				"node", n.config.Name,
+				"provider", n.config.ProviderName,
+				"model", model,
+			)
+		}
+	}
+
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
@@ -351,6 +526,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		Model:    model,
 		Endpoint: endpoint,
 		Stream:   stream,
+		Prompt:   input,
 	}
 	defer func() {
 		tel.Latency = time.Since(callStart)
@@ -381,6 +557,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		if err != nil {
 			tel.ErrText = err.Error()
 		}
+		tel.Response = out
 		// Streaming usage is only populated when the provider emits a
 		// usage chunk (requires stream_options.include_usage). Tolerant:
 		// providers that omit usage leave tel.Usage nil, mirroring the
@@ -403,7 +580,25 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		return "", fmt.Errorf("no choices in %s response", n.config.ProviderName)
 	}
 
-	return llmResp.Choices[0].Message.Content, nil
+	content := llmResp.Choices[0].Message.Content
+	tel.Response = content
+	// Persist the successful non-streaming response so subsequent identical
+	// calls are served from cache. cacheKey is non-empty only when caching
+	// is enabled and this was a non-streaming call that missed. cache.Set
+	// is an in-memory map write (sub-microsecond) so it does not
+	// meaningfully block the response; doing it synchronously keeps
+	// behaviour deterministic and avoids the duplicate-upstream-call race
+	// an async write would introduce for concurrent identical requests.
+	//
+	// L-8: do NOT cache when the provider returned HTTP 200 but also
+	// included an error object in the body. Some providers signal partial
+	// failures this way, and the message content may itself be the error
+	// text — caching it would make subsequent identical requests hit the
+	// cached error instead of retrying upstream.
+	if cacheKey != "" && llmCache != nil && llmResp.Error == nil {
+		llmCache.Set(cacheKey, content)
+	}
+	return content, nil
 }
 
 func (n *OpenAICompatibleNode) readStreamResponse(resp *http.Response, onChunk func(chunk string)) (string, *LLMUsage, error) {
