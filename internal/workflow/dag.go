@@ -81,12 +81,14 @@ func buildDepGraph(steps []WorkflowStep) (*depGraph, error) {
 }
 
 // resolveStepRef 解析依赖引用为步骤索引。
-// 优先按名称匹配；若为纯数字则按 1-based 索引匹配（与 {{step.N}} 语义一致）。
+// 优先按名称匹配；若为纯数字则按 1-based 索引匹配（用户友好，与CLI step编号一致）。
+// 注意：depends_on 数字是 1-based，但表达式 {{step.N}} 是 0-based（数组索引）。
+// 例如 depends_on: [1] 引用第一步，而 {{step.0}} 引用第一步输出。
 func resolveStepRef(ref string, nameToIdx map[string]int, count int) (int, bool) {
 	if idx, ok := nameToIdx[ref]; ok {
 		return idx, true
 	}
-	// 数字引用：1-based，与 {{step.1}} 表达式一致
+	// 数字引用：1-based（用户友好，与CLI step编号一致）
 	if num, err := strconv.Atoi(ref); err == nil {
 		idx := num - 1
 		if idx >= 0 && idx < count {

@@ -136,7 +136,7 @@ func ExecuteWorkflowWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Regi
 		recordWorkflowMetrics(trace, err)
 		return out, results, trace, err
 	}
-	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, "", DefaultWorkflowTimeout)
+	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, "", "", DefaultWorkflowTimeout)
 	recordWorkflowMetrics(trace, err)
 	return out, results, trace, err
 }
@@ -158,7 +158,7 @@ func ExecuteWorkflowWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Regi
 // Callers that go through an Executor pass e.workflowTimeout; the legacy
 // ExecuteWorkflowWithTrace global entry point passes the package-level
 // WorkflowTimeout.
-func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, statePath string, timeout time.Duration) (string, []StepResult, *WorkflowTrace, error) {
+func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, statePath string, walPath string, timeout time.Duration) (string, []StepResult, *WorkflowTrace, error) {
 	// Validate step count
 	if len(wf.Steps) > MaxSteps {
 		return "", nil, nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
@@ -215,11 +215,44 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 	}
 
 	// ── Resume support ──
-	// If a checkpoint file exists at statePath, restore the engine state
-	// (step outputs, variables, flowing data) and continue execution from
-	// the step after the one recorded in the checkpoint.
+	// If a checkpoint file exists at statePath (or a WAL at walPath), restore
+	// the engine state (step outputs, variables, flowing data) and continue
+	// execution from the step after the one recorded in the checkpoint.
 	resumeFromStep := 0
-	if statePath != "" {
+
+	// Open WAL for appends if configured. The WAL is kept open for the
+	// lifetime of this execution and closed via defer.
+	var wal *WAL
+	if walPath != "" {
+		w, err := NewWAL(walPath, WALOptions{})
+		if err != nil {
+			logger.Warn("failed to open WAL for writes, starting fresh", "path", walPath, "error", err)
+		} else {
+			wal = w
+			defer func() {
+				if err := wal.Close(); err != nil {
+					logger.Warn("failed to close WAL", "path", walPath, "error", err)
+				}
+			}()
+		}
+	}
+
+	if wal != nil {
+		// Resume from WAL: replay yields the latest restorable state.
+		if state, err := LoadStateWAL(walPath); err == nil && state != nil {
+			data = RestoreState(state, engine)
+			resumeFromStep = state.StepIndex + 1
+			if resumeFromStep < 0 {
+				resumeFromStep = 0
+			}
+			if resumeFromStep > len(wf.Steps) {
+				resumeFromStep = len(wf.Steps)
+			}
+			logger.Info("Resuming workflow from step (WAL)", "name", wf.Name, "step", resumeFromStep, "wal", walPath)
+		} else if err != nil {
+			logger.Warn("failed to replay WAL, starting fresh", "path", walPath, "error", err)
+		}
+	} else if statePath != "" {
 		if state, err := loadCheckpoint(statePath); err == nil && state != nil {
 			data = RestoreState(state, engine)
 			// state.StepIndex is the last successfully-completed step; resume
@@ -240,8 +273,15 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 	}
 
 	// saveCheckpointIfEnabled writes a per-step checkpoint when statePath is
-	// set. Failures are logged but never interrupt the workflow.
+	// set (or appends to the WAL when walPath is set). Failures are logged
+	// but never interrupt the workflow.
 	saveCheckpointIfEnabled := func(stepIndex int) {
+		if wal != nil {
+			if err := SaveStateWAL(wal, wf, stepIndex, data, engine); err != nil {
+				logger.Warn("failed to append WAL, continuing without", "path", walPath, "step", stepIndex, "error", err)
+			}
+			return
+		}
 		if statePath == "" {
 			return
 		}
@@ -752,6 +792,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 // Workflows that declare depends_on (DAG mode) ignore statePath.
 type Executor struct {
 	statePath       string
+	walPath         string // when set, use append-only WAL instead of JSON checkpoint
 	workflowTimeout time.Duration
 }
 
@@ -769,6 +810,20 @@ func NewExecutor() *Executor {
 // receiver for chaining.
 func (e *Executor) WithCheckpoint(path string) *Executor {
 	e.statePath = path
+	return e
+}
+
+// WithWAL configures the Executor to use an append-only Write-Ahead Log at
+// the given path for durable per-step checkpointing. This is preferred over
+// WithCheckpoint for long-running workflows because:
+//   - Each step appends a single record (no full-state rewrite).
+//   - Records are CRC32-protected against torn tail writes from crashes.
+//   - Periodic compaction bounds replay time.
+//
+// Resume on the next run reads the WAL via LoadStateWAL. When both WithWAL
+// and WithCheckpoint are set, WithWAL takes precedence.
+func (e *Executor) WithWAL(path string) *Executor {
+	e.walPath = path
 	return e
 }
 
@@ -798,11 +853,20 @@ func (e *Executor) ExecuteWithTrace(ctx context.Context, wf *Workflow, reg *node
 		if e.statePath != "" {
 			logger.Warn("checkpoint/resume is not supported in DAG mode, ignoring statePath", "path", e.statePath)
 		}
+		if e.walPath != "" {
+			logger.Warn("WAL checkpoint/resume is not supported in DAG mode, ignoring walPath", "path", e.walPath)
+		}
 		out, results, trace, err := executeWorkflowDAG(ctx, wf, reg, program, e.workflowTimeout)
 		recordWorkflowMetrics(trace, err)
 		return out, results, trace, err
 	}
-	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, e.statePath, e.workflowTimeout)
+	// WAL takes precedence over JSON checkpoint when both are configured.
+	statePath := e.statePath
+	walPath := e.walPath
+	if walPath != "" {
+		statePath = "" // WAL path is the source of truth
+	}
+	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, statePath, walPath, e.workflowTimeout)
 	recordWorkflowMetrics(trace, err)
 	return out, results, trace, err
 }
