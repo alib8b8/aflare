@@ -375,7 +375,7 @@ func TestEvaluateParamsVectorized_PartialResultsOnError(t *testing.T) {
 func TestEvaluateParamsVectorized_FirstErrorInSortedOrder(t *testing.T) {
 	engine := NewExpressionEngine()
 	params := map[string]string{
-		"zeta": "{{step.99}}", // would be last by insertion, but sorted last
+		"zeta":  "{{step.99}}", // would be last by insertion, but sorted last
 		"alpha": "{{step.98}}", // sorted first -> this error should win
 		"mid":   "{{step.97}}",
 	}

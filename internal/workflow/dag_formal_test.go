@@ -319,7 +319,9 @@ func TestDAGFormal_SelfLoop(t *testing.T) {
 }
 
 // TestDAGFormal_DiamondDependency verifies a classic diamond:
-//   s0 → s1, s0 → s2, s1 → s3, s2 → s3
+//
+//	s0 → s1, s0 → s2, s1 → s3, s2 → s3
+//
 // Expected: batch0={s0}, batch1={s1,s2}, batch2={s3}
 func TestDAGFormal_DiamondDependency(t *testing.T) {
 	steps := []WorkflowStep{

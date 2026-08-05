@@ -385,27 +385,27 @@ type exprNode interface {
 type opcode uint8
 
 const (
-	opLiteral    opcode = iota // append string literal (strArg)
-	opInput                    // append workflow input
-	opStep                     // append step output (strArg: name)
-	opVar                      // append workflow variable (strArg: name)
-	opEnv                      // append env var (strArg: name)
-	opFile                     // append file contents (strArg: name)
-	opLoop                     // append loop var (strArg: name)
-	opSecret                   // append secret (strArg: GROUP.KEY)
-	opBareName                 // bare name: var or input (strArg: name)
-	opJSONPath                 // jsonpath extraction (strArg: ref inner, strArg2: path)
-	opUnknown                  // unknown prefix, leave verbatim (inner)
+	opLiteral  opcode = iota // append string literal (strArg)
+	opInput                  // append workflow input
+	opStep                   // append step output (strArg: name)
+	opVar                    // append workflow variable (strArg: name)
+	opEnv                    // append env var (strArg: name)
+	opFile                   // append file contents (strArg: name)
+	opLoop                   // append loop var (strArg: name)
+	opSecret                 // append secret (strArg: GROUP.KEY)
+	opBareName               // bare name: var or input (strArg: name)
+	opJSONPath               // jsonpath extraction (strArg: ref inner, strArg2: path)
+	opUnknown                // unknown prefix, leave verbatim (inner)
 )
 
 // instruction is a single bytecode operation with its operands.
 type instruction struct {
 	op        opcode
-	strArg    string // string operand (literal text, variable name, ref inner, etc.)
-	strArg2   string // second string operand (for opJSONPath: the path)
-	known     bool   // whether this is a known-prefix expression (for error handling)
-	fullMatch string // original {{...}} text for verbatim fallback
-	inner     string // trimmed inner text for error messages
+	strArg    string   // string operand (literal text, variable name, ref inner, etc.)
+	strArg2   string   // second string operand (for opJSONPath: the path)
+	known     bool     // whether this is a known-prefix expression (for error handling)
+	fullMatch string   // original {{...}} text for verbatim fallback
+	inner     string   // trimmed inner text for error messages
 	refNode   exprNode // for opJSONPath: pre-compiled reference expression (avoids per-call alloc)
 }
 
