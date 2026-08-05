@@ -1,0 +1,80 @@
+name: idempotent-transfer
+description: |
+  幂等转账工作流示例，展示金融场景的四大能力：
+  1. 幂等性 - 通过 Idempotency-Key 防重复扣款（README 中展示 SDK 调用方式）
+  2. HTTP 限流 - rate_limit_rps 防止冲垮银行 API
+  3. HTTP 重试 - max_retries 处理银行 API 瞬时故障
+  4. 审计日志 - 所有步骤自动写入 HMAC 哈希链审计（executor 内置）
+
+  注意：此示例仅展示能力，真实生产需配合：
+  - 服务端去重（银行 API 需支持 Idempotency-Key）
+  - 跨步骤事务（saga/补偿，本项目暂未实现）
+  - 决策可复现（LLM 响应缓存，已实现）
+
+vars:
+  # mock 银行 API 地址（由 mock-server.py 提供）
+  bank_api_url: "http://localhost:17800/transfer"
+  # 幂等键：同一 key 重复调用只扣一次款。生产环境应由调用方生成唯一 UUID。
+  idempotency_key: "demo-transfer-{{now}}"
+  from_account: "ACC0001"
+  to_account: "ACC0002"
+  amount: "100.00"
+  currency: "CNY"
+  success_log: "./transfer-log.jsonl"
+  failed_log: "./transfer-failed.jsonl"
+
+steps:
+  # ── Step 1: 调用银行 API（带限流 + 重试 + Idempotency-Key 透传）──
+  # rate_limit_rps=5：每秒最多 5 请求保护银行 API
+  # max_retries=3：5xx/429 自动重试，指数退避
+  # Idempotency-Key 透传到银行 API，服务端据此去重
+  - name: call-bank-api
+    node: http_request
+    params:
+      method: POST
+      url: "{{var.bank_api_url}}"
+      headers: '{"Content-Type":"application/json","Idempotency-Key":"{{var.idempotency_key}}"}'
+      body: '{"from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}"}'
+      rate_limit_rps: "5"
+      rate_limit_burst: "2"
+      max_retries: "3"
+      retry_backoff_ms: "200"
+      retry_on_status: "429,500,502,503,504"
+
+  # ── Step 2: 解析银行响应，提取 status 字段 ──
+  - name: parse-status
+    node: json_parse
+    params:
+      path: "status"
+
+  # ── Step 3: 判断转账是否成功（返回 "true" / "false"）──
+  - name: check-status
+    node: condition
+    params:
+      expr: "equals:success"
+
+  # ── Step 4: 根据结果分流写审计日志（if/else 分支）──
+  - if:
+      condition: "{{step.check-status}}"
+      then:
+        - name: build-success-log
+          node: template_render
+          params:
+            template: '{"ts":"{{now}}","status":"success","from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}"}'
+        - name: log-success
+          node: file_write
+          params:
+            path: "{{var.success_log}}"
+            mode: append
+      else:
+        - name: build-failure-log
+          node: template_render
+          params:
+            template: '{"ts":"{{now}}","status":"failed","from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}","bank_response":"{{step.call-bank-api}}"}'
+        - name: log-failure
+          node: file_write
+          params:
+            path: "{{var.failed_log}}"
+            mode: append
+
+output: "{{step.check-status}}"

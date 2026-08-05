@@ -51,6 +51,7 @@
 - [💡 Why llm-box?](#-why-llm-box)
 - [📖 The Story](#-the-story)
 - [✨ Core Features](#-core-features)
+- [💰 Financial Scenario Capabilities](#-financial-scenario-capabilities)
 - [🤖 Agent Nodes](#-agent-nodes)
 - [📱 HarmonyOS &amp; Mobile Nodes](#-harmonyos--mobile-nodes)
 - [🔒 Security](#-security)
@@ -163,6 +164,30 @@ llm-box run btc-monitor.yaml
 | **🔒 Privacy First** | Local execution by default, auto secret redaction, complete audit logs, 98+ vulnerabilities audited |
 | **🛡️ Enterprise-Grade Security** | SSRF protection, path traversal defense, command injection whitelist, AES-GCM encryption |
 | **⚙️ Engineering Depth** | WAL persistence engine (crash recovery), bytecode-IR expression engine + vectorized evaluation, EWMA latency prediction + Pareto routing, TLA+ formal verification of DAG scheduler |
+
+---
+
+## 💰 Financial Scenario Capabilities
+
+llm-box ships the core capabilities required for real-world financial scenarios (read-only analysis + controlled writes):
+
+| Capability | Implementation | Status |
+|------------|----------------|--------|
+| Audit log (HMAC hash chain) | executor auto-flush, tamper-proof | ✅ |
+| LLM decision reproducibility | cache by (model, prompt, params, seed) | ✅ |
+| Idempotency (prevents double-debit) | Idempotency-Key + atomic placeholder + cross-process lock | ✅ |
+| HTTP rate limiting / retry | per-host token bucket + exponential backoff | ✅ |
+| Quota persistence + multi-tenancy | FileQuotaStore + per-tenant isolation | ✅ |
+| Trace redaction | LLM I/O redacted (API keys/JWT/private keys) before persistence | ✅ |
+
+### Applicable Scenarios
+- ✅ Read-only analysis: AML review, investment research, portfolio review (templates available)
+- ✅ Controlled writes: idempotent transfer, reconciliation (requires server-side dedup)
+- ⚠️ Cross-step transactions: saga/2PC not yet implemented; workflows must self-compensate
+
+### Examples
+- [AML Suspicious Transaction Review](examples/finance/aml-review/) — read-only analysis
+- [Idempotent Transfer](examples/finance/idempotent-transfer/) — controlled write (new)
 
 ---
 
@@ -387,7 +412,8 @@ llm-box help                   Show full help
 | **v0.5** | ✅ Released | ReAct engine, layered memory, skill self-evolution, HarmonyOS adaptation (7 device types), cross-platform protocol (intent:// + ohos://), W3C DID identity, cross-domain agent messaging, GitCode G-Star + ohpm ecosystem |
 | **v0.5.1** | ✅ Released | Ascend NPU adaptation (7-agent pipeline, 3 workflow templates, CANN/MindIE integration) |
 | **v0.5.2** | ✅ Released | Grok Build-inspired capabilities: code graph, subagent prompt hierarchy, circuit breaker, secret redaction, file watch, TUI Markdown/Mermaid rendering (15-vuln audited), unified LLM routing (3 consolidated to 1) |
-| **v0.6.0** | **Current** | **Ant Ling ecosystem, AI Gateway (OmniRoute), Agent Memory Infrastructure, Voice AI Toolchain (ASR/diarization/analysis), Agent Teamization (200+ roles + Agency workflow), Engineering Depth (WAL persistence + bytecode-IR expression engine + EWMA/Pareto routing + TLA+ formal DAG verification)** |
+| **v0.6.0** | ✅ Released | **Ant Ling ecosystem, AI Gateway (OmniRoute), Agent Memory Infrastructure, Voice AI Toolchain (ASR/diarization/analysis), Agent Teamization (200+ roles + Agency workflow), Engineering Depth (WAL persistence + bytecode-IR expression engine + EWMA/Pareto routing + TLA+ formal DAG verification)** |
+| **v0.7.0** | **Current** | **Financial scenario enhancement: ✅ HMAC hash-chain audit, ✅ idempotency (Idempotency-Key + cross-process lock), ✅ HTTP rate limiting/retry, ✅ LLM decision reproducibility cache, ✅ quota persistence + multi-tenancy, ✅ trace redaction (JWT/private keys), ✅ WAL crash recovery** |
 | **v1.0** | 📅 Q3 2026 | Stable API, full documentation, LTS |
 
 📖 [Full Roadmap &rarr;](ROADMAP.md)
@@ -492,6 +518,12 @@ llm-box supports three extension methods:
 Short-term (v0.6-v0.9): Complete agent team collaboration, multimodal capabilities, performance optimization
 Long-term (v1.0+): Stable API, LTS releases, enterprise support, more hardware adaptation (Ascend/Cambricon/Hygon)
 See [Roadmap →](#-roadmap) for details.
+
+### 6. Can llm-box be used in real financial scenarios?
+
+The core financial capabilities (audit / idempotency / rate limiting / redaction / reproducibility) are in place, suitable for read-only analysis and controlled-write scenarios.
+Cross-step transactions (saga/2PC) are not yet implemented; transfer-style workflows require server-side dedup and compensation mechanisms.
+See [Financial Scenario Capabilities](#-financial-scenario-capabilities) for details.
 
 ---
 

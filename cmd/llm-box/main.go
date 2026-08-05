@@ -24,11 +24,13 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/alib8b8/llm-box/internal/autoupgrade"
 	"github.com/alib8b8/llm-box/internal/cli"
 	"github.com/alib8b8/llm-box/internal/history"
 	"github.com/alib8b8/llm-box/internal/i18n"
+	"github.com/alib8b8/llm-box/internal/logger"
 	"github.com/alib8b8/llm-box/internal/mcp"
 	"github.com/alib8b8/llm-box/internal/meta"
 	"github.com/alib8b8/llm-box/internal/nodes"
@@ -489,6 +491,84 @@ func handleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath st
 	}
 }
 
+// resolveAuditDir returns the directory the audit log will land in for a given
+// configured dir. When dir is non-empty it is used as-is; otherwise the history
+// package's default audit directory is derived from GetAuditLogPath. Returns
+// "" when no audit directory is available (e.g. HOME unset), in which case
+// audit logging no-ops inside history.AppendAuditLog and no lock is needed.
+func resolveAuditDir(dir string) string {
+	if dir != "" {
+		return dir
+	}
+	p := history.GetAuditLogPath()
+	if p == "" {
+		return ""
+	}
+	return filepath.Dir(p)
+}
+
+// acquireAuditLock takes an exclusive lock on the audit directory to prevent
+// two llm-box processes from concurrently appending to the same HMAC
+// hash-chained audit log (H-6). The history package's auditWriteMu only
+// serializes appends within a single process; without this lock, two
+// `llm-box run` invocations sharing one audit directory would interleave
+// appends and fork the hash chain, making VerifyAuditChain fail and breaking
+// tamper-evidence — the core guarantee for the financial audit scenario.
+//
+// The lock is a .audit.lock file created atomically with O_CREATE|O_EXCL. On
+// success a release function is returned that closes and removes the lock;
+// the caller MUST defer it. A stale lock left by a crashed process blocks
+// subsequent runs — in that case the caller disables audit for the new
+// process (with a warning) rather than corrupting the chain; the operator
+// removes the stale lock manually. Pass dir="" to skip locking entirely
+// (audit no-ops anyway when no directory is configured).
+func acquireAuditLock(dir string) (func(), error) {
+	if dir == "" {
+		return func() {}, nil
+	}
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return nil, fmt.Errorf("audit: create dir %s: %w", dir, err)
+	}
+	lockPath := filepath.Join(dir, ".audit.lock")
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		if os.IsExist(err) {
+			return nil, fmt.Errorf("another llm-box process is writing audit logs to %s; only one process may run with audit enabled at a time (set LLM_BOX_AUDIT_DIR to isolate, or remove a stale %s)", dir, lockPath)
+		}
+		return nil, err
+	}
+	fmt.Fprintf(f, "pid=%d started=%s\n", os.Getpid(), time.Now().Format(time.RFC3339))
+	return func() {
+		_ = f.Close()
+		_ = os.Remove(lockPath)
+	}, nil
+}
+
+// newAuditEnabledExecutor builds an Executor with tamper-evident audit
+// logging, first acquiring a process-exclusive lock on the audit directory
+// (H-6). If the lock cannot be acquired (another process holds it, or a stale
+// lock remains), audit is disabled for this process — with a warning — so the
+// hash chain is never forked by concurrent writers. The returned release
+// function must be deferred by the caller to release the lock on exit. When
+// no audit directory is available, audit no-ops and the release is a no-op.
+//
+// auditDir is passed through to WithAuditLog unchanged ("" means "use the
+// history default"); the lock is taken on the resolved directory so the
+// default directory is also protected.
+func newAuditEnabledExecutor(auditDir string) (*workflow.Executor, func()) {
+	resolved := resolveAuditDir(auditDir)
+	if resolved == "" {
+		return workflow.NewExecutor().WithAuditLog(true, ""), func() {}
+	}
+	release, err := acquireAuditLock(resolved)
+	if err != nil {
+		logger.Warn("audit lock failed; disabling audit for this process to avoid cross-process hash-chain corruption",
+			"dir", resolved, "error", err)
+		return workflow.NewExecutor().WithAuditLog(false, ""), func() {}
+	}
+	return workflow.NewExecutor().WithAuditLog(true, auditDir), release
+}
+
 func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string) {
 	model := tui.NewModel(wf.Name, wfPath, len(wf.Steps))
 	program := tea.NewProgram(model, tea.WithAltScreen())
@@ -502,15 +582,20 @@ func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 	defer cancel()
 
 	go func() {
+		// Route through the Executor so tamper-evident audit logging is
+		// applied to every TUI workflow run. Audit degrades gracefully (and
+		// silently after one warning) when the HMAC key env vars are unset.
+		// newAuditEnabledExecutor acquires a per-process lock on the audit
+		// directory (H-6) so concurrent llm-box processes cannot fork the
+		// HMAC hash chain; if the lock is held, audit is disabled for this
+		// process rather than corrupting the chain.
+		exec, releaseAudit := newAuditEnabledExecutor("")
+		defer releaseAudit()
 		if statePath != "" {
-			exec := workflow.NewExecutor().WithCheckpoint(statePath)
-			if _, _, _, err := exec.ExecuteWithTrace(ctx, wf, reg, program); err != nil {
-				log.Printf("Workflow execution error: %v", err)
-			}
-		} else {
-			if _, _, err := workflow.ExecuteWorkflowWithTUI(ctx, wf, reg, program); err != nil {
-				log.Printf("Workflow execution error: %v", err)
-			}
+			exec = exec.WithCheckpoint(statePath)
+		}
+		if _, _, _, err := exec.ExecuteWithTrace(ctx, wf, reg, program); err != nil {
+			log.Printf("Workflow execution error: %v", err)
 		}
 	}()
 
@@ -540,12 +625,18 @@ func runCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string) {
 	var finalOutput string
 	var stepResults []workflow.StepResult
 	var execErr error
+	// Route through the Executor so tamper-evident audit logging is applied
+	// to every CLI workflow run. Audit is a no-op when the HMAC key env vars
+	// are not set (graceful degradation), so this never blocks execution.
+	// newAuditEnabledExecutor acquires a per-process lock on the audit
+	// directory (H-6) so concurrent llm-box processes cannot fork the HMAC
+	// hash chain; if the lock is held, audit is disabled for this process.
+	exec, releaseAudit := newAuditEnabledExecutor("")
+	defer releaseAudit()
 	if statePath != "" {
-		exec := workflow.NewExecutor().WithCheckpoint(statePath)
-		finalOutput, stepResults, execErr = exec.Execute(context.Background(), wf, reg)
-	} else {
-		finalOutput, stepResults, execErr = cli.RunWorkflow(wf, reg)
+		exec = exec.WithCheckpoint(statePath)
 	}
+	finalOutput, stepResults, execErr = exec.Execute(context.Background(), wf, reg)
 
 	for _, result := range stepResults {
 		status := "✅"
