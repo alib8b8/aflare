@@ -120,7 +120,7 @@ func NewWAL(path string, opts WALOptions) (*WAL, error) {
 	// Recover the high-water seq and bytes-since-compaction from existing
 	// records (if any).
 	if err := w.recoverSeq(); err != nil {
-		w.Close()
+		_ = w.Close()
 		return nil, err
 	}
 	return w, nil
@@ -204,11 +204,11 @@ func (w *WAL) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if err := w.writer.Flush(); err != nil {
-		w.file.Close()
+		_ = w.file.Close()
 		return fmt.Errorf("wal: flush on close: %w", err)
 	}
 	if err := w.file.Sync(); err != nil {
-		w.file.Close()
+		_ = w.file.Close()
 		return fmt.Errorf("wal: sync on close: %w", err)
 	}
 	return w.file.Close()
@@ -319,23 +319,32 @@ func (w *WAL) Compact() error {
 		// Write single snapshot record (seq preserved).
 		data, err := json.Marshal(*lastRec)
 		if err != nil {
-			snapFile.Close()
+			_ = snapFile.Close()
 			return fmt.Errorf("wal: compact marshal: %w", err)
 		}
 		var lenBuf [walLenFieldLen]byte
 		binary.LittleEndian.PutUint32(lenBuf[:], uint32(len(data)))
-		snapWriter.Write(lenBuf[:])
-		snapWriter.Write(data)
+		if _, err := snapWriter.Write(lenBuf[:]); err != nil {
+			_ = snapFile.Close()
+			return fmt.Errorf("wal: compact write len: %w", err)
+		}
+		if _, err := snapWriter.Write(data); err != nil {
+			_ = snapFile.Close()
+			return fmt.Errorf("wal: compact write data: %w", err)
+		}
 		var crcBuf [walCRCLen]byte
 		binary.LittleEndian.PutUint32(crcBuf[:], crc32.ChecksumIEEE(data))
-		snapWriter.Write(crcBuf[:])
+		if _, err := snapWriter.Write(crcBuf[:]); err != nil {
+			_ = snapFile.Close()
+			return fmt.Errorf("wal: compact write crc: %w", err)
+		}
 	}
 	if err := snapWriter.Flush(); err != nil {
-		snapFile.Close()
+		_ = snapFile.Close()
 		return fmt.Errorf("wal: compact snap flush: %w", err)
 	}
 	if err := snapFile.Sync(); err != nil {
-		snapFile.Close()
+		_ = snapFile.Close()
 		return fmt.Errorf("wal: compact snap sync: %w", err)
 	}
 	if err := snapFile.Close(); err != nil {
