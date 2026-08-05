@@ -162,6 +162,7 @@ llm-box run btc-monitor.yaml
 | **🌐 Multi-Model Support** | Ollama / OpenAI / DeepSeek / Qwen / Kimi / GLM / Mistral, local and cloud |
 | **🔒 Privacy First** | Local execution by default, auto secret redaction, complete audit logs, 98+ vulnerabilities audited |
 | **🛡️ Enterprise-Grade Security** | SSRF protection, path traversal defense, command injection whitelist, AES-GCM encryption |
+| **⚙️ Engineering Depth** | WAL persistence engine (crash recovery), bytecode-IR expression engine + vectorized evaluation, EWMA latency prediction + Pareto routing, TLA+ formal verification of DAG scheduler |
 
 ---
 
@@ -364,11 +365,14 @@ llm-box help                   Show full help
 - **Subagent Prompts** &mdash; 17 specialist prompt templates, main/sub agent hierarchy (Grok Build pattern)
 - **Circuit Breaker** &mdash; Per-node Closed/Open/HalfOpen state machine, auto-isolation prevents cascade failures
 - **Privacy Layer** &mdash; Secret redaction on file read, outbound data volume anomaly monitor
-- **Checkpoint/Resume** &mdash; Per-step state persistence, `--resume` recovers from interruption
+- **Checkpoint/Resume** &mdash; WAL persistence engine (append-only + CRC32 + atomic compaction), replaces full JSON rewrites; `--resume` recovers from interruption
 - **Shared HTTP Client** &mdash; Unified connection-pool tuning and SSRF defense, proxy env passthrough
 - **DAG Parallel Execution** &mdash; Topological-sort dependency scheduling, concurrent execution of independent steps
 - **Multi-Error Aggregation** &mdash; `ProviderMultiError` aggregates all provider failures, supports `errors.Is/As` traversal
 - **Observability** &mdash; Prometheus metrics endpoint, audit-log HMAC hash chain tamper-proofing, log rotation
+- **Expression Engine** &mdash; Bytecode IR (flat opcodes + switch dispatch) + `EvaluateParamsVectorized` vectorized batch evaluation, eliminates virtual call overhead
+- **LLM Smart Routing** &mdash; EWMA latency prediction, full circuit-breaker state machine (Closed→Open→HalfOpen), Pareto cost-latency frontier sorting
+- **Formal Verification** &mdash; TLA+ spec + Go model checking (500 random DAGs) verifies DAG scheduler safety invariants and liveness
 
 ---
 
@@ -383,7 +387,7 @@ llm-box help                   Show full help
 | **v0.5** | ✅ Released | ReAct engine, layered memory, skill self-evolution, HarmonyOS adaptation (7 device types), cross-platform protocol (intent:// + ohos://), W3C DID identity, cross-domain agent messaging, GitCode G-Star + ohpm ecosystem |
 | **v0.5.1** | ✅ Released | Ascend NPU adaptation (7-agent pipeline, 3 workflow templates, CANN/MindIE integration) |
 | **v0.5.2** | ✅ Released | Grok Build-inspired capabilities: code graph, subagent prompt hierarchy, circuit breaker, secret redaction, file watch, TUI Markdown/Mermaid rendering (15-vuln audited), unified LLM routing (3 consolidated to 1) |
-| **v0.6.0** | **Current** | **Ant Ling ecosystem, AI Gateway (OmniRoute), Agent Memory Infrastructure, Voice AI Toolchain (ASR/diarization/analysis), Agent Teamization (200+ roles + Agency workflow)** |
+| **v0.6.0** | **Current** | **Ant Ling ecosystem, AI Gateway (OmniRoute), Agent Memory Infrastructure, Voice AI Toolchain (ASR/diarization/analysis), Agent Teamization (200+ roles + Agency workflow), Engineering Depth (WAL persistence + bytecode-IR expression engine + EWMA/Pareto routing + TLA+ formal DAG verification)** |
 | **v1.0** | 📅 Q3 2026 | Stable API, full documentation, LTS |
 
 📖 [Full Roadmap &rarr;](ROADMAP.md)
@@ -458,6 +462,8 @@ llm-box create from https://github.com/alib8b8/llm-box/tree/main/templates/data-
 ### 1. How is llm-box different from other agent frameworks?
 
 llm-box focuses on the **combination of deterministic workflows and AI agents**: workflows ensure reliable and reproducible execution, while agent nodes provide intelligent reasoning capabilities. We don't rely on a single model provider, supporting 22+ models with 5 routing strategies. The core is written in Go with zero dependencies — fast startup and low memory footprint.
+
+In terms of engineering depth: the expression engine uses bytecode IR + vectorized batch evaluation; persistence uses append-only WAL (CRC32 + atomic compaction) replacing full JSON rewrites; LLM routing integrates EWMA latency prediction + full circuit-breaker state machine + Pareto sorting; the DAG scheduler is verified via TLA+ formal spec + Go model checking for safety invariants and liveness.
 
 ### 2. Which large language models are supported?
 

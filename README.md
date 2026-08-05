@@ -162,6 +162,7 @@ llm-box run btc-monitor.yaml
 | **🌐 多模型支持** | 支持 Ollama / OpenAI / DeepSeek / Qwen / Kimi / GLM / Mistral，本地云端都能跑 |
 | **🔒 隐私优先** | 默认本地执行，秘密自动脱敏，审计日志完整，98+ 漏洞已审计 |
 | **🛡️ 企业级安全** | SSRF 防护、路径遍历防御、命令注入白名单、AES-GCM 加密 |
+| **⚙️ 工程深度** | WAL 持久化引擎（崩溃恢复）、表达式字节码 IR + 向量化求值、EWMA 延迟预测 + 帕累托路由、TLA+ 形式化验证 DAG 调度 |
 
 ---
 
@@ -364,11 +365,14 @@ llm-box help                显示完整帮助
 - **子代理提示词** —— 17 个专家提示词模板、主/子代理层级（Grok Build 模式）
 - **熔断器** —— 每节点 Closed/Open/HalfOpen 状态机，故障自动隔离防止级联失败
 - **隐私层** —— 文件读取时秘密脱敏、出站数据量异常监控
-- **Checkpoint/Resume** —— 工作流每步自动保存状态，`--resume` 从中断处恢复
+- **Checkpoint/Resume** —— WAL 持久化引擎（append-only + CRC32 + 原子压缩），替代 JSON 全量重写；`--resume` 从中断处恢复
 - **共享 HTTP 客户端** —— 统一连接池调优与 SSRF 防护，代理环境变量透传
 - **DAG 并行执行** —— 拓扑排序依赖调度，无依赖步骤并发执行
 - **多错误聚合** —— `ProviderMultiError` 聚合所有 provider 失败，支持 `errors.Is/As` 遍历
 - **可观测性** —— Prometheus 指标端点、审计日志 HMAC 哈希链防篡改、日志轮转
+- **表达式引擎** —— 字节码 IR（扁平 opcode + switch 分派）+ `EvaluateParamsVectorized` 向量化批量求值，消除虚函数调用开销
+- **LLM 智能路由** —— EWMA 延迟预测、完整熔断器状态机（Closed→Open→HalfOpen）、帕累托成本-延迟前沿排序
+- **形式化验证** —— TLA+ 规范 + Go 模型检查（500 次随机 DAG）验证 DAG 调度器的安全不变量与活性
 
 ---
 
@@ -383,7 +387,7 @@ llm-box help                显示完整帮助
 | **v0.5** | ✅ 已发布 | ReAct 引擎、分层记忆、技能自进化、鸿蒙适配（7 种设备）、跨平台协议（intent:// + ohos://）、W3C DID 身份、跨域 Agent 消息、GitCode G-Star + ohpm 生态 |
 | **v0.5.1** | ✅ 已发布 | 昇腾 NPU 适配（7-Agent 流水线、3 种工作流模板、CANN/MindIE 集成） |
 | **v0.5.2** | ✅ 已发布 | Grok Build 启发能力：代码图谱、子代理提示词层级、熔断器、秘密脱敏、文件监听、TUI Markdown/Mermaid 渲染（审计 15 个漏洞）、LLM 路由统一（3 套合并为 1） |
-| **v0.6.0** | **当前** | **百灵生态集成、AI 网关（OmniRoute）、Agent 记忆基础设施、语音 AI 工具链（ASR/分离/分析）、Agent 团队化（200+ 角色 + Agency 工作流）** |
+| **v0.6.0** | **当前** | **百灵生态集成、AI 网关（OmniRoute）、Agent 记忆基础设施、语音 AI 工具链（ASR/分离/分析）、Agent 团队化（200+ 角色 + Agency 工作流）、工程深度优化（WAL 持久化 + 字节码 IR 表达式引擎 + EWMA/帕累托路由 + TLA+ 形式化验证 DAG）** |
 | **v1.0** | 📅 2026 Q3 | 稳定 API、完整文档、LTS |
 
 📖 [完整路线图 →](ROADMAP.md)
@@ -458,6 +462,8 @@ llm-box create from https://github.com/alib8b8/llm-box/tree/main/templates/data-
 ### 1. llm-box 与其他 Agent 框架有什么区别？
 
 llm-box 专注于**确定性工作流与 AI Agent 的结合**：工作流确保执行可靠和可复现，Agent 节点提供智能推理能力。我们不依赖单一模型提供商，支持 22+ 模型、5 种路由策略，核心采用 Go 编写，零依赖、启动快、内存占用低。
+
+工程深度层面：表达式引擎采用字节码 IR + 向量化批量求值；持久化用 append-only WAL（CRC32 + 原子压缩）替代 JSON 全量重写；LLM 路由集成 EWMA 延迟预测 + 完整熔断器状态机 + 帕累托排序；DAG 调度器通过 TLA+ 形式化规范 + Go 模型检查验证安全不变量与活性。
 
 ### 2. 支持哪些大模型？
 
