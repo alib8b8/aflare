@@ -180,6 +180,7 @@ llm-box ships the core capabilities required for real-world financial scenarios 
 | Quota persistence + multi-tenancy | FileQuotaStore + per-tenant isolation | ✅ |
 | Trace redaction | LLM I/O redacted (API keys/JWT/private keys) before persistence | ✅ |
 | **Saga transaction compensation** | forward steps + reverse compensate, best-effort compensation, `{{var.error}}` context | ✅ |
+| **LLM cost attribution** | token usage × price table → estimated USD cost in audit log `cost_usd`/`total_tokens`; `LLM_BOX_PRICING_FILE` overrides prices | ✅ |
 
 ### Applicable Scenarios
 - ✅ Read-only analysis: AML review, investment research, portfolio review, end-of-day reconciliation (templates available)
@@ -418,7 +419,7 @@ llm-box help                   Show full help
 | **v0.5.1** | ✅ Released | Ascend NPU adaptation (7-agent pipeline, 3 workflow templates, CANN/MindIE integration) |
 | **v0.5.2** | ✅ Released | Grok Build-inspired capabilities: code graph, subagent prompt hierarchy, circuit breaker, secret redaction, file watch, TUI Markdown/Mermaid rendering (15-vuln audited), unified LLM routing (3 consolidated to 1) |
 | **v0.6.0** | ✅ Released | **Ant Ling ecosystem, AI Gateway (OmniRoute), Agent Memory Infrastructure, Voice AI Toolchain (ASR/diarization/analysis), Agent Teamization (200+ roles + Agency workflow), Engineering Depth (WAL persistence + bytecode-IR expression engine + EWMA/Pareto routing + TLA+ formal DAG verification)** |
-| **v0.7.0** | **Current** | **Financial scenario enhancement: ✅ HMAC hash-chain audit, ✅ idempotency (Idempotency-Key + cross-process lock), ✅ HTTP rate limiting/retry, ✅ LLM response cache (performance optimization; audit relies on audit log), ✅ quota persistence + multi-tenancy, ✅ trace redaction (JWT/private keys), ✅ WAL crash recovery, ✅ saga transaction compensation (forward + reverse compensate)** |
+| **v0.7.0** | **Current** | **Financial scenario enhancement: ✅ HMAC hash-chain audit, ✅ idempotency (Idempotency-Key + cross-process lock), ✅ HTTP rate limiting/retry, ✅ LLM response cache (performance optimization; audit relies on audit log), ✅ quota persistence + multi-tenancy, ✅ trace redaction (JWT/private keys), ✅ WAL crash recovery, ✅ saga transaction compensation (forward + reverse compensate), ✅ LLM cost attribution (token × price table → audit log `cost_usd`)** |
 | **v1.0** | 📅 Q3 2026 | Stable API, full documentation, LTS |
 
 📖 [Full Roadmap &rarr;](ROADMAP.md)
