@@ -8,7 +8,7 @@ description: |
 
   注意：此示例仅展示能力，真实生产需配合：
   - 服务端去重（银行 API 需支持 Idempotency-Key）
-  - 跨步骤事务（saga/补偿，本项目暂未实现）
+  - 跨步骤事务（多步写入见 ../saga-transfer/ 示例的 saga 补偿能力）
   - 决策可复现（LLM 响应缓存，已实现）
 
 vars:

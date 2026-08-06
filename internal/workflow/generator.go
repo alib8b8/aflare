@@ -335,8 +335,9 @@ func ValidateWorkflow(wf *Workflow) []string {
 }
 
 // hasFileWriteStep reports whether any step uses the file_write node, recursing
-// into compound steps (if/then/else, parallel, map, reduce, capture_error,
-// on_error) so that file_write steps nested inside branches are detected.
+// into compound steps (if/then/else, parallel, map, reduce, saga,
+// capture_error, on_error) so that file_write steps nested inside branches are
+// detected.
 func hasFileWriteStep(steps []WorkflowStep) bool {
 	for _, s := range steps {
 		if s.Node == "file_write" {
@@ -350,6 +351,16 @@ func hasFileWriteStep(steps []WorkflowStep) bool {
 		}
 		if s.IsReduce() && hasFileWriteStep(s.Reduce.Steps) {
 			return true
+		}
+		if s.IsSaga() {
+			for _, sg := range s.Saga.Steps {
+				if hasFileWriteStep([]WorkflowStep{sg.Forward}) {
+					return true
+				}
+				if sg.Compensate != nil && hasFileWriteStep([]WorkflowStep{*sg.Compensate}) {
+					return true
+				}
+			}
 		}
 		if s.HasCaptureError() && hasFileWriteStep(s.CaptureError) {
 			return true

@@ -517,6 +517,33 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 			continue
 		}
 
+		if wStep.IsSaga() {
+			sagaResults, output, err := executeSagaStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
+			if err != nil {
+				results = append(results, sagaResults...)
+				if program != nil {
+					program.Send(tui.WorkflowEndMsg{Success: false})
+				}
+				return "", results, trace, err
+			}
+			results = append(results, sagaResults...)
+			data = output
+			engine.SetStepOutput(i, wStep.Name, output)
+			trace.recordStep(StepTrace{
+				Index:           i,
+				NodeName:        "saga",
+				StepName:        wStep.Name,
+				BatchIndex:      -1,
+				ConditionPassed: true,
+				Attempts:        1,
+				TotalDuration:   time.Since(stepStart),
+				InputLen:        len(data),
+				OutputLen:       len(output),
+			})
+			saveCheckpointIfEnabled(i)
+			continue
+		}
+
 		logger.Info("step started", "index", i, "node", wStep.Node)
 
 		if program != nil {

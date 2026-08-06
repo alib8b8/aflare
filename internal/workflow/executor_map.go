@@ -272,6 +272,9 @@ func executeSubStep(ctx context.Context, baseIdx int, subStep WorkflowStep, inpu
 	if subStep.IsReduce() {
 		return executeReduceStep(ctx, baseIdx, subStep, input, engine, reg, program, globalLimiter)
 	}
+	if subStep.IsSaga() {
+		return executeSagaStep(ctx, baseIdx, subStep, input, engine, reg, program, globalLimiter)
+	}
 
 	// Condition check.
 	if subStep.Condition != "" {

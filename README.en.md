@@ -179,15 +179,19 @@ llm-box ships the core capabilities required for real-world financial scenarios 
 | HTTP rate limiting / retry | per-host token bucket + exponential backoff | ✅ |
 | Quota persistence + multi-tenancy | FileQuotaStore + per-tenant isolation | ✅ |
 | Trace redaction | LLM I/O redacted (API keys/JWT/private keys) before persistence | ✅ |
+| **Saga transaction compensation** | forward steps + reverse compensate, best-effort compensation, `{{var.error}}` context | ✅ |
 
 ### Applicable Scenarios
-- ✅ Read-only analysis: AML review, investment research, portfolio review (templates available)
-- ✅ Controlled writes: idempotent transfer, reconciliation (requires server-side dedup)
-- ⚠️ Cross-step transactions: saga/2PC not yet implemented; workflows must self-compensate
+- ✅ Read-only analysis: AML review, investment research, portfolio review, end-of-day reconciliation (templates available)
+- ✅ Controlled writes: idempotent transfer (requires server-side dedup)
+- ✅ Cross-step transactions: saga transfer compensation (multi-step writes auto-rolled-back in reverse on failure)
+- ⚠️ Strong-consistency distributed transactions: 2PC not yet implemented; strong-consistency scenarios still need database transactions
 
 ### Examples
 - [AML Suspicious Transaction Review](examples/finance/aml-review/) — read-only analysis
-- [Idempotent Transfer](examples/finance/idempotent-transfer/) — controlled write (new)
+- [Idempotent Transfer](examples/finance/idempotent-transfer/) — controlled write
+- [Saga Cross-bank Transfer](examples/finance/saga-transfer/) — cross-step transaction compensation (new)
+- [End-of-day Reconciliation](examples/finance/reconciliation/) — read-only analysis (new)
 
 ---
 
@@ -393,6 +397,7 @@ llm-box help                   Show full help
 - **Checkpoint/Resume** &mdash; WAL persistence engine (append-only + CRC32 + atomic compaction), replaces full JSON rewrites; `--resume` recovers from interruption
 - **Shared HTTP Client** &mdash; Unified connection-pool tuning and SSRF defense, proxy env passthrough
 - **DAG Parallel Execution** &mdash; Topological-sort dependency scheduling, concurrent execution of independent steps
+- **Saga Transaction Compensation** &mdash; forward steps run in order; on any failure, completed steps run their `compensate` in reverse order; best-effort compensation never aborts earlier rollbacks, `{{var.error}}` exposes the triggering cause
 - **Multi-Error Aggregation** &mdash; `ProviderMultiError` aggregates all provider failures, supports `errors.Is/As` traversal
 - **Observability** &mdash; Prometheus metrics endpoint, audit-log HMAC hash chain tamper-proofing, log rotation
 - **Expression Engine** &mdash; Bytecode IR (flat opcodes + switch dispatch) + `EvaluateParamsVectorized` vectorized batch evaluation, eliminates virtual call overhead
@@ -413,7 +418,7 @@ llm-box help                   Show full help
 | **v0.5.1** | ✅ Released | Ascend NPU adaptation (7-agent pipeline, 3 workflow templates, CANN/MindIE integration) |
 | **v0.5.2** | ✅ Released | Grok Build-inspired capabilities: code graph, subagent prompt hierarchy, circuit breaker, secret redaction, file watch, TUI Markdown/Mermaid rendering (15-vuln audited), unified LLM routing (3 consolidated to 1) |
 | **v0.6.0** | ✅ Released | **Ant Ling ecosystem, AI Gateway (OmniRoute), Agent Memory Infrastructure, Voice AI Toolchain (ASR/diarization/analysis), Agent Teamization (200+ roles + Agency workflow), Engineering Depth (WAL persistence + bytecode-IR expression engine + EWMA/Pareto routing + TLA+ formal DAG verification)** |
-| **v0.7.0** | **Current** | **Financial scenario enhancement: ✅ HMAC hash-chain audit, ✅ idempotency (Idempotency-Key + cross-process lock), ✅ HTTP rate limiting/retry, ✅ LLM response cache (performance optimization; audit relies on audit log), ✅ quota persistence + multi-tenancy, ✅ trace redaction (JWT/private keys), ✅ WAL crash recovery** |
+| **v0.7.0** | **Current** | **Financial scenario enhancement: ✅ HMAC hash-chain audit, ✅ idempotency (Idempotency-Key + cross-process lock), ✅ HTTP rate limiting/retry, ✅ LLM response cache (performance optimization; audit relies on audit log), ✅ quota persistence + multi-tenancy, ✅ trace redaction (JWT/private keys), ✅ WAL crash recovery, ✅ saga transaction compensation (forward + reverse compensate)** |
 | **v1.0** | 📅 Q3 2026 | Stable API, full documentation, LTS |
 
 📖 [Full Roadmap &rarr;](ROADMAP.md)
@@ -521,8 +526,8 @@ See [Roadmap →](#-roadmap) for details.
 
 ### 6. Can llm-box be used in real financial scenarios?
 
-The core financial capabilities (audit / idempotency / rate limiting / redaction / caching) are in place, suitable for read-only analysis and controlled-write scenarios.
-Cross-step transactions (saga/2PC) are not yet implemented; transfer-style workflows require server-side dedup and compensation mechanisms.
+The core financial capabilities (audit / idempotency / rate limiting / redaction / caching / saga transaction compensation) are in place, suitable for read-only analysis, controlled-write, and cross-step transaction scenarios.
+Saga supports automatic reverse compensation when multi-step writes fail; 2PC is not yet implemented, so strong-consistency scenarios still need database transactions.
 See [Financial Scenario Capabilities](#-financial-scenario-capabilities) for details.
 
 ---

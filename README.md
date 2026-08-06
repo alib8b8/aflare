@@ -179,15 +179,19 @@ llm-box 已具备真实金融场景（只读分析 + 受控写入）的核心能
 | HTTP 限流/重试 | per-host 令牌桶 + 指数退避 | ✅ |
 | 配额持久化+多租户 | FileQuotaStore + per-tenant 隔离 | ✅ |
 | trace 脱敏 | LLM I/O 持久化前脱敏 API key/JWT/私钥 | ✅ |
+| **saga 事务补偿** | forward 步骤 + 反向 compensate，best-effort 补偿，`{{var.error}}` 上下文 | ✅ |
 
 ### 适用场景
-- ✅ 只读分析：AML 审查、投研报告、组合复核（已有模板）
-- ✅ 受控写入：幂等转账、对账（需配合服务端去重）
-- ⚠️ 跨步骤事务：saga/2PC 暂未实现，需工作流层自行补偿
+- ✅ 只读分析：AML 审查、投研报告、组合复核、日终对账（已有模板）
+- ✅ 受控写入：幂等转账（需配合服务端去重）
+- ✅ 跨步骤事务：saga 转账补偿（多步骤写入失败自动反向回滚）
+- ⚠️ 强一致分布式事务：2PC 暂未实现，强一致场景仍需数据库事务
 
 ### 示例
 - [AML 可疑交易审查](examples/finance/aml-review/) — 只读分析
-- [幂等转账](examples/finance/idempotent-transfer/) — 受控写入（新增）
+- [幂等转账](examples/finance/idempotent-transfer/) — 受控写入
+- [Saga 跨行转账](examples/finance/saga-transfer/) — 跨步骤事务补偿（新增）
+- [日终对账](examples/finance/reconciliation/) — 只读分析（新增）
 
 ---
 
@@ -393,6 +397,7 @@ llm-box help                显示完整帮助
 - **Checkpoint/Resume** —— WAL 持久化引擎（append-only + CRC32 + 原子压缩），替代 JSON 全量重写；`--resume` 从中断处恢复
 - **共享 HTTP 客户端** —— 统一连接池调优与 SSRF 防护，代理环境变量透传
 - **DAG 并行执行** —— 拓扑排序依赖调度，无依赖步骤并发执行
+- **saga 事务补偿** —— forward 步骤顺序执行，任一步骤失败后已完成的步骤按反向顺序执行 compensate；best-effort 补偿不阻断其他回滚，`{{var.error}}` 传入触发原因
 - **多错误聚合** —— `ProviderMultiError` 聚合所有 provider 失败，支持 `errors.Is/As` 遍历
 - **可观测性** —— Prometheus 指标端点、审计日志 HMAC 哈希链防篡改、日志轮转
 - **表达式引擎** —— 字节码 IR（扁平 opcode + switch 分派）+ `EvaluateParamsVectorized` 向量化批量求值，消除虚函数调用开销
@@ -413,7 +418,7 @@ llm-box help                显示完整帮助
 | **v0.5.1** | ✅ 已发布 | 昇腾 NPU 适配（7-Agent 流水线、3 种工作流模板、CANN/MindIE 集成） |
 | **v0.5.2** | ✅ 已发布 | Grok Build 启发能力：代码图谱、子代理提示词层级、熔断器、秘密脱敏、文件监听、TUI Markdown/Mermaid 渲染（审计 15 个漏洞）、LLM 路由统一（3 套合并为 1） |
 | **v0.6.0** | ✅ 已发布 | **百灵生态集成、AI 网关（OmniRoute）、Agent 记忆基础设施、语音 AI 工具链（ASR/分离/分析）、Agent 团队化（200+ 角色 + Agency 工作流）、工程深度优化（WAL 持久化 + 字节码 IR 表达式引擎 + EWMA/帕累托路由 + TLA+ 形式化验证 DAG）** |
-| **v0.7.0** | **当前** | **金融场景增强：✅ HMAC 哈希链审计、✅ 幂等性（Idempotency-Key + 跨进程锁）、✅ HTTP 限流/重试、✅ LLM 响应缓存（性能优化，审计依赖 audit log）、✅ 配额持久化+多租户、✅ trace 脱敏（JWT/私钥）、✅ WAL 崩溃恢复** |
+| **v0.7.0** | **当前** | **金融场景增强：✅ HMAC 哈希链审计、✅ 幂等性（Idempotency-Key + 跨进程锁）、✅ HTTP 限流/重试、✅ LLM 响应缓存（性能优化，审计依赖 audit log）、✅ 配额持久化+多租户、✅ trace 脱敏（JWT/私钥）、✅ WAL 崩溃恢复、✅ saga 事务补偿（forward + 反向 compensate）** |
 | **v1.0** | 📅 2026 Q3 | 稳定 API、完整文档、LTS |
 
 📖 [完整路线图 →](ROADMAP.md)
@@ -521,8 +526,8 @@ llm-box 支持三种扩展方式：
 
 ### 6. llm-box 能用在真实金融场景吗？
 
-已具备核心金融能力（审计/幂等/限流/脱敏/缓存），适用于只读分析和受控写入场景。
-跨步骤事务（saga/2PC）暂未实现，转账类工作流需配合服务端去重和补偿机制。
+已具备核心金融能力（审计/幂等/限流/脱敏/缓存/saga 事务补偿），适用于只读分析、受控写入和跨步骤事务场景。
+saga 已支持多步骤写入失败自动反向补偿；2PC 暂未实现，强一致场景仍需数据库事务。
 详见 [金融场景能力](#-金融场景能力) 章节。
 
 ---

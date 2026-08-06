@@ -1,0 +1,110 @@
+name: reconciliation
+description: |
+  日终对账工作流示例：比对银行对账单与内部账本，标记差异并生成报告。
+  属于只读分析场景（无写副作用，无需 saga 补偿），展示 map 并发对账 + condition + if/else 能力。
+
+  流程：
+    1. 读取银行对账单（bank.json，5 笔交易）
+    2. map 对每笔银行交易在内部账本（ledger，内联 var）中查找匹配项
+       - 匹配成功：标记 reconciled
+       - 内部账本缺失：标记 missing_in_ledger
+    3. 汇总对账结果，输出 Markdown 报告
+
+  设计说明：
+    - 内部账本以内联 var 提供（生产环境通常来自配置/API）。
+      map 子工作流只能访问 {{var.*}}，无法引用外层 {{step.*}}，
+      故将账本作为 var 注入，便于子工作流内做 contains 匹配。
+    - 银行对账单从文件读取，演示 file_read + map 组合。
+
+  生产须知：
+    - 真实对账数据量大时应分批处理（map 的 max_iterations 限制）
+    - 差异项应触发告警和人工复核流程
+    - 对账报告应归档，审计日志自动记录执行过程
+
+vars:
+  bank_file: "examples/finance/reconciliation/bank.json"
+  report_file: "examples/finance/reconciliation/reconciliation-report.md"
+  # 内部账本（4 笔交易，TXN-005 缺失，演示 missing_in_ledger 路径）
+  # 生产环境此数据通常来自账务系统 API 或配置中心，而非内联。
+  ledger: '[{"tx_id":"TXN-001","amount":100.00},{"tx_id":"TXN-002","amount":250.50},{"tx_id":"TXN-003","amount":1000.00},{"tx_id":"TXN-004","amount":75.20}]'
+
+steps:
+  # ── Step 1: 读取银行对账单（JSON 数组）──
+  - name: load-bank
+    node: file_read
+    params:
+      path: "{{var.bank_file}}"
+      redact: "false"
+
+  # ── Step 2: map 对每笔银行交易匹配内部账本 ──
+  # {{step.load-bank}} 是银行交易 JSON 数组；map 对每项跑子工作流。
+  # 子工作流内 {{var.ledger}} 可用（var 透传），{{step.X}} 仅限子工作流内步骤。
+  - name: match
+    map:
+      over: "{{step.load-bank}}"
+      concurrency: 5
+      stop_on_error: false
+      steps:
+        # 子步骤 1: 从当前银行交易（{{loop.item}}）提取 tx_id
+        - name: tx_id
+          node: json_parse
+          params:
+            path: "tx_id"
+        # 子步骤 2: 渲染内部账本为纯文本，作为下一步 condition 的输入
+        # （condition 节点检查 INPUT 是否包含目标子串，故需把账本放到输入位）
+        - name: ledger_text
+          node: template_render
+          params:
+            template: "{{var.ledger}}"
+        # 子步骤 3: 判断账本是否包含当前 tx_id
+        # expr 经表达式引擎展开 {{step.tx_id}} 后变为 contains:TXN-00X，
+        # 再对输入（账本文本）做 contains 检查，输出 true/false
+        - name: check-ledger
+          node: condition
+          params:
+            expr: "contains:{{step.tx_id}}"
+        # 子步骤 4: 根据匹配结果标记差异类型
+        - if:
+            condition: "{{step.check-ledger}}"
+            then:
+              - name: status
+                node: template_render
+                params:
+                  template: "reconciled"
+            else:
+              - name: status
+                node: template_render
+                params:
+                  template: "missing_in_ledger"
+
+  # ── Step 3: 汇总对账报告 ──
+  # {{step.match}} 是 map 输出的状态数组（json_array 策略），如
+  # ["reconciled","reconciled","reconciled","reconciled","missing_in_ledger"]
+  - name: summary
+    node: template_render
+    params:
+      template: |
+        # 日终对账报告
+
+        ## 对账结果（每笔银行交易的匹配状态）
+
+        {{step.match}}
+
+        ## 状态说明
+        - reconciled: 银行与内部账本匹配成功
+        - missing_in_ledger: 内部账本缺失该银行交易（需核查入账延迟或漏记）
+
+        ## 生产建议
+        - 大数据量对账应分批处理并校验金额/币种/日期一致性
+        - missing_in_ledger 与 amount_mismatch 应触发告警和人工复核
+        - 报告生成时间由审计日志（HMAC 哈希链）自动记录
+
+  # ── Step 4: 写入对账报告 ──
+  - name: write-report
+    node: file_write
+    params:
+      path: "{{var.report_file}}"
+      mode: write
+      content: "{{step.summary}}"
+
+output: "{{step.summary}}"

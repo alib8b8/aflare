@@ -43,7 +43,8 @@ mock 银行 API 行为：
 
 ```bash
 # 从仓库根目录运行（先启动 mock 银行 API，见上一步）
-llm-box run examples/finance/idempotent-transfer/workflow.yaml
+# LLMBOX_ALLOW_LOOPBACK=1 允许访问 localhost mock 服务（SSRF 防护默认拦截内网地址）
+LLMBOX_ALLOW_LOOPBACK=1 llm-box run examples/finance/idempotent-transfer/workflow.yaml
 ```
 
 > 参数（`bank_api_url`、`from_account`、`amount` 等）在 `workflow.yaml` 的 `vars`
@@ -131,18 +132,16 @@ check-status (condition: contains:"status":"success")
 | 风险 | 说明 | 生产建议 |
 |------|------|----------|
 | **服务端必须去重** | 客户端 Idempotency-Key 只是第一道防线，恶意调用方可绕过 | 银行 API 必须基于 Idempotency-Key 做数据库唯一索引去重 |
-| **跨步骤事务** | 本工作流是单步转账；多步 saga（扣款→记账→通知）暂未实现 | 需工作流层自行实现补偿/TCC，或用数据库事务 |
+| **跨步骤事务** | 本工作流是单步转账；多步 saga（扣款→记账→通知）见 [saga-transfer](../saga-transfer/) 示例 | 多步骤写入用 saga 步骤自动反向补偿；强一致场景仍需数据库事务 |
 | **金额精度** | 本示例用 float 演示，生产环境必须用 decimal/整数分 | 避免浮点精度丢失导致对账差异 |
 | **审计密钥保管** | `LLM_BOX_AUDIT_HMAC_KEY` 泄露将使审计链可被伪造 | 通过 KMS/Secret Manager 注入，不落盘 |
 | **重试副作用** | HTTP 重试仅对幂等操作安全；非幂等操作需配合 Idempotency-Key | 银行 API 必须支持基于 key 的去重 |
 
-## 与 aml-review 示例的对比
+## 其他金融示例
 
-| 维度 | [aml-review](../aml-review/) | [idempotent-transfer](./)（本示例） |
-|------|------------------------------|--------------------------------------|
-| **场景类型** | 只读分析（AML 可疑交易审查） | 受控写入（转账） |
-| **数据流向** | 读取交易 → 分析 → 生成报告 | 调用银行 API → 解析 → 写审计日志 |
-| **幂等性需求** | 低（只读，重复执行无副作用） | 高（重复扣款是金融事故） |
-| **限流/重试** | 数据源查询（轻量） | 银行 API 调用（必须保护下游） |
-| **审计重点** | 决策依据复现（为何上报/放行） | 交易留痕（每笔转账可追溯） |
-| **LLM 使用** | LLM 综合风险评分 | 无 LLM（纯规则转账，但审计能力同样适用） |
+| 示例 | 场景类型 | 核心能力 |
+|------|----------|----------|
+| [aml-review](../aml-review/) | 只读分析 | map 并发 + LLM 风险评分 |
+| **idempotent-transfer**（本示例） | 单步写入 | 幂等性 + 限流 + 重试 |
+| [saga-transfer](../saga-transfer/) | 跨步骤写入 | saga 事务补偿 |
+| [reconciliation](../reconciliation/) | 只读分析 | map 匹配 + 差异标记 |

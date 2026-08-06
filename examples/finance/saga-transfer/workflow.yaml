@@ -1,0 +1,115 @@
+name: saga-transfer
+description: |
+  Saga 跨行转账工作流示例，展示跨步骤事务补偿能力：
+  1. forward: debit（A 行扣款）→ credit（B 行入账）→ notify（通知）
+  2. 任一 forward 步骤失败时，已完成的步骤按反向执行 compensate
+  3. compensate 是 best-effort：补偿失败不阻断其他补偿，仅告警需人工对账
+  4. {{var.error}} 在补偿步骤中可见，可据此分支处理不同失败原因
+
+  本示例模拟的故障：credit 步骤对 amount=9999 强制失败，触发 debit 的补偿（退款）。
+  修改 amount 变量即可观察不同路径：
+    - amount < 9999：全部成功，saga 提交
+    - amount = 9999：credit 失败，debit 被补偿（退款）
+    - amount > 9999：debit 直接失败，无补偿（第一步无已完成步骤）
+
+  生产须知：
+    - 真实跨行转账需配合服务端幂等（Idempotency-Key）+ 对账机制
+    - compensate 应是幂等的（可能被多次执行）
+    - compensate 失败需人工介入，应有告警和待办流程
+    - 审计日志（HMAC 哈希链）自动记录所有 forward/compensate 步骤
+
+vars:
+  bank_api_url: "http://localhost:17801"
+  from_account: "ACC0001"
+  to_account: "ACC0002"
+  # amount=9999 触发 credit 失败 → debit 补偿（退款）。改此值观察不同路径。
+  amount: "9999"
+  currency: "CNY"
+  result_log: "./saga-result.jsonl"
+
+steps:
+  # ── Saga 跨行转账：debit → credit → notify，失败反向补偿 ──
+  - name: cross-bank-transfer
+    saga:
+      steps:
+        # forward 1: A 行扣款（带限流+重试保护银行 API）
+        - forward:
+            name: debit
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/debit"
+              headers: |-
+                Content-Type: application/json
+                Idempotency-Key: saga-debit-{{var.amount}}
+              body: '{"account":"{{var.from_account}}","amount":{{var.amount}},"currency":"{{var.currency}}"}'
+              rate_limit_rps: "5"
+              rate_limit_burst: "2"
+              max_retries: "3"
+              retry_backoff_ms: "200"
+              retry_on_status: "429,500,502,503,504"
+          # compensate 1: A 行退款（撤销 debit 的副作用）
+          # input 是 debit 步骤的输出，{{var.error}} 是触发回滚的失败原因
+          compensate:
+            name: refund-debit
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/refund"
+              headers: |-
+                Content-Type: application/json
+                Idempotency-Key: saga-refund-{{var.amount}}
+              body: '{"account":"{{var.from_account}}","amount":{{var.amount}},"currency":"{{var.currency}}","reason":"{{var.error}}"}'
+              rate_limit_rps: "5"
+              max_retries: "3"
+              retry_backoff_ms: "200"
+              retry_on_status: "429,500,502,503,504"
+
+        # forward 2: B 行入账（对 amount=9999 强制失败，演示补偿）
+        - forward:
+            name: credit
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/credit"
+              headers: |-
+                Content-Type: application/json
+                Idempotency-Key: saga-credit-{{var.amount}}
+              body: '{"account":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}"}'
+              rate_limit_rps: "5"
+              max_retries: "3"
+              retry_backoff_ms: "200"
+              retry_on_status: "429,500,502,503,504"
+          # compensate 2: B 行冲正（撤销 credit 的副作用）
+          compensate:
+            name: reverse-credit
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/reverse"
+              headers: |-
+                Content-Type: application/json
+                Idempotency-Key: saga-reverse-{{var.amount}}
+              body: '{"account":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}","reason":"{{var.error}}"}'
+              max_retries: "2"
+
+        # forward 3: 通知（无副作用，无需 compensate）
+        - forward:
+            name: notify
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/notify"
+              headers: |-
+                Content-Type: application/json
+              body: '{"from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}},"status":"success"}'
+              max_retries: "2"
+          # 无 compensate：通知是幂等的纯通知，失败无需回滚
+
+  # ── 记录 saga 结果（saga 失败时此步不执行，由审计日志记录失败）──
+  - name: log-result
+    node: file_write
+    params:
+      path: "{{var.result_log}}"
+      mode: append
+      content: '{"status":"saga_committed","from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}}}'

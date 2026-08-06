@@ -159,7 +159,7 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 			}
 
 			// 参数求值（复合步骤的 params 不在此求值，由子执行器处理）
-			if !wStep.IsIf() && !wStep.IsLoop() && !wStep.IsParallel() && !wStep.IsMap() && !wStep.IsReduce() {
+			if !wStep.IsIf() && !wStep.IsLoop() && !wStep.IsParallel() && !wStep.IsMap() && !wStep.IsReduce() && !wStep.IsSaga() {
 				params, err := engine.EvaluateParams(wStep.Params, input)
 				if err != nil {
 					ps.evalErr = err
@@ -499,6 +499,15 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 		// reduce 用独立 engine；{{loop.acc}}/{{loop.item}} 在迭代内生效。
 		reduceEngine := NewExpressionEngine()
 		_, output, execErr = executeReduceStep(ctx, 0, wStep, input, reduceEngine, reg, nil, NewConcurrencyLimiter(0))
+		attemptsMade = 1
+		return
+	}
+	if wStep.IsSaga() {
+		// saga 用独立 engine；forward/compensate 子步骤在内部自建 engine。
+		// DAG 下 saga 的 {{step.X}} 引用无法访问主 workflow 步骤输出，
+		// 与其他复合步骤一致，应通过 input 传递数据。
+		sagaEngine := NewExpressionEngine()
+		_, output, execErr = executeSagaStep(ctx, 0, wStep, input, sagaEngine, reg, nil, NewConcurrencyLimiter(0))
 		attemptsMade = 1
 		return
 	}

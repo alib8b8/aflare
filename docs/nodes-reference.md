@@ -45,7 +45,7 @@
 | [`harmony_atomic_service`](#harmony_atomic_service) | Launch HarmonyOS Atomic Service. Lightweight, card-based services that run without installation. Supports launch, rou... | 4 |
 | [`harmony_device_adapt`](#harmony_device_adapt) | Detect HarmonyOS device type (phone/tablet/foldable/TV/car/wearable) and generate UI adaptation guidance. Inspired by... | 6 |
 | [`harmony_widget`](#harmony_widget) | Manage HarmonyOS desktop widgets (service cards). Add, update, remove, or query widget state on the home screen. | 5 |
-| [`http_request`](#http_request) | Make HTTP requests with custom method, headers, and body | 5 |
+| [`http_request`](#http_request) | Make HTTP requests with custom method, headers, and body | 12 |
 | [`human_in_loop`](#human_in_loop) | Human approval gate — pauses workflow for human review and approval before continuing | 5 |
 | [`ima`](#ima) | Call IMA Copilot LLM API | 15 |
 | [`intent_router`](#intent_router) | Route user intents to appropriate handlers. Central dispatch for AI assistant commands. | 3 |
@@ -379,7 +379,7 @@ Pre-execution ambiguity checker: identifies unclear requirements and generates c
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `model` | string | No | auto | 使用的模型（默认auto，由meta_orchestrator选择） |
+| `model` | string | No | auto | 使用的模型（默认auto，由路由层选择） |
 | `session_id` | string | No |  | 会话ID（自动生成或指定） |
 | `max_history` | int | No | 50 | 最大历史记录数（默认50） |
 | `streaming` | bool | No | true | 流式输出（默认true） |
@@ -981,6 +981,13 @@ Make HTTP requests with custom method, headers, and body
 | `headers` | string | No |  | JSON-encoded headers |
 | `body` | string | No |  | Request body |
 | `timeout` | int | No | 30 | Request timeout in seconds |
+| `rate_limit_rps` | float | No | 0 | Max requests per second per host (0=unlimited) |
+| `rate_limit_burst` | int | No |  | Token-bucket burst size (default=ceil(rate_limit_rps)) |
+| `rate_limit_key` | string | No |  | Explicit bucket key overriding URL.Host; set when multiple domain aliases resolve to the same backend so they share one bucket (M-9) |
+| `max_retries` | int | No | 0 | Max retry attempts on transient failures (default 0=no retry) |
+| `retry_backoff_ms` | int | No | 100 | Initial retry backoff in ms (default 100) |
+| `retry_max_backoff_ms` | int | No | 5000 | Max retry backoff cap in ms (default 5000) |
+| `retry_on_status` | string | No | 429,500,502,503,504 | Comma-separated retryable status codes (default 429,500,502,503,504) |
 
 ---
 
@@ -1161,7 +1168,7 @@ Smart LLM router that automatically selects the best provider with fallback, quo
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `system` | string | No |  | System prompt for the LLM |
-| `strategy` | string | No | priority | Routing strategy: priority, cost, latency, round_robin, random (default: priority) |
+| `strategy` | string | No | priority | Routing strategy: priority, cost, latency, pareto, round_robin, random (default: priority) |
 | `max_retries` | string | No | 3 | Maximum number of fallback attempts (default: 3) |
 | `show_provider` | string | No | false | Show which provider was used in output (default: false) |
 | `show_stats` | string | No | false | Show router statistics in output (default: false) |

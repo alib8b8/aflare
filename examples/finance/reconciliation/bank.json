@@ -1,0 +1,7 @@
+[
+  {"tx_id": "TXN-001", "amount": 100.00, "currency": "CNY", "date": "2026-08-05"},
+  {"tx_id": "TXN-002", "amount": 250.50, "currency": "CNY", "date": "2026-08-05"},
+  {"tx_id": "TXN-003", "amount": 1000.00, "currency": "CNY", "date": "2026-08-05"},
+  {"tx_id": "TXN-004", "amount": 75.20, "currency": "CNY", "date": "2026-08-05"},
+  {"tx_id": "TXN-005", "amount": 500.00, "currency": "CNY", "date": "2026-08-05"}
+]

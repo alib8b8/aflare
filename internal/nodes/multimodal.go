@@ -19,11 +19,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/alib8b8/llm-box/internal/nodes/core"
 )
 
 type MultimodalNode struct{}
@@ -254,6 +259,16 @@ type visionMessage struct {
 	Content []visionMessageContent `json:"content"`
 }
 
+// visionRequest is the OpenAI-compatible /chat/completions request body for
+// multimodal (vision) calls. Unlike core.LLMRequest (whose Messages carry a
+// plain-string Content), this uses visionMessage so each message can hold a
+// mixed array of text and image_url content parts — the wire format vision
+// providers require to actually see the image.
+type visionRequest struct {
+	Model    string          `json:"model"`
+	Messages []visionMessage `json:"messages"`
+}
+
 func callVisionLLM(ctx context.Context, provider, model, apiKey, endpoint, imageURL, prompt, systemPrompt, detail string) (string, error) {
 	var contents []visionMessageContent
 
@@ -324,41 +339,72 @@ func callVisionAPI(ctx context.Context, provider, model, apiKey, endpoint string
 	return fallbackVisionCall(ctx, provider, model, apiKey, endpoint, messages)
 }
 
+// fallbackVisionCall sends the multimodal (vision) request directly to the
+// provider's OpenAI-compatible /chat/completions endpoint. Unlike the old
+// text-only path, this serializes the full visionMessage array — including
+// image_url content parts — so the vision model actually receives the image.
+// It reuses core.SafeLLMHTTPClient (SSRF-safe transport), core.ValidateLMLEndpoint
+// and core.HTTPRedirectValidator so multimodal calls inherit the same network
+// hardening as text LLM calls, and parses the response with core.LLMResponse
+// (the wire format is identical to a text completion).
 func fallbackVisionCall(ctx context.Context, provider, model, apiKey, endpoint string, messages []visionMessage) (string, error) {
 	if apiKey == "" {
 		return "", fmt.Errorf("no API key provided for %s (set %s_API_KEY)", provider, strings.ToUpper(provider))
 	}
 
-	var userText string
-	for _, msg := range messages {
-		if msg.Role == "user" {
-			for _, c := range msg.Content {
-				if c.Type == "text" {
-					userText += c.Text + "\n"
-				}
-			}
-		}
+	if err := core.ValidateLMLEndpoint(endpoint); err != nil {
+		return "", fmt.Errorf("endpoint URL validation failed: %w", err)
 	}
 
-	compatNode := NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            provider,
-		DefaultModel:    model,
-		DefaultEndpoint: endpoint,
-		EnvAPIKey:       strings.ToUpper(provider) + "_API_KEY",
-		ProviderName:    provider,
-	})
-	params := map[string]string{
-		"model":    model,
-		"api_key":  apiKey,
-		"endpoint": endpoint,
-	}
+	generateURL := fmt.Sprintf("%s/chat/completions", endpoint)
 
-	warning := "[Note: Vision API direct call not implemented in this version. Using text-only mode. For full vision support, use providers with vision capability.]\n\n"
-	result, err := compatNode.Execute(ctx, userText, params)
+	reqBody := visionRequest{
+		Model:    model,
+		Messages: messages,
+	}
+	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal vision request: %w", err)
 	}
-	return warning + result, nil
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, generateURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return "", fmt.Errorf("failed to create vision request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{
+		Timeout:       core.DefaultLLMTimeout,
+		Transport:     core.SafeLLMHTTPClient.Transport,
+		CheckRedirect: core.HTTPRedirectValidator(core.ValidateLMLEndpoint),
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to call %s vision API: %w", provider, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp core.LLMResponse
+		_ = json.NewDecoder(io.LimitReader(resp.Body, core.MaxHTTPResponseSize)).Decode(&errResp)
+		if errResp.Error != nil && errResp.Error.Message != "" {
+			return "", fmt.Errorf("%s vision API error (%d): %s", provider, resp.StatusCode, errResp.Error.Message)
+		}
+		return "", fmt.Errorf("%s vision API returned status %d", provider, resp.StatusCode)
+	}
+
+	var llmResp core.LLMResponse
+	if err := json.NewDecoder(io.LimitReader(resp.Body, core.MaxHTTPResponseSize)).Decode(&llmResp); err != nil {
+		return "", fmt.Errorf("failed to parse %s vision response: %w", provider, err)
+	}
+
+	if len(llmResp.Choices) == 0 {
+		return "", fmt.Errorf("no choices in %s vision response", provider)
+	}
+
+	return llmResp.Choices[0].Message.Content, nil
 }
 
 func formatMultimodalOutput(content, source, mode, outputFormat string) string {

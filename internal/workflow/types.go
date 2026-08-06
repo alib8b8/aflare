@@ -57,6 +57,17 @@ type WorkflowStep struct {
 	// for the next iteration. Reduce is inherently sequential (each iteration
 	// depends on the previous accumulator), so there is no concurrency knob.
 	Reduce *ReduceConfig `yaml:"reduce,omitempty"`
+	// Saga runs a sequence of forward transactional steps, each with an
+	// optional compensation step. If any forward step fails (after its own
+	// retry/fallback/capture_error recovery), the already-completed forward
+	// steps are compensated in REVERSE order. Compensation is best-effort:
+	// a compensating step failure is recorded but does not abort the
+	// compensation of earlier steps. The saga step's output is the last
+	// successful forward step's output (or "" if none completed). This is
+	// the cross-step transaction primitive — unlike continue_on_error (which
+	// ignores a failure) or capture_error (which routes on a single step's
+	// error), saga guarantees that partial side effects are rolled back.
+	Saga *SagaConfig `yaml:"saga,omitempty"`
 	// CaptureError is a sub-workflow branch executed when the step's node
 	// fails. Unlike `continue_on_error` (which swallows the error) or
 	// `on_error` (which runs a single handler node), capture_error treats
@@ -145,6 +156,47 @@ type BackoffConfig struct {
 	Jitter      bool   `yaml:"jitter,omitempty"`      // add random jitter
 }
 
+// SagaConfig configures a cross-step saga transaction: a sequence of forward
+// steps executed in order, each with an optional compensating step. On any
+// forward-step failure (after the step's own recovery primitives are
+// exhausted), the executor rolls back by running each completed step's
+// Compensate in reverse order. Compensation is best-effort and never aborts
+// earlier compensations; a compensating step that itself fails is logged and
+// skipped so the rollback of prior steps still proceeds.
+//
+// Each SagaStep runs as a sub-workflow step (reusing executeSubStep), so it
+// supports its own condition/retry/fallback/on_error/capture_error and may
+// itself be an if/loop/map/reduce/parallel compound step. {{step.X}} inside a
+// saga resolves to outputs of saga sub-steps (not the outer workflow), and
+// {{var.*}} inherits the parent workflow's vars.
+//
+// This is the primitive for multi-step financial transactions (debit then
+// credit then notify), distributed writes that must be rolled back on partial
+// failure, and any pipeline where a mid-stream failure leaves inconsistent
+// state unless earlier side effects are undone.
+type SagaConfig struct {
+	// Steps is the ordered list of forward transactional steps. Each is
+	// executed in sequence; the output of step N becomes the input to step
+	// N+1. On failure of step N, steps 1..N-1 are compensated in reverse.
+	Steps []SagaStep `yaml:"steps"`
+}
+
+// SagaStep is a single forward step inside a saga, paired with an optional
+// compensating step that reverses its side effects on rollback.
+type SagaStep struct {
+	// Forward is the transactional step to execute. It is a full WorkflowStep,
+	// so it carries its own node/params/condition/retry/recovery primitives.
+	Forward WorkflowStep `yaml:"forward"`
+	// Compensate is the step run on rollback to undo Forward's side effects.
+	// It receives the Forward step's output as its input, and {{var.error}}
+	// is set to the failure that triggered the rollback. A missing Compensate
+	// means the forward step has no side effects to undo (e.g. a pure read or
+	// an idempotent call that is safe to leave in place). Compensate is
+	// best-effort: if it fails, the failure is recorded and the rollback of
+	// earlier steps continues.
+	Compensate *WorkflowStep `yaml:"compensate,omitempty"`
+}
+
 // IfConfig defines an if/else branch.
 type IfConfig struct {
 	Condition string         `yaml:"condition"`
@@ -190,6 +242,12 @@ func (s *WorkflowStep) IsMap() bool {
 // IsReduce reports whether this step is a reduce (fold with accumulator) step.
 func (s *WorkflowStep) IsReduce() bool {
 	return s.Reduce != nil
+}
+
+// IsSaga reports whether this step is a saga (cross-step transaction with
+// compensation) step.
+func (s *WorkflowStep) IsSaga() bool {
+	return s.Saga != nil
 }
 
 // HasCaptureError reports whether this step declares a capture_error branch.
