@@ -1091,7 +1091,7 @@ func (e *Executor) ExecuteWithTrace(ctx context.Context, wf *Workflow, reg *node
 		out, results, trace, err = executeWorkflowSequential(ctx, wf, reg, program, statePath, walPath, e.workflowTimeout)
 	}
 	recordWorkflowMetrics(trace, err)
-	audit.recordCompletion(results, err)
+	audit.recordCompletion(results, trace, err)
 
 	// Persist the idempotency outcome so a repeat trigger for this key is a
 	// cache hit. The run_id is stamped on the trace for correlation. Only the

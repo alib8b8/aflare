@@ -45,6 +45,20 @@ type WorkflowTrace struct {
 	// hit: no steps were executed and the cached final output was returned
 	// alongside ErrIdempotencyHit. False for all real executions.
 	IdempotencyHit bool `json:"idempotency_hit,omitempty"`
+	// TotalCostUSD is the summed estimated USD cost of every LLM call in the
+	// run (sum of StepTrace.LLM[].CostUSD). It is populated by finish() from
+	// aggregateLLMCosts, so it is only meaningful after the trace has
+	// finished. Zero for runs with no LLM calls or runs whose models are not
+	// in the price table (computeLLMCost returns 0 for unknown models rather
+	// than fabricating a cost). This is a COST ESTIMATE for budget alerts
+	// and cost attribution (e.g. "this Agent run cost $0.012"), NOT a billing
+	// figure — see computeLLMCost's doc for the caveats.
+	TotalCostUSD float64 `json:"total_cost_usd,omitempty"`
+	// TotalTokens is the summed prompt+completion tokens across every LLM
+	// call in the run. Populated alongside TotalCostUSD by finish(). Useful
+	// as a denominator for cost-per-1K-token metrics and for quota tracking
+	// independent of provider-specific cost rounding.
+	TotalTokens int `json:"total_tokens,omitempty"`
 }
 
 // BatchTrace records one topological batch of a DAG run. Steps within a batch
@@ -145,13 +159,19 @@ func newTrace(name, mode string, startedAt time.Time, stepCount int) *WorkflowTr
 	return &WorkflowTrace{Name: name, Mode: mode, StartedAt: startedAt, Steps: make([]StepTrace, 0, stepCount)}
 }
 
-// finish stamps the trace end time and total duration.
+// finish stamps the trace end time and total duration, and aggregates the
+// per-call LLM cost/token totals into TotalCostUSD / TotalTokens. Cost is
+// aggregated here (rather than incrementally as steps complete) so the value
+// is stable once the trace is done — a caller reading TotalCostUSD mid-run
+// would see a partial sum, which is acceptable for a live progress display
+// but the post-finish value is the one used for audit and budget alerts.
 func (t *WorkflowTrace) finish(endedAt time.Time) {
 	if t == nil {
 		return
 	}
 	t.EndedAt = endedAt
 	t.Duration = endedAt.Sub(t.StartedAt)
+	t.TotalCostUSD, t.TotalTokens = aggregateLLMCosts(t)
 }
 
 // recordStep appends a StepTrace and returns a pointer to the stored copy so

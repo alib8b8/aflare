@@ -221,6 +221,18 @@ func projectLLMTelemetry(calls []nodes.LLMCallTelemetry) []LLMStepTrace {
 		if attempt == 0 {
 			attempt = i + 1
 		}
+		// Cost attribution: prefer an upstream-supplied CostUSD (e.g. a
+		// router that computed pricing from its own table) over the
+		// centralised price table. Only when the upstream left it 0 do we
+		// compute from token usage + the built-in price table, so a
+		// router's authoritative cost is never overwritten by a stale
+		// default. This fills the field that recordWorkflowMetrics and
+		// WorkflowTrace.TotalCostUSD already consume but that was
+		// previously always 0.
+		cost := c.CostUSD
+		if cost == 0 {
+			cost = computeLLMCost(c.Model, pt, ct)
+		}
 		out[i] = LLMStepTrace{
 			NodeName:         c.NodeName,
 			Provider:         c.Provider,
@@ -234,7 +246,7 @@ func projectLLMTelemetry(calls []nodes.LLMCallTelemetry) []LLMStepTrace {
 			PromptTokens:     pt,
 			CompletionTokens: ct,
 			TotalTokens:      tt,
-			CostUSD:          c.CostUSD,
+			CostUSD:          cost,
 			Prompt:           redactForTrace(c.Prompt),
 			Response:         redactForTrace(c.Response),
 		}

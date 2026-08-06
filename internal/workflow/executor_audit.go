@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"sync"
 	"unicode/utf8"
@@ -136,7 +137,7 @@ func (ar *auditRecorder) recordStart() {
 		Action:   history.AuditActionWorkflowStart,
 		Resource: ar.workflowName,
 		Success:  true,
-		Detail:   ar.workflowDetail("started", ""),
+		Detail:   ar.workflowDetail("started", "", nil),
 	})
 }
 
@@ -149,7 +150,17 @@ func (ar *auditRecorder) recordStart() {
 //
 // which matches "one record per step as it completes" for chain-integrity and
 // replay purposes.
-func (ar *auditRecorder) recordCompletion(results []StepResult, runErr error) {
+//
+// trace carries the run's aggregated cost/token totals; when non-nil its
+// TotalCostUSD and TotalTokens are stamped into the workflow_end/failed detail
+// so each completed run's estimated LLM cost is tamper-evidently recorded
+// alongside its outcome. This is the cost-attribution hook: a financial
+// operator can answer "how much did this audited run cost in LLM tokens?"
+// directly from the audit log without re-running the workflow or consulting a
+// separate billing system. Nil trace (e.g. a panic-recovery path that never
+// built one) simply omits the cost fields — the audit record still records
+// the outcome.
+func (ar *auditRecorder) recordCompletion(results []StepResult, trace *WorkflowTrace, runErr error) {
 	if !ar.hasHMACKey() {
 		return
 	}
@@ -161,14 +172,14 @@ func (ar *auditRecorder) recordCompletion(results []StepResult, runErr error) {
 			Action:   auditActionFailed,
 			Resource: ar.workflowName,
 			Success:  false,
-			Detail:   ar.workflowDetail("failed", runErr.Error()),
+			Detail:   ar.workflowDetail("failed", runErr.Error(), trace),
 		})
 	} else {
 		ar.appendLog(history.AuditLog{
 			Action:   history.AuditActionWorkflowEnd,
 			Resource: ar.workflowName,
 			Success:  true,
-			Detail:   ar.workflowDetail("completed", ""),
+			Detail:   ar.workflowDetail("completed", "", trace),
 		})
 	}
 }
@@ -293,8 +304,15 @@ func (ar *auditRecorder) appendStep(r StepResult) {
 }
 
 // workflowDetail renders the detail JSON for a workflow-level (start/end)
-// audit record.
-func (ar *auditRecorder) workflowDetail(phase, errMsg string) string {
+// audit record. When trace is non-nil, the run's aggregated estimated LLM
+// cost (TotalCostUSD) and total token count (TotalTokens) are included so the
+// audit log carries cost attribution for each completed run. The cost is
+// rounded to 8 decimal places (sub-cent precision) — enough to represent a
+// single cheap call (~$0.00001) without floating-point noise, while keeping
+// the JSON readable. A zero cost (no LLM calls, or unknown models) is still
+// emitted so a cost-aware alert can distinguish "ran, cost $0" from "ran but
+// cost was not computed".
+func (ar *auditRecorder) workflowDetail(phase, errMsg string, trace *WorkflowTrace) string {
 	d := map[string]interface{}{
 		"workflow": ar.workflowName,
 		"steps":    len(ar.steps),
@@ -303,8 +321,24 @@ func (ar *auditRecorder) workflowDetail(phase, errMsg string) string {
 	if errMsg != "" {
 		d["error"] = errMsg
 	}
+	if trace != nil {
+		d["cost_usd"] = roundCost(trace.TotalCostUSD)
+		d["total_tokens"] = trace.TotalTokens
+	}
 	b, _ := json.Marshal(d)
 	return string(b)
+}
+
+// roundCost truncates a USD cost to 8 decimal places for stable, readable
+// audit output. It rounds half-to-even via fmt formatting to avoid binary
+// float artefacts (e.g. 0.010000000000000002) appearing in the audit log.
+func roundCost(c float64) float64 {
+	// Multiply, round, divide to 8dp. Using math.Round on the scaled value
+	// gives half-away-from-zero; for cost reporting the difference from
+	// half-to-even is sub-cent and immaterial, and math.Round is simpler
+	// than re-implementing banker's rounding.
+	const scale = 1e8
+	return math.Round(c*scale) / scale
 }
 
 // appendLog writes a single audit record. Any error or panic is swallowed and

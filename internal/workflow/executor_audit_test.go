@@ -486,3 +486,62 @@ func TestExecutor_AuditLog_IdempotencyRejectedRecorded(t *testing.T) {
 		t.Errorf("audit log leaked raw idempotency key %q", "transfer-audit-rej")
 	}
 }
+
+// TestExecutor_AuditLog_RecordsCostAttribution verifies that the workflow_end
+// audit record carries cost_usd and total_tokens fields, proving the
+// trace→audit cost-attribution wiring. This is the end-to-end integration
+// check that complements the unit tests in llm_pricing_test.go: the unit
+// tests prove cost is computed correctly, this test proves it reaches the
+// tamper-evident audit log. The workflow here uses a non-LLM testNode, so the
+// cost is 0 — but the fields must still be PRESENT (a missing field would mean
+// the trace was not passed to the recorder, which would hide real cost on LLM
+// workflows). The field-presence assertion is the contract; the value is
+// exercised by computeLLMCost's unit tests.
+func TestExecutor_AuditLog_RecordsCostAttribution(t *testing.T) {
+	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	captureAndIsolateAudit(t, t.TempDir())
+
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	wf := &Workflow{
+		Name: "audit-cost",
+		Steps: []WorkflowStep{
+			{Name: "s1", Node: "test", Params: map[string]string{"prefix": "ok"}},
+		},
+	}
+
+	exec := NewExecutor().WithAuditLog(true, "")
+	if _, _, err := exec.Execute(context.Background(), wf, reg); err != nil {
+		t.Fatalf("workflow failed: %v", err)
+	}
+
+	auditPath := history.GetAuditLogPath()
+	lines := readAuditFileLines(t, auditPath)
+	// Find the workflow_end record (last line).
+	var endDetail map[string]interface{}
+	for _, l := range lines {
+		var entry history.AuditLog
+		if err := json.Unmarshal([]byte(l), &entry); err != nil {
+			continue
+		}
+		if string(entry.Action) == "workflow_end" {
+			if err := json.Unmarshal([]byte(entry.Detail), &endDetail); err != nil {
+				t.Fatalf("failed to parse workflow_end detail: %v", err)
+			}
+			break
+		}
+	}
+	if endDetail == nil {
+		t.Fatal("no workflow_end audit record found")
+	}
+	// cost_usd must be present (value 0 here because testNode is not an LLM
+	// node; the field's PRESENCE is the contract — it proves the trace was
+	// passed to the recorder, so real LLM workflows will carry real cost).
+	if _, ok := endDetail["cost_usd"]; !ok {
+		t.Errorf("workflow_end audit detail missing cost_usd field; detail=%v", endDetail)
+	}
+	if _, ok := endDetail["total_tokens"]; !ok {
+		t.Errorf("workflow_end audit detail missing total_tokens field; detail=%v", endDetail)
+	}
+}

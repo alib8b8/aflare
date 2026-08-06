@@ -180,6 +180,7 @@ llm-box 已具备真实金融场景（只读分析 + 受控写入）的核心能
 | 配额持久化+多租户 | FileQuotaStore + per-tenant 隔离 | ✅ |
 | trace 脱敏 | LLM I/O 持久化前脱敏 API key/JWT/私钥 | ✅ |
 | **saga 事务补偿** | forward 步骤 + 反向 compensate，best-effort 补偿，`{{var.error}}` 上下文 | ✅ |
+| **LLM 成本归因** | token usage × 单价表自动估算 USD 成本，写入审计日志 `cost_usd`/`total_tokens`；`LLM_BOX_PRICING_FILE` 覆盖单价 | ✅ |
 
 ### 适用场景
 - ✅ 只读分析：AML 审查、投研报告、组合复核、日终对账（已有模板）
@@ -418,7 +419,7 @@ llm-box help                显示完整帮助
 | **v0.5.1** | ✅ 已发布 | 昇腾 NPU 适配（7-Agent 流水线、3 种工作流模板、CANN/MindIE 集成） |
 | **v0.5.2** | ✅ 已发布 | Grok Build 启发能力：代码图谱、子代理提示词层级、熔断器、秘密脱敏、文件监听、TUI Markdown/Mermaid 渲染（审计 15 个漏洞）、LLM 路由统一（3 套合并为 1） |
 | **v0.6.0** | ✅ 已发布 | **百灵生态集成、AI 网关（OmniRoute）、Agent 记忆基础设施、语音 AI 工具链（ASR/分离/分析）、Agent 团队化（200+ 角色 + Agency 工作流）、工程深度优化（WAL 持久化 + 字节码 IR 表达式引擎 + EWMA/帕累托路由 + TLA+ 形式化验证 DAG）** |
-| **v0.7.0** | **当前** | **金融场景增强：✅ HMAC 哈希链审计、✅ 幂等性（Idempotency-Key + 跨进程锁）、✅ HTTP 限流/重试、✅ LLM 响应缓存（性能优化，审计依赖 audit log）、✅ 配额持久化+多租户、✅ trace 脱敏（JWT/私钥）、✅ WAL 崩溃恢复、✅ saga 事务补偿（forward + 反向 compensate）** |
+| **v0.7.0** | **当前** | **金融场景增强：✅ HMAC 哈希链审计、✅ 幂等性（Idempotency-Key + 跨进程锁）、✅ HTTP 限流/重试、✅ LLM 响应缓存（性能优化，审计依赖 audit log）、✅ 配额持久化+多租户、✅ trace 脱敏（JWT/私钥）、✅ WAL 崩溃恢复、✅ saga 事务补偿（forward + 反向 compensate）、✅ LLM 成本归因（token×单价表→审计日志 `cost_usd`）** |
 | **v1.0** | 📅 2026 Q3 | 稳定 API、完整文档、LTS |
 
 📖 [完整路线图 →](ROADMAP.md)

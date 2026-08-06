@@ -10,6 +10,7 @@
 | **HTTP 限流** | per-host 令牌桶 | `rate_limit_rps=5` 每秒最多 5 请求，保护下游银行 API |
 | **HTTP 重试** | 指数退避 + 可配重试状态码 | `max_retries=3`，对 `429,500,502,503,504` 自动重试 |
 | **审计日志** | executor HMAC 哈希链自动落盘 | 每个步骤的输入/输出/耗时/重试自动记录，防篡改 |
+| **LLM 成本归因** | token usage × 单价表 → 审计日志 `cost_usd`/`total_tokens` | 每次运行的估算 LLM 成本自动写入 `workflow_end` 审计记录，支持预算告警 |
 
 ## 前置条件
 
@@ -22,6 +23,12 @@ export LLM_BOX_LLM_CACHE=1
 
 # 3. （可选）开启 trace 持久化，记录每步 LLM I/O（已自动脱敏）
 export LLM_BOX_TRACE=1
+
+# 4. （可选）自定义 LLM 单价表，覆盖内置默认价
+#    格式: {"model-name": {"input_per_1m": 2.5, "output_per_1m": 10.0}}
+#    未设置时使用内置价表（OpenAI/Anthropic/DeepSeek/GLM/Kimi/Qwen 等）
+#    每次运行的估算成本（cost_usd + total_tokens）会写入审计日志 workflow_end 记录
+export LLM_BOX_PRICING_FILE="/path/to/pricing.json"
 ```
 
 ## 运行步骤
