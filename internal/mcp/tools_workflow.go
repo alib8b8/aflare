@@ -171,6 +171,11 @@ func (s *Server) toolWorkflowValidate(args map[string]interface{}) (*toolCallRes
 	nodes.RegisterBuiltins(reg)
 
 	for i, step := range wf.Steps {
+		// Compound steps (if/loop/map/reduce/parallel/capture_error) have no
+		// node of their own; skip the node-existence check for them.
+		if step.IsIf() || step.IsLoop() || step.IsMap() || step.IsReduce() || step.IsParallel() || step.HasCaptureError() {
+			continue
+		}
 		if _, ok := reg.Get(step.Node); !ok {
 			warnings = append(warnings, fmt.Sprintf("Step %d: unknown node '%s'", i+1, step.Node))
 		}

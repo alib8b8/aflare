@@ -129,10 +129,15 @@ func executeIfBranch(ctx context.Context, stepIndex int, ifCfg *IfConfig, input 
 		logger.Info("if branch: executing else", "index", stepIndex, "sub_steps", len(branchSteps))
 	}
 
-	// Execute branch steps as a sub-workflow with incremented depth
+	// Execute branch steps as a sub-workflow with incremented depth. The
+	// branch inherits the parent workflow's vars so {{var.*}} resolves the
+	// same as in the parent (matching map/reduce/capture_error semantics).
+	// Step outputs are NOT inherited: the sub-workflow has its own step
+	// namespace, so {{step.X}} references target steps within the branch.
 	subWf := &Workflow{
 		Name:  fmt.Sprintf("if-branch-%d", stepIndex),
 		Steps: branchSteps,
+		Vars:  engine.SnapshotVars(),
 	}
 	// Pass incremented depth and the if-step's input via context. The input
 	// becomes the branch sub-workflow's starting data so the flowing value

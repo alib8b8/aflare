@@ -325,18 +325,47 @@ func ValidateWorkflow(wf *Workflow) []string {
 	}
 
 	// Check for common patterns
-	hasOutput := false
-	for _, step := range wf.Steps {
-		if step.Node == "file_write" {
-			hasOutput = true
-		}
-	}
+	hasOutput := hasFileWriteStep(wf.Steps)
 
 	if !hasOutput && len(wf.Steps) > 0 {
 		suggestions = append(suggestions, "Consider adding a file_write step to save output")
 	}
 
 	return suggestions
+}
+
+// hasFileWriteStep reports whether any step uses the file_write node, recursing
+// into compound steps (if/then/else, parallel, map, reduce, capture_error,
+// on_error) so that file_write steps nested inside branches are detected.
+func hasFileWriteStep(steps []WorkflowStep) bool {
+	for _, s := range steps {
+		if s.Node == "file_write" {
+			return true
+		}
+		if s.IsIf() && (hasFileWriteStep(s.If.Then) || hasFileWriteStep(s.If.Else)) {
+			return true
+		}
+		if s.IsMap() && hasFileWriteStep(s.Map.Steps) {
+			return true
+		}
+		if s.IsReduce() && hasFileWriteStep(s.Reduce.Steps) {
+			return true
+		}
+		if s.HasCaptureError() && hasFileWriteStep(s.CaptureError) {
+			return true
+		}
+		if s.IsParallel() {
+			for _, p := range s.Parallel {
+				if p.Node == "file_write" {
+					return true
+				}
+			}
+		}
+		if s.OnError != nil && s.OnError.Node == "file_write" {
+			return true
+		}
+	}
+	return false
 }
 
 // CreateWorkflowFromDescription creates and saves a workflow from description
