@@ -294,3 +294,123 @@ func TestHTTPRequest_PerHostLimiter(t *testing.T) {
 		t.Fatalf("per-host isolation failed: 4 burst requests took %v (expected <600ms)", elapsed)
 	}
 }
+
+// TestHTTPRequest_RateLimitKeyMergesHosts (M-9) verifies that an explicit
+// rate_limit_key OVERRIDES the default URL.Host bucketing: two DIFFERENT
+// hosts (different mock servers) that share the same rate_limit_key MUST
+// share one token bucket, so 4 requests at rps=2/burst=2 throttle the 3rd
+// and 4th (taking ~1s). Without rate_limit_key the per-host test above
+// proves they would NOT throttle — so this test directly exercises the M-9
+// override.
+//
+// This is the M-9 use case: api.example.com and api2.example.com both
+// resolve to the same backend IP; without an explicit key they would each
+// get their own bucket and double the effective RPS against the backend.
+// rate_limit_key lets the operator merge them into one bucket.
+func TestHTTPRequest_RateLimitKeyMergesHosts(t *testing.T) {
+	allowLoopback(t)
+	resetHTTPRateLimitersForTest()
+
+	srvA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, "A")
+	}))
+	defer srvA.Close()
+	srvB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, "B")
+	}))
+	defer srvB.Close()
+	if srvA.URL == srvB.URL {
+		t.Fatalf("test setup error: both mock servers share URL %q", srvA.URL)
+	}
+
+	node := &HTTPRequestNode{}
+	// Both targets share rate_limit_key="shared-backend" so they collapse
+	// into one bucket regardless of their distinct URL.Host.
+	paramsA := map[string]string{
+		"url":            srvA.URL,
+		"rate_limit_rps": "2",
+		"rate_limit_key": "shared-backend",
+	}
+	paramsB := map[string]string{
+		"url":            srvB.URL,
+		"rate_limit_rps": "2",
+		"rate_limit_key": "shared-backend",
+	}
+
+	start := time.Now()
+	// 4 sequential requests against a SHARED bucket with rps=2/burst=2: the
+	// first 2 consume the burst immediately; the 3rd waits ~0.5s for one
+	// token and the 4th waits ~0.5s more, so the limiter GUARANTEES a minimum
+	// of ~1.0s (2 * 0.5s of mandatory Wait() blocking, sequential because each
+	// Execute calls limiter.Wait before its HTTP call). This is the opposite of
+	// TestHTTPRequest_PerHostLimiter, which asserts <600ms with per-host
+	// buckets (all 4 served from burst capacity).
+	var hits int32
+	for i := 0; i < 2; i++ {
+		if out, err := node.Execute(context.Background(), "", paramsA); err != nil || !strings.Contains(out, "HTTP 200") {
+			t.Fatalf("srvA request %d failed: out=%q err=%v", i+1, out, err)
+		}
+		atomic.AddInt32(&hits, 1)
+		if out, err := node.Execute(context.Background(), "", paramsB); err != nil || !strings.Contains(out, "HTTP 200") {
+			t.Fatalf("srvB request %d failed: out=%q err=%v", i+1, out, err)
+		}
+		atomic.AddInt32(&hits, 1)
+	}
+	elapsed := time.Since(start)
+
+	if got := atomic.LoadInt32(&hits); got != 4 {
+		t.Fatalf("expected 4 successful requests, got %d", got)
+	}
+	// The limiter guarantees ~1.0s of blocking; assert >=0.9s to tolerate
+	// clock/scheduler jitter while staying clearly above the per-host test's
+	// <600ms bound (so a regression that fails to merge buckets would fall
+	// under 0.6s and trip this assertion).
+	if elapsed < 900*time.Millisecond {
+		t.Fatalf("rate_limit_key did not merge hosts into one bucket: elapsed=%v (expected >=0.9s for shared rps=2/burst=2 over 4 requests)", elapsed)
+	}
+	if elapsed > 6*time.Second {
+		t.Fatalf("rate_limit_key over-throttled: elapsed=%v", elapsed)
+	}
+}
+
+// TestHTTPRequest_RateLimitKeyFallsBackToHost (M-9) verifies that when
+// rate_limit_key is NOT set, the legacy URL.Host bucketing is preserved
+// (per-host isolation). This is a regression guard for the M-9 change: the
+// new keyOverride parameter must not change behaviour when empty.
+func TestHTTPRequest_RateLimitKeyFallsBackToHost(t *testing.T) {
+	allowLoopback(t)
+	resetHTTPRateLimitersForTest()
+
+	srvA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, "A")
+	}))
+	defer srvA.Close()
+	srvB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, "B")
+	}))
+	defer srvB.Close()
+	if srvA.URL == srvB.URL {
+		t.Fatalf("test setup error: both mock servers share URL %q", srvA.URL)
+	}
+
+	node := &HTTPRequestNode{}
+	// rate_limit_key intentionally NOT set: behaviour must match the legacy
+	// per-host bucketing (each host gets its own bucket).
+	paramsA := map[string]string{"url": srvA.URL, "rate_limit_rps": "2"}
+	paramsB := map[string]string{"url": srvB.URL, "rate_limit_rps": "2"}
+
+	start := time.Now()
+	for i := 0; i < 2; i++ {
+		if out, err := node.Execute(context.Background(), "", paramsA); err != nil || !strings.Contains(out, "HTTP 200") {
+			t.Fatalf("srvA request %d failed: out=%q err=%v", i+1, out, err)
+		}
+		if out, err := node.Execute(context.Background(), "", paramsB); err != nil || !strings.Contains(out, "HTTP 200") {
+			t.Fatalf("srvB request %d failed: out=%q err=%v", i+1, out, err)
+		}
+	}
+	elapsed := time.Since(start)
+	// Per-host buckets => all 4 served from burst, well under 1s.
+	if elapsed > 600*time.Millisecond {
+		t.Fatalf("empty rate_limit_key should fall back to per-host bucketing: 4 burst requests took %v (expected <600ms)", elapsed)
+	}
+}

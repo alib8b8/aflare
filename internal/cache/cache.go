@@ -31,6 +31,12 @@ type Config struct {
 	TTL        time.Duration
 }
 
+// defaultCacheTTL is the TTL applied when an enabled cache is constructed
+// with a non-positive TTL (L-5). 1h matches the common short-lived LLM
+// response cache use case; callers wanting a different TTL pass one
+// explicitly via Config.TTL.
+const defaultCacheTTL = time.Hour
+
 type Stats struct {
 	Hits    int64
 	Misses  int64
@@ -55,9 +61,18 @@ type Cache struct {
 
 // New 根据配置创建一个带 TTL 与 LRU 淘汰的缓存实例。
 // 若 MaxEntries 未设置或非正数，默认使用 100。
+//
+// L-5: 若缓存已启用（Enabled=true）但 TTL<=0，默认使用 defaultCacheTTL
+// （1 小时）。TTL=0 时 Set 写入的条目 expiresAt = time.Now().Add(0) = 当前
+// 时刻，Get 立即判定过期，但条目仍占 LRU 槽位直到被淘汰或懒清理，浪费内
+// 存且缓存永远不会命中。未启用缓存时 TTL 无意义（Set 是空操作），故不校
+// 验，避免影响仅用 cache 做统计/结构占位的调用方。
 func New(config Config) *Cache {
 	if config.MaxEntries <= 0 {
 		config.MaxEntries = 100
+	}
+	if config.Enabled && config.TTL <= 0 {
+		config.TTL = defaultCacheTTL
 	}
 	return &Cache{
 		config:  config,

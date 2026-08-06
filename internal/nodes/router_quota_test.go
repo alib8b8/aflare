@@ -907,3 +907,247 @@ func TestQuota_WithTimeZone(t *testing.T) {
 		t.Errorf("LastResetDate = %q, want biz-tz %q", s2.LastResetDate, todayBiz)
 	}
 }
+
+// TestQuota_CrossDayResetDoesNotRestoreStaleData (M-6) verifies the cross-day
+// reset race is closed: a stale (yesterday's) Save that is already pending in
+// the quotaSaver when a day rollover occurs must NOT be flushed back to the
+// store after the reset, restoring yesterday's usage/day.
+//
+// Pre-M-6 sequence (the race):
+//  1. recordSuccess on day D-1 enqueues a Save with usage=50, day=D-1.
+//  2. The day rolls over to D.
+//  3. recordSuccess on day D detects LastResetDate != today, zeros the
+//     in-memory counter, calls clearQuotaLocked (sync store.Clear deletes
+//     the file), and then scheduleQuotaSaveLocked enqueues a fresh Save
+//     with usage=0, day=D.
+//  4. The quotaSaver.flush tick fires BETWEEN step 3's store.Clear and
+//     step 3's scheduleQuotaSaveLocked. It snapshots the pending map,
+//     which still contains the STALE entry from step 1 (usage=50, day=D-1),
+//     and writes it back to the store — restoring the data the clear just
+//     removed.
+//
+// Post-M-6 fix: scheduleQuotaClearLocked enqueues a Clear via EnqueueClear,
+// which OVERWRITES the stale pending Save before any flush can observe it.
+// The clear runs on the saver goroutine, off the statsMu critical section
+// (also fixing M-2). The fresh Save is enqueued immediately after.
+//
+// This test simulates the race deterministically by enqueuing the stale
+// Save directly via the saver, then driving recordSuccess across the day
+// boundary, then flushing and asserting the store reflects TODAY's data
+// (not yesterday's).
+func TestQuota_CrossDayResetDoesNotRestoreStaleData(t *testing.T) {
+	store := NewMemoryQuotaStore()
+	providers := []RouterProvider{
+		{Name: "openai", Enabled: true, QuotaDaily: 1000, APIKey: "k", Priority: 1},
+	}
+
+	// Build a router pre-seeded with yesterday's stats so the FIRST
+	// recordSuccess call detects the day rollover. We do this by
+	// constructing stats manually with LastResetDate=yesterday.
+	yesterday := yesterdayStr()
+	router := &LLMRouter{
+		providers:     append([]RouterProvider(nil), providers...),
+		stats:         make(map[string]*ProviderStats),
+		strategy:      config.RouterStrategyPriority,
+		maxRetry:      3,
+		tenantID:      "default",
+		quotaStore:    store,
+		quotaDebounce: 10 * time.Millisecond,
+	}
+	router.initQuotaPersistence()
+	defer router.CloseQuota()
+
+	// Seed in-memory stats as if yesterday's run had recorded usage=50
+	// (this is the state recordSuccess would observe at the first call of
+	// the new day).
+	router.statsMu.Lock()
+	router.stats["openai"] = &ProviderStats{
+		LastResetDate: yesterday,
+		DailyUsage:    50,
+		EwmaLatency:   NewEWMAPredictor(0.3),
+		Breaker:       NewCircuitBreaker(DefaultCircuitBreakerConfig()),
+	}
+	// Enqueue a STALE Save mirroring the in-memory state, as if
+	// yesterday's last recordSuccess had queued it but it had not yet
+	// been flushed. This is the entry the M-6 race would have restored.
+	router.quotaSaver.Save("default", "openai", 50, yesterday)
+	router.statsMu.Unlock()
+
+	// DO NOT flush yet — the stale Save sits in the pending map. Now
+	// trigger a cross-day reset via recordSuccess on the new day. The fix
+	// must ensure this stale Save is dropped (replaced by a Clear then a
+	// fresh Save), not restored.
+	router.recordSuccess("openai", 10, 5) // adds 5 tokens on the new day
+
+	// Flush the saver: with the M-6 fix, the snapshot it processes
+	// contains only the fresh Save (usage=5, day=today) — the stale
+	// (usage=50, day=yesterday) Save must NOT have been flushed.
+	router.FlushQuota()
+
+	usage, day, err := store.Load("default", "openai")
+	if err != nil {
+		t.Fatalf("store.Load after cross-day reset: %v", err)
+	}
+	if day != todayStr() {
+		t.Errorf("store day after cross-day reset = %q, want %q (today) — stale yesterday entry was flushed back (M-6 regression)", day, todayStr())
+	}
+	// 5 tokens were recorded on the new day; the stale 50 from yesterday
+	// must NOT have been restored.
+	if usage != 5 {
+		t.Errorf("store usage after cross-day reset = %d, want 5 (stale yesterday usage=50 was restored — M-6 regression)", usage)
+	}
+}
+
+// TestQuota_AsyncClearOffStatsMu (M-2) verifies that the cross-day reset
+// clear is now ASYNC: recordSuccess does not perform a synchronous
+// store.Clear while holding statsMu. We assert this by checking the store
+// immediately after recordSuccess returns — a sync clear would have removed
+// yesterday's entry by then; an async clear leaves it in place until the
+// saver flushes.
+//
+// The test also confirms correctness: after FlushQuota, the stale entry is
+// gone (Clear ran on the saver goroutine) and the fresh Save with today's
+// usage has been written.
+//
+// A long debounce interval (10s) is used so the saver's ticker does NOT
+// fire during the test — the only flushes are the ones we drive explicitly
+// via FlushQuota, making the assertions deterministic. The M-2 property we
+// are testing (sync vs async clear in recordSuccess) is independent of the
+// debounce interval.
+func TestQuota_AsyncClearOffStatsMu(t *testing.T) {
+	store := NewMemoryQuotaStore()
+
+	// Build a router with an empty store so initQuotaPersistence does NOT
+	// see a stale record (which would trigger a sync clear at init time
+	// via loadQuotaLocked — that path keeps its sync clear deliberately,
+	// see clearQuotaLocked docs). We seed the yesterday entry AFTER init.
+	router := &LLMRouter{
+		providers:     append([]RouterProvider(nil), RouterProvider{Name: "openai", Enabled: true, QuotaDaily: 1000, APIKey: "k", Priority: 1}),
+		stats:         make(map[string]*ProviderStats),
+		strategy:      config.RouterStrategyPriority,
+		maxRetry:      3,
+		tenantID:      "default",
+		quotaStore:    store,
+		quotaDebounce: 10 * time.Second, // long: no auto-tick during the test
+	}
+	router.initQuotaPersistence()
+	defer router.CloseQuota()
+
+	yesterday := yesterdayStr()
+	// Override stats to yesterday so the first recordSuccess hits the
+	// cross-day branch. init left stats["openai"] with today's date and
+	// zero usage (store was empty); we replace it with a yesterday state.
+	router.statsMu.Lock()
+	router.stats["openai"] = &ProviderStats{
+		LastResetDate: yesterday,
+		DailyUsage:    800,
+		EwmaLatency:   NewEWMAPredictor(0.3),
+		Breaker:       NewCircuitBreaker(DefaultCircuitBreakerConfig()),
+	}
+	router.statsMu.Unlock()
+	// Seed the store with yesterday's entry AFTER init, so init's
+	// loadQuotaLocked (which would have sync-cleared a stale record) does
+	// not touch it. This entry represents yesterday's persisted state
+	// that the cross-day reset must clear.
+	if err := store.Save("default", "openai", 800, yesterday); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	// Before recordSuccess, the store has yesterday's entry.
+	if usage, day, _ := store.Load("default", "openai"); usage != 800 || day != yesterday {
+		t.Fatalf("store before reset = (%d, %q), want (800, %q)", usage, day, yesterday)
+	}
+
+	// Trigger cross-day reset. With the M-2 fix, this enqueues an async
+	// Clear and a fresh Save; it does NOT call store.Clear synchronously.
+	router.recordSuccess("openai", 10, 5)
+
+	// In-memory stats must be reset immediately (correctness preserved).
+	stats := router.GetProviderStats()["openai"]
+	if stats.DailyUsage != 5 {
+		t.Errorf("in-memory DailyUsage after reset = %d, want 5", stats.DailyUsage)
+	}
+	if stats.LastResetDate != todayStr() {
+		t.Errorf("in-memory LastResetDate after reset = %q, want %q", stats.LastResetDate, todayStr())
+	}
+
+	// M-2 assertion: the store still has yesterday's entry — the async
+	// clear has not run yet (no FlushQuota, and the long debounce
+	// interval means no auto-tick has fired either). A synchronous clear
+	// (pre-M-2) would have removed this entry by now, which is the
+	// behaviour the M-2 fix moves off the statsMu critical section.
+	if usage, day, _ := store.Load("default", "openai"); usage != 800 || day != yesterday {
+		t.Errorf("store should still hold yesterday's entry pre-flush (async clear not run yet) = (%d, %q), want (800, %q)", usage, day, yesterday)
+	}
+
+	// FlushQuota drains the saver: the most recent pending entry for this
+	// key is the fresh Save (the Clear was overwritten by the
+	// scheduleQuotaSaveLocked that followed scheduleQuotaClearLocked), so
+	// the flush writes today's usage=5 — overwriting yesterday's entry.
+	router.FlushQuota()
+
+	usage, day, err := store.Load("default", "openai")
+	if err != nil {
+		t.Fatalf("store.Load after FlushQuota: %v", err)
+	}
+	if day != todayStr() {
+		t.Errorf("store day after FlushQuota = %q, want %q (today)", day, todayStr())
+	}
+	if usage != 5 {
+		t.Errorf("store usage after FlushQuota = %d, want 5 (today's reset usage)", usage)
+	}
+}
+
+// TestQuotaSaver_EnqueueClearOverwritesPendingSave (M-6) is a focused unit
+// test on the quotaSaver: EnqueueClear for a key that has a pending Save
+// must REPLACE the pending entry with a clear, so the next flush calls
+// store.Clear instead of store.Save with the stale data. This is the
+// primitive that closes the M-6 race.
+func TestQuotaSaver_EnqueueClearOverwritesPendingSave(t *testing.T) {
+	store := NewMemoryQuotaStore()
+	saver := newQuotaSaver(store, 10*time.Second) // long interval; we drive flushes manually
+	defer saver.close()
+
+	// Enqueue a Save with yesterday's data.
+	saver.Save("default", "openai", 50, yesterdayStr())
+
+	// EnqueueClear for the same key — must overwrite the Save.
+	if !saver.EnqueueClear("default", "openai") {
+		t.Fatal("EnqueueClear returned false on a live saver")
+	}
+
+	// Flush: store.Clear must be called (NOT store.Save). The store is
+	// empty, so Clear is a no-op observable; instead, verify Save was NOT
+	// called by checking SaveCount stayed at 0 (Save would have incremented it).
+	saver.flush()
+	if cnt := store.SaveCount(); cnt != 0 {
+		t.Errorf("store.Save called %d times, want 0 (EnqueueClear should have produced a Clear, not a Save)", cnt)
+	}
+}
+
+// TestQuotaSaver_clearPendingDropsEntry (M-6) verifies clearPending removes
+// a queued update for a key. This is the defensive primitive used by
+// scheduleQuotaClearLocked to void a stale pending entry before enqueueing
+// the fresh clear, so a flush tick landing in that window observes neither.
+func TestQuotaSaver_clearPendingDropsEntry(t *testing.T) {
+	store := NewMemoryQuotaStore()
+	saver := newQuotaSaver(store, 10*time.Second)
+	defer saver.close()
+
+	// No entry yet: clearPending reports false.
+	if saver.clearPending("default", "openai") {
+		t.Error("clearPending returned true for a key with no pending entry")
+	}
+
+	// Enqueue a Save, then clearPending must drop it and report true.
+	saver.Save("default", "openai", 50, todayStr())
+	if !saver.clearPending("default", "openai") {
+		t.Error("clearPending returned false for a key with a pending entry")
+	}
+
+	// Flush: nothing pending, so SaveCount must stay 0.
+	saver.flush()
+	if cnt := store.SaveCount(); cnt != 0 {
+		t.Errorf("store.Save called %d times after clearPending+flush, want 0", cnt)
+	}
+}

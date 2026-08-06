@@ -56,6 +56,7 @@ func (n *HTTPRequestNode) Schema() NodeSchema {
 			{Name: "timeout", Type: "int", Description: "Request timeout in seconds", Required: false, Default: "30"},
 			{Name: "rate_limit_rps", Type: "float", Description: "Max requests per second per host (0=unlimited)", Required: false, Default: "0"},
 			{Name: "rate_limit_burst", Type: "int", Description: "Token-bucket burst size (default=ceil(rate_limit_rps))", Required: false},
+			{Name: "rate_limit_key", Type: "string", Description: "Explicit bucket key overriding URL.Host; set when multiple domain aliases resolve to the same backend so they share one bucket (M-9)", Required: false},
 			{Name: "max_retries", Type: "int", Description: "Max retry attempts on transient failures (default 0=no retry)", Required: false, Default: "0"},
 			{Name: "retry_backoff_ms", Type: "int", Description: "Initial retry backoff in ms (default 100)", Required: false, Default: "100"},
 			{Name: "retry_max_backoff_ms", Type: "int", Description: "Max retry backoff cap in ms (default 5000)", Required: false, Default: "5000"},
@@ -135,7 +136,12 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 	if err != nil {
 		return "", fmt.Errorf("failed to parse URL: %w", err)
 	}
-	limiter := getHTTPRateLimiter(reqURL, rlCfg.rps, rlCfg.burst)
+	// M-9: pass rlCfg.rateLimitKey so an explicit bucket key (when set)
+	// overrides URL.Host, merging domain aliases that resolve to the same
+	// backend into one token bucket.
+	limiter := getHTTPRateLimiter(reqURL, rlCfg.rps, rlCfg.burst, rlCfg.rateLimitKey)
+	// host is used for log lines; the limiter bucket key (which may differ
+	// when rate_limit_key is set) is internal to getHTTPRateLimiter.
 	host := reqURL.Host
 
 	hasBody := body != "" && (method == "POST" || method == "PUT" || method == "PATCH")

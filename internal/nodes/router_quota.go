@@ -460,6 +460,14 @@ type quotaUpdate struct {
 	provider string
 	usage    int64
 	day      string
+	// clear, when true, makes flush call store.Clear instead of store.Save.
+	// It is set by scheduleQuotaClearLocked on cross-day reset so the
+	// persisted entry is removed without holding statsMu during file IO
+	// (M-2). Because EnqueueClear overwrites any pending Save for the same
+	// (tenant, provider) key, a stale Save enqueued before the day reset
+	// can no longer be flushed back to the store after the reset — closing
+	// the M-6 race without needing a separate clearPending step.
+	clear bool
 }
 
 // newQuotaSaver starts a debounced writer that flushes to store every
@@ -496,9 +504,50 @@ func (q *quotaSaver) Save(tenant, provider string, usage int64, day string) bool
 	}
 	key := tenant + "\x00" + provider
 	q.mu.Lock()
-	q.pending[key] = quotaUpdate{tenant, provider, usage, day}
+	q.pending[key] = quotaUpdate{tenant: tenant, provider: provider, usage: usage, day: day}
 	q.mu.Unlock()
 	return true
+}
+
+// EnqueueClear queues a Clear for (tenant, provider). It overwrites any
+// pending Save for the same key, which closes the M-6 race: a stale Save
+// enqueued before a cross-day reset can no longer be flushed back to the
+// store after the reset, because the clear replaces it in the pending map.
+// Like Save, it returns false once close() has been called.
+//
+// M-2: EnqueueClear exists so the router's cross-day reset path does NOT
+// perform synchronous store.Clear (a file IO) under statsMu. The clear is
+// debounced and run by the saver goroutine, off the routing critical
+// section. The in-memory DailyUsage is already zeroed by the caller, so
+// routing decisions are correct immediately; the on-disk cleanup is
+// best-effort and reconciled on the next loadQuotaLocked anyway.
+func (q *quotaSaver) EnqueueClear(tenant, provider string) bool {
+	if q.closed.Load() {
+		return false
+	}
+	key := tenant + "\x00" + provider
+	q.mu.Lock()
+	q.pending[key] = quotaUpdate{tenant: tenant, provider: provider, clear: true}
+	q.mu.Unlock()
+	return true
+}
+
+// clearPending drops any queued update (Save or Clear) for (tenant, provider).
+// It is a defensive belt-and-suspenders for the M-6 race: EnqueueClear
+// already overwrites a stale Save, so this is not strictly required for
+// correctness, but it lets a caller explicitly void a pending entry — for
+// example, between detecting a day rollover and enqueueing the fresh Save —
+// so a flush tick landing in that window cannot observe either the stale
+// Save or the just-queued Clear. Returns true if an entry was removed.
+func (q *quotaSaver) clearPending(tenant, provider string) bool {
+	key := tenant + "\x00" + provider
+	q.mu.Lock()
+	_, ok := q.pending[key]
+	if ok {
+		delete(q.pending, key)
+	}
+	q.mu.Unlock()
+	return ok
 }
 
 func (q *quotaSaver) loop() {
@@ -517,8 +566,12 @@ func (q *quotaSaver) loop() {
 }
 
 // flush writes all pending updates to the store and clears the pending map.
-// Save failures are logged but do not stop the flush — each update is
+// Save/Clear failures are logged but do not stop the flush — each update is
 // independent, and a failing one should not block the others.
+//
+// M-2: clear updates (u.clear == true) call store.Clear instead of store.Save,
+// so the cross-day-reset file removal happens here, on the saver goroutine,
+// not under the router's statsMu.
 func (q *quotaSaver) flush() {
 	q.mu.Lock()
 	if len(q.pending) == 0 {
@@ -530,6 +583,16 @@ func (q *quotaSaver) flush() {
 	q.mu.Unlock()
 
 	for _, u := range pending {
+		if u.clear {
+			if err := q.store.Clear(u.tenant, u.provider); err != nil {
+				logger.Warn("quota store clear failed (debounced)",
+					"tenant", u.tenant,
+					"provider", u.provider,
+					"error", err,
+				)
+			}
+			continue
+		}
 		if err := q.store.Save(u.tenant, u.provider, u.usage, u.day); err != nil {
 			logger.Warn("quota store save failed (debounced)",
 				"tenant", u.tenant,
@@ -571,6 +634,27 @@ type RouterOption func(*LLMRouter)
 // WithTenant sets the tenant ID for quota tracking. An empty string is
 // normalized to "default" at lookup time, so callers can pass "" safely.
 // Used to isolate per-tenant quota pools in the QuotaStore.
+//
+// SECURITY (M-1): tenantID MUST be set server-side from an authenticated
+// context and NEVER derived from client-supplied input (e.g. an HTTP
+// request header, query parameter, or JWT claim that the caller controls).
+// The router does not — and cannot, without an auth dependency — verify
+// the provenance of tenantID; a forged tenant="tenantB" would let an
+// attacker draw from another tenant's quota pool. In a multi-tenant SaaS
+// deployment, the recommended pattern is to resolve the tenant once at
+// the request entrypoint from the authenticated principal and propagate
+// it via context, then construct the router per request (or per tenant)
+// using a thin wrapper, e.g.:
+//
+//	func WithTenantFromContext(ctx context.Context) RouterOption {
+//	    // tenant must be injected by the auth middleware, not read from
+//	    // the request body / headers a client can forge.
+//	    tenant, _ := ctx.Value(authTenantKey{}).(string)
+//	    return WithTenant(tenant)
+//	}
+//
+// Without an auth layer, tenantID is caller-trusted and the multi-tenant
+// quota isolation is advisory, not enforced.
 func WithTenant(id string) RouterOption {
 	return func(r *LLMRouter) {
 		r.tenantID = id
@@ -630,6 +714,17 @@ func WithTimeZone(tz *time.Location) RouterOption {
 // WithTenantQuota / WithQuotaStore see the final provider list. The
 // persisted quota is loaded eagerly for every enabled provider, so the first
 // routing decision observes the correct DailyUsage.
+//
+// L-6: when WithQuotaStore is supplied, NewLLMRouter starts a long-lived
+// quotaSaver goroutine (via initQuotaPersistence) that debounces disk
+// writes. The caller MUST call r.CloseQuota() when the router is no longer
+// needed (e.g. at process shutdown or when a per-request router goes out of
+// scope) to stop that goroutine and flush pending writes; otherwise it
+// leaks for the lifetime of the process. CloseQuota is idempotent and a
+// no-op when no store was configured, so calling it unconditionally on
+// shutdown is safe. The process-wide singleton returned by GetGlobalRouter
+// is intentionally exempt: its saver lives for the lifetime of the process
+// and is reaped by OS shutdown, so leaking it is harmless.
 func NewLLMRouter(opts ...RouterOption) *LLMRouter {
 	r := NewLLMRouterFromConfig()
 	for _, opt := range opts {
@@ -725,10 +820,19 @@ func (r *LLMRouter) loadQuotaLocked(name string, stats *ProviderStats) {
 	}
 }
 
-// clearQuotaLocked removes the persisted entry for (tenant, provider). Called
-// under r.statsMu on day reset so the new day starts clean on disk. Errors
-// are logged but do not block the reset — the in-memory counter is already
-// zeroed, and a stale on-disk record will be reconciled on the next load.
+// clearQuotaLocked removes the persisted entry for (tenant, provider).
+// Called under r.statsMu on day reset so the new day starts clean on disk.
+// Errors are logged but do not block the reset — the in-memory counter is
+// already zeroed, and a stale on-disk record will be reconciled on the next
+// load.
+//
+// M-2: this method performs SYNCHRONOUS file IO under statsMu and must only
+// be called from init-time paths (loadQuotaLocked, which itself runs either
+// at startup before any concurrent routing or in the rare defensive
+// getActiveProviders / getOrCreateStatsLocked path for a provider whose stats
+// were not pre-warmed). The hot-path cross-day reset in recordSuccess and
+// getActiveProviders uses scheduleQuotaClearLocked instead, which defers the
+// file IO to the quotaSaver goroutine so statsMu is not held across disk IO.
 func (r *LLMRouter) clearQuotaLocked(name string) {
 	if r.quotaStore == nil {
 		return
@@ -738,6 +842,49 @@ func (r *LLMRouter) clearQuotaLocked(name string) {
 		logger.Warn("quota store clear failed",
 			"tenant", tenant, "provider", name, "error", err)
 	}
+}
+
+// scheduleQuotaClearLocked queues an async Clear of the persisted entry for
+// (tenant, provider). Called under r.statsMu on cross-day reset in the hot
+// routing path (recordSuccess / getActiveProviders) so the new day starts
+// clean on disk WITHOUT holding statsMu across the file IO (M-2).
+//
+// M-6: EnqueueClear overwrites any pending Save for the same (tenant,
+// provider) key. This closes the race where a Save enqueued before the day
+// reset (carrying yesterday's usage/day) would otherwise be flushed back to
+// the store after the reset, restoring stale data. We additionally call
+// clearPending first so a flush tick landing between the reset detection
+// and this enqueue observes an empty pending entry rather than the stale
+// Save. The fresh Save with today's usage is enqueued immediately after by
+// the caller via scheduleQuotaSaveLocked.
+//
+// When no saver is configured (memory-only router, or a manually-constructed
+// router with quotaStore set but initQuotaPersistence not called), this
+// falls back to a synchronous Clear so the on-disk state is still cleaned
+// up — at the cost of holding statsMu during the IO, matching the
+// pre-M-2 behaviour for that edge case.
+func (r *LLMRouter) scheduleQuotaClearLocked(name string) {
+	if r.quotaStore == nil {
+		return
+	}
+	tenant := r.effectiveTenant()
+	if r.quotaSaver == nil {
+		// Fallback for the rare manually-constructed case: synchronous clear.
+		if err := r.quotaStore.Clear(tenant, name); err != nil {
+			logger.Warn("quota store clear failed",
+				"tenant", tenant, "provider", name, "error", err)
+		}
+		return
+	}
+	// M-6: drop any stale pending Save for this key BEFORE enqueuing the
+	// clear, so a concurrent flush cannot observe the stale Save in the
+	// window between detecting the day rollover and replacing the entry.
+	r.quotaSaver.clearPending(tenant, name)
+	// M-2: queue the clear; the actual store.Clear runs on the saver
+	// goroutine, off the statsMu critical section. Best-effort: returns
+	// false once the saver has been closed (after CloseQuota), which we
+	// ignore — quota persistence is advisory.
+	_ = r.quotaSaver.EnqueueClear(tenant, name)
 }
 
 // scheduleQuotaSaveLocked queues a debounced write of the current

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/alib8b8/llm-box/internal/history"
 	"github.com/alib8b8/llm-box/internal/logger"
@@ -257,9 +258,14 @@ func (ar *auditRecorder) appendStep(r StepResult) {
 		detail["status"] = "failed"
 		detail["error"] = r.Error.Error()
 	}
-	// step_index maps to wf.Steps for simple sequential/DAG steps; guard the
-	// bounds for compound-step sub-results that may carry parent indices.
-	if r.StepIndex >= 0 && r.StepIndex < len(ar.steps) {
+	// step_index maps to wf.Steps for simple sequential/DAG steps. For
+	// compound-step sub-results (if/loop/map/reduce branches) the StepIndex is
+	// relative to the sub-workflow, so ar.steps[r.StepIndex] belongs to a
+	// different step namespace and must not be attributed to this result. We
+	// guard both the bounds AND a node-match check: only attribute step_name/
+	// params when the resolved step's node equals the result's NodeName, so a
+	// branch sub-result is never mis-attributed to an unrelated parent step.
+	if r.StepIndex >= 0 && r.StepIndex < len(ar.steps) && ar.steps[r.StepIndex].Node == r.NodeName {
 		step := ar.steps[r.StepIndex]
 		if step.Name != "" {
 			detail["step_name"] = step.Name
@@ -315,9 +321,30 @@ func (ar *auditRecorder) appendLog(log history.AuditLog) {
 }
 
 // truncateAudit bounds a flowing string value written to the audit log.
+//
+// L-11: the cut is by BYTE length (auditMaxFieldLen), but if the cut point
+// lands in the middle of a multi-byte UTF-8 sequence the result would be
+// invalid UTF-8 (a dangling lead/continuation byte). Audit log detail is
+// JSON-marshaled downstream; JSON encoders in Go tolerate invalid UTF-8 by
+// escaping it, but downstream consumers (log aggregators, jq, audit replay
+// tools) may reject or mojibake the record — unacceptable for a financial
+// audit trail. Chinese / Japanese / emoji prompts are the common victims.
+// We therefore walk back from the cut point to the previous UTF-8 rune
+// boundary before appending the ellipsis. utf8.RuneStart reports whether a
+// byte is the first byte of a rune (or a lone ASCII byte), which is exactly
+// the boundary condition we need. The resulting string is always valid
+// UTF-8 and never longer than auditMaxFieldLen + len("...").
 func truncateAudit(s string) string {
 	if len(s) <= auditMaxFieldLen {
 		return s
 	}
-	return s[:auditMaxFieldLen] + "..."
+	truncated := s[:auditMaxFieldLen]
+	// Back up to the last complete UTF-8 rune boundary so we do not emit a
+	// truncated multi-byte sequence. utf8.RuneStart(b) is true when b is
+	// the first byte of a UTF-8 encoded rune (or a single-byte ASCII char);
+	// walking back until it is true lands us on a rune start.
+	for len(truncated) > 0 && !utf8.RuneStart(truncated[len(truncated)-1]) {
+		truncated = truncated[:len(truncated)-1]
+	}
+	return truncated + "..."
 }

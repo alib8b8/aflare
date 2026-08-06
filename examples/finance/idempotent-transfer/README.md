@@ -42,15 +42,12 @@ mock 银行 API 行为：
 ### 2. 用 llm-box CLI 运行工作流
 
 ```bash
-# 从仓库根目录运行
+# 从仓库根目录运行（先启动 mock 银行 API，见上一步）
 llm-box run examples/finance/idempotent-transfer/workflow.yaml
-
-# 自定义参数
-llm-box run examples/finance/idempotent-transfer/workflow.yaml \
-  --var amount=5000.00 \
-  --var from_account=ACC0001 \
-  --var to_account=ACC0002
 ```
+
+> 参数（`bank_api_url`、`from_account`、`amount` 等）在 `workflow.yaml` 的 `vars`
+> 段配置。CLI 暂不支持 `--var` 覆盖，需要改参数时直接编辑 `vars` 即可。
 
 运行后查看审计日志：
 ```bash
@@ -60,38 +57,51 @@ cat ./transfer-failed.jsonl # 失败记录
 
 ### 3. 用 SDK 调用（展示幂等性）
 
+CLI 的 `run` 命令本身不传 Idempotency-Key，要演示工作流级幂等（同一 key 第二次
+直接返回首次结果、不重跑任何步骤、不重复调用银行 API），需用 SDK 调用：
+
 ```go
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 
+	"github.com/alib8b8/llm-box/internal/nodes"
 	"github.com/alib8b8/llm-box/internal/workflow"
 )
 
 func main() {
-	exec := workflow.NewExecutor()
+	wf, err := workflow.ParseWorkflow("examples/finance/idempotent-transfer/workflow.yaml")
+	if err != nil {
+		log.Fatalf("parse workflow: %v", err)
+	}
+	reg := nodes.NewRegistry()
+	nodes.RegisterBuiltins(reg)
 
 	// 同一个 Idempotency-Key 无论调用多少次，工作流只真实执行一次。
 	// 银行 API 侧也应基于此 key 做服务端去重——客户端幂等 + 服务端去重
 	// 双重保险，才能在金融场景下真正防重复扣款。
 	idempotencyKey := "transfer-ACC0001-ACC0002-20260805-001"
+	exec := workflow.NewExecutor().
+		WithAuditLog(true, "").           // 开启 HMAC 哈希链审计
+		WithIdempotencyKey(idempotencyKey) // 开启工作流级幂等
 
 	// 第一次调用：真实执行
-	out1, err := exec.WithIdempotencyKey(idempotencyKey).
-		Execute(context.Background(), "examples/finance/idempotent-transfer/workflow.yaml", "")
+	out1, _, err := exec.Execute(context.Background(), wf, reg)
 	if err != nil {
 		log.Fatalf("first run failed: %v", err)
 	}
 	fmt.Println("first run output:", out1)
 
 	// 第二次调用（相同 key）：命中幂等缓存，直接返回首次结果，
-	// 不会重复调用银行 API，不会重复写审计日志。
-	out2, err := exec.WithIdempotencyKey(idempotencyKey).
-		Execute(context.Background(), "examples/finance/idempotent-transfer/workflow.yaml", "")
-	if err != nil {
+	// 不会重复调用银行 API，不会重复写步骤审计日志（但会写一条
+	// workflow_idempotent_hit 审计记录）。Execute 返回 ErrIdempotencyHit，
+	// 第一个返回值仍是首次的 FinalOutput。
+	out2, _, err := exec.Execute(context.Background(), wf, reg)
+	if err != nil && !errors.Is(err, workflow.ErrIdempotencyHit) {
 		log.Fatalf("second run failed: %v", err)
 	}
 	fmt.Println("second run output (idempotency hit):", out2)
@@ -104,10 +114,7 @@ func main() {
 call-bank-api (http_request + 限流 + 重试)
         │
         ▼
-parse-status (json_parse: 提取 status 字段)
-        │
-        ▼
-check-status (condition: equals:success)
+check-status (condition: contains:"status":"success")
         │
         ▼
    ┌────┴────┐

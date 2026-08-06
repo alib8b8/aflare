@@ -19,6 +19,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -27,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alib8b8/llm-box/internal/cache"
@@ -210,32 +213,62 @@ type OpenAICompatibleNode struct {
 	// SetCache. When false (the default) Execute bypasses the cache
 	// entirely, preserving the pre-cache behaviour so existing tests and
 	// dev workflows are unaffected.
-	cacheEnabled bool
+	//
+	// L-1: stored as an atomic so SetCache (which may run concurrently with
+	// Execute on a different goroutine) does not race with the read in
+	// effectiveCache. The node is always constructed via NewOpenAICompatible
+	// Node (which returns a pointer) and is never copied, so the
+	// no-copy discipline of atomic.Bool is preserved.
+	cacheEnabled atomic.Bool
 	// cache is an optional per-node cache instance. When non-nil it takes
 	// precedence over the env-var-driven shared cache. nil means "fall back
 	// to the shared cache" (which is itself nil unless LLM_BOX_LLM_CACHE=1).
-	cache *cache.Cache
+	//
+	// L-1: stored as an atomic.Pointer so SetCache is safe to call
+	// concurrently with Execute — a concurrent Execute observes either the
+	// old or the new cache, never a torn pointer.
+	cachePtr atomic.Pointer[cache.Cache]
 }
 
 // NewOpenAICompatibleNode constructs an OpenAICompatibleNode from config.
 // Caching is disabled unless the LLM_BOX_LLM_CACHE env var opts in.
 func NewOpenAICompatibleNode(config LLMNodeConfig) *OpenAICompatibleNode {
-	return &OpenAICompatibleNode{
-		config:       config,
-		cacheEnabled: llmCacheEnabledFromEnv(),
-	}
+	n := &OpenAICompatibleNode{config: config}
+	n.cacheEnabled.Store(llmCacheEnabledFromEnv())
+	return n
 }
 
 // --- LLM response caching -------------------------------------------------
 //
-// Caching makes non-streaming LLM decisions reproducible within a
-// configurable TTL window — a regulatory requirement in financial
-// scenarios where an auditor must be able to re-derive a prior decision
-// from the same inputs. Caching is OFF by default so existing tests and
-// dev workflows are unaffected; it is opted into via the LLM_BOX_LLM_CACHE
-// env var, or by injecting a cache instance with SetCache. Only the final
-// non-streaming response string is cached; streaming responses are never
-// cached (SSE chunk boundaries are not byte-reproducible).
+// The LLM response cache is a PERFORMANCE OPTIMIZATION, not an audit
+// mechanism (M-10). It serves identical non-streaming requests from memory
+// within a configurable TTL window (default 24h) so a workflow that issues
+// the same prompt repeatedly does not pay for the upstream call each time.
+// Financial-scenario audit/reproducibility requirements are met by the
+// separate audit log + trace subsystem (executor_audit.go, llm_trace.go),
+// which persists every LLM I/O with HMAC-chained, tamper-evident records
+// for the regulatory retention window (1–7 years). The cache's 24h TTL is
+// far shorter than the audit window and the cache is in-memory only, so it
+// MUST NOT be relied on for audit — a process restart, eviction, or TTL
+// expiry silently removes entries. Caching is OFF by default so existing
+// tests and dev workflows are unaffected; it is opted into via the
+// LLM_BOX_LLM_CACHE env var, or by injecting a cache instance with SetCache.
+// Only the final non-streaming response string is cached; streaming
+// responses are never cached (SSE chunk boundaries are not byte-reproducible).
+//
+// M-4: the cache key includes a hash of the API key (first 8 hex chars of
+// sha256) so identical (model, prompt, params) requests made with DIFFERENT
+// API keys (different accounts / tenants sharing one process) do NOT share
+// a cache entry. The raw key is never stored or logged; only its hash
+// participates in the key. The hash is omitted when no API key is
+// configured (e.g. local ollama), so those deployments see the legacy
+// shared-key behaviour.
+//
+// M-5: responses larger than maxCacheableResponseBytes are not cached — the
+// cache write is skipped, but the response is still returned to the caller.
+// This bounds memory usage: with MaxEntries=1000 and a 64KB per-entry cap
+// the cache occupies at most ~64MB, rather than the ~10GB an unbounded
+// per-entry size could pin.
 
 const (
 	// envLLMCacheEnable opts into the shared LLM response cache when set to
@@ -249,6 +282,17 @@ const (
 
 	defaultLLMCacheTTL  = 24 * time.Hour
 	defaultLLMCacheSize = 1000
+
+	// maxCacheableResponseBytes (M-5) is the per-entry byte cap above which a
+	// successful non-streaming response is NOT written to the LLM cache. The
+	// cache caps entry COUNT (default 1000) but not entry SIZE; an LLM
+	// response can be up to ~10MB, so without a per-entry cap a busy node
+	// could pin ~10GB of response strings in memory. 64KB lets short,
+	// frequently-repeated answers (the high-value cache hits) be cached
+	// while excluding the long-tail large responses that would balloon
+	// memory and offer little reuse. The response is still returned to the
+	// caller — only the cache write is skipped.
+	maxCacheableResponseBytes = 64 * 1024
 )
 
 var (
@@ -300,23 +344,33 @@ func sharedLLMCache() *cache.Cache {
 
 // SetCache attaches a cache instance to this node, enabling LLM response
 // caching for non-streaming Execute calls. Passing nil disables caching on
-// this node and overrides the LLM_BOX_LLM_CACHE env var. SetCache must be
-// called before the first Execute; it is not safe to call concurrently
-// with Execute.
+// this node and overrides the LLM_BOX_LLM_CACHE env var.
+//
+// L-1: SetCache stores the cache and the enabled flag via atomic operations,
+// so it is safe to call concurrently with Execute — a concurrent Execute
+// observes either the old or the new cache, never a torn pointer. The
+// recommended pattern remains "set once at construction before first
+// Execute": the atomicity is a safety net against accidental races, not a
+// license to swap caches mid-flight (doing so would let an in-flight
+// Execute read from one cache and write back to another, which is benign
+// for correctness but would surprise observability and stats).
 func (n *OpenAICompatibleNode) SetCache(c *cache.Cache) {
-	n.cache = c
-	n.cacheEnabled = c != nil
+	n.cachePtr.Store(c)
+	n.cacheEnabled.Store(c != nil)
 }
 
 // effectiveCache returns the cache to consult for this call, or nil when
 // caching is disabled. An explicitly injected cache (SetCache) takes
 // precedence; otherwise the env-var-driven shared cache is used.
+//
+// L-1: reads the atomic cacheEnabled flag and cachePtr, so it is safe to
+// call concurrently with SetCache.
 func (n *OpenAICompatibleNode) effectiveCache() *cache.Cache {
-	if !n.cacheEnabled {
+	if !n.cacheEnabled.Load() {
 		return nil
 	}
-	if n.cache != nil {
-		return n.cache
+	if c := n.cachePtr.Load(); c != nil {
+		return c
 	}
 	return sharedLLMCache()
 }
@@ -325,11 +379,23 @@ func (n *OpenAICompatibleNode) effectiveCache() *cache.Cache {
 // request. The key covers every request field that influences the model's
 // output: model, messages (system + user), temperature, max_tokens, top_p,
 // frequency_penalty, presence_penalty, stop sequences, seed,
-// response_format, tools, tool_choice, and user. The API key and endpoint
-// are deliberately excluded — the API key must never enter the cache, and
-// the same model+seed is expected to be reproducible regardless of which
-// compatible endpoint served it.
-func llmCacheKey(reqBody LLMRequest) string {
+// response_format, tools, tool_choice, and user.
+//
+// M-4: a hash of the API key (apiKeyHash — first 8 hex chars of sha256) is
+// also mixed into the key. Two callers with the SAME (model, prompt,
+// params) but DIFFERENT API keys (different accounts / tenants sharing one
+// process and one sharedLLMCache) MUST NOT share a cache entry, otherwise
+// tenant A's response could be served to tenant B. The raw key is never
+// stored or logged; only its short hash participates in the cache key, so
+// the cache cannot leak the key. When apiKey is empty (e.g. local ollama),
+// the hash is the empty string and the legacy shared-key behaviour is
+// preserved.
+//
+// The endpoint is deliberately excluded: the same model+seed is expected to
+// be reproducible regardless of which compatible endpoint served it, and
+// including the endpoint would fragment the cache when a failover switches
+// the upstream URL.
+func llmCacheKey(reqBody LLMRequest, apiKey string) string {
 	promptBytes, _ := json.Marshal(reqBody.Messages)
 	params := map[string]interface{}{
 		"model":             reqBody.Model,
@@ -343,11 +409,34 @@ func llmCacheKey(reqBody LLMRequest) string {
 		"tools":             reqBody.Tools,
 		"tool_choice":       reqBody.ToolChoice,
 		"user":              reqBody.User,
+		// M-4: isolate cache entries across API keys / tenants. See
+		// apiKeyHash for the rationale and the no-leak guarantee.
+		"api_key_hash": apiKeyHash(apiKey),
 	}
 	if reqBody.Seed != nil {
 		params["seed"] = *reqBody.Seed
 	}
 	return cache.GenerateKey(string(promptBytes), params)
+}
+
+// apiKeyHash returns the first 8 hex characters of sha256(apiKey), or the
+// empty string when apiKey is empty. The hash isolates LLM cache entries
+// across tenants / accounts sharing one process (M-4): two callers with
+// identical (model, prompt, params) but different API keys produce
+// different cache keys, so tenant A's cached response cannot be served to
+// tenant B. Only the short hash participates in the cache key — the raw
+// API key is never stored in the cache, logged, or persisted, so this
+// cannot leak the key. The empty-string fall-back preserves the legacy
+// shared-key behaviour for deployments with no API key (e.g. local
+// ollama). 8 hex chars = 32 bits of entropy = ~4 billion buckets, which
+// is more than enough to keep tenant collision probability negligible for
+// any realistic tenant count while keeping the cache key short.
+func apiKeyHash(apiKey string) string {
+	if apiKey == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(apiKey))
+	return hex.EncodeToString(sum[:])[:8]
 }
 
 // Name implements the Node interface.
@@ -465,18 +554,23 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 	// boundaries and timing are not byte-reproducible, and replaying a
 	// cached assembled string as a single chunk would violate the
 	// streaming contract. For non-streaming calls, caching the final
-	// content makes LLM decisions reproducible within the TTL window — a
-	// regulatory requirement in financial scenarios. The cache key (see
-	// llmCacheKey) covers every output-influencing field but never the
-	// API key. A cache hit returns immediately without touching the
-	// network; a miss falls through to the upstream call and the result
-	// is written back after success.
+	// content avoids paying for the upstream call on repeated identical
+	// requests within the TTL window — a performance optimization (M-10:
+	// NOT an audit mechanism; audit relies on the separate audit log +
+	// trace subsystem). The cache key (see llmCacheKey) covers every
+	// output-influencing field and a hash of the API key (M-4: isolate
+	// tenants / accounts sharing one cache); the raw key is never stored.
+	// A cache hit returns immediately without touching the network; a miss
+	// falls through to the upstream call and the result is written back
+	// after success (subject to the M-5 per-entry size cap).
 	var cacheKey string
 	var llmCache *cache.Cache
 	if !stream {
 		llmCache = n.effectiveCache()
 		if llmCache != nil {
-			cacheKey = llmCacheKey(reqBody)
+			// M-4: pass apiKey so the cache key includes its hash, isolating
+			// entries across tenants / accounts sharing one cache.
+			cacheKey = llmCacheKey(reqBody, apiKey)
 			if cached, ok := llmCache.Get(cacheKey); ok {
 				logger.Debug("[cache hit] LLM response served from cache",
 					"node", n.config.Name,
@@ -595,8 +689,25 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 	// failures this way, and the message content may itself be the error
 	// text — caching it would make subsequent identical requests hit the
 	// cached error instead of retrying upstream.
+	//
+	// M-5: do NOT cache responses larger than maxCacheableResponseBytes.
+	// The cache caps entry COUNT (MaxEntries) but not entry SIZE; without
+	// a per-entry cap, a handful of large LLM responses (up to ~10MB each)
+	// could pin gigabytes of memory. The response is still returned to
+	// the caller — only the cache write is skipped, so correctness is
+	// unaffected.
 	if cacheKey != "" && llmCache != nil && llmResp.Error == nil {
-		llmCache.Set(cacheKey, content)
+		if len(content) > maxCacheableResponseBytes {
+			logger.Debug("[cache skip] LLM response exceeds per-entry size cap, not cached",
+				"node", n.config.Name,
+				"provider", n.config.ProviderName,
+				"model", model,
+				"content_bytes", len(content),
+				"cap", maxCacheableResponseBytes,
+			)
+		} else {
+			llmCache.Set(cacheKey, content)
+		}
 	}
 	return content, nil
 }

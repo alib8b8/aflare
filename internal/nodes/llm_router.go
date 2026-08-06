@@ -409,7 +409,10 @@ func (r *LLMRouter) getActiveProviders() []RouterProvider {
 		if stats.LastResetDate != today {
 			stats.DailyUsage = 0
 			stats.LastResetDate = today
-			r.clearQuotaLocked(p.Name)
+			// M-2 + M-6: async clear off the statsMu critical section;
+			// EnqueueClear also overwrites any stale pending Save so a
+			// flush tick cannot restore yesterday's data after the reset.
+			r.scheduleQuotaClearLocked(p.Name)
 		}
 
 		if quota := r.quotaFor(p); quota > 0 && stats.DailyUsage >= quota {
@@ -733,7 +736,10 @@ func (r *LLMRouter) recordSuccess(name string, latencyMs int64, tokensUsed int64
 	if stats.LastResetDate != today {
 		stats.DailyUsage = 0
 		stats.LastResetDate = today
-		r.clearQuotaLocked(name)
+		// M-2 + M-6: async clear off the statsMu critical section;
+		// EnqueueClear overwrites any stale pending Save so a flush tick
+		// cannot restore yesterday's data after the reset.
+		r.scheduleQuotaClearLocked(name)
 	}
 
 	stats.TotalCalls++

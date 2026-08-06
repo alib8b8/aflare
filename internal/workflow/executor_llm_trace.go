@@ -76,8 +76,25 @@ func redactForTrace(s string) string {
 // environment typically would not set both, so an accidentally-set
 // LLM_BOX_TRACE_NO_REDACT alone does not leak sensitive data.
 //
-// Read on every call (not cached) so tests that flip the env var via
-// t.Setenv take effect immediately.
+// L-10: os.Getenv is read on every redactForTrace call (i.e. once per LLM
+// call) rather than cached in an atomic.Bool via sync.Once. This is
+// intentional, not an oversight:
+//   - The cost is negligible. os.Getenv is a cheap, lock-free lookup into
+//     the process environment block (a couple of hundred nanoseconds); it
+//     is dwarfed by the LLM round-trip that redactForTrace is invoked on.
+//   - Caching would break the test contract. Multiple tests in this
+//     package flip LLM_BOX_TRACE_NO_REDACT / LLM_BOX_DEBUG_MODE via
+//     t.Setenv and rely on the next redactForTrace call observing the new
+//     value immediately. A sync.Once cache (or an atomic.Bool snapshot)
+//     would freeze the first observed value for the lifetime of the
+//     process, forcing every such test to call a resetTraceRedactCache()
+//     helper — added complexity for no measurable production win.
+//   - The env vars are operator-controlled escape hatches, not hot
+//     configuration; they are set at process start and never flipped in
+//     production. Per-call reads cost nothing in the steady state.
+//
+// If a future change makes this hot, prefer a sync.Once + atomic.Bool
+// cache plus a test-only reset helper over an unconditional cache.
 func traceRedactDisabled() bool {
 	if os.Getenv("LLM_BOX_TRACE_NO_REDACT") != "1" {
 		return false

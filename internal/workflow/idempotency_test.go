@@ -322,7 +322,16 @@ func TestIdempotency_TTLExpiry(t *testing.T) {
 	// Short TTL so the test can expire it without slowing the suite. The TTL
 	// is comfortably longer than the time between Record and the immediate
 	// re-Check below, so the first run's record is fresh when written.
-	store := NewFileIdempotencyStore(t.TempDir(), 150*time.Millisecond)
+	//
+	// L-7: previously TTL=150ms with a 250ms sleep. On a slow/loaded CI
+	// runner the workflow execution itself (filesystem Record + Check +
+	// JSON marshal/unmarshal) could approach 150ms, leaving the "fresh"
+	// record already expired by the time run2's Check ran — turning the
+	// expected ErrIdempotencyHit into a re-execution and flaking the suite.
+	// 1s TTL / 1.2s sleep keeps the semantics identical (TTL elapses
+	// between run2 and run3) while giving the execution ~6x more headroom
+	// against scheduler jitter, and the absolute cost is ~1s of wall time.
+	store := NewFileIdempotencyStore(t.TempDir(), 1*time.Second)
 	exec := NewExecutor().WithIdempotencyKey("transfer-E").WithIdempotencyStore(store)
 
 	if _, _, _, err := exec.ExecuteWithTrace(context.Background(), wf, reg, nil); err != nil {
@@ -342,7 +351,7 @@ func TestIdempotency_TTLExpiry(t *testing.T) {
 
 	// Wait past the TTL, then re-trigger: the record is reaped and the
 	// workflow re-executes.
-	time.Sleep(250 * time.Millisecond)
+	time.Sleep(1200 * time.Millisecond)
 	out3, _, trace3, err := exec.ExecuteWithTrace(context.Background(), wf, reg, nil)
 	if err != nil {
 		t.Fatalf("run3 (expired): expected success after TTL expiry, got: %v", err)

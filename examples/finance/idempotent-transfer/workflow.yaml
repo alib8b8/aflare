@@ -15,13 +15,17 @@ vars:
   # mock 银行 API 地址（由 mock-server.py 提供）
   bank_api_url: "http://localhost:17800/transfer"
   # 幂等键：同一 key 重复调用只扣一次款。生产环境应由调用方生成唯一 UUID。
-  idempotency_key: "demo-transfer-{{now}}"
+  # 这里用固定值便于演示服务端去重；SDK 层幂等（WithIdempotencyKey）见 README。
+  idempotency_key: "demo-transfer-001"
   from_account: "ACC0001"
   to_account: "ACC0002"
   amount: "100.00"
   currency: "CNY"
   success_log: "./transfer-log.jsonl"
   failed_log: "./transfer-failed.jsonl"
+  # 演示用静态时间戳。工作流表达式不支持 {{now}}；真实时间戳由审计日志
+  # （audit.log.jsonl，HMAC 哈希链）自动记录，此处仅占位。
+  demo_ts: "2026-08-06T00:00:00Z"
 
 steps:
   # ── Step 1: 调用银行 API（带限流 + 重试 + Idempotency-Key 透传）──
@@ -33,7 +37,11 @@ steps:
     params:
       method: POST
       url: "{{var.bank_api_url}}"
-      headers: '{"Content-Type":"application/json","Idempotency-Key":"{{var.idempotency_key}}"}'
+      # http_request 节点的 headers 参数为「每行一个 Key: Value」格式
+      # （非 JSON）。Idempotency-Key 透传到银行 API，服务端据此去重。
+      headers: |-
+        Content-Type: application/json
+        Idempotency-Key: {{var.idempotency_key}}
       body: '{"from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}"}'
       rate_limit_rps: "5"
       rate_limit_burst: "2"
@@ -41,17 +49,14 @@ steps:
       retry_backoff_ms: "200"
       retry_on_status: "429,500,502,503,504"
 
-  # ── Step 2: 解析银行响应，提取 status 字段 ──
-  - name: parse-status
-    node: json_parse
-    params:
-      path: "status"
-
-  # ── Step 3: 判断转账是否成功（返回 "true" / "false"）──
+  # ── Step 2: 判断转账是否成功（返回 "true" / "false"）──
+  # http_request 节点输出格式为 "HTTP <code>\n<body>"，body 才是银行返回的 JSON。
+  # 由于 "HTTP 200\n..." 前缀不是合法 JSON，json_parse 会解析失败，因此这里直接用
+  # contains 在原始响应里匹配 "status":"success"，等价于解析 status 字段后比较。
   - name: check-status
     node: condition
     params:
-      expr: "equals:success"
+      expr: 'contains:"status":"success"'
 
   # ── Step 4: 根据结果分流写审计日志（if/else 分支）──
   - if:
@@ -60,7 +65,7 @@ steps:
         - name: build-success-log
           node: template_render
           params:
-            template: '{"ts":"{{now}}","status":"success","from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}"}'
+            template: '{"ts":"{{var.demo_ts}}","status":"success","from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}"}'
         - name: log-success
           node: file_write
           params:
@@ -70,7 +75,7 @@ steps:
         - name: build-failure-log
           node: template_render
           params:
-            template: '{"ts":"{{now}}","status":"failed","from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}","bank_response":"{{step.call-bank-api}}"}'
+            template: '{"ts":"{{var.demo_ts}}","status":"failed","from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}"}'
         - name: log-failure
           node: file_write
           params:

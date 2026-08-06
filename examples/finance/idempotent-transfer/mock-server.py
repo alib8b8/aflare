@@ -16,6 +16,7 @@
 """
 
 import json
+import os
 import random
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -27,6 +28,16 @@ LISTEN_ADDR = ("0.0.0.0", 17800)
 _idem_store = {}
 _idem_lock = threading.Lock()
 
+# 确定性 503 注入：环境变量 MOCK_FORCE_503_COUNT=N 时，前 N 次非缓存
+# /transfer 请求固定返回 503（用于稳定验证客户端重试逻辑），之后恢复正常。
+# 不设置或设为 0 时维持原有 ~10% 随机 503 行为。
+_force_503_remaining = 0
+_force_503_lock = threading.Lock()
+try:
+    _force_503_remaining = int(os.environ.get("MOCK_FORCE_503_COUNT", "0"))
+except ValueError:
+    _force_503_remaining = 0
+
 
 class BankHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
@@ -34,7 +45,10 @@ class BankHandler(BaseHTTPRequestHandler):
         print(f"[mock-bank] {self.address_string()} - {fmt % args}")
 
     def _send_json(self, status_code, payload):
-        body = json.dumps(payload).encode("utf-8")
+        # Compact JSON (no spaces after ':' / ',') so clients can match exact
+        # substrings like "status":"success" without depending on formatter
+        # whitespace.
+        body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -71,6 +85,21 @@ class BankHandler(BaseHTTPRequestHandler):
                     print(f"[mock-bank] idempotency hit key={idem_key} -> cached")
                     self._send_json(cached["code"], cached["body"])
                     return
+
+        # 确定性 503 注入（MOCK_FORCE_503_COUNT）：前 N 次非缓存请求固定返回 503，
+        # 用于稳定验证客户端 max_retries 重试逻辑（如 503×2 + 200×1）。
+        # 计数耗尽后回落到原有的 ~10% 随机 503 行为。
+        do_503 = False
+        global _force_503_remaining
+        with _force_503_lock:
+            if _force_503_remaining > 0:
+                _force_503_remaining -= 1
+                do_503 = True
+        if do_503:
+            print(f"[mock-bank] forced 503 (retryable) key={idem_key} "
+                  f"remaining={_force_503_remaining}")
+            self._send_json(503, {"status": "failed", "error": "forced transient outage"})
+            return
 
         # 模拟瞬时故障（约 10% 概率返回 503，触发客户端重试）
         if random.random() < 0.1:
