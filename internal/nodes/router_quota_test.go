@@ -917,8 +917,8 @@ func TestQuota_WithTimeZone(t *testing.T) {
 //  1. recordSuccess on day D-1 enqueues a Save with usage=50, day=D-1.
 //  2. The day rolls over to D.
 //  3. recordSuccess on day D detects LastResetDate != today, zeros the
-//     in-memory counter, calls clearQuotaLocked (sync store.Clear deletes
-//     the file), and then scheduleQuotaSaveLocked enqueues a fresh Save
+//     in-memory counter, calls a synchronous store.Clear (deletes the
+//     file), and then scheduleQuotaSaveLocked enqueues a fresh Save
 //     with usage=0, day=D.
 //  4. The quotaSaver.flush tick fires BETWEEN step 3's store.Clear and
 //     step 3's scheduleQuotaSaveLocked. It snapshots the pending map,
@@ -1019,8 +1019,8 @@ func TestQuota_AsyncClearOffStatsMu(t *testing.T) {
 
 	// Build a router with an empty store so initQuotaPersistence does NOT
 	// see a stale record (which would trigger a sync clear at init time
-	// via loadQuotaLocked — that path keeps its sync clear deliberately,
-	// see clearQuotaLocked docs). We seed the yesterday entry AFTER init.
+	// via loadQuotaLocked — that path keeps its sync clear deliberately).
+	// We seed the yesterday entry AFTER init.
 	router := &LLMRouter{
 		providers:     append([]RouterProvider(nil), RouterProvider{Name: "openai", Enabled: true, QuotaDaily: 1000, APIKey: "k", Priority: 1}),
 		stats:         make(map[string]*ProviderStats),

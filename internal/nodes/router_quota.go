@@ -48,7 +48,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/alib8b8/llm-box/internal/logger"
@@ -293,11 +292,11 @@ func (s *FileQuotaStore) Save(tenant, provider string, usage int64, day string) 
 	}
 	tmpPath := finalPath + ".tmp." + quotaTmpSuffix()
 	// O_EXCL: the tmp name is random, so a collision means tampering —
-	// fail rather than overwrite. O_NOFOLLOW (from syscall, since the os
-	// package does not re-export it): refuse if the tmp path itself is a
-	// symlink (defense-in-depth; the random suffix makes this
-	// near-impossible but the flag is free).
-	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o600)
+	// fail rather than overwrite. quotaOpenNoFollow (O_NOFOLLOW on Unix, 0
+	// on Windows): refuse if the tmp path itself is a symlink
+	// (defense-in-depth; the random suffix makes this near-impossible but
+	// the flag is free on Unix).
+	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL|quotaOpenNoFollow, 0o600)
 	if err != nil {
 		return fmt.Errorf("quota: write tmp %s/%s: %w", tenant, provider, err)
 	}
@@ -817,30 +816,6 @@ func (r *LLMRouter) loadQuotaLocked(name string, stats *ProviderStats) {
 			logger.Warn("quota store clear (stale) failed",
 				"tenant", tenant, "provider", name, "error", err)
 		}
-	}
-}
-
-// clearQuotaLocked removes the persisted entry for (tenant, provider).
-// Called under r.statsMu on day reset so the new day starts clean on disk.
-// Errors are logged but do not block the reset — the in-memory counter is
-// already zeroed, and a stale on-disk record will be reconciled on the next
-// load.
-//
-// M-2: this method performs SYNCHRONOUS file IO under statsMu and must only
-// be called from init-time paths (loadQuotaLocked, which itself runs either
-// at startup before any concurrent routing or in the rare defensive
-// getActiveProviders / getOrCreateStatsLocked path for a provider whose stats
-// were not pre-warmed). The hot-path cross-day reset in recordSuccess and
-// getActiveProviders uses scheduleQuotaClearLocked instead, which defers the
-// file IO to the quotaSaver goroutine so statsMu is not held across disk IO.
-func (r *LLMRouter) clearQuotaLocked(name string) {
-	if r.quotaStore == nil {
-		return
-	}
-	tenant := r.effectiveTenant()
-	if err := r.quotaStore.Clear(tenant, name); err != nil {
-		logger.Warn("quota store clear failed",
-			"tenant", tenant, "provider", name, "error", err)
 	}
 }
 
