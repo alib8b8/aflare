@@ -673,16 +673,22 @@ func TestQuota_SymlinkParentDirRejected(t *testing.T) {
 	}
 
 	// No file should have been created inside the outside target.
+	// outsideRoot is a temp dir we own and should be fully walkable, so any
+	// walk error indicates a broken test setup — surface it via t.Fatalf
+	// instead of swallowing it, consistent with the other walk handlers in
+	// this file.
 	var leaked []string
-	_ = filepath.Walk(outsideRoot, func(path string, info os.FileInfo, err error) error {
+	if err := filepath.Walk(outsideRoot, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil
+			return err
 		}
 		if !info.IsDir() {
 			leaked = append(leaked, path)
 		}
 		return nil
-	})
+	}); err != nil {
+		t.Fatalf("walk outside root: %v", err)
+	}
 	if len(leaked) != 0 {
 		t.Errorf("file was written outside base via parent-dir symlink: %v", leaked)
 	}
