@@ -520,15 +520,17 @@ aflare help                显示完整帮助
 
 ## 🌟 优秀集成案例
 
-使用 aflare 构建的优秀开源项目：
+基于 aflare 核心能力构建的信创落地案例，覆盖金融、工业、政务、能源、运营商五大领域：
 
-| 项目 | 描述 |
-|------|------|
-| [AI 新闻助手]() | 基于 aflare 工作流的 AI 新闻聚合与摘要系统 |
-| [代码审查 Agent]() | 利用代码知识图谱节点的自动化代码审查工具 |
-| [研究助手]() | 结合 researcher + knowledge_graph 节点的学术研究工作流 |
+| 领域 | 案例 | 芯片 | 核心能力 |
+|------|------|------|---------|
+| 🏦 金融 | [全栈国产化 AML 反洗钱智能审查](docs/cases/xinchuang-cases.md#案例一金融信创--全栈国产化-aml-反洗钱智能审查系统) | 昇腾 910B | map 并发审查 + HMAC 审计链 + LLM 成本归因 |
+| 🏭 工业 | [昇腾 + 宇树机器人智能产线巡检](docs/cases/xinchuang-cases.md#案例二工业信创--基于昇腾--宇树机器人的智能产线巡检系统) | 昇腾 310P | unitree_robot 巡逻 + vision 缺陷识别 + saga 闭环 |
+| 🏛️ 政务 | [国产化工单自动分派与督办](docs/cases/xinchuang-cases.md#案例三政务信创--国产化工单自动分派与督办系统) | 国产 GPU | LLM 分派 + saga 协同 + harmony_widget 推送 |
+| ⚡ 能源 | [变电站智能巡检与缺陷闭环](docs/cases/xinchuang-cases.md#案例四能源信创--变电站智能巡检与缺陷闭环管理系统) | 昇腾 + 海光 DCU | 200 站并发 + saga 缺陷闭环 + 日终对账 |
+| 📡 运营商 | [国产化网络告警自愈编排](docs/cases/xinchuang-cases.md#案例五运营商信创--国产化网络告警自愈编排平台) | 寒武纪 MLU 590 | LLM 告警收敛 + saga 自愈 + 成本归因 |
 
-> 如果您的项目使用了 aflare，欢迎提交 PR 添加到此处！
+> 每个案例包含：真实痛点分析 → 方案架构图 → aflare 能力映射 → 信创价值量化。完整内容见 [信创案例集](docs/cases/xinchuang-cases.md)
 
 ---
 

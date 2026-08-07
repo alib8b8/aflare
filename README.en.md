@@ -520,15 +520,17 @@ aflare help                   Show full help
 
 ## 🌟 Featured Integrations
 
-Excellent open-source projects built with aflare:
+Xinchuang (domestic IT) landing cases built on aflare core capabilities, covering five key domains:
 
-| Project | Description |
-|---------|-------------|
-| [AI News Assistant]() | AI news aggregation and summary system based on aflare workflows |
-| [Code Review Agent]() | Automated code review tool leveraging code knowledge graph nodes |
-| [Research Assistant]() | Academic research workflow combining researcher + knowledge_graph nodes |
+| Domain | Case | Chip | Core Capabilities |
+|--------|------|------|-------------------|
+| 🏦 Finance | [AML Review on Ascend](docs/cases/xinchuang-cases.md#案例一金融信创--全栈国产化-aml-反洗钱智能审查系统) | Ascend 910B | map concurrency + HMAC audit chain + LLM cost attribution |
+| 🏭 Industry | [Ascend + Unitree Robot Factory Patrol](docs/cases/xinchuang-cases.md#案例二工业信创--基于昇腾--宇树机器人的智能产线巡检系统) | Ascend 310P | unitree_robot patrol + vision defect detection + saga loop |
+| 🏛️ Government | [Work Order Dispatch on Kylin + HarmonyOS](docs/cases/xinchuang-cases.md#案例三政务信创--国产化工单自动分派与督办系统) | Domestic GPU | LLM dispatch + saga coordination + harmony_widget push |
+| ⚡ Energy | [Substation Inspection with Dual-Chip](docs/cases/xinchuang-cases.md#案例四能源信创--变电站智能巡检与缺陷闭环管理系统) | Ascend + Hygon DCU | 200-station concurrency + saga defect loop + reconciliation |
+| 📡 Telecom | [Network Alarm Self-Healing on Cambricon](docs/cases/xinchuang-cases.md#案例五运营商信创--国产化网络告警自愈编排平台) | Cambricon MLU 590 | LLM alarm convergence + saga self-healing + cost attribution |
 
-> If your project uses aflare, feel free to submit a PR to add it here!
+> Each case includes: pain point analysis → architecture diagram → aflare capability mapping → xinchuang value quantification. See [full case studies](docs/cases/xinchuang-cases.md)
 
 ---
 
