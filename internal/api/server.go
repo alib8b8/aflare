@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -47,8 +46,6 @@ type Server struct {
 	requestsActive  int64
 	workflowsRun    uint64
 	workflowsFailed uint64
-
-	mu sync.RWMutex
 }
 
 // NewServer creates a new API server with the given configuration.
@@ -162,9 +159,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		key := r.Header.Get("X-API-Key")
 		if key == "" {
 			key = r.Header.Get("Authorization")
-			if strings.HasPrefix(key, "Bearer ") {
-				key = strings.TrimPrefix(key, "Bearer ")
-			}
+			key = strings.TrimPrefix(key, "Bearer ")
 		}
 
 		if key != s.apiKey {
