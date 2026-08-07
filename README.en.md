@@ -4,8 +4,8 @@
     <a href="README.md">中文</a> ·
     <strong>English</strong>
   </p>
-  <p><strong>Talk to AI in plain language, it gets the job done.</strong></p>
-  <p>Write reports, reconcile accounts, analyze images, control robots — just describe what you want, and llm-box figures out the steps and runs them. Works on domestic chips (Ascend / Cambricon / Hygon), your data stays local.</p>
+  <p><strong>Stop chatting with AI — make it your execution co-pilot.</strong></p>
+  <p>Natural language in, deterministic YAML out. More elegant than Bash, lighter than n8n, more reliable than pure AI agents. Built-in financial Saga transactions, multimodal analysis, robot control. Deeply adapted for domestic chips (Ascend / Cambricon / Hygon).</p>
   <p><em>What if your computer just understood what you meant?</em></p>
 
   <p>

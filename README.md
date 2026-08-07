@@ -4,8 +4,8 @@
     <strong>中文</strong> ·
     <a href="README.en.md">English</a>
   </p>
-  <p><strong>跟 AI 说人话，它帮你干活。</strong></p>
-  <p>写报告、做对账、分析图片、控制机器人——把你的想法告诉 llm-box，它自动编排执行。支持昇腾 / 寒武纪 / 海光国产芯片，数据不出国。</p>
+  <p><strong>让 AI 告别「聊天」，真正成为你的「执行副驾」。</strong></p>
+  <p>自然语言驱动，YAML 确定性执行——比 Bash 优雅、比 n8n 轻量、比纯 Agent 靠谱。内置金融级 Saga 事务、多模态分析、机器人控制，深度适配昇腾 / 寒武纪 / 海光国产芯片。</p>
   <p><em>What if your computer just understood what you meant?</em></p>
 
   <p>
