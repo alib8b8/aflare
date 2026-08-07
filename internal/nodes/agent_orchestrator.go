@@ -38,26 +38,25 @@ type AgentCapability struct {
 
 // agentDiscovery stores the runtime agent registry.
 var (
-	agentDiscoveryRegistry   = make(map[string]*AgentCapability)
-	agentDiscoveryMu         sync.RWMutex
-	agentDiscoveryCleanupAt  time.Time
+	agentDiscoveryRegistry = make(map[string]*AgentCapability)
+	agentDiscoveryMu       sync.RWMutex
 )
 
 var (
 	validConsensusStrategies = map[string]bool{
-		"majority":   true,
-		"weighted":   true,
-		"unanimous":  true,
+		"majority":    true,
+		"weighted":    true,
+		"unanimous":   true,
 		"round_robin": true,
-		"ranked":     true,
+		"ranked":      true,
 	}
 	validOrchestratorActions = map[string]bool{
-		"discover":  true,
-		"consensus": true,
-		"register":  true,
+		"discover":   true,
+		"consensus":  true,
+		"register":   true,
 		"deregister": true,
-		"list":      true,
-		"status":    true,
+		"list":       true,
+		"status":     true,
 	}
 )
 
@@ -231,11 +230,11 @@ func (n *AgentOrchestratorNode) handleDiscover(task string, params map[string]st
 	}
 
 	return map[string]interface{}{
-		"status":        "completed",
-		"task":          task,
+		"status":         "completed",
+		"task":           task,
 		"matched_agents": len(matched),
-		"total_agents":  len(agentDiscoveryRegistry),
-		"agents":        matched,
+		"total_agents":   len(agentDiscoveryRegistry),
+		"agents":         matched,
 	}
 }
 
@@ -267,9 +266,9 @@ func (n *AgentOrchestratorNode) handleConsensus(topic string, params map[string]
 	}
 
 	result := map[string]interface{}{
-		"status":    "completed",
-		"topic":     topic,
-		"strategy":  strategy,
+		"status":      "completed",
+		"topic":       topic,
+		"strategy":    strategy,
 		"agent_count": len(activeAgents),
 	}
 
@@ -345,11 +344,11 @@ func simulateMajorityConsensus(agents []*AgentCapability, topic string) map[stri
 	}
 
 	return map[string]interface{}{
-		"method":  "majority",
-		"winner":  winner,
-		"votes":   votes,
-		"total":   len(agents),
-		"quorum":  maxVotes > len(agents)/2,
+		"method": "majority",
+		"winner": winner,
+		"votes":  votes,
+		"total":  len(agents),
+		"quorum": maxVotes > len(agents)/2,
 	}
 }
 
@@ -387,11 +386,11 @@ func simulateWeightedConsensus(agents []*AgentCapability, topic string) map[stri
 	}
 
 	return map[string]interface{}{
-		"method":   "weighted",
-		"winner":   winner,
-		"votes":    weightedVotes,
-		"scores":   scores,
-		"total":    len(agents),
+		"method": "weighted",
+		"winner": winner,
+		"votes":  weightedVotes,
+		"scores": scores,
+		"total":  len(agents),
 	}
 }
 
@@ -428,9 +427,9 @@ func simulateRoundRobinConsensus(agents []*AgentCapability, topic string) map[st
 		vote := simulateAgentVote(agent, topic)
 		iterations++
 		rounds = append(rounds, map[string]interface{}{
-			"agent":  agent.AgentID,
-			"round":  iterations,
-			"vote":   vote,
+			"agent": agent.AgentID,
+			"round": iterations,
+			"vote":  vote,
 		})
 	}
 

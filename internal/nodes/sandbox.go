@@ -18,6 +18,7 @@ package nodes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -62,9 +63,8 @@ var (
 		"wget -O /etc/", "curl -o /etc/",
 	}
 
-	sandboxInstances    = make(map[string]*sandboxState)
-	sandboxInstancesMu  sync.RWMutex
-	sandboxCleanupTimer *time.Timer
+	sandboxInstances   = make(map[string]*sandboxState)
+	sandboxInstancesMu sync.RWMutex
 )
 
 type sandboxState struct {
@@ -213,7 +213,8 @@ func (n *SandboxNode) executeShell(ctx context.Context, input string, state *san
 
 	result["exit_code"] = 0
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			result["exit_code"] = exitErr.ExitCode()
 		} else {
 			result["exit_code"] = -1
