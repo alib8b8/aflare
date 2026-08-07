@@ -124,7 +124,7 @@ func TestExecuteNode_ParamTooLong(t *testing.T) {
 	node := &ExecuteNode{}
 	ctx := context.Background()
 	_, err := node.Execute(ctx, "", map[string]string{
-		"command": "echo hello",
+		"command":               "echo hello",
 		strings.Repeat("k", 51): "v",
 	})
 	if err == nil {

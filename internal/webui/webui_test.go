@@ -252,7 +252,7 @@ func TestIsValidWorkflowName_Valid(t *testing.T) {
 		"workflow.v1",
 		"abc123",
 		"ABC_def-123.xyz",
-		"a",   // single char
+		"a", // single char
 		"Workflow-Name_With.Dots",
 	}
 	for _, name := range validNames {
@@ -1732,7 +1732,7 @@ func TestHandleVisualize_AllFormats(t *testing.T) {
 		{"dot", "text/plain"},
 		{"ascii", "text/plain"},
 		{"json", "application/json"},
-		{"", "application/json"}, // default
+		{"", "application/json"},        // default
 		{"unknown", "application/json"}, // unknown falls back to json
 	}
 
@@ -2246,8 +2246,8 @@ func TestHandleVisualize_FormatCaseSensitivity(t *testing.T) {
 	body := `{"workflow":"` + strings.ReplaceAll(workflowYAML, "\n", "\\n") + `"}`
 
 	tests := []struct {
-		format      string
-		expectCT    string
+		format   string
+		expectCT string
 	}{
 		{"MERMAID", "application/json"}, // uppercase → falls to default (json)
 		{"Mermaid", "application/json"}, // mixed case → falls to default (json)
@@ -2471,8 +2471,10 @@ func TestHandleSaveWorkflow_EmptyContent(t *testing.T) {
 func TestMetricsRateLimiter_NoTimePassing(t *testing.T) {
 	rl := newMetricsRateLimiter(3)
 	// First 3 should be allowed
-	if !rl.allow() || !rl.allow() || !rl.allow() {
-		t.Fatal("first 3 requests should be allowed")
+	for i := 0; i < 3; i++ {
+		if !rl.allow() {
+			t.Fatal("first 3 requests should be allowed")
+		}
 	}
 	// 4th should be denied
 	if rl.allow() {
