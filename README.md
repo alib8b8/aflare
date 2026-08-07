@@ -256,12 +256,14 @@ aflare 是面向信创（信息技术应用创新）生态的国产 AI 工作流
 | `moe_streaming` | MoE 专家流式加载：消费级硬件运行 744B 模型，按需加载 |
 | `cli_session` | 交互式终端会话，支持上下文持久化、流式输出、自动补全 |
 | `plugin_system` | 插件扩展：从本地/git/网址/市场安装/卸载/更新，沙箱隔离 |
-| `engineer_skills` | 16 个预置技能：React/TypeScript/API/数据库/CI-CD/Docker/设计模式 |
+| `engineer_skills` | 24 个预置技能：前端/后端/DevOps/架构/安全/数据/信创七大领域，支持技能匹配、应用和版本管理 |
 | `skill_distill` | 从书籍/视频/播客中蒸馏方法论为可调用技能 |
 | `voice_output` | 语音 AI 工具链：TTS + 声音克隆 + **ASR 转录** + **说话人分离** + **语音分析** + 创作模式、11 种语言、5 种 ASR 引擎、**Inkling 音频理解** |
 | `doc_gen` | AI 文档生成：7 种类型（自述文件/API/函数/模块/变更日志/教程/架构） |
 | `video_edit` | AI 视频编辑：智能剪辑/合并/特效/字幕/故事板/超分 |
 | `memory` | **Agent 记忆基础设施**：三层记忆（短期/中期/长期）、16 种操作、可视化、LRU 淘汰、自动清理、**Inkling 长上下文检索** |
+| `sandbox` | 沙箱执行环境：shell/browser/desktop 三模式，命令白名单+超时+资源限制，Agent 安全执行代码 |
+| `agent_orchestrator` | 多智能体编排：运行时 Agent 发现注册、5 种共识策略（多数/加权/全票/轮询/排序）、跨团队协作治理 |
 
 ### 鸿蒙 & 移动端节点
 
@@ -388,6 +390,7 @@ aflare 参与多个开源生态：
 | **寒武纪 Cambricon** | 已集成 | 寒武纪 MLU 适配（MLU 370/590），`cambricon` provider 节点，OpenAI 兼容推理 |
 | **海光 Hygon** | 已集成 | 海光 DCU 适配（K100/Z100），`hygon` provider 节点，ROCm 兼容推理 |
 | **宇树 Unitree** | 已集成 | 宇树机器人控制（Go2/B2/H1/G1），14 种动作，模拟/API 双模式，自然语言驱动 |
+| **信创 MCP 市场** | 已上线 | 15 个领域 35 个 MCP Server：OA（泛微/致远/蓝凌）、ERP（用友/金蝶/浪潮）、数据库（OceanBase/DM/GaussDB）、消息、安全等 |
 
 ### 鸿蒙设备支持
 

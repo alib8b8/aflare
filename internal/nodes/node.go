@@ -118,6 +118,8 @@ func RegisterBuiltins(reg *Registry) {
 	reg.Register(&NotifyNode{})
 	reg.Register(&OllamaNode{})
 	reg.Register(&CallNode{})
+	reg.Register(&SandboxNode{})
+	reg.Register(&AgentOrchestratorNode{})
 
 	// OpenAI-compatible providers (openai, glm, kimi, qwen, deepseek,
 	// anthropic, gemini, mistral, yi, baichuan, internlm, minimax,

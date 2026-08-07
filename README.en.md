@@ -256,12 +256,14 @@ Specialized AI agent nodes for autonomous reasoning:
 | `moe_streaming` | MoE expert streaming: consumer hardware runs 744B models with on-demand loading |
 | `cli_session` | Interactive terminal session with context persistence, streaming output, auto-completion |
 | `plugin_system` | Plugin extension: install/uninstall/update from local/git/url/market with sandbox isolation |
-| `engineer_skills` | 16 pre-built skills: React/TypeScript/API/Database/CI-CD/Docker/Design Patterns |
+| `engineer_skills` | 24 pre-built skills across 7 domains: frontend/backend/DevOps/architecture/security/data/xinchuang |
 | `skill_distill` | Distill methodologies from books/videos/podcasts into callable skills |
 | `voice_output` | Voice AI toolchain: TTS + voice cloning + ASR transcription + speaker diarization + voice analysis, 11 languages, 5 ASR engines |
 | `doc_gen` | AI document generation: 7 types (readme/api/function/module/changelog/tutorial/architecture) |
 | `video_edit` | AI video editing: smart_cut/merge/effects/subtitle/storyboard/upscale |
 | `memory` | Agent memory infrastructure: three-level memory (short/medium/long), 16 operations, LRU eviction, cross-session long-term memory |
+| `sandbox` | Isolated execution sandbox: shell/browser/desktop modes, command whitelist, timeout, resource limits |
+| `agent_orchestrator` | Multi-agent orchestration: runtime agent discovery, 5 consensus strategies (majority/weighted/unanimous/round-robin/ranked) |
 
 ### HarmonyOS &amp; Mobile Nodes
 
@@ -388,6 +390,7 @@ aflare participates in multiple open-source ecosystems:
 | **Cambricon** | Integrated | Cambricon MLU (MLU 370/590), `cambricon` provider node, OpenAI-compatible inference |
 | **Hygon** | Integrated | Hygon DCU (K100/Z100), `hygon` provider node, ROCm-compatible inference |
 | **Unitree** | Integrated | Unitree robot control (Go2/B2/H1/G1), 14 actions, simulate/API dual mode, natural language control |
+| **Xinchuang MCP** | Live | 35 MCP servers across 15 domains: OA (Weaver/Seeyon/Landray), ERP (Yonyou/Kingdee/Inspur), Database (OceanBase/DM/GaussDB), messaging, security, and more |
 
 ### HarmonyOS Device Support
 

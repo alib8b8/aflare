@@ -34,6 +34,9 @@ var (
 		"backend":      true,
 		"devops":       true,
 		"architecture": true,
+		"security":     true,
+		"data":         true,
+		"xinchuang":    true,
 	}
 )
 
@@ -80,6 +83,14 @@ var engineerSkills = map[string]map[string]SkillDetail{
 			Tags:        []string{"State", "Redux", "Zustand", "Context"},
 			Level:       "intermediate",
 		},
+		"frontend_testing": {
+			Name:        "frontend_testing",
+			Description: "Frontend testing strategies: unit, integration, E2E with Jest, Vitest, Playwright",
+			Category:    "frontend",
+			Version:     "1.0.0",
+			Tags:        []string{"Testing", "Jest", "Vitest", "Playwright", "E2E"},
+			Level:       "intermediate",
+		},
 	},
 	"backend": {
 		"api_design": {
@@ -112,6 +123,14 @@ var engineerSkills = map[string]map[string]SkillDetail{
 			Category:    "backend",
 			Version:     "1.0.0",
 			Tags:        []string{"Security", "Authentication", "Authorization"},
+			Level:       "advanced",
+		},
+		"tdd_workflow": {
+			Name:        "tdd_workflow",
+			Description: "Test-Driven Development: red-green-refactor cycle, test doubles, mocking strategies",
+			Category:    "backend",
+			Version:     "1.0.0",
+			Tags:        []string{"TDD", "Testing", "Unit Test", "Mock", "Refactor"},
 			Level:       "advanced",
 		},
 	},
@@ -148,6 +167,14 @@ var engineerSkills = map[string]map[string]SkillDetail{
 			Tags:        []string{"Logging", "ELK", "Observability"},
 			Level:       "intermediate",
 		},
+		"k8s_troubleshooting": {
+			Name:        "k8s_troubleshooting",
+			Description: "Kubernetes troubleshooting: pod debugging, network diagnosis, resource analysis, crash loops",
+			Category:    "devops",
+			Version:     "1.0.0",
+			Tags:        []string{"Kubernetes", "K8s", "Troubleshooting", "Debug", "Ops"},
+			Level:       "advanced",
+		},
 	},
 	"architecture": {
 		"system_design": {
@@ -182,6 +209,68 @@ var engineerSkills = map[string]map[string]SkillDetail{
 			Tags:        []string{"Refactoring", "Clean Code", "Maintainability"},
 			Level:       "intermediate",
 		},
+		"event_driven": {
+			Name:        "event_driven",
+			Description: "Event-driven architecture: CQRS, Event Sourcing, message queues, Kafka/RabbitMQ patterns",
+			Category:    "architecture",
+			Version:     "1.0.0",
+			Tags:        []string{"Event Driven", "CQRS", "Event Sourcing", "Kafka", "Message Queue"},
+			Level:       "advanced",
+		},
+	},
+	"security": {
+		"security_audit": {
+			Name:        "security_audit",
+			Description: "Comprehensive security audit: OWASP Top 10, dependency scanning, SAST, secrets detection",
+			Category:    "security",
+			Version:     "1.0.0",
+			Tags:        []string{"Security", "Audit", "OWASP", "SAST", "Vulnerability"},
+			Level:       "advanced",
+		},
+		"secure_coding": {
+			Name:        "secure_coding",
+			Description: "Secure coding practices: input validation, output encoding, authn/z, cryptography, CSRF/XSS prevention",
+			Category:    "security",
+			Version:     "1.0.0",
+			Tags:        []string{"Secure Coding", "Auth", "Crypto", "CSRF", "XSS"},
+			Level:       "intermediate",
+		},
+	},
+	"data": {
+		"data_pipeline": {
+			Name:        "data_pipeline",
+			Description: "Data pipeline design: ETL/ELT, data warehousing, batch/stream processing, data quality",
+			Category:    "data",
+			Version:     "1.0.0",
+			Tags:        []string{"Data Pipeline", "ETL", "ELT", "Data Warehouse", "Streaming"},
+			Level:       "advanced",
+		},
+		"sql_optimization": {
+			Name:        "sql_optimization",
+			Description: "SQL query optimization: indexing strategies, execution plans, query rewriting, partitioning",
+			Category:    "data",
+			Version:     "1.0.0",
+			Tags:        []string{"SQL", "Optimization", "Index", "Query Plan", "Performance"},
+			Level:       "advanced",
+		},
+	},
+	"xinchuang": {
+		"domestic_migration": {
+			Name:        "domestic_migration",
+			Description: "国产化迁移策略：Oracle → OceanBase/达梦、x86 → ARM64/鲲鹏、NVIDIA → 昇腾/寒武纪迁移",
+			Category:    "xinchuang",
+			Version:     "1.0.0",
+			Tags:        []string{"信创", "国产化", "迁移", "OceanBase", "鲲鹏", "昇腾"},
+			Level:       "advanced",
+		},
+		"harmony_app_dev": {
+			Name:        "harmony_app_dev",
+			Description: "鸿蒙应用开发：ArkUI、ArkTS、Ability 组件、原子化服务、分布式能力",
+			Category:    "xinchuang",
+			Version:     "1.0.0",
+			Tags:        []string{"鸿蒙", "HarmonyOS", "ArkUI", "ArkTS", "Ability"},
+			Level:       "intermediate",
+		},
 	},
 }
 
@@ -190,7 +279,7 @@ type EngineerSkillsNode struct{}
 func (n *EngineerSkillsNode) Name() string { return "engineer_skills" }
 
 func (n *EngineerSkillsNode) Description() string {
-	return "Pre-built engineering skill package with TypeScript/React/Node.js expertise. Supports skill matching, application, and version management."
+	return "预置工程技能包，覆盖前端/后端/DevOps/架构/安全/数据/信创七大领域共 24 项技能。支持技能匹配、应用和版本管理。"
 }
 
 func (n *EngineerSkillsNode) Schema() NodeSchema {
