@@ -24,20 +24,20 @@
     <a href="https://github.com/alib8b8/aflare/actions/workflows/release.yml">
       <img src="https://github.com/alib8b8/aflare/actions/workflows/release.yml/badge.svg" alt="发布状态" />
     </a>
-    <a href="https://gitcode.com/aflare/aflare">
+    <a href="https://gitcode.com/llm-box/llm-box">
       <img src="https://img.shields.io/badge/AtomGit-GitCode-green?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzI1MjUyNSIgZD0iTTIyIDJoLTJWMGgydi0yaDJ2MmgydjItMmgydjItMmgydjJ6bTAgMTZIMnYtMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjJ6bTAgLThIMnYtMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjJ6Ii8+PC9zdmc+" alt="GitCode" />
     </a>
-    <a href="https://gitcode.com/aflare/aflare">
-      <img src="https://gitcode.com/aflare/aflare/star/new_badge.svg" alt="AtomGit G-Star" />
+    <a href="https://gitcode.com/llm-box/llm-box">
+      <img src="https://gitcode.com/llm-box/llm-box/star/new_badge.svg" alt="AtomGit G-Star" />
     </a>
-    <a href="https://gitcode.com/aflare/aflare">
-      <img src="https://gitcode.com/aflare/aflare/star/badge.svg" alt="AtomGit Star" />
+    <a href="https://gitcode.com/llm-box/llm-box">
+      <img src="https://gitcode.com/llm-box/llm-box/star/badge.svg" alt="AtomGit Star" />
     </a>
-    <a href="https://gitcode.com/aflare/aflare">
-      <img src="https://gitcode.com/aflare/aflare/fork/badge.svg" alt="AtomGit Fork" />
+    <a href="https://gitcode.com/llm-box/llm-box">
+      <img src="https://gitcode.com/llm-box/llm-box/fork/badge.svg" alt="AtomGit Fork" />
     </a>
-    <a href="https://gitcode.com/aflare/aflare">
-      <img src="https://gitcode.com/aflare/aflare/download/badge.svg" alt="AtomGit Download" />
+    <a href="https://gitcode.com/llm-box/llm-box">
+      <img src="https://gitcode.com/llm-box/llm-box/download/badge.svg" alt="AtomGit Download" />
     </a>
   </p>
 
@@ -85,7 +85,7 @@
 |-------------|---------|
 | `curl -fsSL https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh \| bash` | `irm https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 \| iex` |
 
-**或从 [GitCode Releases](https://gitcode.com/aflare/aflare/releases) / [GitHub Releases](https://github.com/alib8b8/aflare/releases) 下载**
+**或从 [GitCode Releases](https://gitcode.com/llm-box/llm-box/releases) / [GitHub Releases](https://github.com/alib8b8/aflare/releases) 下载**
 
 📖 [交互式下载页面 →](docs/download.html)
 
@@ -632,7 +632,7 @@ aflare 在多个平台同步，欢迎在您常用的平台关注和贡献：
 | 平台 | 链接 |
 |------|------|
 | **GitHub** | https://github.com/alib8b8/aflare |
-| **GitCode / AtomGit** | https://gitcode.com/aflare/aflare |
+| **GitCode / AtomGit** | https://gitcode.com/llm-box/llm-box |
 
 ---
 
