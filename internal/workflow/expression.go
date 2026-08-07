@@ -1280,15 +1280,15 @@ func ContainsExpression(s string) bool {
 }
 
 var allowedEnvVars = map[string]bool{
-	"PATH":              true,
-	"HOME":              true,
-	"USER":              true,
-	"LOGNAME":           true,
-	"SHELL":             true,
-	"LANG":              true,
-	"LC_ALL":            true,
-	"TERM":              true,
-	"PWD":               true,
+	"PATH":             true,
+	"HOME":             true,
+	"USER":             true,
+	"LOGNAME":          true,
+	"SHELL":            true,
+	"LANG":             true,
+	"LC_ALL":           true,
+	"TERM":             true,
+	"PWD":              true,
 	"AFLARE_LANG":      true,
 	"AFLARE_SAFE_MODE": true,
 }
