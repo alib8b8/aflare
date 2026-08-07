@@ -4,9 +4,9 @@
     <a href="README.md">中文</a> ·
     <strong>English</strong>
   </p>
-  <p><strong>GitHub Actions for your laptop.</strong></p>
-  <p>Automate your terminal with plain English. Tired of writing Bash scripts? Let AI turn your ideas into executable YAML workflows.</p>
-  <p><em>What if Bash understood English?</em></p>
+  <p><strong>AI-powered universal workflow engine.</strong></p>
+  <p>From terminal automation to financial Saga transactions, multimodal analysis, and robot control — describe what you want in natural language, llm-box generates and executes YAML workflows. Supports Ascend / Cambricon / Hygon domestic chips.</p>
+  <p><em>What if Bash understood English — and could trade stocks, analyze images, and control robots?</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/llm-box/actions/workflows/ci.yml">

@@ -4,9 +4,9 @@
     <strong>中文</strong> ·
     <a href="README.en.md">English</a>
   </p>
-  <p><strong>GitHub Actions for your laptop.</strong></p>
-  <p>用自然语言自动化你的终端。厌倦了写 Bash 脚本？让 AI 帮你把想法变成可执行的 YAML 工作流。</p>
-  <p><em>What if Bash understood English?</em></p>
+  <p><strong>AI 驱动的通用工作流引擎。</strong></p>
+  <p>从终端自动化到金融 Saga 事务、多模态分析、机器人控制——自然语言描述即可生成并执行 YAML 工作流。支持昇腾 / 寒武纪 / 海光国产芯片。</p>
+  <p><em>What if Bash understood English — and could trade stocks, analyze images, and control robots?</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/llm-box/actions/workflows/ci.yml">
