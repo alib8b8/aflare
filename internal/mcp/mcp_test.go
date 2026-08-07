@@ -1998,7 +1998,7 @@ func TestClient_SendRequest_Timeout_Direct(t *testing.T) {
 		t.Skip("requires timeout behavior")
 	}
 	c := &Client{
-		pending:   make(map[int]chan *rpcResponse),
+		pending:    make(map[int]chan *rpcResponse),
 		httpClient: &http.Client{Timeout: 1 * time.Second},
 	}
 	// sendRequest with a real unreachable endpoint

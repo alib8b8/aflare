@@ -1232,10 +1232,10 @@ func TestRenderMarkdown_UnclosedCodeBlock(t *testing.T) {
 
 func TestParseHeading(t *testing.T) {
 	tests := []struct {
-		input      string
-		wantLevel  int
+		input       string
+		wantLevel   int
 		wantContent string
-		wantOk     bool
+		wantOk      bool
 	}{
 		{"# H1", 1, "H1", true},
 		{"## H2", 2, "H2", true},
@@ -1751,9 +1751,9 @@ func TestModel_View_EmptyOutput(t *testing.T) {
 func TestModel_View_Streaming(t *testing.T) {
 	m := NewModel("stream", "stream.yaml", 2)
 	m.steps[0] = Step{
-		Name:      "fetch",
-		Status:    StatusRunning,
-		Streaming: true,
+		Name:         "fetch",
+		Status:       StatusRunning,
+		Streaming:    true,
 		StreamOutput: "streaming data",
 	}
 
@@ -1863,9 +1863,9 @@ func TestModel_View_StreamingFirstStep(t *testing.T) {
 	// Test that streaming output from the first step is shown
 	m := NewModel("stream", "stream.yaml", 2)
 	m.steps[0] = Step{
-		Name:      "first",
-		Status:    StatusRunning,
-		Streaming: true,
+		Name:         "first",
+		Status:       StatusRunning,
+		Streaming:    true,
 		StreamOutput: "first output",
 	}
 

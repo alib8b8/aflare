@@ -83,12 +83,13 @@ func openDB(driver, dsn string) (*sql.DB, error) {
 		return nil, fmt.Errorf("driver and dsn are required")
 	}
 	key := dbCacheKey(driver, dsn)
+
 	dbCacheMu.Lock()
+	defer dbCacheMu.Unlock()
+
 	if db, ok := dbCache[key]; ok {
-		dbCacheMu.Unlock()
 		return db, nil
 	}
-	dbCacheMu.Unlock()
 
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
@@ -98,7 +99,6 @@ func openDB(driver, dsn string) (*sql.DB, error) {
 	db.SetMaxIdleConns(2)
 	db.SetConnMaxIdleTime(5 * time.Minute)
 
-	dbCacheMu.Lock()
 	// Evict if pool grew beyond 16 entries.
 	if len(dbCache) >= 16 {
 		for k, v := range dbCache {
@@ -108,7 +108,6 @@ func openDB(driver, dsn string) (*sql.DB, error) {
 		}
 	}
 	dbCache[key] = db
-	dbCacheMu.Unlock()
 	return db, nil
 }
 
@@ -282,8 +281,14 @@ func (n *SQLQueryNode) actionSchema(ctx context.Context, db *sql.DB, table strin
 		}
 		for rows.Next() {
 			var name string
-			_ = rows.Scan(&name)
+			if err := rows.Scan(&name); err != nil {
+				continue
+			}
 			tables = append(tables, name)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return "", fmt.Errorf("rows iteration: %w", err)
 		}
 		_ = rows.Close()
 	}
@@ -300,11 +305,18 @@ func (n *SQLQueryNode) actionSchema(ctx context.Context, db *sql.DB, table strin
 				continue
 			}
 		}
-		cols, _ := scanRows(colRows, 1000)
+		cols, scanErr := scanRows(colRows, 1000)
 		_ = colRows.Close()
+		if scanErr != nil {
+			schema[t] = []interface{}{}
+			continue
+		}
 		schema[t] = cols
 	}
 
-	out, _ := json.MarshalIndent(schema, "", "  ")
+	out, err := json.MarshalIndent(schema, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("marshal schema: %w", err)
+	}
 	return string(out), nil
 }

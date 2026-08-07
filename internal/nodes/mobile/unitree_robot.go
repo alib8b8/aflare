@@ -45,7 +45,7 @@ var (
 		"simulate": true, "api": true,
 	}
 	unitreeRobotIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
-	unitreeIPPattern       = regexp.MustCompile(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`)
+	unitreeIPPattern      = regexp.MustCompile(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`)
 )
 
 // UnitreeRobotNode controls Unitree (宇树) quadruped and humanoid robots
@@ -84,20 +84,20 @@ func (n *UnitreeRobotNode) Schema() core.NodeSchema {
 
 // UnitreeRobotResult is the JSON output from the node.
 type UnitreeRobotResult struct {
-	Type          string                 `json:"type"`
-	RobotModel    string                 `json:"robot_model"`
-	RobotID       string                 `json:"robot_id"`
-	Action        string                 `json:"action"`
-	Mode          string                 `json:"mode"`
-	Success       bool                   `json:"success"`
-	Description   string                 `json:"description"`
-	Parameters    map[string]interface{} `json:"parameters"`
-	SafetyChecks  *SafetyCheckResult     `json:"safety_checks,omitempty"`
-	Status        map[string]interface{} `json:"status,omitempty"`
-	CameraFrame   string                 `json:"camera_frame,omitempty"` // base64 encoded when get_camera
-	Error         string                 `json:"error,omitempty"`
-	APIRaw        string                 `json:"api_raw,omitempty"` // raw API response for debugging
-	Timestamp     string                 `json:"timestamp"`
+	Type         string                 `json:"type"`
+	RobotModel   string                 `json:"robot_model"`
+	RobotID      string                 `json:"robot_id"`
+	Action       string                 `json:"action"`
+	Mode         string                 `json:"mode"`
+	Success      bool                   `json:"success"`
+	Description  string                 `json:"description"`
+	Parameters   map[string]interface{} `json:"parameters"`
+	SafetyChecks *SafetyCheckResult     `json:"safety_checks,omitempty"`
+	Status       map[string]interface{} `json:"status,omitempty"`
+	CameraFrame  string                 `json:"camera_frame,omitempty"` // base64 encoded when get_camera
+	Error        string                 `json:"error,omitempty"`
+	APIRaw       string                 `json:"api_raw,omitempty"` // raw API response for debugging
+	Timestamp    string                 `json:"timestamp"`
 }
 
 func (n *UnitreeRobotNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
@@ -440,7 +440,7 @@ func simulateUnitreeStatus(robotModel, action string, params map[string]interfac
 	} else {
 		// Humanoid
 		status["joint_states"] = map[string]interface{}{
-			"head":    "ok",
+			"head":      "ok",
 			"left_arm":  "ok",
 			"right_arm": "ok",
 			"left_leg":  "ok",

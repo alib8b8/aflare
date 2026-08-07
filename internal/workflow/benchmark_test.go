@@ -247,9 +247,9 @@ func BenchmarkPricingLookup(b *testing.B) {
 // across different models and token usage patterns.
 func BenchmarkCostCompute(b *testing.B) {
 	cases := []struct {
-		name            string
-		model           string
-		promptTokens    int
+		name             string
+		model            string
+		promptTokens     int
 		completionTokens int
 	}{
 		{"Small_gpt4o", "gpt-4o", 100, 50},
@@ -283,8 +283,8 @@ func BenchmarkCostCompute_Batch(b *testing.B) {
 	// Simulate a trace with 50 different LLM calls mixing known and
 	// prefix-matched models.
 	type call struct {
-		model           string
-		promptTokens    int
+		model            string
+		promptTokens     int
 		completionTokens int
 	}
 	calls := make([]call, 50)
@@ -297,8 +297,8 @@ func BenchmarkCostCompute_Batch(b *testing.B) {
 	}
 	for i := range calls {
 		calls[i] = call{
-			model:           models[i%len(models)],
-			promptTokens:    (i + 1) * 100,
+			model:            models[i%len(models)],
+			promptTokens:     (i + 1) * 100,
 			completionTokens: (i + 1) * 50,
 		}
 	}

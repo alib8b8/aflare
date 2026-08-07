@@ -205,11 +205,11 @@ type runWorkflowRequest struct {
 
 // runWorkflowResponse is the JSON response for a workflow run.
 type runWorkflowResponse struct {
-	Success     bool                   `json:"success"`
-	Output      string                 `json:"output,omitempty"`
-	StepResults []workflowStepResult   `json:"step_results,omitempty"`
-	Error       string                 `json:"error,omitempty"`
-	Duration    string                 `json:"duration"`
+	Success     bool                 `json:"success"`
+	Output      string               `json:"output,omitempty"`
+	StepResults []workflowStepResult `json:"step_results,omitempty"`
+	Error       string               `json:"error,omitempty"`
+	Duration    string               `json:"duration"`
 }
 
 // workflowStepResult mirrors workflow.StepResult in JSON-safe form.
