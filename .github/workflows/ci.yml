@@ -46,6 +46,16 @@ jobs:
           echo "::notice::Coverage ${total}% meets threshold ${threshold}%"
         fi
 
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        files: coverage.out
+        flags: unittests
+        name: aflare-coverage
+        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
+      continue-on-error: true
+
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v9
       with:
@@ -57,4 +67,36 @@ jobs:
       run: |
         go install golang.org/x/vuln/cmd/govulncheck@latest
         govulncheck ./...
+
+    - name: Install benchstat
+      run: go install golang.org/x/perf/cmd/benchstat@latest
+
+    - name: Run benchmarks (current branch)
+      run: |
+        go test -bench=. -benchmem -run=^a -count=5 ./... > bench-current.txt 2>&1
+        cat bench-current.txt
+
+    - name: Checkout base branch for baseline
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ github.event.pull_request.base.ref || 'main' }}
+        path: baseline-checkout
+
+    - name: Run benchmarks (base branch)
+      run: |
+        cd baseline-checkout
+        go test -bench=. -benchmem -run=^a -count=5 ./... > ../bench-baseline.txt 2>&1
+        cat ../bench-baseline.txt
+
+    - name: Compare benchmarks
+      run: |
+        echo "=== benchstat comparison (baseline vs current) ==="
+        benchstat bench-baseline.txt bench-current.txt | tee bench-comparison.txt
+        echo "::group::Benchmark Comparison Report"
+        cat bench-comparison.txt
+        echo "::endgroup::"
+        # Check for significant regressions (>15%)
+        if grep -qE '[+-][0-9]{2,}\.[0-9]+%' bench-comparison.txt; then
+          echo "::warning::Potential performance regression detected (>15% change)"
+        fi
 

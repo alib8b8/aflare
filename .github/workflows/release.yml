@@ -8,11 +8,15 @@ on:
 permissions:
   contents: write
   packages: write
+  actions: read
+  id-token: write
 
 jobs:
   release:
     name: Build & Publish Release (GoReleaser)
     runs-on: ubuntu-latest
+    outputs:
+      hashes: ${{ steps.hash.outputs.hashes }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -36,6 +40,67 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate subject hashes for SLSA provenance
+        id: hash
+        run: |
+          set -euo pipefail
+          cd dist/
+          sha256sum * > ../checksums.txt
+          echo "hashes=$(base64 -w0 ../checksums.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign checksums with Cosign
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        run: |
+          for f in dist/*checksums.txt; do
+            cosign sign-blob \
+              --yes \
+              --output-signature="${f}.sig" \
+              --output-certificate="${f}.pem" \
+              "$f"
+          done
+
+      - name: Upload signatures to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            dist/*.sig \
+            dist/*.pem \
+            --clobber
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          artifact-name: sbom-${{ github.ref_name }}.spdx.json
+          output-file: ./sbom.spdx.json
+          format: spdx-json
+
+      - name: Upload SBOM to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            sbom.spdx.json \
+            --clobber
+
+      - name: Update Homebrew formula
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN || secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository_owner }}/homebrew-tap
+          event-type: formula-update
+          client-payload: |
+            {
+              "name": "aflare",
+              "version": "${{ github.ref_name }}",
+              "repo": "${{ github.repository }}",
+              "tag": "${{ github.ref_name }}"
+            }
 
   docker:
     name: Docker Build & Push
@@ -63,3 +128,16 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+
+  provenance:
+    name: Generate SLSA provenance
+    needs: [release]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: "${{ needs.release.outputs.hashes }}"
+      upload-assets: true
