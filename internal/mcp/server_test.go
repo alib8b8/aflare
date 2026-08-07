@@ -17,9 +17,11 @@ package mcp
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/alib8b8/llm-box/internal/workflow"
@@ -506,4 +508,365 @@ func TestGetTools(t *testing.T) {
 
 func TestHandleRequest_ParseError(t *testing.T) {
 	// Run reads from stdin, hard to test. Just ensure handleRequest works.
+}
+
+// ------------------------------------------------------------------
+// Additional server handleRequest tests
+// ------------------------------------------------------------------
+
+func TestHandleRequest_NilID(t *testing.T) {
+	s := NewServer()
+	req := &rpcRequest{JSONRPC: "2.0", ID: nil, Method: "initialize"}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response for initialize")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+func TestHandleRequest_NilID_UnknownMethod(t *testing.T) {
+	s := NewServer()
+	req := &rpcRequest{JSONRPC: "2.0", ID: nil, Method: "unknown/method"}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error == nil {
+		t.Fatal("expected error for unknown method")
+	}
+}
+
+func TestHandleRequest_NilID_Notification(t *testing.T) {
+	s := NewServer()
+	req := &rpcRequest{JSONRPC: "2.0", ID: nil, Method: "notifications/initialized"}
+	resp := s.handleRequest(req)
+	if resp != nil {
+		t.Error("expected nil response for notification")
+	}
+}
+
+func TestHandleRequest_OtherNotification(t *testing.T) {
+	// Non-standard notification methods should still be handled as unknown
+	s := NewServer()
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "notifications/cancelled"}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error == nil {
+		t.Fatal("expected error for unknown notification method")
+	}
+}
+
+func TestHandleRequest_ToolsCall_EmptyParams(t *testing.T) {
+	s := NewServer()
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: json.RawMessage(`{}`)}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error == nil {
+		t.Fatal("expected error for empty params")
+	}
+}
+
+func TestHandleRequest_ToolsCall_MissingName(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"arguments": map[string]interface{}{}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error == nil {
+		t.Fatal("expected error for missing tool name")
+	}
+}
+
+func TestHandleRequest_ToolsCall_MalformedParams(t *testing.T) {
+	s := NewServer()
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: json.RawMessage(`not json`)}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error == nil {
+		t.Fatal("expected error for malformed params")
+	}
+}
+
+func TestHandleRequest_ToolsCall_StringParams(t *testing.T) {
+	// Params is a string instead of an object
+	s := NewServer()
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: json.RawMessage(`"string not object"`)}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error == nil {
+		t.Fatal("expected error for string params")
+	}
+}
+
+// ------------------------------------------------------------------
+// Memory tools via handleRequest
+// ------------------------------------------------------------------
+
+func TestHandleRequest_ToolsCall_MemoryStore(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "memory_store", "arguments": map[string]interface{}{"value": "test memory"}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+func TestHandleRequest_ToolsCall_MemorySearch(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "memory_search", "arguments": map[string]interface{}{"query": "test"}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+func TestHandleRequest_ToolsCall_MemoryStats(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "memory_stats", "arguments": map[string]interface{}{}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+func TestHandleRequest_ToolsCall_MemoryListSessions(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "memory_list_sessions", "arguments": map[string]interface{}{}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+// ------------------------------------------------------------------
+// Compress tools via handleRequest
+// ------------------------------------------------------------------
+
+func TestHandleRequest_ToolsCall_ContextCompress(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "context_compress", "arguments": map[string]interface{}{"text": "test text to compress"}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+// ------------------------------------------------------------------
+// Preference tools via handleRequest
+// ------------------------------------------------------------------
+
+func TestHandleRequest_ToolsCall_PreferenceSet(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "preference_set", "arguments": map[string]interface{}{"key": "test", "value": "val"}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+func TestHandleRequest_ToolsCall_PreferenceGet(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "preference_get", "arguments": map[string]interface{}{"key": "test"}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+// ------------------------------------------------------------------
+// Geospatial tool via handleRequest
+// ------------------------------------------------------------------
+
+func TestHandleRequest_ToolsCall_GeospatialQuery(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "geospatial_query", "arguments": map[string]interface{}{"query": "test"}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+}
+
+// ------------------------------------------------------------------
+// Extended tool response format tests
+// ------------------------------------------------------------------
+
+func TestHandleRequest_ToolsCall_ResponseFormat(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "node_list", "arguments": map[string]interface{}{}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.JSONRPC != "2.0" {
+		t.Errorf("expected jsonrpc 2.0, got %s", resp.JSONRPC)
+	}
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %v", resp.Error)
+	}
+	// Verify result has content array
+	resultBytes, _ := json.Marshal(resp.Result)
+	var result toolCallResult
+	if err := json.Unmarshal(resultBytes, &result); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if len(result.Content) == 0 {
+		t.Error("expected at least one content item")
+	}
+	if result.Content[0].Type != "text" {
+		t.Errorf("expected content type text, got %s", result.Content[0].Type)
+	}
+}
+
+// ------------------------------------------------------------------
+// Workflow validation edge cases
+// ------------------------------------------------------------------
+
+func TestValidateWorkflow_PathTraversal(t *testing.T) {
+	s := NewServer()
+	_, err := s.validateWorkflow(map[string]interface{}{"file": "../../etc/passwd"})
+	if err == nil {
+		t.Fatal("expected error for path traversal")
+	}
+	if !strings.Contains(err.Error(), "path traversal") {
+		t.Errorf("expected path traversal error, got: %v", err)
+	}
+}
+
+func TestValidateWorkflow_NonexistentFile(t *testing.T) {
+	s := NewServer()
+	_, err := s.validateWorkflow(map[string]interface{}{"file": "/nonexistent/file/path.yaml"})
+	if err == nil {
+		t.Fatal("expected error for nonexistent file")
+	}
+}
+
+// ------------------------------------------------------------------
+// Search aggregated tool
+// ------------------------------------------------------------------
+
+func TestToolSearchAggregated_MissingQuery(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolSearchAggregated(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for missing query")
+	}
+}
+
+func TestHandleRequest_ToolsCall_SearchAggregated(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "search_aggregated", "arguments": map[string]interface{}{"query": "test"}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	// May fail if search_aggregate node not available; that's OK
+	if resp.Error != nil {
+		t.Logf("search_aggregated error (may be expected): %v", resp.Error)
+	}
+}
+
+// ------------------------------------------------------------------
+// Code graph tools via handleRequest
+// ------------------------------------------------------------------
+
+func TestHandleRequest_ToolsCall_CodeGraphQuery(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "code_graph_query", "arguments": map[string]interface{}{"query": "test"}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Logf("code_graph_query error (may be expected): %v", resp.Error)
+	}
+}
+
+func TestHandleRequest_ToolsCall_CodeGraphStats(t *testing.T) {
+	s := NewServer()
+	params, _ := json.Marshal(map[string]interface{}{"name": "code_graph_stats", "arguments": map[string]interface{}{}})
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+	resp := s.handleRequest(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if resp.Error != nil {
+		t.Logf("code_graph_stats error (may be expected): %v", resp.Error)
+	}
+}
+
+// ------------------------------------------------------------------
+// Concurrency test for server
+// ------------------------------------------------------------------
+
+func TestServer_ConcurrentHandleRequest(t *testing.T) {
+	s := NewServer()
+	var wg sync.WaitGroup
+	errCh := make(chan error, 20)
+
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			params, _ := json.Marshal(map[string]interface{}{"name": "node_list", "arguments": map[string]interface{}{}})
+			req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
+			resp := s.handleRequest(req)
+			if resp == nil || resp.Error != nil {
+				errCh <- fmt.Errorf("unexpected error: %v", resp)
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Errorf("concurrent request failed: %v", err)
+	}
 }

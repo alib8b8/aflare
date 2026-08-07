@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alib8b8/llm-box/internal/api"
 	"github.com/alib8b8/llm-box/internal/autoupgrade"
 	"github.com/alib8b8/llm-box/internal/cli"
 	"github.com/alib8b8/llm-box/internal/history"
@@ -76,7 +77,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	command, args, safeMode, dryRun, mcpServer, lang, concise, initMCP, initAgent, updateChannel := cli.ParseArgs(os.Args[1:])
+	command, args, safeMode, dryRun, mcpServer, lang, concise, initMCP, initAgent, updateChannel, serveMode := cli.ParseArgs(os.Args[1:])
 
 	// Set output mode based on --concise flag
 	if concise {
@@ -93,6 +94,12 @@ func main() {
 			fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
 			os.Exit(1)
 		}
+		return
+	}
+
+	// API server mode: start HTTP API server (--serve flag)
+	if serveMode {
+		handleServe(args)
 		return
 	}
 
@@ -209,6 +216,9 @@ func main() {
 		return
 	case "audit":
 		handleAudit(args)
+		return
+	case "serve":
+		handleServe(args)
 		return
 	default:
 		// Known subcommands are handled above; anything else is treated as a
@@ -861,6 +871,80 @@ func printWebUIUsage() {
 	fmt.Println("  llm-box webui")
 	fmt.Println("  llm-box webui --port 8080")
 	fmt.Println("  llm-box webui --dir /path/to/workflows")
+}
+
+func handleServe(args []string) {
+	host := ""
+	port := "8080"
+	apiKey := ""
+	workflowsDir := ""
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--host", "-H":
+			if i+1 < len(args) {
+				host = args[i+1]
+				i++
+			}
+		case "--port", "-p":
+			if i+1 < len(args) {
+				port = args[i+1]
+				i++
+			}
+		case "--api-key", "-k":
+			if i+1 < len(args) {
+				apiKey = args[i+1]
+				i++
+			}
+		case "--dir", "-d":
+			if i+1 < len(args) {
+				workflowsDir = args[i+1]
+				i++
+			}
+		case "--help", "-h":
+			printServeUsage()
+			return
+		default:
+			fmt.Printf("Unknown argument: %s\n", args[i])
+			printServeUsage()
+			os.Exit(1)
+		}
+	}
+
+	server := api.NewServer(host, port, apiKey)
+	if workflowsDir != "" {
+		server.SetWorkflowsDir(workflowsDir)
+	}
+
+	fmt.Printf("Starting API server on http://localhost:%s\n", port)
+	fmt.Println("Endpoints:")
+	fmt.Println("  GET  /health               - Health check")
+	fmt.Println("  GET  /api/v1/metrics        - Prometheus metrics")
+	fmt.Println("  POST /api/v1/workflows/run  - Run a workflow")
+	fmt.Println("  GET  /api/v1/workflows      - List available workflows")
+	fmt.Println("  GET  /api/v1/workflows/{name} - Get workflow details")
+	fmt.Println("Press Ctrl+C to stop")
+
+	if err := server.Start(); err != nil {
+		fmt.Printf("API server error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func printServeUsage() {
+	fmt.Println("Usage: llm-box serve [options]")
+	fmt.Println("\nOptions:")
+	fmt.Println("  --port, -p <port>      - API server port (default: 8080)")
+	fmt.Println("  --host, -H <host>      - API server host (default: 0.0.0.0)")
+	fmt.Println("  --api-key, -k <key>    - API key for authentication")
+	fmt.Println("  --dir, -d <dir>        - Workflows directory")
+	fmt.Println("  --help, -h             - Show this help")
+	fmt.Println("\nExamples:")
+	fmt.Println("  llm-box serve")
+	fmt.Println("  llm-box serve --port 9090")
+	fmt.Println("  llm-box serve --api-key my-secret-key")
+	fmt.Println("  llm-box serve --dir /path/to/workflows")
+	fmt.Println("  llm-box --serve --port 8080")
 }
 
 func updateConfigKey(config *autoupgrade.UpgradeConfig, key, value string) {

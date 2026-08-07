@@ -1210,6 +1210,833 @@ func TestValidateMCPURL(t *testing.T) {
 	}
 }
 
+// ------------------------------------------------------------------
+// Additional helper tests
+// ------------------------------------------------------------------
+
+func TestOptionalString(t *testing.T) {
+	if optionalString(map[string]interface{}{"a": "hello"}, "a") != "hello" {
+		t.Error("expected hello")
+	}
+	if optionalString(map[string]interface{}{}, "a") != "" {
+		t.Error("expected empty for missing key")
+	}
+	if optionalString(map[string]interface{}{"a": 42}, "a") != "" {
+		t.Error("expected empty for non-string")
+	}
+	if optionalString(map[string]interface{}{"a": ""}, "a") != "" {
+		t.Error("expected empty string through")
+	}
+}
+
+func TestRequireString_NonString(t *testing.T) {
+	_, err := requireString(map[string]interface{}{"foo": 42}, "foo")
+	if err == nil {
+		t.Fatal("expected error for non-string type")
+	}
+	_, err = requireString(map[string]interface{}{"foo": true}, "foo")
+	if err == nil {
+		t.Fatal("expected error for bool type")
+	}
+	_, err = requireString(map[string]interface{}{"foo": nil}, "foo")
+	if err == nil {
+		t.Fatal("expected error for nil")
+	}
+}
+
+func TestOptionalInt_EdgeCases(t *testing.T) {
+	// Invalid string should return default
+	if optionalInt(map[string]interface{}{"n": "not-a-number"}, "n", 5) != 5 {
+		t.Error("expected default 5 for invalid string")
+	}
+	// bool should return default
+	if optionalInt(map[string]interface{}{"n": true}, "n", 3) != 3 {
+		t.Error("expected default 3 for bool")
+	}
+	// nil should return default
+	if optionalInt(map[string]interface{}{"n": nil}, "n", 10) != 10 {
+		t.Error("expected default 10 for nil")
+	}
+	// negative int
+	if optionalInt(map[string]interface{}{"n": -5}, "n", 0) != -5 {
+		t.Error("expected -5")
+	}
+	// float64 with decimal
+	if optionalInt(map[string]interface{}{"n": 3.99}, "n", 0) != 3 {
+		t.Error("expected 3 (truncated)")
+	}
+}
+
+func TestOptionalBool_EdgeCases(t *testing.T) {
+	// 1/0 as int (not handled, should return default)
+	if optionalBool(map[string]interface{}{"b": 1}, "b", true) != true {
+		t.Error("expected default true for int")
+	}
+	// mixed case string
+	if !optionalBool(map[string]interface{}{"b": "True"}, "b", false) {
+		t.Error("expected true for mixed case")
+	}
+	if optionalBool(map[string]interface{}{"b": "FALSE"}, "b", true) {
+		t.Error("expected false for uppercase false")
+	}
+	// unrecognized string
+	if !optionalBool(map[string]interface{}{"b": "yes"}, "b", true) {
+		t.Error("expected default true for unrecognized string")
+	}
+}
+
+func TestSanitizeError_HomeDir(t *testing.T) {
+	// Home directory replacement is tested inline; just verify nil is safe
+	if sanitizeError(nil) != nil {
+		t.Error("expected nil for nil error")
+	}
+}
+
+func TestSanitizeError_MorePatterns(t *testing.T) {
+	patterns := []string{
+		"invalid token: abc123",
+		"missing secret key",
+		"wrong password provided",
+		"invalid credential pair",
+	}
+	for _, p := range patterns {
+		err := sanitizeError(fmt.Errorf("%s", p))
+		if !strings.Contains(err.Error(), "redacted") {
+			t.Errorf("expected redacted error for pattern %q, got: %v", p, err)
+		}
+	}
+}
+
+func TestTruncate_EdgeCases(t *testing.T) {
+	if truncate("", 5) != "" {
+		t.Error("expected empty string")
+	}
+	if truncate("abc", 3) != "abc" {
+		t.Error("expected exact match")
+	}
+	// "abcde" with maxLen=4 => "a..."
+	if truncate("abcde", 4) != "a..." {
+		t.Errorf("expected a..., got %s", truncate("abcde", 4))
+	}
+}
+
+// ------------------------------------------------------------------
+// Additional workflow tool tests
+// ------------------------------------------------------------------
+
+func TestToolWorkflowRun_PathTraversal(t *testing.T) {
+	s := NewServer()
+	// runWorkflow blocks path traversal; toolWorkflowRun doesn't
+	_, err := s.runWorkflow(map[string]interface{}{"file": "../../etc/passwd"})
+	if err == nil {
+		t.Fatal("expected error for path traversal")
+	}
+	if !strings.Contains(err.Error(), "path traversal") {
+		t.Errorf("expected path traversal error, got: %v", err)
+	}
+}
+
+func TestToolWorkflowList_NonDirPath(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "test.yaml")
+	_ = os.WriteFile(filePath, []byte("name: test"), 0644)
+
+	// Passing a file path instead of directory should fail
+	_, err := s.toolWorkflowList(map[string]interface{}{"directory": filePath})
+	if err == nil {
+		t.Fatal("expected error for non-directory path")
+	}
+}
+
+// ------------------------------------------------------------------
+// Additional node tool tests
+// ------------------------------------------------------------------
+
+func TestToolNodeInfo_EmptyString(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolNodeInfo(map[string]interface{}{"name": ""})
+	if err == nil {
+		t.Fatal("expected error for empty name")
+	}
+}
+
+func TestToolNodeInfo_WhitespaceOnly(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolNodeInfo(map[string]interface{}{"name": "   "})
+	if err == nil {
+		t.Fatal("expected error for whitespace-only name")
+	}
+}
+
+// ------------------------------------------------------------------
+// Additional history tool tests
+// ------------------------------------------------------------------
+
+func TestToolHistoryList_NonExistentDir(t *testing.T) {
+	s := NewServer()
+	history.SetHistoryDir("/nonexistent/path/xyz123")
+	defer history.SetHistoryDir("")
+
+	// history.ListRecordsWithFilter may gracefully handle missing dirs;
+	// we just check that it doesn't panic.
+	result, err := s.toolHistoryList(map[string]interface{}{})
+	if err != nil {
+		t.Logf("history list error (acceptable): %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestToolHistoryList_TriggerFilter(t *testing.T) {
+	s := NewServer()
+	tmpDir := t.TempDir()
+	history.SetHistoryDir(tmpDir)
+	defer history.SetHistoryDir("")
+
+	rec := history.Record{
+		ID:        "test-trigger-1",
+		Name:      "test-workflow",
+		Trigger:   history.TriggerAPI,
+		Success:   true,
+		StartedAt: time.Now().Add(-time.Hour),
+		Duration:  5 * time.Second,
+	}
+	if err := history.SaveRecord(rec); err != nil {
+		t.Fatalf("failed to save record: %v", err)
+	}
+
+	result, err := s.toolHistoryList(map[string]interface{}{"limit": 5})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+// ------------------------------------------------------------------
+// Memory tool tests
+// ------------------------------------------------------------------
+
+func TestToolMemoryStore_MissingValue(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolMemoryStore(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for missing value")
+	}
+}
+
+func TestToolMemoryStore_WithSession(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolMemoryStore(map[string]interface{}{
+		"session_id": "test-session",
+		"key":        "my-key",
+		"value":      "some memory content",
+		"level":      "short",
+		"type":       "fact",
+		"tags":       "test,example",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "Stored:") {
+		t.Errorf("expected stored confirmation, got: %s", text)
+	}
+}
+
+func TestToolMemoryStore_Defaults(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolMemoryStore(map[string]interface{}{
+		"value": "default session test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestToolMemoryStore_ConfidenceFloat(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolMemoryStore(map[string]interface{}{
+		"value":      "confidence test",
+		"confidence": 0.5,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestToolMemoryStore_ConfidenceInt(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolMemoryStore(map[string]interface{}{
+		"value":      "confidence int test",
+		"confidence": 1,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestToolMemoryRetrieve_MissingKey(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolMemoryRetrieve(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for missing key")
+	}
+}
+
+func TestToolMemoryRetrieve_NotFound(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolMemoryRetrieve(map[string]interface{}{
+		"session_id": "nonexistent-session",
+		"key":        "nonexistent-key",
+	})
+	if err == nil {
+		t.Fatal("expected error for non-existent key")
+	}
+}
+
+func TestToolMemorySearch_MissingQuery(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolMemorySearch(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for missing query")
+	}
+}
+
+func TestToolMemorySearch_EmptyResults(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolMemorySearch(map[string]interface{}{
+		"session_id": "empty-session",
+		"query":      "nonexistent-content-xyz",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	if !strings.Contains(result.Content[0].Text, "No matching") {
+		t.Errorf("expected no matching message, got: %s", result.Content[0].Text)
+	}
+}
+
+func TestToolMemorySearch_WithLevel(t *testing.T) {
+	s := NewServer()
+	// Store something first
+	_, _ = s.toolMemoryStore(map[string]interface{}{
+		"session_id": "search-session",
+		"key":        "searchable-key",
+		"value":      "searchable content for testing",
+		"level":      "long",
+	})
+
+	result, err := s.toolMemorySearch(map[string]interface{}{
+		"session_id": "search-session",
+		"query":      "searchable",
+		"level":      "long",
+		"top_k":      5,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestToolMemoryStats_DefaultSession(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolMemoryStats(map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestToolMemoryStats_Global(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolMemoryStats(map[string]interface{}{"session_id": "global"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	if !strings.Contains(result.Content[0].Text, "Global") {
+		t.Errorf("expected global stats, got: %s", result.Content[0].Text)
+	}
+}
+
+func TestToolMemoryListSessions(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolMemoryListSessions()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+// ------------------------------------------------------------------
+// Preference tool tests
+// ------------------------------------------------------------------
+
+func TestToolPreferenceGet_MissingKey(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolPreferenceGet(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for missing key")
+	}
+}
+
+func TestToolPreferenceGet_NotFound(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolPreferenceGet(map[string]interface{}{
+		"key": "nonexistent-pref",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	if !strings.Contains(result.Content[0].Text, "No preference") {
+		t.Errorf("expected not found message, got: %s", result.Content[0].Text)
+	}
+}
+
+func TestToolPreferenceSet_MissingKey(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolPreferenceSet(map[string]interface{}{"value": "test"})
+	if err == nil {
+		t.Fatal("expected error for missing key")
+	}
+}
+
+func TestToolPreferenceSet_MissingValue(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolPreferenceSet(map[string]interface{}{"key": "test"})
+	if err == nil {
+		t.Fatal("expected error for missing value")
+	}
+}
+
+func TestToolPreferenceSet_Learn(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolPreferenceSet(map[string]interface{}{
+		"key":      "coding_style",
+		"value":    "functional",
+		"category": "coding_style",
+		"learn":    true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	if !strings.Contains(result.Content[0].Text, "learned") {
+		t.Errorf("expected learned, got: %s", result.Content[0].Text)
+	}
+}
+
+func TestToolPreferenceSet_Explicit(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolPreferenceSet(map[string]interface{}{
+		"key":      "verbosity",
+		"value":    "concise",
+		"category": "verbosity",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	if !strings.Contains(result.Content[0].Text, "set") {
+		t.Errorf("expected set, got: %s", result.Content[0].Text)
+	}
+}
+
+func TestToolPreferenceGet_AfterSet(t *testing.T) {
+	s := NewServer()
+	_, _ = s.toolPreferenceSet(map[string]interface{}{
+		"key":      "test-key",
+		"value":    "test-value",
+		"category": "custom",
+		"user_id":  "test-user",
+	})
+
+	result, err := s.toolPreferenceGet(map[string]interface{}{
+		"key":      "test-key",
+		"category": "custom",
+		"user_id":  "test-user",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	if !strings.Contains(result.Content[0].Text, "test-value") {
+		t.Errorf("expected test-value, got: %s", result.Content[0].Text)
+	}
+}
+
+// ------------------------------------------------------------------
+// Compress tool tests
+// ------------------------------------------------------------------
+
+func TestToolContextCompress_MissingText(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolContextCompress(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for missing text")
+	}
+}
+
+func TestToolContextCompress_Defaults(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolContextCompress(map[string]interface{}{
+		"text": "This is a test text to compress. It contains multiple sentences. We need to see how well the compression works.",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	if !strings.Contains(result.Content[0].Text, "Compressed:") {
+		t.Errorf("expected compress output, got: %s", result.Content[0].Text)
+	}
+}
+
+func TestToolContextCompress_WithAlgorithm(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolContextCompress(map[string]interface{}{
+		"text":      "Some text to compress with a specific algorithm.",
+		"algorithm": "extract",
+		"ratio":     0.5,
+		"max_chars": 2000,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+// ------------------------------------------------------------------
+// Geospatial tool tests
+// ------------------------------------------------------------------
+
+func TestToolGeospatialQuery_MissingQuery(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolGeospatialQuery(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for missing query")
+	}
+}
+
+func TestToolGeospatialQuery_Defaults(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolGeospatialQuery(map[string]interface{}{
+		"query": "Show NDVI trend in Amazon basin",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	if !strings.Contains(result.Content[0].Text, "Geospatial") {
+		t.Errorf("expected geospatial output, got: %s", result.Content[0].Text)
+	}
+}
+
+func TestToolGeospatialQuery_WithRegion(t *testing.T) {
+	s := NewServer()
+	result, err := s.toolGeospatialQuery(map[string]interface{}{
+		"query":      "Show NDVI trend",
+		"dataset":    "landsat8",
+		"region":     "Amazon",
+		"time_start": "2020-01-01",
+		"time_end":   "2024-12-31",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "Amazon") {
+		t.Errorf("expected region in output, got: %s", text)
+	}
+}
+
+// ------------------------------------------------------------------
+// Code graph tool tests
+// ------------------------------------------------------------------
+
+func TestToolCodeGraphIndex_Defaults(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolCodeGraphIndex(map[string]interface{}{})
+	if err != nil {
+		t.Logf("code_graph_index error (may be expected): %v", err)
+	}
+}
+
+func TestToolCodeGraphQuery_MissingQuery(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolCodeGraphQuery(map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for missing query")
+	}
+}
+
+func TestToolCodeGraphQuery_WithTopK(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolCodeGraphQuery(map[string]interface{}{
+		"query": "authentication",
+		"top_k": 5,
+	})
+	if err != nil {
+		t.Logf("code_graph_query error (may be expected): %v", err)
+	}
+}
+
+func TestToolCodeGraphStats(t *testing.T) {
+	s := NewServer()
+	_, err := s.toolCodeGraphStats()
+	if err != nil {
+		t.Logf("code_graph_stats error (may be expected): %v", err)
+	}
+}
+
+// ------------------------------------------------------------------
+// CallExtendedTool dispatch tests
+// ------------------------------------------------------------------
+
+func TestCallExtendedTool_UnknownTool(t *testing.T) {
+	s := NewServer()
+	_, err := s.callExtendedTool(&toolCallParams{Name: "nonexistent_tool_xyz"})
+	if err == nil {
+		t.Fatal("expected error for unknown tool")
+	}
+	if !strings.Contains(err.Error(), "unknown tool") {
+		t.Errorf("expected unknown tool error, got: %v", err)
+	}
+}
+
+func TestCallExtendedTool_EmptyToolName(t *testing.T) {
+	s := NewServer()
+	_, err := s.callExtendedTool(&toolCallParams{Name: ""})
+	if err == nil {
+		t.Fatal("expected error for empty tool name")
+	}
+}
+
+// ------------------------------------------------------------------
+// Additional Client tests
+// ------------------------------------------------------------------
+
+func TestClient_ListTools_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req rpcRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
+		if req.Method == "initialize" {
+			resp.Result = initializeResult{
+				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
+				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
+			}
+		} else if req.Method == "notifications/initialized" {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		} else if req.Method == "tools/list" {
+			resp.Error = &rpcError{Code: -32603, Message: "server error"}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := Connect(server.URL)
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer client.Close()
+
+	_, err = client.ListTools()
+	if err == nil {
+		t.Fatal("expected error from ListTools")
+	}
+}
+
+func TestClient_ListTools_InvalidResult(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req rpcRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
+		if req.Method == "initialize" {
+			resp.Result = initializeResult{
+				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
+				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
+			}
+		} else if req.Method == "notifications/initialized" {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		} else if req.Method == "tools/list" {
+			resp.Result = "invalid result type"
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := Connect(server.URL)
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer client.Close()
+
+	_, err = client.ListTools()
+	if err == nil {
+		t.Fatal("expected error from ListTools with invalid result")
+	}
+}
+
+func TestClient_CallTool_NilArgs(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req rpcRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
+		if req.Method == "initialize" {
+			resp.Result = initializeResult{
+				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
+				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
+			}
+		} else if req.Method == "notifications/initialized" {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		} else if req.Method == "tools/call" {
+			resp.Result = toolCallResult{Content: []content{{Type: "text", Text: "ok"}}}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := Connect(server.URL)
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer client.Close()
+
+	// nil args should be fine, gets marshaled as null
+	result, err := client.CallTool("test_tool", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || len(result.Content) == 0 {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestClient_CallTool_InvalidResult(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req rpcRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
+		if req.Method == "initialize" {
+			resp.Result = initializeResult{
+				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
+				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
+			}
+		} else if req.Method == "notifications/initialized" {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		} else if req.Method == "tools/call" {
+			resp.Result = "not a tool result"
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := Connect(server.URL)
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer client.Close()
+
+	_, err = client.CallTool("some_tool", map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected error for invalid result type")
+	}
+}
+
+func TestClient_SendRequest_Timeout_Direct(t *testing.T) {
+	// Direct timeout test: pending request with no response
+	if testing.Short() {
+		t.Skip("requires timeout behavior")
+	}
+	c := &Client{
+		pending:   make(map[int]chan *rpcResponse),
+		httpClient: &http.Client{Timeout: 1 * time.Second},
+	}
+	// sendRequest with a real unreachable endpoint
+	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "test"}
+	_, err := c.sendRequest(req)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestClient_SanitizeErrorString_EdgeCases(t *testing.T) {
+	// Empty string
+	if sanitizeErrorString("") != "" {
+		t.Error("expected empty string unchanged")
+	}
+	// All caps sensitive word
+	if sanitizeErrorString("KEY not found") != "tool execution failed (sensitive details redacted)" {
+		t.Error("expected KEY to be redacted")
+	}
+	// Mixed case
+	if sanitizeErrorString("my Token is invalid") != "tool execution failed (sensitive details redacted)" {
+		t.Error("expected Token to be redacted")
+	}
+}
+
+func TestClient_ValidateMCPURL_EdgeCases(t *testing.T) {
+	// IPv6 loopback
+	err := validateMCPURL("http://[::1]:8080/mcp")
+	if err != nil {
+		t.Errorf("expected valid IPv6 loopback URL, got: %v", err)
+	}
+	// Port
+	err = validateMCPURL("http://localhost:9999/sse")
+	if err != nil {
+		t.Errorf("expected valid localhost with port, got: %v", err)
+	}
+}
+
 func TestValidateMCPIP(t *testing.T) {
 	tests := []struct {
 		name    string

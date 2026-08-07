@@ -1,0 +1,134 @@
+name: saga-transfer-ascend
+description: |
+  Saga 跨行转账工作流 —— 昇腾（Ascend）NPU 版。
+  在转账前增加昇腾 LLM 欺诈检测，展示金融交易 Agent 在国产硬件上的落地能力。
+
+  流程：
+  1. 昇腾 LLM 欺诈检测（ascend 节点，分析交易模式）
+  2. Saga 跨行转账：debit（扣款）→ credit（入账）→ notify（通知）
+  3. 任一步骤失败时，已完成的步骤按反向执行 compensate（best-effort）
+  4. {{var.error}} 在补偿步骤中可见，可据此分支处理不同失败原因
+
+  赛事对照：
+  - 金融场景：跨境支付 / 转账
+  - 昇腾算力：LLM 欺诈检测使用 ascend provider（MindIE 推理服务）
+  - 真问题：Saga 事务补偿 + LLM 欺诈检测，解决分布式交易一致性
+
+  前置条件：
+    export ASCEND_API_BASE="http://<ascend-npu-ip>:8080/v1"  # MindIE 推理服务地址
+    export ASCEND_API_KEY="your-api-key"                       # 或本地部署无需 key
+
+vars:
+  # 昇腾推理服务地址（MindIE 默认端口 8080，OpenAI 兼容 API）
+  # 也可通过 ASCEND_API_BASE 环境变量设置
+  ascend_endpoint: "http://localhost:8080/v1"
+  # 银行 mock API（模拟跨行转账）
+  bank_api_url: "http://localhost:17801"
+  from_account: "ACC0001"
+  to_account: "ACC0002"
+  # amount=9999 触发 credit 失败 → debit 补偿（退款）
+  amount: "9999"
+  currency: "CNY"
+  result_log: "./saga-ascend-result.jsonl"
+
+steps:
+  # ── Step 1: 昇腾 LLM 欺诈检测（转账前风险筛查）──
+  - name: fraud_check
+    node: ascend
+    params:
+      endpoint: "{{var.ascend_endpoint}}"
+      model: "qwen2.5-7b"
+      system: |
+        你是金融交易欺诈检测助手。分析转账请求，输出风险评分。
+        只输出 JSON，格式：{"risk_score":0-100,"risk_level":"low|medium|high","flags":[],"decision":"allow|review|block"}
+      prompt: |
+        请分析以下转账请求的欺诈风险：
+
+        付款账户：{{var.from_account}}
+        收款账户：{{var.to_account}}
+        金额：{{var.amount}} {{var.currency}}
+    retry: 1
+
+  # ── Step 2: Saga 跨行转账（debit → credit → notify）──
+  - name: cross-bank-transfer
+    saga:
+      steps:
+        # forward 1: A 行扣款（带限流+重试保护银行 API）
+        - forward:
+            name: debit
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/debit"
+              headers: |-
+                Content-Type: application/json
+                Idempotency-Key: saga-ascend-debit-{{var.amount}}
+              body: '{"account":"{{var.from_account}}","amount":{{var.amount}},"currency":"{{var.currency}}","fraud_score":{{step.fraud_check}}}'
+              rate_limit_rps: "5"
+              rate_limit_burst: "2"
+              max_retries: "3"
+              retry_backoff_ms: "200"
+              retry_on_status: "429,500,502,503,504"
+          # compensate 1: A 行退款
+          compensate:
+            name: refund-debit
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/refund"
+              headers: |-
+                Content-Type: application/json
+                Idempotency-Key: saga-ascend-refund-{{var.amount}}
+              body: '{"account":"{{var.from_account}}","amount":{{var.amount}},"currency":"{{var.currency}}","reason":"{{var.error}}"}'
+              rate_limit_rps: "5"
+              max_retries: "3"
+              retry_backoff_ms: "200"
+              retry_on_status: "429,500,502,503,504"
+
+        # forward 2: B 行入账
+        - forward:
+            name: credit
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/credit"
+              headers: |-
+                Content-Type: application/json
+                Idempotency-Key: saga-ascend-credit-{{var.amount}}
+              body: '{"account":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}"}'
+              rate_limit_rps: "5"
+              max_retries: "3"
+              retry_backoff_ms: "200"
+              retry_on_status: "429,500,502,503,504"
+          # compensate 2: B 行冲正
+          compensate:
+            name: reverse-credit
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/reverse"
+              headers: |-
+                Content-Type: application/json
+                Idempotency-Key: saga-ascend-reverse-{{var.amount}}
+              body: '{"account":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}","reason":"{{var.error}}"}'
+              max_retries: "2"
+
+        # forward 3: 通知
+        - forward:
+            name: notify
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/notify"
+              headers: |-
+                Content-Type: application/json
+              body: '{"from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}},"status":"success","fraud_score":{{step.fraud_check}}}'
+              max_retries: "2"
+
+  # ── Step 3: 记录结果 ──
+  - name: log-result
+    node: file_write
+    params:
+      path: "{{var.result_log}}"
+      mode: append
+      content: '{"status":"saga_committed","from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}},"fraud_check":{{step.fraud_check}}}'

@@ -411,10 +411,10 @@ func formatMultimodalOutput(content, source, mode, outputFormat string) string {
 	switch outputFormat {
 	case "json":
 		return fmt.Sprintf(`{
-  "mode": "%s",
-  "source": "%s",
+  "mode": %s,
+  "source": %s,
   "result": %s
-}`, mode, source, escapeJSON(content))
+}`, escapeJSON(mode), escapeJSON(source), escapeJSON(content))
 	default:
 		var builder strings.Builder
 		builder.WriteString(fmt.Sprintf("## Multimodal Analysis (%s)\n\n", mode))
@@ -425,10 +425,14 @@ func formatMultimodalOutput(content, source, mode, outputFormat string) string {
 	}
 }
 
+// escapeJSON returns s as a JSON-encoded string (with surrounding quotes).
+// Uses json.Marshal so all control characters, Unicode escapes, and other
+// JSON-special characters are handled correctly regardless of the LLM output.
 func escapeJSON(s string) string {
-	s = strings.ReplaceAll(s, "\\", "\\\\")
-	s = strings.ReplaceAll(s, "\"", "\\\"")
-	s = strings.ReplaceAll(s, "\n", "\\n")
-	s = strings.ReplaceAll(s, "\t", "\\t")
-	return "\"" + s + "\""
+	b, err := json.Marshal(s)
+	if err != nil {
+		// json.Marshal never fails for a string input, but guard defensively.
+		return "\"\""
+	}
+	return string(b)
 }

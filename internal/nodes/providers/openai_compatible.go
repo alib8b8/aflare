@@ -162,6 +162,14 @@ var openAICompatibleConfigs = []core.LLMNodeConfig{
 		EnvAPIBase:      "IMA_API_BASE", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "IMA Copilot",
 	},
+	{
+		Name:            "ascend",
+		DefaultModel:    "qwen2.5-7b",
+		DefaultEndpoint: "http://localhost:8080/v1",
+		EnvAPIKey:       "ASCEND_API_KEY",  // #nosec G101 -- env var name, not a credential value
+		EnvAPIBase:      "ASCEND_API_BASE", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "Ascend",
+	},
 }
 
 func init() {

@@ -160,7 +160,7 @@ llm-box run btc-monitor.yaml
 | **🔄 Scheduled Execution** | Built-in Cron scheduling. Every 10 minutes, daily, weekly — however you want it |
 | **🧩 100+ Built-in Templates** | BTC monitor, GitHub Star alerts, Arxiv paper summaries, weather reminders… ready to use |
 | **🔌 Plugin System** | Extend like Homebrew taps. `llm-box install btc-monitor` |
-| **🌐 Multi-Model Support** | Ollama / OpenAI / DeepSeek / Qwen / Kimi / GLM / Mistral, local and cloud |
+| **🌐 Multi-Model Support** | Ollama / OpenAI / DeepSeek / Qwen / Kimi / GLM / Mistral / **Ascend**, local and cloud |
 | **🔒 Privacy First** | Local execution by default, auto secret redaction, complete audit logs, 98+ vulnerabilities audited |
 | **🛡️ Enterprise-Grade Security** | SSRF protection, path traversal defense, command injection whitelist, AES-GCM encryption |
 | **⚙️ Engineering Depth** | WAL persistence engine (crash recovery), bytecode-IR expression engine + vectorized evaluation, EWMA latency prediction + Pareto routing, TLA+ formal verification of DAG scheduler |
@@ -190,9 +190,11 @@ llm-box ships the core capabilities required for real-world financial scenarios 
 
 ### Examples
 - [AML Suspicious Transaction Review](examples/finance/aml-review/) — read-only analysis
+- [AML Review (Ascend NPU)](examples/finance/aml-review-ascend/) — read-only analysis, LLM inference on Ascend NPU
 - [Idempotent Transfer](examples/finance/idempotent-transfer/) — controlled write
-- [Saga Cross-bank Transfer](examples/finance/saga-transfer/) — cross-step transaction compensation (new)
-- [End-of-day Reconciliation](examples/finance/reconciliation/) — read-only analysis (new)
+- [Saga Cross-bank Transfer](examples/finance/saga-transfer/) — cross-step transaction compensation
+- [Saga Transfer (Ascend NPU)](examples/finance/saga-transfer-ascend/) — cross-step transaction compensation + Ascend LLM fraud detection
+- [End-of-day Reconciliation](examples/finance/reconciliation/) — read-only analysis
 
 ---
 
@@ -296,6 +298,7 @@ llm-box participates in multiple open-source ecosystems:
 | **Ant Ling** | Active | API integration (4 models: ling-2.6-flash/ling-2.6-1t/ring-2.6-1t/ming-flash-omni-2.0), OpenAI-compatible endpoint |
 | **OPPO AndesGPT** | Active | API integration (Tiny/Turbo/Titan tiers), PersonaX personalization, end-cloud collaboration |
 | **GitHub** | Active | CI/CD, CodeQL security scan, automated releases |
+| **Ascend** | Integrated | Ascend NPU (MindIE inference), `ascend` provider node, financial risk/transfer templates |
 
 ### HarmonyOS Device Support
 

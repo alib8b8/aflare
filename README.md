@@ -160,7 +160,7 @@ llm-box run btc-monitor.yaml
 | **🔄 定时调度** | 内置 Cron 调度，每 10 分钟、每天、每周——想怎么跑就怎么跑 |
 | **🧩 100+ 内置模板** | BTC 监控、GitHub Star 告警、Arxiv 论文总结、天气提醒……拿来就用 |
 | **🔌 插件系统** | 像 Homebrew tap 一样扩展。`llm-box install btc-monitor` |
-| **🌐 多模型支持** | 支持 Ollama / OpenAI / DeepSeek / Qwen / Kimi / GLM / Mistral，本地云端都能跑 |
+| **🌐 多模型支持** | 支持 Ollama / OpenAI / DeepSeek / Qwen / Kimi / GLM / Mistral / **昇腾 Ascend**，本地云端都能跑 |
 | **🔒 隐私优先** | 默认本地执行，秘密自动脱敏，审计日志完整，98+ 漏洞已审计 |
 | **🛡️ 企业级安全** | SSRF 防护、路径遍历防御、命令注入白名单、AES-GCM 加密 |
 | **⚙️ 工程深度** | WAL 持久化引擎（崩溃恢复）、表达式字节码 IR + 向量化求值、EWMA 延迟预测 + 帕累托路由、TLA+ 形式化验证 DAG 调度器 |
@@ -190,9 +190,11 @@ llm-box 已具备真实金融场景（只读分析 + 受控写入）的核心能
 
 ### 示例
 - [AML 可疑交易审查](examples/finance/aml-review/) — 只读分析
+- [AML 可疑交易审查（昇腾 NPU 版）](examples/finance/aml-review-ascend/) — 只读分析，LLM 推理运行于昇腾 Ascend
 - [幂等转账](examples/finance/idempotent-transfer/) — 受控写入
-- [Saga 跨行转账](examples/finance/saga-transfer/) — 跨步骤事务补偿（新增）
-- [日终对账](examples/finance/reconciliation/) — 只读分析（新增）
+- [Saga 跨行转账](examples/finance/saga-transfer/) — 跨步骤事务补偿
+- [Saga 跨行转账（昇腾 NPU 版）](examples/finance/saga-transfer-ascend/) — 跨步骤事务补偿 + 昇腾 LLM 欺诈检测
+- [日终对账](examples/finance/reconciliation/) — 只读分析
 
 ---
 
@@ -296,6 +298,7 @@ llm-box 参与多个开源生态：
 | **Ant Ling (百灵)** | 活跃 | API 集成（4 个模型：ling-2.6-flash/ling-2.6-1t/ring-2.6-1t/ming-flash-omni-2.0）、OpenAI 兼容端点 |
 | **OPPO AndesGPT** | 活跃 | API 集成（Tiny/Turbo/Titan 三档）、PersonaX 个性化、端云协同 |
 | **GitHub** | 活跃 | CI/CD、CodeQL 安全扫描、自动发布 |
+| **昇腾 Ascend** | 已集成 | 昇腾 NPU 适配（MindIE 推理服务），`ascend` provider 节点，金融风控/转账模板 |
 
 ### 鸿蒙设备支持
 

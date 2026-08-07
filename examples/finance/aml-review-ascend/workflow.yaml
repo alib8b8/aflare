@@ -1,0 +1,139 @@
+name: aml-review-ascend
+description: |
+  反洗钱（AML）可疑交易审查工作流 —— 昇腾（Ascend）NPU 版。
+  基于昇腾算力底座运行 LLM 风险评分，展示金融风控 Agent 在国产硬件上的落地能力。
+
+  流程：
+  1. 读取交易数据（JSON 批量）
+  2. map 并发查询：黑名单 / 工商 / 媒体负面（三源交叉验证）
+  3. 昇腾 LLM 综合风险评分（ascend 节点，使用 qwen2.5-7b 模型）
+  4. 按风险等级分流，生成审查报告
+
+  赛事对照：
+  - 金融场景：风控 / 反洗钱
+  - 昇腾算力：LLM 推理使用 ascend provider（MindIE 推理服务）
+  - 真问题：三源交叉验证 + LLM 风险评分，可解释决策
+
+  前置条件：
+    export ASCEND_API_BASE="http://<ascend-npu-ip>:8080/v1"  # MindIE 推理服务地址
+    export ASCEND_API_KEY="your-api-key"                       # 或本地部署无需 key
+
+vars:
+  # 昇腾推理服务地址（MindIE 默认端口 8080，OpenAI 兼容 API）
+  # 也可通过 ASCEND_API_BASE 环境变量设置
+  ascend_endpoint: "http://localhost:8080/v1"
+  # 数据源地址（mock server 模拟黑名单/工商/媒体查询）
+  data_endpoint: "http://localhost:17791"
+  transactions_file: "examples/finance/aml-review/demo/transactions.json"
+  report_file: "examples/finance/aml-review-ascend/output/report.md"
+
+steps:
+  # ── Step 1: 读取交易数据 ──
+  - name: load
+    node: file_read
+    params:
+      path: "{{var.transactions_file}}"
+      redact: "false"
+
+  # ── Step 2: 提取 items 数组 ──
+  - name: items
+    node: json_parse
+    params:
+      path: "items"
+
+  # ── Step 3: map 并发审查（每个交易三源查询 + 昇腾 LLM 评分）──
+  - name: review
+    map:
+      over: "{{step.items}}"
+      concurrency: 3
+      stop_on_error: false
+      steps:
+        # 子步骤 1: 提取关联方名
+        - name: cp_name
+          node: json_parse
+          params:
+            path: "counterparty"
+
+        # 子步骤 2: 查黑名单（失败降级，不终止）
+        - name: blacklist
+          node: http_request
+          params:
+            url: "{{var.data_endpoint}}/blacklist"
+            method: POST
+            body: '{"name":"{{step.cp_name}}"}'
+            timeout: "5s"
+          retry: 1
+          continue_on_error: true
+
+        # 子步骤 3: 查工商（失败降级）
+        - name: business
+          node: http_request
+          params:
+            url: "{{var.data_endpoint}}/business"
+            method: POST
+            body: '{"name":"{{step.cp_name}}"}'
+            timeout: "5s"
+          retry: 1
+          continue_on_error: true
+
+        # 子步骤 4: 查媒体负面（失败降级）
+        - name: media
+          node: http_request
+          params:
+            url: "{{var.data_endpoint}}/media"
+            method: POST
+            body: '{"name":"{{step.cp_name}}"}'
+            timeout: "5s"
+          retry: 1
+          continue_on_error: true
+
+        # 子步骤 5: 昇腾 LLM 综合风险评分（核心）
+        # 使用 ascend 节点，运行在昇腾 NPU 上
+        - name: risk_assess
+          node: ascend
+          params:
+            endpoint: "{{var.ascend_endpoint}}"
+            model: "qwen2.5-7b"
+            system: |
+              你是反洗钱风险分析助手。基于以下三源查询结果，输出风险评分。
+              只输出 JSON，格式：{"risk_score":0-100,"risk_level":"low|medium|high","flags":[],"summary":""}
+
+              关联方：{{step.cp_name}}
+              原始交易：{{loop.item}}
+
+              黑名单查询结果：
+              {{step.blacklist}}
+
+              工商查询结果：
+              {{step.business}}
+
+              媒体负面查询结果：
+              {{step.media}}
+          retry: 1
+
+  # ── Step 4: 生成审查报告 ──
+  - name: report
+    node: template_render
+    params:
+      template: |
+        # AML 可疑交易审查报告（昇腾 NPU 版）
+
+        生成时间：{{now}}
+        推理算力：昇腾 Ascend NPU（MindIE 推理服务）
+        LLM 模型：qwen2.5-7b
+
+        ## 审查结果（每项含 tx_id、关联方、三源原始响应、昇腾 LLM 风险评分）
+
+        {{step.review}}
+
+        ---
+        *本报告由 llm-box AML review workflow 生成，LLM 推理运行于昇腾 Ascend NPU。*
+        *全链路审计日志（HMAC 哈希链）已自动记录。*
+
+  # ── Step 5: 落盘报告 ──
+  - name: save_report
+    node: file_write
+    params:
+      path: "{{var.report_file}}"
+
+output: "{{step.report}}"
