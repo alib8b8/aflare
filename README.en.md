@@ -4,9 +4,9 @@
     <a href="README.md">中文</a> ·
     <strong>English</strong>
   </p>
-  <p><strong>AI-powered universal workflow engine.</strong></p>
-  <p>From terminal automation to financial Saga transactions, multimodal analysis, and robot control — describe what you want in natural language, llm-box generates and executes YAML workflows. Supports Ascend / Cambricon / Hygon domestic chips.</p>
-  <p><em>What if Bash understood English — and could trade stocks, analyze images, and control robots?</em></p>
+  <p><strong>Talk to AI in plain language, it gets the job done.</strong></p>
+  <p>Write reports, reconcile accounts, analyze images, control robots — just describe what you want, and llm-box figures out the steps and runs them. Works on domestic chips (Ascend / Cambricon / Hygon), your data stays local.</p>
+  <p><em>What if your computer just understood what you meant?</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/llm-box/actions/workflows/ci.yml">
