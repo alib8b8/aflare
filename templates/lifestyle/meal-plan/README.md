@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate weekly meal
 ## Usage
 
 ```bash
-llm-box install health-wellness/meal-plan
-llm-box run meal-plan/workflow.yaml
+aflare install health-wellness/meal-plan
+aflare run meal-plan/workflow.yaml
 ```
 
 ## Parameters

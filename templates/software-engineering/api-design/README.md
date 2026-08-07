@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate restful api
 ## Usage
 
 ```bash
-llm-box install api-development/api-design
-llm-box run api-design/workflow.yaml
+aflare install api-development/api-design
+aflare run api-design/workflow.yaml
 ```
 
 ## Parameters

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -115,7 +115,7 @@ func (n *FetchURLNode) Execute(ctx context.Context, input string, params map[str
 	}
 
 	// Set user agent
-	req.Header.Set("User-Agent", "llm-box/1.0")
+	req.Header.Set("User-Agent", "aflare/1.0")
 
 	// Parse timeout from params
 	timeout := 30 * time.Second

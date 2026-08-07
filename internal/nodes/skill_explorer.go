@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -64,7 +64,7 @@ func (n *SkillExplorerNode) Schema() NodeSchema {
 }
 
 var skillRegistry = []SkillQualityScore{
-	{Name: "llm-box-workflow", Description: "Build and execute AI workflows with multi-step nodes", Category: "development", Tags: []string{"workflow", "automation", "pipeline"}, Completeness: 95, Documentation: 90, Usability: 85, Overall: 90},
+	{Name: "aflare-workflow", Description: "Build and execute AI workflows with multi-step nodes", Category: "development", Tags: []string{"workflow", "automation", "pipeline"}, Completeness: 95, Documentation: 90, Usability: 85, Overall: 90},
 	{Name: "code-review", Description: "Hybrid architecture code review with deterministic rules + LLM", Category: "development", Tags: []string{"code-review", "security", "quality"}, Completeness: 90, Documentation: 80, Usability: 85, Overall: 85},
 	{Name: "smart-search", Description: "Multi-source search aggregator with 20+ information sources", Category: "research", Tags: []string{"search", "intelligence", "news"}, Completeness: 88, Documentation: 75, Usability: 80, Overall: 81},
 	{Name: "agent-browser", Description: "Agent-optimized web browser for autonomous navigation", Category: "productivity", Tags: []string{"browser", "scraping", "automation"}, Completeness: 80, Documentation: 70, Usability: 75, Overall: 75},

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate performance
 ## Usage
 
 ```bash
-llm-box install hr-recruiting/performance-review
-llm-box run performance-review/workflow.yaml
+aflare install hr-recruiting/performance-review
+aflare run performance-review/workflow.yaml
 ```
 
 ## Parameters

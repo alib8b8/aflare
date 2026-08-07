@@ -3,7 +3,7 @@
   "name": "telegram-bot",
   "version": "1.0.0",
   "description": "Send notifications to Telegram from your workflows.",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "integrations",
   "tags": [
     "integrations",

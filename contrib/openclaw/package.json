@@ -1,7 +1,7 @@
 {
   "name": "openclaw-llmbox",
   "version": "1.1.0",
-  "description": "Invoke llm-box workflows as tools in OpenClaw conversations",
+  "description": "Invoke aflare workflows as tools in OpenClaw conversations",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -30,7 +30,7 @@
   },
   "keywords": [
     "openclaw",
-    "llm-box",
+    "aflare",
     "workflow",
     "automation",
     "ai"
@@ -40,7 +40,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/alib8b8/llm-box.git",
+    "url": "https://github.com/alib8b8/aflare.git",
     "directory": "contrib/openclaw"
   },
   "devDependencies": {

@@ -1,7 +1,7 @@
 name: GitHub Weekly Report
 # Generates a weekly GitHub activity report
-# Usage: llm-box install github-report
-#        llm-box run github-report/workflow.yaml
+# Usage: aflare install github-report
+#        aflare run github-report/workflow.yaml
 # Config: Set REPO and AUTHOR in params below
 
 steps:

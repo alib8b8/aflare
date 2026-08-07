@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -25,8 +25,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/logger"
-	"github.com/alib8b8/llm-box/internal/meta"
+	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/meta"
 )
 
 type UpgradeMode string
@@ -151,7 +151,7 @@ func (e *UpgradeEngine) CheckAndUpgrade(ctx context.Context) {
 
 	logger.Info("checking for updates...")
 
-	release, err := meta.CheckLatestRelease("alib8b8/llm-box")
+	release, err := meta.CheckLatestRelease("alib8b8/aflare")
 	if err != nil {
 		logger.Error("failed to check for updates", "error", err)
 		return
@@ -205,7 +205,7 @@ func (e *UpgradeEngine) PerformUpgrade(ctx context.Context, release *meta.GitHub
 		}
 	}
 
-	result, err := meta.SelfUpdate("alib8b8/llm-box")
+	result, err := meta.SelfUpdate("alib8b8/aflare")
 	if err != nil {
 		e.mu.Lock()
 		e.state.UpgradeStatus = "failed"
@@ -265,7 +265,7 @@ func (e *UpgradeEngine) SetConfig(config *UpgradeConfig) {
 }
 
 func (e *UpgradeEngine) RunSelfUpdate() (string, error) {
-	release, err := meta.CheckLatestRelease("alib8b8/llm-box")
+	release, err := meta.CheckLatestRelease("alib8b8/aflare")
 	if err != nil {
 		return "", fmt.Errorf("failed to check latest release: %w", err)
 	}
@@ -274,7 +274,7 @@ func (e *UpgradeEngine) RunSelfUpdate() (string, error) {
 		return fmt.Sprintf("Already up to date (%s)", meta.GetVersion()), nil
 	}
 
-	result, err := meta.SelfUpdate("alib8b8/llm-box")
+	result, err := meta.SelfUpdate("alib8b8/aflare")
 	if err != nil {
 		return "", err
 	}

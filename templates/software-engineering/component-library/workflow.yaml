@@ -1,7 +1,7 @@
 name: Component Library Design
 # Generate UI component library design
-# Usage: llm-box install frontend/component-library
-#        llm-box run component-library/workflow.yaml
+# Usage: aflare install frontend/component-library
+#        aflare run component-library/workflow.yaml
 
 steps:
   - node: agent

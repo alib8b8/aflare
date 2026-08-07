@@ -3,7 +3,7 @@
   "name": "nginx-access-analyzer",
   "version": "1.0.0",
   "description": "Analyze Nginx access logs for traffic patterns",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "devops-infra",
   "tags": [
     "devops-infra",

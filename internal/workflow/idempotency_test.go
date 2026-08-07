@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/nodes"
+	"github.com/alib8b8/aflare/internal/nodes"
 )
 
 // idempCounterNode increments a shared counter on every Execute and returns
@@ -681,11 +681,11 @@ var _ IdempotencyStore = (*MemoryIdempotencyStore)(nil)
 // attacker who can modify the idempotency file must NOT be able to inject a
 // fake transfer confirmation that the next trigger serves as a cache hit.
 //
-// This test does not call t.Parallel because it sets LLM_BOX_AUDIT_HMAC_KEY
+// This test does not call t.Parallel because it sets AFLARE_AUDIT_HMAC_KEY
 // (the shared idempotency HMAC key source) via t.Setenv, which is incompatible
 // with parallel tests.
 func TestIdempotency_TamperedRecordRejected(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "idemp-tamper-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "idemp-tamper-key")
 
 	var counter int
 	reg := newIdempTestRegistry(&counter)
@@ -770,16 +770,16 @@ func TestIdempotency_TamperedRecordRejected(t *testing.T) {
 }
 
 // TestIdempotency_NoHMACKeyDegradesGracefully verifies the graceful-degrade
-// branch of H-4: when neither LLM_BOX_AUDIT_HMAC_KEY nor
-// LLM_BOX_SECRETS_PASSWORD is set, signing is skipped (HMAC left empty) and
+// branch of H-4: when neither AFLARE_AUDIT_HMAC_KEY nor
+// AFLARE_SECRETS_PASSWORD is set, signing is skipped (HMAC left empty) and
 // verification is skipped on read, so records still round-trip and cache hits
 // still work. The workflow is never blocked by the absence of a key.
 //
 // Not parallel: it sets env vars via t.Setenv.
 func TestIdempotency_NoHMACKeyDegradesGracefully(t *testing.T) {
 	// Force both key sources empty so signing/verification degrade to no-ops.
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "")
-	t.Setenv("LLM_BOX_SECRETS_PASSWORD", "")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "")
+	t.Setenv("AFLARE_SECRETS_PASSWORD", "")
 
 	var counter int
 	reg := newIdempTestRegistry(&counter)

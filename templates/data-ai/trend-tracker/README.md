@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for track and analyze em
 ## Usage
 
 ```bash
-llm-box install research-analysis/trend-tracker
-llm-box run trend-tracker/workflow.yaml
+aflare install research-analysis/trend-tracker
+aflare run trend-tracker/workflow.yaml
 ```
 
 ## Parameters

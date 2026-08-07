@@ -66,16 +66,16 @@ prompt 至少覆盖以下 10 个维度，每个维度多个问题：
 
 ```bash
 # 1. 基础用法：对一个需求做 50+ 问题的澄清
-llm-box run examples/real-world/grill-me/workflow.yaml \
+aflare run examples/real-world/grill-me/workflow.yaml \
   --var task_description="实现一个支持断点续传的大文件上传服务"
 
 # 2. 调高提问阈值，做更彻底的澄清
-llm-box run examples/real-world/grill-me/workflow.yaml \
+aflare run examples/real-world/grill-me/workflow.yaml \
   --var task_description="为现有 REST API 增加 OAuth2 鉴权层" \
   --var min_questions=80
 
 # 3. 换用本地其它模型
-llm-box run examples/real-world/grill-me/workflow.yaml \
+aflare run examples/real-world/grill-me/workflow.yaml \
   --var task_description="设计一个分布式任务调度器" \
   --var model=qwen2.5
 ```

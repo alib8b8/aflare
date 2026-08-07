@@ -1,7 +1,7 @@
 name: Image Optimizer
 # Batch optimize images for web
-# Usage: llm-box install automation/image-optimizer
-#        llm-box run image-optimizer/workflow.yaml
+# Usage: aflare install automation/image-optimizer
+#        aflare run image-optimizer/workflow.yaml
 
 steps:
   - node: execute

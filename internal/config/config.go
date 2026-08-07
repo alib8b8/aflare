@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -111,20 +111,20 @@ func LoadConfig() (*Config, error) {
 func getConfigPaths() []string {
 	var paths []string
 
-	if envPath := os.Getenv("LLM_BOX_CONFIG"); envPath != "" {
+	if envPath := os.Getenv("AFLARE_CONFIG"); envPath != "" {
 		paths = append(paths, envPath)
 	}
 
 	cwd, err := os.Getwd()
 	if err == nil {
-		paths = append(paths, filepath.Join(cwd, "llm-box.yaml"))
-		paths = append(paths, filepath.Join(cwd, ".llm-box.yaml"))
+		paths = append(paths, filepath.Join(cwd, "aflare.yaml"))
+		paths = append(paths, filepath.Join(cwd, ".aflare.yaml"))
 	}
 
 	home, err := os.UserHomeDir()
 	if err == nil {
-		paths = append(paths, filepath.Join(home, ".config", "llm-box", "config.yaml"))
-		paths = append(paths, filepath.Join(home, ".llm-box.yaml"))
+		paths = append(paths, filepath.Join(home, ".config", "aflare", "config.yaml"))
+		paths = append(paths, filepath.Join(home, ".aflare.yaml"))
 	}
 
 	return paths
@@ -187,9 +187,9 @@ func GetDefaultModel(provider, envVar, defaultModel string) string {
 	return defaultModel
 }
 
-// IsSafeMode 判断是否启用安全模式，优先读取环境变量 LLM_BOX_SAFE_MODE。
+// IsSafeMode 判断是否启用安全模式，优先读取环境变量 AFLARE_SAFE_MODE。
 func IsSafeMode() bool {
-	if envVal := os.Getenv("LLM_BOX_SAFE_MODE"); envVal != "" {
+	if envVal := os.Getenv("AFLARE_SAFE_MODE"); envVal != "" {
 		lower := strings.ToLower(strings.TrimSpace(envVal))
 		switch lower {
 		case "false", "0", "no", "off", "disable", "disabled":
@@ -216,7 +216,7 @@ const (
 // GetSecurityLevel 返回当前安全等级（L0/L1/L2/L3）。
 // 优先级：环境变量 > 配置文件 > 默认值（safe mode 为 L3，否则 L1）。
 func GetSecurityLevel() string {
-	if envVal := os.Getenv("LLM_BOX_SECURITY_LEVEL"); envVal != "" {
+	if envVal := os.Getenv("AFLARE_SECURITY_LEVEL"); envVal != "" {
 		upper := strings.ToUpper(strings.TrimSpace(envVal))
 		switch upper {
 		case SecurityLevelL0, SecurityLevelL1, SecurityLevelL2, SecurityLevelL3:

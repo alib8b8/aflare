@@ -1,7 +1,7 @@
 name: SEO Keyword Research
 # Research and analyze SEO keywords for a topic
-# Usage: llm-box install content-marketing/seo-keyword-research
-#        llm-box run seo-keyword-research/workflow.yaml
+# Usage: aflare install content-marketing/seo-keyword-research
+#        aflare run seo-keyword-research/workflow.yaml
 
 steps:
   - node: http_request

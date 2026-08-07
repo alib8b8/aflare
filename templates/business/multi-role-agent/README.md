@@ -31,5 +31,5 @@
 ## 使用方式
 
 ```bash
-llm-box run business/multi-role-agent
+aflare run business/multi-role-agent
 ```

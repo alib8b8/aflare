@@ -1,7 +1,7 @@
 name: Competitor Analysis
 # Analyze competitors and their strategies
-# Usage: llm-box install research-analysis/competitor-analysis
-#        llm-box run competitor-analysis/workflow.yaml
+# Usage: aflare install research-analysis/competitor-analysis
+#        aflare run competitor-analysis/workflow.yaml
 
 steps:
   - node: http_request

@@ -1,14 +1,14 @@
 # MCP (Model Context Protocol) Integration
 
-llm-box supports the Model Context Protocol (MCP) for connecting external tools and services to AI workflows.
+aflare supports the Model Context Protocol (MCP) for connecting external tools and services to AI workflows.
 
 ## Overview
 
-MCP allows llm-box to act as a tool server that can be called by AI agents. This enables:
+MCP allows aflare to act as a tool server that can be called by AI agents. This enables:
 
-- External AI applications to use llm-box workflows
+- External AI applications to use aflare workflows
 - Integration with AI IDEs and chat interfaces
-- Programmatic access to llm-box capabilities
+- Programmatic access to aflare capabilities
 
 ## Quick Start
 
@@ -16,13 +16,13 @@ MCP allows llm-box to act as a tool server that can be called by AI agents. This
 
 ```bash
 # Start MCP server
-llm-box mcp
+aflare mcp
 
 # Start on custom port
-llm-box mcp --port 8082
+aflare mcp --port 8082
 
 # Enable verbose logging
-llm-box mcp --verbose
+aflare mcp --verbose
 ```
 
 ### Connect from AI Agent
@@ -57,7 +57,7 @@ The MCP server follows the JSON-RPC 2.0 protocol over stdin/stdout or HTTP.
       }
     },
     "serverInfo": {
-      "name": "llm-box",
+      "name": "aflare",
       "version": "0.3.0"
     }
   }
@@ -199,8 +199,8 @@ Add a new secret.
 
 | Variable | Description |
 |----------|-------------|
-| `LLM_BOX_MCP_PORT` | Default HTTP port |
-| `LLM_BOX_SECRETS_PASSWORD` | Required for secrets operations |
+| `AFLARE_MCP_PORT` | Default HTTP port |
+| `AFLARE_SECRETS_PASSWORD` | Required for secrets operations |
 
 ## Integration Examples
 
@@ -232,7 +232,7 @@ client = OpenAI()
 
 assistant = client.beta.assistants.create(
     name="Workflow Assistant",
-    instructions="Use the workflow_run tool to execute llm-box workflows",
+    instructions="Use the workflow_run tool to execute aflare workflows",
     model="gpt-4o",
     tools=[{
         "type": "function",
@@ -256,7 +256,7 @@ assistant = client.beta.assistants.create(
 
 ```bash
 # Start MCP server in HTTP mode
-llm-box mcp --port 8082
+aflare mcp --port 8082
 
 # Call via HTTP
 curl -X POST http://localhost:8082/v1/call \

@@ -1,6 +1,6 @@
-# Getting Started with llm-box
+# Getting Started with aflare
 
-Welcome to llm-box! This guide will get you up and running in under 5 minutes.
+Welcome to aflare! This guide will get you up and running in under 5 minutes.
 
 ---
 
@@ -11,56 +11,56 @@ Welcome to llm-box! This guide will get you up and running in under 5 minutes.
 Download the install script from the repository and run it locally:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
+curl -sL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh -o install.sh
 bash install.sh
 ```
 
 **国内网络加速**（推荐国内用户使用）：
 
 ```bash
-curl -sL https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
+curl -sL https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh -o install.sh
 bash install.sh
 ```
 
 ### Windows
 
-Download the latest binary from the [Releases page](https://github.com/alib8b8/llm-box/releases), then:
+Download the latest binary from the [Releases page](https://github.com/alib8b8/aflare/releases), then:
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-windows-amd64.exe" -OutFile llm-box.exe
-.\llm-box.exe --help
+Invoke-WebRequest -Uri "https://github.com/alib8b8/aflare/releases/latest/download/aflare-windows-amd64.exe" -OutFile aflare.exe
+.\aflare.exe --help
 ```
 
 **国内网络加速**（PowerShell）：
 
 ```powershell
-Invoke-WebRequest -Uri "https://ghproxy.com/https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-windows-amd64.exe" -OutFile llm-box.exe
-.\llm-box.exe --help
+Invoke-WebRequest -Uri "https://ghproxy.com/https://github.com/alib8b8/aflare/releases/latest/download/aflare-windows-amd64.exe" -OutFile aflare.exe
+.\aflare.exe --help
 ```
 
 ### Build from Source
 
 ```bash
-git clone https://github.com/alib8b8/llm-box.git
-cd llm-box
-go install ./cmd/llm-box
+git clone https://github.com/alib8b8/aflare.git
+cd aflare
+go install ./cmd/aflare
 ```
 
 **国内网络加速**（使用GitCode镜像）：
 
 ```bash
-git clone https://gitcode.com/llm-box/llm-box.git
-cd llm-box
-go install ./cmd/llm-box
+git clone https://gitcode.com/aflare/aflare.git
+cd aflare
+go install ./cmd/aflare
 ```
 
 Verify installation:
 
 ```bash
-llm-box --help
+aflare --help
 ```
 
-You should see the llm-box help output.
+You should see the aflare help output.
 
 ---
 
@@ -69,7 +69,7 @@ You should see the llm-box help output.
 Let's start with a simple workflow: fetch content from a URL and save it to a file.
 
 ```bash
-llm-box create "fetch example.com and save to example.html"
+aflare create "fetch example.com and save to example.html"
 ```
 
 This will generate a file called `example-workflow.yaml` with something like:
@@ -90,14 +90,14 @@ steps:
 ## Step 3: Run Your Workflow
 
 ```bash
-llm-box run example-workflow.yaml
+aflare run example-workflow.yaml
 ```
 
 You'll see the beautiful TUI showing progress:
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║ 🚀 llm-box - Fetch and Save Example                          ║
+║ 🚀 aflare - Fetch and Save Example                          ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║ 📝 Fetching URL...                                           ║
@@ -117,7 +117,7 @@ cat example.html
 
 ## Step 4: Explore More Workflows
 
-Check out the [examples directory](https://github.com/alib8b8/llm-box/tree/main/examples) for 10 practical workflows you can use:
+Check out the [examples directory](https://github.com/alib8b8/aflare/tree/main/examples) for 10 practical workflows you can use:
 
 - Daily GitHub summary
 - Research assistant
@@ -145,6 +145,6 @@ Try them out and modify them to fit your needs!
 
 ## Need Help?
 
-- Open a [Discussion](https://github.com/alib8b8/llm-box/discussions)
-- File an [Issue](https://github.com/alib8b8/llm-box/issues)
+- Open a [Discussion](https://github.com/alib8b8/aflare/discussions)
+- File an [Issue](https://github.com/alib8b8/aflare/issues)
 - Check the [FAQ](../README.md#faq) in the README

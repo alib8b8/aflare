@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -34,7 +34,7 @@ func TestGetAPIKey_EnvVar(t *testing.T) {
 
 func TestGetAPIKey_ConfigFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "llm-box.yaml")
+	configPath := filepath.Join(tmpDir, "aflare.yaml")
 
 	configContent := `
 providers:
@@ -47,8 +47,8 @@ providers:
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
-	os.Setenv("LLM_BOX_CONFIG", configPath)
-	defer os.Unsetenv("LLM_BOX_CONFIG")
+	os.Setenv("AFLARE_CONFIG", configPath)
+	defer os.Unsetenv("AFLARE_CONFIG")
 
 	resetForTesting()
 
@@ -60,7 +60,7 @@ providers:
 
 func TestGetDefaultModel_ConfigFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "llm-box.yaml")
+	configPath := filepath.Join(tmpDir, "aflare.yaml")
 
 	configContent := `
 providers:
@@ -72,8 +72,8 @@ providers:
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
-	os.Setenv("LLM_BOX_CONFIG", configPath)
-	defer os.Unsetenv("LLM_BOX_CONFIG")
+	os.Setenv("AFLARE_CONFIG", configPath)
+	defer os.Unsetenv("AFLARE_CONFIG")
 
 	resetForTesting()
 
@@ -94,15 +94,15 @@ func TestGetDefaultModel_Default(t *testing.T) {
 
 func TestLoadConfig_InvalidYAML(t *testing.T) {
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "llm-box.yaml")
+	configPath := filepath.Join(tmpDir, "aflare.yaml")
 
 	err := os.WriteFile(configPath, []byte("invalid: yaml: :"), 0644)
 	if err != nil {
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
-	os.Setenv("LLM_BOX_CONFIG", configPath)
-	defer os.Unsetenv("LLM_BOX_CONFIG")
+	os.Setenv("AFLARE_CONFIG", configPath)
+	defer os.Unsetenv("AFLARE_CONFIG")
 
 	resetForTesting()
 
@@ -113,8 +113,8 @@ func TestLoadConfig_InvalidYAML(t *testing.T) {
 }
 
 func TestIsSafeMode(t *testing.T) {
-	os.Setenv("LLM_BOX_SAFE_MODE", "1")
-	defer os.Unsetenv("LLM_BOX_SAFE_MODE")
+	os.Setenv("AFLARE_SAFE_MODE", "1")
+	defer os.Unsetenv("AFLARE_SAFE_MODE")
 
 	resetForTesting()
 
@@ -159,7 +159,7 @@ func TestGetEndpoint_EnvVar(t *testing.T) {
 
 func TestGetEndpoint_ConfigFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "llm-box.yaml")
+	configPath := filepath.Join(tmpDir, "aflare.yaml")
 
 	configContent := `
 providers:
@@ -171,8 +171,8 @@ providers:
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
-	os.Setenv("LLM_BOX_CONFIG", configPath)
-	defer os.Unsetenv("LLM_BOX_CONFIG")
+	os.Setenv("AFLARE_CONFIG", configPath)
+	defer os.Unsetenv("AFLARE_CONFIG")
 
 	resetForTesting()
 
@@ -195,8 +195,8 @@ func TestIsSafeMode_FalseValues(t *testing.T) {
 	falseValues := []string{"false", "0", "no", "off", "disable", "disabled", "FALSE", "NO"}
 	for _, val := range falseValues {
 		t.Run(val, func(t *testing.T) {
-			os.Setenv("LLM_BOX_SAFE_MODE", val)
-			defer os.Unsetenv("LLM_BOX_SAFE_MODE")
+			os.Setenv("AFLARE_SAFE_MODE", val)
+			defer os.Unsetenv("AFLARE_SAFE_MODE")
 
 			resetForTesting()
 
@@ -211,8 +211,8 @@ func TestIsSafeMode_TrueValues(t *testing.T) {
 	trueValues := []string{"true", "1", "yes", "on", "enable", "enabled", "TRUE", "YES"}
 	for _, val := range trueValues {
 		t.Run(val, func(t *testing.T) {
-			os.Setenv("LLM_BOX_SAFE_MODE", val)
-			defer os.Unsetenv("LLM_BOX_SAFE_MODE")
+			os.Setenv("AFLARE_SAFE_MODE", val)
+			defer os.Unsetenv("AFLARE_SAFE_MODE")
 
 			resetForTesting()
 
@@ -227,8 +227,8 @@ func TestGetSecurityLevel_EnvVar(t *testing.T) {
 	levels := []string{"L0", "L1", "L2", "L3", "l0", "l1", "l2", "l3"}
 	for _, level := range levels {
 		t.Run(level, func(t *testing.T) {
-			os.Setenv("LLM_BOX_SECURITY_LEVEL", level)
-			defer os.Unsetenv("LLM_BOX_SECURITY_LEVEL")
+			os.Setenv("AFLARE_SECURITY_LEVEL", level)
+			defer os.Unsetenv("AFLARE_SECURITY_LEVEL")
 
 			resetForTesting()
 
@@ -242,8 +242,8 @@ func TestGetSecurityLevel_EnvVar(t *testing.T) {
 }
 
 func TestGetSecurityLevel_InvalidEnv(t *testing.T) {
-	os.Setenv("LLM_BOX_SECURITY_LEVEL", "INVALID")
-	defer os.Unsetenv("LLM_BOX_SECURITY_LEVEL")
+	os.Setenv("AFLARE_SECURITY_LEVEL", "INVALID")
+	defer os.Unsetenv("AFLARE_SECURITY_LEVEL")
 
 	resetForTesting()
 
@@ -255,7 +255,7 @@ func TestGetSecurityLevel_InvalidEnv(t *testing.T) {
 
 func TestGetSecurityLevel_ConfigFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "llm-box.yaml")
+	configPath := filepath.Join(tmpDir, "aflare.yaml")
 
 	configContent := `
 security_level: L2
@@ -265,8 +265,8 @@ security_level: L2
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
-	os.Setenv("LLM_BOX_CONFIG", configPath)
-	defer os.Unsetenv("LLM_BOX_CONFIG")
+	os.Setenv("AFLARE_CONFIG", configPath)
+	defer os.Unsetenv("AFLARE_CONFIG")
 
 	resetForTesting()
 
@@ -277,8 +277,8 @@ security_level: L2
 }
 
 func TestGetSecurityLevel_SafeModeDefaultsToL3(t *testing.T) {
-	os.Setenv("LLM_BOX_SAFE_MODE", "1")
-	defer os.Unsetenv("LLM_BOX_SAFE_MODE")
+	os.Setenv("AFLARE_SAFE_MODE", "1")
+	defer os.Unsetenv("AFLARE_SAFE_MODE")
 
 	resetForTesting()
 
@@ -308,8 +308,8 @@ func TestSecurityLevelAtLeast(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.current+"_vs_"+tt.required, func(t *testing.T) {
 			resetForTesting()
-			os.Setenv("LLM_BOX_SECURITY_LEVEL", tt.current)
-			defer os.Unsetenv("LLM_BOX_SECURITY_LEVEL")
+			os.Setenv("AFLARE_SECURITY_LEVEL", tt.current)
+			defer os.Unsetenv("AFLARE_SECURITY_LEVEL")
 
 			got := SecurityLevelAtLeast(tt.required)
 			if got != tt.want {
@@ -331,7 +331,7 @@ func TestGetRouterConfig_Default(t *testing.T) {
 
 func TestGetRouterConfig_ConfigFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "llm-box.yaml")
+	configPath := filepath.Join(tmpDir, "aflare.yaml")
 
 	configContent := `
 router:
@@ -343,8 +343,8 @@ router:
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
-	os.Setenv("LLM_BOX_CONFIG", configPath)
-	defer os.Unsetenv("LLM_BOX_CONFIG")
+	os.Setenv("AFLARE_CONFIG", configPath)
+	defer os.Unsetenv("AFLARE_CONFIG")
 
 	resetForTesting()
 

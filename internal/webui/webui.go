@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -28,11 +28,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/logger"
-	"github.com/alib8b8/llm-box/internal/metrics"
-	"github.com/alib8b8/llm-box/internal/nodes/core"
-	"github.com/alib8b8/llm-box/internal/visualizer"
-	"github.com/alib8b8/llm-box/internal/workflow"
+	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/metrics"
+	"github.com/alib8b8/aflare/internal/nodes/core"
+	"github.com/alib8b8/aflare/internal/visualizer"
+	"github.com/alib8b8/aflare/internal/workflow"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -125,20 +125,20 @@ func (s *WebUIServer) buildHandler() http.Handler {
 	mux.HandleFunc("/api/workflow", s.authMiddleware(s.handleWorkflow))
 	mux.HandleFunc("/api/validate", s.authMiddleware(s.handleValidate))
 
-	// pprof 调试端点:默认关闭,仅当环境变量 LLM_BOX_PPROF=1 时启用。
+	// pprof 调试端点:默认关闭,仅当环境变量 AFLARE_PPROF=1 时启用。
 	// 生产环境保持关闭以避免安全暴露;需要在线性能剖析时显式开启。
 	// 端点受 authMiddleware 保护,访问需带 X-Auth-Token(若设置了 token)。
-	if os.Getenv("LLM_BOX_PPROF") == "1" {
+	if os.Getenv("AFLARE_PPROF") == "1" {
 		s.registerPprof(mux)
-		logger.Info("pprof endpoints enabled at /debug/pprof/ (LLM_BOX_PPROF=1)")
+		logger.Info("pprof endpoints enabled at /debug/pprof/ (AFLARE_PPROF=1)")
 	}
 
 	// Prometheus /metrics endpoint: disabled by default for security (the
 	// endpoint exposes internal statistics and is unauthenticated so scrapers
-	// do not need to carry a token). Enable by setting LLM_BOX_METRICS=1.
+	// do not need to carry a token). Enable by setting AFLARE_METRICS=1.
 	// The handler is rate-limited via a token bucket (metricsRPS req/s) and
 	// is NOT behind authMiddleware, matching the Prometheus scrape convention.
-	if os.Getenv("LLM_BOX_METRICS") == "1" {
+	if os.Getenv("AFLARE_METRICS") == "1" {
 		registerMetricsProviders()
 		metrics.Register()
 		limiter := newMetricsRateLimiter(metricsRPS)
@@ -150,7 +150,7 @@ func (s *WebUIServer) buildHandler() http.Handler {
 			metrics.CollectSnapshot()
 			promhttp.Handler().ServeHTTP(w, r)
 		})
-		logger.Info("prometheus /metrics endpoint enabled (LLM_BOX_METRICS=1)")
+		logger.Info("prometheus /metrics endpoint enabled (AFLARE_METRICS=1)")
 	}
 
 	return mux
@@ -517,7 +517,7 @@ var indexHTML = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM Box - Workflow Visualizer</title>
+    <title>Aflare - Workflow Visualizer</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f23; color: #e0e0e0; }
@@ -569,7 +569,7 @@ var indexHTML = `<!DOCTYPE html>
     <div class="container">
         <div class="sidebar">
             <div class="sidebar-header">
-                <h1>LLM Box</h1>
+                <h1>Aflare</h1>
             </div>
             <div class="sidebar-content">
                 <ul class="workflow-list" id="workflowList"></ul>

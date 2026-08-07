@@ -1,7 +1,7 @@
 name: Investment Portfolio Review
 # Review and optimize investment portfolio
-# Usage: llm-box install finance-investing/portfolio-review
-#        llm-box run portfolio-review/workflow.yaml
+# Usage: aflare install finance-investing/portfolio-review
+#        aflare run portfolio-review/workflow.yaml
 
 steps:
   - node: file_read

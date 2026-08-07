@@ -1,7 +1,7 @@
 name: API Integration Test Suite
 # Generate API integration test suite
-# Usage: llm-box install api-development/api-test-suite
-#        llm-box run api-test-suite/workflow.yaml
+# Usage: aflare install api-development/api-test-suite
+#        aflare run api-test-suite/workflow.yaml
 
 steps:
   - node: file_read

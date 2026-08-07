@@ -1,14 +1,14 @@
 ---
-name: llm-box-workflow
+name: aflare-workflow
 description: >
-  Generate and execute terminal workflows using llm-box.
+  Generate and execute terminal workflows using aflare.
   Use when the user wants to automate multi-step terminal tasks, chain commands,
   fetch URLs, process data, create reusable pipelines, or build CI/CD-like
   automation locally. Trigger on keywords: workflow, pipeline, automate,
   batch process, fetch and save, schedule task.
 ---
 
-# llm-box Workflow Skill
+# aflare Workflow Skill
 
 ## When to Use
 
@@ -21,13 +21,13 @@ Use this skill when the user wants to:
 - **Integrate LLMs into automation** — use Ollama, DeepSeek, or OpenAI-compatible models
 - **Replace fragile bash scripts** — with structured, auditable YAML workflows
 
-## How llm-box Works
+## How aflare Works
 
 ```
 Plain English description → YAML workflow → Execute with TUI progress
 ```
 
-llm-box generates a YAML workflow file from a natural language description.
+aflare generates a YAML workflow file from a natural language description.
 The workflow is deterministic and reproducible — same workflow always produces
 the same result. Users can edit the YAML by hand if they want to tweak things.
 
@@ -37,22 +37,22 @@ the same result. Users can edit the YAML by hand if they want to tweak things.
 
 ```bash
 # Generate a workflow from plain English
-llm-box create "<description>"
+aflare create "<description>"
 
 # Run a workflow file
-llm-box run <workflow.yaml>
+aflare run <workflow.yaml>
 
 # List all available nodes
-llm-box list
+aflare list
 
 # Validate a workflow file without running
-llm-box validate <workflow.yaml>
+aflare validate <workflow.yaml>
 
 # Run in safe mode (disables execute node)
-llm-box --safe-mode run <workflow.yaml>
+aflare --safe-mode run <workflow.yaml>
 
 # Dry run (show steps without executing)
-llm-box --dry-run run <workflow.yaml>
+aflare --dry-run run <workflow.yaml>
 ```
 
 ### Available Nodes
@@ -205,7 +205,7 @@ steps:
 
 ## Security Notes
 
-- llm-box has built-in SSRF protection (URL validation, DNS rebinding checks)
+- aflare has built-in SSRF protection (URL validation, DNS rebinding checks)
 - Path traversal protection (sandboxed paths, symlink resolution)
 - Command injection prevention (shell metachar filtering, optional allowlist)
 - Resource limits (file size, response body, step count, timeouts)
@@ -215,14 +215,14 @@ steps:
 
 ```bash
 # Linux/macOS - download and run install script
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
+curl -sL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh -o install.sh
 bash install.sh
 
 # Or via Go
-go install github.com/alib8b8/llm-box/cmd/llm-box@latest
+go install github.com/alib8b8/aflare/cmd/aflare@latest
 
 # Verify installation
-llm-box list
+aflare list
 ```
 
 ## Examples
@@ -239,4 +239,4 @@ The repo includes 10 ready-to-use workflow examples:
 - DevOps automation
 - Team weekly report
 
-See: https://github.com/alib8b8/llm-box/tree/main/examples
+See: https://github.com/alib8b8/aflare/tree/main/examples

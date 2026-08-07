@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for review and optimize 
 ## Usage
 
 ```bash
-llm-box install finance-investing/portfolio-review
-llm-box run portfolio-review/workflow.yaml
+aflare install finance-investing/portfolio-review
+aflare run portfolio-review/workflow.yaml
 ```
 
 ## Parameters

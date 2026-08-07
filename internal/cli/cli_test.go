@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -21,9 +21,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/alib8b8/llm-box/internal/i18n"
-	"github.com/alib8b8/llm-box/internal/nodes"
-	"github.com/alib8b8/llm-box/internal/workflow"
+	"github.com/alib8b8/aflare/internal/i18n"
+	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/workflow"
 )
 
 func TestParseArgs_BasicCommand(t *testing.T) {
@@ -307,7 +307,7 @@ func TestPrintUsage(t *testing.T) {
 	}
 
 	expectedSubstrings := []string{
-		"llm-box",
+		"aflare",
 		"create",
 		"run",
 		"--safe-mode",
@@ -325,8 +325,8 @@ func TestPrintUsage_Chinese(t *testing.T) {
 	if usage == "" {
 		t.Error("expected non-empty usage")
 	}
-	if !contains(usage, "llm-box") {
-		t.Error("expected usage to contain 'llm-box'")
+	if !contains(usage, "aflare") {
+		t.Error("expected usage to contain 'aflare'")
 	}
 }
 
@@ -620,7 +620,7 @@ func TestEscapeJSONString(t *testing.T) {
 }
 
 func TestMergeMCPConfigSafe_Empty(t *testing.T) {
-	result, err := mergeMCPConfigSafe([]byte("{}"), "/usr/bin/llm-box")
+	result, err := mergeMCPConfigSafe([]byte("{}"), "/usr/bin/aflare")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -630,16 +630,16 @@ func TestMergeMCPConfigSafe_Empty(t *testing.T) {
 		t.Fatalf("failed to parse result: %v", err)
 	}
 
-	if cfg.MCPServers["llm-box"].Command != "/usr/bin/llm-box" {
-		t.Errorf("expected command '/usr/bin/llm-box', got %q", cfg.MCPServers["llm-box"].Command)
+	if cfg.MCPServers["aflare"].Command != "/usr/bin/aflare" {
+		t.Errorf("expected command '/usr/bin/aflare', got %q", cfg.MCPServers["aflare"].Command)
 	}
-	if len(cfg.MCPServers["llm-box"].Args) != 1 || cfg.MCPServers["llm-box"].Args[0] != "--mcp-server" {
-		t.Errorf("expected args ['--mcp-server'], got %v", cfg.MCPServers["llm-box"].Args)
+	if len(cfg.MCPServers["aflare"].Args) != 1 || cfg.MCPServers["aflare"].Args[0] != "--mcp-server" {
+		t.Errorf("expected args ['--mcp-server'], got %v", cfg.MCPServers["aflare"].Args)
 	}
 }
 
 func TestMergeMCPConfigSafe_NilServers(t *testing.T) {
-	result, err := mergeMCPConfigSafe([]byte("{}"), "/usr/bin/llm-box")
+	result, err := mergeMCPConfigSafe([]byte("{}"), "/usr/bin/aflare")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -649,8 +649,8 @@ func TestMergeMCPConfigSafe_NilServers(t *testing.T) {
 }
 
 func TestMergeMCPConfigSafe_ExistingServer(t *testing.T) {
-	existing := `{"mcpServers":{"llm-box":{"command":"old","args":["--old"]}}}`
-	result, err := mergeMCPConfigSafe([]byte(existing), "/usr/bin/llm-box")
+	existing := `{"mcpServers":{"aflare":{"command":"old","args":["--old"]}}}`
+	result, err := mergeMCPConfigSafe([]byte(existing), "/usr/bin/aflare")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -660,13 +660,13 @@ func TestMergeMCPConfigSafe_ExistingServer(t *testing.T) {
 		t.Fatalf("failed to parse result: %v", err)
 	}
 
-	if cfg.MCPServers["llm-box"].Command != "old" {
-		t.Errorf("expected existing command to be preserved 'old', got %q", cfg.MCPServers["llm-box"].Command)
+	if cfg.MCPServers["aflare"].Command != "old" {
+		t.Errorf("expected existing command to be preserved 'old', got %q", cfg.MCPServers["aflare"].Command)
 	}
 }
 
 func TestMergeMCPConfigSafe_InvalidJSON(t *testing.T) {
-	_, err := mergeMCPConfigSafe([]byte("invalid json"), "/usr/bin/llm-box")
+	_, err := mergeMCPConfigSafe([]byte("invalid json"), "/usr/bin/aflare")
 	if err == nil {
 		t.Error("expected error for invalid JSON")
 	}
@@ -769,7 +769,7 @@ func TestInstallSkillsToDir_WithSkills(t *testing.T) {
 		t.Error("expected Installed to be true")
 	}
 
-	installedPath := filepath.Join(skillsDir, "llm-box-test-skill")
+	installedPath := filepath.Join(skillsDir, "aflare-test-skill")
 	if _, err := os.Stat(installedPath); os.IsNotExist(err) {
 		t.Errorf("expected skill to be installed at %q", installedPath)
 	}

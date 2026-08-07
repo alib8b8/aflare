@@ -1,7 +1,7 @@
 name: Stress Management Plan
 # Create stress management toolkit
-# Usage: llm-box install health-wellness/stress-management
-#        llm-box run stress-management/workflow.yaml
+# Usage: aflare install health-wellness/stress-management
+#        aflare run stress-management/workflow.yaml
 
 steps:
   - node: agent

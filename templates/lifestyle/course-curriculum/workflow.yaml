@@ -1,7 +1,7 @@
 name: Course Curriculum Designer
 # Design complete course curriculum
-# Usage: llm-box install education/course-curriculum
-#        llm-box run course-curriculum/workflow.yaml
+# Usage: aflare install education/course-curriculum
+#        aflare run course-curriculum/workflow.yaml
 
 steps:
   - node: agent

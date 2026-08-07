@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -43,8 +43,8 @@ func (n *HumanInLoopNode) Schema() NodeSchema {
 		Output:      "string - approved content (or original if approved)",
 		Params: []ParamSchema{
 			{Name: "mode", Type: "string", Description: "Approval mode: file, env, stdin, auto_approve (default: file)", Required: false, Default: "file"},
-			{Name: "approval_file", Type: "string", Description: "Path to approval flag file (mode=file)", Required: false, Default: ".llm-box-approval"},
-			{Name: "approval_env", Type: "string", Description: "Environment variable to check for approval (mode=env)", Required: false, Default: "LLM_BOX_APPROVED"},
+			{Name: "approval_file", Type: "string", Description: "Path to approval flag file (mode=file)", Required: false, Default: ".aflare-approval"},
+			{Name: "approval_env", Type: "string", Description: "Environment variable to check for approval (mode=env)", Required: false, Default: "AFLARE_APPROVED"},
 			{Name: "prompt", Type: "string", Description: "Custom prompt message for the human reviewer", Required: false},
 			{Name: "on_approve", Type: "string", Description: "What to output on approve: original, modified, passthrough (default: original)", Required: false, Default: "original"},
 		},
@@ -53,8 +53,8 @@ func (n *HumanInLoopNode) Schema() NodeSchema {
 
 func (n *HumanInLoopNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	mode := getParam(params, "mode", "file")
-	approvalFile := getParam(params, "approval_file", ".llm-box-approval")
-	approvalEnv := getParam(params, "approval_env", "LLM_BOX_APPROVED")
+	approvalFile := getParam(params, "approval_file", ".aflare-approval")
+	approvalEnv := getParam(params, "approval_env", "AFLARE_APPROVED")
 	customPrompt := getParam(params, "prompt", "")
 	onApprove := getParam(params, "on_approve", "original")
 

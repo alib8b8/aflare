@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -30,7 +30,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/logger"
+	"github.com/alib8b8/aflare/internal/logger"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -82,7 +82,7 @@ var (
 func init() {
 	home, err := os.UserHomeDir()
 	if err == nil {
-		historyDir = filepath.Join(home, ".config", "llm-box", "history")
+		historyDir = filepath.Join(home, ".config", "aflare", "history")
 	}
 }
 
@@ -331,17 +331,17 @@ const auditLogFileName = "audit.log.jsonl"
 const auditZeroHash = "0000000000000000000000000000000000000000000000000000000000000000"
 
 // Audit HMAC key configuration. Priority:
-//  1. LLM_BOX_AUDIT_HMAC_KEY environment variable (raw bytes)
-//  2. PBKDF2 derivation from LLM_BOX_SECRETS_PASSWORD
+//  1. AFLARE_AUDIT_HMAC_KEY environment variable (raw bytes)
+//  2. PBKDF2 derivation from AFLARE_SECRETS_PASSWORD
 //  3. Insecure built-in default (logged once at warn level)
 const (
-	auditEnvHMACKey       = "LLM_BOX_AUDIT_HMAC_KEY"
-	auditEnvSecretsPasswd = "LLM_BOX_SECRETS_PASSWORD"
-	auditPBKDF2Salt       = "llm-box-audit-hmac-salt-v1"
+	auditEnvHMACKey       = "AFLARE_AUDIT_HMAC_KEY"
+	auditEnvSecretsPasswd = "AFLARE_SECRETS_PASSWORD"
+	auditPBKDF2Salt       = "aflare-audit-hmac-salt-v1"
 	auditPBKDF2Iterations = 100000
 	auditPBKDF2KeyLen     = 32
 	// auditDefaultKey is an insecure fallback used only when no key is configured.
-	auditDefaultKey = "llm-box-default-audit-hmac-key-v1"
+	auditDefaultKey = "aflare-default-audit-hmac-key-v1"
 )
 
 var (
@@ -366,7 +366,7 @@ func getAuditHMACKey() []byte {
 		return deriveAuditKeyFromPassword(password)
 	}
 	warnDefaultKeyOnce.Do(func() {
-		logger.Warn("audit HMAC key not configured; using insecure default. Set LLM_BOX_AUDIT_HMAC_KEY for production use.")
+		logger.Warn("audit HMAC key not configured; using insecure default. Set AFLARE_AUDIT_HMAC_KEY for production use.")
 	})
 	return []byte(auditDefaultKey)
 }

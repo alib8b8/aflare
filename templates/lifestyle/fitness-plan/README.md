@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for create personalized 
 ## Usage
 
 ```bash
-llm-box install health-wellness/fitness-plan
-llm-box run fitness-plan/workflow.yaml
+aflare install health-wellness/fitness-plan
+aflare run fitness-plan/workflow.yaml
 ```
 
 ## Parameters

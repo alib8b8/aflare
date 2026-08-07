@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -103,8 +103,8 @@ func TestSkillExplorer_Recommend(t *testing.T) {
 		t.Errorf("expected recommended header, got: %s", output)
 	}
 	// Recommendations use a min_quality of 60, so high-quality skills appear.
-	if !strings.Contains(output, "llm-box-workflow") {
-		t.Errorf("expected 'llm-box-workflow' in recommendations, got: %s", output)
+	if !strings.Contains(output, "aflare-workflow") {
+		t.Errorf("expected 'aflare-workflow' in recommendations, got: %s", output)
 	}
 }
 
@@ -190,7 +190,7 @@ func TestSkillExplorer_InvalidMinQuality(t *testing.T) {
 	}
 	// Multiple known skills should appear, proving the default was applied
 	// rather than the filter rejecting everything.
-	expected := []string{"llm-box-workflow", "code-review", "llm-router", "self-heal"}
+	expected := []string{"aflare-workflow", "code-review", "llm-router", "self-heal"}
 	for _, name := range expected {
 		if !strings.Contains(output, name) {
 			t.Errorf("expected skill %q with default min_quality, got: %s", name, output)
@@ -218,7 +218,7 @@ func TestSkillExplorer_InvalidLimit(t *testing.T) {
 	// All 10 skills are listed when limit >= 10. Count known skill names
 	// that appear in the output to confirm the default limit was used.
 	known := []string{
-		"llm-box-workflow", "code-review", "smart-search", "agent-browser",
+		"aflare-workflow", "code-review", "smart-search", "agent-browser",
 		"self-heal", "llm-router", "knowledge-graph", "multi-role-agent",
 		"omniroute-gateway", "swarm-communication",
 	}

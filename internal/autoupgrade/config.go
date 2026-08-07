@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -44,13 +44,13 @@ func LoadConfig() (*UpgradeConfig, error) {
 func getConfigPaths() []string {
 	var paths []string
 
-	if envPath := os.Getenv("LLM_BOX_AUTOUPGRADE_CONFIG"); envPath != "" {
+	if envPath := os.Getenv("AFLARE_AUTOUPGRADE_CONFIG"); envPath != "" {
 		paths = append(paths, envPath)
 	}
 
 	home, err := os.UserHomeDir()
 	if err == nil {
-		paths = append(paths, filepath.Join(home, ".config", "llm-box", "autoupgrade.yaml"))
+		paths = append(paths, filepath.Join(home, ".config", "aflare", "autoupgrade.yaml"))
 	}
 
 	cwd, err := os.Getwd()
@@ -69,7 +69,7 @@ func getDefaultConfig() *UpgradeConfig {
 		CheckInterval:       "24h",
 		BackupBeforeUpgrade: true,
 		RollbackOnFailure:   true,
-		RepositoryURL:       "https://github.com/alib8b8/llm-box",
+		RepositoryURL:       "https://github.com/alib8b8/aflare",
 		Channel:             ChannelStable,
 	}
 }
@@ -80,7 +80,7 @@ func SaveConfig(config *UpgradeConfig) error {
 		return fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	configDir := filepath.Join(home, ".config", "llm-box")
+	configDir := filepath.Join(home, ".config", "aflare")
 	if err := os.MkdirAll(configDir, 0750); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for run network diagnost
 ## Usage
 
 ```bash
-llm-box install networking/network-diagnostics
-llm-box run network-diagnostics/workflow.yaml
+aflare install networking/network-diagnostics
+aflare run network-diagnostics/workflow.yaml
 ```
 
 ## Parameters

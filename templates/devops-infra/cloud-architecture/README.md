@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate cloud archi
 ## Usage
 
 ```bash
-llm-box install cloud-infra/cloud-architecture
-llm-box run cloud-architecture/workflow.yaml
+aflare install cloud-infra/cloud-architecture
+aflare run cloud-architecture/workflow.yaml
 ```
 
 ## Parameters

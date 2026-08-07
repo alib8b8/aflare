@@ -3,7 +3,7 @@
   "name": "incident-response",
   "version": "1.0.0",
   "description": "Generate incident response playbook",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "devops-infra",
   "tags": [
     "devops-infra",

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate data cleani
 ## Usage
 
 ```bash
-llm-box install ai-ml/data-cleaning
-llm-box run data-cleaning/workflow.yaml
+aflare install ai-ml/data-cleaning
+aflare run data-cleaning/workflow.yaml
 ```
 
 ## Parameters

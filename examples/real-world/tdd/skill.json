@@ -3,7 +3,7 @@
   "name": "tdd",
   "version": "1.0.0",
   "description": "Constraint skill inspired by mattpocock/skills /tdd: enforces a strict Red-Green-Refactor loop. Write a failing test first (Red), produce the minimal implementation to make it pass (Green), then refactor without changing behavior. Each phase is a separate LLM step so the discipline cannot be skipped.",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "constraint",
   "tags": [
     "constraint",

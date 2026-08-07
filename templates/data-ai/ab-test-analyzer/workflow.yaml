@@ -1,7 +1,7 @@
 name: A/B Test Analyzer
 # Analyze A/B test results and determine winner
-# Usage: llm-box install data-analytics/ab-test-analyzer
-#        llm-box run ab-test-analyzer/workflow.yaml
+# Usage: aflare install data-analytics/ab-test-analyzer
+#        aflare run ab-test-analyzer/workflow.yaml
 
 steps:
   - node: file_read

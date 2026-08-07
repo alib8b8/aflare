@@ -1,6 +1,6 @@
 # Scheduled Workflows
 
-llm-box supports scheduling workflows to run at specified times using cron expressions.
+aflare supports scheduling workflows to run at specified times using cron expressions.
 
 ## Quick Start
 
@@ -8,34 +8,34 @@ llm-box supports scheduling workflows to run at specified times using cron expre
 
 ```bash
 # Schedule workflow to run daily at 9:00 AM
-llm-box schedule --cron "0 9 * * *" my-workflow.yaml
+aflare schedule --cron "0 9 * * *" my-workflow.yaml
 
 # Schedule workflow to run every hour
-llm-box schedule --cron "0 * * * *" my-workflow.yaml
+aflare schedule --cron "0 * * * *" my-workflow.yaml
 
 # Schedule workflow with custom task ID
-llm-box schedule --id daily-report --cron "0 9 * * *" my-workflow.yaml
+aflare schedule --id daily-report --cron "0 9 * * *" my-workflow.yaml
 ```
 
 ### List Scheduled Tasks
 
 ```bash
 # List all scheduled tasks
-llm-box schedule --list
+aflare schedule --list
 
 # Get task details
-llm-box schedule --info daily-report
+aflare schedule --info daily-report
 ```
 
 ### Remove a Scheduled Task
 
 ```bash
-llm-box schedule --remove daily-report
+aflare schedule --remove daily-report
 ```
 
 ## Cron Expression Syntax
 
-llm-box uses standard 5-field cron expressions:
+aflare uses standard 5-field cron expressions:
 
 ```
 ┌───────────── minute (0 - 59)
@@ -90,7 +90,7 @@ llm-box uses standard 5-field cron expressions:
 
 | Variable | Description |
 |----------|-------------|
-| `LLM_BOX_SCHEDULER_LOG_FILE` | Path to scheduler log file |
+| `AFLARE_SCHEDULER_LOG_FILE` | Path to scheduler log file |
 
 ## Scheduled Workflow Example
 
@@ -156,10 +156,10 @@ steps:
 
 ```bash
 # View scheduler logs
-tail -f ~/.llm-box/logs/scheduler.log
+tail -f ~/.aflare/logs/scheduler.log
 
 # Search for specific task logs
-grep "daily-report" ~/.llm-box/logs/scheduler.log
+grep "daily-report" ~/.aflare/logs/scheduler.log
 ```
 
 ### Log Format
@@ -180,7 +180,7 @@ grep "daily-report" ~/.llm-box/logs/scheduler.log
 
 ```bash
 # Check task status
-llm-box schedule --info daily-report
+aflare schedule --info daily-report
 
 # Output:
 # Task ID: daily-report
@@ -200,10 +200,10 @@ A workflow can have multiple schedules by creating separate tasks:
 
 ```bash
 # Daily morning report
-llm-box schedule --id morning-report --cron "0 9 * * *" report.yaml
+aflare schedule --id morning-report --cron "0 9 * * *" report.yaml
 
 # Daily evening report
-llm-box schedule --id evening-report --cron "0 18 * * *" report.yaml
+aflare schedule --id evening-report --cron "0 18 * * *" report.yaml
 ```
 
 ### Parameterized Schedules
@@ -211,7 +211,7 @@ llm-box schedule --id evening-report --cron "0 18 * * *" report.yaml
 Pass parameters to scheduled workflows:
 
 ```bash
-llm-box schedule --cron "0 9 * * *" --params '{"type":"daily"}' report.yaml
+aflare schedule --cron "0 9 * * *" --params '{"type":"daily"}' report.yaml
 ```
 
 ### Time Zones
@@ -220,7 +220,7 @@ Schedules use the system's local time zone. For specific time zones:
 
 ```bash
 # Set time zone before scheduling
-TZ=UTC llm-box schedule --cron "0 9 * * *" report.yaml
+TZ=UTC aflare schedule --cron "0 9 * * *" report.yaml
 ```
 
 ### Error Handling
@@ -254,15 +254,15 @@ For production, run the scheduler as a systemd service:
 
 ```ini
 [Unit]
-Description=llm-box Scheduler
+Description=aflare Scheduler
 After=network.target
 
 [Service]
 Type=simple
 User=youruser
-ExecStart=/usr/local/bin/llm-box scheduler
+ExecStart=/usr/local/bin/aflare scheduler
 Restart=on-failure
-Environment=LLM_BOX_SECRETS_PASSWORD=your-password
+Environment=AFLARE_SECRETS_PASSWORD=your-password
 
 [Install]
 WantedBy=multi-user.target
@@ -271,14 +271,14 @@ WantedBy=multi-user.target
 ```bash
 # Enable and start
 sudo systemctl daemon-reload
-sudo systemctl enable llm-box-scheduler
-sudo systemctl start llm-box-scheduler
+sudo systemctl enable aflare-scheduler
+sudo systemctl start aflare-scheduler
 
 # Check status
-sudo systemctl status llm-box-scheduler
+sudo systemctl status aflare-scheduler
 
 # View logs
-journalctl -u llm-box-scheduler -f
+journalctl -u aflare-scheduler -f
 ```
 
 ## Best Practices

@@ -1,7 +1,7 @@
 name: Microservices Architecture
 # Generate microservices architecture design
-# Usage: llm-box install backend/microservices-design
-#        llm-box run microservices-design/workflow.yaml
+# Usage: aflare install backend/microservices-design
+#        aflare run microservices-design/workflow.yaml
 
 steps:
   - node: agent

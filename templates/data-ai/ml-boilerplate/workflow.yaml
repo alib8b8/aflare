@@ -1,7 +1,7 @@
 name: ML Project Boilerplate
 # Generate ML project structure and boilerplate
-# Usage: llm-box install ai-ml/ml-boilerplate
-#        llm-box run ml-boilerplate/workflow.yaml
+# Usage: aflare install ai-ml/ml-boilerplate
+#        aflare run ml-boilerplate/workflow.yaml
 
 steps:
   - node: agent

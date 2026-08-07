@@ -1,7 +1,7 @@
 name: Story Plot Generator
 # Generate story plot and character outlines
-# Usage: llm-box install creative/story-plot
-#        llm-box run story-plot/workflow.yaml
+# Usage: aflare install creative/story-plot
+#        aflare run story-plot/workflow.yaml
 
 steps:
   - node: agent

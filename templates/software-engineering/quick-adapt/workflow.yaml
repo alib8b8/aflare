@@ -5,8 +5,8 @@ description: |
   适用于 Demo 跑通、迁移可行性评估、快速产出最小适配报告。
   输入：模型名称（如 Qwen2.5-7B-Instruct）。
 # 用法:
-#   llm-box run ascend-adapt/quick-adapt/workflow.yaml --input "Qwen2.5-7B-Instruct"
-#   llm-box run ascend-adapt/quick-adapt/workflow.yaml --input "ChatGLM3-6B" --set target_npu=910B
+#   aflare run ascend-adapt/quick-adapt/workflow.yaml --input "Qwen2.5-7B-Instruct"
+#   aflare run ascend-adapt/quick-adapt/workflow.yaml --input "ChatGLM3-6B" --set target_npu=910B
 
 inputs:
   model: "Qwen2.5-7B-Instruct"      # 待适配的模型名称

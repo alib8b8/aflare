@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for summarize academic p
 ## Usage
 
 ```bash
-llm-box install research-analysis/paper-summarizer
-llm-box run paper-summarizer/workflow.yaml
+aflare install research-analysis/paper-summarizer
+aflare run paper-summarizer/workflow.yaml
 ```
 
 ## Parameters

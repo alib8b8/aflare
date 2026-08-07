@@ -69,18 +69,18 @@ flowchart TD
 
 ```bash
 # 1. 默认：用 Go 写一个功能的 TDD 三阶段
-llm-box run examples/real-world/tdd/workflow.yaml \
+aflare run examples/real-world/tdd/workflow.yaml \
   --var feature_description="实现一个限流器：令每秒最多 N 个请求通过，超出则排队等待"
 
 # 2. 切换语言（Python），并自定义产物文件名
-llm-box run examples/real-world/tdd/workflow.yaml \
+aflare run examples/real-world/tdd/workflow.yaml \
   --var feature_description="实现一个 LRU 缓存，支持 get/put 和容量上限" \
   --var language=python \
   --var test_file=lru_cache_test.py \
   --var impl_file=lru_cache.py
 
 # 3. 换用本地其它模型
-llm-box run examples/real-world/tdd/workflow.yaml \
+aflare run examples/real-world/tdd/workflow.yaml \
   --var feature_description="实现一个环形缓冲区，支持溢出时覆盖最旧元素" \
   --var model=qwen2.5
 ```

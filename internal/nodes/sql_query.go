@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -24,14 +24,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/nodes/core"
+	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
 // SQLQueryNode executes SQL against any database/sql-compatible driver.
 // The driver must be registered by the host program (e.g. via
 // `_ "github.com/mattn/go-sqlite3"`); this node only depends on the
 // standard library and never imports a specific driver, so it adds no
-// third-party / CGO dependency to llm-box itself.
+// third-party / CGO dependency to aflare itself.
 //
 // Inspired by OtterMind/Chat2DB: AI agents need a uniform data access
 // layer. This node enforces read-only safety by default, parameterized

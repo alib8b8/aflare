@@ -1,7 +1,7 @@
 name: Competitor Content Analyzer
 # Analyze competitor content strategy
-# Usage: llm-box install marketing/competitor-content
-#        llm-box run competitor-content/workflow.yaml
+# Usage: aflare install marketing/competitor-content
+#        aflare run competitor-content/workflow.yaml
 
 steps:
   - node: http_request

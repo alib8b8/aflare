@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for review the week and 
 ## Usage
 
 ```bash
-llm-box install productivity-personal/weekly-review
-llm-box run weekly-review/workflow.yaml
+aflare install productivity-personal/weekly-review
+aflare run weekly-review/workflow.yaml
 ```
 
 ## Parameters

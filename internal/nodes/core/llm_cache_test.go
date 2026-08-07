@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/cache"
+	"github.com/alib8b8/aflare/internal/cache"
 )
 
 // newCountingMockLLM stands up an OpenAI-compatible /chat/completions
@@ -197,7 +197,7 @@ func TestLLMCache_TTLExpiry(t *testing.T) {
 func TestLLMCache_DisabledByDefault(t *testing.T) {
 	// Ensure the env opt-in is unset so the node is in its default
 	// (caching disabled) state regardless of ambient environment.
-	t.Setenv("LLM_BOX_LLM_CACHE", "")
+	t.Setenv("AFLARE_LLM_CACHE", "")
 
 	srv, calls := newCountingMockLLM(t, "r")
 	n := NewOpenAICompatibleNode(LLMNodeConfig{

@@ -1,7 +1,7 @@
 name: Ebook Outline Generator
 # Generate comprehensive ebook outline
-# Usage: llm-box install writing-content/ebook-outline
-#        llm-box run ebook-outline/workflow.yaml
+# Usage: aflare install writing-content/ebook-outline
+#        aflare run ebook-outline/workflow.yaml
 
 steps:
   - node: agent

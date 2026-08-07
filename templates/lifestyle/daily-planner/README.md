@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate structured 
 ## Usage
 
 ```bash
-llm-box install productivity-personal/daily-planner
-llm-box run daily-planner/workflow.yaml
+aflare install productivity-personal/daily-planner
+aflare run daily-planner/workflow.yaml
 ```
 
 ## Parameters

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate project kic
 ## Usage
 
 ```bash
-llm-box install project-management/project-kickoff
-llm-box run project-kickoff/workflow.yaml
+aflare install project-management/project-kickoff
+aflare run project-kickoff/workflow.yaml
 ```
 
 ## Parameters

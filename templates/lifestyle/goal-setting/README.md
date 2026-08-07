@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for set smart goals with
 ## Usage
 
 ```bash
-llm-box install productivity-personal/goal-setting
-llm-box run goal-setting/workflow.yaml
+aflare install productivity-personal/goal-setting
+aflare run goal-setting/workflow.yaml
 ```
 
 ## Parameters

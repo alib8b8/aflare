@@ -9,17 +9,17 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$LLM_BOX_NAME = "llm-box"
-$GITHUB_REPO = "alib8b8/llm-box"
-$ATOMGIT_REPO = "llm-box/llm-box"
+$AFLARE_NAME = "aflare"
+$GITHUB_REPO = "alib8b8/aflare"
+$ATOMGIT_REPO = "aflare/aflare"
 
-if ($Home -eq "") { $Home = "$env:USERPROFILE\llm-box" }
-if ($Data -eq "") { $Data = "$env:USERPROFILE\.llm-box" }
-if ($Mirror -ne "") { $env:LLM_BOX_MIRROR = $Mirror }
-if ($Version -ne "latest") { $env:LLM_BOX_TAG = $Version }
+if ($Home -eq "") { $Home = "$env:USERPROFILE\aflare" }
+if ($Data -eq "") { $Data = "$env:USERPROFILE\.aflare" }
+if ($Mirror -ne "") { $env:AFLARE_MIRROR = $Mirror }
+if ($Version -ne "latest") { $env:AFLARE_TAG = $Version }
 
 Write-Host "╔══════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║           llm-box Installer               ║" -ForegroundColor Cyan
+Write-Host "║           aflare Installer               ║" -ForegroundColor Cyan
 Write-Host "╚══════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 
@@ -58,7 +58,7 @@ function Install-FromSource {
         exit 1
     }
 
-    $buildDir = Join-Path $env:TEMP "llm-box-build-$(Get-Random)"
+    $buildDir = Join-Path $env:TEMP "aflare-build-$(Get-Random)"
     New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
 
     $cloneUrl = if ($AtomGit) {
@@ -76,8 +76,8 @@ function Install-FromSource {
     }
 
     Set-Location $buildDir
-    Write-Host "[INFO] Building llm-box..." -ForegroundColor Blue
-    go build -o "$Home\bin\llm-box.exe" ./cmd/llm-box
+    Write-Host "[INFO] Building aflare..." -ForegroundColor Blue
+    go build -o "$Home\bin\aflare.exe" ./cmd/aflare
 
     if (Test-Path "templates") { Copy-Item -Recurse "templates" "$Home\" -Force }
     if (Test-Path "README*") { Copy-Item "README*" "$Home\" -Force }
@@ -98,8 +98,8 @@ Write-Host "[INFO] Program dir: $Home" -ForegroundColor Blue
 Write-Host "[INFO] Data dir: $Data" -ForegroundColor Blue
 if ($AtomGit) { Write-Host "[INFO] Mirror: AtomGit (China optimized)" -ForegroundColor Blue }
 
-if ((Test-Path "$Home\bin\llm-box.exe") -and -not $Force) {
-    Write-Host "[WARN] llm-box already installed at $Home" -ForegroundColor Yellow
+if ((Test-Path "$Home\bin\aflare.exe") -and -not $Force) {
+    Write-Host "[WARN] aflare already installed at $Home" -ForegroundColor Yellow
     Write-Host "[WARN] Use -Force to reinstall" -ForegroundColor Yellow
     exit 0
 }
@@ -118,7 +118,7 @@ if ($tag -eq "") {
     if ($tag -eq "") { $tag = "main" }
 }
 
-$assetName = "${LLM_BOX_NAME}_${tag}_windows_${arch}.tar.gz"
+$assetName = "${AFLARE_NAME}_${tag}_windows_${arch}.tar.gz"
 $downloadUrl = if ($Mirror -ne "") {
     "$Mirror/$assetName"
 } elseif ($AtomGit) {
@@ -127,7 +127,7 @@ $downloadUrl = if ($Mirror -ne "") {
     "https://github.com/$GITHUB_REPO/releases/download/$tag/$assetName"
 }
 
-$tmpFile = Join-Path $env:TEMP "llm-box-$(Get-Random).tar.gz"
+$tmpFile = Join-Path $env:TEMP "aflare-$(Get-Random).tar.gz"
 $downloaded = Download-File $downloadUrl $tmpFile
 
 if ($downloaded -and (Test-Path $tmpFile)) {
@@ -150,8 +150,8 @@ if ($downloaded -and (Test-Path $tmpFile)) {
     Install-FromSource
 }
 
-if (-not (Test-Path "$Home\bin\llm-box.exe")) {
-    Write-Host "[ERROR] Installation failed: llm-box.exe not found" -ForegroundColor Red
+if (-not (Test-Path "$Home\bin\aflare.exe")) {
+    Write-Host "[ERROR] Installation failed: aflare.exe not found" -ForegroundColor Red
     exit 1
 }
 
@@ -161,19 +161,19 @@ if ($currentPath -notlike "*$Home\bin*") {
     Write-Host "[OK] Added $Home\bin to user PATH" -ForegroundColor Green
 }
 
-[Environment]::SetEnvironmentVariable("LLM_BOX_HOME", $Home, "User")
-[Environment]::SetEnvironmentVariable("LLM_BOX_DATA", $Data, "User")
+[Environment]::SetEnvironmentVariable("AFLARE_HOME", $Home, "User")
+[Environment]::SetEnvironmentVariable("AFLARE_DATA", $Data, "User")
 
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║      llm-box installed successfully!      ║" -ForegroundColor Green
+Write-Host "║      aflare installed successfully!      ║" -ForegroundColor Green
 Write-Host "╚══════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
 Write-Host "[OK] Program: $Home" -ForegroundColor Green
 Write-Host "[OK] Data:    $Data" -ForegroundColor Green
 Write-Host ""
 Write-Host "[INFO] Quick start (restart your terminal first):" -ForegroundColor Blue
-Write-Host "  llm-box skills list"
-Write-Host "  llm-box run <template>"
-Write-Host "  llm-box init --mcp all"
+Write-Host "  aflare skills list"
+Write-Host "  aflare run <template>"
+Write-Host "  aflare init --mcp all"
 Write-Host ""

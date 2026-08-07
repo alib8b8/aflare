@@ -1,7 +1,7 @@
 name: Blog Post Outline Generator
 # Generate structured blog post outlines from topics
-# Usage: llm-box install content-marketing/blog-outline-generator
-#        llm-box run blog-outline-generator/workflow.yaml
+# Usage: aflare install content-marketing/blog-outline-generator
+#        aflare run blog-outline-generator/workflow.yaml
 
 steps:
   - node: http_request

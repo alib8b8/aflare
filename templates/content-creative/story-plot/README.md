@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate story plot 
 ## Usage
 
 ```bash
-llm-box install creative/story-plot
-llm-box run story-plot/workflow.yaml
+aflare install creative/story-plot
+aflare run story-plot/workflow.yaml
 ```
 
 ## Parameters

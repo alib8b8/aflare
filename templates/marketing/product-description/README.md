@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for write compelling pro
 ## Usage
 
 ```bash
-llm-box install content-marketing/product-description
-llm-box run product-description/workflow.yaml
+aflare install content-marketing/product-description
+aflare run product-description/workflow.yaml
 ```
 
 ## Parameters

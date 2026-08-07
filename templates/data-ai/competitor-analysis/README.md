@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for analyze competitors 
 ## Usage
 
 ```bash
-llm-box install research-analysis/competitor-analysis
-llm-box run competitor-analysis/workflow.yaml
+aflare install research-analysis/competitor-analysis
+aflare run competitor-analysis/workflow.yaml
 ```
 
 ## Parameters

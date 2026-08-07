@@ -1,6 +1,6 @@
 # 日终对账工作流示例
 
-> 真实金融只读分析场景的可运行 Demo：比对银行对账单与内部账本，标记差异并生成报告。展示 llm-box 的 **map 并发匹配**能力在金融对账中的应用。
+> 真实金融只读分析场景的可运行 Demo：比对银行对账单与内部账本，标记差异并生成报告。展示 aflare 的 **map 并发匹配**能力在金融对账中的应用。
 
 ## 展示的金融能力
 
@@ -53,7 +53,7 @@ cat bank.json    # 银行对账单（5 笔交易）
 
 ```bash
 # 从仓库根目录运行（纯本地文件操作，无需启动 mock 服务）
-llm-box run examples/finance/reconciliation/workflow.yaml
+aflare run examples/finance/reconciliation/workflow.yaml
 ```
 
 ### 3. 查看对账报告

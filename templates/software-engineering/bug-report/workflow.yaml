@@ -1,7 +1,7 @@
 name: Bug Report Template
 # Generate structured bug report template
-# Usage: llm-box install quality-assurance/bug-report
-#        llm-box run bug-report/workflow.yaml
+# Usage: aflare install quality-assurance/bug-report
+#        aflare run bug-report/workflow.yaml
 
 steps:
   - node: agent

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate sales perfo
 ## Usage
 
 ```bash
-llm-box install data-analytics/sales-dashboard
-llm-box run sales-dashboard/workflow.yaml
+aflare install data-analytics/sales-dashboard
+aflare run sales-dashboard/workflow.yaml
 ```
 
 ## Parameters

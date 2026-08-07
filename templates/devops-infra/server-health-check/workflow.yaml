@@ -1,7 +1,7 @@
 name: Server Health Check
 # Check server health metrics and generate report
-# Usage: llm-box install devops-monitoring/server-health-check
-#        llm-box run server-health-check/workflow.yaml
+# Usage: aflare install devops-monitoring/server-health-check
+#        aflare run server-health-check/workflow.yaml
 
 steps:
   - node: execute

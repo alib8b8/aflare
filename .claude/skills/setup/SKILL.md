@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Guide for installing and configuring llm-box, including binary installation, source builds, workflows directory setup, and initial workflow creation
+description: Guide for installing and configuring aflare, including binary installation, source builds, workflows directory setup, and initial workflow creation
 allowed-tools:
   - bash
   - file_read
@@ -14,14 +14,14 @@ tags:
   - setup
   - installation
   - configuration
-  - llm-box
+  - aflare
 ---
 
 # Setup Skill
 
 ## Overview
 
-The setup skill walks you through installing llm-box and getting your first workflow running. llm-box is a workflow engine that chains nodes (steps) to automate tasks — fetching URLs, executing commands, transforming data, calling local LLMs via Ollama, reading/writing files, and more. This skill covers binary installation, building from source, directory structure, configuration, secrets, and verification.
+The setup skill walks you through installing aflare and getting your first workflow running. aflare is a workflow engine that chains nodes (steps) to automate tasks — fetching URLs, executing commands, transforming data, calling local LLMs via Ollama, reading/writing files, and more. This skill covers binary installation, building from source, directory structure, configuration, secrets, and verification.
 
 ## Prerequisites
 
@@ -33,49 +33,49 @@ The setup skill walks you through installing llm-box and getting your first work
 
 ## Instructions
 
-### 1. Install llm-box
+### 1. Install aflare
 
-**Binary release:** Download the latest release asset for your platform from the [GitHub Releases](https://github.com/alib8b8/llm-box/releases) page.
+**Binary release:** Download the latest release asset for your platform from the [GitHub Releases](https://github.com/alib8b8/aflare/releases) page.
 
 **Build from source:**
 
 ```bash
-git clone https://github.com/alib8b8/llm-box.git
-cd llm-box
-go build -o llm-box ./cmd/llm-box
-sudo mv llm-box /usr/local/bin/
+git clone https://github.com/alib8b8/aflare.git
+cd aflare
+go build -o aflare ./cmd/aflare
+sudo mv aflare /usr/local/bin/
 ```
 
 ### 2. Verify Installation
 
 ```bash
-llm-box --version
+aflare --version
 ```
 
 ### 3. Create Workflows Directory
 
 ```bash
-mkdir -p ~/.llm-box/workflows
+mkdir -p ~/.aflare/workflows
 ```
 
 ### 4. Configure Secrets (Optional)
 
 ```bash
-llm-box secrets init
-llm-box secrets set --group api --key service <password>
+aflare secrets init
+aflare secrets set --group api --key service <password>
 ```
 
 ### 5. Test with a Sample Workflow
 
 ```bash
-llm-box run examples/content-processor.yaml
+aflare run examples/content-processor.yaml
 ```
 
 ## Output
 
 After a successful setup you should have:
-- A working `llm-box` binary available in your PATH
-- A workflows directory at `~/.llm-box/workflows/` (or a custom path)
+- A working `aflare` binary available in your PATH
+- A workflows directory at `~/.aflare/workflows/` (or a custom path)
 - An optional secrets store for sensitive parameters
 - A test run confirming the engine can execute workflows
 
@@ -83,28 +83,28 @@ After a successful setup you should have:
 
 ```bash
 # Full installation from source
-git clone https://github.com/alib8b8/llm-box.git
-cd llm-box
-go build -o llm-box ./cmd/llm-box
-sudo mv llm-box /usr/local/bin/
+git clone https://github.com/alib8b8/aflare.git
+cd aflare
+go build -o aflare ./cmd/aflare
+sudo mv aflare /usr/local/bin/
 
 # Create and run your first workflow
-mkdir -p ~/.llm-box/workflows
-cat > ~/.llm-box/workflows/hello.yaml << 'EOF'
+mkdir -p ~/.aflare/workflows
+cat > ~/.aflare/workflows/hello.yaml << 'EOF'
 name: hello-world
 description: Simple hello world workflow
 steps:
   - node: file_write
     params:
       path: "output.txt"
-    input: "Hello from llm-box!"
+    input: "Hello from aflare!"
 EOF
-llm-box run ~/.llm-box/workflows/hello.yaml
+aflare run ~/.aflare/workflows/hello.yaml
 ```
 
 ## Resources
 
-- [llm-box GitHub Repository](https://github.com/alib8b8/llm-box)
+- [aflare GitHub Repository](https://github.com/alib8b8/aflare)
 - [Node Reference Documentation](docs/nodes-reference.md)
 - [Custom Nodes Guide](docs/custom-nodes.md)
 - [Example Workflows](examples/)

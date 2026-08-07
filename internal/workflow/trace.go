@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -145,7 +145,7 @@ type LLMStepTrace struct {
 	// (via core.RedactSensitive) is applied before persistence so that
 	// API keys, tokens, private keys and other secrets never reach disk.
 	// Empty when the call produced no prompt or when redaction is disabled
-	// via LLM_BOX_TRACE_NO_REDACT=1.
+	// via AFLARE_TRACE_NO_REDACT=1.
 	Prompt string `json:"prompt,omitempty"`
 	// Response is the redacted response text for this LLM call, subject
 	// to the same redaction as Prompt.

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -1192,18 +1192,18 @@ func TestHumanInLoopNode_Execute(t *testing.T) {
 	}
 
 	// env 模式未批准应报错
-	os.Unsetenv("LLM_BOX_APPROVED")
+	os.Unsetenv("AFLARE_APPROVED")
 	if _, err := n.Execute(ctx, "x", map[string]string{"mode": "env"}); err == nil {
 		t.Errorf("env mode without approval should error")
 	}
 	// env 模式已批准（需 on_approve=modified 才能看到 reason）
-	os.Setenv("LLM_BOX_APPROVED", "1")
-	defer os.Unsetenv("LLM_BOX_APPROVED")
+	os.Setenv("AFLARE_APPROVED", "1")
+	defer os.Unsetenv("AFLARE_APPROVED")
 	out, err = n.Execute(ctx, "x", map[string]string{"mode": "env", "on_approve": "modified"})
 	if err != nil {
 		t.Fatalf("env approved error: %v", err)
 	}
-	if !strings.Contains(out, "env LLM_BOX_APPROVED=approved") {
+	if !strings.Contains(out, "env AFLARE_APPROVED=approved") {
 		t.Errorf("expected env approval message, got: %s", out)
 	}
 

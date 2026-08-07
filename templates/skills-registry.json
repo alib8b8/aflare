@@ -7,7 +7,7 @@
       "name": "business-plan",
       "version": "1.0.0",
       "description": "Generate comprehensive business plan outline",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -26,7 +26,7 @@
       "name": "churn-analyzer",
       "version": "1.0.0",
       "description": "Analyze customer churn and retention",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -45,7 +45,7 @@
       "name": "contract-review-sop",
       "version": "1.0.0",
       "description": "contract-review-sop workflow template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -64,7 +64,7 @@
       "name": "customer-persona",
       "version": "1.0.0",
       "description": "Build detailed customer personas",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -83,7 +83,7 @@
       "name": "faq-generator",
       "version": "1.0.0",
       "description": "Generate FAQ from support interactions",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -102,7 +102,7 @@
       "name": "interview-questions",
       "version": "1.0.0",
       "description": "Generate interview questions for any role",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -121,7 +121,7 @@
       "name": "job-description",
       "version": "1.0.0",
       "description": "Generate professional job descriptions",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -140,7 +140,7 @@
       "name": "multi-role-agent",
       "version": "1.0.0",
       "description": "三角色一体商业智能体（营销 + BD + IR），参考 xiaobei 的产品设计思路。一个入口，覆盖从内容产出、找客户、到融资材料的全流程。",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -159,7 +159,7 @@
       "name": "onboarding-plan",
       "version": "1.0.0",
       "description": "Create 30-60-90 day onboarding plan",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -178,7 +178,7 @@
       "name": "performance-review",
       "version": "1.0.0",
       "description": "Generate performance review templates",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -197,7 +197,7 @@
       "name": "pitch-deck",
       "version": "1.0.0",
       "description": "Generate pitch deck structure and content",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -216,7 +216,7 @@
       "name": "privacy-policy",
       "version": "1.0.0",
       "description": "Generate privacy policy template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -235,7 +235,7 @@
       "name": "project-kickoff",
       "version": "1.0.0",
       "description": "Generate project kickoff document",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -254,7 +254,7 @@
       "name": "retrospective",
       "version": "1.0.0",
       "description": "Generate sprint retrospective template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -273,7 +273,7 @@
       "name": "saas-pricing",
       "version": "1.0.0",
       "description": "Design SaaS pricing strategy and tiers",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -292,7 +292,7 @@
       "name": "sales-emails",
       "version": "1.0.0",
       "description": "Generate cold email sequences for sales",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -311,7 +311,7 @@
       "name": "sprint-planner",
       "version": "1.0.0",
       "description": "Plan and organize sprint tasks",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -330,7 +330,7 @@
       "name": "terms-of-service",
       "version": "1.0.0",
       "description": "Generate terms of service agreement",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -349,7 +349,7 @@
       "name": "ticket-classifier",
       "version": "1.0.0",
       "description": "Classify and prioritize support tickets",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "business",
       "tags": [
         "business",
@@ -368,7 +368,7 @@
       "name": "brand-identity",
       "version": "1.0.0",
       "description": "Generate complete brand identity guide",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "content-creative",
       "tags": [
         "content-creative",
@@ -387,7 +387,7 @@
       "name": "case-study",
       "version": "1.0.0",
       "description": "Generate customer case study template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "content-creative",
       "tags": [
         "content-creative",
@@ -406,7 +406,7 @@
       "name": "ebook-outline",
       "version": "1.0.0",
       "description": "Generate comprehensive ebook outline",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "content-creative",
       "tags": [
         "content-creative",
@@ -425,7 +425,7 @@
       "name": "press-release",
       "version": "1.0.0",
       "description": "Generate professional press release",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "content-creative",
       "tags": [
         "content-creative",
@@ -444,7 +444,7 @@
       "name": "song-lyrics",
       "version": "1.0.0",
       "description": "Generate song lyrics in any style",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "content-creative",
       "tags": [
         "content-creative",
@@ -463,7 +463,7 @@
       "name": "story-plot",
       "version": "1.0.0",
       "description": "Generate story plot and character outlines",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "content-creative",
       "tags": [
         "content-creative",
@@ -482,7 +482,7 @@
       "name": "whitepaper",
       "version": "1.0.0",
       "description": "Generate whitepaper structure and content",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "content-creative",
       "tags": [
         "content-creative",
@@ -501,7 +501,7 @@
       "name": "ab-test-analyzer",
       "version": "1.0.0",
       "description": "Analyze A/B test results and determine winner",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -520,7 +520,7 @@
       "name": "competitor-analysis",
       "version": "1.0.0",
       "description": "Analyze competitors and their strategies",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -539,7 +539,7 @@
       "name": "csv-analyzer",
       "version": "1.0.0",
       "description": "Analyze CSV data files and generate insights",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -558,7 +558,7 @@
       "name": "data-analysis",
       "version": "1.0.0",
       "description": "data-analysis workflow template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -577,7 +577,7 @@
       "name": "data-cleaning",
       "version": "1.0.0",
       "description": "Generate data cleaning and preprocessing pipeline",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -596,7 +596,7 @@
       "name": "experiment-design",
       "version": "1.0.0",
       "description": "experiment-design workflow template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -615,7 +615,7 @@
       "name": "financial-analyzer",
       "version": "1.0.0",
       "description": "Analyze financial reports and key metrics",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -634,7 +634,7 @@
       "name": "literature-review",
       "version": "1.0.0",
       "description": "literature-review workflow template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -653,7 +653,7 @@
       "name": "llm-finetune",
       "version": "1.0.0",
       "description": "Generate LLM fine-tuning preparation guide",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -672,7 +672,7 @@
       "name": "market-research",
       "version": "1.0.0",
       "description": "Research market trends and competitive landscape",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -691,7 +691,7 @@
       "name": "mindsearch-deep-research",
       "version": "1.0.0",
       "description": "mindsearch-deep-research workflow template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -710,7 +710,7 @@
       "name": "ml-boilerplate",
       "version": "1.0.0",
       "description": "Generate ML project structure and boilerplate",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -729,7 +729,7 @@
       "name": "model-evaluation",
       "version": "1.0.0",
       "description": "Generate comprehensive model evaluation report",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -748,7 +748,7 @@
       "name": "paper-summarizer",
       "version": "1.0.0",
       "description": "Summarize academic papers into key insights",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -767,7 +767,7 @@
       "name": "paper-writing",
       "version": "1.0.0",
       "description": "paper-writing workflow template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -786,7 +786,7 @@
       "name": "prompt-engineering",
       "version": "1.0.0",
       "description": "Generate optimized prompts for specific tasks",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -805,7 +805,7 @@
       "name": "sales-dashboard",
       "version": "1.0.0",
       "description": "Generate sales performance dashboard",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -824,7 +824,7 @@
       "name": "survey-analyzer",
       "version": "1.0.0",
       "description": "Analyze survey responses and extract insights",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -843,7 +843,7 @@
       "name": "swot-analysis",
       "version": "1.0.0",
       "description": "Generate comprehensive SWOT analysis for any business",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -862,7 +862,7 @@
       "name": "trend-tracker",
       "version": "1.0.0",
       "description": "Track and analyze emerging industry trends",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "data-ai",
       "tags": [
         "data-ai",
@@ -881,7 +881,7 @@
       "name": "backup-automation",
       "version": "1.0.0",
       "description": "Automated backup workflow with verification",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -900,7 +900,7 @@
       "name": "batch-rename",
       "version": "1.0.0",
       "description": "Batch rename files with patterns",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -919,7 +919,7 @@
       "name": "cloud-architecture",
       "version": "1.0.0",
       "description": "Generate cloud architecture design",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -938,7 +938,7 @@
       "name": "dns-checker",
       "version": "1.0.0",
       "description": "Check all DNS records for a domain",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -957,7 +957,7 @@
       "name": "docker-cleaner",
       "version": "1.0.0",
       "description": "Clean up unused Docker images and containers",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -976,7 +976,7 @@
       "name": "file-organizer",
       "version": "1.0.0",
       "description": "Organize files by type, date, or extension",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -995,7 +995,7 @@
       "name": "iac-template",
       "version": "1.0.0",
       "description": "Generate Terraform/IaC templates",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -1014,7 +1014,7 @@
       "name": "image-optimizer",
       "version": "1.0.0",
       "description": "Batch optimize images for web",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -1033,7 +1033,7 @@
       "name": "incident-response",
       "version": "1.0.0",
       "description": "Generate incident response playbook",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -1052,7 +1052,7 @@
       "name": "log-analyzer",
       "version": "1.0.0",
       "description": "Analyze application logs for errors and patterns",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -1071,7 +1071,7 @@
       "name": "network-diagnostics",
       "version": "1.0.0",
       "description": "Run network diagnostics and generate report",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -1090,7 +1090,7 @@
       "name": "nginx-access-analyzer",
       "version": "1.0.0",
       "description": "Analyze Nginx access logs for traffic patterns",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -1109,7 +1109,7 @@
       "name": "password-policy",
       "version": "1.0.0",
       "description": "Generate security password policy",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -1128,7 +1128,7 @@
       "name": "rss-aggregator",
       "version": "1.0.0",
       "description": "Aggregate and summarize RSS feeds",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -1147,7 +1147,7 @@
       "name": "security-audit",
       "version": "1.0.0",
       "description": "Run security audit checklist on a project",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -1166,7 +1166,7 @@
       "name": "server-health-check",
       "version": "1.0.0",
       "description": "Check server health metrics and generate report",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -1185,7 +1185,7 @@
       "name": "ssl-cert-checker",
       "version": "1.0.0",
       "description": "Check SSL certificate expiry for domains",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "devops-infra",
       "tags": [
         "devops-infra",
@@ -1204,7 +1204,7 @@
       "name": "btc-alert",
       "version": "1.0.0",
       "description": "Monitor Bitcoin price and get alerted when it crosses your threshold.",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "finance",
       "tags": [
         "finance",
@@ -1223,7 +1223,7 @@
       "name": "budget-planner",
       "version": "1.0.0",
       "description": "Create personal budget plan and tracker",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "finance",
       "tags": [
         "finance",
@@ -1242,7 +1242,7 @@
       "name": "financial-analysis-sop",
       "version": "1.0.0",
       "description": "financial-analysis-sop workflow template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "finance",
       "tags": [
         "finance",
@@ -1261,7 +1261,7 @@
       "name": "investment-research",
       "version": "1.0.0",
       "description": "Comprehensive investment research: deep analysis, due diligence, and portfolio construction.",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "finance",
       "tags": [
         "finance",
@@ -1280,7 +1280,7 @@
       "name": "market-scan",
       "version": "1.0.0",
       "description": "Financial market scanning and investment intelligence workflow.",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "finance",
       "tags": [
         "finance",
@@ -1299,7 +1299,7 @@
       "name": "portfolio-review",
       "version": "1.0.0",
       "description": "Review and optimize investment portfolio",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "finance",
       "tags": [
         "finance",
@@ -1318,7 +1318,7 @@
       "name": "ai-news",
       "version": "1.0.0",
       "description": "Fetch and summarize the latest AI/ML news from Hacker News.",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "integrations",
       "tags": [
         "integrations",
@@ -1337,7 +1337,7 @@
       "name": "github-report",
       "version": "1.0.0",
       "description": "Generate a weekly activity report for your GitHub repository.",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "integrations",
       "tags": [
         "integrations",
@@ -1356,7 +1356,7 @@
       "name": "telegram-bot",
       "version": "1.0.0",
       "description": "Send notifications to Telegram from your workflows.",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "integrations",
       "tags": [
         "integrations",
@@ -1375,7 +1375,7 @@
       "name": "book-notes",
       "version": "1.0.0",
       "description": "Generate comprehensive book notes and key takeaways",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1394,7 +1394,7 @@
       "name": "course-curriculum",
       "version": "1.0.0",
       "description": "Design complete course curriculum",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1413,7 +1413,7 @@
       "name": "course-design-sop",
       "version": "1.0.0",
       "description": "course-design-sop workflow template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1432,7 +1432,7 @@
       "name": "daily-planner",
       "version": "1.0.0",
       "description": "Generate structured daily plan from goals",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1451,7 +1451,7 @@
       "name": "essay-outline",
       "version": "1.0.0",
       "description": "Generate structured essay outlines",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1470,7 +1470,7 @@
       "name": "fitness-plan",
       "version": "1.0.0",
       "description": "Create personalized fitness plan",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1489,7 +1489,7 @@
       "name": "flashcards",
       "version": "1.0.0",
       "description": "Generate flashcards from study material",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1508,7 +1508,7 @@
       "name": "goal-setting",
       "version": "1.0.0",
       "description": "Set SMART goals with action plans",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1527,7 +1527,7 @@
       "name": "habit-tracker",
       "version": "1.0.0",
       "description": "Track habits and generate progress reports",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1546,7 +1546,7 @@
       "name": "language-learning",
       "version": "1.0.0",
       "description": "Create language learning curriculum",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1565,7 +1565,7 @@
       "name": "meal-plan",
       "version": "1.0.0",
       "description": "Generate weekly meal plan",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1584,7 +1584,7 @@
       "name": "medical-consultation-sop",
       "version": "1.0.0",
       "description": "medical-consultation-sop workflow template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1603,7 +1603,7 @@
       "name": "sleep-guide",
       "version": "1.0.0",
       "description": "Generate personalized sleep improvement plan",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1622,7 +1622,7 @@
       "name": "stress-management",
       "version": "1.0.0",
       "description": "Create stress management toolkit",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1641,7 +1641,7 @@
       "name": "study-plan",
       "version": "1.0.0",
       "description": "Create personalized study plan for any topic",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1660,7 +1660,7 @@
       "name": "travel-itinerary",
       "version": "1.0.0",
       "description": "Generate detailed travel itinerary",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1679,7 +1679,7 @@
       "name": "trip-budget",
       "version": "1.0.0",
       "description": "Calculate and plan trip budget",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1698,7 +1698,7 @@
       "name": "weekly-review",
       "version": "1.0.0",
       "description": "Review the week and plan for next",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "lifestyle",
       "tags": [
         "lifestyle",
@@ -1717,7 +1717,7 @@
       "name": "blog-outline-generator",
       "version": "1.0.0",
       "description": "Generate structured blog post outlines from topics",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "marketing",
       "tags": [
         "marketing",
@@ -1736,7 +1736,7 @@
       "name": "competitor-content",
       "version": "1.0.0",
       "description": "Analyze competitor content strategy",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "marketing",
       "tags": [
         "marketing",
@@ -1755,7 +1755,7 @@
       "name": "content-calendar",
       "version": "1.0.0",
       "description": "Generate monthly content calendar",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "marketing",
       "tags": [
         "marketing",
@@ -1774,7 +1774,7 @@
       "name": "email-newsletter",
       "version": "1.0.0",
       "description": "Generate weekly email newsletter content",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "marketing",
       "tags": [
         "marketing",
@@ -1793,7 +1793,7 @@
       "name": "landing-page-copy",
       "version": "1.0.0",
       "description": "Generate high-converting landing page copy",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "marketing",
       "tags": [
         "marketing",
@@ -1812,7 +1812,7 @@
       "name": "product-description",
       "version": "1.0.0",
       "description": "Write compelling product descriptions",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "marketing",
       "tags": [
         "marketing",
@@ -1831,7 +1831,7 @@
       "name": "seo-keyword-research",
       "version": "1.0.0",
       "description": "Research and analyze SEO keywords for a topic",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "marketing",
       "tags": [
         "marketing",
@@ -1850,7 +1850,7 @@
       "name": "seo-writer",
       "version": "1.0.0",
       "description": "Generate SEO-optimized articles with AI-powered research and audit.",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "marketing",
       "tags": [
         "marketing",
@@ -1869,7 +1869,7 @@
       "name": "social-media-planner",
       "version": "1.0.0",
       "description": "Plan social media content for the week",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "marketing",
       "tags": [
         "marketing",
@@ -1888,7 +1888,7 @@
       "name": "agent-legion",
       "version": "1.0.0",
       "description": "agent-legion workflow template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -1907,7 +1907,7 @@
       "name": "api-design",
       "version": "1.0.0",
       "description": "Generate RESTful API design specification",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -1926,7 +1926,7 @@
       "name": "api-docs-builder",
       "version": "1.0.0",
       "description": "Build API documentation from spec",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -1945,7 +1945,7 @@
       "name": "api-docs-generator",
       "version": "1.0.0",
       "description": "Generate API documentation from code comments",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -1964,7 +1964,7 @@
       "name": "api-test-suite",
       "version": "1.0.0",
       "description": "Generate API integration test suite",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -1983,7 +1983,7 @@
       "name": "bug-report",
       "version": "1.0.0",
       "description": "Generate structured bug report template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2002,7 +2002,7 @@
       "name": "code-duplicate-finder",
       "version": "1.0.0",
       "description": "Scan codebase for duplicated code patterns",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2021,7 +2021,7 @@
       "name": "component-library",
       "version": "1.0.0",
       "description": "Generate UI component library design",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2040,7 +2040,7 @@
       "name": "db-migration",
       "version": "1.0.0",
       "description": "Generate database migration plan",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2059,7 +2059,7 @@
       "name": "db-schema-docs",
       "version": "1.0.0",
       "description": "Generate database schema documentation",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2078,7 +2078,7 @@
       "name": "dependency-checker",
       "version": "1.0.0",
       "description": "Check project dependencies for updates and vulnerabilities",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2097,7 +2097,7 @@
       "name": "dev-setup",
       "version": "1.0.0",
       "description": "Automated development environment setup",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2116,7 +2116,7 @@
       "name": "dotfiles-manager",
       "version": "1.0.0",
       "description": "Manage and backup dotfiles",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2135,7 +2135,7 @@
       "name": "end-to-end-adapt",
       "version": "1.0.0",
       "description": "昇腾 Model-Agent 模型适配大赛 · 赛道一主力模板",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2154,7 +2154,7 @@
       "name": "frontend-architecture",
       "version": "1.0.0",
       "description": "Generate frontend architecture plan",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2173,7 +2173,7 @@
       "name": "git-commit-analyzer",
       "version": "1.0.0",
       "description": "Analyze git commit history and generate changelog",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2192,7 +2192,7 @@
       "name": "microservices-design",
       "version": "1.0.0",
       "description": "Generate microservices architecture design",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2211,7 +2211,7 @@
       "name": "performance-tune",
       "version": "1.0.0",
       "description": "昇腾 Model-Agent 模型适配大赛 · 赛道二主力模板",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2230,7 +2230,7 @@
       "name": "quick-adapt",
       "version": "1.0.0",
       "description": "quick-adapt workflow template",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2249,7 +2249,7 @@
       "name": "readme-generator",
       "version": "1.0.0",
       "description": "Generate project README.md",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2268,7 +2268,7 @@
       "name": "test-plan",
       "version": "1.0.0",
       "description": "Generate comprehensive test plan",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",
@@ -2287,7 +2287,7 @@
       "name": "unit-test-generator",
       "version": "1.0.0",
       "description": "Generate unit test skeleton for Go functions",
-      "author": "llm-box community",
+      "author": "aflare community",
       "category": "software-engineering",
       "tags": [
         "software-engineering",

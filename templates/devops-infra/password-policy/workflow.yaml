@@ -1,7 +1,7 @@
 name: Password Policy Generator
 # Generate security password policy
-# Usage: llm-box install security/password-policy
-#        llm-box run password-policy/workflow.yaml
+# Usage: aflare install security/password-policy
+#        aflare run password-policy/workflow.yaml
 
 steps:
   - node: agent

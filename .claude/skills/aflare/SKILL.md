@@ -1,6 +1,6 @@
 ---
-name: llm-box
-description: Core skill for creating, validating, and running llm-box workflows — YAML-defined automation pipelines that chain nodes for fetching, transforming, LLM inference, file I/O, and more
+name: aflare
+description: Core skill for creating, validating, and running aflare workflows — YAML-defined automation pipelines that chain nodes for fetching, transforming, LLM inference, file I/O, and more
 allowed-tools:
   - bash
   - file_read
@@ -14,20 +14,20 @@ tags:
   - workflow
   - automation
   - llm
-  - llm-box
+  - aflare
   - ai
   - pipeline
 ---
 
-# llm-box Workflow Skill
+# aflare Workflow Skill
 
 ## Overview
 
-llm-box is a workflow engine that chains together **nodes** (steps) to automate tasks. Each workflow is a YAML file defining a sequence of nodes. Supported node types include `fetch_url`, `execute`, `transform`, `ollama` (local LLM), `file_read`, `file_write`, `notify`, `call`, and custom community nodes. Workflows support error handling with retries, parallel execution, conditional branching, variable substitution, and workflow chaining.
+aflare is a workflow engine that chains together **nodes** (steps) to automate tasks. Each workflow is a YAML file defining a sequence of nodes. Supported node types include `fetch_url`, `execute`, `transform`, `ollama` (local LLM), `file_read`, `file_write`, `notify`, `call`, and custom community nodes. Workflows support error handling with retries, parallel execution, conditional branching, variable substitution, and workflow chaining.
 
 ## Prerequisites
 
-- **llm-box binary** installed and in your PATH
+- **aflare binary** installed and in your PATH
 - **Ollama** running locally if your workflows use `ollama` nodes
 - **Required models** installed (e.g., `ollama pull llama3`)
 - **API access** to any external services your workflow nodes call
@@ -51,21 +51,21 @@ steps:
 ### 2. Validate the Workflow
 
 ```bash
-llm-box validate my-workflow.yaml
+aflare validate my-workflow.yaml
 ```
 
 ### 3. Run the Workflow
 
 ```bash
-llm-box run my-workflow.yaml
-llm-box run my-workflow.yaml -var key=value
-llm-box run my-workflow.yaml -input "text to process"
+aflare run my-workflow.yaml
+aflare run my-workflow.yaml -var key=value
+aflare run my-workflow.yaml -input "text to process"
 ```
 
 ### 4. Debug Issues
 
-- Review `~/.llm-box/logs/audit.log` for execution history
-- Use `llm-box run --verbose` for detailed step output
+- Review `~/.aflare/logs/audit.log` for execution history
+- Use `aflare run --verbose` for detailed step output
 - Inspect individual node output for error messages
 
 ### 5. Advanced Patterns
@@ -81,7 +81,7 @@ llm-box run my-workflow.yaml -input "text to process"
 Running a workflow produces:
 - **Files** written by `file_write` nodes
 - **Console output** from `notify` or `execute` nodes
-- **Audit log entries** in `~/.llm-box/logs/audit.log`
+- **Audit log entries** in `~/.aflare/logs/audit.log`
 - **Return code** 0 on success, non-zero on failure
 
 ## Examples
@@ -109,14 +109,14 @@ steps:
 ### Run with Variables
 
 ```bash
-llm-box run workflow.yaml -var url="https://news.example.com"
+aflare run workflow.yaml -var url="https://news.example.com"
 ```
 
 ## Resources
 
-- [Workflow Examples](.trae/skills/llm-box-workflow/examples.md)
+- [Workflow Examples](.trae/skills/aflare-workflow/examples.md)
 - [Node Reference](docs/nodes-reference.md)
 - [Custom Nodes Guide](docs/custom-nodes.md)
 - [Batch URL Processor Example](examples/real-world/batch-url-processor/README.md)
-- [GitHub Repository](https://github.com/alib8b8/llm-box)
+- [GitHub Repository](https://github.com/alib8b8/aflare)
 - [OpenClaw Plugin](contrib/openclaw/)

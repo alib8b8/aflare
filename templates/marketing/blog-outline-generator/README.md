@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate structured 
 ## Usage
 
 ```bash
-llm-box install content-marketing/blog-outline-generator
-llm-box run blog-outline-generator/workflow.yaml
+aflare install content-marketing/blog-outline-generator
+aflare run blog-outline-generator/workflow.yaml
 ```
 
 ## Parameters

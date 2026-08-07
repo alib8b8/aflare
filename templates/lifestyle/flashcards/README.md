@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate flashcards 
 ## Usage
 
 ```bash
-llm-box install education/flashcards
-llm-box run flashcards/workflow.yaml
+aflare install education/flashcards
+aflare run flashcards/workflow.yaml
 ```
 
 ## Parameters

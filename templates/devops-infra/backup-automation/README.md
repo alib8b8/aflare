@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for automated backup wor
 ## Usage
 
 ```bash
-llm-box install automation/backup-automation
-llm-box run backup-automation/workflow.yaml
+aflare install automation/backup-automation
+aflare run backup-automation/workflow.yaml
 ```
 
 ## Parameters

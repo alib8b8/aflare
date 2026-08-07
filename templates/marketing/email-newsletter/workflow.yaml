@@ -1,7 +1,7 @@
 name: Email Newsletter Generator
 # Generate weekly email newsletter content
-# Usage: llm-box install content-marketing/email-newsletter
-#        llm-box run email-newsletter/workflow.yaml
+# Usage: aflare install content-marketing/email-newsletter
+#        aflare run email-newsletter/workflow.yaml
 
 steps:
   - node: http_request

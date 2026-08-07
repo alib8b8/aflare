@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -46,7 +46,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/httpclient"
+	"github.com/alib8b8/aflare/internal/httpclient"
 )
 
 // Vector is a dense float32 embedding. We use float32 (not float64) because
@@ -167,7 +167,7 @@ type HTTPEmbedder struct {
 // httpclient factory with ValidateAllowLoopback so local embedders work
 // while private/link-local/reserved ranges stay blocked, and so the
 // connection pool is tuned consistently with every other outbound client
-// in llm-box (the previous bare &http.Client{} used the stdlib default of
+// in aflare (the previous bare &http.Client{} used the stdlib default of
 // MaxIdleConnsPerHost==2, which serialized concurrent embedder calls
 // against the same host).
 func NewHTTPEmbedder(endpoint, apiKey, model string, dim int) *HTTPEmbedder {

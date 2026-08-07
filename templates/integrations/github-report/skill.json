@@ -3,7 +3,7 @@
   "name": "github-report",
   "version": "1.0.0",
   "description": "Generate a weekly activity report for your GitHub repository.",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "integrations",
   "tags": [
     "integrations",

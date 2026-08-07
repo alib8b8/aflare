@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for organize files by ty
 ## Usage
 
 ```bash
-llm-box install automation/file-organizer
-llm-box run file-organizer/workflow.yaml
+aflare install automation/file-organizer
+aflare run file-organizer/workflow.yaml
 ```
 
 ## Parameters

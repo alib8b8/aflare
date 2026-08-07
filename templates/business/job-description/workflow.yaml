@@ -1,7 +1,7 @@
 name: Job Description Generator
 # Generate professional job descriptions
-# Usage: llm-box install hr-recruiting/job-description
-#        llm-box run job-description/workflow.yaml
+# Usage: aflare install hr-recruiting/job-description
+#        aflare run job-description/workflow.yaml
 
 steps:
   - node: agent

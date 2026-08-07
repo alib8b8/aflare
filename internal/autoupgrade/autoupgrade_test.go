@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/meta"
+	"github.com/alib8b8/aflare/internal/meta"
 )
 
 func TestNewUpgradeEngine(t *testing.T) {
@@ -57,7 +57,7 @@ func TestGetDefaultConfig(t *testing.T) {
 
 func TestLoadConfig_NotFound(t *testing.T) {
 	// Ensure env var is not set
-	t.Setenv("LLM_BOX_AUTOUPGRADE_CONFIG", "")
+	t.Setenv("AFLARE_AUTOUPGRADE_CONFIG", "")
 	config, err := LoadConfig()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -78,7 +78,7 @@ func TestLoadConfig_FromEnv(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	t.Setenv("LLM_BOX_AUTOUPGRADE_CONFIG", configPath)
+	t.Setenv("AFLARE_AUTOUPGRADE_CONFIG", configPath)
 	config, err := LoadConfig()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -98,7 +98,7 @@ func TestLoadConfig_InvalidYAML(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	t.Setenv("LLM_BOX_AUTOUPGRADE_CONFIG", configPath)
+	t.Setenv("AFLARE_AUTOUPGRADE_CONFIG", configPath)
 	config, err := LoadConfig()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -128,7 +128,7 @@ func TestSaveConfig(t *testing.T) {
 	}
 
 	// Verify file exists
-	configDir := filepath.Join(tmpDir, ".config", "llm-box")
+	configDir := filepath.Join(tmpDir, ".config", "aflare")
 	configPath := filepath.Join(configDir, "autoupgrade.yaml")
 	if _, err := os.Stat(configPath); err != nil {
 		t.Fatalf("config file not found: %v", err)
@@ -148,7 +148,7 @@ func TestSaveConfig(t *testing.T) {
 }
 
 func TestGetConfigPaths(t *testing.T) {
-	t.Setenv("LLM_BOX_AUTOUPGRADE_CONFIG", "")
+	t.Setenv("AFLARE_AUTOUPGRADE_CONFIG", "")
 	paths := getConfigPaths()
 	if len(paths) == 0 {
 		t.Error("expected at least one path")
@@ -458,8 +458,8 @@ func TestUpgradeConfig(t *testing.T) {
 
 func TestSaveConfig_FailCreateDir(t *testing.T) {
 	tmpDir := t.TempDir()
-	// Create .config/llm-box as a file to cause mkdir failure
-	configDir := filepath.Join(tmpDir, ".config", "llm-box")
+	// Create .config/aflare as a file to cause mkdir failure
+	configDir := filepath.Join(tmpDir, ".config", "aflare")
 	if err := os.MkdirAll(filepath.Dir(configDir), 0755); err != nil {
 		t.Fatalf("failed to create parent dir: %v", err)
 	}
@@ -695,7 +695,7 @@ func TestStart_AutoMode_WithTimeout(t *testing.T) {
 
 func TestGetConfigPaths_WithEnv(t *testing.T) {
 	envPath := "/custom/path/autoupgrade.yaml"
-	t.Setenv("LLM_BOX_AUTOUPGRADE_CONFIG", envPath)
+	t.Setenv("AFLARE_AUTOUPGRADE_CONFIG", envPath)
 	paths := getConfigPaths()
 	if len(paths) == 0 {
 		t.Error("expected at least one path")
@@ -730,7 +730,7 @@ func TestLoadConfig_FromCwd(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	t.Setenv("LLM_BOX_AUTOUPGRADE_CONFIG", "")
+	t.Setenv("AFLARE_AUTOUPGRADE_CONFIG", "")
 	config, err := LoadConfig()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -845,7 +845,7 @@ func TestLoadConfig_InvalidYAML_Skip(t *testing.T) {
 	if err := os.WriteFile(envConfigPath, []byte("invalid: ["), 0600); err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}
-	t.Setenv("LLM_BOX_AUTOUPGRADE_CONFIG", envConfigPath)
+	t.Setenv("AFLARE_AUTOUPGRADE_CONFIG", envConfigPath)
 
 	// Create valid config in cwd
 	origDir, err := os.Getwd()

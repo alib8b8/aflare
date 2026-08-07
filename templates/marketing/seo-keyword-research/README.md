@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for research and analyze
 ## Usage
 
 ```bash
-llm-box install content-marketing/seo-keyword-research
-llm-box run seo-keyword-research/workflow.yaml
+aflare install content-marketing/seo-keyword-research
+aflare run seo-keyword-research/workflow.yaml
 ```
 
 ## Parameters

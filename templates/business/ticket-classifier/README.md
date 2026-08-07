@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for classify and priorit
 ## Usage
 
 ```bash
-llm-box install customer-support/ticket-classifier
-llm-box run ticket-classifier/workflow.yaml
+aflare install customer-support/ticket-classifier
+aflare run ticket-classifier/workflow.yaml
 ```
 
 ## Parameters

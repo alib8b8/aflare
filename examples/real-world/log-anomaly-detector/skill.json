@@ -3,7 +3,7 @@
   "name": "log-anomaly-detector",
   "version": "1.0.0",
   "description": "Detect log anomalies: read logs, filter errors, branch on critical patterns via if/else, run root-cause agent on anomalies, and notify.",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "devops-monitoring",
   "tags": [
     "devops-monitoring",

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate weekly emai
 ## Usage
 
 ```bash
-llm-box install content-marketing/email-newsletter
-llm-box run email-newsletter/workflow.yaml
+aflare install content-marketing/email-newsletter
+aflare run email-newsletter/workflow.yaml
 ```
 
 ## Parameters

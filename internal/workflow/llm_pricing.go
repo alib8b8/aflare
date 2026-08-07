@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -21,7 +21,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alib8b8/llm-box/internal/logger"
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 // LLM cost attribution (inspired by PenguinHarness's "how much does an Agent
@@ -43,7 +43,7 @@ import (
 //     that should not defeat pricing. Exact match is tried first; if it misses,
 //     the longest key that is a prefix of the lowercased model wins.
 //   - Unknown models yield 0.0 — we never fabricate a cost. Operators who need
-//     coverage for an unlisted model set LLM_BOX_PRICING_FILE to a JSON file
+//     coverage for an unlisted model set AFLARE_PRICING_FILE to a JSON file
 //     mapping model → {input_per_1m, output_per_1m}; entries merge over the
 //     defaults and also override default keys.
 //   - The table is a snapshot read once (sync.Once) from env + defaults.
@@ -61,7 +61,7 @@ type ModelPricing struct {
 // "output_per_1m": 10.0}, ...}. Model names are matched case-insensitively
 // and by longest-prefix (see computeLLMCost), so a key like "gpt-4o" covers
 // "gpt-4o-2024-08-06" without a separate entry.
-const pricingEnvVar = "LLM_BOX_PRICING_FILE"
+const pricingEnvVar = "AFLARE_PRICING_FILE"
 
 // defaultPricing is the built-in price table, sourced from each provider's
 // published list pricing (USD per 1M tokens). Local/self-hosted models
@@ -69,7 +69,7 @@ const pricingEnvVar = "LLM_BOX_PRICING_FILE"
 // hardware, not per-call. Prices are indicative for cost awareness and
 // budget alerts, NOT for billing: a provider's invoice is authoritative.
 // When a provider's prices change, update here or override via
-// LLM_BOX_PRICING_FILE without a code change.
+// AFLARE_PRICING_FILE without a code change.
 var defaultPricing = map[string]ModelPricing{
 	// OpenAI
 	"gpt-4o":        {2.50, 10.00},
@@ -120,7 +120,7 @@ var defaultPricing = map[string]ModelPricing{
 
 var (
 	// pricingOnce is a *sync.Once (not a value) so tests can atomically swap
-	// in a fresh one to re-trigger resolution after flipping LLM_BOX_PRICING_FILE
+	// in a fresh one to re-trigger resolution after flipping AFLARE_PRICING_FILE
 	// via t.Setenv. In production the env is set once at startup and never
 	// changes, so the once-only semantics hold; the pointer is solely a
 	// testability hook, mirroring how sharedLLMCacheOnce could be reset.
@@ -129,10 +129,10 @@ var (
 )
 
 // resolvePricing returns the effective price table: the built-in defaults
-// merged with any entries from the LLM_BOX_PRICING_FILE override file. The
+// merged with any entries from the AFLARE_PRICING_FILE override file. The
 // result is computed once per process (sync.Once); env / file changes after
 // the first call are not observed without a restart. This matches the
-// existing pattern for LLM_BOX_LLM_CACHE (also sync.Once) and keeps the hot
+// existing pattern for AFLARE_LLM_CACHE (also sync.Once) and keeps the hot
 // path (computeLLMCost, called per LLM call) lock-free.
 func resolvePricing() map[string]ModelPricing {
 	pricingOnce.Do(func() {

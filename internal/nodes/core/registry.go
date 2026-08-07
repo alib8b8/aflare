@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -34,9 +34,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/i18n"
-	"github.com/alib8b8/llm-box/internal/logger"
-	"github.com/alib8b8/llm-box/internal/metrics"
+	"github.com/alib8b8/aflare/internal/i18n"
+	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/metrics"
 	"gopkg.in/yaml.v3"
 )
 

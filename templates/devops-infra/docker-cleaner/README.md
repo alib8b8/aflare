@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for clean up unused dock
 ## Usage
 
 ```bash
-llm-box install devops-monitoring/docker-cleaner
-llm-box run docker-cleaner/workflow.yaml
+aflare install devops-monitoring/docker-cleaner
+aflare run docker-cleaner/workflow.yaml
 ```
 
 ## Parameters

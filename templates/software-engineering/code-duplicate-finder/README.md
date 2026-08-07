@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for scan codebase for du
 ## Usage
 
 ```bash
-llm-box install developer-tools/code-duplicate-finder
-llm-box run code-duplicate-finder/workflow.yaml
+aflare install developer-tools/code-duplicate-finder
+aflare run code-duplicate-finder/workflow.yaml
 ```
 
 ## Parameters

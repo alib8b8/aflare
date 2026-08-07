@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -160,7 +160,7 @@ func autoGenerateMeta(dirPath, id, baseDir string) *SkillMeta {
 		Name:        name,
 		Version:     "1.0.0",
 		Description: description,
-		Author:      "llm-box community",
+		Author:      "aflare community",
 		Category:    category,
 		Tags:        []string{category, "workflow"},
 		Keywords:    []string{name, category},

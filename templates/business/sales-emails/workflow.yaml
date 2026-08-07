@@ -1,7 +1,7 @@
 name: Sales Email Generator
 # Generate cold email sequences for sales
-# Usage: llm-box install business-sales/sales-emails
-#        llm-box run sales-emails/workflow.yaml
+# Usage: aflare install business-sales/sales-emails
+#        aflare run sales-emails/workflow.yaml
 
 steps:
   - node: agent

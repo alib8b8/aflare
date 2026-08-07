@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate comprehensi
 ## Usage
 
 ```bash
-llm-box install research-analysis/swot-analysis
-llm-box run swot-analysis/workflow.yaml
+aflare install research-analysis/swot-analysis
+aflare run swot-analysis/workflow.yaml
 ```
 
 ## Parameters

@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-BINARY_NAME="llm-box"
+BINARY_NAME="aflare"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
-REPO="alib8b8/llm-box"
-GITCODE_REPO="llm-box/llm-box"
+REPO="alib8b8/aflare"
+GITCODE_REPO="aflare/aflare"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -125,7 +125,7 @@ download_file() {
 main() {
     echo ""
     echo "╔══════════════════════════════════════════╗"
-    echo "║          llm-box 安装向导                ║"
+    echo "║          aflare 安装向导                ║"
     echo "║   AI Workflow Engine Installer          ║"
     echo "╚══════════════════════════════════════════╝"
     echo ""

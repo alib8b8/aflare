@@ -1,6 +1,6 @@
 name: Multi-Role Business Agent
 description: Three-roles-in-one business agent (Marketing + BD + IR) inspired by xiaobei. Handles content creation, lead hunting, investor relations, and business material generation through a single unified interface.
-author: llm-box community
+author: aflare community
 version: 1.0.0
 tags: [business, marketing, bd, investor-relations, multi-agent, opc]
 

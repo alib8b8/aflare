@@ -1,7 +1,7 @@
 name: Whitepaper Generator
 # Generate whitepaper structure and content
-# Usage: llm-box install writing-content/whitepaper
-#        llm-box run whitepaper/workflow.yaml
+# Usage: aflare install writing-content/whitepaper
+#        aflare run whitepaper/workflow.yaml
 
 steps:
   - node: http_request

@@ -1,14 +1,14 @@
 ---
 name: loop-triage
-description: Daily triage loop for the llm-box project. Scans CI status, open issues, PRs, and recent commits, then updates STATE.md with prioritized findings.
+description: Daily triage loop for the aflare project. Scans CI status, open issues, PRs, and recent commits, then updates STATE.md with prioritized findings.
 invocation: both
 ---
 
-# Loop Triage Skill — llm-box
+# Loop Triage Skill — aflare
 
 ## Overview
 
-Run the daily triage loop for the llm-box repository. Scan CI failures, open issues, pull requests, and recent commits. Compare against the current `STATE.md` and update it with prioritized findings. This is L1 report-only mode — do not auto-fix anything.
+Run the daily triage loop for the aflare repository. Scan CI failures, open issues, pull requests, and recent commits. Compare against the current `STATE.md` and update it with prioritized findings. This is L1 report-only mode — do not auto-fix anything.
 
 ## Prerequisites
 

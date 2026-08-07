@@ -3,7 +3,7 @@
   "name": "grill-me",
   "version": "1.0.0",
   "description": "Constraint skill inspired by mattpocock/skills /grill-me: forces the AI to thoroughly clarify requirements by asking at least min_questions questions across boundary conditions, error handling, performance, security, compatibility, testing and deployment dimensions before any code is written.",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "constraint",
   "tags": [
     "constraint",

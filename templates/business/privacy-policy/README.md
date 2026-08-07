@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate privacy pol
 ## Usage
 
 ```bash
-llm-box install legal/privacy-policy
-llm-box run privacy-policy/workflow.yaml
+aflare install legal/privacy-policy
+aflare run privacy-policy/workflow.yaml
 ```
 
 ## Parameters

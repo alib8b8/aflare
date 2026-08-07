@@ -1,7 +1,7 @@
 name: LLM Fine-tuning Guide
 # Generate LLM fine-tuning preparation guide
-# Usage: llm-box install ai-ml/llm-finetune
-#        llm-box run llm-finetune/workflow.yaml
+# Usage: aflare install ai-ml/llm-finetune
+#        aflare run llm-finetune/workflow.yaml
 
 steps:
   - node: agent

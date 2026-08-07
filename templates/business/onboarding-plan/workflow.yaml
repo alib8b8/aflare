@@ -1,7 +1,7 @@
 name: Onboarding Plan
 # Create 30-60-90 day onboarding plan
-# Usage: llm-box install hr-recruiting/onboarding-plan
-#        llm-box run onboarding-plan/workflow.yaml
+# Usage: aflare install hr-recruiting/onboarding-plan
+#        aflare run onboarding-plan/workflow.yaml
 
 steps:
   - node: agent

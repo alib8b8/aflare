@@ -1,7 +1,7 @@
 name: Telegram Notification Bot
 # Send notifications to Telegram
-# Usage: llm-box install telegram-bot
-#        llm-box run telegram-bot/workflow.yaml
+# Usage: aflare install telegram-bot
+#        aflare run telegram-bot/workflow.yaml
 # Config: Set TELEGRAM_BOT_TOKEN and CHAT_ID
 
 steps:
@@ -14,10 +14,10 @@ steps:
   - node: template_render
     params:
       template: |
-        {{ if .message }}{{ .message }}{{ else }}Hello from llm-box!{{ end }}
+        {{ if .message }}{{ .message }}{{ else }}Hello from aflare!{{ end }}
         
         ---
-        Sent by llm-box at {{ .timestamp }}
+        Sent by aflare at {{ .timestamp }}
       timestamp: "{{ .timestamp }}"
     id: final_message
 

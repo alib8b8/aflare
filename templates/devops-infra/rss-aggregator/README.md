@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for aggregate and summar
 ## Usage
 
 ```bash
-llm-box install automation/rss-aggregator
-llm-box run rss-aggregator/workflow.yaml
+aflare install automation/rss-aggregator
+aflare run rss-aggregator/workflow.yaml
 ```
 
 ## Parameters

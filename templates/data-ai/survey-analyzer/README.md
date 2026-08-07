@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for analyze survey respo
 ## Usage
 
 ```bash
-llm-box install data-analytics/survey-analyzer
-llm-box run survey-analyzer/workflow.yaml
+aflare install data-analytics/survey-analyzer
+aflare run survey-analyzer/workflow.yaml
 ```
 
 ## Parameters

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@ import (
 
 // TestAuditLock_SecondProcessRejected verifies the H-6 cross-process audit
 // lock: once a lock is held on an audit directory, a second acquireAuditLock
-// (simulating a concurrent llm-box process) must fail. Without this lock, two
+// (simulating a concurrent aflare process) must fail. Without this lock, two
 // processes sharing one audit directory would interleave HMAC hash-chain
 // appends and fork the chain, breaking tamper-evidence.
 func TestAuditLock_SecondProcessRejected(t *testing.T) {

@@ -1,7 +1,7 @@
 name: Meal Plan Generator
 # Generate weekly meal plan
-# Usage: llm-box install health-wellness/meal-plan
-#        llm-box run meal-plan/workflow.yaml
+# Usage: aflare install health-wellness/meal-plan
+#        aflare run meal-plan/workflow.yaml
 
 steps:
   - node: agent

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alib8b8/llm-box/internal/nodes/core"
+	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
 // echoMetricsNode is a minimal Node used to drive ExecuteWithStats so the
@@ -40,7 +40,7 @@ func (echoMetricsNode) Execute(_ context.Context, input string, _ map[string]str
 }
 
 func TestMetricsEndpoint_DisabledByDefault(t *testing.T) {
-	t.Setenv("LLM_BOX_METRICS", "")
+	t.Setenv("AFLARE_METRICS", "")
 	s := NewWebUIServer("127.0.0.1", "0")
 	ts := httptest.NewServer(s.buildHandler())
 	defer ts.Close()
@@ -63,7 +63,7 @@ func TestMetricsEndpoint_DisabledByDefault(t *testing.T) {
 }
 
 func TestMetricsEndpoint_Enabled(t *testing.T) {
-	t.Setenv("LLM_BOX_METRICS", "1")
+	t.Setenv("AFLARE_METRICS", "1")
 	s := NewWebUIServer("127.0.0.1", "0")
 	ts := httptest.NewServer(s.buildHandler())
 	defer ts.Close()
@@ -95,7 +95,7 @@ func TestMetricsEndpoint_Enabled(t *testing.T) {
 }
 
 func TestMetricsEndpoint_IncrementAfterNodeExecution(t *testing.T) {
-	t.Setenv("LLM_BOX_METRICS", "1")
+	t.Setenv("AFLARE_METRICS", "1")
 	s := NewWebUIServer("127.0.0.1", "0")
 	ts := httptest.NewServer(s.buildHandler())
 	defer ts.Close()
@@ -126,7 +126,7 @@ func TestMetricsEndpoint_IncrementAfterNodeExecution(t *testing.T) {
 func TestMetricsEndpoint_NoAuthRequired(t *testing.T) {
 	// /metrics must be reachable without an X-Auth-Token even when an auth
 	// token is configured on the server (scrapers typically carry no token).
-	t.Setenv("LLM_BOX_METRICS", "1")
+	t.Setenv("AFLARE_METRICS", "1")
 	s := NewWebUIServer("127.0.0.1", "0")
 	s.SetAuthToken("secret-token")
 	ts := httptest.NewServer(s.buildHandler())

@@ -1,7 +1,7 @@
 name: Dotfiles Manager
 # Manage and backup dotfiles
-# Usage: llm-box install environment-setup/dotfiles-manager
-#        llm-box run dotfiles-manager/workflow.yaml
+# Usage: aflare install environment-setup/dotfiles-manager
+#        aflare run dotfiles-manager/workflow.yaml
 
 steps:
   - node: execute

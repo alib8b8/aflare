@@ -1,9 +1,9 @@
 # 第三方工具声明 (Third-Party Notices)
 
 本目录下的 `tools_compat.go` 实现了"工具可移植性"兼容层，为从其他主流
-AI Agent 工具链迁移到 llm-box 的工作流提供熟悉的工具名入口。
+AI Agent 工具链迁移到 aflare 的工作流提供熟悉的工具名入口。
 
-下列工具的**工具名与概念**借鉴自以下开源项目，但 llm-box 中的实现为**完全
+下列工具的**工具名与概念**借鉴自以下开源项目，但 aflare 中的实现为**完全
 独立的原创实现**，未复制任何源代码。
 
 ## 借鉴来源
@@ -13,7 +13,7 @@ AI Agent 工具链迁移到 llm-box 的工作流提供熟悉的工具名入口�
 - Repository: https://github.com/openai/codex
 - 借鉴内容：`glob` / `grep` / `list_dir` / `apply_patch` 的工具名与概念
 - 说明：Codex 提供了一组面向代码工作流的本地工具，本兼容层沿用了其工具命名
-  与语义约定，使 Codex 用户迁移到 llm-box 时无需重写工作流。
+  与语义约定，使 Codex 用户迁移到 aflare 时无需重写工作流。
 
 ### 2. OpenCode
 - License: MIT License
@@ -21,7 +21,7 @@ AI Agent 工具链迁移到 llm-box 的工作流提供熟悉的工具名入口�
   `write` 的工具名与概念
 - 说明：OpenCode 定义了一组面向 Agent 编排的工具接口，本兼容层中的 `glob` 与
   `grep` 同时借鉴了 OpenCode 的同名工具语义。其余工具名（`bash`/`edit`/`read`/
-  `write`/`skill`/`todowrite`）仅作为概念参考列出，llm-box 已有等价节点
+  `write`/`skill`/`todowrite`）仅作为概念参考列出，aflare 已有等价节点
   （如 `file_read` / `file_write` / `execute`），未在此兼容层中重复实现。
 
 ### 3. Grok Build (xai-org/grok-build)
@@ -45,17 +45,17 @@ AI Agent 工具链迁移到 llm-box 的工作流提供熟悉的工具名入口�
 
 ## 独立实现声明
 
-llm-box 是一个独立项目。本兼容层中的所有代码：
+aflare 是一个独立项目。本兼容层中的所有代码：
 
 - **未复制** Codex / OpenCode / Grok Build 的任何源代码；
 - **仅借鉴** 工具名、参数命名与大致语义，便于工作流迁移；
 - 实现细节（路径校验、安全限制、原子补丁算法、控制字符清洗等）均依据
-  llm-box 自身的安全模型独立设计。
+  aflare 自身的安全模型独立设计。
 
 ## License 说明
 
 - Apache License 2.0：见 https://www.apache.org/licenses/LICENSE-2.0
 - MIT License：见 https://opensource.org/licenses/MIT
 
-如上述开源项目的许可证要求，本声明文件旨在注明借鉴来源。llm-box 本身的
+如上述开源项目的许可证要求，本声明文件旨在注明借鉴来源。aflare 本身的
 许可证以其仓库根目录下的 LICENSE 文件为准。

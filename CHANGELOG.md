@@ -69,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ollama integration
 - History tracking
 
-[Unreleased]: https://github.com/alib8b8/llm-box/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/alib8b8/llm-box/compare/v0.2.10...v0.3.0
-[0.2.10]: https://github.com/alib8b8/llm-box/compare/v0.1.0...v0.2.10
-[0.1.0]: https://github.com/alib8b8/llm-box/releases/tag/v0.1.0
+[Unreleased]: https://github.com/alib8b8/aflare/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/alib8b8/aflare/compare/v0.2.10...v0.3.0
+[0.2.10]: https://github.com/alib8b8/aflare/compare/v0.1.0...v0.2.10
+[0.1.0]: https://github.com/alib8b8/aflare/releases/tag/v0.1.0

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -38,7 +38,7 @@ func (s *Server) getExtendedTools() []tool {
 		},
 		{
 			Name:        "run_workflow",
-			Description: "Execute a llm-box workflow from a YAML file path. Returns the final output of the workflow.",
+			Description: "Execute a aflare workflow from a YAML file path. Returns the final output of the workflow.",
 			InputSchema: inputSchema{
 				Type: "object",
 				Properties: map[string]interface{}{
@@ -52,7 +52,7 @@ func (s *Server) getExtendedTools() []tool {
 		},
 		{
 			Name:        "run_workflow_yaml",
-			Description: "Execute a llm-box workflow from raw YAML content. Returns the final output of the workflow.",
+			Description: "Execute a aflare workflow from raw YAML content. Returns the final output of the workflow.",
 			InputSchema: inputSchema{
 				Type: "object",
 				Properties: map[string]interface{}{
@@ -66,7 +66,7 @@ func (s *Server) getExtendedTools() []tool {
 		},
 		{
 			Name:        "list_nodes",
-			Description: "List all available llm-box nodes with their descriptions. Call this to discover what nodes can be used in workflows.",
+			Description: "List all available aflare nodes with their descriptions. Call this to discover what nodes can be used in workflows.",
 			InputSchema: inputSchema{
 				Type:       "object",
 				Properties: map[string]interface{}{},
@@ -74,7 +74,7 @@ func (s *Server) getExtendedTools() []tool {
 		},
 		{
 			Name:        "validate_workflow",
-			Description: "Validate a llm-box workflow YAML file without executing it. Returns validation warnings if any.",
+			Description: "Validate a aflare workflow YAML file without executing it. Returns validation warnings if any.",
 			InputSchema: inputSchema{
 				Type: "object",
 				Properties: map[string]interface{}{

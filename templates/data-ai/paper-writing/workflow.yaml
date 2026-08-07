@@ -1,7 +1,7 @@
 name: Academic Paper Writing
 # Structured academic paper writing with proper formatting
-# Usage: llm-box install research/paper-writing
-#        llm-box run paper-writing/workflow.yaml
+# Usage: aflare install research/paper-writing
+#        aflare run paper-writing/workflow.yaml
 
 steps:
   - node: file_read

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate sprint retr
 ## Usage
 
 ```bash
-llm-box install project-management/retrospective
-llm-box run retrospective/workflow.yaml
+aflare install project-management/retrospective
+aflare run retrospective/workflow.yaml
 ```
 
 ## Parameters

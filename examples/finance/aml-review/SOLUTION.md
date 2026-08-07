@@ -70,7 +70,7 @@ cd examples/finance/aml-review/demo
 go run ./mockserver &
 
 # 2. 运行 AML 审查工作流
-llm-box run examples/finance/aml-review/workflow.yaml
+aflare run examples/finance/aml-review/workflow.yaml
 
 # 3. 查看报告
 cat examples/finance/aml-review/output/report.md

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate api documen
 ## Usage
 
 ```bash
-llm-box install developer-tools/api-docs-generator
-llm-box run api-docs-generator/workflow.yaml
+aflare install developer-tools/api-docs-generator
+aflare run api-docs-generator/workflow.yaml
 ```
 
 ## Parameters

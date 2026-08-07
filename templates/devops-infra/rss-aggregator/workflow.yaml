@@ -1,7 +1,7 @@
 name: RSS Feed Aggregator
 # Aggregate and summarize RSS feeds
-# Usage: llm-box install automation/rss-aggregator
-#        llm-box run rss-aggregator/workflow.yaml
+# Usage: aflare install automation/rss-aggregator
+#        aflare run rss-aggregator/workflow.yaml
 
 steps:
   - node: execute

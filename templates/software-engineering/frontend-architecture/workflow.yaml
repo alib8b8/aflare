@@ -1,7 +1,7 @@
 name: React/Component Architecture
 # Generate frontend architecture plan
-# Usage: llm-box install frontend/frontend-architecture
-#        llm-box run frontend-architecture/workflow.yaml
+# Usage: aflare install frontend/frontend-architecture
+#        aflare run frontend-architecture/workflow.yaml
 
 steps:
   - node: agent

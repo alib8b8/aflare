@@ -1,10 +1,10 @@
 .PHONY: build test test-short lint race fmt vet security cover clean install release version ci
 
-BINARY=llm-box
-CMD=./cmd/llm-box
+BINARY=aflare
+CMD=./cmd/aflare
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-LDFLAGS=-ldflags "-s -w -X github.com/alib8b8/llm-box/internal/version.Version=$(VERSION) -X github.com/alib8b8/llm-box/internal/version.BuildDate=$(BUILD_DATE)"
+LDFLAGS=-ldflags "-s -w -X github.com/alib8b8/aflare/internal/version.Version=$(VERSION) -X github.com/alib8b8/aflare/internal/version.BuildDate=$(BUILD_DATE)"
 
 # Warning-level linters (errorlint, nilerr, unparam, prealloc) are enabled in
 # .golangci.yml with severity=warning. They are surfaced by `make lint` but kept
@@ -62,7 +62,7 @@ install: build
 	cp $(BINARY) /usr/local/bin/
 
 docker:
-	docker build -t llm-box .
+	docker build -t aflare .
 
 # Cross-compile for release
 release: clean

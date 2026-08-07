@@ -1,7 +1,7 @@
 name: API Documentation Generator
 # Generate API documentation from code comments
-# Usage: llm-box install developer-tools/api-docs-generator
-#        llm-box run api-docs-generator/workflow.yaml
+# Usage: aflare install developer-tools/api-docs-generator
+#        aflare run api-docs-generator/workflow.yaml
 
 steps:
   - node: execute

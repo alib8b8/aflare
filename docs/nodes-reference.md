@@ -1003,8 +1003,8 @@ Human approval gate — pauses workflow for human review and approval before con
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `mode` | string | No | file | Approval mode: file, env, stdin, auto_approve (default: file) |
-| `approval_file` | string | No | .llm-box-approval | Path to approval flag file (mode=file) |
-| `approval_env` | string | No | LLM_BOX_APPROVED | Environment variable to check for approval (mode=env) |
+| `approval_file` | string | No | .aflare-approval | Path to approval flag file (mode=file) |
+| `approval_env` | string | No | AFLARE_APPROVED | Environment variable to check for approval (mode=env) |
 | `prompt` | string | No |  | Custom prompt message for the human reviewer |
 | `on_approve` | string | No | original | What to output on approve: original, modified, passthrough (default: original) |
 

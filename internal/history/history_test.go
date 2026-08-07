@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -690,7 +690,7 @@ func writeAuditLines(t *testing.T, path string, lines []string) {
 }
 
 func TestAppendAuditLog_HashChainLinkage(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
 	tmpDir := t.TempDir()
 	SetHistoryDir(tmpDir)
 
@@ -720,7 +720,7 @@ func TestAppendAuditLog_HashChainLinkage(t *testing.T) {
 }
 
 func TestVerifyAuditChain_Valid(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
 	tmpDir := t.TempDir()
 	SetHistoryDir(tmpDir)
 
@@ -739,7 +739,7 @@ func TestVerifyAuditChain_Valid(t *testing.T) {
 }
 
 func TestVerifyAuditChain_Tampered(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
 	tmpDir := t.TempDir()
 	SetHistoryDir(tmpDir)
 
@@ -771,7 +771,7 @@ func TestVerifyAuditChain_Tampered(t *testing.T) {
 }
 
 func TestVerifyAuditChain_Deleted(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
 	tmpDir := t.TempDir()
 	SetHistoryDir(tmpDir)
 
@@ -801,7 +801,7 @@ func TestVerifyAuditChain_Deleted(t *testing.T) {
 }
 
 func TestVerifyAuditChain_Empty(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
 	tmpDir := t.TempDir()
 	SetHistoryDir(tmpDir)
 
@@ -824,7 +824,7 @@ func TestVerifyAuditChain_Empty(t *testing.T) {
 }
 
 func TestVerifyAuditChain_LegacyFormat(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
 	tmpDir := t.TempDir()
 	SetHistoryDir(tmpDir)
 
@@ -860,7 +860,7 @@ func TestVerifyAuditChain_LegacyFormat(t *testing.T) {
 }
 
 func TestAppendAuditLog_ExtendsExistingChain(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
 	tmpDir := t.TempDir()
 	SetHistoryDir(tmpDir)
 

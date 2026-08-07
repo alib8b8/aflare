@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate api integra
 ## Usage
 
 ```bash
-llm-box install api-development/api-test-suite
-llm-box run api-test-suite/workflow.yaml
+aflare install api-development/api-test-suite
+aflare run api-test-suite/workflow.yaml
 ```
 
 ## Parameters

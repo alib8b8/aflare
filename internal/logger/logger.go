@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -52,7 +52,7 @@ func init() {
 }
 
 func getLevelFromEnv() slog.Level {
-	envLevel := strings.ToLower(strings.TrimSpace(os.Getenv("LLM_BOX_LOG_LEVEL")))
+	envLevel := strings.ToLower(strings.TrimSpace(os.Getenv("AFLARE_LOG_LEVEL")))
 	switch envLevel {
 	case "debug":
 		return slog.LevelDebug
@@ -68,7 +68,7 @@ func getLevelFromEnv() slog.Level {
 }
 
 func getFormatFromEnv() string {
-	format := strings.ToLower(strings.TrimSpace(os.Getenv("LLM_BOX_LOG_FORMAT")))
+	format := strings.ToLower(strings.TrimSpace(os.Getenv("AFLARE_LOG_FORMAT")))
 	if format == "json" || format == "text" {
 		return format
 	}
@@ -76,18 +76,18 @@ func getFormatFromEnv() string {
 }
 
 func getOutputFromEnv() string {
-	output := strings.TrimSpace(os.Getenv("LLM_BOX_LOG_FILE"))
+	output := strings.TrimSpace(os.Getenv("AFLARE_LOG_FILE"))
 	if output != "" {
 		return output
 	}
 	return "stderr"
 }
 
-// getLogMaxMB reads LLM_BOX_LOG_MAX_MB and returns the rotation threshold in
+// getLogMaxMB reads AFLARE_LOG_MAX_MB and returns the rotation threshold in
 // bytes. A value of 0 disables rotation. Invalid values fall back to the
 // default.
 func getLogMaxMB() int64 {
-	raw := strings.TrimSpace(os.Getenv("LLM_BOX_LOG_MAX_MB"))
+	raw := strings.TrimSpace(os.Getenv("AFLARE_LOG_MAX_MB"))
 	if raw == "" {
 		return int64(defaultLogMaxMB) * 1024 * 1024
 	}
@@ -98,10 +98,10 @@ func getLogMaxMB() int64 {
 	return n * 1024 * 1024
 }
 
-// getLogMaxBackups reads LLM_BOX_LOG_MAX_BACKUPS and returns the number of
+// getLogMaxBackups reads AFLARE_LOG_MAX_BACKUPS and returns the number of
 // rotated backup files to retain. Invalid values fall back to the default.
 func getLogMaxBackups() int {
-	raw := strings.TrimSpace(os.Getenv("LLM_BOX_LOG_MAX_BACKUPS"))
+	raw := strings.TrimSpace(os.Getenv("AFLARE_LOG_MAX_BACKUPS"))
 	if raw == "" {
 		return defaultLogMaxBackups
 	}

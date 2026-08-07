@@ -1,7 +1,7 @@
 name: Social Media Content Planner
 # Plan social media content for the week
-# Usage: llm-box install content-marketing/social-media-planner
-#        llm-box run social-media-planner/workflow.yaml
+# Usage: aflare install content-marketing/social-media-planner
+#        aflare run social-media-planner/workflow.yaml
 
 steps:
   - node: template_render

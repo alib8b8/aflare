@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate personalize
 ## Usage
 
 ```bash
-llm-box install health-wellness/sleep-guide
-llm-box run sleep-guide/workflow.yaml
+aflare install health-wellness/sleep-guide
+aflare run sleep-guide/workflow.yaml
 ```
 
 ## Parameters

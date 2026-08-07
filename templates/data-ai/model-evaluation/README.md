@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate comprehensi
 ## Usage
 
 ```bash
-llm-box install ai-ml/model-evaluation
-llm-box run model-evaluation/workflow.yaml
+aflare install ai-ml/model-evaluation
+aflare run model-evaluation/workflow.yaml
 ```
 
 ## Parameters

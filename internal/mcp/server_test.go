@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -24,7 +24,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alib8b8/llm-box/internal/workflow"
+	"github.com/alib8b8/aflare/internal/workflow"
 	"gopkg.in/yaml.v3"
 )
 
@@ -52,8 +52,8 @@ func TestHandleRequest_Initialize(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected initializeResult, got %T", resp.Result)
 	}
-	if result.ServerInfo.Name != "llm-box" {
-		t.Errorf("expected server name llm-box, got %s", result.ServerInfo.Name)
+	if result.ServerInfo.Name != "aflare" {
+		t.Errorf("expected server name aflare, got %s", result.ServerInfo.Name)
 	}
 }
 
@@ -259,7 +259,7 @@ func TestListNodes(t *testing.T) {
 		t.Fatal("expected non-empty result")
 	}
 	text := result.Content[0].Text
-	if !strings.Contains(text, "Available llm-box nodes") {
+	if !strings.Contains(text, "Available aflare nodes") {
 		t.Errorf("expected header in output, got %s", text)
 	}
 }

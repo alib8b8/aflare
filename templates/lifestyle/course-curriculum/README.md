@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for design complete cour
 ## Usage
 
 ```bash
-llm-box install education/course-curriculum
-llm-box run course-curriculum/workflow.yaml
+aflare install education/course-curriculum
+aflare run course-curriculum/workflow.yaml
 ```
 
 ## Parameters

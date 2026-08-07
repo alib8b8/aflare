@@ -1,7 +1,7 @@
 name: SEO Article Writer
 # Generate SEO-optimized articles
-# Usage: llm-box install seo-writer
-#        llm-box run seo-writer/workflow.yaml
+# Usage: aflare install seo-writer
+#        aflare run seo-writer/workflow.yaml
 # Config: Set TOPIC and KEYWORDS in params below
 
 steps:

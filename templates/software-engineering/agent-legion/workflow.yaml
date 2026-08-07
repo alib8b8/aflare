@@ -1,8 +1,8 @@
 name: Agent Legion - Multi-Agent Software Development
 # Inspired by superset-sh/superset: multiple coding agents collaborating
 # Deploy an army of coding agents to build features, review code, and ship
-# Usage: llm-box install development/agent-legion
-#        llm-box run agent-legion/workflow.yaml
+# Usage: aflare install development/agent-legion
+#        aflare run agent-legion/workflow.yaml
 
 steps:
   - node: file_read

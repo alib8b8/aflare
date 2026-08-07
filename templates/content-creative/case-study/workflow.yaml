@@ -1,7 +1,7 @@
 name: Case Study Generator
 # Generate customer case study template
-# Usage: llm-box install writing-content/case-study
-#        llm-box run case-study/workflow.yaml
+# Usage: aflare install writing-content/case-study
+#        aflare run case-study/workflow.yaml
 
 steps:
   - node: agent

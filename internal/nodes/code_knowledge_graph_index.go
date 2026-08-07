@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -48,7 +48,7 @@ type ckgIndex struct {
 var (
 	ckgIndexCache = make(map[string]*ckgIndex)
 	ckgIndexMu    sync.RWMutex
-	ckgIndexDir   = ".llm-box-cache"
+	ckgIndexDir   = ".aflare-cache"
 )
 
 // computeFileHash 计算文件 SHA256 哈希

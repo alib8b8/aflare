@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate detailed tr
 ## Usage
 
 ```bash
-llm-box install travel/travel-itinerary
-llm-box run travel-itinerary/workflow.yaml
+aflare install travel/travel-itinerary
+aflare run travel-itinerary/workflow.yaml
 ```
 
 ## Parameters

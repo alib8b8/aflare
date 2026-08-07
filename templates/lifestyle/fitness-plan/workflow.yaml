@@ -1,7 +1,7 @@
 name: Fitness Plan Generator
 # Create personalized fitness plan
-# Usage: llm-box install health-wellness/fitness-plan
-#        llm-box run fitness-plan/workflow.yaml
+# Usage: aflare install health-wellness/fitness-plan
+#        aflare run fitness-plan/workflow.yaml
 
 steps:
   - node: agent

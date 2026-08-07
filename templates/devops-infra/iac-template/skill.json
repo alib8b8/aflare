@@ -3,7 +3,7 @@
   "name": "iac-template",
   "version": "1.0.0",
   "description": "Generate Terraform/IaC templates",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "devops-infra",
   "tags": [
     "devops-infra",

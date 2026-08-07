@@ -1,7 +1,7 @@
 name: Incident Response Plan
 # Generate incident response playbook
-# Usage: llm-box install security/incident-response
-#        llm-box run incident-response/workflow.yaml
+# Usage: aflare install security/incident-response
+#        aflare run incident-response/workflow.yaml
 
 steps:
   - node: agent

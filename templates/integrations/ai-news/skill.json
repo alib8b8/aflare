@@ -3,7 +3,7 @@
   "name": "ai-news",
   "version": "1.0.0",
   "description": "Fetch and summarize the latest AI/ML news from Hacker News.",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "integrations",
   "tags": [
     "integrations",

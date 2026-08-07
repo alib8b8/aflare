@@ -1,7 +1,7 @@
 name: Database Schema Documentation
 # Generate database schema documentation
-# Usage: llm-box install database/db-schema-docs
-#        llm-box run db-schema-docs/workflow.yaml
+# Usage: aflare install database/db-schema-docs
+#        aflare run db-schema-docs/workflow.yaml
 
 steps:
   - node: file_read

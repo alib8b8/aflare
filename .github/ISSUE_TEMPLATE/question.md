@@ -1,6 +1,6 @@
 ---
 name: Question
-about: 关于 llm-box 的使用问题
+about: 关于 aflare 的使用问题
 title: "[Question]: "
 labels: question
 assignees: ''
@@ -17,7 +17,7 @@ assignees: ''
 ## 🖥️ 环境
 
 - OS:
-- llm-box 版本:
+- aflare 版本:
 - Ollama 版本（如相关）:
 
 ## 📎 附加信息

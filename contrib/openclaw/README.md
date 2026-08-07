@@ -1,16 +1,16 @@
-# OpenClaw llm-box Plugin
+# OpenClaw aflare Plugin
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/alib8b8/llm-box/main/docs/logo.svg" width="200" alt="llm-box logo"/>
+  <img src="https://raw.githubusercontent.com/alib8b8/aflare/main/docs/logo.svg" width="200" alt="aflare logo"/>
 </p>
 
 <p align="center">
-  <strong>Invoke llm-box workflows as tools in OpenClaw conversations</strong>
+  <strong>Invoke aflare workflows as tools in OpenClaw conversations</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/alib8b8/llm-box">
-    <img src="https://img.shields.io/badge/llm--box-v1.0.0-blue" alt="llm-box"/>
+  <a href="https://github.com/alib8b8/aflare">
+    <img src="https://img.shields.io/badge/llm--box-v1.0.0-blue" alt="aflare"/>
   </a>
   <a href="https://github.com/alib8b8/openclaw-llmbox">
     <img src="https://img.shields.io/badge/OpenClaw-Plugin-green" alt="OpenClaw Plugin"/>
@@ -24,14 +24,14 @@
 
 ## Overview
 
-This plugin integrates **llm-box** with **OpenClaw**, allowing you to invoke llm-box workflows as callable tools within OpenClaw conversations. Your AI assistant can now execute complex, multi-step workflows built with llm-box directly from chat.
+This plugin integrates **aflare** with **OpenClaw**, allowing you to invoke aflare workflows as callable tools within OpenClaw conversations. Your AI assistant can now execute complex, multi-step workflows built with aflare directly from chat.
 
 ## Features
 
-- **Workflow Discovery** - List all available llm-box workflows in your configured directory
+- **Workflow Discovery** - List all available aflare workflows in your configured directory
 - **Workflow Execution** - Execute any workflow by name with optional input parameters
 - **Workflow Inspection** - Get detailed descriptions of what each workflow does
-- **Multi-Provider Support** - Leverage 20+ LLM providers through llm-box (Ollama, Kimi, DeepSeek, Qwen, etc.)
+- **Multi-Provider Support** - Leverage 20+ LLM providers through aflare (Ollama, Kimi, DeepSeek, Qwen, etc.)
 
 ## How It Works
 
@@ -45,7 +45,7 @@ This plugin integrates **llm-box** with **OpenClaw**, allowing you to invoke llm
 │         ↓                                                    │
 │  Agent → llmbox_run_workflow(workflow_file="kimi_summary")   │
 │         ↓                                                    │
-│  llm-box executes:                                            │
+│  aflare executes:                                            │
 │    [STEP 1] fetch_url → Extract article content              │
 │    [STEP 2] kimi → Generate summary                          │
 │         ↓                                                    │
@@ -56,8 +56,8 @@ This plugin integrates **llm-box** with **OpenClaw**, allowing you to invoke llm
 ## Prerequisites
 
 - **OpenClaw** installed and configured
-- **llm-box** installed (`go install github.com/alib8b8/llm-box@latest`)
-- Some llm-box workflows in your workflows directory
+- **aflare** installed (`go install github.com/alib8b8/aflare@latest`)
+- Some aflare workflows in your workflows directory
 
 ## Installation
 
@@ -82,7 +82,7 @@ Edit your OpenClaw config file (`~/.openclaw/config.json`):
   "plugins": {
     "openclaw-llmbox": {
       "workflowDir": "./workflows",
-      "llmboxPath": "llm-box",
+      "llmboxPath": "aflare",
       "enableAutoDiscovery": true
     }
   }
@@ -91,15 +91,15 @@ Edit your OpenClaw config file (`~/.openclaw/config.json`):
 
 | Config Option | Default | Description |
 |--------------|---------|-------------|
-| `workflowDir` | `./workflows` | Directory containing your llm-box workflow YAML files |
-| `llmboxPath` | `llm-box` | Path to llm-box binary (must be in PATH or use full path) |
+| `workflowDir` | `./workflows` | Directory containing your aflare workflow YAML files |
+| `llmboxPath` | `aflare` | Path to aflare binary (must be in PATH or use full path) |
 | `enableAutoDiscovery` | `true` | Auto-discover workflows in the configured directory |
 
 ## Available Tools
 
 ### `llmbox_list_workflows`
 
-List all available llm-box workflows in your configured directory.
+List all available aflare workflows in your configured directory.
 
 **Parameters:** None
 
@@ -117,7 +117,7 @@ Agent calls llmbox_list_workflows:
 
 ### `llmbox_run_workflow`
 
-Execute a specific llm-box workflow.
+Execute a specific aflare workflow.
 
 **Parameters:**
 - `workflow_file` (required): The workflow filename (e.g., `"kimi_summary.yaml"`)
@@ -245,7 +245,7 @@ $ openclaw "Summarize https://example.com/article using my kimi_summary workflow
 
 - Node.js >= 22.0.0
 - OpenClaw
-- llm-box
+- aflare
 
 ## License
 
@@ -257,6 +257,6 @@ Contributions are welcome! Please open an issue or submit a PR.
 
 ## Links
 
-- [llm-box](https://github.com/alib8b8/llm-box) - Terminal-based AI workflow engine
+- [aflare](https://github.com/alib8b8/aflare) - Terminal-based AI workflow engine
 - [OpenClaw](https://github.com/alib8b8/openclaw) - Personal AI assistant
 - [OpenClaw Plugins](https://github.com/alib8b8/awesome-openclaw) - Discover more plugins

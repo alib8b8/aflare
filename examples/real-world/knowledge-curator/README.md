@@ -41,15 +41,15 @@ flowchart TD
 
 ```bash
 # 1. 默认：整理维基百科 LLM 词条
-llm-box run examples/real-world/knowledge-curator/workflow.yaml
+aflare run examples/real-world/knowledge-curator/workflow.yaml
 
 # 2. 整理任意 URL，写入自定义图谱文件
-llm-box run examples/real-world/knowledge-curator/workflow.yaml \
+aflare run examples/real-world/knowledge-curator/workflow.yaml \
   --var source_url=https://example.com/tech-article \
   --var graph_path=my-kb.json
 
 # 3. 增量扩展：对同一 graph_path 重复运行不同 URL
-llm-box run examples/real-world/knowledge-curator/workflow.yaml \
+aflare run examples/real-world/knowledge-curator/workflow.yaml \
   --var source_url=https://example.com/article-2 \
   --var graph_path=my-kb.json
 ```
@@ -109,4 +109,4 @@ graph LR
 - **图谱持久化与复用**：`graph_path` 让 `extract` 写盘、`visualize`/`stats` 读盘——多次运行不同 URL 可增量扩展同一份知识库，体现"curator"语义。
 - **同节点多动作编排**：连续三步都调用 `knowledge_graph`，分别用 `extract` / `visualize` / `stats` 动作，展示单节点的多面能力。
 - **跨步引用汇总**：`template_render` 同时引用 `{{step.extract}}`、`{{step.visualize}}`、`{{step.stats}}`，把分散的中间结果汇成一份报告。
-- **正确的表达式语法**：使用 `{{var.graph_path}}`、`{{step.stats}}`——llm-box 引擎真正解析的语法。
+- **正确的表达式语法**：使用 `{{var.graph_path}}`、`{{step.stats}}`——aflare 引擎真正解析的语法。

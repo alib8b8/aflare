@@ -1,7 +1,7 @@
 name: Habit Tracker
 # Track habits and generate progress reports
-# Usage: llm-box install productivity-personal/habit-tracker
-#        llm-box run habit-tracker/workflow.yaml
+# Usage: aflare install productivity-personal/habit-tracker
+#        aflare run habit-tracker/workflow.yaml
 
 steps:
   - node: file_read

@@ -1,7 +1,7 @@
 name: Performance Review Template
 # Generate performance review templates
-# Usage: llm-box install hr-recruiting/performance-review
-#        llm-box run performance-review/workflow.yaml
+# Usage: aflare install hr-recruiting/performance-review
+#        aflare run performance-review/workflow.yaml
 
 steps:
   - node: agent

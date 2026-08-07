@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for build api documentat
 ## Usage
 
 ```bash
-llm-box install documentation/api-docs-builder
-llm-box run api-docs-builder/workflow.yaml
+aflare install documentation/api-docs-builder
+aflare run api-docs-builder/workflow.yaml
 ```
 
 ## Parameters

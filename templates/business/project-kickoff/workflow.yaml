@@ -1,7 +1,7 @@
 name: Project Kickoff Template
 # Generate project kickoff document
-# Usage: llm-box install project-management/project-kickoff
-#        llm-box run project-kickoff/workflow.yaml
+# Usage: aflare install project-management/project-kickoff
+#        aflare run project-kickoff/workflow.yaml
 
 steps:
   - node: agent

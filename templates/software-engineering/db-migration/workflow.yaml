@@ -1,7 +1,7 @@
 name: Migration Plan Generator
 # Generate database migration plan
-# Usage: llm-box install database/db-migration
-#        llm-box run db-migration/workflow.yaml
+# Usage: aflare install database/db-migration
+#        aflare run db-migration/workflow.yaml
 
 steps:
   - node: file_read

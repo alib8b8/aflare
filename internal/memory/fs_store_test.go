@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -26,7 +26,7 @@ import (
 )
 
 // newTestFSStore constructs an FSStore backed by per-test temp directories,
-// avoiding any I/O to the user's home (~/.llm-box). All fields are
+// avoiding any I/O to the user's home (~/.aflare). All fields are
 // constructed directly because NewFSStore would touch the user's home dir
 // via os.UserHomeDir().
 func newTestFSStore(t *testing.T) *FSStore {

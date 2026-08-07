@@ -1,7 +1,7 @@
 name: Daily Planner
 # Generate structured daily plan from goals
-# Usage: llm-box install productivity-personal/daily-planner
-#        llm-box run daily-planner/workflow.yaml
+# Usage: aflare install productivity-personal/daily-planner
+#        aflare run daily-planner/workflow.yaml
 
 steps:
   - node: execute

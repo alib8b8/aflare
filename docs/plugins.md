@@ -1,15 +1,15 @@
 # Plugin System
 
-llm-box supports a plugin system for extending functionality with community-contributed plugins.
+aflare supports a plugin system for extending functionality with community-contributed plugins.
 
 ## Overview
 
 The plugin system allows you to:
 
-- Add custom nodes to llm-box
+- Add custom nodes to aflare
 - Extend existing functionality
 - Share plugins with the community
-- Build ecosystem around llm-box
+- Build ecosystem around aflare
 
 ## Plugin Types
 
@@ -23,29 +23,29 @@ The plugin system allows you to:
 ### List Installed Plugins
 
 ```bash
-llm-box plugins list
+aflare plugins list
 
 # List by type
-llm-box plugins list --type node
-llm-box plugins list --type extension
+aflare plugins list --type node
+aflare plugins list --type extension
 ```
 
 ### Enable a Plugin
 
 ```bash
-llm-box plugins enable my-plugin
+aflare plugins enable my-plugin
 ```
 
 ### Disable a Plugin
 
 ```bash
-llm-box plugins disable my-plugin
+aflare plugins disable my-plugin
 ```
 
 ### Check Plugin Status
 
 ```bash
-llm-box plugins info my-plugin
+aflare plugins info my-plugin
 ```
 
 ## Plugin Structure
@@ -53,7 +53,7 @@ llm-box plugins info my-plugin
 ### Directory Layout
 
 ```
-~/.llm-box/plugins/
+~/.aflare/plugins/
 ├── my-plugin/
 │   ├── plugin.yaml
 │   ├── main.go
@@ -69,7 +69,7 @@ llm-box plugins info my-plugin
 ```yaml
 name: "my-plugin"
 version: "1.0.0"
-description: "A custom plugin for llm-box"
+description: "A custom plugin for aflare"
 author: "John Doe"
 type: "node"
 dependencies:
@@ -84,7 +84,7 @@ dependencies:
 package main
 
 import (
-    "github.com/alib8b8/llm-box/internal/plugins"
+    "github.com/alib8b8/aflare/internal/plugins"
 )
 
 type MyNodePlugin struct {
@@ -181,13 +181,13 @@ Dependencies are automatically checked when enabling a plugin:
 1. **Review Plugins**: Only install plugins from trusted sources
 2. **Sandbox Execution**: External node plugins run in a sandboxed environment
 3. **Sensitive Data**: Sensitive parameters (API keys, passwords) are filtered from external plugins
-4. **Permission Control**: Plugins run with the same permissions as the llm-box process
+4. **Permission Control**: Plugins run with the same permissions as the aflare process
 
 ## Plugin Market
 
 ### Finding Plugins
 
-- **GitHub**: Search for `llm-box-plugin`
+- **GitHub**: Search for `aflare-plugin`
 - **Official Registry**: (Coming soon)
 - **Community**: Check Discord/Slack channels
 
@@ -225,8 +225,8 @@ steps:
 
 ### Plugin Not Found
 
-1. Check plugin is registered: `llm-box plugins list`
-2. Verify plugin directory exists in `~/.llm-box/plugins/`
+1. Check plugin is registered: `aflare plugins list`
+2. Verify plugin directory exists in `~/.aflare/plugins/`
 3. Check `plugin.yaml` has correct format
 
 ### Dependency Error

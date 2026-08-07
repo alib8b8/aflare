@@ -1,7 +1,7 @@
 name: Security Audit Checklist
 # Run security audit checklist on a project
-# Usage: llm-box install security/security-audit
-#        llm-box run security-audit/workflow.yaml
+# Usage: aflare install security/security-audit
+#        aflare run security-audit/workflow.yaml
 
 steps:
   - node: execute

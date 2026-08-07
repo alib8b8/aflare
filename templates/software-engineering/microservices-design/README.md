@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate microservic
 ## Usage
 
 ```bash
-llm-box install backend/microservices-design
-llm-box run microservices-design/workflow.yaml
+aflare install backend/microservices-design
+aflare run microservices-design/workflow.yaml
 ```
 
 ## Parameters

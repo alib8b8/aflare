@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for track habits and gen
 ## Usage
 
 ```bash
-llm-box install productivity-personal/habit-tracker
-llm-box run habit-tracker/workflow.yaml
+aflare install productivity-personal/habit-tracker
+aflare run habit-tracker/workflow.yaml
 ```
 
 ## Parameters

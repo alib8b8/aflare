@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate ui componen
 ## Usage
 
 ```bash
-llm-box install frontend/component-library
-llm-box run component-library/workflow.yaml
+aflare install frontend/component-library
+aflare run component-library/workflow.yaml
 ```
 
 ## Parameters

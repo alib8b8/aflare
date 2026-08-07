@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -48,12 +48,12 @@ type ExecuteNode struct{}
 
 func init() {
 	Register(&ExecuteNode{})
-	if os.Getenv("LLM_BOX_EXECUTE_ALLOWLIST") == "1" {
+	if os.Getenv("AFLARE_EXECUTE_ALLOWLIST") == "1" {
 		allowListEnabled = true
 	}
 	home, err := os.UserHomeDir()
 	if err == nil {
-		auditLogFile = filepath.Join(home, ".config", "llm-box", "audit.log")
+		auditLogFile = filepath.Join(home, ".config", "aflare", "audit.log")
 	}
 }
 
@@ -114,7 +114,7 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 		if len(firstWord) > 0 {
 			cmdName := filepath.Base(firstWord[0])
 			if !allowedCommands[cmdName] {
-				return "", fmt.Errorf("command %q is not in the allowed list (enable via LLM_BOX_EXECUTE_ALLOWLIST=1)", cmdName)
+				return "", fmt.Errorf("command %q is not in the allowed list (enable via AFLARE_EXECUTE_ALLOWLIST=1)", cmdName)
 			}
 		}
 	}

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate security pa
 ## Usage
 
 ```bash
-llm-box install security/password-policy
-llm-box run password-policy/workflow.yaml
+aflare install security/password-policy
+aflare run password-policy/workflow.yaml
 ```
 
 ## Parameters

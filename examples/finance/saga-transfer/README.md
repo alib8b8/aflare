@@ -1,6 +1,6 @@
 # Saga 跨行转账工作流示例
 
-> 真实金融跨步骤事务场景的可运行 Demo：展示 llm-box 的 **saga 事务补偿**能力——多步骤写入在任一步骤失败时，已完成的步骤按反向顺序自动补偿（回滚）。
+> 真实金融跨步骤事务场景的可运行 Demo：展示 aflare 的 **saga 事务补偿**能力——多步骤写入在任一步骤失败时，已完成的步骤按反向顺序自动补偿（回滚）。
 
 ## 展示的金融能力
 
@@ -36,7 +36,7 @@ forward（顺序执行）        失败时 compensate（反向执行）
 
 ```bash
 # 设置审计 HMAC 密钥（防篡改审计链，记录所有 forward/compensate）
-export LLM_BOX_AUDIT_HMAC_KEY="your-secret-hmac-key"
+export AFLARE_AUDIT_HMAC_KEY="your-secret-hmac-key"
 ```
 
 ## 运行步骤
@@ -64,7 +64,7 @@ mock 银行 API 端点：
 ```bash
 # 从仓库根目录运行
 # LLMBOX_ALLOW_LOOPBACK=1 允许访问 localhost mock 服务（SSRF 防护默认拦截内网地址）
-LLMBOX_ALLOW_LOOPBACK=1 llm-box run examples/finance/saga-transfer/workflow.yaml
+LLMBOX_ALLOW_LOOPBACK=1 aflare run examples/finance/saga-transfer/workflow.yaml
 ```
 
 预期行为：

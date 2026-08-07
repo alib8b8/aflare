@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate structured 
 ## Usage
 
 ```bash
-llm-box install quality-assurance/bug-report
-llm-box run bug-report/workflow.yaml
+aflare install quality-assurance/bug-report
+aflare run bug-report/workflow.yaml
 ```
 
 ## Parameters

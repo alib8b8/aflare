@@ -1,7 +1,7 @@
 name: Nginx Access Analyzer
 # Analyze Nginx access logs for traffic patterns
-# Usage: llm-box install devops-monitoring/nginx-access-analyzer
-#        llm-box run nginx-access-analyzer/workflow.yaml
+# Usage: aflare install devops-monitoring/nginx-access-analyzer
+#        aflare run nginx-access-analyzer/workflow.yaml
 
 steps:
   - node: execute

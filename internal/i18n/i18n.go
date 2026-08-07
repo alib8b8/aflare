@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -170,8 +170,8 @@ func loadLocale(lang string) (map[string]string, error) {
 }
 
 func detectLanguage() string {
-	// 1. Check LLM_BOX_LANG env var
-	if lang := os.Getenv("LLM_BOX_LANG"); lang != "" {
+	// 1. Check AFLARE_LANG env var
+	if lang := os.Getenv("AFLARE_LANG"); lang != "" {
 		return normalizeLang(lang)
 	}
 

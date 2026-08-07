@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -19,7 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/alib8b8/llm-box/internal/logger"
+	"github.com/alib8b8/aflare/internal/logger"
 	"io"
 	"net/http"
 	"runtime/debug"
@@ -383,7 +383,7 @@ func httpGet(ctx context.Context, urlStr, userAgent string) (string, error) {
 	}
 	ua := userAgent
 	if ua == "" {
-		ua = "Mozilla/5.0 (compatible; llm-box/1.0)"
+		ua = "Mozilla/5.0 (compatible; aflare/1.0)"
 	}
 	req.Header.Set("User-Agent", ua)
 	req.Header.Set("Accept", "application/json")

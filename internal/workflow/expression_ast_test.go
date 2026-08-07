@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -134,7 +134,7 @@ func legacyEvalSingle(e *ExpressionEngine, expr, input string) (string, error) {
 		return "", fmt.Errorf("loop variable not found: %s", name)
 	case "secret":
 		if e.secretGetter == nil {
-			return "", fmt.Errorf("secrets not available - use 'llm-box secrets add' to store secrets first")
+			return "", fmt.Errorf("secrets not available - use 'aflare secrets add' to store secrets first")
 		}
 		secretParts := strings.SplitN(name, ".", 2)
 		if len(secretParts) < 2 {
@@ -182,7 +182,7 @@ func TestAST_EquivalentToLegacyOracle(t *testing.T) {
 		"{{secret.missing}}",
 		"{{env.PATH}}",
 		"{{env.SECRET}}",
-		"{{env.LLM_BOX_NONEXISTENT_XYZ}}",
+		"{{env.AFLARE_NONEXISTENT_XYZ}}",
 		"{{file.nonexistent.txt}}",
 		"{{unknown.value}}",
 		"{{.foo}}",

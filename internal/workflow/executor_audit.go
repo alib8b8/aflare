@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -25,8 +25,8 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/alib8b8/llm-box/internal/history"
-	"github.com/alib8b8/llm-box/internal/logger"
+	"github.com/alib8b8/aflare/internal/history"
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 // Audit log action values for workflow-execution records. These extend the
@@ -50,8 +50,8 @@ const (
 // Audit HMAC key environment variables, mirrored from internal/history so the
 // recorder can detect a missing key without that package exporting the names.
 const (
-	auditEnvHMACKey     = "LLM_BOX_AUDIT_HMAC_KEY"
-	auditEnvSecretsPass = "LLM_BOX_SECRETS_PASSWORD"
+	auditEnvHMACKey     = "AFLARE_AUDIT_HMAC_KEY"
+	auditEnvSecretsPass = "AFLARE_SECRETS_PASSWORD"
 )
 
 // auditMaxFieldLen bounds the size of flowing input/output strings written to
@@ -121,7 +121,7 @@ func (ar *auditRecorder) hasHMACKey() bool {
 		ar.keyAvailable = os.Getenv(auditEnvHMACKey) != "" || os.Getenv(auditEnvSecretsPass) != ""
 		if !ar.keyAvailable {
 			warnAuditNoKeyOnce.Do(func() {
-				logger.Warn("audit log disabled: set LLM_BOX_AUDIT_HMAC_KEY or LLM_BOX_SECRETS_PASSWORD to enable tamper-evident audit logging")
+				logger.Warn("audit log disabled: set AFLARE_AUDIT_HMAC_KEY or AFLARE_SECRETS_PASSWORD to enable tamper-evident audit logging")
 			})
 		}
 	}

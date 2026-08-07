@@ -1,7 +1,7 @@
 name: Survey Results Analyzer
 # Analyze survey responses and extract insights
-# Usage: llm-box install data-analytics/survey-analyzer
-#        llm-box run survey-analyzer/workflow.yaml
+# Usage: aflare install data-analytics/survey-analyzer
+#        aflare run survey-analyzer/workflow.yaml
 
 steps:
   - node: file_read

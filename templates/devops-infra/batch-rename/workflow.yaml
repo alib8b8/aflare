@@ -1,7 +1,7 @@
 name: Rename Batch Tool
 # Batch rename files with patterns
-# Usage: llm-box install automation/batch-rename
-#        llm-box run batch-rename/workflow.yaml
+# Usage: aflare install automation/batch-rename
+#        aflare run batch-rename/workflow.yaml
 
 steps:
   - node: execute

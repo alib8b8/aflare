@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -26,21 +26,21 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/api"
-	"github.com/alib8b8/llm-box/internal/autoupgrade"
-	"github.com/alib8b8/llm-box/internal/cli"
-	"github.com/alib8b8/llm-box/internal/history"
-	"github.com/alib8b8/llm-box/internal/i18n"
-	"github.com/alib8b8/llm-box/internal/logger"
-	"github.com/alib8b8/llm-box/internal/mcp"
-	"github.com/alib8b8/llm-box/internal/meta"
-	"github.com/alib8b8/llm-box/internal/nodes"
-	"github.com/alib8b8/llm-box/internal/output"
-	"github.com/alib8b8/llm-box/internal/scheduler"
-	"github.com/alib8b8/llm-box/internal/skills"
-	"github.com/alib8b8/llm-box/internal/tui"
-	"github.com/alib8b8/llm-box/internal/webui"
-	"github.com/alib8b8/llm-box/internal/workflow"
+	"github.com/alib8b8/aflare/internal/api"
+	"github.com/alib8b8/aflare/internal/autoupgrade"
+	"github.com/alib8b8/aflare/internal/cli"
+	"github.com/alib8b8/aflare/internal/history"
+	"github.com/alib8b8/aflare/internal/i18n"
+	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/mcp"
+	"github.com/alib8b8/aflare/internal/meta"
+	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/output"
+	"github.com/alib8b8/aflare/internal/scheduler"
+	"github.com/alib8b8/aflare/internal/skills"
+	"github.com/alib8b8/aflare/internal/tui"
+	"github.com/alib8b8/aflare/internal/webui"
+	"github.com/alib8b8/aflare/internal/workflow"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
@@ -329,9 +329,9 @@ func handleRegistry(args []string) {
 	if len(args) < 1 {
 		fmt.Println(i18n.T("registry.usage"))
 		fmt.Println("\nCommands:")
-		fmt.Println("  sync     - llm-box registry sync")
-		fmt.Println("  list     - llm-box registry list")
-		fmt.Println("  search   - llm-box registry search <query>")
+		fmt.Println("  sync     - aflare registry sync")
+		fmt.Println("  list     - aflare registry list")
+		fmt.Println("  search   - aflare registry search <query>")
 		os.Exit(1)
 	}
 
@@ -411,9 +411,9 @@ func handleCreate(args []string) {
 	if len(args) < 1 {
 		fmt.Println(i18n.T("create.usage"))
 		fmt.Println("\nExamples:")
-		fmt.Println("  llm-box create \"fetch example.com and save to file\"")
-		fmt.Println("  llm-box create \"fetch Hacker News and save to hn.txt\"")
-		fmt.Println("  llm-box create \"summarize article and write to summary.md\"")
+		fmt.Println("  aflare create \"fetch example.com and save to file\"")
+		fmt.Println("  aflare create \"fetch Hacker News and save to hn.txt\"")
+		fmt.Println("  aflare create \"summarize article and write to summary.md\"")
 		os.Exit(1)
 	}
 
@@ -428,15 +428,15 @@ func handleCreate(args []string) {
 
 	fmt.Printf("\n✅ %s\n", i18n.T("create.success", filename))
 	fmt.Printf("\n%s\n", i18n.T("create.run_hint"))
-	fmt.Printf("  llm-box run %s\n", filename)
+	fmt.Printf("  aflare run %s\n", filename)
 }
 
 func handleRun(args []string, dryRun bool) {
 	// Parse --resume flag. Two forms are supported:
-	//   llm-box run --resume my-workflow.yaml
-	//     → boolean flag; checkpoint defaults to ~/.llm-box/checkpoints/<name>.json
-	//   llm-box run --resume /path/to/state.json my-workflow.yaml
-	//   llm-box run --resume=/path/to/state.json my-workflow.yaml
+	//   aflare run --resume my-workflow.yaml
+	//     → boolean flag; checkpoint defaults to ~/.aflare/checkpoints/<name>.json
+	//   aflare run --resume /path/to/state.json my-workflow.yaml
+	//   aflare run --resume=/path/to/state.json my-workflow.yaml
 	//     → explicit checkpoint path
 	resumeEnabled := false
 	resumePath := ""
@@ -491,7 +491,7 @@ func handleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath st
 		if resumePath != "" {
 			statePath = resumePath
 		} else {
-			// Default: ~/.llm-box/checkpoints/<workflow-name>.json
+			// Default: ~/.aflare/checkpoints/<workflow-name>.json
 			name := wf.Name
 			if name == "" {
 				name = strings.TrimSuffix(filepath.Base(wfPath), filepath.Ext(wfPath))
@@ -524,10 +524,10 @@ func resolveAuditDir(dir string) string {
 }
 
 // acquireAuditLock takes an exclusive lock on the audit directory to prevent
-// two llm-box processes from concurrently appending to the same HMAC
+// two aflare processes from concurrently appending to the same HMAC
 // hash-chained audit log (H-6). The history package's auditWriteMu only
 // serializes appends within a single process; without this lock, two
-// `llm-box run` invocations sharing one audit directory would interleave
+// `aflare run` invocations sharing one audit directory would interleave
 // appends and fork the hash chain, making VerifyAuditChain fail and breaking
 // tamper-evidence — the core guarantee for the financial audit scenario.
 //
@@ -549,7 +549,7 @@ func acquireAuditLock(dir string) (func(), error) {
 	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		if os.IsExist(err) {
-			return nil, fmt.Errorf("another llm-box process is writing audit logs to %s; only one process may run with audit enabled at a time (set LLM_BOX_AUDIT_DIR to isolate, or remove a stale %s)", dir, lockPath)
+			return nil, fmt.Errorf("another aflare process is writing audit logs to %s; only one process may run with audit enabled at a time (set AFLARE_AUDIT_DIR to isolate, or remove a stale %s)", dir, lockPath)
 		}
 		return nil, err
 	}
@@ -602,7 +602,7 @@ func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 		// applied to every TUI workflow run. Audit degrades gracefully (and
 		// silently after one warning) when the HMAC key env vars are unset.
 		// newAuditEnabledExecutor acquires a per-process lock on the audit
-		// directory (H-6) so concurrent llm-box processes cannot fork the
+		// directory (H-6) so concurrent aflare processes cannot fork the
 		// HMAC hash chain; if the lock is held, audit is disabled for this
 		// process rather than corrupting the chain.
 		exec, releaseAudit := newAuditEnabledExecutor("")
@@ -645,7 +645,7 @@ func runCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string) {
 	// to every CLI workflow run. Audit is a no-op when the HMAC key env vars
 	// are not set (graceful degradation), so this never blocks execution.
 	// newAuditEnabledExecutor acquires a per-process lock on the audit
-	// directory (H-6) so concurrent llm-box processes cannot fork the HMAC
+	// directory (H-6) so concurrent aflare processes cannot fork the HMAC
 	// hash chain; if the lock is held, audit is disabled for this process.
 	exec, releaseAudit := newAuditEnabledExecutor("")
 	defer releaseAudit()
@@ -675,7 +675,7 @@ func runCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string) {
 }
 
 func handleSelfUpdate() {
-	repo := "alib8b8/llm-box"
+	repo := "alib8b8/aflare"
 	fmt.Println("Checking for updates...")
 	result, err := cli.SelfUpdate(repo)
 	if err != nil {
@@ -735,7 +735,7 @@ func handleAutoUpgrade(args []string) {
 			os.Exit(1)
 		}
 		fmt.Println("✅ Auto-upgrade disabled")
-		fmt.Println("   Mode: manual (you need to run 'llm-box self-update' manually)")
+		fmt.Println("   Mode: manual (you need to run 'aflare self-update' manually)")
 
 	case "monitor":
 		config.Mode = autoupgrade.ModeMonitor
@@ -757,7 +757,7 @@ func handleAutoUpgrade(args []string) {
 
 	case "config":
 		if len(args) < 2 {
-			fmt.Println("Usage: llm-box autoupgrade config <key>=<value>")
+			fmt.Println("Usage: aflare autoupgrade config <key>=<value>")
 			fmt.Println("\nAvailable keys:")
 			fmt.Println("  mode           - auto, monitor, manual")
 			fmt.Println("  auto_update    - true, false")
@@ -800,7 +800,7 @@ func handleAutoUpgrade(args []string) {
 }
 
 func printAutoUpgradeUsage() {
-	fmt.Println("Usage: llm-box autoupgrade <command>")
+	fmt.Println("Usage: aflare autoupgrade <command>")
 	fmt.Println("\nCommands:")
 	fmt.Println("  status       - Show current auto-upgrade status")
 	fmt.Println("  enable       - Enable automatic updates")
@@ -810,9 +810,9 @@ func printAutoUpgradeUsage() {
 	fmt.Println("  config       - Configure auto-upgrade settings")
 	fmt.Println("  auto-merge   - Run automatic branch merge")
 	fmt.Println("\nExamples:")
-	fmt.Println("  llm-box autoupgrade enable")
-	fmt.Println("  llm-box autoupgrade config mode=auto interval=6h")
-	fmt.Println("  llm-box autoupgrade run")
+	fmt.Println("  aflare autoupgrade enable")
+	fmt.Println("  aflare autoupgrade config mode=auto interval=6h")
+	fmt.Println("  aflare autoupgrade run")
 }
 
 func handleWebUI(args []string) {
@@ -862,15 +862,15 @@ func handleWebUI(args []string) {
 }
 
 func printWebUIUsage() {
-	fmt.Println("Usage: llm-box webui [options]")
+	fmt.Println("Usage: aflare webui [options]")
 	fmt.Println("\nOptions:")
 	fmt.Println("  --port, -p <port>    - WebUI server port (default: 8081)")
 	fmt.Println("  --dir, -d <dir>      - Workflows directory")
 	fmt.Println("  --help, -h           - Show this help")
 	fmt.Println("\nExamples:")
-	fmt.Println("  llm-box webui")
-	fmt.Println("  llm-box webui --port 8080")
-	fmt.Println("  llm-box webui --dir /path/to/workflows")
+	fmt.Println("  aflare webui")
+	fmt.Println("  aflare webui --port 8080")
+	fmt.Println("  aflare webui --dir /path/to/workflows")
 }
 
 func handleServe(args []string) {
@@ -932,7 +932,7 @@ func handleServe(args []string) {
 }
 
 func printServeUsage() {
-	fmt.Println("Usage: llm-box serve [options]")
+	fmt.Println("Usage: aflare serve [options]")
 	fmt.Println("\nOptions:")
 	fmt.Println("  --port, -p <port>      - API server port (default: 8080)")
 	fmt.Println("  --host, -H <host>      - API server host (default: 0.0.0.0)")
@@ -940,11 +940,11 @@ func printServeUsage() {
 	fmt.Println("  --dir, -d <dir>        - Workflows directory")
 	fmt.Println("  --help, -h             - Show this help")
 	fmt.Println("\nExamples:")
-	fmt.Println("  llm-box serve")
-	fmt.Println("  llm-box serve --port 9090")
-	fmt.Println("  llm-box serve --api-key my-secret-key")
-	fmt.Println("  llm-box serve --dir /path/to/workflows")
-	fmt.Println("  llm-box --serve --port 8080")
+	fmt.Println("  aflare serve")
+	fmt.Println("  aflare serve --port 9090")
+	fmt.Println("  aflare serve --api-key my-secret-key")
+	fmt.Println("  aflare serve --dir /path/to/workflows")
+	fmt.Println("  aflare --serve --port 8080")
 }
 
 func updateConfigKey(config *autoupgrade.UpgradeConfig, key, value string) {
@@ -1061,17 +1061,17 @@ func handleInit(args []string) {
 }
 
 func printInitUsage() {
-	fmt.Println("Usage: llm-box init [options]")
-	fmt.Println("\nInitialize llm-box integration with AI agents and configure settings.")
+	fmt.Println("Usage: aflare init [options]")
+	fmt.Println("\nInitialize aflare integration with AI agents and configure settings.")
 	fmt.Println("\nOptions:")
 	fmt.Println("  --mcp <agent>       Setup MCP server configuration (claude-code, opencode, all)")
-	fmt.Println("  --agent <agent>     Install llm-box skills to agent (claude-code, opencode, all)")
+	fmt.Println("  --agent <agent>     Install aflare skills to agent (claude-code, opencode, all)")
 	fmt.Println("  --channel <channel> Set update channel (stable, beta, nightly)")
 	fmt.Println("  -h, --help          Show this help message")
 	fmt.Println("\nExamples:")
-	fmt.Println("  llm-box init --mcp all")
-	fmt.Println("  llm-box init --mcp claude-code --agent all")
-	fmt.Println("  llm-box init --channel beta")
+	fmt.Println("  aflare init --mcp all")
+	fmt.Println("  aflare init --mcp claude-code --agent all")
+	fmt.Println("  aflare init --channel beta")
 }
 
 func handleSkills(args []string) {
@@ -1114,7 +1114,7 @@ func handleSkills(args []string) {
 		fmt.Printf("✅ Registry saved to %s/%s\n", templatesDir, skills.RegistryFileName)
 	case "search":
 		if len(args) < 2 {
-			fmt.Println("Usage: llm-box skills search <keyword>")
+			fmt.Println("Usage: aflare skills search <keyword>")
 			os.Exit(1)
 		}
 		results := registry.Search(args[1])
@@ -1131,7 +1131,7 @@ func handleSkills(args []string) {
 		}
 	case "category", "cat":
 		if len(args) < 2 {
-			fmt.Println("Usage: llm-box skills category <name>")
+			fmt.Println("Usage: aflare skills category <name>")
 			os.Exit(1)
 		}
 		catSkills := registry.ListByCategory(args[1])
@@ -1141,7 +1141,7 @@ func handleSkills(args []string) {
 		}
 	case "show", "get":
 		if len(args) < 2 {
-			fmt.Println("Usage: llm-box skills show <id>")
+			fmt.Println("Usage: aflare skills show <id>")
 			os.Exit(1)
 		}
 		s, err := registry.Get(args[1])
@@ -1170,8 +1170,8 @@ func handleSkills(args []string) {
 }
 
 func printSkillsUsage() {
-	fmt.Println("Usage: llm-box skills <command> [options]")
-	fmt.Println("\nManage and discover llm-box skills/templates.")
+	fmt.Println("Usage: aflare skills <command> [options]")
+	fmt.Println("\nManage and discover aflare skills/templates.")
 	fmt.Println("\nCommands:")
 	fmt.Println("  list, ls               List all available skills")
 	fmt.Println("  scan, index            Scan templates and save registry")
@@ -1183,10 +1183,10 @@ func printSkillsUsage() {
 	fmt.Println("  show <id>              Show skill details")
 	fmt.Println("  -h, --help             Show this help message")
 	fmt.Println("\nExamples:")
-	fmt.Println("  llm-box skills scan")
-	fmt.Println("  llm-box skills list")
-	fmt.Println("  llm-box skills search security")
-	fmt.Println("  llm-box skills category development")
+	fmt.Println("  aflare skills scan")
+	fmt.Println("  aflare skills list")
+	fmt.Println("  aflare skills search security")
+	fmt.Println("  aflare skills category development")
 }
 
 func handleSchedule(args []string) {
@@ -1312,7 +1312,7 @@ func handleScheduleAdd(args []string) {
 	fmt.Printf("✅ Scheduled task %q added\n", taskID)
 	fmt.Printf("   Cron:     %s\n", cronExpr)
 	fmt.Printf("   Workflow: %s\n", wfPath)
-	fmt.Printf("   Run 'llm-box schedule start' to begin executing on schedule.\n")
+	fmt.Printf("   Run 'aflare schedule start' to begin executing on schedule.\n")
 }
 
 func handleScheduleList() {
@@ -1323,7 +1323,7 @@ func handleScheduleList() {
 		os.Exit(1)
 	}
 	if len(entries) == 0 {
-		fmt.Println("No scheduled tasks. Use 'llm-box schedule add' to add one.")
+		fmt.Println("No scheduled tasks. Use 'aflare schedule add' to add one.")
 		return
 	}
 
@@ -1338,7 +1338,7 @@ func handleScheduleList() {
 
 func handleScheduleRemove(args []string) {
 	if len(args) < 1 {
-		fmt.Println("Usage: llm-box schedule remove <id>")
+		fmt.Println("Usage: aflare schedule remove <id>")
 		os.Exit(1)
 	}
 	id := args[0]
@@ -1379,7 +1379,7 @@ func handleScheduleStart() {
 		os.Exit(1)
 	}
 	if len(entries) == 0 {
-		fmt.Println("No scheduled tasks. Use 'llm-box schedule add' to add one.")
+		fmt.Println("No scheduled tasks. Use 'aflare schedule add' to add one.")
 		os.Exit(1)
 	}
 
@@ -1419,7 +1419,7 @@ func handleScheduleStart() {
 }
 
 func printScheduleUsage() {
-	fmt.Println("Usage: llm-box schedule <command> [options]")
+	fmt.Println("Usage: aflare schedule <command> [options]")
 	fmt.Println("\nSchedule workflows to run at specified times using cron expressions.")
 	fmt.Println("\nCommands:")
 	fmt.Println("  add --cron \"<expr>\" [--id <id>] <workflow.yaml>  Add a scheduled task")
@@ -1432,11 +1432,11 @@ func printScheduleUsage() {
 	fmt.Println("       \"*/15 * * * *\"   - every 15 minutes")
 	fmt.Println("       \"0 9 * * 1-5\"    - weekdays at 09:00")
 	fmt.Println("\nExamples:")
-	fmt.Println("  llm-box schedule add --cron \"0 9 * * *\" my-workflow.yaml")
-	fmt.Println("  llm-box schedule add --id daily-report --cron \"0 9 * * *\" report.yaml")
-	fmt.Println("  llm-box schedule list")
-	fmt.Println("  llm-box schedule remove daily-report")
-	fmt.Println("  llm-box schedule start")
+	fmt.Println("  aflare schedule add --cron \"0 9 * * *\" my-workflow.yaml")
+	fmt.Println("  aflare schedule add --id daily-report --cron \"0 9 * * *\" report.yaml")
+	fmt.Println("  aflare schedule list")
+	fmt.Println("  aflare schedule remove daily-report")
+	fmt.Println("  aflare schedule start")
 }
 
 func handleAudit(args []string) {
@@ -1471,7 +1471,7 @@ func handleAuditVerify(args []string) {
 				os.Exit(1)
 			}
 		case "--help", "-h":
-			fmt.Println("Usage: llm-box audit verify [--file <path>]")
+			fmt.Println("Usage: aflare audit verify [--file <path>]")
 			return
 		default:
 			if strings.HasPrefix(args[i], "--file=") {
@@ -1505,7 +1505,7 @@ func handleAuditVerify(args []string) {
 }
 
 func printAuditUsage() {
-	fmt.Println("Usage: llm-box audit <command> [options]")
+	fmt.Println("Usage: aflare audit <command> [options]")
 	fmt.Println("\nVerify the integrity of the tamper-evident audit log hash chain.")
 	fmt.Println("\nCommands:")
 	fmt.Println("  verify [--file <path>]   Verify the audit log HMAC hash chain")
@@ -1513,6 +1513,6 @@ func printAuditUsage() {
 	fmt.Println("\nOptions:")
 	fmt.Println("  --file, -f <path>   Path to the audit log file (defaults to the standard location)")
 	fmt.Println("\nExamples:")
-	fmt.Println("  llm-box audit verify")
-	fmt.Println("  llm-box audit verify --file /path/to/audit.log.jsonl")
+	fmt.Println("  aflare audit verify")
+	fmt.Println("  aflare audit verify --file /path/to/audit.log.jsonl")
 }

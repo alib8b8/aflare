@@ -1,7 +1,7 @@
 name: Git Commit Analyzer
 # Analyze git commit history and generate changelog
-# Usage: llm-box install developer-tools/git-commit-analyzer
-#        llm-box run git-commit-analyzer/workflow.yaml
+# Usage: aflare install developer-tools/git-commit-analyzer
+#        aflare run git-commit-analyzer/workflow.yaml
 
 steps:
   - node: execute

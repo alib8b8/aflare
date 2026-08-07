@@ -1,7 +1,7 @@
 name: File Organizer
 # Organize files by type, date, or extension
-# Usage: llm-box install automation/file-organizer
-#        llm-box run file-organizer/workflow.yaml
+# Usage: aflare install automation/file-organizer
+#        aflare run file-organizer/workflow.yaml
 
 steps:
   - node: execute

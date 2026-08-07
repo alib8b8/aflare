@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for create stress manage
 ## Usage
 
 ```bash
-llm-box install health-wellness/stress-management
-llm-box run stress-management/workflow.yaml
+aflare install health-wellness/stress-management
+aflare run stress-management/workflow.yaml
 ```
 
 ## Parameters

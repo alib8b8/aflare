@@ -27,13 +27,13 @@
 
 ```bash
 # 使用默认模型 Qwen2.5-7B-Instruct、目标硬件 800I-A2 跑全流程
-llm-box run ascend-adapt/end-to-end-adapt/workflow.yaml
+aflare run ascend-adapt/end-to-end-adapt/workflow.yaml
 ```
 
 ### 指定模型与硬件
 
 ```bash
-llm-box run ascend-adapt/end-to-end-adapt/workflow.yaml \
+aflare run ascend-adapt/end-to-end-adapt/workflow.yaml \
   --input "Qwen2.5-14B-Instruct" \
   --set target_npu=910C \
   --set framework=pytorch
@@ -42,7 +42,7 @@ llm-box run ascend-adapt/end-to-end-adapt/workflow.yaml \
 ### 调整量化策略与部署端口
 
 ```bash
-llm-box run ascend-adapt/end-to-end-adapt/workflow.yaml \
+aflare run ascend-adapt/end-to-end-adapt/workflow.yaml \
   --input "ChatGLM3-6B" \
   --set quantize_method=fp8 \
   --set deploy_port=9000
@@ -51,8 +51,8 @@ llm-box run ascend-adapt/end-to-end-adapt/workflow.yaml \
 ### 安装为本地模板
 
 ```bash
-llm-box install ascend-adapt/end-to-end-adapt
-llm-box run end-to-end-adapt/workflow.yaml --input "Qwen2.5-7B-Instruct"
+aflare install ascend-adapt/end-to-end-adapt
+aflare run end-to-end-adapt/workflow.yaml --input "Qwen2.5-7B-Instruct"
 ```
 
 ## 输入说明
@@ -150,7 +150,7 @@ llm-box run end-to-end-adapt/workflow.yaml --input "Qwen2.5-7B-Instruct"
 
 ## 环境前置要求
 
-- llm-box CLI（`llm-box --version`）
+- aflare CLI（`aflare --version`）
 - CANN Toolkit ≥ 7.0 + NPU 驱动（`npu-smi info` 可用）
 - PyTorch / MindSpore 昇腾适配版
 - MindIE（部署阶段）

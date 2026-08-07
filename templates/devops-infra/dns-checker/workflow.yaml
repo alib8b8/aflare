@@ -1,7 +1,7 @@
 name: DNS Records Checker
 # Check all DNS records for a domain
-# Usage: llm-box install networking/dns-checker
-#        llm-box run dns-checker/workflow.yaml
+# Usage: aflare install networking/dns-checker
+#        aflare run dns-checker/workflow.yaml
 
 steps:
   - node: execute

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate complete br
 ## Usage
 
 ```bash
-llm-box install creative/brand-identity
-llm-box run brand-identity/workflow.yaml
+aflare install creative/brand-identity
+aflare run brand-identity/workflow.yaml
 ```
 
 ## Parameters

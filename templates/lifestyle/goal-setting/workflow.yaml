@@ -1,7 +1,7 @@
 name: Goal Setting Workbook
 # Set SMART goals with action plans
-# Usage: llm-box install productivity-personal/goal-setting
-#        llm-box run goal-setting/workflow.yaml
+# Usage: aflare install productivity-personal/goal-setting
+#        aflare run goal-setting/workflow.yaml
 
 steps:
   - node: agent

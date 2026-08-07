@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate terraform/i
 ## Usage
 
 ```bash
-llm-box install cloud-infra/iac-template
-llm-box run iac-template/workflow.yaml
+aflare install cloud-infra/iac-template
+aflare run iac-template/workflow.yaml
 ```
 
 ## Parameters

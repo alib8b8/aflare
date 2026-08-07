@@ -1,7 +1,7 @@
 name: Landing Page Copy
 # Generate high-converting landing page copy
-# Usage: llm-box install marketing/landing-page-copy
-#        llm-box run landing-page-copy/workflow.yaml
+# Usage: aflare install marketing/landing-page-copy
+#        aflare run landing-page-copy/workflow.yaml
 
 steps:
   - node: agent

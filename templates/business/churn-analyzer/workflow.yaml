@@ -1,7 +1,7 @@
 name: Customer Churn Analyzer
 # Analyze customer churn and retention
-# Usage: llm-box install customer-support/churn-analyzer
-#        llm-box run churn-analyzer/workflow.yaml
+# Usage: aflare install customer-support/churn-analyzer
+#        aflare run churn-analyzer/workflow.yaml
 
 steps:
   - node: file_read

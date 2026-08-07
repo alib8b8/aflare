@@ -1,7 +1,7 @@
 name: Experiment Design
 # Rigorous experimental design for scientific research
-# Usage: llm-box install research/experiment-design
-#        llm-box run experiment-design/workflow.yaml
+# Usage: aflare install research/experiment-design
+#        aflare run experiment-design/workflow.yaml
 
 steps:
   - node: supervisor

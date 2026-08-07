@@ -1,7 +1,7 @@
 name: CSV Data Analyzer
 # Analyze CSV data files and generate insights
-# Usage: llm-box install data-analytics/csv-analyzer
-#        llm-box run csv-analyzer/workflow.yaml
+# Usage: aflare install data-analytics/csv-analyzer
+#        aflare run csv-analyzer/workflow.yaml
 
 steps:
   - node: file_read

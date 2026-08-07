@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for design saas pricing 
 ## Usage
 
 ```bash
-llm-box install business-sales/saas-pricing
-llm-box run saas-pricing/workflow.yaml
+aflare install business-sales/saas-pricing
+aflare run saas-pricing/workflow.yaml
 ```
 
 ## Parameters

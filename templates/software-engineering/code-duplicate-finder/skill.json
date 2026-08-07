@@ -3,7 +3,7 @@
   "name": "code-duplicate-finder",
   "version": "1.0.0",
   "description": "Scan codebase for duplicated code patterns",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "software-engineering",
   "tags": [
     "software-engineering",

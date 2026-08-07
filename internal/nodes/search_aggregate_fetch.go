@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -319,7 +319,7 @@ func fetchReddit(ctx context.Context, query string, limit int, timeRange string)
 	searchURL := fmt.Sprintf("https://www.reddit.com/search.json?q=%s&sort=top&t=%s&limit=%d",
 		url.QueryEscape(query), t, limit)
 
-	body, err := httpGet(ctx, searchURL, "llm-box/1.0")
+	body, err := httpGet(ctx, searchURL, "aflare/1.0")
 	if err != nil {
 		return nil
 	}

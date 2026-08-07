@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate interview q
 ## Usage
 
 ```bash
-llm-box install hr-recruiting/interview-questions
-llm-box run interview-questions/workflow.yaml
+aflare install hr-recruiting/interview-questions
+aflare run interview-questions/workflow.yaml
 ```
 
 ## Parameters

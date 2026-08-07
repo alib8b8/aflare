@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -449,11 +449,11 @@ func TestExpressionEngine_GetVariable(t *testing.T) {
 }
 
 func TestExpressionEngine_EnvVar(t *testing.T) {
-	os.Setenv("LLM_BOX_TEST_VAR", "hello")
-	defer os.Unsetenv("LLM_BOX_TEST_VAR")
+	os.Setenv("AFLARE_TEST_VAR", "hello")
+	defer os.Unsetenv("AFLARE_TEST_VAR")
 
 	engine := NewExpressionEngine()
-	result, err := engine.Evaluate("{{env.LLM_BOX_TEST_VAR}}", "")
+	result, err := engine.Evaluate("{{env.AFLARE_TEST_VAR}}", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -472,7 +472,7 @@ func TestExpressionEngine_EnvVar_Disallowed(t *testing.T) {
 
 func TestExpressionEngine_EnvVar_NotFound(t *testing.T) {
 	engine := NewExpressionEngine()
-	_, err := engine.Evaluate("{{env.LLM_BOX_NONEXISTENT_VAR_XYZ}}", "")
+	_, err := engine.Evaluate("{{env.AFLARE_NONEXISTENT_VAR_XYZ}}", "")
 	if err == nil {
 		t.Error("expected error for missing env var")
 	}
@@ -723,8 +723,8 @@ func TestIsAllowedEnvVar(t *testing.T) {
 	if !isAllowedEnvVar("PATH") {
 		t.Error("PATH should be allowed")
 	}
-	if !isAllowedEnvVar("llm_box_custom") {
-		t.Error("LLM_BOX_ prefix should be allowed")
+	if !isAllowedEnvVar("aflare_custom") {
+		t.Error("AFLARE_ prefix should be allowed")
 	}
 	if isAllowedEnvVar("SECRET") {
 		t.Error("SECRET should not be allowed")

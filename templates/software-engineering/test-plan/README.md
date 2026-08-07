@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate comprehensi
 ## Usage
 
 ```bash
-llm-box install quality-assurance/test-plan
-llm-box run test-plan/workflow.yaml
+aflare install quality-assurance/test-plan
+aflare run test-plan/workflow.yaml
 ```
 
 ## Parameters

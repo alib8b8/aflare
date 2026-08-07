@@ -1,6 +1,6 @@
 # Web UI Editor
 
-llm-box includes a built-in web-based workflow editor with visualization capabilities.
+aflare includes a built-in web-based workflow editor with visualization capabilities.
 
 ## Quick Start
 
@@ -8,16 +8,16 @@ llm-box includes a built-in web-based workflow editor with visualization capabil
 
 ```bash
 # Start on default port (8081)
-llm-box webui
+aflare webui
 
 # Start on custom port
-llm-box webui --port 8080
+aflare webui --port 8080
 
 # Start with custom host (accessible from network)
-llm-box webui --host 0.0.0.0 --port 8081
+aflare webui --host 0.0.0.0 --port 8081
 
 # Start with specific workflows directory
-llm-box webui --workflows-dir ./workflows
+aflare webui --workflows-dir ./workflows
 ```
 
 ### Access the UI
@@ -58,7 +58,7 @@ http://localhost:8081
 ┌─────────────────────────────────────────────────────────────┐
 │  Sidebar                    Main Area                      │
 │  ┌─────────────────┐  ┌─────────────────────────────────┐  │
-│  │ LLM Box         │  │ Toolbar (format, validate, save)│  │
+│  │ Aflare          │  │ Toolbar (format, validate, save)│  │
 │  ├─────────────────┤  ├─────────────────────────────────┤  │
 │  │ Workflow List   │  │ Tabs (Editor / Preview)         │  │
 │  │ - workflow1     │  │                                 │  │
@@ -116,16 +116,16 @@ curl -X POST "http://localhost:8081/api/visualize?format=mermaid" \
 
 | Variable | Description |
 |----------|-------------|
-| `LLM_BOX_WEBUI_HOST` | Default host |
-| `LLM_BOX_WEBUI_PORT` | Default port |
-| `LLM_BOX_WORKFLOWS_DIR` | Default workflows directory |
-| `LLM_BOX_METRICS` | Set to `1` to enable the Prometheus `/metrics` endpoint (disabled by default) |
-| `LLM_BOX_PPROF` | Set to `1` to enable the `/debug/pprof/` profiling endpoints (disabled by default) |
+| `AFLARE_WEBUI_HOST` | Default host |
+| `AFLARE_WEBUI_PORT` | Default port |
+| `AFLARE_WORKFLOWS_DIR` | Default workflows directory |
+| `AFLARE_METRICS` | Set to `1` to enable the Prometheus `/metrics` endpoint (disabled by default) |
+| `AFLARE_PPROF` | Set to `1` to enable the `/debug/pprof/` profiling endpoints (disabled by default) |
 
 ## Prometheus Metrics
 
 The Web UI server can expose a Prometheus `/metrics` endpoint that scrapes
-llm-box's internal statistics (node/workflow execution, security blocks, LLM
+aflare's internal statistics (node/workflow execution, security blocks, LLM
 calls, cache hits). The endpoint is **disabled by default** for security: it is
 unauthenticated (Prometheus scrapers usually carry no auth token) and exposes
 runtime statistics, so it should only be enabled on a trusted network or behind
@@ -133,10 +133,10 @@ a reverse proxy.
 
 ### Enabling the endpoint
 
-Set `LLM_BOX_METRICS=1` before starting the server:
+Set `AFLARE_METRICS=1` before starting the server:
 
 ```bash
-LLM_BOX_METRICS=1 llm-box webui --host 0.0.0.0 --port 8081
+AFLARE_METRICS=1 aflare webui --host 0.0.0.0 --port 8081
 ```
 
 The endpoint is then available at `http://localhost:8081/metrics`. It is
@@ -148,7 +148,7 @@ convention.
 
 ```yaml
 scrape_configs:
-  - job_name: "llm-box"
+  - job_name: "aflare"
     static_configs:
       - targets: ["localhost:8081"]
     metrics_path: /metrics
@@ -207,7 +207,7 @@ scrape from the existing internal stats accumulators via `CollectSnapshot`.
 
 ### UI Not Accessible
 
-1. Check if the server is running: `llm-box webui`
+1. Check if the server is running: `aflare webui`
 2. Verify the port: `netstat -tlnp | grep 8081`
 3. Check firewall rules
 4. Try accessing with `--host 0.0.0.0`
@@ -230,13 +230,13 @@ For production deployments:
 
 ```ini
 [Unit]
-Description=llm-box WebUI
+Description=aflare WebUI
 After=network.target
 
 [Service]
 Type=simple
 User=youruser
-ExecStart=/usr/local/bin/llm-box webui --host 0.0.0.0 --port 8081
+ExecStart=/usr/local/bin/aflare webui --host 0.0.0.0 --port 8081
 Restart=on-failure
 
 [Install]

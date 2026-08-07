@@ -1,4 +1,4 @@
-# Loop Budget — llm-box
+# Loop Budget — aflare
 
 ## Daily Budget
 

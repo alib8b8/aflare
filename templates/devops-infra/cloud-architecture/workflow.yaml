@@ -1,7 +1,7 @@
 name: Cloud Architecture Diagram
 # Generate cloud architecture design
-# Usage: llm-box install cloud-infra/cloud-architecture
-#        llm-box run cloud-architecture/workflow.yaml
+# Usage: aflare install cloud-infra/cloud-architecture
+#        aflare run cloud-architecture/workflow.yaml
 
 steps:
   - node: agent

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate comprehensi
 ## Usage
 
 ```bash
-llm-box install writing-content/ebook-outline
-llm-box run ebook-outline/workflow.yaml
+aflare install writing-content/ebook-outline
+aflare run ebook-outline/workflow.yaml
 ```
 
 ## Parameters

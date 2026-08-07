@@ -1,10 +1,10 @@
-# llm-box Extension
+# aflare Extension
 
-llm-box is a terminal-first workflow automation engine. It generates executable YAML workflows from plain English descriptions.
+aflare is a terminal-first workflow automation engine. It generates executable YAML workflows from plain English descriptions.
 
 ## When to Use
 
-Use llm-box when the user wants to:
+Use aflare when the user wants to:
 
 - **Automate multi-step terminal tasks** — fetching data, processing it, saving results
 - **Create reusable pipelines** — workflows that can be run repeatedly
@@ -19,7 +19,7 @@ Use llm-box when the user wants to:
 Plain English description → YAML workflow → Execute with progress
 ```
 
-llm-box generates a YAML workflow file from a natural language description.
+aflare generates a YAML workflow file from a natural language description.
 The workflow is deterministic and reproducible — same workflow always produces
 the same result. Users can edit the YAML by hand if they want to tweak things.
 
@@ -39,22 +39,22 @@ This extension provides the following MCP tools:
 
 ```bash
 # Generate a workflow from plain English
-llm-box create "<description>"
+aflare create "<description>"
 
 # Run a workflow file
-llm-box run <workflow.yaml>
+aflare run <workflow.yaml>
 
 # List all available nodes
-llm-box list
+aflare list
 
 # Validate a workflow file without running
-llm-box validate <workflow.yaml>
+aflare validate <workflow.yaml>
 
 # Run in safe mode (disables execute node)
-llm-box --safe-mode run <workflow.yaml>
+aflare --safe-mode run <workflow.yaml>
 
 # Dry run (show steps without executing)
-llm-box --dry-run run <workflow.yaml>
+aflare --dry-run run <workflow.yaml>
 ```
 
 ### Available Nodes
@@ -96,16 +96,16 @@ llm-box --dry-run run <workflow.yaml>
 
 ## Installation
 
-If llm-box is not installed, install it first:
+If aflare is not installed, install it first:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh && bash install.sh
+curl -sL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh -o install.sh && bash install.sh
 ```
 
 Or build from source:
 
 ```bash
-go install github.com/alib8b8/llm-box/cmd/llm-box@latest
+go install github.com/alib8b8/aflare/cmd/aflare@latest
 ```
 
 ## Best Practices

@@ -1,6 +1,6 @@
-# Contributing to llm-box
+# Contributing to aflare
 
-Welcome to llm-box! We appreciate your interest in contributing. This guide will help you get started.
+Welcome to aflare! We appreciate your interest in contributing. This guide will help you get started.
 
 ## 🌟 Good First Issues
 
@@ -8,11 +8,11 @@ New to the project? Start here — these issues are specifically curated for fir
 
 | Category | Description | How to Find |
 |----------|-------------|-------------|
-| 🐛 **Bug Fixes** | Small, well-defined bugs with clear reproduction steps | [`good first issue` label](https://github.com/alib8b8/llm-box/labels/good%20first%20issue) |
-| 📝 **Documentation** | Typos, clarifications, missing examples | [`documentation` label](https://github.com/alib8b8/llm-box/labels/documentation) |
+| 🐛 **Bug Fixes** | Small, well-defined bugs with clear reproduction steps | [`good first issue` label](https://github.com/alib8b8/aflare/labels/good%20first%20issue) |
+| 📝 **Documentation** | Typos, clarifications, missing examples | [`documentation` label](https://github.com/alib8b8/aflare/labels/documentation) |
 | ✅ **Tests** | Add test coverage for low-coverage packages | See "Test Coverage" section below |
 | 🔧 **New Nodes** | Build a new utility or external node | [Custom Nodes Guide](docs/custom-nodes.md) |
-| 🌐 **i18n** | Add or improve translations | [`i18n` label](https://github.com/alib8b8/llm-box/labels/i18n) |
+| 🌐 **i18n** | Add or improve translations | [`i18n` label](https://github.com/alib8b8/aflare/labels/i18n) |
 
 ### Test Coverage Targets
 
@@ -30,9 +30,9 @@ Help us reach our 85% coverage goal! These packages need the most love:
 ## 📋 Getting Started
 
 1. **Fork the repository**
-2. **Clone your fork**: `git clone https://github.com/your-username/llm-box.git`
+2. **Clone your fork**: `git clone https://github.com/your-username/aflare.git`
 3. **Install dependencies**: `go mod download`
-4. **Build locally**: `go build -o llm-box ./cmd/llm-box`
+4. **Build locally**: `go build -o aflare ./cmd/aflare`
 5. **Create a branch**: `git checkout -b feature/your-feature-name`
 6. **Make changes**
 7. **Run tests**: `go test ./... -short`
@@ -163,7 +163,7 @@ go test -v ./...
 
 ## 🚀 Performance Benchmarks
 
-We track performance to ensure llm-box stays fast. Here's how to run and write benchmarks.
+We track performance to ensure aflare stays fast. Here's how to run and write benchmarks.
 
 ### Running Benchmarks
 

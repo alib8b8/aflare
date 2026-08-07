@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for manage and backup do
 ## Usage
 
 ```bash
-llm-box install environment-setup/dotfiles-manager
-llm-box run dotfiles-manager/workflow.yaml
+aflare install environment-setup/dotfiles-manager
+aflare run dotfiles-manager/workflow.yaml
 ```
 
 ## Parameters

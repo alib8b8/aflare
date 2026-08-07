@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate whitepaper 
 ## Usage
 
 ```bash
-llm-box install writing-content/whitepaper
-llm-box run whitepaper/workflow.yaml
+aflare install writing-content/whitepaper
+aflare run whitepaper/workflow.yaml
 ```
 
 ## Parameters

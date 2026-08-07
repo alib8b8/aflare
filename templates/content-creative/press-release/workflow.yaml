@@ -1,7 +1,7 @@
 name: Press Release Generator
 # Generate professional press release
-# Usage: llm-box install writing-content/press-release
-#        llm-box run press-release/workflow.yaml
+# Usage: aflare install writing-content/press-release
+#        aflare run press-release/workflow.yaml
 
 steps:
   - node: agent

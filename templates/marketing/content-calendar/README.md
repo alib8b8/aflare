@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate monthly con
 ## Usage
 
 ```bash
-llm-box install marketing/content-calendar
-llm-box run content-calendar/workflow.yaml
+aflare install marketing/content-calendar
+aflare run content-calendar/workflow.yaml
 ```
 
 ## Parameters

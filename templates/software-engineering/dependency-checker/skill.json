@@ -3,7 +3,7 @@
   "name": "dependency-checker",
   "version": "1.0.0",
   "description": "Check project dependencies for updates and vulnerabilities",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "software-engineering",
   "tags": [
     "software-engineering",

@@ -1,7 +1,7 @@
 name: Privacy Policy Generator
 # Generate privacy policy template
-# Usage: llm-box install legal/privacy-policy
-#        llm-box run privacy-policy/workflow.yaml
+# Usage: aflare install legal/privacy-policy
+#        aflare run privacy-policy/workflow.yaml
 
 steps:
   - node: agent

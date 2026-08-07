@@ -1,7 +1,7 @@
 name: Flashcard Generator
 # Generate flashcards from study material
-# Usage: llm-box install education/flashcards
-#        llm-box run flashcards/workflow.yaml
+# Usage: aflare install education/flashcards
+#        aflare run flashcards/workflow.yaml
 
 steps:
   - node: file_read

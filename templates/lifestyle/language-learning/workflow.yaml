@@ -1,7 +1,7 @@
 name: Language Learning Plan
 # Create language learning curriculum
-# Usage: llm-box install education/language-learning
-#        llm-box run language-learning/workflow.yaml
+# Usage: aflare install education/language-learning
+#        aflare run language-learning/workflow.yaml
 
 steps:
   - node: agent

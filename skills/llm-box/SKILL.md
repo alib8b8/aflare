@@ -1,10 +1,10 @@
 ---
-name: llm-box
-description: Generate and execute terminal workflows using llm-box. Use when the user wants to automate multi-step terminal tasks, chain commands, fetch URLs, process data, create reusable pipelines, or build CI/CD-like automation locally.
+name: aflare
+description: Generate and execute terminal workflows using aflare. Use when the user wants to automate multi-step terminal tasks, chain commands, fetch URLs, process data, create reusable pipelines, or build CI/CD-like automation locally.
 invocation: both
 allowed-tools: Read, Edit, Write, Bash, Glob, Grep, WebFetch
 version: 0.6.0
-author: llm-box
+author: aflare
 license: AGPL-3.0
 compatibility: claude-code >= 0.7.0
 tags: [workflow, automation, cli, pipeline, terminal]
@@ -12,7 +12,7 @@ tags: [workflow, automation, cli, pipeline, terminal]
 
 ## Overview
 
-llm-box is an AI-powered terminal workflow engine that generates and executes multi-step automation pipelines from natural language descriptions. It supports 30+ agent nodes including LLM providers, code analysis, file operations, web fetching, and system integrations. Workflows are defined as deterministic YAML files that can be version-controlled and reused.
+aflare is an AI-powered terminal workflow engine that generates and executes multi-step automation pipelines from natural language descriptions. It supports 30+ agent nodes including LLM providers, code analysis, file operations, web fetching, and system integrations. Workflows are defined as deterministic YAML files that can be version-controlled and reused.
 
 Key features:
 - Natural language to YAML workflow generation
@@ -23,7 +23,7 @@ Key features:
 
 ## Prerequisites
 
-- llm-box CLI installed (`go install github.com/alib8b8/llm-box/cmd/llm-box@latest`)
+- aflare CLI installed (`go install github.com/alib8b8/aflare/cmd/aflare@latest`)
 - Go 1.21+ or a pre-built binary
 - Optional: Ollama for local LLM inference
 
@@ -38,22 +38,22 @@ Key features:
 
 ```bash
 # Generate a workflow from plain English
-llm-box create "fetch weather data and save to file"
+aflare create "fetch weather data and save to file"
 
 # Run a workflow file
-llm-box run workflow.yaml
+aflare run workflow.yaml
 
 # List all available nodes
-llm-box list
+aflare list
 
 # Validate a workflow without executing
-llm-box validate workflow.yaml
+aflare validate workflow.yaml
 
 # Dry run (show steps without executing)
-llm-box --dry-run run workflow.yaml
+aflare --dry-run run workflow.yaml
 
 # Safe mode (disables execute node)
-llm-box --safe-mode run workflow.yaml
+aflare --safe-mode run workflow.yaml
 ```
 
 ### Available Nodes
@@ -155,8 +155,8 @@ steps:
 
 ## Resources
 
-- **GitHub**: https://github.com/alib8b8/llm-box
-- **GitCode**: https://gitcode.com/llm-box/llm-box
-- **Documentation**: https://gitcode.com/llm-box/llm-box/blob/main/README.md
-- **Issues**: https://github.com/alib8b8/llm-box/issues
+- **GitHub**: https://github.com/alib8b8/aflare
+- **GitCode**: https://gitcode.com/aflare/aflare
+- **Documentation**: https://gitcode.com/aflare/aflare/blob/main/README.md
+- **Issues**: https://github.com/alib8b8/aflare/issues
 - **License**: AGPL-3.0

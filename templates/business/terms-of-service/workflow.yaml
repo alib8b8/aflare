@@ -1,7 +1,7 @@
 name: Terms of Service Generator
 # Generate terms of service agreement
-# Usage: llm-box install legal/terms-of-service
-#        llm-box run terms-of-service/workflow.yaml
+# Usage: aflare install legal/terms-of-service
+#        aflare run terms-of-service/workflow.yaml
 
 steps:
   - node: agent

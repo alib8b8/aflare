@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate faq from su
 ## Usage
 
 ```bash
-llm-box install customer-support/faq-generator
-llm-box run faq-generator/workflow.yaml
+aflare install customer-support/faq-generator
+aflare run faq-generator/workflow.yaml
 ```
 
 ## Parameters

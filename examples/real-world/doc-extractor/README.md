@@ -29,7 +29,7 @@ flowchart TD
 
 | 参数 | 说明 | 默认值 | 必填 |
 |------|------|--------|------|
-| `source_url` | 待抓取的文档 URL（http/https/raw） | llm-box 仓库 README | 否 |
+| `source_url` | 待抓取的文档 URL（http/https/raw） | aflare 仓库 README | 否 |
 | `extraction_schema` | 期望抽取的 JSON 结构（提示 Agent 用） | `{"title","summary","key_features","install_cmd"}` | 否 |
 | `provider` | LLM 供应商 | `ollama` | 否 |
 | `model` | 模型名 | `llama3` | 否 |
@@ -38,15 +38,15 @@ flowchart TD
 ## 运行命令
 
 ```bash
-# 1. 默认：抓取 llm-box README 并提取标题/摘要/安装命令
-llm-box run examples/real-world/doc-extractor/workflow.yaml
+# 1. 默认：抓取 aflare README 并提取标题/摘要/安装命令
+aflare run examples/real-world/doc-extractor/workflow.yaml
 
 # 2. 抓取任意 URL
-llm-box run examples/real-world/doc-extractor/workflow.yaml \
+aflare run examples/real-world/doc-extractor/workflow.yaml \
   --var source_url=https://example.com/product-docs
 
 # 3. 用云端模型（更强抽取能力）
-llm-box run examples/real-world/doc-extractor/workflow.yaml \
+aflare run examples/real-world/doc-extractor/workflow.yaml \
   --var provider=deepseek --var model=deepseek-chat
 ```
 
@@ -64,7 +64,7 @@ Document extracted. JSON saved to extracted-doc.json.
 
 ```json
 {
-  "title": "llm-box",
+  "title": "aflare",
   "summary": "A workflow engine and multi-model agent runtime for building AI-powered automation pipelines.",
   "key_features": [
     "100+ workflow nodes",
@@ -72,7 +72,7 @@ Document extracted. JSON saved to extracted-doc.json.
     "YAML-based workflow definition",
     "MCP protocol support"
   ],
-  "install_cmd": "curl -fsSL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash"
+  "install_cmd": "curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash"
 }
 ```
 
@@ -89,7 +89,7 @@ Document extracted. JSON saved to extracted-doc.json.
 ```
 
 ## Field Highlights
-- **Title:** llm-box
+- **Title:** aflare
 - **Summary:** A workflow engine and multi-model agent runtime...
 - **Install command:** `curl -fsSL ... | bash`
 ```

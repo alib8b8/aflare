@@ -127,7 +127,7 @@ steps:
         {{step.review}}
 
         ---
-        *本报告由 llm-box AML review workflow 生成，LLM 推理运行于昇腾 Ascend NPU。*
+        *本报告由 aflare AML review workflow 生成，LLM 推理运行于昇腾 Ascend NPU。*
         *全链路审计日志（HMAC 哈希链）已自动记录。*
 
   # ── Step 5: 落盘报告 ──

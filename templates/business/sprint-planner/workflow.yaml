@@ -1,7 +1,7 @@
 name: Sprint Planner
 # Plan and organize sprint tasks
-# Usage: llm-box install project-management/sprint-planner
-#        llm-box run sprint-planner/workflow.yaml
+# Usage: aflare install project-management/sprint-planner
+#        aflare run sprint-planner/workflow.yaml
 
 steps:
   - node: file_read

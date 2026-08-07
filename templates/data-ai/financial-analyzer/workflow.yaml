@@ -1,7 +1,7 @@
 name: Financial Report Analyzer
 # Analyze financial reports and key metrics
-# Usage: llm-box install data-analytics/financial-analyzer
-#        llm-box run financial-analyzer/workflow.yaml
+# Usage: aflare install data-analytics/financial-analyzer
+#        aflare run financial-analyzer/workflow.yaml
 
 steps:
   - node: file_read

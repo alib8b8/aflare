@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: 为 llm-box 提议一个新功能
+about: 为 aflare 提议一个新功能
 title: "[Feature]: "
 labels: enhancement
 assignees: ''

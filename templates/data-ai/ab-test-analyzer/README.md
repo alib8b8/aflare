@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for analyze a/b test res
 ## Usage
 
 ```bash
-llm-box install data-analytics/ab-test-analyzer
-llm-box run ab-test-analyzer/workflow.yaml
+aflare install data-analytics/ab-test-analyzer
+aflare run ab-test-analyzer/workflow.yaml
 ```
 
 ## Parameters

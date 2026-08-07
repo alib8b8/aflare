@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate song lyrics
 ## Usage
 
 ```bash
-llm-box install creative/song-lyrics
-llm-box run song-lyrics/workflow.yaml
+aflare install creative/song-lyrics
+aflare run song-lyrics/workflow.yaml
 ```
 
 ## Parameters

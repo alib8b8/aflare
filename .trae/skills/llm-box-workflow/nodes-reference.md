@@ -1,6 +1,6 @@
-# llm-box Node Reference
+# aflare Node Reference
 
-Complete catalog of built-in nodes available in llm-box workflows.
+Complete catalog of built-in nodes available in aflare workflows.
 
 ## Utility Nodes
 
@@ -35,7 +35,7 @@ Full HTTP client. Any method, headers, body. Returns response body and status co
 ```yaml
 - node: http_request
   params:
-    url: "https://api.github.com/repos/alib8b8/llm-box"
+    url: "https://api.github.com/repos/alib8b8/aflare"
     method: "GET"
     headers:
       Authorization: "Bearer ghp_xxx"
@@ -301,20 +301,20 @@ steps:
 
 ## External Nodes
 
-llm-box supports external nodes installed via the registry:
+aflare supports external nodes installed via the registry:
 
 ```bash
 # List available external nodes
-llm-box registry list
+aflare registry list
 
 # Search for a node
-llm-box registry search weather
+aflare registry search weather
 
 # Install an external node
-llm-box install weather-api
+aflare install weather-api
 
 # Uninstall
-llm-box uninstall weather-api
+aflare uninstall weather-api
 ```
 
-Installed external nodes appear in `llm-box list` and can be used like built-in nodes.
+Installed external nodes appear in `aflare list` and can be used like built-in nodes.

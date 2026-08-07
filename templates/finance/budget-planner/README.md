@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for create personal budg
 ## Usage
 
 ```bash
-llm-box install finance-investing/budget-planner
-llm-box run budget-planner/workflow.yaml
+aflare install finance-investing/budget-planner
+aflare run budget-planner/workflow.yaml
 ```
 
 ## Parameters

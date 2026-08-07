@@ -1,10 +1,10 @@
 # Custom Nodes
 
-llm-box allows you to build custom nodes in any programming language. Custom nodes extend the workflow engine with new functionality.
+aflare allows you to build custom nodes in any programming language. Custom nodes extend the workflow engine with new functionality.
 
 ## Overview
 
-Custom nodes are external scripts that communicate with llm-box via stdin/stdout using JSON protocol. This allows you to write nodes in:
+Custom nodes are external scripts that communicate with aflare via stdin/stdout using JSON protocol. This allows you to write nodes in:
 
 - Python
 - Node.js
@@ -16,7 +16,7 @@ Custom nodes are external scripts that communicate with llm-box via stdin/stdout
 
 ### stdin Input
 
-llm-box sends JSON input to the custom node via stdin:
+aflare sends JSON input to the custom node via stdin:
 
 ```json
 {
@@ -40,14 +40,14 @@ The custom node must return JSON output via stdout:
 
 ### Environment Variables
 
-llm-box sets the following environment variables:
+aflare sets the following environment variables:
 
 | Variable | Description |
 |----------|-------------|
-| `LLM_BOX_NODE_NAME` | Name of the node |
-| `LLM_BOX_WORKFLOW_NAME` | Name of the current workflow |
-| `LLM_BOX_STEP_INDEX` | Zero-based step index |
-| `LLM_BOX_SECRETS_PASSWORD` | Secrets password (if set) |
+| `AFLARE_NODE_NAME` | Name of the node |
+| `AFLARE_WORKFLOW_NAME` | Name of the current workflow |
+| `AFLARE_STEP_INDEX` | Zero-based step index |
+| `AFLARE_SECRETS_PASSWORD` | Secrets password (if set) |
 
 ### Sensitive Data Filtering
 
@@ -62,10 +62,10 @@ Sensitive parameters (API keys, passwords, secrets) are automatically filtered f
 
 ## Directory Structure
 
-Custom nodes are stored in `~/.llm-box/nodes/`:
+Custom nodes are stored in `~/.aflare/nodes/`:
 
 ```
-~/.llm-box/nodes/
+~/.aflare/nodes/
 ├── my_custom_node/
 │   ├── node.json      # Node metadata
 │   └── main.py        # Node implementation
@@ -122,13 +122,13 @@ Custom nodes are stored in `~/.llm-box/nodes/`:
 ### Step 1: Create Node Directory
 
 ```bash
-mkdir -p ~/.llm-box/nodes/my_custom_node
+mkdir -p ~/.aflare/nodes/my_custom_node
 ```
 
 ### Step 2: Create Metadata
 
 ```json
-// ~/.llm-box/nodes/my_custom_node/node.json
+// ~/.aflare/nodes/my_custom_node/node.json
 {
   "name": "my_custom_node",
   "description": "Echo input with custom prefix",
@@ -152,7 +152,7 @@ mkdir -p ~/.llm-box/nodes/my_custom_node
 
 ```python
 #!/usr/bin/env python3
-# ~/.llm-box/nodes/my_custom_node/main.py
+# ~/.aflare/nodes/my_custom_node/main.py
 
 import sys
 import json
@@ -181,7 +181,7 @@ if __name__ == "__main__":
 ### Step 4: Make Executable
 
 ```bash
-chmod +x ~/.llm-box/nodes/my_custom_node/main.py
+chmod +x ~/.aflare/nodes/my_custom_node/main.py
 ```
 
 ### Step 5: Use in Workflow
@@ -288,13 +288,13 @@ func main() {
 ### Manual Testing
 
 ```bash
-echo '{"input": "test", "params": {"prefix": "Test: "}}' | python3 ~/.llm-box/nodes/my_custom_node/main.py
+echo '{"input": "test", "params": {"prefix": "Test: "}}' | python3 ~/.aflare/nodes/my_custom_node/main.py
 ```
 
-### Using llm-box run-node
+### Using aflare run-node
 
 ```bash
-llm-box run-node my_custom_node --input "Hello" --params '{"prefix": "Output: "}'
+aflare run-node my_custom_node --input "Hello" --params '{"prefix": "Output: "}'
 ```
 
 ### Integration Testing
@@ -345,7 +345,7 @@ Return errors via stdout with "error" field:
 ### Viewing Logs
 
 ```bash
-tail -f ~/.llm-box/logs/audit.log | grep my_custom_node
+tail -f ~/.aflare/logs/audit.log | grep my_custom_node
 ```
 
 ## Advanced Features
@@ -364,7 +364,7 @@ steps:
 **Note**: Sensitive parameters are filtered from the params passed to external nodes. Access secrets through environment variables instead:
 
 ```bash
-SECRET=$(llm-box secrets get --group api --key service)
+SECRET=$(aflare secrets get --group api --key service)
 ```
 
 ### Using Environment Variables
@@ -372,8 +372,8 @@ SECRET=$(llm-box secrets get --group api --key service)
 ```python
 import os
 
-workflow_name = os.environ.get("LLM_BOX_WORKFLOW_NAME", "unknown")
-step_index = os.environ.get("LLM_BOX_STEP_INDEX", "0")
+workflow_name = os.environ.get("AFLARE_WORKFLOW_NAME", "unknown")
+step_index = os.environ.get("AFLARE_STEP_INDEX", "0")
 ```
 
 ### Binary Data
@@ -431,17 +431,17 @@ my-custom-node/
 
 ### Installation
 
-Users can install your node by cloning to `~/.llm-box/nodes/`:
+Users can install your node by cloning to `~/.aflare/nodes/`:
 
 ```bash
-git clone https://github.com/yourname/my-custom-node ~/.llm-box/nodes/my-custom-node
+git clone https://github.com/yourname/my-custom-node ~/.aflare/nodes/my-custom-node
 ```
 
 ## Troubleshooting
 
 ### Node Not Found
 
-1. Check directory structure: `ls ~/.llm-box/nodes/my_custom_node/`
+1. Check directory structure: `ls ~/.aflare/nodes/my_custom_node/`
 2. Verify `node.json` exists and has correct format
 3. Check entrypoint script is executable
 4. Verify node name matches exactly

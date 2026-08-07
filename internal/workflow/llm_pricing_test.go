@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -98,7 +98,7 @@ func TestComputeLLMCost_OnlyCompletionTokens(t *testing.T) {
 	}
 }
 
-// TestPricingOverride_File loads a JSON override via LLM_BOX_PRICING_FILE and
+// TestPricingOverride_File loads a JSON override via AFLARE_PRICING_FILE and
 // confirms it both ADDS a new model and OVERRIDES an existing default. This is
 // the operator escape hatch for unlisted/renegotiated prices without a code
 // change. Uses t.Setenv so the process-wide sync.Once snapshot is taken with
@@ -133,7 +133,7 @@ func TestPricingOverride_File(t *testing.T) {
 	// the swap is race-free.
 	pricingOnce = &sync.Once{}
 	pricingResolved = nil
-	// t.Setenv restores LLM_BOX_PRICING_FILE to "" on exit; reset the cache
+	// t.Setenv restores AFLARE_PRICING_FILE to "" on exit; reset the cache
 	// again so any later test re-resolves against the (now-empty) env and
 	// picks up defaults, rather than inheriting this test's override.
 	t.Cleanup(func() {

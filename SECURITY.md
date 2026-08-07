@@ -8,7 +8,7 @@
 
 ## Reporting Security Issues
 
-If you discover a security vulnerability in llm-box, please report it immediately. We take security seriously and will respond promptly.
+If you discover a security vulnerability in aflare, please report it immediately. We take security seriously and will respond promptly.
 
 ### How to Report
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -22,7 +22,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/alib8b8/llm-box/internal/logger"
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 type TemplateVar struct {

@@ -3,7 +3,7 @@
   "name": "security-audit",
   "version": "1.0.0",
   "description": "Run security audit checklist on a project",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "devops-infra",
   "tags": [
     "devops-infra",

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for build detailed custo
 ## Usage
 
 ```bash
-llm-box install business-sales/customer-persona
-llm-box run customer-persona/workflow.yaml
+aflare install business-sales/customer-persona
+aflare run customer-persona/workflow.yaml
 ```
 
 ## Parameters

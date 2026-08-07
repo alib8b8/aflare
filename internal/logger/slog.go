@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -70,7 +70,7 @@ func (a *SlogAdapter) Error(msg string, args ...any) {
 
 // InitSlog initializes the slog logger from environment variables. It reads
 // LOG_FORMAT (json/text) and LOG_LEVEL (debug/info/warn/error). If those are
-// not set, it falls back to LLM_BOX_LOG_FORMAT and LLM_BOX_LOG_LEVEL. This is
+// not set, it falls back to AFLARE_LOG_FORMAT and AFLARE_LOG_LEVEL. This is
 // safe to call multiple times to reconfigure the logger at runtime.
 func InitSlog() {
 	level := getLevelFromInit()
@@ -79,11 +79,11 @@ func InitSlog() {
 	initLogger(level, format, output)
 }
 
-// getLevelFromInit reads LOG_LEVEL first, falling back to LLM_BOX_LOG_LEVEL.
+// getLevelFromInit reads LOG_LEVEL first, falling back to AFLARE_LOG_LEVEL.
 func getLevelFromInit() slog.Level {
 	envLevel := strings.ToLower(strings.TrimSpace(os.Getenv("LOG_LEVEL")))
 	if envLevel == "" {
-		envLevel = strings.ToLower(strings.TrimSpace(os.Getenv("LLM_BOX_LOG_LEVEL")))
+		envLevel = strings.ToLower(strings.TrimSpace(os.Getenv("AFLARE_LOG_LEVEL")))
 	}
 	switch envLevel {
 	case "debug":
@@ -99,11 +99,11 @@ func getLevelFromInit() slog.Level {
 	}
 }
 
-// getFormatFromInit reads LOG_FORMAT first, falling back to LLM_BOX_LOG_FORMAT.
+// getFormatFromInit reads LOG_FORMAT first, falling back to AFLARE_LOG_FORMAT.
 func getFormatFromInit() string {
 	format := strings.ToLower(strings.TrimSpace(os.Getenv("LOG_FORMAT")))
 	if format == "" {
-		format = strings.ToLower(strings.TrimSpace(os.Getenv("LLM_BOX_LOG_FORMAT")))
+		format = strings.ToLower(strings.TrimSpace(os.Getenv("AFLARE_LOG_FORMAT")))
 	}
 	if format == "json" || format == "text" {
 		return format

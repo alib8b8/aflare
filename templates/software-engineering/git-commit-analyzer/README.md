@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for analyze git commit h
 ## Usage
 
 ```bash
-llm-box install developer-tools/git-commit-analyzer
-llm-box run git-commit-analyzer/workflow.yaml
+aflare install developer-tools/git-commit-analyzer
+aflare run git-commit-analyzer/workflow.yaml
 ```
 
 ## Parameters

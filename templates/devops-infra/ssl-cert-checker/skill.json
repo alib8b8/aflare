@@ -3,7 +3,7 @@
   "name": "ssl-cert-checker",
   "version": "1.0.0",
   "description": "Check SSL certificate expiry for domains",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "devops-infra",
   "tags": [
     "devops-infra",

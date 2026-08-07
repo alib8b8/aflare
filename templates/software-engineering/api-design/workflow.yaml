@@ -1,7 +1,7 @@
 name: REST API Design Guide
 # Generate RESTful API design specification
-# Usage: llm-box install api-development/api-design
-#        llm-box run api-design/workflow.yaml
+# Usage: aflare install api-development/api-design
+#        aflare run api-design/workflow.yaml
 
 steps:
   - node: agent

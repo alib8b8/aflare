@@ -1,7 +1,7 @@
 name: README Generator
 # Generate project README.md
-# Usage: llm-box install documentation/readme-generator
-#        llm-box run readme-generator/workflow.yaml
+# Usage: aflare install documentation/readme-generator
+#        aflare run readme-generator/workflow.yaml
 
 steps:
   - node: execute

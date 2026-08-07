@@ -1,23 +1,23 @@
 version: 2
 
-project_name: llm-box
+project_name: aflare
 
 before:
   hooks:
     - go mod tidy
 
 builds:
-  - id: llm-box
-    main: ./cmd/llm-box
-    binary: llm-box
+  - id: aflare
+    main: ./cmd/aflare
+    binary: aflare
     env:
       - CGO_ENABLED=0
     flags:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/alib8b8/llm-box/internal/version.Version={{.Tag}}
-      - -X github.com/alib8b8/llm-box/internal/version.BuildDate={{.Date}}
+      - -X github.com/alib8b8/aflare/internal/version.Version={{.Tag}}
+      - -X github.com/alib8b8/aflare/internal/version.BuildDate={{.Date}}
     goos:
       - linux
       - darwin
@@ -58,16 +58,16 @@ changelog:
 release:
   github:
     owner: alib8b8
-    name: llm-box
-  name_template: "llm-box {{ .Tag }}"
+    name: aflare
+  name_template: "aflare {{ .Tag }}"
   footer: |
     ### Install (Linux / macOS)
     Download the install script from the repository and run it locally:
-    https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh
+    https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh
 
 nfpms:
   - id: packages
-    package_name: llm-box
+    package_name: aflare
     description: Terminal-first AI workflow engine
     maintainer: alib8b8
     license: AGPL-3.0
@@ -76,4 +76,4 @@ nfpms:
       - rpm
     contents:
       - src: install.sh
-        dst: /usr/share/llm-box/install.sh
+        dst: /usr/share/aflare/install.sh

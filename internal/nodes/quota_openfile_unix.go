@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // Unix-only: O_NOFOLLOW is available via syscall. The os package does not
 // re-export it, so we pull it here on non-Windows builds.

@@ -1,7 +1,7 @@
 name: API Documentation Builder
 # Build API documentation from spec
-# Usage: llm-box install documentation/api-docs-builder
-#        llm-box run api-docs-builder/workflow.yaml
+# Usage: aflare install documentation/api-docs-builder
+#        aflare run api-docs-builder/workflow.yaml
 
 steps:
   - node: file_read

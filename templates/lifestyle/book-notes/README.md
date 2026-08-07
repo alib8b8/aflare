@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate comprehensi
 ## Usage
 
 ```bash
-llm-box install productivity-personal/book-notes
-llm-box run book-notes/workflow.yaml
+aflare install productivity-personal/book-notes
+aflare run book-notes/workflow.yaml
 ```
 
 ## Parameters

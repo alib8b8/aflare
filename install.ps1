@@ -1,8 +1,8 @@
 $ErrorActionPreference = "Stop"
 
-$BINARY_NAME = "llm-box"
-$REPO = "alib8b8/llm-box"
-$GITCODE_REPO = "llm-box/llm-box"
+$BINARY_NAME = "aflare"
+$REPO = "alib8b8/aflare"
+$GITCODE_REPO = "aflare/aflare"
 
 function Write-Info($msg)    { Write-Host "[INFO] " -ForegroundColor Cyan -NoNewline; Write-Host $msg }
 function Write-Success($msg) { Write-Host "[OK] "   -ForegroundColor Green -NoNewline; Write-Host $msg }
@@ -83,7 +83,7 @@ function Detect-Region {
 
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════╗"
-Write-Host "║         llm-box 安装向导                 ║"
+Write-Host "║         aflare 安装向导                 ║"
 Write-Host "║   AI Workflow Engine Installer          ║"
 Write-Host "╚══════════════════════════════════════════╝"
 Write-Host ""
@@ -115,7 +115,7 @@ $archiveName = "$BINARY_NAME-$($plat.OS)-$($plat.Arch).zip"
 $downloadUrl = "https://github.com/$REPO/releases/download/$version/$archiveName"
 $checksumsUrl = "https://github.com/$REPO/releases/download/$version/checksums.txt"
 
-$tmpDir = Join-Path $env:TEMP "llm-box-install-$(Get-Random)"
+$tmpDir = Join-Path $env:TEMP "aflare-install-$(Get-Random)"
 New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
 
 $archivePath = Join-Path $tmpDir $archiveName
@@ -140,7 +140,7 @@ if (-not (Test-Path $exePath)) {
     exit 1
 }
 
-$installDir = Join-Path $env:LOCALAPPDATA "Programs\llm-box"
+$installDir = Join-Path $env:LOCALAPPDATA "Programs\aflare"
 Write-Info "安装到 $installDir..."
 if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Path $installDir -Force | Out-Null
@@ -163,9 +163,9 @@ Write-Host "║           安装完成！🎉                   ║"
 Write-Host "╚══════════════════════════════════════════╝"
 Write-Host ""
 Write-Host "快速开始："
-Write-Host "  llm-box --help"
-Write-Host "  llm-box create `"Summarize today's AI news`""
-Write-Host "  llm-box run your-workflow.yaml"
+Write-Host "  aflare --help"
+Write-Host "  aflare create `"Summarize today's AI news`""
+Write-Host "  aflare run your-workflow.yaml"
 Write-Host ""
 Write-Host "更多文档：https://gitcode.com/$GITCODE_REPO"
 Write-Host ""

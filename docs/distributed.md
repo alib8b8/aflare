@@ -3,11 +3,11 @@
 > **⚠️ Status: Not Implemented (Design Document Only)**
 >
 > The Coordinator/Worker architecture described below is a design proposal.
-> No code exists under `internal/distributed/`, and the `llm-box coordinator`
-> / `llm-box worker` CLI commands are not available. This document is retained
+> No code exists under `internal/distributed/`, and the `aflare coordinator`
+> / `aflare worker` CLI commands are not available. This document is retained
 > as a design reference for future implementation.
 
-llm-box supports distributed workflow execution across multiple machines using a Coordinator/Worker architecture.
+aflare supports distributed workflow execution across multiple machines using a Coordinator/Worker architecture.
 
 ## Architecture
 
@@ -43,10 +43,10 @@ llm-box supports distributed workflow execution across multiple machines using a
 
 ```bash
 # Start coordinator on default port (8090)
-llm-box coordinator --auth-token my-secret-token
+aflare coordinator --auth-token my-secret-token
 
 # Start on custom port
-llm-box coordinator --port 8090 --auth-token my-secret-token
+aflare coordinator --port 8090 --auth-token my-secret-token
 ```
 
 ### Step 2: Start Workers
@@ -55,17 +55,17 @@ On each worker machine:
 
 ```bash
 # Start worker with default capacity (5 tasks)
-llm-box worker --coordinator http://coordinator-host:8090 --auth-token my-secret-token
+aflare worker --coordinator http://coordinator-host:8090 --auth-token my-secret-token
 
 # Start with custom capacity
-llm-box worker --coordinator http://coordinator-host:8090 --auth-token my-secret-token --capacity 10 --port 8091
+aflare worker --coordinator http://coordinator-host:8090 --auth-token my-secret-token --capacity 10 --port 8091
 ```
 
 ### Step 3: Submit Workflow
 
 ```bash
 # Submit workflow for distributed execution
-llm-box run --distributed http://coordinator-host:8090 my-workflow.yaml
+aflare run --distributed http://coordinator-host:8090 my-workflow.yaml
 ```
 
 ## Configuration
@@ -90,8 +90,8 @@ llm-box run --distributed http://coordinator-host:8090 my-workflow.yaml
 
 | Variable | Description |
 |----------|-------------|
-| `LLM_BOX_COORDINATOR` | Default coordinator URL |
-| `LLM_BOX_AUTH_TOKEN` | Default authentication token |
+| `AFLARE_COORDINATOR` | Default coordinator URL |
+| `AFLARE_AUTH_TOKEN` | Default authentication token |
 
 ## API Endpoints
 
@@ -186,16 +186,16 @@ Each worker maintains its own secrets file. For distributed deployments:
 **Option 1: Manual Sync (Recommended for small teams)**
 ```bash
 # On coordinator
-llm-box secrets export > secrets.json
+aflare secrets export > secrets.json
 
 # On each worker
-llm-box secrets import < secrets.json
+aflare secrets import < secrets.json
 ```
 
 **Option 2: Environment Variables**
 ```bash
 # Set on all workers
-export LLM_BOX_SECRETS_PASSWORD="your-master-password"
+export AFLARE_SECRETS_PASSWORD="your-master-password"
 ```
 
 **Option 3: Shared Secrets Volume (Docker/Kubernetes)**
@@ -221,8 +221,8 @@ curl -H "X-Auth-Token: my-secret-token" "http://coordinator:8090/api/task?task_i
 
 Logs are stored locally on each machine:
 
-- Coordinator: `~/.llm-box/logs/coordinator.log`
-- Worker: `~/.llm-box/logs/worker.log`
+- Coordinator: `~/.aflare/logs/coordinator.log`
+- Worker: `~/.aflare/logs/worker.log`
 
 ## Troubleshooting
 
@@ -231,7 +231,7 @@ Logs are stored locally on each machine:
 1. Check Coordinator URL is correct
 2. Verify auth tokens match
 3. Check firewall rules allow traffic between worker and coordinator
-4. Check logs: `cat ~/.llm-box/logs/worker.log`
+4. Check logs: `cat ~/.aflare/logs/worker.log`
 
 ### Tasks Not Being Assigned
 
@@ -263,7 +263,7 @@ For production deployments requiring high availability:
 
 ## Performance Tips
 
-1. **Local Execution**: For small workflows, use local execution (`llm-box run`) instead of distributed
+1. **Local Execution**: For small workflows, use local execution (`aflare run`) instead of distributed
 2. **Worker Placement**: Place workers near data sources to minimize network latency
 3. **Capacity Planning**: Monitor worker load and adjust capacity as needed
 4. **Heartbeat Interval**: Default is 10 seconds; reduce for high-latency networks

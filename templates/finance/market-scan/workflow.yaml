@@ -1,7 +1,7 @@
 name: Market Scan & Intelligence
 # Scan financial markets, aggregate news, and build investment thesis
-# Usage: llm-box install finance/market-scan
-#        llm-box run market-scan/workflow.yaml
+# Usage: aflare install finance/market-scan
+#        aflare run market-scan/workflow.yaml
 
 steps:
   - node: http_request

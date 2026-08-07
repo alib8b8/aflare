@@ -3,7 +3,7 @@
   "name": "dns-checker",
   "version": "1.0.0",
   "description": "Check all DNS records for a domain",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "devops-infra",
   "tags": [
     "devops-infra",

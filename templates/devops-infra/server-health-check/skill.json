@@ -3,7 +3,7 @@
   "name": "server-health-check",
   "version": "1.0.0",
   "description": "Check server health metrics and generate report",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "devops-infra",
   "tags": [
     "devops-infra",

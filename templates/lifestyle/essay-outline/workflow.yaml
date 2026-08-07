@@ -1,7 +1,7 @@
 name: Essay Outline Generator
 # Generate structured essay outlines
-# Usage: llm-box install education/essay-outline
-#        llm-box run essay-outline/workflow.yaml
+# Usage: aflare install education/essay-outline
+#        aflare run essay-outline/workflow.yaml
 
 steps:
   - node: http_request

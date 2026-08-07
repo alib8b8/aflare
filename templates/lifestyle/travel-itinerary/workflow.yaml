@@ -1,7 +1,7 @@
 name: Travel Itinerary Planner
 # Generate detailed travel itinerary
-# Usage: llm-box install travel/travel-itinerary
-#        llm-box run travel-itinerary/workflow.yaml
+# Usage: aflare install travel/travel-itinerary
+#        aflare run travel-itinerary/workflow.yaml
 
 steps:
   - node: http_request

@@ -5,13 +5,13 @@ Fetch and summarize the latest AI/ML news from Hacker News.
 ## Install
 
 ```bash
-llm-box install ai-news
+aflare install ai-news
 ```
 
 ## Run
 
 ```bash
-llm-box run templates/ai-news/workflow.yaml
+aflare run templates/ai-news/workflow.yaml
 ```
 
 ## Output
@@ -30,5 +30,5 @@ llm-box run templates/ai-news/workflow.yaml
 
 ```bash
 # Daily at 9 AM
-0 9 * * * llm-box run /path/to/templates/ai-news/workflow.yaml
+0 9 * * * aflare run /path/to/templates/ai-news/workflow.yaml
 ```

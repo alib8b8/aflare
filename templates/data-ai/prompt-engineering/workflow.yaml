@@ -1,7 +1,7 @@
 name: Prompt Engineering Guide
 # Generate optimized prompts for specific tasks
-# Usage: llm-box install ai-ml/prompt-engineering
-#        llm-box run prompt-engineering/workflow.yaml
+# Usage: aflare install ai-ml/prompt-engineering
+#        aflare run prompt-engineering/workflow.yaml
 
 steps:
   - node: agent

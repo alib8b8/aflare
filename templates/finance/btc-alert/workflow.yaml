@@ -1,7 +1,7 @@
 name: BTC Price Alert
 # Monitors Bitcoin price and alerts when threshold is crossed
-# Usage: llm-box install btc-alert
-#        llm-box run btc-alert/workflow.yaml
+# Usage: aflare install btc-alert
+#        aflare run btc-alert/workflow.yaml
 # Config: Set PRICE_THRESHOLD and ALERT_METHOD in params below
 
 steps:

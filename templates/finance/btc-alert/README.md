@@ -5,7 +5,7 @@ Monitor Bitcoin price and get alerted when it crosses your threshold.
 ## Install
 
 ```bash
-llm-box install btc-alert
+aflare install btc-alert
 ```
 
 ## Configure
@@ -20,7 +20,7 @@ params:
 ## Run
 
 ```bash
-llm-box run templates/btc-alert/workflow.yaml
+aflare run templates/btc-alert/workflow.yaml
 ```
 
 ## Features
@@ -34,5 +34,5 @@ llm-box run templates/btc-alert/workflow.yaml
 
 ```bash
 # Run every 5 minutes
-*/5 * * * * llm-box run /path/to/templates/btc-alert/workflow.yaml
+*/5 * * * * aflare run /path/to/templates/btc-alert/workflow.yaml
 ```

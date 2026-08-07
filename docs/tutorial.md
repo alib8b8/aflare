@@ -1,4 +1,4 @@
-# llm-box 教程体系
+# aflare 教程体系
 
 ## 目录
 
@@ -16,19 +16,19 @@
 
 **Linux/macOS:**
 ```bash
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash
 ```
 
 **Windows:**
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/alib8b8/llm-box/releases/latest/download/llm-box-windows-amd64.exe" -OutFile llm-box.exe
+Invoke-WebRequest -Uri "https://github.com/alib8b8/aflare/releases/latest/download/aflare-windows-amd64.exe" -OutFile aflare.exe
 ```
 
 **从源码构建:**
 ```bash
-git clone https://github.com/alib8b8/llm-box.git
-cd llm-box
-go build -o llm-box ./cmd/llm-box
+git clone https://github.com/alib8b8/aflare.git
+cd aflare
+go build -o aflare ./cmd/aflare
 ```
 
 ### 你的第一个工作流
@@ -36,7 +36,7 @@ go build -o llm-box ./cmd/llm-box
 **创建工作流:**
 ```bash
 # 使用自然语言创建工作流
-llm-box create "fetch Hacker News top 5 stories and save to hn.txt"
+aflare create "fetch Hacker News top 5 stories and save to hn.txt"
 ```
 
 这会生成一个 YAML 文件 `hn_workflow.yaml`:
@@ -57,7 +57,7 @@ steps:
 
 **运行工作流:**
 ```bash
-llm-box run hn_workflow.yaml
+aflare run hn_workflow.yaml
 ```
 
 **查看结果:**
@@ -69,13 +69,13 @@ cat hn.txt
 
 ```bash
 # 检查版本
-llm-box version
+aflare version
 
 # 查看帮助
-llm-box help
+aflare help
 
 # 列出可用节点
-llm-box nodes
+aflare nodes
 ```
 
 ---
@@ -534,17 +534,17 @@ FROM golang:1.25-alpine
 WORKDIR /app
 COPY . .
 
-RUN go build -o llm-box ./cmd/llm-box
+RUN go build -o aflare ./cmd/aflare
 
 ENV LLMBOX_CONFIG=/app/config.yaml
 ENV LLMBOX_LOG_LEVEL=info
 
-ENTRYPOINT ["./llm-box"]
+ENTRYPOINT ["./aflare"]
 ```
 
 ```bash
-docker build -t llm-box .
-docker run -v $(pwd)/workflows:/app/workflows llm-box run my-workflow.yaml
+docker build -t aflare .
+docker run -v $(pwd)/workflows:/app/workflows aflare run my-workflow.yaml
 ```
 
 #### Kubernetes 部署
@@ -560,9 +560,9 @@ spec:
       template:
         spec:
           containers:
-          - name: llm-box
-            image: llm-box:latest
-            command: ["./llm-box", "run", "daily-report.yaml"]
+          - name: aflare
+            image: aflare:latest
+            command: ["./aflare", "run", "daily-report.yaml"]
             env:
             - name: API_KEY
               valueFrom:
@@ -581,10 +581,10 @@ spec:
 **Q: 如何调试工作流？**
 ```bash
 # 使用 verbose 模式查看详细日志
-llm-box run workflow.yaml --verbose
+aflare run workflow.yaml --verbose
 
 # 检查单个节点输出
-llm-box run workflow.yaml --step fetch_data --dry-run
+aflare run workflow.yaml --step fetch_data --dry-run
 ```
 
 **Q: 如何处理大型数据？**
@@ -602,19 +602,19 @@ steps:
 **Q: 如何分享工作流？**
 ```bash
 # 打包工作流及其依赖
-llm-box package my-workflow.yaml -o my-workflow.tar.gz
+aflare package my-workflow.yaml -o my-workflow.tar.gz
 
 # 导入工作流
-llm-box import my-workflow.tar.gz
+aflare import my-workflow.tar.gz
 ```
 
 **Q: 如何监控运行状态？**
 ```bash
 # 实时监控
-llm-box monitor
+aflare monitor
 
 # 查看 Web UI
-llm-box webui --port 8080
+aflare webui --port 8080
 ```
 
 ### 故障排除
@@ -667,7 +667,7 @@ steps:
 - 📖 阅读 [API 参考](./api-reference.md)
 - 🔧 学习 [自定义节点开发](./custom-nodes.md)
 - 🌐 了解 [分布式执行](./distributed.md)
-- 🤝 加入 [社区讨论](https://github.com/alib8b8/llm-box/discussions)
+- 🤝 加入 [社区讨论](https://github.com/alib8b8/aflare/discussions)
 
 ---
 

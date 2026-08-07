@@ -1,6 +1,6 @@
 # Workflow Visualizer
 
-llm-box can generate visual diagrams from workflow YAML files in multiple formats.
+aflare can generate visual diagrams from workflow YAML files in multiple formats.
 
 ## Quick Start
 
@@ -8,23 +8,23 @@ llm-box can generate visual diagrams from workflow YAML files in multiple format
 
 ```bash
 # Generate Mermaid diagram
-llm-box visualize workflow.yaml
+aflare visualize workflow.yaml
 
 # Generate specific format
-llm-box visualize workflow.yaml --format mermaid
-llm-box visualize workflow.yaml --format dot
-llm-box visualize workflow.yaml --format ascii
-llm-box visualize workflow.yaml --format json
+aflare visualize workflow.yaml --format mermaid
+aflare visualize workflow.yaml --format dot
+aflare visualize workflow.yaml --format ascii
+aflare visualize workflow.yaml --format json
 
 # Output to file
-llm-box visualize workflow.yaml -o diagram.md
-llm-box visualize workflow.yaml --format dot -o diagram.dot
+aflare visualize workflow.yaml -o diagram.md
+aflare visualize workflow.yaml --format dot -o diagram.dot
 ```
 
 ### Programmatic Usage
 
 ```go
-import "github.com/alib8b8/llm-box/internal/visualizer"
+import "github.com/alib8b8/aflare/internal/visualizer"
 
 // Generate Mermaid diagram
 mermaid := visualizer.GenerateMermaid(yamlContent)
@@ -151,10 +151,10 @@ Different node types are rendered with different colors and shapes:
 
 ```bash
 # Left-to-right layout
-llm-box visualize workflow.yaml --format mermaid --direction LR
+aflare visualize workflow.yaml --format mermaid --direction LR
 
 # Top-to-bottom (default)
-llm-box visualize workflow.yaml --format mermaid --direction TD
+aflare visualize workflow.yaml --format mermaid --direction TD
 ```
 
 ### Parallel Steps
@@ -260,7 +260,7 @@ steps:
 
 ```markdown
 ```mermaid
-{{#llm-box visualize workflow.yaml --format mermaid}}
+{{#aflare visualize workflow.yaml --format mermaid}}
 ```
 ```
 
@@ -269,5 +269,5 @@ steps:
 ```yaml
 # GitHub Actions
 - name: Generate diagram
-  run: llm-box visualize workflow.yaml -o docs/diagram.md
+  run: aflare visualize workflow.yaml -o docs/diagram.md
 ```

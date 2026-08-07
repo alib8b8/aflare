@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate professiona
 ## Usage
 
 ```bash
-llm-box install hr-recruiting/job-description
-llm-box run job-description/workflow.yaml
+aflare install hr-recruiting/job-description
+aflare run job-description/workflow.yaml
 ```
 
 ## Parameters

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate database mi
 ## Usage
 
 ```bash
-llm-box install database/db-migration
-llm-box run db-migration/workflow.yaml
+aflare install database/db-migration
+aflare run db-migration/workflow.yaml
 ```
 
 ## Parameters

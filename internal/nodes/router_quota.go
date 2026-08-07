@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -50,7 +50,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/logger"
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 // defaultQuotaTenant is the tenant ID used when none is configured. It keeps
@@ -91,21 +91,21 @@ type quotaRecord struct {
 // FileQuotaStore is the default QuotaStore: each (tenant, provider) pair is
 // persisted as a single JSON file at <base>/<tenant>/<provider>.json, written
 // atomically via tmp + rename. The base directory defaults to
-// <os.UserConfigDir>/llm-box/quota.
+// <os.UserConfigDir>/aflare/quota.
 type FileQuotaStore struct {
 	mu   sync.Mutex
 	base string
 }
 
 // DefaultQuotaDir returns the default on-disk directory for the file quota
-// store: <os.UserConfigDir>/llm-box/quota. Falls back to os.TempDir() when
+// store: <os.UserConfigDir>/aflare/quota. Falls back to os.TempDir() when
 // the user config directory cannot be determined.
 func DefaultQuotaDir() string {
 	dir, err := os.UserConfigDir()
 	if err != nil || dir == "" {
 		dir = os.TempDir()
 	}
-	return filepath.Join(dir, "llm-box", "quota")
+	return filepath.Join(dir, "aflare", "quota")
 }
 
 // NewFileQuotaStore creates a FileQuotaStore rooted at base. When base is

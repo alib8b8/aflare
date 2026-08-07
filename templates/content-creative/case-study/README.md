@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate customer ca
 ## Usage
 
 ```bash
-llm-box install writing-content/case-study
-llm-box run case-study/workflow.yaml
+aflare install writing-content/case-study
+aflare run case-study/workflow.yaml
 ```
 
 ## Parameters

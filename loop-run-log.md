@@ -1,4 +1,4 @@
-# Loop Run Log — llm-box
+# Loop Run Log — aflare
 
 ## Run History
 

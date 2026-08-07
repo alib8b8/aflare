@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -78,18 +78,18 @@ type kgFile struct {
 }
 
 // NewFSStore creates a unified context store.
-// skillsDir is empty by default ~/.llm-box/skills.
+// skillsDir is empty by default ~/.aflare/skills.
 func NewFSStore(skillsDir string) *FSStore {
 	if skillsDir == "" {
 		if home, err := os.UserHomeDir(); err == nil {
-			skillsDir = filepath.Join(home, ".llm-box", "skills")
+			skillsDir = filepath.Join(home, ".aflare", "skills")
 		} else {
-			skillsDir = ".llm-box/skills"
+			skillsDir = ".aflare/skills"
 		}
 	}
 	kgPath := ""
 	if home, err := os.UserHomeDir(); err == nil {
-		kgPath = filepath.Join(home, ".llm-box", "knowledge_graph.json")
+		kgPath = filepath.Join(home, ".aflare", "knowledge_graph.json")
 	}
 	return &FSStore{
 		sessionMgr: GlobalSessionManager,

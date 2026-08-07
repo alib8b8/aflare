@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -72,7 +72,7 @@ func setupClaudeCodeMCP(exePath string) (*MCPSetupResult, error) {
 
 	config := fmt.Sprintf(`{
   "mcpServers": {
-    "llm-box": {
+    "aflare": {
       "command": "%s",
       "args": ["--mcp-server"]
     }
@@ -122,7 +122,7 @@ func setupOpenCodeMCP(exePath string) (*MCPSetupResult, error) {
 
 	config := fmt.Sprintf(`{
   "mcpServers": {
-    "llm-box": {
+    "aflare": {
       "command": "%s",
       "args": ["--mcp-server"]
     }
@@ -173,8 +173,8 @@ func mergeMCPConfigSafe(existing []byte, exePath string) (string, error) {
 		cfg.MCPServers = make(map[string]mcpServerEntry)
 	}
 
-	if _, exists := cfg.MCPServers["llm-box"]; !exists {
-		cfg.MCPServers["llm-box"] = mcpServerEntry{
+	if _, exists := cfg.MCPServers["aflare"]; !exists {
+		cfg.MCPServers["aflare"] = mcpServerEntry{
 			Command: exePath,
 			Args:    []string{"--mcp-server"},
 		}
@@ -270,7 +270,7 @@ func installSkillsToDir(skillsDir, source, agentName string) (*SkillInstallResul
 	for _, entry := range entries {
 		if entry.IsDir() {
 			srcPath := filepath.Join(source, entry.Name())
-			dstPath := filepath.Join(skillsDir, "llm-box-"+entry.Name())
+			dstPath := filepath.Join(skillsDir, "aflare-"+entry.Name())
 
 			if err := copyDir(srcPath, dstPath); err != nil {
 				continue

@@ -1,7 +1,7 @@
 name: Literature Review
 # Systematic literature review and synthesis workflow
-# Usage: llm-box install research/literature-review
-#        llm-box run literature-review/workflow.yaml
+# Usage: aflare install research/literature-review
+#        aflare run literature-review/workflow.yaml
 
 steps:
   - node: search_aggregate

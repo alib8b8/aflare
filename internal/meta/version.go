@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -33,12 +33,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/httpclient"
+	"github.com/alib8b8/aflare/internal/httpclient"
 )
 
 // Three shared clients for the self-update flow, built once via the
 // httpclient factory so they share connection-pool tuning and SSRF
-// dial-time validation with every other outbound client in llm-box.
+// dial-time validation with every other outbound client in aflare.
 //
 // We deliberately do NOT use nodes/core.ValidateURL here — that would
 // create a circular dependency from the version package into nodes/core.
@@ -128,7 +128,7 @@ func GetVersion() string {
 
 // GetBuildInfo 返回包含版本、构建时间与运行时环境的构建信息。
 func GetBuildInfo() string {
-	return fmt.Sprintf("llm-box version %s\n  built: %s\n  go:    %s\n  os:    %s/%s",
+	return fmt.Sprintf("aflare version %s\n  built: %s\n  go:    %s\n  os:    %s/%s",
 		Version, BuildDate, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 }
 

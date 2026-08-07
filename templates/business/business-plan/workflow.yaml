@@ -1,7 +1,7 @@
 name: Business Plan Generator
 # Generate comprehensive business plan outline
-# Usage: llm-box install business-sales/business-plan
-#        llm-box run business-plan/workflow.yaml
+# Usage: aflare install business-sales/business-plan
+#        aflare run business-plan/workflow.yaml
 
 steps:
   - node: agent

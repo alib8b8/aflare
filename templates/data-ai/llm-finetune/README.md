@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate llm fine-tu
 ## Usage
 
 ```bash
-llm-box install ai-ml/llm-finetune
-llm-box run llm-finetune/workflow.yaml
+aflare install ai-ml/llm-finetune
+aflare run llm-finetune/workflow.yaml
 ```
 
 ## Parameters

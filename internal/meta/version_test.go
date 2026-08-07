@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -83,9 +83,9 @@ func TestFindAsset(t *testing.T) {
 			BrowserDownloadURL string `json:"browser_download_url"`
 			Size               int64  `json:"size"`
 		}{
-			{Name: "llm-box-linux-amd64", BrowserDownloadURL: "https://example.com/linux-amd64"},
-			{Name: "llm-box-darwin-amd64", BrowserDownloadURL: "https://example.com/darwin-amd64"},
-			{Name: "llm-box-windows-amd64.exe", BrowserDownloadURL: "https://example.com/win-amd64"},
+			{Name: "aflare-linux-amd64", BrowserDownloadURL: "https://example.com/linux-amd64"},
+			{Name: "aflare-darwin-amd64", BrowserDownloadURL: "https://example.com/darwin-amd64"},
+			{Name: "aflare-windows-amd64.exe", BrowserDownloadURL: "https://example.com/win-amd64"},
 		},
 	}
 
@@ -95,9 +95,9 @@ func TestFindAsset(t *testing.T) {
 		wantURL  string
 		wantName string
 	}{
-		{"linux", "amd64", "https://example.com/linux-amd64", "llm-box-linux-amd64"},
-		{"darwin", "amd64", "https://example.com/darwin-amd64", "llm-box-darwin-amd64"},
-		{"windows", "amd64", "https://example.com/win-amd64", "llm-box-windows-amd64.exe"},
+		{"linux", "amd64", "https://example.com/linux-amd64", "aflare-linux-amd64"},
+		{"darwin", "amd64", "https://example.com/darwin-amd64", "aflare-darwin-amd64"},
+		{"windows", "amd64", "https://example.com/win-amd64", "aflare-windows-amd64.exe"},
 		{"freebsd", "arm64", "", ""},
 	}
 
@@ -172,7 +172,7 @@ func TestCheckLatestRelease_NetworkError(t *testing.T) {
 	var err error
 	go func() {
 		defer close(done)
-		release, err = CheckLatestRelease("alib8b8/llm-box")
+		release, err = CheckLatestRelease("alib8b8/aflare")
 	}()
 	select {
 	case <-done:
@@ -198,7 +198,7 @@ func TestCheckLatestRelease_GitHubToken(t *testing.T) {
 	var err error
 	go func() {
 		defer close(done)
-		_, err = CheckLatestRelease("alib8b8/llm-box")
+		_, err = CheckLatestRelease("alib8b8/aflare")
 	}()
 	select {
 	case <-done:
@@ -219,7 +219,7 @@ func TestSelfUpdate_NetworkError(t *testing.T) {
 	var err error
 	go func() {
 		defer close(done)
-		result, err = SelfUpdate("alib8b8/llm-box")
+		result, err = SelfUpdate("alib8b8/aflare")
 	}()
 	select {
 	case <-done:
@@ -267,7 +267,7 @@ func TestFindAssetWindows(t *testing.T) {
 			BrowserDownloadURL string `json:"browser_download_url"`
 			Size               int64  `json:"size"`
 		}{
-			{Name: "llm-box-windows-amd64.exe", BrowserDownloadURL: "https://example.com/win"},
+			{Name: "aflare-windows-amd64.exe", BrowserDownloadURL: "https://example.com/win"},
 		},
 	}
 	url, name := FindAsset(release, "windows", "amd64")
@@ -358,12 +358,12 @@ func TestCheckLatestRelease_Success(t *testing.T) {
 	body := makeMockReleaseJSON("v1.2.3")
 	m := &mockTransport{
 		responses: map[string]*http.Response{
-			"api.github.com/repos/alib8b8/llm-box/releases/latest": mockResponse(body, http.StatusOK),
+			"api.github.com/repos/alib8b8/aflare/releases/latest": mockResponse(body, http.StatusOK),
 		},
 	}
 	setMockTransport(t, m)
 
-	release, err := CheckLatestRelease("alib8b8/llm-box")
+	release, err := CheckLatestRelease("alib8b8/aflare")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -389,12 +389,12 @@ func TestCheckLatestRelease_NotFound(t *testing.T) {
 func TestCheckLatestRelease_InvalidJSON(t *testing.T) {
 	m := &mockTransport{
 		responses: map[string]*http.Response{
-			"api.github.com/repos/alib8b8/llm-box/releases/latest": mockResponse([]byte("not json"), http.StatusOK),
+			"api.github.com/repos/alib8b8/aflare/releases/latest": mockResponse([]byte("not json"), http.StatusOK),
 		},
 	}
 	setMockTransport(t, m)
 
-	_, err := CheckLatestRelease("alib8b8/llm-box")
+	_, err := CheckLatestRelease("alib8b8/aflare")
 	if err == nil {
 		t.Error("expected error for invalid JSON")
 	}
@@ -408,12 +408,12 @@ func TestSelfUpdate_AlreadyUpToDate_Mock(t *testing.T) {
 	body := makeMockReleaseJSON("v1.0.0")
 	m := &mockTransport{
 		responses: map[string]*http.Response{
-			"api.github.com/repos/alib8b8/llm-box/releases/latest": mockResponse(body, http.StatusOK),
+			"api.github.com/repos/alib8b8/aflare/releases/latest": mockResponse(body, http.StatusOK),
 		},
 	}
 	setMockTransport(t, m)
 
-	result, err := SelfUpdate("alib8b8/llm-box")
+	result, err := SelfUpdate("alib8b8/aflare")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -430,12 +430,12 @@ func TestSelfUpdate_NoAsset(t *testing.T) {
 	body := makeMockReleaseJSON("v1.0.0")
 	m := &mockTransport{
 		responses: map[string]*http.Response{
-			"api.github.com/repos/alib8b8/llm-box/releases/latest": mockResponse(body, http.StatusOK),
+			"api.github.com/repos/alib8b8/aflare/releases/latest": mockResponse(body, http.StatusOK),
 		},
 	}
 	setMockTransport(t, m)
 
-	_, err := SelfUpdate("alib8b8/llm-box")
+	_, err := SelfUpdate("alib8b8/aflare")
 	if err == nil {
 		t.Error("expected error when no compatible asset found")
 	}
@@ -446,20 +446,20 @@ func TestSelfUpdate_DownloadSuccess(t *testing.T) {
 	Version = "v0.1.0"
 	defer func() { Version = oldVersion }()
 
-	assetName := fmt.Sprintf("llm-box-%s-%s", runtime.GOOS, runtime.GOARCH)
+	assetName := fmt.Sprintf("aflare-%s-%s", runtime.GOOS, runtime.GOARCH)
 	if runtime.GOOS == "windows" {
 		assetName += ".exe"
 	}
 	body := makeMockReleaseJSONWithAsset("v1.0.0", assetName, "https://github.com/asset")
 	m := &mockTransport{
 		responses: map[string]*http.Response{
-			"api.github.com/repos/alib8b8/llm-box/releases/latest": mockResponse(body, http.StatusOK),
+			"api.github.com/repos/alib8b8/aflare/releases/latest": mockResponse(body, http.StatusOK),
 			"github.com/asset": mockResponse([]byte("fake binary"), http.StatusOK),
 		},
 	}
 	setMockTransport(t, m)
 
-	_, err := SelfUpdate("alib8b8/llm-box")
+	_, err := SelfUpdate("alib8b8/aflare")
 	// It will try to replace the test binary; we accept either success or a rename error
 	if err != nil {
 		t.Logf("SelfUpdate error (may be rename-related): %v", err)
@@ -473,7 +473,7 @@ func TestFindChecksumsURL(t *testing.T) {
 			BrowserDownloadURL string `json:"browser_download_url"`
 			Size               int64  `json:"size"`
 		}{
-			{Name: "llm-box-linux-amd64", BrowserDownloadURL: "https://example.com/linux"},
+			{Name: "aflare-linux-amd64", BrowserDownloadURL: "https://example.com/linux"},
 			{Name: "sha256sums.txt", BrowserDownloadURL: "https://example.com/sha256"},
 		},
 	}
@@ -491,7 +491,7 @@ func TestFindChecksumsURL_ChecksumsSuffix(t *testing.T) {
 			BrowserDownloadURL string `json:"browser_download_url"`
 			Size               int64  `json:"size"`
 		}{
-			{Name: "llm-box-checksums.txt", BrowserDownloadURL: "https://example.com/checksums"},
+			{Name: "aflare-checksums.txt", BrowserDownloadURL: "https://example.com/checksums"},
 		},
 	}
 
@@ -508,7 +508,7 @@ func TestFindChecksumsURL_None(t *testing.T) {
 			BrowserDownloadURL string `json:"browser_download_url"`
 			Size               int64  `json:"size"`
 		}{
-			{Name: "llm-box-linux-amd64", BrowserDownloadURL: "https://example.com/linux"},
+			{Name: "aflare-linux-amd64", BrowserDownloadURL: "https://example.com/linux"},
 		},
 	}
 
@@ -563,7 +563,7 @@ func TestVerifyChecksum_FileNotFound(t *testing.T) {
 }
 
 func TestDownloadChecksums(t *testing.T) {
-	checksumContent := "abc123def456  llm-box-linux-amd64\n789ghi012jkl  llm-box-darwin-amd64\n"
+	checksumContent := "abc123def456  aflare-linux-amd64\n789ghi012jkl  aflare-darwin-amd64\n"
 	m := &mockTransport{
 		responses: map[string]*http.Response{
 			"objects.githubusercontent.com/checksums": mockResponse([]byte(checksumContent), http.StatusOK),
@@ -578,8 +578,8 @@ func TestDownloadChecksums(t *testing.T) {
 	if len(checksums) != 2 {
 		t.Errorf("Expected 2 checksums, got %d", len(checksums))
 	}
-	if checksums["llm-box-linux-amd64"] != "abc123def456" {
-		t.Errorf("Unexpected checksum for linux-amd64: %s", checksums["llm-box-linux-amd64"])
+	if checksums["aflare-linux-amd64"] != "abc123def456" {
+		t.Errorf("Unexpected checksum for linux-amd64: %s", checksums["aflare-linux-amd64"])
 	}
 }
 

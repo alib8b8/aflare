@@ -3,7 +3,7 @@
   "name": "doc-extractor",
   "version": "1.0.0",
   "description": "Fetch a web document, use an agent with json_parse + template_render tools to extract structured fields, validate the JSON, and render a summary.",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "data-processing",
   "tags": [
     "data-processing",
@@ -23,7 +23,7 @@
       "name": "source_url",
       "type": "string",
       "required": false,
-      "default": "https://raw.githubusercontent.com/alib8b8/llm-box/main/README.md"
+      "default": "https://raw.githubusercontent.com/alib8b8/aflare/main/README.md"
     },
     {
       "name": "extraction_schema",

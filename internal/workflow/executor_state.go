@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -83,7 +83,7 @@ func SaveState(path string, state *WorkflowState) error {
 // saveCheckpoint persists a WorkflowState snapshot to the given path.
 //
 // Unlike SaveState, this is intended for the Executor's checkpoint feature and
-// accepts absolute paths (e.g. ~/.llm-box/checkpoints/<name>.json). It creates
+// accepts absolute paths (e.g. ~/.aflare/checkpoints/<name>.json). It creates
 // the parent directory (mode 0700) if it does not yet exist. The file itself
 // is written with mode 0600.
 func saveCheckpoint(path string, state *WorkflowState) error {

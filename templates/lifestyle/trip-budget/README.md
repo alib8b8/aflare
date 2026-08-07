@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for calculate and plan t
 ## Usage
 
 ```bash
-llm-box install travel/trip-budget
-llm-box run trip-budget/workflow.yaml
+aflare install travel/trip-budget
+aflare run trip-budget/workflow.yaml
 ```
 
 ## Parameters

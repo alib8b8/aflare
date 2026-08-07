@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for batch rename files w
 ## Usage
 
 ```bash
-llm-box install automation/batch-rename
-llm-box run batch-rename/workflow.yaml
+aflare install automation/batch-rename
+aflare run batch-rename/workflow.yaml
 ```
 
 ## Parameters

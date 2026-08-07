@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -21,7 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/alib8b8/llm-box/internal/meta"
+	"github.com/alib8b8/aflare/internal/meta"
 )
 
 // SchedulesFileName is the name of the file that stores persisted schedules.
@@ -37,7 +37,7 @@ type ScheduleEntry struct {
 }
 
 // DefaultSchedulesPath returns the default path to the schedules store file
-// (DataDir/schedules.json, i.e. ~/.llm-box/schedules.json).
+// (DataDir/schedules.json, i.e. ~/.aflare/schedules.json).
 func DefaultSchedulesPath() string {
 	return filepath.Join(meta.DataDir(), SchedulesFileName)
 }

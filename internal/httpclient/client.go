@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // Package httpclient is the single source of truth for outbound HTTP
-// clients across llm-box. It centralizes two concerns that were
+// clients across aflare. It centralizes two concerns that were
 // previously copy-pasted into four packages (nodes/core, registry, mcp,
 // and the meta/memory packages' bare &http.Client{} literals):
 //
@@ -69,7 +69,7 @@ type Options struct {
 }
 
 // Pool tuning defaults. These are package-level constants (not Options
-// fields) on purpose: every outbound client in llm-box should use the
+// fields) on purpose: every outbound client in aflare should use the
 // same pool sizing so that the global connection ceiling is predictable.
 // If a caller genuinely needs different sizing it can build its own
 // *http.Transport — but none currently does.

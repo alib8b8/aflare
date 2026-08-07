@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // Mock servers for the AML review demo. Runs two services on one process:
 //   - :17790  mock LLM (OpenAI /chat/completions protocol, keyword-based)

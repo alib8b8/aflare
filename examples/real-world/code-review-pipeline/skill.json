@@ -3,7 +3,7 @@
   "name": "code-review-pipeline",
   "version": "1.0.0",
   "description": "Hybrid code review pipeline combining deterministic rule-engine checks with LLM deep analysis, producing a markdown report.",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "developer-tools",
   "tags": [
     "developer-tools",

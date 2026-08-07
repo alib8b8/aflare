@@ -1,7 +1,7 @@
 name: Budget Planner
 # Create personal budget plan and tracker
-# Usage: llm-box install finance-investing/budget-planner
-#        llm-box run budget-planner/workflow.yaml
+# Usage: aflare install finance-investing/budget-planner
+#        aflare run budget-planner/workflow.yaml
 
 steps:
   - node: agent

@@ -1,7 +1,7 @@
 name: Content Calendar Generator
 # Generate monthly content calendar
-# Usage: llm-box install marketing/content-calendar
-#        llm-box run content-calendar/workflow.yaml
+# Usage: aflare install marketing/content-calendar
+#        aflare run content-calendar/workflow.yaml
 
 steps:
   - node: agent

@@ -1,13 +1,13 @@
-# Loop State — llm-box
+# Loop State — aflare
 
 Last run: 2026-07-14
 Loop level: L1 (report-only)
 
 ## High Priority (loop is acting or waiting on human)
 
-- [ ] #6 — Marketplace quality grade below A-bar; skills `setup` and `llm-box` scored D (69/61). Fix by 2026-07-22 or delisted.
+- [ ] #6 — Marketplace quality grade below A-bar; skills `setup` and `aflare` scored D (69/61). Fix by 2026-07-22 or delisted.
   Status: Waiting on human to prioritize skill documentation work.
-  Suggested action: Update `skills/setup/SKILL.md` and `skills/llm-box/SKILL.md` to include 8-field frontmatter and 6 required body sections per marketplace rubric.
+  Suggested action: Update `skills/setup/SKILL.md` and `skills/aflare/SKILL.md` to include 8-field frontmatter and 6 required body sections per marketplace rubric.
 
 ## Watch List
 

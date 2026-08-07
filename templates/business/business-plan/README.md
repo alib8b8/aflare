@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate comprehensi
 ## Usage
 
 ```bash
-llm-box install business-sales/business-plan
-llm-box run business-plan/workflow.yaml
+aflare install business-sales/business-plan
+aflare run business-plan/workflow.yaml
 ```
 
 ## Parameters

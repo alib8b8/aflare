@@ -1,7 +1,7 @@
 name: Unit Test Generator
 # Generate unit test skeleton for Go functions
-# Usage: llm-box install developer-tools/unit-test-generator
-#        llm-box run unit-test-generator/workflow.yaml
+# Usage: aflare install developer-tools/unit-test-generator
+#        aflare run unit-test-generator/workflow.yaml
 
 steps:
   - node: execute

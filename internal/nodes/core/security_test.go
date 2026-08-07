@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -26,11 +26,11 @@ import (
 	"testing"
 )
 
-// setSecurityLevel sets LLM_BOX_SECURITY_LEVEL for the duration of the test.
+// setSecurityLevel sets AFLARE_SECURITY_LEVEL for the duration of the test.
 // Using t.Setenv means these tests must not call t.Parallel.
 func setSecurityLevel(t *testing.T, level string) {
 	t.Helper()
-	t.Setenv("LLM_BOX_SECURITY_LEVEL", level)
+	t.Setenv("AFLARE_SECURITY_LEVEL", level)
 }
 
 // --- SafeJoinPath ---

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate frontend ar
 ## Usage
 
 ```bash
-llm-box install frontend/frontend-architecture
-llm-box run frontend-architecture/workflow.yaml
+aflare install frontend/frontend-architecture
+aflare run frontend-architecture/workflow.yaml
 ```
 
 ## Parameters

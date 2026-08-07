@@ -5,7 +5,7 @@ Generate SEO-optimized articles with AI-powered research and audit.
 ## Install
 
 ```bash
-llm-box install seo-writer
+aflare install seo-writer
 ```
 
 ## Configure
@@ -22,7 +22,7 @@ params:
 ## Run
 
 ```bash
-llm-box run templates/seo-writer/workflow.yaml
+aflare run templates/seo-writer/workflow.yaml
 ```
 
 ## Output

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate unit test s
 ## Usage
 
 ```bash
-llm-box install developer-tools/unit-test-generator
-llm-box run unit-test-generator/workflow.yaml
+aflare install developer-tools/unit-test-generator
+aflare run unit-test-generator/workflow.yaml
 ```
 
 ## Parameters

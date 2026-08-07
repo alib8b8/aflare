@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for create language lear
 ## Usage
 
 ```bash
-llm-box install education/language-learning
-llm-box run language-learning/workflow.yaml
+aflare install education/language-learning
+aflare run language-learning/workflow.yaml
 ```
 
 ## Parameters

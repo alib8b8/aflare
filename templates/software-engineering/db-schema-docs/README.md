@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate database sc
 ## Usage
 
 ```bash
-llm-box install database/db-schema-docs
-llm-box run db-schema-docs/workflow.yaml
+aflare install database/db-schema-docs
+aflare run db-schema-docs/workflow.yaml
 ```
 
 ## Parameters

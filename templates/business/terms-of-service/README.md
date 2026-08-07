@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate terms of se
 ## Usage
 
 ```bash
-llm-box install legal/terms-of-service
-llm-box run terms-of-service/workflow.yaml
+aflare install legal/terms-of-service
+aflare run terms-of-service/workflow.yaml
 ```
 
 ## Parameters

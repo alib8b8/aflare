@@ -50,10 +50,10 @@ jobs:
           path: coverage.out
 
       - name: Build
-        run: go build -ldflags "-s -w" -o llm-box ./cmd/llm-box
+        run: go build -ldflags "-s -w" -o aflare ./cmd/aflare
 
       - name: Verify binary
-        run: ./llm-box --help
+        run: ./aflare --help
 
   security-scan:
     name: Security Scan
@@ -118,12 +118,12 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
-          BINARY_NAME="llm-box-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}"
-          go build -ldflags "-s -w" -o "$BINARY_NAME" ./cmd/llm-box
+          BINARY_NAME="aflare-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}"
+          go build -ldflags "-s -w" -o "$BINARY_NAME" ./cmd/aflare
           echo "BINARY_NAME=$BINARY_NAME" >> $GITHUB_ENV
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
-          name: llm-box-${{ matrix.os }}-${{ matrix.arch }}
-          path: llm-box-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: aflare-${{ matrix.os }}-${{ matrix.arch }}
+          path: aflare-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}

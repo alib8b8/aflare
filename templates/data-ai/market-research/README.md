@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for research market tren
 ## Usage
 
 ```bash
-llm-box install research-analysis/market-research
-llm-box run market-research/workflow.yaml
+aflare install research-analysis/market-research
+aflare run market-research/workflow.yaml
 ```
 
 ## Parameters

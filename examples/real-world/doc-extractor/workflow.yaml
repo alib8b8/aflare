@@ -5,7 +5,7 @@ description: |
   extracted JSON and render a clean summary.
 
 vars:
-  source_url: https://raw.githubusercontent.com/alib8b8/llm-box/main/README.md
+  source_url: https://raw.githubusercontent.com/alib8b8/aflare/main/README.md
   extraction_schema: |
     {"title":"","summary":"","key_features":[],"install_cmd":""}
   provider: ollama

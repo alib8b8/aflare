@@ -1,6 +1,6 @@
 # Cross-Step Data Flow
 
-llm-box supports flexible data flow between workflow steps through various reference mechanisms.
+aflare supports flexible data flow between workflow steps through various reference mechanisms.
 
 ## Basic Data Flow
 
@@ -262,7 +262,7 @@ steps:
 
 ### Text-Based Flow
 
-All data flow in llm-box is text-based. Nodes receive and return strings.
+All data flow in aflare is text-based. Nodes receive and return strings.
 
 ### Handling JSON Data
 

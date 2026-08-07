@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate optimized p
 ## Usage
 
 ```bash
-llm-box install ai-ml/prompt-engineering
-llm-box run prompt-engineering/workflow.yaml
+aflare install ai-ml/prompt-engineering
+aflare run prompt-engineering/workflow.yaml
 ```
 
 ## Parameters

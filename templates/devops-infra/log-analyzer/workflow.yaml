@@ -1,7 +1,7 @@
 name: Log Analyzer
 # Analyze application logs for errors and patterns
-# Usage: llm-box install devops-monitoring/log-analyzer
-#        llm-box run log-analyzer/workflow.yaml
+# Usage: aflare install devops-monitoring/log-analyzer
+#        aflare run log-analyzer/workflow.yaml
 
 steps:
   - node: execute

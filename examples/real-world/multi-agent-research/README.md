@@ -40,20 +40,20 @@ flowchart TD
 
 ```bash
 # 1. 默认研究问题：RAG vs 微调
-llm-box run examples/real-world/multi-agent-research/workflow.yaml
+aflare run examples/real-world/multi-agent-research/workflow.yaml
 
 # 2. 自定义研究问题与资料来源
-llm-box run examples/real-world/multi-agent-research/workflow.yaml \
+aflare run examples/real-world/multi-agent-research/workflow.yaml \
   --var topic="Should we migrate from Postgres to MongoDB?" \
   --var research_urls="https://example.com/pg-vs-mongo,https://example.com/case-study"
 
 # 3. 深度研究 + 云端强模型
-llm-box run examples/real-world/multi-agent-research/workflow.yaml \
+aflare run examples/real-world/multi-agent-research/workflow.yaml \
   --var depth=comprehensive \
   --var provider=anthropic --var model=claude-3-5-sonnet-latest
 ```
 
-> **本地 dry-run**：三个 Agent 节点均依赖 LLM。未启动 Ollama 时它们会失败；但 `workflow.yaml` 语法始终合法，可用 `llm-box run --dry-run`（如可用）校验结构与表达式。
+> **本地 dry-run**：三个 Agent 节点均依赖 LLM。未启动 Ollama 时它们会失败；但 `workflow.yaml` 语法始终合法，可用 `aflare run --dry-run`（如可用）校验结构与表达式。
 
 ## 输出示例
 

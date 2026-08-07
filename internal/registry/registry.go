@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -28,15 +28,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/httpclient"
-	"github.com/alib8b8/llm-box/internal/logger"
+	"github.com/alib8b8/aflare/internal/httpclient"
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 // safeHTTPClient is the registry's shared HTTP client. It uses the
 // httpclient factory so that SSRF defense (re-resolve + validate at dial
 // time, closing the DNS-rebinding TOCTOU window) and connection-pool
 // tuning (MaxIdleConns / MaxIdleConnsPerHost / IdleConnTimeout) are
-// shared with every other outbound client in llm-box rather than
+// shared with every other outbound client in aflare rather than
 // re-implemented here. Registry endpoints are public-only, so we use
 // ValidatePublic (loopback blocked).
 var safeHTTPClient = httpclient.NewClient(httpclient.Options{
@@ -58,14 +58,14 @@ type Registry struct {
 	Nodes []NodeInfo `json:"nodes"`
 }
 
-const defaultRegistryURL = "https://raw.githubusercontent.com/alib8b8/llm-box/main/nodes-registry.json"
+const defaultRegistryURL = "https://raw.githubusercontent.com/alib8b8/aflare/main/nodes-registry.json"
 
 func GetRegistryPath() string {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
-		return filepath.Join(os.TempDir(), "llm-box", "registry.json")
+		return filepath.Join(os.TempDir(), "aflare", "registry.json")
 	}
-	return filepath.Join(configDir, "llm-box", "registry.json")
+	return filepath.Join(configDir, "aflare", "registry.json")
 }
 
 func LoadRegistry() (*Registry, error) {
@@ -73,7 +73,7 @@ func LoadRegistry() (*Registry, error) {
 	data, err := os.ReadFile(path) // #nosec G304 -- internally generated config path
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("registry not found, run 'llm-box registry sync' first")
+			return nil, fmt.Errorf("registry not found, run 'aflare registry sync' first")
 		}
 		return nil, fmt.Errorf("failed to read registry: %w", err)
 	}
@@ -312,7 +312,7 @@ func GetNodesDir() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get config dir: %w", err)
 	}
-	nodesDir := filepath.Join(configDir, "llm-box", "nodes")
+	nodesDir := filepath.Join(configDir, "aflare", "nodes")
 	if err := os.MkdirAll(nodesDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to create nodes directory: %w", err)
 	}

@@ -1,28 +1,28 @@
 ---
-name: llm-box
+name: aflare
 description: 终端工作流自动化引擎，通过自然语言生成并执行 YAML 工作流。支持 20+ 内置节点、15+ LLM 提供商。
 invocation: both
 ---
 
-# llm-box Grok Skill
+# aflare Grok Skill
 
 ## 一句话调用
 
-当用户说类似以下内容时，直接使用 llm-box：
+当用户说类似以下内容时，直接使用 aflare：
 
 **创建工作流：**
-- "用 llm-box 创建一个备份工作流"
-- "用 llm-box 创建 GitHub 每日总结工作流"
-- "用 llm-box 监控日志并在出错时通知我"
-- "用 llm-box 把 Markdown 文章转为 HTML 并保存"
+- "用 aflare 创建一个备份工作流"
+- "用 aflare 创建 GitHub 每日总结工作流"
+- "用 aflare 监控日志并在出错时通知我"
+- "用 aflare 把 Markdown 文章转为 HTML 并保存"
 
 **执行工作流：**
-- "运行 llm-box 工作流：每天抓取 Hacker News 前 10 条"
+- "运行 aflare 工作流：每天抓取 Hacker News 前 10 条"
 - "执行 workflow.yaml"
 - "运行这个工作流：{yaml_content}"
 
 **其他操作：**
-- "查看 llm-box 有哪些可用节点"
+- "查看 aflare 有哪些可用节点"
 - "验证这个工作流文件是否正确"
 
 ## 调用流程
@@ -62,17 +62,17 @@ invocation: both
 
 ## 安装与连接
 
-### 安装 llm-box
+### 安装 aflare
 
 ```bash
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
+curl -sL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh -o install.sh
 bash install.sh
 ```
 
 ### 启动 MCP 服务
 
 ```bash
-llm-box --mcp-server
+aflare --mcp-server
 ```
 
 ### Grok Web 连接
@@ -85,7 +85,7 @@ llm-box --mcp-server
 
 ### 示例 1：创建并执行工作流
 
-用户："用 llm-box 创建一个抓取 Hacker News 前 5 条并保存的工作流"
+用户："用 aflare 创建一个抓取 Hacker News 前 5 条并保存的工作流"
 
 执行步骤：
 1. 调用 `create_workflow("fetch top 5 Hacker News stories and save to file")`

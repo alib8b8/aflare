@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -22,11 +22,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/logger"
-	"github.com/alib8b8/llm-box/internal/metrics"
-	"github.com/alib8b8/llm-box/internal/nodes"
-	"github.com/alib8b8/llm-box/internal/secrets"
-	"github.com/alib8b8/llm-box/internal/tui"
+	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/metrics"
+	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/secrets"
+	"github.com/alib8b8/aflare/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 	"gopkg.in/yaml.v3"
 )
@@ -808,7 +808,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 //
 // Build one with NewExecutor and chain WithCheckpoint to enable persistence:
 //
-//	exec := NewExecutor().WithCheckpoint("~/.llm-box/checkpoints/wf.json")
+//	exec := NewExecutor().WithCheckpoint("~/.aflare/checkpoints/wf.json")
 //	out, results, err := exec.Execute(ctx, wf, reg)
 //
 // When statePath is set and a checkpoint file already exists, execution
@@ -827,7 +827,7 @@ type Executor struct {
 	auditEnabled bool
 	// auditDir, when non-empty, overrides the history/audit directory used
 	// for the audit log. When empty the history package default
-	// (~/.config/llm-box/history) is used.
+	// (~/.config/aflare/history) is used.
 	auditDir string
 	// idempotencyKey, when non-empty, activates workflow idempotency: before
 	// executing, the Executor consults idempotencyStore for a prior
@@ -890,10 +890,10 @@ func (e *Executor) WithTimeout(d time.Duration) *Executor {
 // a workflow_end (or workflow_failed) record.
 //
 // When dir is non-empty it overrides the history/audit directory; when empty
-// the history package default (~/.config/llm-box/history) is used. Audit is
+// the history package default (~/.config/aflare/history) is used. Audit is
 // off by default and must be explicitly enabled.
 //
-// If LLM_BOX_AUDIT_HMAC_KEY (or LLM_BOX_SECRETS_PASSWORD) is not set, audit
+// If AFLARE_AUDIT_HMAC_KEY (or AFLARE_SECRETS_PASSWORD) is not set, audit
 // writing is skipped after a single warning (graceful degradation) and the
 // workflow is unaffected. Any audit write failure is logged at warn level and
 // never blocks execution. Returns the receiver for chaining.
@@ -906,7 +906,7 @@ func (e *Executor) WithTimeout(d time.Duration) *Executor {
 // audit directory for all workflows in a process, or disable audit
 // per-Executor (WithAuditLog(false, "")). The CLI additionally guards
 // against cross-process hash-chain corruption via an audit-directory lock
-// (see cmd/llm-box acquireAuditLock).
+// (see cmd/aflare acquireAuditLock).
 func (e *Executor) WithAuditLog(enabled bool, dir string) *Executor {
 	e.auditEnabled = enabled
 	e.auditDir = dir
@@ -928,7 +928,7 @@ func (e *Executor) WithAuditLog(enabled bool, dir string) *Executor {
 //     the next trigger for the same key becomes a cache hit.
 //
 // If no store has been configured via WithIdempotencyStore, a default
-// FileIdempotencyStore at DefaultIdempotencyDir() (~/.config/llm-box/
+// FileIdempotencyStore at DefaultIdempotencyDir() (~/.config/aflare/
 // idempotency) is used. Idempotency is otherwise OFF by default, so existing
 // callers that do not set a key see no behaviour change.
 //

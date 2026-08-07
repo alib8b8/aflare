@@ -1,7 +1,7 @@
 name: Pitch Deck Generator
 # Generate pitch deck structure and content
-# Usage: llm-box install business-sales/pitch-deck
-#        llm-box run pitch-deck/workflow.yaml
+# Usage: aflare install business-sales/pitch-deck
+#        aflare run pitch-deck/workflow.yaml
 
 steps:
   - node: agent

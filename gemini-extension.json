@@ -1,8 +1,8 @@
 {
-  "name": "llm-box",
+  "name": "aflare",
   "version": "0.3.0",
   "description": "Terminal-first workflow automation engine. Generate and execute YAML workflows from plain English descriptions. Features 20+ built-in nodes, 15+ LLM providers, and MCP server mode.",
-  "repository": "https://github.com/alib8b8/llm-box",
+  "repository": "https://github.com/alib8b8/aflare",
   "license": "AGPL-3.0",
   "keywords": [
     "workflow",
@@ -15,8 +15,8 @@
   ],
   "contextFileName": "GEMINI.md",
   "mcpServers": {
-    "llm-box": {
-      "command": "llm-box",
+    "aflare": {
+      "command": "aflare",
       "args": ["--mcp-server"]
     }
   }

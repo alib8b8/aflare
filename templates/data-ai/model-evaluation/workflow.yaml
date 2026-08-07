@@ -1,7 +1,7 @@
 name: Model Evaluation Report
 # Generate comprehensive model evaluation report
-# Usage: llm-box install ai-ml/model-evaluation
-#        llm-box run model-evaluation/workflow.yaml
+# Usage: aflare install ai-ml/model-evaluation
+#        aflare run model-evaluation/workflow.yaml
 
 steps:
   - node: file_read

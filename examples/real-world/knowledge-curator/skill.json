@@ -3,7 +3,7 @@
   "name": "knowledge-curator",
   "version": "1.0.0",
   "description": "Curate a knowledge base from a web document: extract entities/relations into a persistent knowledge graph, visualize as Mermaid, and assemble a Markdown report.",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "research",
   "tags": [
     "research",

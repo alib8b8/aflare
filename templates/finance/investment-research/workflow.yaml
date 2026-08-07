@@ -1,7 +1,7 @@
 name: Investment Research Workflow
 # Deep investment research: asset analysis, due diligence, portfolio construction
-# Usage: llm-box install finance/investment-research
-#        llm-box run investment-research/workflow.yaml
+# Usage: aflare install finance/investment-research
+#        aflare run investment-research/workflow.yaml
 
 steps:
   - node: file_read

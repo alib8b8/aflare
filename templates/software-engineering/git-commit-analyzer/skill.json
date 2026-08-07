@@ -3,7 +3,7 @@
   "name": "git-commit-analyzer",
   "version": "1.0.0",
   "description": "Analyze git commit history and generate changelog",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "software-engineering",
   "tags": [
     "software-engineering",

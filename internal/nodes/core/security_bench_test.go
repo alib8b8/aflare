@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -26,7 +26,7 @@ import (
 // filepath.EvalSymlinks which is disk-bound and intentionally not exercised
 // here to keep the benchmark deterministic and focused on the string-op cost.
 func BenchmarkSafeJoinPath(b *testing.B) {
-	b.Setenv("LLM_BOX_SECURITY_LEVEL", "L0")
+	b.Setenv("AFLARE_SECURITY_LEVEL", "L0")
 	base := b.TempDir()
 
 	cases := []struct {
@@ -54,7 +54,7 @@ func BenchmarkSafeJoinPath(b *testing.B) {
 // at once. SafeJoinPath is read-only on the filesystem tree, so concurrent
 // access is safe.
 func BenchmarkSafeJoinPath_Parallel(b *testing.B) {
-	b.Setenv("LLM_BOX_SECURITY_LEVEL", "L0")
+	b.Setenv("AFLARE_SECURITY_LEVEL", "L0")
 	base := b.TempDir()
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {

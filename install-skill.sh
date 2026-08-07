@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# install-skill.sh — Install llm-box workflow skill into TRAE global skill directories
+# install-skill.sh — Install aflare workflow skill into TRAE global skill directories
 #
-# Installs the "llm-box-workflow" skill to:
+# Installs the "aflare-workflow" skill to:
 #   ~/.traecli/skills/   (TRAE CLI global)
 #   ~/.trae-cn/skills/   (TRAE IDE global)
 #
@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-SKILL_NAME="llm-box-workflow"
+SKILL_NAME="aflare-workflow"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_SRC="$SCRIPT_DIR/.traecli/skills/$SKILL_NAME"
 
@@ -31,7 +31,7 @@ error() { printf "\033[1;31m[err]\033[0m   %s\n" "$*" >&2; }
 
 if [ ! -f "$SKILL_SRC/SKILL.md" ]; then
   error "Skill source not found at: $SKILL_SRC/SKILL.md"
-  error "Make sure you run this script from the llm-box repository root."
+  error "Make sure you run this script from the aflare repository root."
   exit 1
 fi
 
@@ -47,7 +47,7 @@ while [ $# -gt 0 ]; do
     --remove) ACTION="remove" ;;
     --help|-h)
       cat <<EOF
-install-skill.sh — Install llm-box TRAE skill
+install-skill.sh — Install aflare TRAE skill
 
 Usage:
   bash install-skill.sh [options]
@@ -60,7 +60,7 @@ Options:
   --help       Show this help
 
 The skill files are located at:
-  .traecli/skills/llm-box-workflow/
+  .traecli/skills/aflare-workflow/
 EOF
       exit 0
       ;;

@@ -3,7 +3,7 @@
   "name": "llm-finetune",
   "version": "1.0.0",
   "description": "Generate LLM fine-tuning preparation guide",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "data-ai",
   "tags": [
     "data-ai",

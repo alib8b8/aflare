@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -60,7 +60,7 @@ func TestGetLevelFromEnv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("LLM_BOX_LOG_LEVEL", tt.env)
+			t.Setenv("AFLARE_LOG_LEVEL", tt.env)
 			got := getLevelFromEnv()
 			if got != tt.level {
 				t.Errorf("getLevelFromEnv() = %v, want %v", got, tt.level)
@@ -88,7 +88,7 @@ func TestGetFormatFromEnv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("LLM_BOX_LOG_FORMAT", tt.env)
+			t.Setenv("AFLARE_LOG_FORMAT", tt.env)
 			got := getFormatFromEnv()
 			if got != tt.format {
 				t.Errorf("getFormatFromEnv() = %v, want %v", got, tt.format)
@@ -101,13 +101,13 @@ func TestGetOutputFromEnv(t *testing.T) {
 	origLevel, origFormat, origLogger := saveState()
 	defer restoreState(origLevel, origFormat, origLogger)
 
-	t.Setenv("LLM_BOX_LOG_FILE", "/tmp/test.log")
+	t.Setenv("AFLARE_LOG_FILE", "/tmp/test.log")
 	got := getOutputFromEnv()
 	if got != "/tmp/test.log" {
 		t.Errorf("getOutputFromEnv() = %v, want %v", got, "/tmp/test.log")
 	}
 
-	t.Setenv("LLM_BOX_LOG_FILE", "")
+	t.Setenv("AFLARE_LOG_FILE", "")
 	got = getOutputFromEnv()
 	if got != "stderr" {
 		t.Errorf("getOutputFromEnv() = %v, want %v", got, "stderr")
@@ -386,27 +386,27 @@ func TestGetLogMaxMB(t *testing.T) {
 	origLevel, origFormat, origLogger := saveState()
 	defer restoreState(origLevel, origFormat, origLogger)
 
-	t.Setenv("LLM_BOX_LOG_MAX_MB", "")
+	t.Setenv("AFLARE_LOG_MAX_MB", "")
 	if got := getLogMaxMB(); got != int64(defaultLogMaxMB)*1024*1024 {
 		t.Errorf("default maxSize = %d, want %d", got, int64(defaultLogMaxMB)*1024*1024)
 	}
 
-	t.Setenv("LLM_BOX_LOG_MAX_MB", "0")
+	t.Setenv("AFLARE_LOG_MAX_MB", "0")
 	if got := getLogMaxMB(); got != 0 {
 		t.Errorf("maxSize with 0 = %d, want 0 (rotation disabled)", got)
 	}
 
-	t.Setenv("LLM_BOX_LOG_MAX_MB", "2")
+	t.Setenv("AFLARE_LOG_MAX_MB", "2")
 	if got := getLogMaxMB(); got != 2*1024*1024 {
 		t.Errorf("maxSize with 2 = %d, want %d", got, 2*1024*1024)
 	}
 
-	t.Setenv("LLM_BOX_LOG_MAX_MB", "not-a-number")
+	t.Setenv("AFLARE_LOG_MAX_MB", "not-a-number")
 	if got := getLogMaxMB(); got != int64(defaultLogMaxMB)*1024*1024 {
 		t.Errorf("invalid maxSize = %d, want default %d", got, int64(defaultLogMaxMB)*1024*1024)
 	}
 
-	t.Setenv("LLM_BOX_LOG_MAX_MB", "-5")
+	t.Setenv("AFLARE_LOG_MAX_MB", "-5")
 	if got := getLogMaxMB(); got != int64(defaultLogMaxMB)*1024*1024 {
 		t.Errorf("negative maxSize = %d, want default %d", got, int64(defaultLogMaxMB)*1024*1024)
 	}
@@ -416,22 +416,22 @@ func TestGetLogMaxBackups(t *testing.T) {
 	origLevel, origFormat, origLogger := saveState()
 	defer restoreState(origLevel, origFormat, origLogger)
 
-	t.Setenv("LLM_BOX_LOG_MAX_BACKUPS", "")
+	t.Setenv("AFLARE_LOG_MAX_BACKUPS", "")
 	if got := getLogMaxBackups(); got != defaultLogMaxBackups {
 		t.Errorf("default maxBackups = %d, want %d", got, defaultLogMaxBackups)
 	}
 
-	t.Setenv("LLM_BOX_LOG_MAX_BACKUPS", "5")
+	t.Setenv("AFLARE_LOG_MAX_BACKUPS", "5")
 	if got := getLogMaxBackups(); got != 5 {
 		t.Errorf("maxBackups with 5 = %d, want 5", got)
 	}
 
-	t.Setenv("LLM_BOX_LOG_MAX_BACKUPS", "0")
+	t.Setenv("AFLARE_LOG_MAX_BACKUPS", "0")
 	if got := getLogMaxBackups(); got != 0 {
 		t.Errorf("maxBackups with 0 = %d, want 0", got)
 	}
 
-	t.Setenv("LLM_BOX_LOG_MAX_BACKUPS", "garbage")
+	t.Setenv("AFLARE_LOG_MAX_BACKUPS", "garbage")
 	if got := getLogMaxBackups(); got != defaultLogMaxBackups {
 		t.Errorf("invalid maxBackups = %d, want default %d", got, defaultLogMaxBackups)
 	}
@@ -532,7 +532,7 @@ func TestRotatingWriterMaxBackupsZero(t *testing.T) {
 }
 
 // TestRotatingWriterThroughInitLogger exercises the full initLogger path with
-// a small LLM_BOX_LOG_MAX_MB so rotation happens end-to-end.
+// a small AFLARE_LOG_MAX_MB so rotation happens end-to-end.
 func TestRotatingWriterThroughInitLogger(t *testing.T) {
 	origLevel, origFormat, origLogger := saveState()
 	defer restoreState(origLevel, origFormat, origLogger)
@@ -540,8 +540,8 @@ func TestRotatingWriterThroughInitLogger(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "init_rotate.log")
 
-	t.Setenv("LLM_BOX_LOG_MAX_MB", "1")
-	t.Setenv("LLM_BOX_LOG_MAX_BACKUPS", "2")
+	t.Setenv("AFLARE_LOG_MAX_MB", "1")
+	t.Setenv("AFLARE_LOG_MAX_BACKUPS", "2")
 
 	initLogger(slog.LevelInfo, "text", logPath)
 	if rotWriter == nil {

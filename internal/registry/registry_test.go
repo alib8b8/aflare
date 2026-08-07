@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -115,7 +115,7 @@ func TestLoadRegistryNotFound(t *testing.T) {
 
 func TestLoadRegistry_InvalidJSON(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	regDir := filepath.Join(tmpDir, "llm-box")
+	regDir := filepath.Join(tmpDir, "aflare")
 	os.MkdirAll(regDir, 0750)
 	os.WriteFile(filepath.Join(regDir, "registry.json"), []byte("invalid"), 0600)
 
@@ -127,7 +127,7 @@ func TestLoadRegistry_InvalidJSON(t *testing.T) {
 
 func TestLoadRegistry_Success(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	regDir := filepath.Join(tmpDir, "llm-box")
+	regDir := filepath.Join(tmpDir, "aflare")
 	os.MkdirAll(regDir, 0750)
 	reg := Registry{
 		Nodes: []NodeInfo{
@@ -187,7 +187,7 @@ func TestRegistryJSONRoundTrip(t *testing.T) {
 
 func TestSearchNodesWithFile(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	regDir := filepath.Join(tmpDir, "llm-box")
+	regDir := filepath.Join(tmpDir, "aflare")
 	os.MkdirAll(regDir, 0750)
 	reg := Registry{
 		Nodes: []NodeInfo{
@@ -212,7 +212,7 @@ func TestSearchNodesWithFile(t *testing.T) {
 
 func TestSearchNodes_NoMatch(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	regDir := filepath.Join(tmpDir, "llm-box")
+	regDir := filepath.Join(tmpDir, "aflare")
 	os.MkdirAll(regDir, 0750)
 	reg := Registry{Nodes: []NodeInfo{{Name: "node1", Description: "desc", Tags: []string{"tag1"}}}}
 	data, _ := json.Marshal(reg)
@@ -229,7 +229,7 @@ func TestSearchNodes_NoMatch(t *testing.T) {
 
 func TestListNodes(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	regDir := filepath.Join(tmpDir, "llm-box")
+	regDir := filepath.Join(tmpDir, "aflare")
 	os.MkdirAll(regDir, 0750)
 	reg := Registry{
 		Nodes: []NodeInfo{
@@ -251,7 +251,7 @@ func TestListNodes(t *testing.T) {
 
 func TestGetNode_Found(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	regDir := filepath.Join(tmpDir, "llm-box")
+	regDir := filepath.Join(tmpDir, "aflare")
 	os.MkdirAll(regDir, 0750)
 	reg := Registry{
 		Nodes: []NodeInfo{{Name: "found-node", Description: "found"}},
@@ -270,7 +270,7 @@ func TestGetNode_Found(t *testing.T) {
 
 func TestGetNode_NotFound(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	regDir := filepath.Join(tmpDir, "llm-box")
+	regDir := filepath.Join(tmpDir, "aflare")
 	os.MkdirAll(regDir, 0750)
 	reg := Registry{Nodes: []NodeInfo{}}
 	data, _ := json.Marshal(reg)
@@ -305,7 +305,7 @@ func TestGetRegistryPath(t *testing.T) {
 
 func TestListInstalledNodes(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	nodesDir := filepath.Join(tmpDir, "llm-box", "nodes")
+	nodesDir := filepath.Join(tmpDir, "aflare", "nodes")
 	os.MkdirAll(nodesDir, 0750)
 	os.WriteFile(filepath.Join(nodesDir, "node1.yaml"), []byte("test"), 0644)
 	os.WriteFile(filepath.Join(nodesDir, "node2.yml"), []byte("test"), 0644)
@@ -324,7 +324,7 @@ func TestListInstalledNodes(t *testing.T) {
 
 func TestListInstalledNodes_Empty(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	nodesDir := filepath.Join(tmpDir, "llm-box", "nodes")
+	nodesDir := filepath.Join(tmpDir, "aflare", "nodes")
 	os.MkdirAll(nodesDir, 0750)
 
 	names, err := ListInstalledNodes()
@@ -338,7 +338,7 @@ func TestListInstalledNodes_Empty(t *testing.T) {
 
 func TestUninstallNode(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	nodesDir := filepath.Join(tmpDir, "llm-box", "nodes")
+	nodesDir := filepath.Join(tmpDir, "aflare", "nodes")
 	os.MkdirAll(nodesDir, 0750)
 	os.WriteFile(filepath.Join(nodesDir, "testnode.yaml"), []byte("test"), 0644)
 
@@ -423,7 +423,7 @@ func TestValidateRegistryURL(t *testing.T) {
 		wantErr bool
 	}{
 		{"https://example.com/registry.json", false},
-		{"https://raw.githubusercontent.com/alib8b8/llm-box/main/nodes-registry.json", false},
+		{"https://raw.githubusercontent.com/alib8b8/aflare/main/nodes-registry.json", false},
 		{"http://example.com/registry.json", true},
 		{"ftp://example.com/registry.json", true},
 		{"https://localhost/registry.json", true},
@@ -444,7 +444,7 @@ func TestValidateRegistryURL(t *testing.T) {
 
 func TestInstallNode_InvalidName(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	regDir := filepath.Join(tmpDir, "llm-box")
+	regDir := filepath.Join(tmpDir, "aflare")
 	os.MkdirAll(regDir, 0750)
 	reg := Registry{
 		Nodes: []NodeInfo{{Name: "bad../name", URL: "https://example.com/node.yaml"}},
@@ -459,7 +459,7 @@ func TestInstallNode_InvalidName(t *testing.T) {
 
 func TestInstallNode_NotFound(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	regDir := filepath.Join(tmpDir, "llm-box")
+	regDir := filepath.Join(tmpDir, "aflare")
 	os.MkdirAll(regDir, 0750)
 	reg := Registry{Nodes: []NodeInfo{}}
 	data, _ := json.Marshal(reg)
@@ -554,7 +554,7 @@ func TestGetRegistryPath_NoConfigDir(t *testing.T) {
 
 func TestLoadRegistry_ReadError(t *testing.T) {
 	tmpDir := setupTempConfig(t)
-	regDir := filepath.Join(tmpDir, "llm-box")
+	regDir := filepath.Join(tmpDir, "aflare")
 	os.MkdirAll(regDir, 0750)
 	regPath := filepath.Join(regDir, "registry.json")
 	os.WriteFile(regPath, []byte("valid but not json"), 0000) // no read permission
@@ -572,7 +572,7 @@ func TestLoadRegistry_ReadError(t *testing.T) {
 func TestUninstallNode_RemoveError(t *testing.T) {
 	// Create a directory instead of a file so os.Remove fails (or use a read-only parent)
 	tmpDir := setupTempConfig(t)
-	nodesDir := filepath.Join(tmpDir, "llm-box", "nodes")
+	nodesDir := filepath.Join(tmpDir, "aflare", "nodes")
 	os.MkdirAll(nodesDir, 0750)
 	// Create a directory with the target name so os.Remove on a non-empty dir may fail
 	os.MkdirAll(filepath.Join(nodesDir, "testnode.yaml"), 0750)

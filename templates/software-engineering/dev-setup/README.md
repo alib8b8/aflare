@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for automated developmen
 ## Usage
 
 ```bash
-llm-box install environment-setup/dev-setup
-llm-box run dev-setup/workflow.yaml
+aflare install environment-setup/dev-setup
+aflare run dev-setup/workflow.yaml
 ```
 
 ## Parameters

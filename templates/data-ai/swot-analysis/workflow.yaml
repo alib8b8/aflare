@@ -1,7 +1,7 @@
 name: SWOT Analysis Generator
 # Generate comprehensive SWOT analysis for any business
-# Usage: llm-box install research-analysis/swot-analysis
-#        llm-box run swot-analysis/workflow.yaml
+# Usage: aflare install research-analysis/swot-analysis
+#        aflare run swot-analysis/workflow.yaml
 
 steps:
   - node: http_request

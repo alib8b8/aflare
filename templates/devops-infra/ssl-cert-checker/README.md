@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for check ssl certificat
 ## Usage
 
 ```bash
-llm-box install devops-monitoring/ssl-cert-checker
-llm-box run ssl-cert-checker/workflow.yaml
+aflare install devops-monitoring/ssl-cert-checker
+aflare run ssl-cert-checker/workflow.yaml
 ```
 
 ## Parameters

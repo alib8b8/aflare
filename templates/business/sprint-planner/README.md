@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for plan and organize sp
 ## Usage
 
 ```bash
-llm-box install project-management/sprint-planner
-llm-box run sprint-planner/workflow.yaml
+aflare install project-management/sprint-planner
+aflare run sprint-planner/workflow.yaml
 ```
 
 ## Parameters

@@ -1,7 +1,7 @@
 name: Test Plan Generator
 # Generate comprehensive test plan
-# Usage: llm-box install quality-assurance/test-plan
-#        llm-box run test-plan/workflow.yaml
+# Usage: aflare install quality-assurance/test-plan
+#        aflare run test-plan/workflow.yaml
 
 steps:
   - node: agent

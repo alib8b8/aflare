@@ -3,7 +3,7 @@
   "name": "multi-agent-research",
   "version": "1.0.0",
   "description": "Multi-agent research pipeline: Planner decomposes the question, Researcher gathers sources, Critic reviews findings, and a final step synthesizes a structured brief.",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "research",
   "tags": [
     "research",

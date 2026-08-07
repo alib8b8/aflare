@@ -1,7 +1,7 @@
 name: Research Data Analysis
 # Statistical analysis and visualization for research data
-# Usage: llm-box install research/data-analysis
-#        llm-box run data-analysis/workflow.yaml
+# Usage: aflare install research/data-analysis
+#        aflare run data-analysis/workflow.yaml
 
 steps:
   - node: file_read

@@ -1,7 +1,7 @@
 name: AI News Daily
 # Fetches and summarizes the latest AI news
-# Usage: llm-box install ai-news
-#        llm-box run ai-news/workflow.yaml
+# Usage: aflare install ai-news
+#        aflare run ai-news/workflow.yaml
 
 steps:
   - node: http_request

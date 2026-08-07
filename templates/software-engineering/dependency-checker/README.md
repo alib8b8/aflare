@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for check project depend
 ## Usage
 
 ```bash
-llm-box install developer-tools/dependency-checker
-llm-box run dependency-checker/workflow.yaml
+aflare install developer-tools/dependency-checker
+aflare run dependency-checker/workflow.yaml
 ```
 
 ## Parameters

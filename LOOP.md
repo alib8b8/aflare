@@ -1,4 +1,4 @@
-# Loop Configuration — llm-box
+# Loop Configuration — aflare
 
 ## Active Loops
 
@@ -37,10 +37,10 @@
 /loop 1d Run $loop-triage and update STATE.md. Do not auto-fix on first week — report only.
 ```
 
-### llm-box (native execution)
+### aflare (native execution)
 
 ```
-llm-box create "Daily triage for llm-box repo: check CI, scan issues, review PRs, update STATE.md with priorities"
+aflare create "Daily triage for aflare repo: check CI, scan issues, review PRs, update STATE.md with priorities"
 ```
 
 ## State Contract
@@ -70,4 +70,4 @@ The loop must update these fields every run in `STATE.md`:
 
 - Pattern: [daily-triage](https://github.com/cobusgreyling/loop-engineering/blob/main/patterns/daily-triage.md)
 - Loop engineering: [loop-engineering repo](https://github.com/cobusgreyling/loop-engineering)
-- Project: [llm-box README](./README.md)
+- Project: [aflare README](./README.md)

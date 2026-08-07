@@ -26,7 +26,7 @@
 ### 基本用法（800I A2 默认硬件）
 
 ```bash
-llm-box run ascend-adapt/performance-tune/workflow.yaml \
+aflare run ascend-adapt/performance-tune/workflow.yaml \
   --input "Qwen2.5-7B-Instruct" \
   --set hardware=800I-A2
 ```
@@ -34,7 +34,7 @@ llm-box run ascend-adapt/performance-tune/workflow.yaml \
 ### 边缘侧 310P 场景
 
 ```bash
-llm-box run ascend-adapt/performance-tune/workflow.yaml \
+aflare run ascend-adapt/performance-tune/workflow.yaml \
   --input "Qwen2.5-7B-Instruct" \
   --set hardware=310P \
   --set quantize_method=int8 \
@@ -44,7 +44,7 @@ llm-box run ascend-adapt/performance-tune/workflow.yaml \
 ### 设定性能目标
 
 ```bash
-llm-box run ascend-adapt/performance-tune/workflow.yaml \
+aflare run ascend-adapt/performance-tune/workflow.yaml \
   --input "Qwen2.5-7B-Instruct" \
   --set hardware=800I-A2 \
   --set target_latency=30 \
@@ -54,8 +54,8 @@ llm-box run ascend-adapt/performance-tune/workflow.yaml \
 ### 安装为本地模板
 
 ```bash
-llm-box install ascend-adapt/performance-tune
-llm-box run performance-tune/workflow.yaml --input "Qwen2.5-7B-Instruct" --set hardware=800I-A2
+aflare install ascend-adapt/performance-tune
+aflare run performance-tune/workflow.yaml --input "Qwen2.5-7B-Instruct" --set hardware=800I-A2
 ```
 
 ## 输入说明
@@ -164,7 +164,7 @@ llm-box run performance-tune/workflow.yaml --input "Qwen2.5-7B-Instruct" --set h
 
 ## 环境前置要求
 
-- llm-box CLI（`llm-box --version`）
+- aflare CLI（`aflare --version`）
 - CANN Toolkit ≥ 7.0 + NPU 驱动（`npu-smi info` 可用）
 - PyTorch / MindSpore 昇腾适配版
 - MindIE ≥ 1.0（部署阶段，支持张量并行与连续批处理）

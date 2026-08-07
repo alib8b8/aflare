@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for analyze application 
 ## Usage
 
 ```bash
-llm-box install devops-monitoring/log-analyzer
-llm-box run log-analyzer/workflow.yaml
+aflare install devops-monitoring/log-analyzer
+aflare run log-analyzer/workflow.yaml
 ```
 
 ## Parameters

@@ -1,7 +1,7 @@
 name: Dependency Checker
 # Check project dependencies for updates and vulnerabilities
-# Usage: llm-box install developer-tools/dependency-checker
-#        llm-box run dependency-checker/workflow.yaml
+# Usage: aflare install developer-tools/dependency-checker
+#        aflare run dependency-checker/workflow.yaml
 
 steps:
   - node: execute

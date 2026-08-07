@@ -1,6 +1,6 @@
 # 幂等转账工作流示例
 
-> 真实金融写入场景的可运行 Demo：展示 llm-box 在**受控写入**类金融业务中的四大核心能力——幂等性、HTTP 限流、HTTP 重试、审计日志。
+> 真实金融写入场景的可运行 Demo：展示 aflare 在**受控写入**类金融业务中的四大核心能力——幂等性、HTTP 限流、HTTP 重试、审计日志。
 
 ## 展示的金融能力
 
@@ -16,19 +16,19 @@
 
 ```bash
 # 1. 设置审计 HMAC 密钥（防篡改审计链）
-export LLM_BOX_AUDIT_HMAC_KEY="your-secret-hmac-key"
+export AFLARE_AUDIT_HMAC_KEY="your-secret-hmac-key"
 
 # 2. （可选）开启 LLM 决策缓存，保证决策可复现
-export LLM_BOX_LLM_CACHE=1
+export AFLARE_LLM_CACHE=1
 
 # 3. （可选）开启 trace 持久化，记录每步 LLM I/O（已自动脱敏）
-export LLM_BOX_TRACE=1
+export AFLARE_TRACE=1
 
 # 4. （可选）自定义 LLM 单价表，覆盖内置默认价
 #    格式: {"model-name": {"input_per_1m": 2.5, "output_per_1m": 10.0}}
 #    未设置时使用内置价表（OpenAI/Anthropic/DeepSeek/GLM/Kimi/Qwen 等）
 #    每次运行的估算成本（cost_usd + total_tokens）会写入审计日志 workflow_end 记录
-export LLM_BOX_PRICING_FILE="/path/to/pricing.json"
+export AFLARE_PRICING_FILE="/path/to/pricing.json"
 ```
 
 ## 运行步骤
@@ -46,12 +46,12 @@ mock 银行 API 行为：
 - `amount > 10000` 时返回失败（演示失败审计路径）
 - 约 10% 概率返回 503（演示 HTTP 重试）
 
-### 2. 用 llm-box CLI 运行工作流
+### 2. 用 aflare CLI 运行工作流
 
 ```bash
 # 从仓库根目录运行（先启动 mock 银行 API，见上一步）
 # LLMBOX_ALLOW_LOOPBACK=1 允许访问 localhost mock 服务（SSRF 防护默认拦截内网地址）
-LLMBOX_ALLOW_LOOPBACK=1 llm-box run examples/finance/idempotent-transfer/workflow.yaml
+LLMBOX_ALLOW_LOOPBACK=1 aflare run examples/finance/idempotent-transfer/workflow.yaml
 ```
 
 > 参数（`bank_api_url`、`from_account`、`amount` 等）在 `workflow.yaml` 的 `vars`
@@ -77,8 +77,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/alib8b8/llm-box/internal/nodes"
-	"github.com/alib8b8/llm-box/internal/workflow"
+	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/workflow"
 )
 
 func main() {
@@ -141,7 +141,7 @@ check-status (condition: contains:"status":"success")
 | **服务端必须去重** | 客户端 Idempotency-Key 只是第一道防线，恶意调用方可绕过 | 银行 API 必须基于 Idempotency-Key 做数据库唯一索引去重 |
 | **跨步骤事务** | 本工作流是单步转账；多步 saga（扣款→记账→通知）见 [saga-transfer](../saga-transfer/) 示例 | 多步骤写入用 saga 步骤自动反向补偿；强一致场景仍需数据库事务 |
 | **金额精度** | 本示例用 float 演示，生产环境必须用 decimal/整数分 | 避免浮点精度丢失导致对账差异 |
-| **审计密钥保管** | `LLM_BOX_AUDIT_HMAC_KEY` 泄露将使审计链可被伪造 | 通过 KMS/Secret Manager 注入，不落盘 |
+| **审计密钥保管** | `AFLARE_AUDIT_HMAC_KEY` 泄露将使审计链可被伪造 | 通过 KMS/Secret Manager 注入，不落盘 |
 | **重试副作用** | HTTP 重试仅对幂等操作安全；非幂等操作需配合 Idempotency-Key | 银行 API 必须支持基于 key 的去重 |
 
 ## 其他金融示例

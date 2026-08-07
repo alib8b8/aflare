@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for create 30-60-90 day 
 ## Usage
 
 ```bash
-llm-box install hr-recruiting/onboarding-plan
-llm-box run onboarding-plan/workflow.yaml
+aflare install hr-recruiting/onboarding-plan
+aflare run onboarding-plan/workflow.yaml
 ```
 
 ## Parameters

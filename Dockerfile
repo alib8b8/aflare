@@ -9,7 +9,7 @@ RUN go mod download
 
 # Copy source and build
 COPY . .
-RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o llm-box ./cmd/llm-box
+RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o aflare ./cmd/aflare
 
 # Runtime stage
 FROM alpine:3.21
@@ -17,12 +17,12 @@ FROM alpine:3.21
 RUN apk add --no-cache ca-certificates bash && \
     adduser -D llmbox
 
-COPY --from=builder /app/llm-box /usr/local/bin/llm-box
-COPY --from=builder /app/install.sh /usr/local/share/llm-box/install.sh
+COPY --from=builder /app/aflare /usr/local/bin/aflare
+COPY --from=builder /app/install.sh /usr/local/share/aflare/install.sh
 
 ENV PATH="/usr/local/bin:${PATH}"
 
 USER llmbox
 
-ENTRYPOINT ["llm-box"]
+ENTRYPOINT ["aflare"]
 CMD ["--help"]

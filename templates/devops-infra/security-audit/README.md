@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for run security audit c
 ## Usage
 
 ```bash
-llm-box install security/security-audit
-llm-box run security-audit/workflow.yaml
+aflare install security/security-audit
+aflare run security-audit/workflow.yaml
 ```
 
 ## Parameters

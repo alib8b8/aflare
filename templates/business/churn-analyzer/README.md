@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for analyze customer chu
 ## Usage
 
 ```bash
-llm-box install customer-support/churn-analyzer
-llm-box run churn-analyzer/workflow.yaml
+aflare install customer-support/churn-analyzer
+aflare run churn-analyzer/workflow.yaml
 ```
 
 ## Parameters

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for analyze competitor c
 ## Usage
 
 ```bash
-llm-box install marketing/competitor-content
-llm-box run competitor-content/workflow.yaml
+aflare install marketing/competitor-content
+aflare run competitor-content/workflow.yaml
 ```
 
 ## Parameters

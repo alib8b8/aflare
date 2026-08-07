@@ -1,7 +1,7 @@
 name: Code Duplicate Finder
 # Scan codebase for duplicated code patterns
-# Usage: llm-box install developer-tools/code-duplicate-finder
-#        llm-box run code-duplicate-finder/workflow.yaml
+# Usage: aflare install developer-tools/code-duplicate-finder
+#        aflare run code-duplicate-finder/workflow.yaml
 
 steps:
   - node: execute

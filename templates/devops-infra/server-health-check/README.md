@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for check server health 
 ## Usage
 
 ```bash
-llm-box install devops-monitoring/server-health-check
-llm-box run server-health-check/workflow.yaml
+aflare install devops-monitoring/server-health-check
+aflare run server-health-check/workflow.yaml
 ```
 
 ## Parameters

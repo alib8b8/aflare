@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alib8b8/llm-box/internal/nodes/core"
+	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
 func TestOnDeviceLLMNode_Metadata(t *testing.T) {

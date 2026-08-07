@@ -8,7 +8,7 @@ This guide provides common error codes, error messages, and their solutions.
 
 | Error Code | Error Message | Cause | Solution |
 |------------|---------------|-------|----------|
-| WF001 | `node '%s' not found in registry` | The specified node doesn't exist or isn't registered | Check the node name spelling, ensure the node is installed, run `llm-box nodes list` to see available nodes |
+| WF001 | `node '%s' not found in registry` | The specified node doesn't exist or isn't registered | Check the node name spelling, ensure the node is installed, run `aflare nodes list` to see available nodes |
 | WF002 | `step %d (%s) failed: %w` | A step execution failed | Check the step's input and parameters, verify credentials, review node-specific error messages |
 | WF003 | `workflow timed out during retry delay` | Workflow exceeded the timeout limit while waiting for retry | Increase `max_timeout` in workflow config, reduce retry count, optimize step execution time |
 | WF004 | `condition evaluation failed: %w` | A condition expression couldn't be evaluated | Check the condition syntax, ensure referenced variables exist |
@@ -25,7 +25,7 @@ This guide provides common error codes, error messages, and their solutions.
 | ND001 | `failed to fetch URL: %w` | Network request failed | Check network connectivity, verify URL, check firewall rules |
 | ND002 | `HTTP request failed: %d %s` | HTTP request returned non-200 status | Check API endpoint, verify authentication, check rate limits |
 | ND003 | `connection timeout` | Connection to remote server timed out | Increase timeout parameter, check server availability, reduce network latency |
-| ND004 | `API key invalid or missing` | Authentication failed | Verify API key is correct, check secrets configuration, ensure `LLM_BOX_SECRETS_PASSWORD` is set |
+| ND004 | `API key invalid or missing` | Authentication failed | Verify API key is correct, check secrets configuration, ensure `AFLARE_SECRETS_PASSWORD` is set |
 
 #### File Operations
 
@@ -68,11 +68,11 @@ This guide provides common error codes, error messages, and their solutions.
 
 | Error Code | Error Message | Cause | Solution |
 |------------|---------------|-------|----------|
-| SEC001 | `secrets password not set - set LLM_BOX_SECRETS_PASSWORD environment variable` | Master password not configured | Set `LLM_BOX_SECRETS_PASSWORD` environment variable |
+| SEC001 | `secrets password not set - set AFLARE_SECRETS_PASSWORD environment variable` | Master password not configured | Set `AFLARE_SECRETS_PASSWORD` environment variable |
 | SEC002 | `invalid secret type: %s` | Unknown secret type | Use only `normal` or `secret` type |
 | SEC003 | `file too short: invalid format` | Secrets file is corrupted or empty | Restore from backup, recreate secrets file |
-| SEC004 | `failed to decrypt secrets: %w` | Incorrect master password | Verify `LLM_BOX_SECRETS_PASSWORD` is correct |
-| SEC005 | `secret not found: %s/%s` | Requested secret doesn't exist | Add the secret using `llm-box secrets add` |
+| SEC004 | `failed to decrypt secrets: %w` | Incorrect master password | Verify `AFLARE_SECRETS_PASSWORD` is correct |
+| SEC005 | `secret not found: %s/%s` | Requested secret doesn't exist | Add the secret using `aflare secrets add` |
 
 ### Scheduler Errors
 
@@ -80,7 +80,7 @@ This guide provides common error codes, error messages, and their solutions.
 |------------|---------------|-------|----------|
 | SCH001 | `invalid cron expression: %w` | Invalid cron syntax | Check cron expression format, use 5 fields: `minute hour day month weekday` |
 | SCH002 | `task with id %q already exists` | Duplicate task ID | Use a different task ID or remove the existing task |
-| SCH003 | `task with id %q not found` | Task doesn't exist | Check task ID, list tasks with `llm-box schedule --list` |
+| SCH003 | `task with id %q not found` | Task doesn't exist | Check task ID, list tasks with `aflare schedule --list` |
 | SCH004 | `invalid step value %q` | Invalid step value in cron expression | Step must be a positive integer |
 | SCH005 | `value %d out of range [%d, %d]` | Cron field value is out of bounds | Use valid ranges (minute: 0-59, hour: 0-23, etc.) |
 
@@ -102,7 +102,7 @@ This guide provides common error codes, error messages, and their solutions.
 
 **Solution**:
 1. Verify the node name is spelled correctly
-2. Check if the node is registered: `llm-box nodes list`
+2. Check if the node is registered: `aflare nodes list`
 3. Ensure the node is built into the binary or installed as a plugin
 4. If using custom nodes, ensure they're in the plugins directory
 
@@ -111,8 +111,8 @@ This guide provides common error codes, error messages, and their solutions.
 **Symptom**: `API key invalid or missing`
 
 **Solution**:
-1. Set `LLM_BOX_SECRETS_PASSWORD` environment variable
-2. Verify the secret exists: `llm-box secrets list <group>`
+1. Set `AFLARE_SECRETS_PASSWORD` environment variable
+2. Verify the secret exists: `aflare secrets list <group>`
 3. Check the reference syntax: `{{secret.group.key}}`
 4. Ensure the key value is correct
 
@@ -143,7 +143,7 @@ This guide provides common error codes, error messages, and their solutions.
 **Solution**:
 1. Check file/directory permissions: `ls -la`
 2. Change permissions: `chmod 755 directory`
-3. Run llm-box with appropriate user permissions
+3. Run aflare with appropriate user permissions
 4. Write to a directory you have access to
 
 ### Issue: Execute node command not allowed
@@ -151,18 +151,18 @@ This guide provides common error codes, error messages, and their solutions.
 **Symptom**: `command not allowed in safe mode`
 
 **Solution**:
-1. Disable safe mode: `llm-box --safe-mode=false run workflow.yaml`
-2. Or set environment variable: `LLM_BOX_SAFE_MODE=0`
+1. Disable safe mode: `aflare --safe-mode=false run workflow.yaml`
+2. Or set environment variable: `AFLARE_SAFE_MODE=0`
 3. For production, use allowlist mode instead
 
 ### Issue: Secrets not available
 
-**Symptom**: `secrets not available - use 'llm-box secrets add' to store secrets first`
+**Symptom**: `secrets not available - use 'aflare secrets add' to store secrets first`
 
 **Solution**:
-1. Set `LLM_BOX_SECRETS_PASSWORD` environment variable
-2. Add secrets via CLI: `llm-box secrets add --group llm --key openai --value sk-...`
-3. Verify secrets are stored: `llm-box secrets list llm`
+1. Set `AFLARE_SECRETS_PASSWORD` environment variable
+2. Add secrets via CLI: `aflare secrets add --group llm --key openai --value sk-...`
+3. Verify secrets are stored: `aflare secrets list llm`
 
 ### Issue: Cron expression invalid
 
@@ -172,7 +172,7 @@ This guide provides common error codes, error messages, and their solutions.
 1. Use standard 5-field cron syntax
 2. Example: `0 9 * * *` (daily at 9 AM)
 3. Avoid 6-field cron formats
-4. Test with: `llm-box schedule --cron "0 9 * * *" --validate`
+4. Test with: `aflare schedule --cron "0 9 * * *" --validate`
 
 ## Debugging Tips
 
@@ -180,38 +180,38 @@ This guide provides common error codes, error messages, and their solutions.
 
 ```bash
 # Enable debug logging
-LLM_BOX_LOG_LEVEL=debug llm-box run workflow.yaml
+AFLARE_LOG_LEVEL=debug aflare run workflow.yaml
 
 # View detailed logs
-tail -f ~/.llm-box/logs/audit.log
+tail -f ~/.aflare/logs/audit.log
 ```
 
 ### Use Dry Run Mode
 
 ```bash
 # Preview commands without executing
-llm-box run --dry-run workflow.yaml
+aflare run --dry-run workflow.yaml
 ```
 
 ### Check Step Output
 
 ```bash
 # Run with verbose output to see each step's input/output
-llm-box run --verbose workflow.yaml
+aflare run --verbose workflow.yaml
 ```
 
 ### Validate Workflow Syntax
 
 ```bash
 # Validate YAML syntax without running
-llm-box validate workflow.yaml
+aflare validate workflow.yaml
 ```
 
 ### Test Individual Nodes
 
 ```bash
 # Test a node directly
-llm-box node test http_request --params '{"url":"https://example.com"}'
+aflare node test http_request --params '{"url":"https://example.com"}'
 ```
 
 ## Log Analysis
@@ -220,16 +220,16 @@ llm-box node test http_request --params '{"url":"https://example.com"}'
 
 ```bash
 # Search for errors
-grep -i "error\|failed" ~/.llm-box/logs/audit.log
+grep -i "error\|failed" ~/.aflare/logs/audit.log
 
 # Search for specific workflow
-grep "my-workflow" ~/.llm-box/logs/audit.log
+grep "my-workflow" ~/.aflare/logs/audit.log
 
 # Search for API-related errors
-grep -i "api\|auth\|token" ~/.llm-box/logs/audit.log
+grep -i "api\|auth\|token" ~/.aflare/logs/audit.log
 
 # View recent logs
-tail -n 100 ~/.llm-box/logs/audit.log
+tail -n 100 ~/.aflare/logs/audit.log
 ```
 
 ### Log Field Reference
@@ -258,4 +258,4 @@ If you can't resolve an issue:
    - Error message
    - Workflow YAML (redact secrets)
    - Steps to reproduce
-   - Environment details (OS, llm-box version)
+   - Environment details (OS, aflare version)

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alib8b8/llm-box/internal/nodes"
+	"github.com/alib8b8/aflare/internal/nodes"
 )
 
 // projectOne is a small helper that runs a single LLMCallTelemetry record
@@ -95,14 +95,14 @@ func TestStepTrace_RedactsResponse(t *testing.T) {
 }
 
 // TestStepTrace_NoRedactWhenDisabled verifies that setting BOTH
-// LLM_BOX_TRACE_NO_REDACT=1 AND LLM_BOX_DEBUG_MODE=1 bypasses redaction
+// AFLARE_TRACE_NO_REDACT=1 AND AFLARE_DEBUG_MODE=1 bypasses redaction
 // entirely, so the raw prompt/response are preserved verbatim in the trace.
 // The dual control (H-8) means a single env var is not enough; production
 // safety relies on both being set together. This escape hatch is intended
 // for local debugging only.
 func TestStepTrace_NoRedactWhenDisabled(t *testing.T) {
-	t.Setenv("LLM_BOX_TRACE_NO_REDACT", "1")
-	t.Setenv("LLM_BOX_DEBUG_MODE", "1")
+	t.Setenv("AFLARE_TRACE_NO_REDACT", "1")
+	t.Setenv("AFLARE_DEBUG_MODE", "1")
 
 	secret := "sk-abcdefghijklmnopqrstuvwxyz1234567890"
 	jwt := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
@@ -123,13 +123,13 @@ func TestStepTrace_NoRedactWhenDisabled(t *testing.T) {
 }
 
 // TestStepTrace_NoRedactRequiresDebugMode verifies the H-8 dual control:
-// setting LLM_BOX_TRACE_NO_REDACT=1 ALONE (without LLM_BOX_DEBUG_MODE=1)
+// setting AFLARE_TRACE_NO_REDACT=1 ALONE (without AFLARE_DEBUG_MODE=1)
 // must NOT bypass redaction. This is the production-safety property — a
 // single accidentally-set env var cannot leak sensitive prompts into trace
 // files. The secret must still be scrubbed as if neither flag were set.
 func TestStepTrace_NoRedactRequiresDebugMode(t *testing.T) {
-	t.Setenv("LLM_BOX_TRACE_NO_REDACT", "1")
-	// LLM_BOX_DEBUG_MODE intentionally NOT set.
+	t.Setenv("AFLARE_TRACE_NO_REDACT", "1")
+	// AFLARE_DEBUG_MODE intentionally NOT set.
 
 	secret := "sk-abcdefghijklmnopqrstuvwxyz1234567890"
 	tr := projectOne(t, nodes.LLMCallTelemetry{

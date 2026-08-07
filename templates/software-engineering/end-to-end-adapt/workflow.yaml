@@ -5,8 +5,8 @@ description: |
   搜索 → 验证 → 适配 → 量化 → 调优 → 部署 → 文档。
   输入：模型名称（如 Qwen2.5-7B-Instruct），可选目标硬件与框架。
 # 用法:
-#   llm-box run ascend-adapt/end-to-end-adapt/workflow.yaml --input "Qwen2.5-7B-Instruct"
-#   llm-box run ascend-adapt/end-to-end-adapt/workflow.yaml --input "Qwen2.5-14B-Instruct" --set target_npu=910C
+#   aflare run ascend-adapt/end-to-end-adapt/workflow.yaml --input "Qwen2.5-7B-Instruct"
+#   aflare run ascend-adapt/end-to-end-adapt/workflow.yaml --input "Qwen2.5-14B-Instruct" --set target_npu=910C
 
 inputs:
   model: "Qwen2.5-7B-Instruct"      # 待适配的模型名称

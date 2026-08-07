@@ -1,4 +1,4 @@
-# llm-box Workflow Examples
+# aflare Workflow Examples
 
 10 ready-to-use workflow patterns. Use these as templates when generating workflows for users.
 

@@ -1,6 +1,6 @@
-# 📦 llm-box Community Nodes
+# 📦 aflare Community Nodes
 
-This directory holds **community-contributed nodes** that extend llm-box.
+This directory holds **community-contributed nodes** that extend aflare.
 Each node is a self-contained folder with a `metadata.yaml` and an entry script.
 
 > Want to add your own? See [CONTRIBUTING.md](../CONTRIBUTING.md).

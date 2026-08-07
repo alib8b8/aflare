@@ -1,4 +1,4 @@
-module github.com/alib8b8/llm-box
+module github.com/alib8b8/aflare
 
 go 1.25.12
 

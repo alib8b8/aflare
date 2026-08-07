@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>llm-box</h1>
+  <h1>aflare</h1>
   <p>🌍
     <a href="README.md">中文</a> ·
     <strong>English</strong>
@@ -9,11 +9,11 @@
   <p><em>What if your computer just understood what you meant?</em></p>
 
   <p>
-    <a href="https://github.com/alib8b8/llm-box/actions/workflows/ci.yml">
-      <img src="https://img.shields.io/github/actions/workflow/status/alib8b8/llm-box/ci.yml?branch=main&style=flat-square&label=CI" alt="CI Status" />
+    <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
+      <img src="https://img.shields.io/github/actions/workflow/status/alib8b8/aflare/ci.yml?branch=main&style=flat-square&label=CI" alt="CI Status" />
     </a>
-    <a href="https://github.com/alib8b8/llm-box/releases">
-      <img src="https://img.shields.io/github/v/release/alib8b8/llm-box?display_name=tag&include_prereleases&style=flat-square" alt="release" />
+    <a href="https://github.com/alib8b8/aflare/releases">
+      <img src="https://img.shields.io/github/v/release/alib8b8/aflare?display_name=tag&include_prereleases&style=flat-square" alt="release" />
     </a>
     <a href="https://golang.org/">
       <img src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat-square" alt="Go" />
@@ -21,23 +21,23 @@
     <a href="LICENSE">
       <img src="https://img.shields.io/badge/License-AGPL%20v3.0-blue.svg?style=flat-square" alt="license" />
     </a>
-    <a href="https://github.com/alib8b8/llm-box/actions/workflows/release.yml">
-      <img src="https://github.com/alib8b8/llm-box/actions/workflows/release.yml/badge.svg" alt="Release status" />
+    <a href="https://github.com/alib8b8/aflare/actions/workflows/release.yml">
+      <img src="https://github.com/alib8b8/aflare/actions/workflows/release.yml/badge.svg" alt="Release status" />
     </a>
-    <a href="https://gitcode.com/llm-box/llm-box">
+    <a href="https://gitcode.com/aflare/aflare">
       <img src="https://img.shields.io/badge/AtomGit-GitCode-green?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzI1MjUyNSIgZD0iTTIyIDJoLTJWMGgydi0yaDJ2MmgydjItMmgydjItMmgydjJ6bTAgMTZIMnYtMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjJ6bTAgLThIMnYtMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjJ6Ii8+PC9zdmc+" alt="GitCode" />
     </a>
-    <a href="https://gitcode.com/llm-box/llm-box">
-      <img src="https://gitcode.com/llm-box/llm-box/star/new_badge.svg" alt="AtomGit G-Star" />
+    <a href="https://gitcode.com/aflare/aflare">
+      <img src="https://gitcode.com/aflare/aflare/star/new_badge.svg" alt="AtomGit G-Star" />
     </a>
-    <a href="https://gitcode.com/llm-box/llm-box">
-      <img src="https://gitcode.com/llm-box/llm-box/star/badge.svg" alt="AtomGit Star" />
+    <a href="https://gitcode.com/aflare/aflare">
+      <img src="https://gitcode.com/aflare/aflare/star/badge.svg" alt="AtomGit Star" />
     </a>
-    <a href="https://gitcode.com/llm-box/llm-box">
-      <img src="https://gitcode.com/llm-box/llm-box/fork/badge.svg" alt="AtomGit Fork" />
+    <a href="https://gitcode.com/aflare/aflare">
+      <img src="https://gitcode.com/aflare/aflare/fork/badge.svg" alt="AtomGit Fork" />
     </a>
-    <a href="https://gitcode.com/llm-box/llm-box">
-      <img src="https://gitcode.com/llm-box/llm-box/download/badge.svg" alt="AtomGit Download" />
+    <a href="https://gitcode.com/aflare/aflare">
+      <img src="https://gitcode.com/aflare/aflare/download/badge.svg" alt="AtomGit Download" />
     </a>
   </p>
 
@@ -48,7 +48,7 @@
 ## 📋 Table of Contents
 
 - [🚀 Quick Start](#-quick-start)
-- [💡 Why llm-box?](#-why-llm-box)
+- [💡 Why aflare?](#-why-aflare)
 - [📖 The Story](#-the-story)
 - [✨ Core Features](#-core-features)
 - [💰 Financial Scenario Capabilities](#-financial-scenario-capabilities)
@@ -77,15 +77,15 @@
 
 | macOS | Linux | Windows |
 |-------|-------|---------|
-| `brew install alib8b8/tap/llm-box` | `curl -fsSL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh \| bash` | `irm https://raw.githubusercontent.com/alib8b8/llm-box/main/install.ps1 \| iex` |
+| `brew install alib8b8/tap/aflare` | `curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh \| bash` | `irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 \| iex` |
 
 **🌏 China users &mdash; use mirror for faster download:**
 
 | macOS/Linux | Windows |
 |-------------|---------|
-| `curl -fsSL https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh \| bash` | `irm https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.ps1 \| iex` |
+| `curl -fsSL https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh \| bash` | `irm https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 \| iex` |
 
-**Or download from [GitCode Releases](https://gitcode.com/llm-box/llm-box/releases) / [GitHub Releases](https://github.com/alib8b8/llm-box/releases)**
+**Or download from [GitCode Releases](https://gitcode.com/aflare/aflare/releases) / [GitHub Releases](https://github.com/alib8b8/aflare/releases)**
 
 📖 [Interactive Download Page →](docs/download.html)
 
@@ -93,42 +93,42 @@
 
 ### Generate Workflows in One Line
 
-Tell llm-box what you want in plain English, and it generates YAML workflows:
+Tell aflare what you want in plain English, and it generates YAML workflows:
 
 ```bash
 # Monitor BTC price every 10 minutes
-llm-box create "monitor BTC price every 10 minutes and send telegram alert when > 70000"
+aflare create "monitor BTC price every 10 minutes and send telegram alert when > 70000"
 
 # Watch GitHub repo stars and notify at threshold
-llm-box create "watch my github repo alib8b8/llm-box and notify me when star > 100"
+aflare create "watch my github repo alib8b8/aflare and notify me when star > 100"
 
 # Download and summarize arxiv AI papers daily
-llm-box create "download arxiv AI papers every day and summarize top 5"
+aflare create "download arxiv AI papers every day and summarize top 5"
 
 # Watch TSLA stock and send Telegram alerts
-llm-box create "watch TSLA stock and send telegram alert when price drops 5%"
+aflare create "watch TSLA stock and send telegram alert when price drops 5%"
 
 # Monitor Shanghai weather and email if rain
-llm-box create "monitor Shanghai weather and email me if it will rain tomorrow"
+aflare create "monitor Shanghai weather and email me if it will rain tomorrow"
 ```
 
 Then run the generated workflow:
 
 ```bash
-llm-box run btc-monitor.yaml
+aflare run btc-monitor.yaml
 ```
 
 📖 [Full Getting Started Guide →](docs/getting-started.md)
 
 ---
 
-## 💡 Why llm-box?
+## 💡 Why aflare?
 
-> llm-box is not an AI assistant — it's a **deterministic execution engine**.
+> aflare is not an AI assistant — it's a **deterministic execution engine**.
 >
 > AI understands your intent. YAML guarantees execution.
 
-| Tool | The Problem | llm-box's Approach |
+| Tool | The Problem | aflare's Approach |
 |------|-------------|-------------------|
 | **Bash** | Too hard to write, hard to maintain, error-prone | Natural language generation, YAML is readable and editable |
 | **n8n** | Too heavy — one automation task needs Docker | Single binary, works right in your terminal |
@@ -140,7 +140,7 @@ llm-box run btc-monitor.yaml
 
 ## 📖 The Story
 
-> I built llm-box because I was tired of writing Bash scripts.
+> I built aflare because I was tired of writing Bash scripts.
 >
 > Every time I wanted to automate something simple — monitor a price, scrape news, send a timed message — I'd end up writing dozens of lines of Bash, handling errors, retries, dependencies.
 >
@@ -161,7 +161,7 @@ llm-box run btc-monitor.yaml
 | **🔌 Fully Offline Capable** | Works with Ollama — everything runs locally. Works without internet, data never leaves your device |
 | **🔄 Scheduled Execution** | Built-in Cron scheduling. Every 10 minutes, daily, weekly — however you want it |
 | **🧩 100+ Built-in Templates** | BTC monitor, GitHub Star alerts, Arxiv paper summaries, weather reminders… ready to use |
-| **🔌 Plugin System** | Extend like Homebrew taps. `llm-box install btc-monitor` |
+| **🔌 Plugin System** | Extend like Homebrew taps. `aflare install btc-monitor` |
 | **🌐 Multi-Model Support** | Ollama / OpenAI / DeepSeek / Qwen / Kimi / GLM / Mistral / **Ascend**, local and cloud |
 | **🔒 Privacy First** | Local execution by default, auto secret redaction, complete audit logs, 98+ vulnerabilities audited |
 | **🛡️ Enterprise-Grade Security** | SSRF protection, path traversal defense, command injection whitelist, AES-GCM encryption |
@@ -171,7 +171,7 @@ llm-box run btc-monitor.yaml
 
 ## 💰 Financial Scenario Capabilities
 
-llm-box ships the core capabilities required for real-world financial scenarios (read-only analysis + controlled writes):
+aflare ships the core capabilities required for real-world financial scenarios (read-only analysis + controlled writes):
 
 | Capability | Implementation | Status |
 |------------|----------------|--------|
@@ -182,7 +182,7 @@ llm-box ships the core capabilities required for real-world financial scenarios 
 | Quota persistence + multi-tenancy | FileQuotaStore + per-tenant isolation | ✅ |
 | Trace redaction | LLM I/O redacted (API keys/JWT/private keys) before persistence | ✅ |
 | **Saga transaction compensation** | forward steps + reverse compensate, best-effort compensation, `{{var.error}}` context | ✅ |
-| **LLM cost attribution** | token usage × price table → estimated USD cost in audit log `cost_usd`/`total_tokens`; `LLM_BOX_PRICING_FILE` overrides prices | ✅ |
+| **LLM cost attribution** | token usage × price table → estimated USD cost in audit log `cost_usd`/`total_tokens`; `AFLARE_PRICING_FILE` overrides prices | ✅ |
 
 ### Applicable Scenarios
 - ✅ Read-only analysis: AML review, investment research, portfolio review, end-of-day reconciliation (templates available)
@@ -202,7 +202,7 @@ llm-box ships the core capabilities required for real-world financial scenarios 
 
 ## 🏛️ Xinchuang &amp; Domestic IT
 
-llm-box is a domestic AI workflow engine built for China's Xinchuang (信息技术应用创新) ecosystem — from chip ISA to OS, from AI compute to mobile, the entire stack runs on domestic technology.
+aflare is a domestic AI workflow engine built for China's Xinchuang (信息技术应用创新) ecosystem — from chip ISA to OS, from AI compute to mobile, the entire stack runs on domestic technology.
 
 ### Xinchuang Compatibility Matrix
 
@@ -225,7 +225,7 @@ llm-box is a domestic AI workflow engine built for China's Xinchuang (信息技�
 
 ### Xinchuang Differentiators
 
-| Dimension | llm-box | Domestic Alternatives |
+| Dimension | aflare | Domestic Alternatives |
 |-----------|---------|----------------------|
 | **Chip Support** | Ascend + Cambricon + Hygon (3 vendors) | Mostly NVIDIA CUDA only |
 | **Deployment** | Single binary, fully offline/air-gapped | Mostly SaaS or Docker |
@@ -298,7 +298,7 @@ Specialized AI agent nodes for autonomous reasoning:
 
 ## 🤖 Unitree Robot Integration
 
-llm-box ships with a built-in `unitree_robot` node that brings Unitree (宇树) robots into YAML workflow orchestration, supporting both quadruped and humanoid robot control and status monitoring.
+aflare ships with a built-in `unitree_robot` node that brings Unitree (宇树) robots into YAML workflow orchestration, supporting both quadruped and humanoid robot control and status monitoring.
 
 | Node | Description |
 |------|-------------|
@@ -344,7 +344,7 @@ Built-in safety validation engine: high-speed operation warnings, safety zone ch
 
 ## 🔒 Security
 
-llm-box takes security seriously. Key protections:
+aflare takes security seriously. Key protections:
 
 | Protection | Implementation |
 |------------|----------------|
@@ -374,7 +374,7 @@ llm-box takes security seriously. Key protections:
 
 ## 🌐 Ecosystem
 
-llm-box participates in multiple open-source ecosystems:
+aflare participates in multiple open-source ecosystems:
 
 | Ecosystem | Status | Description |
 |-----------|--------|-------------|
@@ -438,22 +438,22 @@ llm-box participates in multiple open-source ecosystems:
 ## 🛠️ CLI Commands
 
 ```bash
-llm-box create [description]    Generate workflow from description
-llm-box run <file>             Run a workflow
-llm-box run --resume <file>    Resume workflow from last checkpoint
-llm-box secrets add            Store an encrypted secret
-llm-box secrets list           List secrets in a group
-llm-box schedule add           Add a scheduled task
-llm-box schedule list          List scheduled tasks
-llm-box schedule remove        Remove a scheduled task
-llm-box schedule start         Start the scheduler
-llm-box ui                     Start web UI editor
-llm-box visualize <file>       Visualize a workflow
-llm-box validate <file>        Validate a workflow file
-llm-box node install           Install external node
-llm-box plugin install         Install a plugin
-llm-box version                Show version
-llm-box help                   Show full help
+aflare create [description]    Generate workflow from description
+aflare run <file>             Run a workflow
+aflare run --resume <file>    Resume workflow from last checkpoint
+aflare secrets add            Store an encrypted secret
+aflare secrets list           List secrets in a group
+aflare schedule add           Add a scheduled task
+aflare schedule list          List scheduled tasks
+aflare schedule remove        Remove a scheduled task
+aflare schedule start         Start the scheduler
+aflare ui                     Start web UI editor
+aflare visualize <file>       Visualize a workflow
+aflare validate <file>        Validate a workflow file
+aflare node install           Install external node
+aflare plugin install         Install a plugin
+aflare version                Show version
+aflare help                   Show full help
 ```
 
 📖 [Full CLI Reference &rarr;](docs/getting-started.md#cli-command-reference)
@@ -520,62 +520,62 @@ llm-box help                   Show full help
 
 ## 🌟 Featured Integrations
 
-Excellent open-source projects built with llm-box:
+Excellent open-source projects built with aflare:
 
 | Project | Description |
 |---------|-------------|
-| [AI News Assistant]() | AI news aggregation and summary system based on llm-box workflows |
+| [AI News Assistant]() | AI news aggregation and summary system based on aflare workflows |
 | [Code Review Agent]() | Automated code review tool leveraging code knowledge graph nodes |
 | [Research Assistant]() | Academic research workflow combining researcher + knowledge_graph nodes |
 
-> If your project uses llm-box, feel free to submit a PR to add it here!
+> If your project uses aflare, feel free to submit a PR to add it here!
 
 ---
 
 ## 🛒 Featured Skills Marketplace
 
-llm-box ships with 100+ ready-to-use workflow templates covering development, ops, marketing, research, and more. One command to install and use.
+aflare ships with 100+ ready-to-use workflow templates covering development, ops, marketing, research, and more. One command to install and use.
 
 ### Installation
 
 ```bash
 # Install from the skills marketplace
-llm-box create from templates/software-engineering/unit-test-generator
+aflare create from templates/software-engineering/unit-test-generator
 
 # Or install directly from GitHub
-llm-box create from https://github.com/alib8b8/llm-box/tree/main/templates/data-ai/prompt-engineering
+aflare create from https://github.com/alib8b8/aflare/tree/main/templates/data-ai/prompt-engineering
 ```
 
 ### Popular Skills
 
 | Category | Skill | Description | Install |
 |----------|-------|-------------|---------|
-| 🤖 AI/ML | Prompt Engineering | LLM prompt engineering template | `llm-box create from templates/data-ai/prompt-engineering` |
-| 🤖 AI/ML | LLM Fine-tune | Large model fine-tuning pipeline | `llm-box create from templates/data-ai/llm-finetune` |
-| 🤖 AI/ML | Model Evaluation | Model evaluation and benchmarking | `llm-box create from templates/data-ai/model-evaluation` |
-| 💻 Dev Tools | Unit Test Generator | Auto-generate unit tests | `llm-box create from templates/software-engineering/unit-test-generator` |
-| 💻 Dev Tools | API Docs Generator | Auto-generate API docs | `llm-box create from templates/software-engineering/api-docs-generator` |
-| 💻 Dev Tools | Code Duplicate Finder | Code duplication detection | `llm-box create from templates/software-engineering/code-duplicate-finder` |
-| 💻 Dev Tools | Dependency Checker | Dependency security check | `llm-box create from templates/software-engineering/dependency-checker` |
-| 🔧 DevOps | Log Analyzer | Intelligent log analysis | `llm-box create from templates/devops-infra/log-analyzer` |
-| 🔧 DevOps | Docker Cleaner | Docker resource cleanup | `llm-box create from templates/devops-infra/docker-cleaner` |
-| 🔧 DevOps | SSL Cert Checker | SSL certificate expiry check | `llm-box create from templates/devops-infra/ssl-cert-checker` |
-| 📊 Data | CSV Analyzer | CSV data analysis | `llm-box create from templates/data-ai/csv-analyzer` |
-| 📊 Data | A/B Test Analyzer | A/B test analysis | `llm-box create from templates/data-ai/ab-test-analyzer` |
-| 📊 Data | Financial Analyzer | Financial data analysis | `llm-box create from templates/data-ai/financial-analyzer` |
-| 📝 Content | Blog Outline Generator | Blog outline generation | `llm-box create from templates/marketing/blog-outline-generator` |
-| 📝 Content | SEO Keyword Research | SEO keyword research | `llm-box create from templates/marketing/seo-keyword-research` |
-| 🔬 Research | Literature Review | Literature review | `llm-box create from templates/data-ai/literature-review` |
-| 🔬 Research | Paper Summarizer | Paper summarization | `llm-box create from templates/data-ai/paper-summarizer` |
-| 🔬 Research | Competitor Analysis | Competitor analysis | `llm-box create from templates/data-ai/competitor-analysis` |
-| 📈 Business | Business Plan | Business plan writing | `llm-box create from templates/business/business-plan` |
-| 📈 Business | SaaS Pricing | SaaS pricing strategy | `llm-box create from templates/business/saas-pricing` |
-| 🔒 Security | Security Audit | Security auditing | `llm-box create from templates/devops-infra/security-audit` |
-| 🔒 Security | Incident Response | Incident response | `llm-box create from templates/devops-infra/incident-response` |
-| 📚 Docs | README Generator | README auto-generation | `llm-box create from templates/software-engineering/readme-generator` |
-| 📚 Docs | API Docs Builder | API docs builder | `llm-box create from templates/software-engineering/api-docs-builder` |
-| 🏗️ Arch | Microservices Design | Microservices design | `llm-box create from templates/software-engineering/microservices-design` |
-| 🏗️ Arch | Cloud Architecture | Cloud architecture design | `llm-box create from templates/devops-infra/cloud-architecture` |
+| 🤖 AI/ML | Prompt Engineering | LLM prompt engineering template | `aflare create from templates/data-ai/prompt-engineering` |
+| 🤖 AI/ML | LLM Fine-tune | Large model fine-tuning pipeline | `aflare create from templates/data-ai/llm-finetune` |
+| 🤖 AI/ML | Model Evaluation | Model evaluation and benchmarking | `aflare create from templates/data-ai/model-evaluation` |
+| 💻 Dev Tools | Unit Test Generator | Auto-generate unit tests | `aflare create from templates/software-engineering/unit-test-generator` |
+| 💻 Dev Tools | API Docs Generator | Auto-generate API docs | `aflare create from templates/software-engineering/api-docs-generator` |
+| 💻 Dev Tools | Code Duplicate Finder | Code duplication detection | `aflare create from templates/software-engineering/code-duplicate-finder` |
+| 💻 Dev Tools | Dependency Checker | Dependency security check | `aflare create from templates/software-engineering/dependency-checker` |
+| 🔧 DevOps | Log Analyzer | Intelligent log analysis | `aflare create from templates/devops-infra/log-analyzer` |
+| 🔧 DevOps | Docker Cleaner | Docker resource cleanup | `aflare create from templates/devops-infra/docker-cleaner` |
+| 🔧 DevOps | SSL Cert Checker | SSL certificate expiry check | `aflare create from templates/devops-infra/ssl-cert-checker` |
+| 📊 Data | CSV Analyzer | CSV data analysis | `aflare create from templates/data-ai/csv-analyzer` |
+| 📊 Data | A/B Test Analyzer | A/B test analysis | `aflare create from templates/data-ai/ab-test-analyzer` |
+| 📊 Data | Financial Analyzer | Financial data analysis | `aflare create from templates/data-ai/financial-analyzer` |
+| 📝 Content | Blog Outline Generator | Blog outline generation | `aflare create from templates/marketing/blog-outline-generator` |
+| 📝 Content | SEO Keyword Research | SEO keyword research | `aflare create from templates/marketing/seo-keyword-research` |
+| 🔬 Research | Literature Review | Literature review | `aflare create from templates/data-ai/literature-review` |
+| 🔬 Research | Paper Summarizer | Paper summarization | `aflare create from templates/data-ai/paper-summarizer` |
+| 🔬 Research | Competitor Analysis | Competitor analysis | `aflare create from templates/data-ai/competitor-analysis` |
+| 📈 Business | Business Plan | Business plan writing | `aflare create from templates/business/business-plan` |
+| 📈 Business | SaaS Pricing | SaaS pricing strategy | `aflare create from templates/business/saas-pricing` |
+| 🔒 Security | Security Audit | Security auditing | `aflare create from templates/devops-infra/security-audit` |
+| 🔒 Security | Incident Response | Incident response | `aflare create from templates/devops-infra/incident-response` |
+| 📚 Docs | README Generator | README auto-generation | `aflare create from templates/software-engineering/readme-generator` |
+| 📚 Docs | API Docs Builder | API docs builder | `aflare create from templates/software-engineering/api-docs-builder` |
+| 🏗️ Arch | Microservices Design | Microservices design | `aflare create from templates/software-engineering/microservices-design` |
+| 🏗️ Arch | Cloud Architecture | Cloud architecture design | `aflare create from templates/devops-infra/cloud-architecture` |
 
 > See the [templates/](templates/) directory for the full list — 120+ skills and growing.
 
@@ -583,9 +583,9 @@ llm-box create from https://github.com/alib8b8/llm-box/tree/main/templates/data-
 
 ## 📖❓ FAQ
 
-### 1. How is llm-box different from other agent frameworks?
+### 1. How is aflare different from other agent frameworks?
 
-llm-box focuses on the **combination of deterministic workflows and AI agents**: workflows ensure reliable and reproducible execution, while agent nodes provide intelligent reasoning capabilities. We don't rely on a single model provider, supporting 22+ models with 5 routing strategies. The core is written in Go with zero dependencies — fast startup and low memory footprint.
+aflare focuses on the **combination of deterministic workflows and AI agents**: workflows ensure reliable and reproducible execution, while agent nodes provide intelligent reasoning capabilities. We don't rely on a single model provider, supporting 22+ models with 5 routing strategies. The core is written in Go with zero dependencies — fast startup and low memory footprint.
 
 In terms of engineering depth: the expression engine uses bytecode IR + vectorized batch evaluation; persistence uses append-only WAL (CRC32 + atomic compaction) replacing full JSON rewrites; LLM routing integrates EWMA latency prediction + full circuit-breaker state machine + Pareto sorting; the DAG scheduler is verified via TLA+ formal spec + Go model checking for safety invariants and liveness.
 
@@ -598,7 +598,7 @@ Currently supporting **22+ models** across mainstream providers:
 
 ### 3. Can it be used in enterprise environments?
 
-Absolutely. llm-box uses the GNU Affero General Public License v3.0 and provides:
+Absolutely. aflare uses the GNU Affero General Public License v3.0 and provides:
 - **Tiered security configuration** (L0-L3), supporting security gradients from development to production
 - **Secret redaction** + **outbound data monitoring** to prevent data leaks
 - **Audit logging** for traceability of all operations
@@ -606,7 +606,7 @@ Absolutely. llm-box uses the GNU Affero General Public License v3.0 and provides
 
 ### 4. How do I extend with custom nodes?
 
-llm-box supports three extension methods:
+aflare supports three extension methods:
 - **Plugin System**: Install plugins from local/git/URL/market with sandbox isolation
 - **MCP Protocol**: Connect external tools via Model Context Protocol
 - **Custom Nodes**: Implement standard interfaces in any language — see [custom nodes guide](docs/custom-nodes.md)
@@ -617,7 +617,7 @@ Short-term (v0.6-v0.9): Complete agent team collaboration, multimodal capabiliti
 Long-term (v1.0+): Stable API, LTS releases, enterprise support, more hardware adaptation (Ascend/Cambricon/Hygon)
 See [Roadmap →](#-roadmap) for details.
 
-### 6. Can llm-box be used in real financial scenarios?
+### 6. Can aflare be used in real financial scenarios?
 
 The core financial capabilities (audit / idempotency / rate limiting / redaction / caching / saga transaction compensation) are in place, suitable for read-only analysis, controlled-write, and cross-step transaction scenarios.
 Saga supports automatic reverse compensation when multi-step writes fail; 2PC is not yet implemented, so strong-consistency scenarios still need database transactions.
@@ -627,12 +627,12 @@ See [Financial Scenario Capabilities](#-financial-scenario-capabilities) for det
 
 ## 📦 Code Hosting
 
-llm-box is synced across multiple platforms — follow and contribute on your preferred platform:
+aflare is synced across multiple platforms — follow and contribute on your preferred platform:
 
 | Platform | Link |
 |----------|------|
-| **GitHub** | https://github.com/alib8b8/llm-box |
-| **GitCode / AtomGit** | https://gitcode.com/llm-box/llm-box |
+| **GitHub** | https://github.com/alib8b8/aflare |
+| **GitCode / AtomGit** | https://gitcode.com/aflare/aflare |
 
 ---
 
@@ -644,7 +644,7 @@ We welcome contributions from the community!
 
 New to the project? Start here:
 
-- 🐛 [Bug fixes labeled "good first issue"](https://github.com/alib8b8/llm-box/labels/good%20first%20issue)
+- 🐛 [Bug fixes labeled "good first issue"](https://github.com/alib8b8/aflare/labels/good%20first%20issue)
 - 📝 Documentation improvements
 - ✅ Add test coverage for low-coverage packages
 - 🔧 New utility nodes (see [custom nodes guide](docs/custom-nodes.md))
@@ -678,10 +678,10 @@ GNU Affero General Public License v3.0 &mdash; see [LICENSE](LICENSE) for detail
 <div align="center">
   <p>Built with ❤️ for developers who love the terminal</p>
   <p>
-    <a href="https://github.com/alib8b8/llm-box">GitHub</a>
+    <a href="https://github.com/alib8b8/aflare">GitHub</a>
     &middot;
-    <a href="https://github.com/alib8b8/llm-box/issues">Issues</a>
+    <a href="https://github.com/alib8b8/aflare/issues">Issues</a>
     &middot;
-    <a href="https://github.com/alib8b8/llm-box/discussions">Discussions</a>
+    <a href="https://github.com/alib8b8/aflare/discussions">Discussions</a>
   </p>
 </div>

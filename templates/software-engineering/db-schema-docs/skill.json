@@ -3,7 +3,7 @@
   "name": "db-schema-docs",
   "version": "1.0.0",
   "description": "Generate database schema documentation",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "software-engineering",
   "tags": [
     "software-engineering",

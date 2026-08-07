@@ -1,7 +1,7 @@
 name: Product Description Writer
 # Write compelling product descriptions
-# Usage: llm-box install content-marketing/product-description
-#        llm-box run product-description/workflow.yaml
+# Usage: aflare install content-marketing/product-description
+#        aflare run product-description/workflow.yaml
 
 steps:
   - node: agent

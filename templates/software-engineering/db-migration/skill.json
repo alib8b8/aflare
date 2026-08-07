@@ -3,7 +3,7 @@
   "name": "db-migration",
   "version": "1.0.0",
   "description": "Generate database migration plan",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "software-engineering",
   "tags": [
     "software-engineering",

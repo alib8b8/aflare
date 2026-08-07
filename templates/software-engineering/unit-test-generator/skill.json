@@ -3,7 +3,7 @@
   "name": "unit-test-generator",
   "version": "1.0.0",
   "description": "Generate unit test skeleton for Go functions",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "software-engineering",
   "tags": [
     "software-engineering",

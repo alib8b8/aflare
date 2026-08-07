@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -46,7 +46,7 @@ var defaultSecretsPath string
 
 func init() {
 	if home, err := os.UserHomeDir(); err == nil {
-		defaultSecretsPath = filepath.Join(home, ".config", "llm-box", "secrets.dat")
+		defaultSecretsPath = filepath.Join(home, ".config", "aflare", "secrets.dat")
 	}
 }
 
@@ -424,12 +424,12 @@ func (sm *SecretManager) GetAllVars() map[string]string {
 }
 
 // GetSecretManager returns the global secret manager instance.
-// It reads the master password from LLM_BOX_SECRETS_PASSWORD environment variable.
+// It reads the master password from AFLARE_SECRETS_PASSWORD environment variable.
 // If the file doesn't exist, it creates a new empty secret manager.
 func GetSecretManager() (*SecretManager, error) {
-	password := os.Getenv("LLM_BOX_SECRETS_PASSWORD")
+	password := os.Getenv("AFLARE_SECRETS_PASSWORD")
 	if password == "" {
-		return nil, fmt.Errorf("secrets password not set - set LLM_BOX_SECRETS_PASSWORD environment variable")
+		return nil, fmt.Errorf("secrets password not set - set AFLARE_SECRETS_PASSWORD environment variable")
 	}
 	return LoadFromFile(defaultSecretsPath, password)
 }

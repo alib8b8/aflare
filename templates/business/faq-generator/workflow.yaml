@@ -1,7 +1,7 @@
 name: FAQ Generator
 # Generate FAQ from support interactions
-# Usage: llm-box install customer-support/faq-generator
-#        llm-box run faq-generator/workflow.yaml
+# Usage: aflare install customer-support/faq-generator
+#        aflare run faq-generator/workflow.yaml
 
 steps:
   - node: file_read

@@ -5,8 +5,8 @@ description: |
   聚焦极致吞吐与延迟优化，适用于已通过基础适配、追求极致性能的模型。
   输入：模型名称 + 目标硬件（800I A2 或 310P）。
 # 用法:
-#   llm-box run ascend-adapt/performance-tune/workflow.yaml --input "Qwen2.5-7B-Instruct" --set hardware=800I-A2
-#   llm-box run ascend-adapt/performance-tune/workflow.yaml --input "Qwen2.5-7B-Instruct" --set hardware=310P --set quantize_method=int8
+#   aflare run ascend-adapt/performance-tune/workflow.yaml --input "Qwen2.5-7B-Instruct" --set hardware=800I-A2
+#   aflare run ascend-adapt/performance-tune/workflow.yaml --input "Qwen2.5-7B-Instruct" --set hardware=310P --set quantize_method=int8
 
 inputs:
   model: "Qwen2.5-7B-Instruct"      # 待调优的模型名称

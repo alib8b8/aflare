@@ -1,7 +1,7 @@
 name: Customer Persona Builder
 # Build detailed customer personas
-# Usage: llm-box install business-sales/customer-persona
-#        llm-box run customer-persona/workflow.yaml
+# Usage: aflare install business-sales/customer-persona
+#        aflare run customer-persona/workflow.yaml
 
 steps:
   - node: agent

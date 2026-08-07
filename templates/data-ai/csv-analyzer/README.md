@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for analyze csv data fil
 ## Usage
 
 ```bash
-llm-box install data-analytics/csv-analyzer
-llm-box run csv-analyzer/workflow.yaml
+aflare install data-analytics/csv-analyzer
+aflare run csv-analyzer/workflow.yaml
 ```
 
 ## Parameters

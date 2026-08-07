@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate project rea
 ## Usage
 
 ```bash
-llm-box install documentation/readme-generator
-llm-box run readme-generator/workflow.yaml
+aflare install documentation/readme-generator
+aflare run readme-generator/workflow.yaml
 ```
 
 ## Parameters

@@ -1,7 +1,7 @@
 name: SSL Certificate Checker
 # Check SSL certificate expiry for domains
-# Usage: llm-box install devops-monitoring/ssl-cert-checker
-#        llm-box run ssl-cert-checker/workflow.yaml
+# Usage: aflare install devops-monitoring/ssl-cert-checker
+#        aflare run ssl-cert-checker/workflow.yaml
 
 steps:
   - node: execute

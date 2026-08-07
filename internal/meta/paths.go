@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -26,11 +26,11 @@ import (
 )
 
 const (
-	EnvHome = "LLM_BOX_HOME"
-	EnvData = "LLM_BOX_DATA"
+	EnvHome = "AFLARE_HOME"
+	EnvData = "AFLARE_DATA"
 
-	DefaultHomeDirName = "llm-box"
-	DefaultDataDirName = ".llm-box"
+	DefaultHomeDirName = "aflare"
+	DefaultDataDirName = ".aflare"
 
 	TemplatesDirName  = "templates"
 	SkillsDirName     = "skills"
@@ -47,13 +47,13 @@ var (
 	dataDir string
 )
 
-// HomeDir 返回程序主目录路径，受 LLM_BOX_HOME 环境变量影响。
+// HomeDir 返回程序主目录路径，受 AFLARE_HOME 环境变量影响。
 func HomeDir() string {
 	once.Do(initDirs)
 	return homeDir
 }
 
-// DataDir 返回数据目录路径，受 LLM_BOX_DATA 环境变量影响。
+// DataDir 返回数据目录路径，受 AFLARE_DATA 环境变量影响。
 func DataDir() string {
 	once.Do(initDirs)
 	return dataDir

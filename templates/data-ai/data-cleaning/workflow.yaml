@@ -1,7 +1,7 @@
 name: Data Cleaning Pipeline
 # Generate data cleaning and preprocessing pipeline
-# Usage: llm-box install ai-ml/data-cleaning
-#        llm-box run data-cleaning/workflow.yaml
+# Usage: aflare install ai-ml/data-cleaning
+#        aflare run data-cleaning/workflow.yaml
 
 steps:
   - node: file_read

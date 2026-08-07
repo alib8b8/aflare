@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate pitch deck 
 ## Usage
 
 ```bash
-llm-box install business-sales/pitch-deck
-llm-box run pitch-deck/workflow.yaml
+aflare install business-sales/pitch-deck
+aflare run pitch-deck/workflow.yaml
 ```
 
 ## Parameters

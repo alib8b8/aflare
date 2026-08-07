@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -29,13 +29,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/httpclient"
+	"github.com/alib8b8/aflare/internal/httpclient"
 )
 
 // safeHTTPClient is the MCP client's shared HTTP client. It uses the
 // httpclient factory so that SSRF defense (re-resolve + validate at dial
 // time, closing the DNS-rebinding TOCTOU window) and connection-pool
-// tuning are shared with every other outbound client in llm-box rather
+// tuning are shared with every other outbound client in aflare rather
 // than re-implemented here. MCP servers commonly run on localhost, so we
 // use ValidateAllowLoopback (loopback permitted, all other dangerous
 // ranges blocked).

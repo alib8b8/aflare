@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -136,12 +136,12 @@ func TestNormalizeLang(t *testing.T) {
 
 func TestDetectLanguage(t *testing.T) {
 	// Test with env var
-	os.Setenv("LLM_BOX_LANG", "zh")
+	os.Setenv("AFLARE_LANG", "zh")
 	lang := detectLanguage()
 	if lang != "zh" {
 		t.Errorf("expected zh, got %s", lang)
 	}
-	os.Unsetenv("LLM_BOX_LANG")
+	os.Unsetenv("AFLARE_LANG")
 
 	// Test with LANG env var
 	os.Setenv("LANG", "ru_RU.UTF-8")
@@ -152,7 +152,7 @@ func TestDetectLanguage(t *testing.T) {
 	os.Unsetenv("LANG")
 
 	// Test default
-	os.Unsetenv("LLM_BOX_LANG")
+	os.Unsetenv("AFLARE_LANG")
 	os.Unsetenv("LANG")
 	os.Unsetenv("LANGUAGE")
 	lang = detectLanguage()

@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for check all dns record
 ## Usage
 
 ```bash
-llm-box install networking/dns-checker
-llm-box run dns-checker/workflow.yaml
+aflare install networking/dns-checker
+aflare run dns-checker/workflow.yaml
 ```
 
 ## Parameters

@@ -1,7 +1,7 @@
 name: Study Plan Generator
 # Create personalized study plan for any topic
-# Usage: llm-box install education/study-plan
-#        llm-box run study-plan/workflow.yaml
+# Usage: aflare install education/study-plan
+#        aflare run study-plan/workflow.yaml
 
 steps:
   - node: agent

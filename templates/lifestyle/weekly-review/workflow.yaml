@@ -1,7 +1,7 @@
 name: Weekly Review
 # Review the week and plan for next
-# Usage: llm-box install productivity-personal/weekly-review
-#        llm-box run weekly-review/workflow.yaml
+# Usage: aflare install productivity-personal/weekly-review
+#        aflare run weekly-review/workflow.yaml
 
 steps:
   - node: execute

@@ -1,7 +1,7 @@
 name: Infrastructure as Code Template
 # Generate Terraform/IaC templates
-# Usage: llm-box install cloud-infra/iac-template
-#        llm-box run iac-template/workflow.yaml
+# Usage: aflare install cloud-infra/iac-template
+#        aflare run iac-template/workflow.yaml
 
 steps:
   - node: agent

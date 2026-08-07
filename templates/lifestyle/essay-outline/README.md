@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate structured 
 ## Usage
 
 ```bash
-llm-box install education/essay-outline
-llm-box run essay-outline/workflow.yaml
+aflare install education/essay-outline
+aflare run essay-outline/workflow.yaml
 ```
 
 ## Parameters

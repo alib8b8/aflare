@@ -1,7 +1,7 @@
 name: Dev Environment Setup
 # Automated development environment setup
-# Usage: llm-box install environment-setup/dev-setup
-#        llm-box run dev-setup/workflow.yaml
+# Usage: aflare install environment-setup/dev-setup
+#        aflare run dev-setup/workflow.yaml
 
 steps:
   - node: execute

@@ -1,7 +1,7 @@
 name: Song Lyric Generator
 # Generate song lyrics in any style
-# Usage: llm-box install creative/song-lyrics
-#        llm-box run song-lyrics/workflow.yaml
+# Usage: aflare install creative/song-lyrics
+#        aflare run song-lyrics/workflow.yaml
 
 steps:
   - node: agent

@@ -1,7 +1,7 @@
 name: Support Ticket Classifier
 # Classify and prioritize support tickets
-# Usage: llm-box install customer-support/ticket-classifier
-#        llm-box run ticket-classifier/workflow.yaml
+# Usage: aflare install customer-support/ticket-classifier
+#        aflare run ticket-classifier/workflow.yaml
 
 steps:
   - node: file_read

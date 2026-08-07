@@ -1,10 +1,10 @@
 ---
 name: setup
-description: Install and configure llm-box, including the MCP server connection for Claude Code.
+description: Install and configure aflare, including the MCP server connection for Claude Code.
 invocation: user
 allowed-tools: Read, Edit, Write, Bash
 version: 0.6.0
-author: llm-box
+author: aflare
 license: AGPL-3.0
 compatibility: claude-code >= 0.7.0
 tags: [setup, installation, configuration, mcp]
@@ -12,7 +12,7 @@ tags: [setup, installation, configuration, mcp]
 
 ## Overview
 
-This skill installs and configures llm-box, an AI-powered terminal workflow engine, and sets up the MCP server connection for Claude Code integration. It handles binary installation, PATH configuration, and MCP server setup.
+This skill installs and configures aflare, an AI-powered terminal workflow engine, and sets up the MCP server connection for Claude Code integration. It handles binary installation, PATH configuration, and MCP server setup.
 
 ## Prerequisites
 
@@ -22,30 +22,30 @@ This skill installs and configures llm-box, an AI-powered terminal workflow engi
 
 ## Instructions
 
-### Step 1: Install llm-box
+### Step 1: Install aflare
 
 Choose one of the following installation methods:
 
 **Option 1: Install Script (Linux/macOS)**
 ```bash
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
+curl -sL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh -o install.sh
 bash install.sh
 ```
 
 **Option 2: Go Install**
 ```bash
-go install github.com/alib8b8/llm-box/cmd/llm-box@latest
+go install github.com/alib8b8/aflare/cmd/aflare@latest
 ```
 
 **Option 3: Download from Releases**
 Download the binary for your platform:
-https://github.com/alib8b8/llm-box/releases
+https://github.com/alib8b8/aflare/releases
 
 ### Step 2: Verify Installation
 
 ```bash
-llm-box --version
-llm-box list
+aflare --version
+aflare list
 ```
 
 ### Step 3: Configure MCP Server
@@ -55,9 +55,9 @@ The MCP server is pre-configured in `.mcp.json`:
 ```json
 {
   "mcpServers": {
-    "llm-box": {
+    "aflare": {
       "type": "stdio",
-      "command": "llm-box",
+      "command": "aflare",
       "args": ["--mcp-server"]
     }
   }
@@ -68,7 +68,7 @@ Claude Code will automatically start the MCP server when the plugin is activated
 
 ### Step 4: Create Configuration (Optional)
 
-Create `~/.llm-box/config.yaml`:
+Create `~/.aflare/config.yaml`:
 
 ```yaml
 safe_mode: false
@@ -81,30 +81,30 @@ api_keys:
 ## Output
 
 After successful setup:
-- llm-box CLI is installed and available in PATH
+- aflare CLI is installed and available in PATH
 - MCP server is configured for Claude Code
-- Configuration file created at `~/.llm-box/config.yaml`
-- Verify with: `llm-box --version`
+- Configuration file created at `~/.aflare/config.yaml`
+- Verify with: `aflare --version`
 
 ## Examples
 
 **Example 1: Fresh Install on Linux**
 ```bash
-curl -sL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh -o install.sh
+curl -sL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh -o install.sh
 bash install.sh
-llm-box --version
+aflare --version
 ```
 
 **Example 2: Update via Go**
 ```bash
-go install github.com/alib8b8/llm-box/cmd/llm-box@latest
-llm-box --version
+go install github.com/alib8b8/aflare/cmd/aflare@latest
+aflare --version
 ```
 
 **Example 3: Configure API Keys**
 ```bash
-mkdir -p ~/.llm-box
-cat > ~/.llm-box/config.yaml <<EOF
+mkdir -p ~/.aflare
+cat > ~/.aflare/config.yaml <<EOF
 safe_mode: false
 default_model: "deepseek-chat"
 api_keys:
@@ -115,13 +115,13 @@ EOF
 
 ## Resources
 
-- **GitHub**: https://github.com/alib8b8/llm-box
-- **GitCode**: https://gitcode.com/llm-box/llm-box
-- **Releases**: https://github.com/alib8b8/llm-box/releases
-- **Documentation**: https://gitcode.com/llm-box/llm-box/blob/main/README.md
-- **Issues**: https://github.com/alib8b8/llm-box/issues
+- **GitHub**: https://github.com/alib8b8/aflare
+- **GitCode**: https://gitcode.com/aflare/aflare
+- **Releases**: https://github.com/alib8b8/aflare/releases
+- **Documentation**: https://gitcode.com/aflare/aflare/blob/main/README.md
+- **Issues**: https://github.com/alib8b8/aflare/issues
 - **Troubleshooting**:
-  - Check PATH: `which llm-box`
-  - Verify version: `llm-box --version`
-  - Test MCP server: `llm-box --mcp-server`
+  - Check PATH: `which aflare`
+  - Verify version: `aflare --version`
+  - Test MCP server: `aflare --mcp-server`
 - **License**: AGPL-3.0

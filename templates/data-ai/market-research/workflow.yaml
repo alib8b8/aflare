@@ -1,7 +1,7 @@
 name: Market Research Assistant
 # Research market trends and competitive landscape
-# Usage: llm-box install research-analysis/market-research
-#        llm-box run market-research/workflow.yaml
+# Usage: aflare install research-analysis/market-research
+#        aflare run market-research/workflow.yaml
 
 steps:
   - node: http_request

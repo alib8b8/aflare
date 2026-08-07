@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for analyze nginx access
 ## Usage
 
 ```bash
-llm-box install devops-monitoring/nginx-access-analyzer
-llm-box run nginx-access-analyzer/workflow.yaml
+aflare install devops-monitoring/nginx-access-analyzer
+aflare run nginx-access-analyzer/workflow.yaml
 ```
 
 ## Parameters

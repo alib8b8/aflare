@@ -1,7 +1,7 @@
 name: Docker Image Cleaner
 # Clean up unused Docker images and containers
-# Usage: llm-box install devops-monitoring/docker-cleaner
-#        llm-box run docker-cleaner/workflow.yaml
+# Usage: aflare install devops-monitoring/docker-cleaner
+#        aflare run docker-cleaner/workflow.yaml
 
 steps:
   - node: execute

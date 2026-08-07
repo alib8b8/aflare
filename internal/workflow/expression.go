@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -350,7 +350,7 @@ func evalFileContents(name string) (string, error) {
 // secret getter. Extracted from the inline switch to keep the hot loop compact.
 func evalSecretRef(e *ExpressionEngine, name string) (string, error) {
 	if e.secretGetter == nil {
-		return "", fmt.Errorf("secrets not available - use 'llm-box secrets add' to store secrets first")
+		return "", fmt.Errorf("secrets not available - use 'aflare secrets add' to store secrets first")
 	}
 	secretParts := strings.SplitN(name, ".", 2)
 	if len(secretParts) < 2 {
@@ -801,7 +801,7 @@ type secretExpr struct {
 
 func (n *secretExpr) eval(e *ExpressionEngine, input string) (string, error) {
 	if e.secretGetter == nil {
-		return "", fmt.Errorf("secrets not available - use 'llm-box secrets add' to store secrets first")
+		return "", fmt.Errorf("secrets not available - use 'aflare secrets add' to store secrets first")
 	}
 	secretParts := strings.SplitN(n.name, ".", 2)
 	if len(secretParts) < 2 {
@@ -1289,13 +1289,13 @@ var allowedEnvVars = map[string]bool{
 	"LC_ALL":            true,
 	"TERM":              true,
 	"PWD":               true,
-	"LLM_BOX_LANG":      true,
-	"LLM_BOX_SAFE_MODE": true,
+	"AFLARE_LANG":      true,
+	"AFLARE_SAFE_MODE": true,
 }
 
 func isAllowedEnvVar(name string) bool {
 	if allowedEnvVars[strings.ToUpper(name)] {
 		return true
 	}
-	return strings.HasPrefix(strings.ToUpper(name), "LLM_BOX_")
+	return strings.HasPrefix(strings.ToUpper(name), "AFLARE_")
 }

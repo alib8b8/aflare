@@ -1,7 +1,7 @@
 name: Trend Tracker
 # Track and analyze emerging industry trends
-# Usage: llm-box install research-analysis/trend-tracker
-#        llm-box run trend-tracker/workflow.yaml
+# Usage: aflare install research-analysis/trend-tracker
+#        aflare run trend-tracker/workflow.yaml
 
 steps:
   - node: http_request

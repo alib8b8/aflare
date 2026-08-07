@@ -54,16 +54,16 @@ cat > /tmp/app.log <<'EOF'
 EOF
 
 # 1. 用示例日志运行（会命中 FATAL/panic，触发告警分支）
-llm-box run examples/real-world/log-anomaly-detector/workflow.yaml \
+aflare run examples/real-world/log-anomaly-detector/workflow.yaml \
   --var log_path=/tmp/app.log
 
 # 2. 自定义关键模式
-llm-box run examples/real-world/log-anomaly-detector/workflow.yaml \
+aflare run examples/real-world/log-anomaly-detector/workflow.yaml \
   --var log_path=/var/log/myapp.log \
   --var critical_pattern="OutOfMemoryError|StackOverflow|CassandraException"
 
 # 3. 告警发到 Slack（需配置 webhook url）
-llm-box run examples/real-world/log-anomaly-detector/workflow.yaml \
+aflare run examples/real-world/log-anomaly-detector/workflow.yaml \
   --var alert_channel=slack \
   --var log_path=/var/log/myapp.log
 ```

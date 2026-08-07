@@ -1,6 +1,6 @@
 # Docker 部署指南
 
-本指南介绍如何使用 Docker 部署 llm-box。
+本指南介绍如何使用 Docker 部署 aflare。
 
 ## 快速开始
 
@@ -8,25 +8,25 @@
 
 ```bash
 # 拉取最新镜像
-docker pull ghcr.io/alib8b8/llm-box:latest
+docker pull ghcr.io/alib8b8/aflare:latest
 
 # 运行工作流
 docker run --rm \
   -v $(pwd)/workflows:/workflows \
   -v $(pwd)/output:/output \
   -e ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY} \
-  ghcr.io/alib8b8/llm-box:latest \
+  ghcr.io/alib8b8/aflare:latest \
   run /workflows/my-workflow.yaml
 ```
 
 ### 使用特定版本
 
 ```bash
-docker pull ghcr.io/alib8b8/llm-box:v0.2.10
+docker pull ghcr.io/alib8b8/aflare:v0.2.10
 
 docker run --rm \
   -v $(pwd)/workflows:/workflows \
-  ghcr.io/alib8b8/llm-box:v0.2.10 \
+  ghcr.io/alib8b8/aflare:v0.2.10 \
   run /workflows/my-workflow.yaml
 ```
 
@@ -36,11 +36,11 @@ docker run --rm \
 
 ```bash
 # 克隆仓库
-git clone https://github.com/alib8b8/llm-box.git
-cd llm-box
+git clone https://github.com/alib8b8/aflare.git
+cd aflare
 
 # 构建镜像
-docker build -t llm-box:latest .
+docker build -t aflare:latest .
 ```
 
 ### 多平台构建
@@ -52,7 +52,7 @@ docker buildx create --use
 # 构建 linux/amd64 和 linux/arm64
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t llm-box:latest \
+  -t aflare:latest \
   --push \
   .
 ```
@@ -80,7 +80,7 @@ COPY . .
 # 构建
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags "-s -w -X main.version=$(git describe --tags --always --dirty)" \
-    -o llm-box ./cmd/llm-box
+    -o aflare ./cmd/aflare
 
 # Stage 2: Runtime
 FROM alpine:3.20
@@ -91,7 +91,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates tzdata
 
 # 从构建阶段复制二进制文件
-COPY --from=builder /app/llm-box /app/llm-box
+COPY --from=builder /app/aflare /app/aflare
 
 # 创建必要目录
 RUN mkdir -p /workflows /output /nodes
@@ -105,7 +105,7 @@ ENV TZ=Asia/Shanghai
 WORKDIR /workflows
 
 # 入口点
-ENTRYPOINT ["/app/llm-box"]
+ENTRYPOINT ["/app/aflare"]
 CMD ["--help"]
 ```
 
@@ -117,7 +117,7 @@ CMD ["--help"]
 |------|------|--------|
 | `LLMBOX_CONFIG` | 配置文件路径 | `/app/config.yaml` |
 | `LLMBOX_LOG_LEVEL` | 日志级别 | `info` |
-| `LLMBOX_CACHE_DIR` | 缓存目录 | `/tmp/llm-box-cache` |
+| `LLMBOX_CACHE_DIR` | 缓存目录 | `/tmp/aflare-cache` |
 | `ANTHROPIC_API_KEY` | Anthropic API 密钥 | - |
 | `OPENAI_API_KEY` | OpenAI API 密钥 | - |
 | `DEEPSEEK_API_KEY` | DeepSeek API 密钥 | - |
@@ -130,8 +130,8 @@ docker run --rm \
   -v $(pwd)/output:/output \            # 输出目录
   -v $(pwd)/nodes:/nodes \              # 自定义节点
   -v $(pwd)/config.yaml:/app/config.yaml \  # 配置文件
-  -v llmbox-cache:/tmp/llm-box-cache \  # 持久化缓存
-  ghcr.io/alib8b8/llm-box:latest \
+  -v llmbox-cache:/tmp/aflare-cache \  # 持久化缓存
+  ghcr.io/alib8b8/aflare:latest \
   run /workflows/my-workflow.yaml
 ```
 
@@ -140,7 +140,7 @@ docker run --rm \
 创建 `config.yaml`：
 
 ```yaml
-# llm-box 配置
+# aflare 配置
 
 # 日志设置
 log:
@@ -180,15 +180,15 @@ security:
 version: '3.8'
 
 services:
-  llm-box:
-    image: ghcr.io/alib8b8/llm-box:latest
-    container_name: llm-box
+  aflare:
+    image: ghcr.io/alib8b8/aflare:latest
+    container_name: aflare
     restart: unless-stopped
     volumes:
       - ./workflows:/workflows
       - ./output:/output
       - ./nodes:/nodes
-      - llmbox-cache:/tmp/llm-box-cache
+      - llmbox-cache:/tmp/aflare-cache
     environment:
       - LLMBOX_LOG_LEVEL=info
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -221,9 +221,9 @@ services:
               count: all
               capabilities: [gpu]
 
-  llm-box:
-    image: ghcr.io/alib8b8/llm-box:latest
-    container_name: llm-box
+  aflare:
+    image: ghcr.io/alib8b8/aflare:latest
+    container_name: aflare
     restart: unless-stopped
     depends_on:
       - ollama
@@ -246,9 +246,9 @@ volumes:
 version: '3.8'
 
 services:
-  llm-box-cron:
-    image: ghcr.io/alib8b8/llm-box:latest
-    container_name: llm-box-cron
+  aflare-cron:
+    image: ghcr.io/alib8b8/aflare:latest
+    container_name: aflare-cron
     restart: unless-stopped
     volumes:
       - ./workflows:/workflows
@@ -257,7 +257,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     entrypoint: |
       sh -c "
-        echo '0 9 * * * cd /workflows && /app/llm-box run daily-report.yaml' | crontab -
+        echo '0 9 * * * cd /workflows && /app/aflare run daily-report.yaml' | crontab -
         crond -f
       "
 ```
@@ -270,22 +270,22 @@ services:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: llm-box
+  name: aflare
   labels:
-    app: llm-box
+    app: aflare
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: llm-box
+      app: aflare
   template:
     metadata:
       labels:
-        app: llm-box
+        app: aflare
     spec:
       containers:
-      - name: llm-box
-        image: ghcr.io/alib8b8/llm-box:latest
+      - name: aflare
+        image: ghcr.io/alib8b8/aflare:latest
         resources:
           requests:
             memory: "256Mi"
@@ -318,7 +318,7 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: llm-box-daily
+  name: aflare-daily
 spec:
   schedule: "0 9 * * *"
   jobTemplate:
@@ -326,8 +326,8 @@ spec:
       template:
         spec:
           containers:
-          - name: llm-box
-            image: ghcr.io/alib8b8/llm-box:latest
+          - name: aflare
+            image: ghcr.io/alib8b8/aflare:latest
             args:
             - run
             - /workflows/daily-report.yaml
@@ -349,7 +349,7 @@ spec:
 ```bash
 docker run --rm \
   -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
-  ghcr.io/alib8b8/llm-box:latest \
+  ghcr.io/alib8b8/aflare:latest \
   run my-workflow.yaml
 ```
 
@@ -363,8 +363,8 @@ Linux 用户可能需要添加：
 
 ```bash
 docker run --rm \
-  -v llmbox-cache:/tmp/llm-box-cache \
-  ghcr.io/alib8b8/llm-box:latest \
+  -v llmbox-cache:/tmp/aflare-cache \
+  ghcr.io/alib8b8/aflare:latest \
   run my-workflow.yaml
 ```
 
@@ -374,15 +374,15 @@ docker run --rm \
 # 进入容器
 docker run --rm -it \
   --entrypoint sh \
-  ghcr.io/alib8b8/llm-box:latest
+  ghcr.io/alib8b8/aflare:latest
 
 # 查看日志
-docker logs llm-box
+docker logs aflare
 
 # 详细日志
 docker run --rm \
   -e LLMBOX_LOG_LEVEL=debug \
-  ghcr.io/alib8b8/llm-box:latest \
+  ghcr.io/alib8b8/aflare:latest \
   run my-workflow.yaml
 ```
 
@@ -392,7 +392,7 @@ docker run --rm \
 docker run --rm \
   --memory="512m" \
   --cpus="0.5" \
-  ghcr.io/alib8b8/llm-box:latest \
+  ghcr.io/alib8b8/aflare:latest \
   run my-workflow.yaml
 ```
 
@@ -407,7 +407,7 @@ docker run --rm \
   --cap-drop=ALL \
   --read-only \
   --tmpfs /tmp \
-  ghcr.io/alib8b8/llm-box:latest \
+  ghcr.io/alib8b8/aflare:latest \
   run my-workflow.yaml
 ```
 
@@ -417,11 +417,11 @@ docker run --rm \
 
 ```bash
 docker pull alpine:3.20
-docker build --no-cache -t llm-box:latest .
+docker build --no-cache -t aflare:latest .
 ```
 
 ## 更多资源
 
-- [Docker Hub](https://hub.docker.com/r/alib8b8/llm-box)
-- [GitHub Container Registry](https://github.com/alib8b8/llm-box/pkgs/container/llm-box)
+- [Docker Hub](https://hub.docker.com/r/alib8b8/aflare)
+- [GitHub Container Registry](https://github.com/alib8b8/aflare/pkgs/container/aflare)
 - [Kubernetes Helm Chart](./helm/)

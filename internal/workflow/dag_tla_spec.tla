@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- llm-box DAG Scheduler — TLA+ Specification
+-- aflare DAG Scheduler — TLA+ Specification
 --
 -- This specification formalises the topological-batch scheduling algorithm
 -- in /workspace/hkaic/internal/workflow/dag.go (topoBatches).

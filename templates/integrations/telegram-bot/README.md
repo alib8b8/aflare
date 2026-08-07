@@ -5,7 +5,7 @@ Send notifications to Telegram from your workflows.
 ## Install
 
 ```bash
-llm-box install telegram-bot
+aflare install telegram-bot
 ```
 
 ## Configure
@@ -24,7 +24,7 @@ export TELEGRAM_CHAT_ID="your-chat-id"
 echo "Deployment successful!" > message.txt
 
 # Send it
-llm-box run templates/telegram-bot/workflow.yaml
+aflare run templates/telegram-bot/workflow.yaml
 ```
 
 ## Features

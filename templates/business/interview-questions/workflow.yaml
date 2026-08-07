@@ -1,7 +1,7 @@
 name: Interview Questions Generator
 # Generate interview questions for any role
-# Usage: llm-box install hr-recruiting/interview-questions
-#        llm-box run interview-questions/workflow.yaml
+# Usage: aflare install hr-recruiting/interview-questions
+#        aflare run interview-questions/workflow.yaml
 
 steps:
   - node: agent

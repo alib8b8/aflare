@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate high-conver
 ## Usage
 
 ```bash
-llm-box install marketing/landing-page-copy
-llm-box run landing-page-copy/workflow.yaml
+aflare install marketing/landing-page-copy
+aflare run landing-page-copy/workflow.yaml
 ```
 
 ## Parameters

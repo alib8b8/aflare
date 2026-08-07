@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -25,7 +25,7 @@
 // Design:
 //   - IdempotencyStore is a key→record ledger. The default FileIdempotencyStore
 //     persists each key as a single JSON file at
-//     ~/.config/llm-box/idempotency/<sha256(key)>.json, written atomically
+//     ~/.config/aflare/idempotency/<sha256(key)>.json, written atomically
 //     (tmp + rename).
 //   - The Executor (see executor.go) consults the store before executing when
 //     a key has been set via WithIdempotencyKey. On a "completed" hit it
@@ -54,7 +54,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/logger"
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 // ErrIdempotencyHit is returned by Executor.ExecuteWithTrace (and Execute)
@@ -129,7 +129,7 @@ type IdempotencyRecord struct {
 	// attacker who rewrites FinalOutput on disk could otherwise inject a forged
 	// result (e.g. a fake transfer confirmation) that the next trigger returns
 	// as if it were the cached outcome of a real run. When an HMAC key is
-	// configured (LLM_BOX_AUDIT_HMAC_KEY or LLM_BOX_SECRETS_PASSWORD), Check
+	// configured (AFLARE_AUDIT_HMAC_KEY or AFLARE_SECRETS_PASSWORD), Check
 	// rejects a record whose HMAC does not verify, forcing re-execution instead
 	// of returning a forged result. When no key is configured the field is left
 	// empty and verification is skipped (graceful degradation), preserving
@@ -142,8 +142,8 @@ type IdempotencyRecord struct {
 // single deployment secret protects both audit and idempotency records; no
 // new environment variable is introduced.
 var idempotencyHMACKeyEnvVars = []string{
-	"LLM_BOX_AUDIT_HMAC_KEY",
-	"LLM_BOX_SECRETS_PASSWORD",
+	"AFLARE_AUDIT_HMAC_KEY",
+	"AFLARE_SECRETS_PASSWORD",
 }
 
 // warnIdempotencyNoKeyOnce ensures the "no HMAC key" warning is logged at most
@@ -165,7 +165,7 @@ func idempotencyHMACKey() []byte {
 		}
 	}
 	warnIdempotencyNoKeyOnce.Do(func() {
-		logger.Warn("idempotency HMAC key not configured; set LLM_BOX_AUDIT_HMAC_KEY or LLM_BOX_SECRETS_PASSWORD to enable tamper-evident idempotency records")
+		logger.Warn("idempotency HMAC key not configured; set AFLARE_AUDIT_HMAC_KEY or AFLARE_SECRETS_PASSWORD to enable tamper-evident idempotency records")
 	})
 	return nil
 }
@@ -273,7 +273,7 @@ func NewFileIdempotencyStore(dir string, ttl time.Duration) *FileIdempotencyStor
 }
 
 // DefaultIdempotencyDir returns the default on-disk directory for the file
-// idempotency store: <os.UserConfigDir>/llm-box/idempotency. The directory is
+// idempotency store: <os.UserConfigDir>/aflare/idempotency. The directory is
 // created lazily on the first write. This is the location used when
 // WithIdempotencyKey is called without an explicit WithIdempotencyStore.
 func DefaultIdempotencyDir() string { return defaultIdempotencyDir() }
@@ -283,7 +283,7 @@ func defaultIdempotencyDir() string {
 	if err != nil || base == "" {
 		base = os.TempDir()
 	}
-	return filepath.Join(base, "llm-box", "idempotency")
+	return filepath.Join(base, "aflare", "idempotency")
 }
 
 // Check implements IdempotencyStore. If the stored record has expired (its

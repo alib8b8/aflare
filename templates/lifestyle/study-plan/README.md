@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for create personalized 
 ## Usage
 
 ```bash
-llm-box install education/study-plan
-llm-box run study-plan/workflow.yaml
+aflare install education/study-plan
+aflare run study-plan/workflow.yaml
 ```
 
 ## Parameters

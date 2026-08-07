@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate incident re
 ## Usage
 
 ```bash
-llm-box install security/incident-response
-llm-box run incident-response/workflow.yaml
+aflare install security/incident-response
+aflare run incident-response/workflow.yaml
 ```
 
 ## Parameters

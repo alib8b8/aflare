@@ -1,7 +1,7 @@
 name: Brand Identity Guide
 # Generate complete brand identity guide
-# Usage: llm-box install creative/brand-identity
-#        llm-box run brand-identity/workflow.yaml
+# Usage: aflare install creative/brand-identity
+#        aflare run brand-identity/workflow.yaml
 
 steps:
   - node: agent

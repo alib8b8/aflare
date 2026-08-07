@@ -36,20 +36,20 @@ flowchart TD
 
 ```bash
 # 1. 默认配置（审查本仓库的 transform.go，使用本地 ollama）
-llm-box run examples/real-world/code-review-pipeline/workflow.yaml
+aflare run examples/real-world/code-review-pipeline/workflow.yaml
 
 # 2. 审查指定文件，聚焦安全问题
-llm-box run examples/real-world/code-review-pipeline/workflow.yaml \
+aflare run examples/real-world/code-review-pipeline/workflow.yaml \
   --var target_file=path/to/your/file.go \
   --var focus=security \
   --var severity=high
 
 # 3. 使用云端模型（需设置对应环境变量，如 OPENAI_API_KEY）
-llm-box run examples/real-world/code-review-pipeline/workflow.yaml \
+aflare run examples/real-world/code-review-pipeline/workflow.yaml \
   --var provider=openai --var model=gpt-4o
 ```
 
-> **本地 dry-run**：若本地未启动 Ollama，`code_review` 节点的 LLM 子步骤会失败，但确定性规则引擎仍会运行——`workflow.yaml` 语法本身始终合法，可用 `llm-box run --dry-run`（如可用）校验结构。
+> **本地 dry-run**：若本地未启动 Ollama，`code_review` 节点的 LLM 子步骤会失败，但确定性规则引擎仍会运行——`workflow.yaml` 语法本身始终合法，可用 `aflare run --dry-run`（如可用）校验结构。
 
 ## 输出示例
 
@@ -73,7 +73,7 @@ Code review complete. Report written to code-review-report.md.
 ## Source Preview (first 15 lines)
 
 ```
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 ...
 ```
 
@@ -89,6 +89,6 @@ default case; unexpected operations silently pass through...
 ## 设计要点
 
 - **混合审查**：`code_review` 节点的 `use_rules: "true"` + `use_llm: "true"` 同时启用两条链路，体现项目"确定性规则 + LLM"特色。
-- **正确的表达式语法**：使用 `{{var.target_file}}`、`{{step.read_source}}`、`{{step.review}}`——这是 llm-box workflow 引擎真正解析的语法（注意：不是 Go 模板的 `{{ .foo }}`）。
+- **正确的表达式语法**：使用 `{{var.target_file}}`、`{{step.read_source}}`、`{{step.review}}`——这是 aflare workflow 引擎真正解析的语法（注意：不是 Go 模板的 `{{ .foo }}`）。
 - **线性数据流**：每步的输出自动成为下一步的输入；`template_render` 通过 `{{step.X}}` 跨步引用，避免数据丢失。
 - **可配置**：所有可变参数集中在 `vars:` 块，支持命令行 `--var` 覆盖。

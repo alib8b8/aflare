@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for batch optimize image
 ## Usage
 
 ```bash
-llm-box install automation/image-optimizer
-llm-box run image-optimizer/workflow.yaml
+aflare install automation/image-optimizer
+aflare run image-optimizer/workflow.yaml
 ```
 
 ## Parameters

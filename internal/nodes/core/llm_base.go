@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -32,9 +32,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/alib8b8/llm-box/internal/cache"
-	"github.com/alib8b8/llm-box/internal/config"
-	"github.com/alib8b8/llm-box/internal/logger"
+	"github.com/alib8b8/aflare/internal/cache"
+	"github.com/alib8b8/aflare/internal/config"
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 const maxStreamResponseSize = 10 * 1024 * 1024 // 10MB max stream content
@@ -209,7 +209,7 @@ type OpenAICompatibleNode struct {
 	config LLMNodeConfig
 
 	// cacheEnabled is the master switch for LLM response caching. It is set
-	// at construction from the LLM_BOX_LLM_CACHE env var, or explicitly via
+	// at construction from the AFLARE_LLM_CACHE env var, or explicitly via
 	// SetCache. When false (the default) Execute bypasses the cache
 	// entirely, preserving the pre-cache behaviour so existing tests and
 	// dev workflows are unaffected.
@@ -222,7 +222,7 @@ type OpenAICompatibleNode struct {
 	cacheEnabled atomic.Bool
 	// cache is an optional per-node cache instance. When non-nil it takes
 	// precedence over the env-var-driven shared cache. nil means "fall back
-	// to the shared cache" (which is itself nil unless LLM_BOX_LLM_CACHE=1).
+	// to the shared cache" (which is itself nil unless AFLARE_LLM_CACHE=1).
 	//
 	// L-1: stored as an atomic.Pointer so SetCache is safe to call
 	// concurrently with Execute — a concurrent Execute observes either the
@@ -231,7 +231,7 @@ type OpenAICompatibleNode struct {
 }
 
 // NewOpenAICompatibleNode constructs an OpenAICompatibleNode from config.
-// Caching is disabled unless the LLM_BOX_LLM_CACHE env var opts in.
+// Caching is disabled unless the AFLARE_LLM_CACHE env var opts in.
 func NewOpenAICompatibleNode(config LLMNodeConfig) *OpenAICompatibleNode {
 	n := &OpenAICompatibleNode{config: config}
 	n.cacheEnabled.Store(llmCacheEnabledFromEnv())
@@ -252,7 +252,7 @@ func NewOpenAICompatibleNode(config LLMNodeConfig) *OpenAICompatibleNode {
 // MUST NOT be relied on for audit — a process restart, eviction, or TTL
 // expiry silently removes entries. Caching is OFF by default so existing
 // tests and dev workflows are unaffected; it is opted into via the
-// LLM_BOX_LLM_CACHE env var, or by injecting a cache instance with SetCache.
+// AFLARE_LLM_CACHE env var, or by injecting a cache instance with SetCache.
 // Only the final non-streaming response string is cached; streaming
 // responses are never cached (SSE chunk boundaries are not byte-reproducible).
 //
@@ -273,12 +273,12 @@ func NewOpenAICompatibleNode(config LLMNodeConfig) *OpenAICompatibleNode {
 const (
 	// envLLMCacheEnable opts into the shared LLM response cache when set to
 	// "1" or "true". Evaluated at node construction.
-	envLLMCacheEnable = "LLM_BOX_LLM_CACHE"
+	envLLMCacheEnable = "AFLARE_LLM_CACHE"
 	// envLLMCacheTTL overrides the shared cache TTL (Go duration string,
 	// e.g. "24h", "30m"). Defaults to defaultLLMCacheTTL.
-	envLLMCacheTTL = "LLM_BOX_LLM_CACHE_TTL"
+	envLLMCacheTTL = "AFLARE_LLM_CACHE_TTL"
 	// envLLMCacheSize overrides the shared cache max entry count.
-	envLLMCacheSize = "LLM_BOX_LLM_CACHE_SIZE"
+	envLLMCacheSize = "AFLARE_LLM_CACHE_SIZE"
 
 	defaultLLMCacheTTL  = 24 * time.Hour
 	defaultLLMCacheSize = 1000
@@ -300,7 +300,7 @@ var (
 	sharedLLMCacheInst *cache.Cache
 )
 
-// llmCacheEnabledFromEnv reports whether the LLM_BOX_LLM_CACHE env var
+// llmCacheEnabledFromEnv reports whether the AFLARE_LLM_CACHE env var
 // opts into the shared response cache. Recognised truthy values are "1"
 // and "true" (case-insensitive).
 func llmCacheEnabledFromEnv() bool {
@@ -312,7 +312,7 @@ func llmCacheEnabledFromEnv() bool {
 }
 
 // sharedLLMCache returns a process-wide cache instance built from the
-// LLM_BOX_LLM_CACHE* env vars, or nil if caching is not enabled via env.
+// AFLARE_LLM_CACHE* env vars, or nil if caching is not enabled via env.
 // The instance is built lazily on first use and shared by every
 // OpenAICompatibleNode that has no cache of its own. Env vars are read at
 // most once (sync.Once); set them before process start.
@@ -344,7 +344,7 @@ func sharedLLMCache() *cache.Cache {
 
 // SetCache attaches a cache instance to this node, enabling LLM response
 // caching for non-streaming Execute calls. Passing nil disables caching on
-// this node and overrides the LLM_BOX_LLM_CACHE env var.
+// this node and overrides the AFLARE_LLM_CACHE env var.
 //
 // L-1: SetCache stores the cache and the enabled flag via atomic operations,
 // so it is safe to call concurrently with Execute — a concurrent Execute

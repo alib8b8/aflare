@@ -13,8 +13,8 @@ Comprehensive investment research: deep analysis, due diligence, and portfolio c
 ## Usage
 
 ```bash
-llm-box install finance/investment-research
-llm-box run investment-research/workflow.yaml \
+aflare install finance/investment-research
+aflare run investment-research/workflow.yaml \
   --params.research_brief="/path/to/research-brief.md"
 ```
 

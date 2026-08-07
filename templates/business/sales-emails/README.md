@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate cold email 
 ## Usage
 
 ```bash
-llm-box install business-sales/sales-emails
-llm-box run sales-emails/workflow.yaml
+aflare install business-sales/sales-emails
+aflare run sales-emails/workflow.yaml
 ```
 
 ## Parameters

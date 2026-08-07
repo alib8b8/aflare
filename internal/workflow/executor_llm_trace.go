@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -21,8 +21,8 @@ import (
 	"regexp"
 	"sync"
 
-	"github.com/alib8b8/llm-box/internal/logger"
-	"github.com/alib8b8/llm-box/internal/nodes"
+	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/nodes"
 )
 
 // traceRedactExtras holds secret patterns that core.RedactSensitive does not
@@ -51,7 +51,7 @@ var traceRedactExtras = []struct {
 // does not yet recognise.
 //
 // Redaction is on by default (it is a safety control). Bypassing it requires
-// BOTH LLM_BOX_TRACE_NO_REDACT=1 AND LLM_BOX_DEBUG_MODE=1 — a dual control so
+// BOTH AFLARE_TRACE_NO_REDACT=1 AND AFLARE_DEBUG_MODE=1 — a dual control so
 // a single misconfigured env var in production cannot leak prompts (which may
 // carry PII, API keys, or card numbers) into trace files. This is intended
 // only for local debugging of trace content; never enable in production.
@@ -69,12 +69,12 @@ func redactForTrace(s string) string {
 	return nodes.RedactSensitive(s)
 }
 
-// traceRedactDisabled reports whether the LLM_BOX_TRACE_NO_REDACT escape
+// traceRedactDisabled reports whether the AFLARE_TRACE_NO_REDACT escape
 // hatch is active. As a production-safety dual control, BOTH
-// LLM_BOX_TRACE_NO_REDACT=1 AND LLM_BOX_DEBUG_MODE=1 must be set to bypass
+// AFLARE_TRACE_NO_REDACT=1 AND AFLARE_DEBUG_MODE=1 must be set to bypass
 // redaction; if either is missing, redaction stays on. A production
 // environment typically would not set both, so an accidentally-set
-// LLM_BOX_TRACE_NO_REDACT alone does not leak sensitive data.
+// AFLARE_TRACE_NO_REDACT alone does not leak sensitive data.
 //
 // L-10: os.Getenv is read on every redactForTrace call (i.e. once per LLM
 // call) rather than cached in an atomic.Bool via sync.Once. This is
@@ -83,7 +83,7 @@ func redactForTrace(s string) string {
 //     the process environment block (a couple of hundred nanoseconds); it
 //     is dwarfed by the LLM round-trip that redactForTrace is invoked on.
 //   - Caching would break the test contract. Multiple tests in this
-//     package flip LLM_BOX_TRACE_NO_REDACT / LLM_BOX_DEBUG_MODE via
+//     package flip AFLARE_TRACE_NO_REDACT / AFLARE_DEBUG_MODE via
 //     t.Setenv and rely on the next redactForTrace call observing the new
 //     value immediately. A sync.Once cache (or an atomic.Bool snapshot)
 //     would freeze the first observed value for the lifetime of the
@@ -96,16 +96,16 @@ func redactForTrace(s string) string {
 // If a future change makes this hot, prefer a sync.Once + atomic.Bool
 // cache plus a test-only reset helper over an unconditional cache.
 func traceRedactDisabled() bool {
-	if os.Getenv("LLM_BOX_TRACE_NO_REDACT") != "1" {
+	if os.Getenv("AFLARE_TRACE_NO_REDACT") != "1" {
 		return false
 	}
-	if os.Getenv("LLM_BOX_DEBUG_MODE") != "1" {
+	if os.Getenv("AFLARE_DEBUG_MODE") != "1" {
 		return false // dual control: debug mode must also be on
 	}
 	return true
 }
 
-// traceNoRedactWarnOnce ensures the LLM_BOX_TRACE_NO_REDACT safety warning is
+// traceNoRedactWarnOnce ensures the AFLARE_TRACE_NO_REDACT safety warning is
 // emitted at most once per process, on the first redactForTrace call. Using
 // sync.Once (rather than init) means tests that flip the env var via t.Setenv
 // and then call redactForTrace trigger the warning based on the env value at
@@ -114,19 +114,19 @@ func traceRedactDisabled() bool {
 var traceNoRedactWarnOnce sync.Once
 
 // warnTraceNoRedactIfEnabled logs a prominent warning when the trace redaction
-// escape hatch is (or would be) active. When LLM_BOX_TRACE_NO_REDACT=1 is set
-// but LLM_BOX_DEBUG_MODE!=1, redaction remains enabled (the dual control held)
+// escape hatch is (or would be) active. When AFLARE_TRACE_NO_REDACT=1 is set
+// but AFLARE_DEBUG_MODE!=1, redaction remains enabled (the dual control held)
 // and the operator is told so; when both are set, redaction is actually
 // disabled and the operator is warned that sensitive data will be logged.
 func warnTraceNoRedactIfEnabled() {
-	if os.Getenv("LLM_BOX_TRACE_NO_REDACT") != "1" {
+	if os.Getenv("AFLARE_TRACE_NO_REDACT") != "1" {
 		return
 	}
-	if os.Getenv("LLM_BOX_DEBUG_MODE") != "1" {
-		logger.Warn("LLM_BOX_TRACE_NO_REDACT=1 set but LLM_BOX_DEBUG_MODE!=1, redaction remains enabled (production safety)")
+	if os.Getenv("AFLARE_DEBUG_MODE") != "1" {
+		logger.Warn("AFLARE_TRACE_NO_REDACT=1 set but AFLARE_DEBUG_MODE!=1, redaction remains enabled (production safety)")
 		return
 	}
-	logger.Warn("LLM_BOX_TRACE_NO_REDACT=1 AND LLM_BOX_DEBUG_MODE=1 — SENSITIVE DATA WILL BE LOGGED, DO NOT USE IN PRODUCTION")
+	logger.Warn("AFLARE_TRACE_NO_REDACT=1 AND AFLARE_DEBUG_MODE=1 — SENSITIVE DATA WILL BE LOGGED, DO NOT USE IN PRODUCTION")
 }
 
 // llmCallCollector is both an LLMCallSink (B-2) and a RouterDecisionSink

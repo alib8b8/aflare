@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>llm-box</h1>
+  <h1>aflare</h1>
   <p>🌍
     <strong>中文</strong> ·
     <a href="README.en.md">English</a>
@@ -9,11 +9,11 @@
   <p><em>What if your computer just understood what you meant?</em></p>
 
   <p>
-    <a href="https://github.com/alib8b8/llm-box/actions/workflows/ci.yml">
-      <img src="https://img.shields.io/github/actions/workflow/status/alib8b8/llm-box/ci.yml?branch=main&style=flat-square&label=CI" alt="CI 状态" />
+    <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
+      <img src="https://img.shields.io/github/actions/workflow/status/alib8b8/aflare/ci.yml?branch=main&style=flat-square&label=CI" alt="CI 状态" />
     </a>
-    <a href="https://github.com/alib8b8/llm-box/releases">
-      <img src="https://img.shields.io/github/v/release/alib8b8/llm-box?display_name=tag&include_prereleases&style=flat-square" alt="发布版本" />
+    <a href="https://github.com/alib8b8/aflare/releases">
+      <img src="https://img.shields.io/github/v/release/alib8b8/aflare?display_name=tag&include_prereleases&style=flat-square" alt="发布版本" />
     </a>
     <a href="https://golang.org/">
       <img src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat-square" alt="Go" />
@@ -21,23 +21,23 @@
     <a href="LICENSE">
       <img src="https://img.shields.io/badge/License-AGPL%20v3.0-blue.svg?style=flat-square" alt="许可证" />
     </a>
-    <a href="https://github.com/alib8b8/llm-box/actions/workflows/release.yml">
-      <img src="https://github.com/alib8b8/llm-box/actions/workflows/release.yml/badge.svg" alt="发布状态" />
+    <a href="https://github.com/alib8b8/aflare/actions/workflows/release.yml">
+      <img src="https://github.com/alib8b8/aflare/actions/workflows/release.yml/badge.svg" alt="发布状态" />
     </a>
-    <a href="https://gitcode.com/llm-box/llm-box">
+    <a href="https://gitcode.com/aflare/aflare">
       <img src="https://img.shields.io/badge/AtomGit-GitCode-green?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzI1MjUyNSIgZD0iTTIyIDJoLTJWMGgydi0yaDJ2MmgydjItMmgydjItMmgydjJ6bTAgMTZIMnYtMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjJ6bTAgLThIMnYtMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjItMmgydjJ6Ii8+PC9zdmc+" alt="GitCode" />
     </a>
-    <a href="https://gitcode.com/llm-box/llm-box">
-      <img src="https://gitcode.com/llm-box/llm-box/star/new_badge.svg" alt="AtomGit G-Star" />
+    <a href="https://gitcode.com/aflare/aflare">
+      <img src="https://gitcode.com/aflare/aflare/star/new_badge.svg" alt="AtomGit G-Star" />
     </a>
-    <a href="https://gitcode.com/llm-box/llm-box">
-      <img src="https://gitcode.com/llm-box/llm-box/star/badge.svg" alt="AtomGit Star" />
+    <a href="https://gitcode.com/aflare/aflare">
+      <img src="https://gitcode.com/aflare/aflare/star/badge.svg" alt="AtomGit Star" />
     </a>
-    <a href="https://gitcode.com/llm-box/llm-box">
-      <img src="https://gitcode.com/llm-box/llm-box/fork/badge.svg" alt="AtomGit Fork" />
+    <a href="https://gitcode.com/aflare/aflare">
+      <img src="https://gitcode.com/aflare/aflare/fork/badge.svg" alt="AtomGit Fork" />
     </a>
-    <a href="https://gitcode.com/llm-box/llm-box">
-      <img src="https://gitcode.com/llm-box/llm-box/download/badge.svg" alt="AtomGit Download" />
+    <a href="https://gitcode.com/aflare/aflare">
+      <img src="https://gitcode.com/aflare/aflare/download/badge.svg" alt="AtomGit Download" />
     </a>
   </p>
 
@@ -48,7 +48,7 @@
 ## 📋 目录
 
 - [🚀 快速开始](#-快速开始)
-- [💡 为什么是 llm-box？](#-为什么是-llm-box)
+- [💡 为什么是 aflare？](#-为什么是-aflare)
 - [📖 故事](#-故事)
 - [✨ 核心特性](#-核心特性)
 - [💰 金融场景能力](#-金融场景能力)
@@ -77,15 +77,15 @@
 
 | macOS | Linux | Windows |
 |-------|-------|---------|
-| `brew install alib8b8/tap/llm-box` | `curl -fsSL https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh \| bash` | `irm https://raw.githubusercontent.com/alib8b8/llm-box/main/install.ps1 \| iex` |
+| `brew install alib8b8/tap/aflare` | `curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh \| bash` | `irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 \| iex` |
 
 **🌏 中国用户 — 使用镜像加速下载：**
 
 | macOS/Linux | Windows |
 |-------------|---------|
-| `curl -fsSL https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.sh \| bash` | `irm https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/llm-box/main/install.ps1 \| iex` |
+| `curl -fsSL https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh \| bash` | `irm https://ghproxy.com/https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 \| iex` |
 
-**或从 [GitCode Releases](https://gitcode.com/llm-box/llm-box/releases) / [GitHub Releases](https://github.com/alib8b8/llm-box/releases) 下载**
+**或从 [GitCode Releases](https://gitcode.com/aflare/aflare/releases) / [GitHub Releases](https://github.com/alib8b8/aflare/releases) 下载**
 
 📖 [交互式下载页面 →](docs/download.html)
 
@@ -93,42 +93,42 @@
 
 ### 一句话生成工作流
 
-用自然语言告诉 llm-box 你想做什么，它会生成 YAML 工作流：
+用自然语言告诉 aflare 你想做什么，它会生成 YAML 工作流：
 
 ```bash
 # 监控 BTC 价格，每 10 分钟检查一次
-llm-box create "monitor BTC price every 10 minutes and send telegram alert when > 70000"
+aflare create "monitor BTC price every 10 minutes and send telegram alert when > 70000"
 
 # 监控 GitHub 仓库 Star 数，超过阈值提醒
-llm-box create "watch my github repo alib8b8/llm-box and notify me when star > 100"
+aflare create "watch my github repo alib8b8/aflare and notify me when star > 100"
 
 # 每天下载 arXiv AI 论文并总结
-llm-box create "download arxiv AI papers every day and summarize top 5"
+aflare create "download arxiv AI papers every day and summarize top 5"
 
 # 监控特斯拉股价并发送 Telegram 告警
-llm-box create "watch TSLA stock and send telegram alert when price drops 5%"
+aflare create "watch TSLA stock and send telegram alert when price drops 5%"
 
 # 监控上海天气并发邮件
-llm-box create "monitor Shanghai weather and email me if it will rain tomorrow"
+aflare create "monitor Shanghai weather and email me if it will rain tomorrow"
 ```
 
 然后运行生成的工作流：
 
 ```bash
-llm-box run btc-monitor.yaml
+aflare run btc-monitor.yaml
 ```
 
 📖 [完整入门指南 →](docs/getting-started.md)
 
 ---
 
-## 💡 为什么是 llm-box？
+## 💡 为什么是 aflare？
 
-> llm-box 不是 AI 助手 —— 它是一个**确定性执行引擎**。
+> aflare 不是 AI 助手 —— 它是一个**确定性执行引擎**。
 >
 > AI 负责理解你的意图，YAML 负责保证执行。
 
-| 工具 | 问题 | llm-box 的方式 |
+| 工具 | 问题 | aflare 的方式 |
 |------|------|----------------|
 | **Bash** | 太难写，难维护，容易出错 | 自然语言生成，YAML 可读可改 |
 | **n8n** | 太重了，一个自动化任务还要跑 Docker | 单二进制，终端里就能用 |
@@ -140,7 +140,7 @@ llm-box run btc-monitor.yaml
 
 ## 📖 故事
 
-> I built llm-box because I was tired of writing Bash scripts.
+> I built aflare because I was tired of writing Bash scripts.
 >
 > 每次想自动化一个简单的事情——监控价格、抓取新闻、定时发消息——都要写几十行 Bash，还要处理错误、重试、依赖。
 >
@@ -161,7 +161,7 @@ llm-box run btc-monitor.yaml
 | **🔌 完全离线运行** | 配合 Ollama，所有东西都可以在本地完成。断网也能工作，数据从不离开你的设备 |
 | **🔄 定时调度** | 内置 Cron 调度，每 10 分钟、每天、每周——想怎么跑就怎么跑 |
 | **🧩 100+ 内置模板** | BTC 监控、GitHub Star 告警、Arxiv 论文总结、天气提醒……拿来就用 |
-| **🔌 插件系统** | 像 Homebrew tap 一样扩展。`llm-box install btc-monitor` |
+| **🔌 插件系统** | 像 Homebrew tap 一样扩展。`aflare install btc-monitor` |
 | **🌐 多模型支持** | 支持 Ollama / OpenAI / DeepSeek / Qwen / Kimi / GLM / Mistral / **昇腾 Ascend**，本地云端都能跑 |
 | **🔒 隐私优先** | 默认本地执行，秘密自动脱敏，审计日志完整，98+ 漏洞已审计 |
 | **🛡️ 企业级安全** | SSRF 防护、路径遍历防御、命令注入白名单、AES-GCM 加密 |
@@ -171,7 +171,7 @@ llm-box run btc-monitor.yaml
 
 ## 💰 金融场景能力
 
-llm-box 已具备真实金融场景（只读分析 + 受控写入）的核心能力：
+aflare 已具备真实金融场景（只读分析 + 受控写入）的核心能力：
 
 | 能力 | 实现 | 状态 |
 |------|------|------|
@@ -182,7 +182,7 @@ llm-box 已具备真实金融场景（只读分析 + 受控写入）的核心能
 | 配额持久化+多租户 | FileQuotaStore + per-tenant 隔离 | ✅ |
 | trace 脱敏 | LLM I/O 持久化前脱敏 API key/JWT/私钥 | ✅ |
 | **saga 事务补偿** | forward 步骤 + 反向 compensate，best-effort 补偿，`{{var.error}}` 上下文 | ✅ |
-| **LLM 成本归因** | token usage × 单价表自动估算 USD 成本，写入审计日志 `cost_usd`/`total_tokens`；`LLM_BOX_PRICING_FILE` 覆盖单价 | ✅ |
+| **LLM 成本归因** | token usage × 单价表自动估算 USD 成本，写入审计日志 `cost_usd`/`total_tokens`；`AFLARE_PRICING_FILE` 覆盖单价 | ✅ |
 
 ### 适用场景
 - ✅ 只读分析：AML 审查、投研报告、组合复核、日终对账（已有模板）
@@ -202,7 +202,7 @@ llm-box 已具备真实金融场景（只读分析 + 受控写入）的核心能
 
 ## 🏛️ 信创国产化
 
-llm-box 是面向信创（信息技术应用创新）生态的国产 AI 工作流引擎，从芯片指令集到操作系统、从 AI 算力到移动端，全链路适配国产技术栈。
+aflare 是面向信创（信息技术应用创新）生态的国产 AI 工作流引擎，从芯片指令集到操作系统、从 AI 算力到移动端，全链路适配国产技术栈。
 
 ### 信创适配矩阵
 
@@ -225,7 +225,7 @@ llm-box 是面向信创（信息技术应用创新）生态的国产 AI 工作�
 
 ### 信创差异化优势
 
-| 对比维度 | llm-box | 国内同类产品 |
+| 对比维度 | aflare | 国内同类产品 |
 |---------|---------|-------------|
 | **芯片适配** | 昇腾/寒武纪/海光 三芯适配 | 多数仅支持 NVIDIA CUDA |
 | **部署方式** | 单二进制，内网离线运行 | 多为 SaaS 或 Docker 部署 |
@@ -298,7 +298,7 @@ llm-box 是面向信创（信息技术应用创新）生态的国产 AI 工作�
 
 ## 🤖 宇树机器人集成
 
-llm-box 内置 `unitree_robot` 节点，将宇树（Unitree）系列机器人纳入 YAML 工作流编排，支持四足机器人和人形机器人的控制与状态监控。
+aflare 内置 `unitree_robot` 节点，将宇树（Unitree）系列机器人纳入 YAML 工作流编排，支持四足机器人和人形机器人的控制与状态监控。
 
 | 节点 | 描述 |
 |------|------|
@@ -344,7 +344,7 @@ Go2、B2、B2-W、Go1、A1、H1、H1-2、G1、G1-Humanoid
 
 ## 🔒 安全
 
-llm-box 认真对待安全问题。关键防护措施：
+aflare 认真对待安全问题。关键防护措施：
 
 | 防护 | 实现 |
 |------------|----------------|
@@ -374,7 +374,7 @@ llm-box 认真对待安全问题。关键防护措施：
 
 ## 🌐 生态
 
-llm-box 参与多个开源生态：
+aflare 参与多个开源生态：
 
 | 生态 | 状态 | 描述 |
 |-----------|--------|-------------|
@@ -438,22 +438,22 @@ llm-box 参与多个开源生态：
 ## 🛠️ CLI 命令
 
 ```bash
-llm-box create [描述]      从描述生成工作流
-llm-box run <文件>          运行工作流
-llm-box run --resume <文件> 从上次中断处恢复工作流
-llm-box secrets add         存储加密秘密
-llm-box secrets list        列出分组中的秘密
-llm-box schedule add        添加定时任务
-llm-box schedule list       列出定时任务
-llm-box schedule remove     移除定时任务
-llm-box schedule start      启动调度器
-llm-box ui                  启动 Web UI 编辑器
-llm-box visualize <文件>    可视化工作流
-llm-box validate <文件>     验证工作流文件
-llm-box node install        安装外部节点
-llm-box plugin install      安装插件
-llm-box version             显示版本
-llm-box help                显示完整帮助
+aflare create [描述]      从描述生成工作流
+aflare run <文件>          运行工作流
+aflare run --resume <文件> 从上次中断处恢复工作流
+aflare secrets add         存储加密秘密
+aflare secrets list        列出分组中的秘密
+aflare schedule add        添加定时任务
+aflare schedule list       列出定时任务
+aflare schedule remove     移除定时任务
+aflare schedule start      启动调度器
+aflare ui                  启动 Web UI 编辑器
+aflare visualize <文件>    可视化工作流
+aflare validate <文件>     验证工作流文件
+aflare node install        安装外部节点
+aflare plugin install      安装插件
+aflare version             显示版本
+aflare help                显示完整帮助
 ```
 
 📖 [完整 CLI 参考 →](docs/getting-started.md#cli-command-reference)
@@ -520,62 +520,62 @@ llm-box help                显示完整帮助
 
 ## 🌟 优秀集成案例
 
-使用 llm-box 构建的优秀开源项目：
+使用 aflare 构建的优秀开源项目：
 
 | 项目 | 描述 |
 |------|------|
-| [AI 新闻助手]() | 基于 llm-box 工作流的 AI 新闻聚合与摘要系统 |
+| [AI 新闻助手]() | 基于 aflare 工作流的 AI 新闻聚合与摘要系统 |
 | [代码审查 Agent]() | 利用代码知识图谱节点的自动化代码审查工具 |
 | [研究助手]() | 结合 researcher + knowledge_graph 节点的学术研究工作流 |
 
-> 如果您的项目使用了 llm-box，欢迎提交 PR 添加到此处！
+> 如果您的项目使用了 aflare，欢迎提交 PR 添加到此处！
 
 ---
 
 ## 🛒 精选技能市场
 
-llm-box 内置 100+ 开箱即用的工作流模板，覆盖开发、运维、营销、研究等场景。一键安装，即刻使用。
+aflare 内置 100+ 开箱即用的工作流模板，覆盖开发、运维、营销、研究等场景。一键安装，即刻使用。
 
 ### 安装方式
 
 ```bash
 # 从技能市场一键安装
-llm-box create from templates/software-engineering/unit-test-generator
+aflare create from templates/software-engineering/unit-test-generator
 
 # 或直接从 GitHub 安装
-llm-box create from https://github.com/alib8b8/llm-box/tree/main/templates/data-ai/prompt-engineering
+aflare create from https://github.com/alib8b8/aflare/tree/main/templates/data-ai/prompt-engineering
 ```
 
 ### 热门技能
 
 | 分类 | 技能 | 描述 | 一键安装 |
 |------|------|------|---------|
-| 🤖 AI/ML | Prompt Engineering | LLM 提示词工程模板 | `llm-box create from templates/data-ai/prompt-engineering` |
-| 🤖 AI/ML | LLM Fine-tune | 大模型微调流水线 | `llm-box create from templates/data-ai/llm-finetune` |
-| 🤖 AI/ML | Model Evaluation | 模型评估与基准测试 | `llm-box create from templates/data-ai/model-evaluation` |
-| 💻 开发工具 | Unit Test Generator | 自动生成单元测试 | `llm-box create from templates/software-engineering/unit-test-generator` |
-| 💻 开发工具 | API Docs Generator | API 文档自动生成 | `llm-box create from templates/software-engineering/api-docs-generator` |
-| 💻 开发工具 | Code Duplicate Finder | 代码重复检测 | `llm-box create from templates/software-engineering/code-duplicate-finder` |
-| 💻 开发工具 | Dependency Checker | 依赖安全检查 | `llm-box create from templates/software-engineering/dependency-checker` |
-| 🔧 DevOps | Log Analyzer | 日志智能分析 | `llm-box create from templates/devops-infra/log-analyzer` |
-| 🔧 DevOps | Docker Cleaner | Docker 资源清理 | `llm-box create from templates/devops-infra/docker-cleaner` |
-| 🔧 DevOps | SSL Cert Checker | SSL 证书到期检查 | `llm-box create from templates/devops-infra/ssl-cert-checker` |
-| 📊 数据分析 | CSV Analyzer | CSV 数据分析 | `llm-box create from templates/data-ai/csv-analyzer` |
-| 📊 数据分析 | A/B Test Analyzer | A/B 测试分析 | `llm-box create from templates/data-ai/ab-test-analyzer` |
-| 📊 数据分析 | Financial Analyzer | 财务数据分析 | `llm-box create from templates/data-ai/financial-analyzer` |
-| 📝 内容创作 | Blog Outline Generator | 博客大纲生成 | `llm-box create from templates/marketing/blog-outline-generator` |
-| 📝 内容创作 | SEO Keyword Research | SEO 关键词研究 | `llm-box create from templates/marketing/seo-keyword-research` |
-| 🔬 研究 | Literature Review | 文献综述 | `llm-box create from templates/data-ai/literature-review` |
-| 🔬 研究 | Paper Summarizer | 论文摘要 | `llm-box create from templates/data-ai/paper-summarizer` |
-| 🔬 研究 | Competitor Analysis | 竞品分析 | `llm-box create from templates/data-ai/competitor-analysis` |
-| 📈 商业 | Business Plan | 商业计划书 | `llm-box create from templates/business/business-plan` |
-| 📈 商业 | SaaS Pricing | SaaS 定价策略 | `llm-box create from templates/business/saas-pricing` |
-| 🔒 安全 | Security Audit | 安全审计 | `llm-box create from templates/devops-infra/security-audit` |
-| 🔒 安全 | Incident Response | 事件响应 | `llm-box create from templates/devops-infra/incident-response` |
-| 📚 文档 | README Generator | README 自动生成 | `llm-box create from templates/software-engineering/readme-generator` |
-| 📚 文档 | API Docs Builder | API 文档构建 | `llm-box create from templates/software-engineering/api-docs-builder` |
-| 🏗️ 架构 | Microservices Design | 微服务设计 | `llm-box create from templates/software-engineering/microservices-design` |
-| 🏗️ 架构 | Cloud Architecture | 云架构设计 | `llm-box create from templates/devops-infra/cloud-architecture` |
+| 🤖 AI/ML | Prompt Engineering | LLM 提示词工程模板 | `aflare create from templates/data-ai/prompt-engineering` |
+| 🤖 AI/ML | LLM Fine-tune | 大模型微调流水线 | `aflare create from templates/data-ai/llm-finetune` |
+| 🤖 AI/ML | Model Evaluation | 模型评估与基准测试 | `aflare create from templates/data-ai/model-evaluation` |
+| 💻 开发工具 | Unit Test Generator | 自动生成单元测试 | `aflare create from templates/software-engineering/unit-test-generator` |
+| 💻 开发工具 | API Docs Generator | API 文档自动生成 | `aflare create from templates/software-engineering/api-docs-generator` |
+| 💻 开发工具 | Code Duplicate Finder | 代码重复检测 | `aflare create from templates/software-engineering/code-duplicate-finder` |
+| 💻 开发工具 | Dependency Checker | 依赖安全检查 | `aflare create from templates/software-engineering/dependency-checker` |
+| 🔧 DevOps | Log Analyzer | 日志智能分析 | `aflare create from templates/devops-infra/log-analyzer` |
+| 🔧 DevOps | Docker Cleaner | Docker 资源清理 | `aflare create from templates/devops-infra/docker-cleaner` |
+| 🔧 DevOps | SSL Cert Checker | SSL 证书到期检查 | `aflare create from templates/devops-infra/ssl-cert-checker` |
+| 📊 数据分析 | CSV Analyzer | CSV 数据分析 | `aflare create from templates/data-ai/csv-analyzer` |
+| 📊 数据分析 | A/B Test Analyzer | A/B 测试分析 | `aflare create from templates/data-ai/ab-test-analyzer` |
+| 📊 数据分析 | Financial Analyzer | 财务数据分析 | `aflare create from templates/data-ai/financial-analyzer` |
+| 📝 内容创作 | Blog Outline Generator | 博客大纲生成 | `aflare create from templates/marketing/blog-outline-generator` |
+| 📝 内容创作 | SEO Keyword Research | SEO 关键词研究 | `aflare create from templates/marketing/seo-keyword-research` |
+| 🔬 研究 | Literature Review | 文献综述 | `aflare create from templates/data-ai/literature-review` |
+| 🔬 研究 | Paper Summarizer | 论文摘要 | `aflare create from templates/data-ai/paper-summarizer` |
+| 🔬 研究 | Competitor Analysis | 竞品分析 | `aflare create from templates/data-ai/competitor-analysis` |
+| 📈 商业 | Business Plan | 商业计划书 | `aflare create from templates/business/business-plan` |
+| 📈 商业 | SaaS Pricing | SaaS 定价策略 | `aflare create from templates/business/saas-pricing` |
+| 🔒 安全 | Security Audit | 安全审计 | `aflare create from templates/devops-infra/security-audit` |
+| 🔒 安全 | Incident Response | 事件响应 | `aflare create from templates/devops-infra/incident-response` |
+| 📚 文档 | README Generator | README 自动生成 | `aflare create from templates/software-engineering/readme-generator` |
+| 📚 文档 | API Docs Builder | API 文档构建 | `aflare create from templates/software-engineering/api-docs-builder` |
+| 🏗️ 架构 | Microservices Design | 微服务设计 | `aflare create from templates/software-engineering/microservices-design` |
+| 🏗️ 架构 | Cloud Architecture | 云架构设计 | `aflare create from templates/devops-infra/cloud-architecture` |
 
 > 完整技能列表见 [templates/](templates/) 目录，120+ 技能持续更新中。
 
@@ -583,9 +583,9 @@ llm-box create from https://github.com/alib8b8/llm-box/tree/main/templates/data-
 
 ## 📖❓ 疑问解答
 
-### 1. llm-box 与其他 Agent 框架有什么区别？
+### 1. aflare 与其他 Agent 框架有什么区别？
 
-llm-box 专注于**确定性工作流与 AI Agent 的结合**：工作流确保执行可靠和可复现，Agent 节点提供智能推理能力。我们不依赖单一模型提供商，支持 22+ 模型、5 种路由策略，核心采用 Go 编写，零依赖、启动快、内存占用低。
+aflare 专注于**确定性工作流与 AI Agent 的结合**：工作流确保执行可靠和可复现，Agent 节点提供智能推理能力。我们不依赖单一模型提供商，支持 22+ 模型、5 种路由策略，核心采用 Go 编写，零依赖、启动快、内存占用低。
 
 工程深度层面：表达式引擎采用字节码 IR + 向量化批量求值；持久化用 append-only WAL（CRC32 + 原子压缩）替代 JSON 全量重写；LLM 路由集成 EWMA 延迟预测 + 完整熔断器状态机 + 帕累托排序；DAG 调度器通过 TLA+ 形式化规范 + Go 模型检查验证安全不变量与活性。
 
@@ -598,7 +598,7 @@ llm-box 专注于**确定性工作流与 AI Agent 的结合**：工作流确保�
 
 ### 3. 可以在企业环境中使用吗？
 
-完全可以。llm-box 采用 GNU Affero 通用公共许可证 v3.0，提供：
+完全可以。aflare 采用 GNU Affero 通用公共许可证 v3.0，提供：
 - **分级防护配置**（L0-L3），支持从开发环境到生产环境的安全梯度
 - **秘密脱敏** + **出站数据监控**，防止数据泄漏
 - **审计日志**，所有操作可追溯
@@ -606,7 +606,7 @@ llm-box 专注于**确定性工作流与 AI Agent 的结合**：工作流确保�
 
 ### 4. 如何扩展自定义节点？
 
-llm-box 支持三种扩展方式：
+aflare 支持三种扩展方式：
 - **插件系统**：从本地/git/网址/市场安装插件，沙箱隔离
 - **MCP 协议**：通过 Model Context Protocol 连接外部工具
 - **自定义节点**：用任意语言实现标准接口，参考[自定义节点指南](docs/custom-nodes.md)
@@ -617,7 +617,7 @@ llm-box 支持三种扩展方式：
 长期（v1.0+）：稳定 API、LTS 版本、企业级支持、更多硬件适配（昇腾/寒武纪/海光）
 详见[路线图 →](#️-路线图)
 
-### 6. llm-box 能用在真实金融场景吗？
+### 6. aflare 能用在真实金融场景吗？
 
 已具备核心金融能力（审计/幂等/限流/脱敏/缓存/saga 事务补偿），适用于只读分析、受控写入和跨步骤事务场景。
 saga 已支持多步骤写入失败自动反向补偿；2PC 暂未实现，强一致场景仍需数据库事务。
@@ -627,12 +627,12 @@ saga 已支持多步骤写入失败自动反向补偿；2PC 暂未实现，强�
 
 ## 📦 代码托管
 
-llm-box 在多个平台同步，欢迎在您常用的平台关注和贡献：
+aflare 在多个平台同步，欢迎在您常用的平台关注和贡献：
 
 | 平台 | 链接 |
 |------|------|
-| **GitHub** | https://github.com/alib8b8/llm-box |
-| **GitCode / AtomGit** | https://gitcode.com/llm-box/llm-box |
+| **GitHub** | https://github.com/alib8b8/aflare |
+| **GitCode / AtomGit** | https://gitcode.com/aflare/aflare |
 
 ---
 
@@ -644,7 +644,7 @@ llm-box 在多个平台同步，欢迎在您常用的平台关注和贡献：
 
 刚接触项目？从这里开始：
 
-- 🐛 [标有 "good first issue" 的 Bug 修复](https://github.com/alib8b8/llm-box/labels/good%20first%20issue)
+- 🐛 [标有 "good first issue" 的 Bug 修复](https://github.com/alib8b8/aflare/labels/good%20first%20issue)
 - 📝 文档改进
 - ✅ 为低覆盖率包添加测试
 - 🔧 新实用节点（参见[自定义节点指南](docs/custom-nodes.md)）
@@ -678,10 +678,10 @@ GNU Affero 通用公共许可证 v3.0 —— 详见 [LICENSE](LICENSE)。
 <div align="center">
   <p>为热爱终端的开发者精心打造 ❤️</p>
   <p>
-    <a href="https://github.com/alib8b8/llm-box">GitHub</a>
+    <a href="https://github.com/alib8b8/aflare">GitHub</a>
     ·
-    <a href="https://github.com/alib8b8/llm-box/issues">Issues</a>
+    <a href="https://github.com/alib8b8/aflare/issues">Issues</a>
     ·
-    <a href="https://github.com/alib8b8/llm-box/discussions">Discussions</a>
+    <a href="https://github.com/alib8b8/aflare/discussions">Discussions</a>
   </p>
 </div>

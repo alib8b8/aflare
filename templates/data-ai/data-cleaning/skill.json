@@ -3,7 +3,7 @@
   "name": "data-cleaning",
   "version": "1.0.0",
   "description": "Generate data cleaning and preprocessing pipeline",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "data-ai",
   "tags": [
     "data-ai",

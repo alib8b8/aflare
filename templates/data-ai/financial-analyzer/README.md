@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for analyze financial re
 ## Usage
 
 ```bash
-llm-box install data-analytics/financial-analyzer
-llm-box run financial-analyzer/workflow.yaml
+aflare install data-analytics/financial-analyzer
+aflare run financial-analyzer/workflow.yaml
 ```
 
 ## Parameters

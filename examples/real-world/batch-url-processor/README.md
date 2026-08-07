@@ -25,9 +25,9 @@
 
 ```bash
 # 用默认 5 个 example.com URL 试跑（fetch 会失败，走降级路径）
-llm-box run examples/real-world/batch-url-processor/workflow.yaml
+aflare run examples/real-world/batch-url-processor/workflow.yaml
 
 # 处理自己的 URL 列表
-llm-box run examples/real-world/batch-url-processor/workflow.yaml \
+aflare run examples/real-world/batch-url-processor/workflow.yaml \
   -var urls='["https://news.ycombinator.com","https://go.dev"]'
 ```

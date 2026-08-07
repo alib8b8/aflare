@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -25,8 +25,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alib8b8/llm-box/internal/history"
-	"github.com/alib8b8/llm-box/internal/nodes"
+	"github.com/alib8b8/aflare/internal/history"
+	"github.com/alib8b8/aflare/internal/nodes"
 )
 
 // restoreAuditDir restores the global history directory captured as an audit
@@ -73,7 +73,7 @@ func readAuditFileLines(t *testing.T, path string) []string {
 // is intact. It also checks that a sensitive step parameter (api_key) is
 // sanitized before being written.
 func TestExecutor_AuditLog_RecordsAllSteps(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
 	captureAndIsolateAudit(t, t.TempDir())
 
 	reg := nodes.NewRegistry()
@@ -176,7 +176,7 @@ func TestExecutor_AuditLog_RecordsAllSteps(t *testing.T) {
 // that the second execution's records extend the first execution's hash chain
 // continuously (no broken link across the run boundary).
 func TestExecutor_AuditLog_HMACChain(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "chain-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "chain-key")
 	captureAndIsolateAudit(t, t.TempDir())
 
 	reg := nodes.NewRegistry()
@@ -230,12 +230,12 @@ func TestExecutor_AuditLog_HMACChain(t *testing.T) {
 }
 
 // TestExecutor_AuditLog_NoHMACKeyDegradesGracefully verifies that when neither
-// LLM_BOX_AUDIT_HMAC_KEY nor LLM_BOX_SECRETS_PASSWORD is set, the workflow
+// AFLARE_AUDIT_HMAC_KEY nor AFLARE_SECRETS_PASSWORD is set, the workflow
 // still executes successfully and no audit records are written.
 func TestExecutor_AuditLog_NoHMACKeyDegradesGracefully(t *testing.T) {
 	// Force both key sources to be empty.
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "")
-	t.Setenv("LLM_BOX_SECRETS_PASSWORD", "")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "")
+	t.Setenv("AFLARE_SECRETS_PASSWORD", "")
 	captureAndIsolateAudit(t, t.TempDir())
 
 	reg := nodes.NewRegistry()
@@ -274,7 +274,7 @@ func TestExecutor_AuditLog_NoHMACKeyDegradesGracefully(t *testing.T) {
 // failure (here: history dir points at a regular file so MkdirAll fails) does
 // not prevent the workflow from completing.
 func TestExecutor_AuditLog_WriteFailureDoesNotBlock(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
 
 	// Point the history dir at a regular file: AppendAuditLog's MkdirAll will
 	// fail with ENOTDIR, exercising the non-blocking error path. This is
@@ -330,9 +330,9 @@ func TestExecutor_AuditLog_WriteFailureDoesNotBlock(t *testing.T) {
 // cache-hit path skips). Financial scenarios require that "a transfer was
 // served from cache" leaves an auditable trail.
 //
-// Not parallel: it sets LLM_BOX_AUDIT_HMAC_KEY via t.Setenv.
+// Not parallel: it sets AFLARE_AUDIT_HMAC_KEY via t.Setenv.
 func TestExecutor_AuditLog_IdempotencyHitRecorded(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "idemp-audit-hit-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "idemp-audit-hit-key")
 	captureAndIsolateAudit(t, t.TempDir())
 
 	var counter int
@@ -421,9 +421,9 @@ func TestExecutor_AuditLog_IdempotencyHitRecorded(t *testing.T) {
 // with Success=false and the in-progress run_id, so the operator can attribute
 // the suppression to the live run.
 //
-// Not parallel: it sets LLM_BOX_AUDIT_HMAC_KEY via t.Setenv.
+// Not parallel: it sets AFLARE_AUDIT_HMAC_KEY via t.Setenv.
 func TestExecutor_AuditLog_IdempotencyRejectedRecorded(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "idemp-audit-rej-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "idemp-audit-rej-key")
 	captureAndIsolateAudit(t, t.TempDir())
 
 	var counter int
@@ -498,7 +498,7 @@ func TestExecutor_AuditLog_IdempotencyRejectedRecorded(t *testing.T) {
 // workflows). The field-presence assertion is the contract; the value is
 // exercised by computeLLMCost's unit tests.
 func TestExecutor_AuditLog_RecordsCostAttribution(t *testing.T) {
-	t.Setenv("LLM_BOX_AUDIT_HMAC_KEY", "test-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
 	captureAndIsolateAudit(t, t.TempDir())
 
 	reg := nodes.NewRegistry()

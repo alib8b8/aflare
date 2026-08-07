@@ -13,8 +13,8 @@ Financial market scanning and investment intelligence workflow.
 ## Usage
 
 ```bash
-llm-box install finance/market-scan
-llm-box run market-scan/workflow.yaml \
+aflare install finance/market-scan
+aflare run market-scan/workflow.yaml \
   --params.query="AI sector stocks Q3 outlook" \
   --params.strategy="growth" \
   --params.risk_tolerance="medium" \

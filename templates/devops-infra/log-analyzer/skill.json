@@ -3,7 +3,7 @@
   "name": "log-analyzer",
   "version": "1.0.0",
   "description": "Analyze application logs for errors and patterns",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "devops-infra",
   "tags": [
     "devops-infra",

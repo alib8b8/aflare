@@ -3,7 +3,7 @@
   "name": "docker-cleaner",
   "version": "1.0.0",
   "description": "Clean up unused Docker images and containers",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "devops-infra",
   "tags": [
     "devops-infra",

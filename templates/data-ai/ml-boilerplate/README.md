@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate ml project 
 ## Usage
 
 ```bash
-llm-box install ai-ml/ml-boilerplate
-llm-box run ml-boilerplate/workflow.yaml
+aflare install ai-ml/ml-boilerplate
+aflare run ml-boilerplate/workflow.yaml
 ```
 
 ## Parameters

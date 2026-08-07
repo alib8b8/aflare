@@ -1,6 +1,6 @@
 # Tenant Isolation
 
-llm-box supports multi-tenant deployments with resource isolation between tenants.
+aflare supports multi-tenant deployments with resource isolation between tenants.
 
 ## Overview
 
@@ -17,10 +17,10 @@ Tenant isolation allows you to:
 
 ```bash
 # Create tenant with default configuration
-llm-box tenant create --id acme --name "Acme Corp"
+aflare tenant create --id acme --name "Acme Corp"
 
 # Create tenant with custom quotas
-llm-box tenant create \
+aflare tenant create \
   --id startup \
   --name "Startup Inc" \
   --max-workflows 10 \
@@ -31,19 +31,19 @@ llm-box tenant create \
 ### List Tenants
 
 ```bash
-llm-box tenant list
+aflare tenant list
 ```
 
 ### Get Tenant Info
 
 ```bash
-llm-box tenant info acme
+aflare tenant info acme
 ```
 
 ### Delete a Tenant
 
 ```bash
-llm-box tenant delete acme
+aflare tenant delete acme
 ```
 
 ## Resource Isolation
@@ -53,7 +53,7 @@ llm-box tenant delete acme
 Each tenant gets isolated directories for resources:
 
 ```
-~/.llm-box/
+~/.aflare/
 ├── tenants/
 │   ├── acme/
 │   │   ├── workflows/        # Tenant-specific workflows
@@ -80,7 +80,7 @@ Each tenant gets isolated directories for resources:
 
 ```bash
 # Set quotas when creating
-llm-box tenant create \
+aflare tenant create \
   --id enterprise \
   --name "Enterprise Ltd" \
   --max-workflows 100 \
@@ -99,7 +99,7 @@ llm-box tenant create \
 ### Checking Quota Usage
 
 ```bash
-llm-box tenant quota acme
+aflare tenant quota acme
 
 # Output:
 # Tenant: acme
@@ -134,7 +134,7 @@ Tenant isolation is enforced via context:
 
 ```go
 import (
-    "github.com/alib8b8/llm-box/internal/tenant"
+    "github.com/alib8b8/aflare/internal/tenant"
 )
 
 // Set tenant in context
@@ -150,36 +150,36 @@ tenantID := tenant.GetTenantID(ctx)
 
 ```bash
 # Create tenants for each customer
-llm-box tenant create --id customer-a --name "Customer A"
-llm-box tenant create --id customer-b --name "Customer B"
+aflare tenant create --id customer-a --name "Customer A"
+aflare tenant create --id customer-b --name "Customer B"
 
 # Deploy workflows per tenant
-llm-box run --tenant customer-a workflow-a.yaml
-llm-box run --tenant customer-b workflow-b.yaml
+aflare run --tenant customer-a workflow-a.yaml
+aflare run --tenant customer-b workflow-b.yaml
 ```
 
 ### Multi-Team Environment
 
 ```bash
 # Create team tenants
-llm-box tenant create --id engineering --name "Engineering"
-llm-box tenant create --id marketing --name "Marketing"
+aflare tenant create --id engineering --name "Engineering"
+aflare tenant create --id marketing --name "Marketing"
 
 # Set appropriate quotas
-llm-box tenant config engineering --max-workflows 50 --max-concurrency 20
-llm-box tenant config marketing --max-workflows 20 --max-concurrency 10
+aflare tenant config engineering --max-workflows 50 --max-concurrency 20
+aflare tenant config marketing --max-workflows 20 --max-concurrency 10
 ```
 
 ### Development/Testing
 
 ```bash
 # Create isolated environments
-llm-box tenant create --id dev --name "Development"
-llm-box tenant create --id staging --name "Staging"
-llm-box tenant create --id prod --name "Production"
+aflare tenant create --id dev --name "Development"
+aflare tenant create --id staging --name "Staging"
+aflare tenant create --id prod --name "Production"
 
 # Run workflows in isolation
-llm-box run --tenant dev test-workflow.yaml
+aflare run --tenant dev test-workflow.yaml
 ```
 
 ## Security
@@ -224,7 +224,7 @@ curl -X DELETE http://localhost:8090/api/tenants/new-tenant
 
 ```go
 import (
-    "github.com/alib8b8/llm-box/internal/tenant"
+    "github.com/alib8b8/aflare/internal/tenant"
 )
 
 // Create tenant manager
@@ -254,14 +254,14 @@ err := tm.ValidateAccess("acme", "/path/to/tenant/workflow.yaml")
 
 ### Tenant Not Found
 
-1. Verify tenant exists: `llm-box tenant list`
+1. Verify tenant exists: `aflare tenant list`
 2. Check tenant ID spelling
 3. Ensure tenant was created successfully
 
 ### Quota Exceeded
 
-1. Check current usage: `llm-box tenant quota <id>`
-2. Increase quota: `llm-box tenant config <id> --max-workflows 100`
+1. Check current usage: `aflare tenant quota <id>`
+2. Increase quota: `aflare tenant config <id> --max-workflows 100`
 3. Delete unused workflows
 
 ### Permission Denied

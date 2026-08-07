@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for plan social media co
 ## Usage
 
 ```bash
-llm-box install content-marketing/social-media-planner
-llm-box run social-media-planner/workflow.yaml
+aflare install content-marketing/social-media-planner
+aflare run social-media-planner/workflow.yaml
 ```
 
 ## Parameters

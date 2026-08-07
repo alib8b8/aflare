@@ -3,7 +3,7 @@
   "name": "btc-alert",
   "version": "1.0.0",
   "description": "Monitor Bitcoin price and get alerted when it crosses your threshold.",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "finance",
   "tags": [
     "finance",

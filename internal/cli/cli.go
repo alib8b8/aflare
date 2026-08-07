@@ -1,4 +1,4 @@
-// Copyright (c) 2026 llm-box Contributors
+// Copyright (c) 2026 aflare Contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -22,12 +22,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/alib8b8/llm-box/internal/i18n"
-	"github.com/alib8b8/llm-box/internal/logger"
-	"github.com/alib8b8/llm-box/internal/meta"
-	"github.com/alib8b8/llm-box/internal/nodes"
-	"github.com/alib8b8/llm-box/internal/registry"
-	"github.com/alib8b8/llm-box/internal/workflow"
+	"github.com/alib8b8/aflare/internal/i18n"
+	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/meta"
+	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/registry"
+	"github.com/alib8b8/aflare/internal/workflow"
 )
 
 // ParseArgs parses the command-line arguments and returns the command and its arguments.
@@ -159,30 +159,30 @@ func PrintUsage() string {
 	return fmt.Sprintf(`%s
 
 %s:
-  llm-box create "workflow description"   %s
-  llm-box run <workflow-file.yaml>         %s
-  llm-box install <node-name>              %s
-  llm-box uninstall <node-name>            %s
-  llm-box registry sync                    %s
-  llm-box registry list                    %s
-  llm-box registry search <query>          %s
-  llm-box version                         %s
-  llm-box self-update                     %s
-  llm-box autoupgrade <cmd>               %s
-  llm-box help                            %s
+  aflare create "workflow description"   %s
+  aflare run <workflow-file.yaml>         %s
+  aflare install <node-name>              %s
+  aflare uninstall <node-name>            %s
+  aflare registry sync                    %s
+  aflare registry list                    %s
+  aflare registry search <query>          %s
+  aflare version                         %s
+  aflare self-update                     %s
+  aflare autoupgrade <cmd>               %s
+  aflare help                            %s
 
 %s:
   --safe-mode   %s
   --lang <lang>  %s (en, zh)
 
 %s:
-  llm-box create "fetch example.com and save to file"
-  llm-box run examples/basic_summary.yaml
-  llm-box --safe-mode run examples/multi_step.yaml
-  llm-box --lang zh run examples/basic_summary.yaml
-  llm-box registry sync
-  llm-box registry search weather
-  llm-box install weather_api`,
+  aflare create "fetch example.com and save to file"
+  aflare run examples/basic_summary.yaml
+  aflare --safe-mode run examples/multi_step.yaml
+  aflare --lang zh run examples/basic_summary.yaml
+  aflare registry sync
+  aflare registry search weather
+  aflare install weather_api`,
 		i18n.T("usage.title"),
 		i18n.T("usage.help"),
 		i18n.T("usage.create"),

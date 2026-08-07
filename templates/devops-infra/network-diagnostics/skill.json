@@ -3,7 +3,7 @@
   "name": "network-diagnostics",
   "version": "1.0.0",
   "description": "Run network diagnostics and generate report",
-  "author": "llm-box community",
+  "author": "aflare community",
   "category": "devops-infra",
   "tags": [
     "devops-infra",

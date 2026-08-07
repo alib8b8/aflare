@@ -9,8 +9,8 @@ This workflow template provides a ready-to-use solution for generate professiona
 ## Usage
 
 ```bash
-llm-box install writing-content/press-release
-llm-box run press-release/workflow.yaml
+aflare install writing-content/press-release
+aflare run press-release/workflow.yaml
 ```
 
 ## Parameters

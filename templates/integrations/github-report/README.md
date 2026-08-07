@@ -5,7 +5,7 @@ Generate a weekly activity report for your GitHub repository.
 ## Install
 
 ```bash
-llm-box install github-report
+aflare install github-report
 ```
 
 ## Configure
@@ -21,7 +21,7 @@ params:
 ## Run
 
 ```bash
-llm-box run templates/github-report/workflow.yaml
+aflare run templates/github-report/workflow.yaml
 ```
 
 ## Output
@@ -40,5 +40,5 @@ llm-box run templates/github-report/workflow.yaml
 
 ```bash
 # Every Monday at 9 AM
-0 9 * * 1 llm-box run /path/to/templates/github-report/workflow.yaml
+0 9 * * 1 aflare run /path/to/templates/github-report/workflow.yaml
 ```
