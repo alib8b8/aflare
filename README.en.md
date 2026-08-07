@@ -52,8 +52,10 @@
 - [📖 The Story](#-the-story)
 - [✨ Core Features](#-core-features)
 - [💰 Financial Scenario Capabilities](#-financial-scenario-capabilities)
+- [🏛️ Xinchuang &amp; Domestic IT](#-xinchuang--domestic-it)
 - [🤖 Agent Nodes](#-agent-nodes)
 - [📱 HarmonyOS &amp; Mobile Nodes](#-harmonyos--mobile-nodes)
+- [🤖 Unitree Robot Integration](#-unitree-robot-integration)
 - [🔒 Security](#-security)
 - [🌐 Ecosystem](#-ecosystem)
 - [📚 Documentation](#-documentation)
@@ -198,6 +200,43 @@ llm-box ships the core capabilities required for real-world financial scenarios 
 
 ---
 
+## 🏛️ Xinchuang &amp; Domestic IT
+
+llm-box is a domestic AI workflow engine built for China's Xinchuang (信息技术应用创新) ecosystem — from chip ISA to OS, from AI compute to mobile, the entire stack runs on domestic technology.
+
+### Xinchuang Compatibility Matrix
+
+| Layer | Supported | Notes |
+|-------|-----------|-------|
+| **AI Chips** | Ascend 910B/310P, Cambricon MLU 370/590, Hygon DCU K100/Z100 | Via OpenAI-compatible inference servers, `ascend`/`cambricon`/`hygon` provider nodes |
+| **CPU Architecture** | x86-64, ARM64 (Kunpeng 920) | CI validates both architectures, single binary cross-platform |
+| **Operating Systems** | openEuler, Kylin, UOS | Go single binary, zero runtime dependencies |
+| **Mobile** | HarmonyOS | 19 nodes: Ability launch, atomic service, widget, device adapt, cross-app |
+| **AI Models** | DeepSeek, Qwen, GLM, Kimi, Ant Ling | All domestic models, local/cloud deployment |
+| **Code Hosting** | GitCode / AtomGit | Domestic mirror, Xinchuang community engagement |
+
+### Xinchuang Scenarios
+
+| Scenario | Example | Chip |
+|----------|---------|------|
+| Financial Risk | [AML Review (Ascend)](examples/finance/aml-review-ascend/) | Ascend 910B |
+| Transaction Compensation | [Saga Transfer (Ascend)](examples/finance/saga-transfer-ascend/) | Ascend 910B |
+| Smart Patrol | [Unitree Go2 Patrol](examples/robot/unitree-go2-patrol/) | Edge + Ascend cloud |
+
+### Xinchuang Differentiators
+
+| Dimension | llm-box | Domestic Alternatives |
+|-----------|---------|----------------------|
+| **Chip Support** | Ascend + Cambricon + Hygon (3 vendors) | Mostly NVIDIA CUDA only |
+| **Deployment** | Single binary, fully offline/air-gapped | Mostly SaaS or Docker |
+| **HarmonyOS** | 19 native nodes, full device coverage | None or basic |
+| **License** | AGPL v3.0, fully open source | Mostly source-available or partial |
+| **Financial Compliance** | HMAC audit chain + idempotency + redaction + saga compensation | Most lack financial capabilities |
+
+> **Strategic positioning**: Enter through financial Xinchuang, become the benchmark for "domestic AI workflow engines." The Xinchuang market has databases, OSes, and chips — what it lacks is a good AI automation orchestration tool.
+
+---
+
 ## 🤖 Agent Nodes
 
 Specialized AI agent nodes for autonomous reasoning:
@@ -246,6 +285,7 @@ Specialized AI agent nodes for autonomous reasoning:
 | `screen_understanding` | L3-level screen content understanding: parse UI elements, identify actionable items, generate interaction plans for agent phones |
 | `voice_input` | Voice pipeline: VAD, wake word detection, speech-to-text with on-device support |
 | `robot_control` | Plan and execute robot action sequences for embodied AI: humanoid/mobile_base/arm/drone/dog/wheelchair with safety checks |
+| `unitree_robot` | Dedicated Unitree robot control: Go2/B2/H1/G1 and 9 models, 14 actions, simulate/API dual mode, natural language control |
 | `andesgpt` | OPPO AndesGPT integration: Tiny (on-device 1B) / Turbo (edge-cloud 7B) / Titan (cloud 100B+), PersonaX personalization, end-cloud collaboration |
 
 ### Code Intelligence Nodes
@@ -253,6 +293,52 @@ Specialized AI agent nodes for autonomous reasoning:
 | Node | Description |
 |------|-------------|
 | `file_watch` | Watch a path for file changes (create/modify/delete), polling-based, context-aware |
+
+---
+
+## 🤖 Unitree Robot Integration
+
+llm-box ships with a built-in `unitree_robot` node that brings Unitree (宇树) robots into YAML workflow orchestration, supporting both quadruped and humanoid robot control and status monitoring.
+
+| Node | Description |
+|------|-------------|
+| `unitree_robot` | Control Unitree quadruped/humanoid robots with 14 actions, 9 models, simulate/API dual mode |
+
+### Supported Models
+
+Go2, B2, B2-W, Go1, A1, H1, H1-2, G1, G1-Humanoid
+
+### Supported Actions
+
+| Category | Actions |
+|----------|---------|
+| Basic Movement | stand, sit, walk, run, stop |
+| Navigation & Patrol | patrol, navigate |
+| Posture Control | step_up, step_down |
+| Humanoid Interaction | wave_hand, shake_hands |
+| Perception Query | get_status, get_camera |
+| Performance | dance |
+
+### Two Modes
+
+| Mode | Description |
+|------|-------------|
+| **Simulate (default)** | No hardware required; returns simulated IMU/GPS/joint state/battery data — ideal for development, debugging, and CI testing |
+| **API (direct)** | Controls real robot hardware via HTTP API, with support for custom API endpoints and API key authentication |
+
+### Natural Language Control
+
+Chinese natural language input is supported with automatic action inference: say "巡逻仓库" → `patrol`, "站起来" → `stand`, "挥手" → `wave_hand` (humanoid models), "检查电池" → `get_status`.
+
+### Safety Checks
+
+Built-in safety validation engine: high-speed operation warnings, safety zone checks, collision-avoidance alerts for humanoid arm movements. Results include a `safety_checks` field in JSON output.
+
+### Examples
+
+- [Go2 Warehouse Patrol](examples/robot/unitree-go2-patrol/workflow.yaml) — Quadruped simulated patrol: stand → patrol → camera → status → sit
+- [H1 Natural Language Interaction](examples/robot/unitree-h1-interact/workflow.yaml) — Humanoid NL commands with auto-inferred wave/shake/stand actions
+- [B2 API Direct Control](examples/robot/unitree-b2-api/workflow.yaml) — Industrial robot HTTP API direct control, industrial park patrol + real-time status
 
 ---
 
@@ -299,6 +385,9 @@ llm-box participates in multiple open-source ecosystems:
 | **OPPO AndesGPT** | Active | API integration (Tiny/Turbo/Titan tiers), PersonaX personalization, end-cloud collaboration |
 | **GitHub** | Active | CI/CD, CodeQL security scan, automated releases |
 | **Ascend** | Integrated | Ascend NPU (MindIE inference), `ascend` provider node, financial risk/transfer templates |
+| **Cambricon** | Integrated | Cambricon MLU (MLU 370/590), `cambricon` provider node, OpenAI-compatible inference |
+| **Hygon** | Integrated | Hygon DCU (K100/Z100), `hygon` provider node, ROCm-compatible inference |
+| **Unitree** | Integrated | Unitree robot control (Go2/B2/H1/G1), 14 actions, simulate/API dual mode, natural language control |
 
 ### HarmonyOS Device Support
 
@@ -422,7 +511,7 @@ llm-box help                   Show full help
 | **v0.5.1** | ✅ Released | Ascend NPU adaptation (7-agent pipeline, 3 workflow templates, CANN/MindIE integration) |
 | **v0.5.2** | ✅ Released | Grok Build-inspired capabilities: code graph, subagent prompt hierarchy, circuit breaker, secret redaction, file watch, TUI Markdown/Mermaid rendering (15-vuln audited), unified LLM routing (3 consolidated to 1) |
 | **v0.6.0** | ✅ Released | **Ant Ling ecosystem, AI Gateway (OmniRoute), Agent Memory Infrastructure, Voice AI Toolchain (ASR/diarization/analysis), Agent Teamization (200+ roles + Agency workflow), Engineering Depth (WAL persistence + bytecode-IR expression engine + EWMA/Pareto routing + TLA+ formal DAG verification)** |
-| **v0.7.0** | **Current** | **Financial scenario enhancement: ✅ HMAC hash-chain audit, ✅ idempotency (Idempotency-Key + cross-process lock), ✅ HTTP rate limiting/retry, ✅ LLM response cache (performance optimization; audit relies on audit log), ✅ quota persistence + multi-tenancy, ✅ trace redaction (JWT/private keys), ✅ WAL crash recovery, ✅ saga transaction compensation (forward + reverse compensate), ✅ LLM cost attribution (token × price table → audit log `cost_usd`)** |
+| **v0.7.0** | **Current** | **Financial scenario + Xinchuang: ✅ HMAC hash-chain audit, ✅ idempotency, ✅ HTTP rate limiting/retry, ✅ LLM response cache, ✅ quota persistence + multi-tenancy, ✅ trace redaction, ✅ WAL crash recovery, ✅ saga transaction compensation, ✅ LLM cost attribution, ✅ Unitree robot integration, ✅ Cambricon MLU + Hygon DCU triple-chip support, ✅ ARM64 Kunpeng CI** |
 | **v1.0** | 📅 Q3 2026 | Stable API, full documentation, LTS |
 
 📖 [Full Roadmap &rarr;](ROADMAP.md)

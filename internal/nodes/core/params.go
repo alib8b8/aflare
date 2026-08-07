@@ -103,6 +103,10 @@ func DefaultEndpointFor(provider string) string {
 		return "https://generativelanguage.googleapis.com/v1beta/openai"
 	case "ascend":
 		return "http://localhost:8080/v1"
+	case "cambricon":
+		return "http://localhost:8081/v1"
+	case "hygon":
+		return "http://localhost:8082/v1"
 	default:
 		return "http://localhost:11434"
 	}

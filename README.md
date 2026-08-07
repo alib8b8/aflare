@@ -52,8 +52,10 @@
 - [📖 故事](#-故事)
 - [✨ 核心特性](#-核心特性)
 - [💰 金融场景能力](#-金融场景能力)
+- [🏛️ 信创国产化](#-信创国产化)
 - [🤖 Agent 节点](#-agent-节点)
 - [📱 鸿蒙 & 移动端节点](#-鸿蒙--移动端节点)
+- [🤖 宇树机器人集成](#-宇树机器人集成)
 - [🔒 安全](#-安全)
 - [🌐 生态](#-生态)
 - [📚 文档](#-文档)
@@ -198,6 +200,43 @@ llm-box 已具备真实金融场景（只读分析 + 受控写入）的核心能
 
 ---
 
+## 🏛️ 信创国产化
+
+llm-box 是面向信创（信息技术应用创新）生态的国产 AI 工作流引擎，从芯片指令集到操作系统、从 AI 算力到移动端，全链路适配国产技术栈。
+
+### 信创适配矩阵
+
+| 层级 | 已适配 | 说明 |
+|------|--------|------|
+| **AI 芯片** | 昇腾 Ascend 910B/310P、寒武纪 MLU 370/590、海光 DCU K100/Z100 | 通过 OpenAI 兼容推理服务接入，`ascend`/`cambricon`/`hygon` provider 节点 |
+| **CPU 架构** | x86-64、ARM64（鲲鹏 920） | CI 双架构验证，单二进制跨平台部署 |
+| **操作系统** | openEuler、Kylin、UOS | Go 单二进制，无运行时依赖，直接部署 |
+| **移动端** | 鸿蒙 HarmonyOS | 19 个节点：Ability 启动、原子服务、卡片、设备适配、跨应用 |
+| **AI 模型** | DeepSeek、Qwen 通义、GLM 智谱、Kimi 月之暗面、百灵 Ant Ling | 全部国产模型，支持本地/云端部署 |
+| **代码托管** | GitCode / AtomGit | 国内镜像同步，信创社区参与 |
+
+### 信创场景示例
+
+| 场景 | 示例 | 国产芯片 |
+|------|------|---------|
+| 金融风控 | [AML 可疑交易审查（昇腾版）](examples/finance/aml-review-ascend/) | 昇腾 Ascend 910B |
+| 事务补偿 | [Saga 跨行转账（昇腾版）](examples/finance/saga-transfer-ascend/) | 昇腾 Ascend 910B |
+| 智能巡检 | [宇树 Go2 仓库巡逻](examples/robot/unitree-go2-patrol/) | 端侧 + 昇腾云端协同 |
+
+### 信创差异化优势
+
+| 对比维度 | llm-box | 国内同类产品 |
+|---------|---------|-------------|
+| **芯片适配** | 昇腾/寒武纪/海光 三芯适配 | 多数仅支持 NVIDIA CUDA |
+| **部署方式** | 单二进制，内网离线运行 | 多为 SaaS 或 Docker 部署 |
+| **鸿蒙集成** | 19 个原生节点，设备全覆盖 | 无或仅基础适配 |
+| **开源协议** | AGPL v3.0，代码完全开放 | 多为源码可用或部分开源 |
+| **金融合规** | HMAC 审计链 + 幂等 + 脱敏 + saga 补偿 | 多数无金融场景能力 |
+
+> **战略定位**：以金融信创为切入点，做「国产 AI 工作流引擎」的标杆。信创市场不缺数据库、不缺 OS、不缺芯片，但缺少一个好用的 AI 自动化编排工具。
+
+---
+
 ## 🤖 Agent 节点
 
 用于自主推理的专业 AI Agent 节点：
@@ -246,13 +285,60 @@ llm-box 已具备真实金融场景（只读分析 + 受控写入）的核心能
 | `screen_understanding` | L3 级屏幕内容理解：解析 UI 元素、识别可操作项、为 Agent 手机生成交互计划 |
 | `voice_input` | 语音流水线：VAD、唤醒词检测（hey_box/hello_box/hi_box/ok_box/box_box）、支持端侧的语音转文本 |
 | `robot_control` | 为具身 AI 规划和执行机器人动作序列：人形/移动底盘/机械臂/无人机/机器狗/轮椅，带安全检查 |
+| `unitree_robot` | 宇树机器人专用控制：Go2/B2/H1/G1 等 9 款机型、14 种动作、模拟/API 双模式、自然语言驱动 |
 | `andesgpt` | OPPO AndesGPT 集成：Tiny（端侧 1B）/ Turbo（端云协同 7B）/ Titan（云端 100B+）、PersonaX 个性化、端云协同 |
 
 ### 代码智能节点
 
 | 节点 | 描述 |
-|------|-------------|
+|------|------|
 | `file_watch` | 监听路径文件变化（创建/修改/删除），基于轮询，上下文感知 |
+
+---
+
+## 🤖 宇树机器人集成
+
+llm-box 内置 `unitree_robot` 节点，将宇树（Unitree）系列机器人纳入 YAML 工作流编排，支持四足机器人和人形机器人的控制与状态监控。
+
+| 节点 | 描述 |
+|------|------|
+| `unitree_robot` | 控制宇树四足/人形机器人，支持 14 种动作、9 款机型、模拟/API 双模式 |
+
+### 支持机型
+
+Go2、B2、B2-W、Go1、A1、H1、H1-2、G1、G1-Humanoid
+
+### 支持动作
+
+| 类别 | 动作 |
+|------|------|
+| 基础运动 | stand、sit、walk、run、stop |
+| 导航巡逻 | patrol、navigate |
+| 姿态控制 | step_up、step_down |
+| 人形交互 | wave_hand、shake_hands |
+| 感知查询 | get_status、get_camera |
+| 表演 | dance |
+
+### 两种模式
+
+| 模式 | 说明 |
+|------|------|
+| **模拟模式（simulate）** | 默认模式，无需硬件，返回模拟的 IMU/GPS/关节状态/电池数据，适合开发调试和 CI 测试 |
+| **API 直连模式（api）** | 通过 HTTP API 直接控制真实机器人硬件，支持自定义 API endpoint 和 API key 认证 |
+
+### 自然语言驱动
+
+支持中文自然语言输入，自动推断动作类型：说「巡逻仓库」→ `patrol`，「站起来」→ `stand`，「挥手」→ `wave_hand`（人形机型），「检查电池」→ `get_status`。
+
+### 安全检查
+
+内置安全校验引擎：高速运行警告、安全区域检查、人形手臂动作防碰撞提示，结果 JSON 中附带 `safety_checks` 字段。
+
+### 示例
+
+- [Go2 仓库巡逻巡检](examples/robot/unitree-go2-patrol/workflow.yaml) — 四足机器人模拟巡逻，站立→巡检→拍照→状态检查→蹲下
+- [H1 自然语言交互](examples/robot/unitree-h1-interact/workflow.yaml) — 人形机器人自然语言指令，自动推断挥手/握手/站立
+- [B2 API 直连控制](examples/robot/unitree-b2-api/workflow.yaml) — 工业机器人 HTTP API 直连，巡逻工业园区+实时状态监控
 
 ---
 
@@ -299,6 +385,9 @@ llm-box 参与多个开源生态：
 | **OPPO AndesGPT** | 活跃 | API 集成（Tiny/Turbo/Titan 三档）、PersonaX 个性化、端云协同 |
 | **GitHub** | 活跃 | CI/CD、CodeQL 安全扫描、自动发布 |
 | **昇腾 Ascend** | 已集成 | 昇腾 NPU 适配（MindIE 推理服务），`ascend` provider 节点，金融风控/转账模板 |
+| **寒武纪 Cambricon** | 已集成 | 寒武纪 MLU 适配（MLU 370/590），`cambricon` provider 节点，OpenAI 兼容推理 |
+| **海光 Hygon** | 已集成 | 海光 DCU 适配（K100/Z100），`hygon` provider 节点，ROCm 兼容推理 |
+| **宇树 Unitree** | 已集成 | 宇树机器人控制（Go2/B2/H1/G1），14 种动作，模拟/API 双模式，自然语言驱动 |
 
 ### 鸿蒙设备支持
 
@@ -422,7 +511,7 @@ llm-box help                显示完整帮助
 | **v0.5.1** | ✅ 已发布 | 昇腾 NPU 适配（7-Agent 流水线、3 种工作流模板、CANN/MindIE 集成） |
 | **v0.5.2** | ✅ 已发布 | Grok Build 启发能力：代码图谱、子代理提示词层级、熔断器、秘密脱敏、文件监听、TUI Markdown/Mermaid 渲染（审计 15 个漏洞）、LLM 路由统一（3 套合并为 1） |
 | **v0.6.0** | ✅ 已发布 | **百灵生态集成、AI 网关（OmniRoute）、Agent 记忆基础设施、语音 AI 工具链（ASR/分离/分析）、Agent 团队化（200+ 角色 + Agency 工作流）、工程深度优化（WAL 持久化 + 字节码 IR 表达式引擎 + EWMA/帕累托路由 + TLA+ 形式化验证 DAG）** |
-| **v0.7.0** | **当前** | **金融场景增强：✅ HMAC 哈希链审计、✅ 幂等性（Idempotency-Key + 跨进程锁）、✅ HTTP 限流/重试、✅ LLM 响应缓存（性能优化，审计依赖 audit log）、✅ 配额持久化+多租户、✅ trace 脱敏（JWT/私钥）、✅ WAL 崩溃恢复、✅ saga 事务补偿（forward + 反向 compensate）、✅ LLM 成本归因（token×单价表→审计日志 `cost_usd`）** |
+| **v0.7.0** | **当前** | **金融场景增强 + 信创深化：✅ HMAC 哈希链审计、✅ 幂等性（Idempotency-Key + 跨进程锁）、✅ HTTP 限流/重试、✅ LLM 响应缓存、✅ 配额持久化+多租户、✅ trace 脱敏（JWT/私钥）、✅ WAL 崩溃恢复、✅ saga 事务补偿、✅ LLM 成本归因、✅ 宇树机器人集成、✅ 寒武纪 MLU / 海光 DCU 三芯适配、✅ ARM64 鲲鹏 CI** |
 | **v1.0** | 📅 2026 Q3 | 稳定 API、完整文档、LTS |
 
 📖 [完整路线图 →](ROADMAP.md)

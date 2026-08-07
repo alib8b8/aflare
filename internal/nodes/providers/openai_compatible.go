@@ -170,6 +170,22 @@ var openAICompatibleConfigs = []core.LLMNodeConfig{
 		EnvAPIBase:      "ASCEND_API_BASE", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "Ascend",
 	},
+	{
+		Name:            "cambricon",
+		DefaultModel:    "qwen2.5-7b",
+		DefaultEndpoint: "http://localhost:8081/v1",
+		EnvAPIKey:       "CAMBRICON_API_KEY",  // #nosec G101 -- env var name, not a credential value
+		EnvAPIBase:      "CAMBRICON_API_BASE", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "Cambricon MLU",
+	},
+	{
+		Name:            "hygon",
+		DefaultModel:    "qwen2.5-7b",
+		DefaultEndpoint: "http://localhost:8082/v1",
+		EnvAPIKey:       "HYGON_API_KEY",  // #nosec G101 -- env var name, not a credential value
+		EnvAPIBase:      "HYGON_API_BASE", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "Hygon DCU",
+	},
 }
 
 func init() {
