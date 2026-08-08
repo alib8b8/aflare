@@ -1527,7 +1527,7 @@ func TestInstallSkillsToDir_OnlyFilesNotDirs(t *testing.T) {
 func TestValidateCommand_AllKnownCommands(t *testing.T) {
 	allCommands := []string{
 		"create", "run", "help", "-h", "--help", "install", "uninstall",
-		"registry", "list", "validate", "version", "--version", "-v",
+		"registry", "list", "validate", "review", "version", "--version", "-v",
 		"self-update", "update", "autoupgrade", "au", "init", "webui",
 		"skills", "schedule", "audit", "serve",
 	}

@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alib8b8/aflare/internal/ai"
 	"github.com/alib8b8/aflare/internal/api"
 	"github.com/alib8b8/aflare/internal/autoupgrade"
 	"github.com/alib8b8/aflare/internal/cli"
@@ -190,6 +191,9 @@ func main() {
 	case "validate":
 		handleValidate(args)
 		return
+	case "review":
+		handleReview(args)
+		return
 	case "version", "--version", "-v":
 		fmt.Println(cli.PrintVersion())
 		return
@@ -290,6 +294,107 @@ func handleValidate(args []string) {
 		}
 		os.Exit(1)
 	}
+}
+
+func handleReview(args []string) {
+	if len(args) < 1 {
+		fmt.Println("Usage: aflare review <workflow.yaml>")
+		fmt.Println("\nAI-powered workflow review — analyzes your workflow YAML and provides")
+		fmt.Println("optimization suggestions, security checks, and a natural-language summary.")
+		fmt.Println("\nInspired by agno v2.8.7 AdvisorTools: the advisor model reviews the")
+		fmt.Println("generated workflow before execution, catching issues early.")
+		os.Exit(1)
+	}
+
+	data, err := os.ReadFile(args[0])
+	if err != nil {
+		fmt.Printf("❌ Failed to read workflow file: %v\n", err)
+		os.Exit(1)
+	}
+
+	workflowYAML := string(data)
+
+	// Run the AI optimizer (rule-based analysis)
+	optimizer := ai.NewWorkflowOptimizer()
+	report := optimizer.Analyze(workflowYAML)
+
+	// Generate natural-language explanation
+	explainer := ai.NewWorkflowExplainer()
+	explanation := explainer.Explain(workflowYAML)
+
+	// Print header
+	fmt.Println()
+	fmt.Println("╔══════════════════════════════════════════════════════════╗")
+	fmt.Println("║           aflare Workflow Advisor Review                ║")
+	fmt.Println("╚══════════════════════════════════════════════════════════╝")
+	fmt.Println()
+
+	// Print the natural-language summary
+	fmt.Println("📋 What this workflow does:")
+	fmt.Println(strings.Repeat("─", 60))
+	fmt.Println(explanation)
+	fmt.Println()
+
+	// Print optimization score
+	scoreColor := "🟢"
+	if report.Score < 70 {
+		scoreColor = "🟡"
+	}
+	if report.Score < 40 {
+		scoreColor = "🔴"
+	}
+	fmt.Printf("%s Optimization Score: %d/100\n", scoreColor, report.Score)
+	fmt.Println(strings.Repeat("─", 60))
+
+	if len(report.Suggestions) == 0 {
+		fmt.Println("✅ No issues found — workflow looks great!")
+	} else {
+		// Group by severity
+		var errors, warnings, infos []ai.Suggestion
+		for _, s := range report.Suggestions {
+			switch s.Severity {
+			case ai.SeverityError:
+				errors = append(errors, s)
+			case ai.SeverityWarning:
+				warnings = append(warnings, s)
+			case ai.SeverityInfo:
+				infos = append(infos, s)
+			}
+		}
+
+		if len(errors) > 0 {
+			fmt.Printf("\n🔴 Errors (%d):\n", len(errors))
+			for _, s := range errors {
+				fmt.Printf("  ❌ %s\n", s.Message)
+				if s.Fix != "" {
+					fmt.Printf("     Fix: %s\n", s.Fix)
+				}
+			}
+		}
+		if len(warnings) > 0 {
+			fmt.Printf("\n🟡 Warnings (%d):\n", len(warnings))
+			for _, s := range warnings {
+				fmt.Printf("  ⚠️  %s\n", s.Message)
+				if s.Fix != "" {
+					fmt.Printf("     Fix: %s\n", s.Fix)
+				}
+			}
+		}
+		if len(infos) > 0 {
+			fmt.Printf("\n🔵 Suggestions (%d):\n", len(infos))
+			for _, s := range infos {
+				fmt.Printf("  💡 %s\n", s.Message)
+				if s.Fix != "" {
+					fmt.Printf("     Tip: %s\n", s.Fix)
+				}
+			}
+		}
+	}
+
+	fmt.Println()
+	fmt.Println(strings.Repeat("─", 60))
+	fmt.Println("💡 Tip: Run 'aflare review' before 'aflare run' to catch issues early.")
+	fmt.Println("   The advisor model checks for security, performance, and reliability.")
 }
 
 func handleInstall(args []string) {

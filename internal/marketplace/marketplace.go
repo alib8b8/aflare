@@ -187,6 +187,63 @@ steps:
 `,
 		},
 		{
+			Name:        "habit-tracker",
+			Version:     "1.0.0",
+			Description: "Track personal habits and send motivational reminders — inspired by Pace",
+			Category:    "health",
+			Author:      "aflare",
+			WorkflowYAML: `name: "Habit Tracker"
+description: "Track daily habits, count progress, and receive motivational reminders at configurable intervals"
+schedule:
+  cron: "0 */2 * * *"
+steps:
+  - node: file_read
+    id: load_state
+    params:
+      path: "~/.aflare/habit-tracker.json"
+    on_error:
+      - node: file_write
+        id: init_state
+        params:
+          path: "~/.aflare/habit-tracker.json"
+          content: '{"habit": "{{habit_name}}", "streak": 0, "total": 0, "last_check": "{{now}}"}'
+  - node: json_parse
+    id: parse_state
+    params:
+      path: "input"
+  - node: counter
+    id: update_counter
+    params:
+      value: "{{streak}}"
+      increment: 1
+  - node: condition
+    id: check_streak
+    params:
+      condition: "{{streak}} > 0"
+    then:
+      - node: notify
+        id: send_motivation
+        params:
+          channel: "telegram"
+          message: "{{habit_name}} streak: {{streak}} days! You've tracked {{total}} times total. Keep going!"
+  - node: condition
+    id: check_milestone
+    params:
+      condition: "{{streak}} % 7 == 0"
+    then:
+      - node: notify
+        id: milestone_alert
+        params:
+          channel: "telegram"
+          message: "Milestone: {{habit_name}} streak reached {{streak}} days! Consider rewarding yourself."
+  - node: file_write
+    id: save_state
+    params:
+      path: "~/.aflare/habit-tracker.json"
+      content: "{{state}}"
+`,
+		},
+		{
 			Name:        "unitree-patrol",
 			Version:     "1.0.0",
 			Description: "Autonomous robot patrol routine using Unitree robot with vision-based inspection",

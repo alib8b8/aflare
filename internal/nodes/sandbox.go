@@ -22,9 +22,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/aflare/internal/meta"
 )
 
 // sandboxMode defines the execution mode of the sandbox.
@@ -74,6 +77,8 @@ type sandboxState struct {
 	lastUsed  time.Time
 	workDir   string
 	envVars   map[string]string
+	cookies   map[string]string // browser session cookies
+	userAgent string            // browser user-agent for anti-detection
 }
 
 // SandboxNode provides an isolated execution environment for running code,
@@ -138,12 +143,17 @@ func (n *SandboxNode) Execute(ctx context.Context, input string, params map[stri
 	sandboxInstancesMu.Lock()
 	state, exists := sandboxInstances[sandboxID]
 	if !exists {
-		state = &sandboxState{
-			id:        sandboxID,
-			mode:      mode,
-			createdAt: time.Now(),
-			workDir:   workDir,
-			envVars:   envVars,
+		// Try to load from disk first
+		state = loadSessionFromDisk(sandboxID)
+		if state == nil {
+			state = &sandboxState{
+				id:        sandboxID,
+				mode:      mode,
+				createdAt: time.Now(),
+				workDir:   workDir,
+				envVars:   envVars,
+				cookies:   make(map[string]string),
+			}
 		}
 		sandboxInstances[sandboxID] = state
 	}
@@ -177,6 +187,9 @@ func (n *SandboxNode) Execute(ctx context.Context, input string, params map[stri
 	result["mode"] = string(mode)
 	result["latency_ms"] = time.Since(startTime).Milliseconds()
 	result["timestamp"] = time.Now().UTC().Format(time.RFC3339)
+
+	// Auto-save session state to disk for persistence across runs
+	saveSessionToDisk(sandboxID, state)
 
 	output, _ := json.MarshalIndent(result, "", "  ")
 	return string(output), nil
@@ -264,6 +277,30 @@ func (n *SandboxNode) executeBrowser(input string, state *sandboxState) map[stri
 		result["status"] = "completed"
 		result["action_type"] = "extract"
 		result["message"] = fmt.Sprintf("浏览器内容提取（模拟模式，实际运行需playwright）")
+	case strings.Contains(lower, "captcha") || strings.Contains(lower, "验证码") || strings.Contains(lower, "recaptcha") || strings.Contains(lower, "hcaptcha"):
+		// Captcha detected — requires human intervention
+		// This integrates with the Policy Engine's approval mechanism.
+		// When a workflow encounters a captcha, it pauses and requests human
+		// approval via the configured approval channel.
+		result["status"] = "human_intervention_required"
+		result["action_type"] = "captcha"
+		result["intervention_type"] = "captcha_solve"
+		result["message"] = "CAPTCHA detected — human intervention required. The workflow will pause and request approval via the Policy Engine."
+		result["requires_approval"] = true
+		result["approval_action"] = "browser:captcha"
+		result["approval_details"] = input
+	case strings.Contains(lower, "login") || strings.Contains(lower, "登录") || strings.Contains(lower, "signin"):
+		// Login operations may require session persistence
+		result["status"] = "completed"
+		result["action_type"] = "login"
+		result["message"] = fmt.Sprintf("浏览器登录操作（模拟模式，session已持久化）")
+		result["session_persisted"] = true
+	case strings.Contains(lower, "cookie") || strings.Contains(lower, "cookies"):
+		// Cookie management for session persistence
+		result["status"] = "completed"
+		result["action_type"] = "cookie_management"
+		result["message"] = fmt.Sprintf("浏览器Cookie管理（模拟模式）")
+		result["cookies_count"] = len(state.cookies)
 	default:
 		result["status"] = "completed"
 		result["action_type"] = "unknown"
@@ -378,6 +415,99 @@ func scheduleSandboxCleanup() {
 			delete(sandboxInstances, id)
 		}
 	}
+}
+
+// sandboxSessionsDir returns the directory where sandbox session states are persisted.
+func sandboxSessionsDir() string {
+	return filepath.Join(meta.DataDir(), "sandboxes")
+}
+
+// sessionFile is the JSON-serializable form of sandboxState for disk persistence.
+type sessionFile struct {
+	ID        string            `json:"id"`
+	Mode      string            `json:"mode"`
+	CreatedAt string            `json:"created_at"`
+	LastUsed  string            `json:"last_used"`
+	WorkDir   string            `json:"work_dir"`
+	EnvVars   map[string]string `json:"env_vars"`
+	Cookies   map[string]string `json:"cookies"`
+	UserAgent string            `json:"user_agent"`
+}
+
+// saveSessionToDisk persists the sandbox session state to disk.
+// Sessions are saved to ~/.aflare/sandboxes/<id>.json.
+func saveSessionToDisk(id string, state *sandboxState) {
+	sessDir := sandboxSessionsDir()
+	if err := os.MkdirAll(sessDir, 0700); err != nil {
+		return // silent fail — persistence is best-effort
+	}
+
+	sf := sessionFile{
+		ID:        state.id,
+		Mode:      string(state.mode),
+		CreatedAt: state.createdAt.Format(time.RFC3339),
+		LastUsed:  state.lastUsed.Format(time.RFC3339),
+		WorkDir:   state.workDir,
+		EnvVars:   state.envVars,
+		Cookies:   state.cookies,
+		UserAgent: state.userAgent,
+	}
+
+	data, err := json.MarshalIndent(sf, "", "  ")
+	if err != nil {
+		return
+	}
+
+	sessPath := filepath.Join(sessDir, id+".json")
+	_ = os.WriteFile(sessPath, data, 0600)
+}
+
+// loadSessionFromDisk attempts to restore a sandbox session from disk.
+// Returns nil if the session file doesn't exist or can't be parsed.
+func loadSessionFromDisk(id string) *sandboxState {
+	sessPath := filepath.Join(sandboxSessionsDir(), id+".json")
+	data, err := os.ReadFile(sessPath)
+	if err != nil {
+		return nil
+	}
+
+	var sf sessionFile
+	if err := json.Unmarshal(data, &sf); err != nil {
+		return nil
+	}
+
+	createdAt, _ := time.Parse(time.RFC3339, sf.CreatedAt)
+	lastUsed, _ := time.Parse(time.RFC3339, sf.LastUsed)
+
+	return &sandboxState{
+		id:        sf.ID,
+		mode:      sandboxMode(sf.Mode),
+		createdAt: createdAt,
+		lastUsed:  lastUsed,
+		workDir:   sf.WorkDir,
+		envVars:   sf.EnvVars,
+		cookies:   sf.Cookies,
+		userAgent: sf.UserAgent,
+	}
+}
+
+// ListSandboxSessions returns a list of all persisted sandbox session IDs.
+func ListSandboxSessions() ([]string, error) {
+	sessDir := sandboxSessionsDir()
+	entries, err := os.ReadDir(sessDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var ids []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
+			ids = append(ids, strings.TrimSuffix(e.Name(), ".json"))
+		}
+	}
+	return ids, nil
 }
 
 func init() {

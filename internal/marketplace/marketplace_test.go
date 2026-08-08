@@ -25,11 +25,11 @@ func TestBuiltinRegistry(t *testing.T) {
 	reg := NewRegistry()
 
 	pkgs := reg.List()
-	if len(pkgs) != 5 {
-		t.Fatalf("expected 5 builtin packages, got %d", len(pkgs))
+	if len(pkgs) != 6 {
+		t.Fatalf("expected 6 builtin packages, got %d", len(pkgs))
 	}
 
-	expected := []string{"arxiv-daily", "btc-monitor", "financial-aml", "github-alert", "unitree-patrol"}
+	expected := []string{"arxiv-daily", "btc-monitor", "financial-aml", "github-alert", "habit-tracker", "unitree-patrol"}
 	for _, name := range expected {
 		pkg, err := reg.Get(name)
 		if err != nil || pkg == nil {
@@ -82,6 +82,11 @@ func TestListByCategory(t *testing.T) {
 	devops := reg.ListByCategory("devops")
 	if len(devops) != 1 {
 		t.Fatalf("expected 1 devops package, got %d", len(devops))
+	}
+
+	health := reg.ListByCategory("health")
+	if len(health) != 1 {
+		t.Fatalf("expected 1 health package, got %d", len(health))
 	}
 }
 
