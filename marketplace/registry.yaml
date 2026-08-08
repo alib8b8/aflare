@@ -1,0 +1,71 @@
+# aflare Workflow Marketplace Registry
+# This file lists all available workflow packages in the marketplace.
+# To install a workflow: aflare install <name>
+# To list all workflows: aflare marketplace list
+# To search: aflare marketplace search <keyword>
+
+packages:
+  - name: btc-monitor
+    version: "1.0.0"
+    description: "Monitor Bitcoin price movements and send alerts via Telegram"
+    category: finance
+    author: aflare
+    install_command: "aflare install btc-monitor"
+    tags:
+      - bitcoin
+      - cryptocurrency
+      - price
+      - alert
+      - telegram
+
+  - name: github-alert
+    version: "1.0.0"
+    description: "Aggregate GitHub repository activity and send daily digest"
+    category: devops
+    author: aflare
+    install_command: "aflare install github-alert"
+    tags:
+      - github
+      - devops
+      - notification
+      - digest
+      - repository
+
+  - name: arxiv-daily
+    version: "1.0.0"
+    description: "Fetch latest arXiv papers by category and generate research summaries"
+    category: research
+    author: aflare
+    install_command: "aflare install arxiv-daily"
+    tags:
+      - arxiv
+      - papers
+      - research
+      - academic
+      - summary
+
+  - name: financial-aml
+    version: "1.0.0"
+    description: "Anti-Money Laundering transaction screening and risk scoring workflow"
+    category: finance
+    author: aflare
+    install_command: "aflare install financial-aml"
+    tags:
+      - aml
+      - compliance
+      - risk
+      - finance
+      - security
+
+  - name: unitree-patrol
+    version: "1.0.0"
+    description: "Autonomous robot patrol routine using Unitree robot with vision-based inspection"
+    category: robot
+    author: aflare
+    install_command: "aflare install unitree-patrol"
+    tags:
+      - robot
+      - unitree
+      - patrol
+      - autonomous
+      - vision

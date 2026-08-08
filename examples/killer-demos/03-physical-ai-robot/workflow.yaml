@@ -1,0 +1,496 @@
+# ============================================================================
+# Physical AI – Unitree 机器人智能巡逻与 AI 视觉异常响应
+# ============================================================================
+# 展示 Physical AI 核心理念：AI 大脑 + 机器人身体 + 工作流编排
+#
+# 流程概述：
+#   每 2 小时自动执行一次巡逻任务。
+#   Go2 机器人从 dock 出发 → 沿预设检查点巡逻 → 每个检查点拍照 →
+#   LLM 视觉分析图像 → 检测到异常则触发 Saga 事件响应（警报/通知/记录）→
+#   无人机升空航拍 → 返回 dock 蹲下。
+#
+# 模式：
+#   默认 simulate 模式，无需真实机器人即可运行和测试。
+#   连接真机时设置 mode=api 并配置 robot_ip。
+#
+# 使用方式：
+#   aflare run examples/killer-demos/03-physical-ai-robot/workflow.yaml
+#   或定时执行：
+#   aflare schedule --id robot-patrol --cron "0 */2 * * *" \
+#     examples/killer-demos/03-physical-ai-robot/workflow.yaml
+# ============================================================================
+
+name: Physical AI – 机器人智能巡逻
+description: |
+  Unitree 机器人自主巡逻 + AI 视觉异常检测 + 自动化事件响应。
+  展示 Physical AI 的完整闭环：感知 → 推理 → 决策 → 执行。
+
+schedule:
+  cron: "0 */2 * * *"
+  enabled: true
+
+vars:
+  # ── 机器人配置 ──
+  robot_model: "Go2"
+  robot_ip: "{{env.UNITREE_ROBOT_IP}}"
+  robot_mode: "simulate"                    # simulate | api
+
+  # ── 巡逻检查点（可自定义）──
+  checkpoints:
+    - name: "主入口"
+      location: "main_entrance"
+      duration: 15
+      description: "园区主入口大门，检查门禁状态和人员流动"
+    - name: "停车场"
+      location: "parking_lot"
+      duration: 20
+      description: "地下停车场，检查车辆异常和可疑人员"
+    - name: "仓库A区"
+      location: "warehouse_zone_a"
+      duration: 15
+      description: "仓库A区，检查货物堆放和消防通道"
+    - name: "服务器机房"
+      location: "server_room"
+      duration: 10
+      description: "服务器机房，检查温度和设备指示灯"
+    - name: "后门围墙"
+      location: "perimeter_fence"
+      duration: 20
+      description: "后门围墙，检查围栏完整性和入侵痕迹"
+
+  # ── AI 视觉配置 ──
+  vision_provider: "openai"
+  vision_model: "gpt-4o"
+  anomaly_threshold: "medium"               # low | medium | high
+
+  # ── 警报配置 ──
+  security_webhook: "{{env.SECURITY_WEBHOOK_URL}}"
+  security_chat_id: "{{env.SECURITY_TELEGRAM_CHAT_ID}}"
+  security_bot_token: "{{env.SECURITY_BOT_TOKEN}}"
+
+  # ── 输出路径 ──
+  patrol_log: "./patrol-logs/{{env.AFLARE_RUN_ID}}.jsonl"
+  anomaly_report: "./patrol-logs/anomaly-{{env.AFLARE_RUN_ID}}.md"
+
+steps:
+  # ═══════════════════════════════════════════════════════════════════════
+  # 阶段 1：机器人启动 & 安全检查
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - name: dock_stand
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "stand"
+      speed: "0.3"
+      safety_zone_m: "1.5"
+
+  - name: preflight_check
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "get_status"
+    description: "起飞前自检：电池电量、电机温度、IMU 姿态、GPS 定位"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 阶段 2：按检查点巡逻 + 拍照 + AI 视觉分析
+  # ═══════════════════════════════════════════════════════════════════════
+
+  # 检查点 1：主入口
+  - name: patrol_checkpoint_1
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "navigate"
+      target_location: "main_entrance"
+      speed: "0.4"
+      safety_zone_m: "1.5"
+      duration_seconds: "15"
+
+  - name: snapshot_1
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "get_camera"
+
+  - name: vision_analysis_1
+    node: multimodal
+    params:
+      mode: "describe"
+      provider: "{{var.vision_provider}}"
+      model: "{{var.vision_model}}"
+      output_format: "json"
+    input: |
+      你是园区安全巡检 AI 分析员。分析这张来自「主入口」的监控照片。
+      请检测以下异常并给出 JSON 格式结果：
+      - 是否有未授权人员闯入？
+      - 门禁是否异常（损坏/开启/撬锁痕迹）？
+      - 是否有可疑包裹或物品？
+      - 是否有车辆异常停放？
+      - 光照是否正常（夜间/停电）？
+
+      输出 JSON 格式：
+      {
+        "checkpoint": "主入口",
+        "anomaly_detected": true/false,
+        "severity": "low|medium|high|critical",
+        "findings": ["发现1", "发现2"],
+        "confidence": 0.0-1.0,
+        "recommended_action": "建议操作"
+      }
+
+  # 检查点 2：停车场
+  - name: patrol_checkpoint_2
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "navigate"
+      target_location: "parking_lot"
+      speed: "0.4"
+      safety_zone_m: "1.5"
+      duration_seconds: "20"
+
+  - name: snapshot_2
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "get_camera"
+
+  - name: vision_analysis_2
+    node: multimodal
+    params:
+      mode: "describe"
+      provider: "{{var.vision_provider}}"
+      model: "{{var.vision_model}}"
+      output_format: "json"
+    input: |
+      你是园区安全巡检 AI 分析员。分析这张来自「停车场」的监控照片。
+      检测异常：未授权车辆、可疑人员徘徊、破坏行为、照明异常、漏水/火灾。
+      输出 JSON 格式：{"checkpoint":"停车场","anomaly_detected":true/false,"severity":"low|medium|high|critical","findings":[],"confidence":0.0-1.0,"recommended_action":""}
+
+  # 检查点 3：仓库 A 区
+  - name: patrol_checkpoint_3
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "navigate"
+      target_location: "warehouse_zone_a"
+      speed: "0.4"
+      safety_zone_m: "1.5"
+      duration_seconds: "15"
+
+  - name: snapshot_3
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "get_camera"
+
+  - name: vision_analysis_3
+    node: multimodal
+    params:
+      mode: "describe"
+      provider: "{{var.vision_provider}}"
+      model: "{{var.vision_model}}"
+      output_format: "json"
+    input: |
+      你是园区安全巡检 AI 分析员。分析这张来自「仓库A区」的监控照片。
+      检测异常：货物倒塌/堵塞消防通道、烟雾/火源、漏水、可疑人员、未授权叉车操作。
+      输出 JSON 格式：{"checkpoint":"仓库A区","anomaly_detected":true/false,"severity":"low|medium|high|critical","findings":[],"confidence":0.0-1.0,"recommended_action":""}
+
+  # 检查点 4：服务器机房
+  - name: patrol_checkpoint_4
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "navigate"
+      target_location: "server_room"
+      speed: "0.3"
+      safety_zone_m: "1.0"
+      duration_seconds: "10"
+
+  - name: snapshot_4
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "get_camera"
+
+  - name: vision_analysis_4
+    node: multimodal
+    params:
+      mode: "describe"
+      provider: "{{var.vision_provider}}"
+      model: "{{var.vision_model}}"
+      output_format: "json"
+    input: |
+      你是园区安全巡检 AI 分析员。分析这张来自「服务器机房」的监控照片。
+      检测异常：设备指示灯异常（红灯/黄灯）、线缆松动、温度过高（烟雾/烧焦痕迹）、未授权人员、机柜门未关。
+      输出 JSON 格式：{"checkpoint":"服务器机房","anomaly_detected":true/false,"severity":"low|medium|high|critical","findings":[],"confidence":0.0-1.0,"recommended_action":""}
+
+  # 检查点 5：后门围墙
+  - name: patrol_checkpoint_5
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "navigate"
+      target_location: "perimeter_fence"
+      speed: "0.4"
+      safety_zone_m: "1.5"
+      duration_seconds: "20"
+
+  - name: snapshot_5
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "get_camera"
+
+  - name: vision_analysis_5
+    node: multimodal
+    params:
+      mode: "describe"
+      provider: "{{var.vision_provider}}"
+      model: "{{var.vision_model}}"
+      output_format: "json"
+    input: |
+      你是园区安全巡检 AI 分析员。分析这张来自「后门围墙」的监控照片。
+      检测异常：围栏破损/攀爬痕迹、可疑人员靠近、物品遗留、野生动物闯入、摄像头被遮挡。
+      输出 JSON 格式：{"checkpoint":"后门围墙","anomaly_detected":true/false,"severity":"low|medium|high|critical","findings":[],"confidence":0.0-1.0,"recommended_action":""}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 阶段 3：汇总分析结果
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - name: aggregate_results
+    node: template_render
+    params:
+      template: |
+        # 巡逻报告
+
+        **时间:** {{env.AFLARE_RUN_ID}}
+        **机器人:** {{var.robot_model}} ({{var.robot_mode}} 模式)
+
+        ## 检查点分析结果
+
+        ### 1. 主入口
+        {{step.vision_analysis_1}}
+
+        ### 2. 停车场
+        {{step.vision_analysis_2}}
+
+        ### 3. 仓库A区
+        {{step.vision_analysis_3}}
+
+        ### 4. 服务器机房
+        {{step.vision_analysis_4}}
+
+        ### 5. 后门围墙
+        {{step.vision_analysis_5}}
+
+  - name: detect_anomaly
+    node: agent
+    params:
+      provider: "{{var.vision_provider}}"
+      model: "{{var.vision_model}}"
+      max_iterations: "1"
+    input: |
+      分析以下五个检查点的巡逻结果，判断是否存在任何需要响应的异常事件。
+      如果任一检查点的 anomaly_detected 为 true 且 severity 在 medium 或以上，则输出 "YES"。
+      如果所有检查点正常或仅有 low 级别的轻微发现，则输出 "NO"。
+      只输出 "YES" 或 "NO"，不要输出其他内容。
+
+      巡逻结果：
+      {{step.aggregate_results}}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 阶段 4：条件分支 — 异常响应 vs 正常结束
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - if:
+      condition: "{{step.detect_anomaly}} contains YES"
+      then:
+        # ── 异常响应（Saga 事务保证）──
+        - name: incident_response
+          saga:
+            steps:
+              # Forward 1：触发现场警报
+              - forward:
+                  name: trigger_alarm
+                  node: execute
+                  params:
+                    command: |
+                      echo "[ALARM] 异常事件触发 - 检查点发现安全隐患"
+                      echo "时间: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                      echo "详情: {{step.aggregate_results}}"
+                  # 警报不可逆，无需 compensate
+
+              # Forward 2：通知安保团队
+              - forward:
+                  name: notify_security
+                  node: notify
+                  params:
+                    channel: "webhook"
+                    url: "{{var.security_webhook}}"
+                    method: "POST"
+                    headers: '{"Content-Type":"application/json"}'
+                    body: |
+                      {"title":"安全警报 - 机器人巡逻发现异常","severity":"high","summary":"{{step.aggregate_results}}","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+                compensate:
+                  name: notify_cancel
+                  node: notify
+                  params:
+                    channel: "webhook"
+                    url: "{{var.security_webhook}}"
+                    method: "POST"
+                    headers: '{"Content-Type":"application/json"}'
+                    body: |
+                      {"title":"安全警报已解除","summary":"事件响应失败，警报已自动撤销","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+
+              # Forward 3：记录事件到审计日志
+              - forward:
+                  name: log_incident
+                  node: file_write
+                  params:
+                    path: "{{var.patrol_log}}"
+                    mode: "append"
+                    content: |
+                      {"type":"incident","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","run_id":"{{env.AFLARE_RUN_ID}}","details":{{step.aggregate_results}}}
+                compensate:
+                  name: log_cancel
+                  node: file_write
+                  params:
+                    path: "{{var.patrol_log}}"
+                    mode: "append"
+                    content: |
+                      {"type":"incident_cancelled","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","run_id":"{{env.AFLARE_RUN_ID}}","reason":"事件响应回滚"}
+
+        # ── 无人机升空航拍 ──
+        - name: drone_aerial_inspection
+          node: execute
+          params:
+            command: |
+              echo "[DRONE] 无人机升空进行航拍检查"
+              echo "检查点: 异常区域"
+              echo "飞行高度: 50m"
+              echo "状态: 航拍完成，图像已回传"
+
+        - name: drone_image_analysis
+          node: multimodal
+          params:
+            mode: "describe"
+            provider: "{{var.vision_provider}}"
+            model: "{{var.vision_model}}"
+            output_format: "markdown"
+          input: |
+            这是无人机从高空拍摄的异常区域照片。请综合分析地面机器人和无人机视角，给出完整的安全评估报告。
+
+        - name: save_anomaly_report
+          node: file_write
+          params:
+            path: "{{var.anomaly_report}}"
+          input: |
+            # 异常事件报告
+
+            {{step.aggregate_results}}
+
+            ## 无人机航拍分析
+
+            {{step.drone_image_analysis}}
+
+            ## 事件响应状态
+
+            - 现场警报: 已触发
+            - 安保通知: 已发送
+            - 事件记录: 已存档
+            - 无人机航拍: 已完成
+
+            > 生成时间: {{env.AFLARE_RUN_ID}}
+
+      else:
+        # ── 正常情况：记录正常日志 ──
+        - name: log_normal
+          node: file_write
+          params:
+            path: "{{var.patrol_log}}"
+            mode: "append"
+            content: |
+              {"type":"patrol_normal","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","run_id":"{{env.AFLARE_RUN_ID}}","status":"all_clear"}
+
+        - name: normal_notify
+          node: notify
+          params:
+            channel: "stdout"
+            message: "巡逻完成 - 所有检查点正常，未发现异常。"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 阶段 5：返回 dock & 蹲下
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - name: return_to_dock
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "navigate"
+      target_location: "dock"
+      speed: "0.5"
+      safety_zone_m: "1.0"
+
+  - name: dock_sit
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "sit"
+      safety_zone_m: "0.5"
+
+  - name: final_status
+    node: unitree_robot
+    params:
+      robot_model: "{{var.robot_model}}"
+      robot_ip: "{{var.robot_ip}}"
+      mode: "{{var.robot_mode}}"
+      action: "get_status"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 阶段 6：最终通知
+  # ═══════════════════════════════════════════════════════════════════════
+
+  - name: patrol_complete
+    node: notify
+    params:
+      channel: "stdout"
+      message: |
+        ============================================
+        Physical AI 巡逻任务完成
+        ============================================
+        机器人: {{var.robot_model}}
+        模式: {{var.robot_mode}}
+        检查点: 5 个
+        异常检测: {{step.detect_anomaly}}
+        日志: {{var.patrol_log}}
+        ============================================

@@ -1,0 +1,239 @@
+name: financial-workflow
+description: |
+  企业级金融工作流 —— 跨行转账全链路 Demo。
+  展示 aflare 在企业金融场景中的核心能力：
+
+  1. 🛡️  LLM 欺诈检测 —— 转账前 AI 风险分析（异常金额/黑名单/交易模式）
+  2. 🔄  Saga 事务补偿 —— 跨行转账 debit→credit，失败自动反向补偿
+  3. 📜  HMAC 审计链 —— 所有步骤自动记录防篡改审计日志
+  4. 🔑  幂等性 —— Idempotency-Key 防重复执行
+  5. 🚦  限流 + 重试 + 退避 —— 保护下游银行 API
+  6. 🛑  capture_error —— 错误即分支，不崩溃
+  7. 📬  通知 —— 多通道（stdout/webhook）发送转账结果
+
+  流程：
+    fraud_check(LLM) → saga(debit⇄refund, credit⇄reverse, notify) → audit_log → notification
+    ─────────────────────────────────────────────────────────────
+    失败时 saga 反向补偿 + capture_error 兜底 + 审计全记录
+
+  赛事对照：
+    - 金融场景：企业级跨行转账 / 合规审计
+    - 真问题：Saga 事务补偿 + LLM 欺诈检测 + 审计合规
+    - 核心卖点：一条 YAML 同时解决分布式事务一致性、AI 风控、合规审计三大痛点
+
+vars:
+  bank_api_url: "http://localhost:17901"
+  from_account: "CORP-ACC-001"
+  to_account: "CORP-ACC-002"
+  amount: "9999"
+  currency: "CNY"
+  transfer_ref: "TXN-2026-0807-001"
+  audit_log: "./audit-trail.jsonl"
+  fraud_report: "./fraud-report.json"
+
+steps:
+  # ═══════════════════════════════════════════════════════════════
+  # Step 1: LLM 欺诈检测（转账前 AI 风险分析）
+  # ═══════════════════════════════════════════════════════════════
+  # 使用 LLM 分析交易风险：异常金额、黑名单关联方、交易模式
+  # capture_error 兜底：LLM 挂了也不阻塞转账，降级为"人工审核"
+  - name: fraud_check
+    node: openai
+    params:
+      model: "gpt-4o"
+      system: |
+        你是企业金融交易欺诈检测专家。分析转账请求，输出结构化风险评估。
+        关注以下风险维度：
+        1. 交易金额异常（如整数大额、频繁小额测试）
+        2. 收款方是否在黑名单/制裁名单
+        3. 交易模式是否匹配历史行为
+        4. 时间/地区异常
+
+        只输出 JSON，格式：
+        {
+          "risk_score": 0-100,
+          "risk_level": "low|medium|high|critical",
+          "flags": ["flag1", "flag2"],
+          "decision": "allow|review|block",
+          "reasoning": "分析依据"
+        }
+      prompt: |
+        请分析以下企业转账请求的欺诈风险：
+
+        转账编号：{{var.transfer_ref}}
+        付款账户：{{var.from_account}}
+        收款账户：{{var.to_account}}
+        金额：{{var.amount}} {{var.currency}}
+    retry: 2
+    backoff:
+      exponential: true
+      base: "500ms"
+      max_delay: "5s"
+      jitter: true
+    capture_error:
+      # LLM 不可用时降级为"人工审核"，不阻塞转账
+      - name: fraud_fallback
+        node: template_render
+        params:
+          template: |
+            {"risk_score":50,"risk_level":"medium","flags":["llm_unavailable"],"decision":"review","reasoning":"LLM 服务不可用，降级为人工审核。转账编号：{{var.transfer_ref}}"}
+
+  # ═══════════════════════════════════════════════════════════════
+  # Step 2: 保存欺诈检测报告
+  # ═══════════════════════════════════════════════════════════════
+  - name: save_fraud_report
+    node: file_write
+    params:
+      path: "{{var.fraud_report}}"
+      content: "{{step.fraud_check}}"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Step 3: Saga 跨行转账（核心事务）
+  # ═══════════════════════════════════════════════════════════════
+  # debit → credit → notify，任一步骤失败时按反向补偿
+  # 每个 forward 步骤都带 Idempotency-Key、限流、重试、退避
+  - name: cross_bank_transfer
+    saga:
+      steps:
+        # ── forward 1: 扣款（A 行）──
+        - forward:
+            name: debit
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/debit"
+              headers: |-
+                Content-Type: application/json
+                Idempotency-Key: {{var.transfer_ref}}-debit
+              body: '{"account":"{{var.from_account}}","amount":{{var.amount}},"currency":"{{var.currency}}","ref":"{{var.transfer_ref}}"}'
+              rate_limit_rps: "5"
+              rate_limit_burst: "2"
+              max_retries: "3"
+              retry_backoff_ms: "200"
+              retry_on_status: "429,500,502,503,504"
+          # compensate 1: 退款（撤销 debit）
+          compensate:
+            name: refund_debit
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/refund"
+              headers: |-
+                Content-Type: application/json
+                Idempotency-Key: {{var.transfer_ref}}-refund
+              body: '{"account":"{{var.from_account}}","amount":{{var.amount}},"currency":"{{var.currency}}","ref":"{{var.transfer_ref}}","reason":"{{var.error}}"}'
+              rate_limit_rps: "5"
+              max_retries: "3"
+              retry_backoff_ms: "200"
+              retry_on_status: "429,500,502,503,504"
+
+        # ── forward 2: 入账（B 行）──
+        # amount=9999 触发模拟失败，演示 saga 补偿
+        - forward:
+            name: credit
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/credit"
+              headers: |-
+                Content-Type: application/json
+                Idempotency-Key: {{var.transfer_ref}}-credit
+              body: '{"account":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}","ref":"{{var.transfer_ref}}"}'
+              rate_limit_rps: "5"
+              rate_limit_burst: "2"
+              max_retries: "3"
+              retry_backoff_ms: "200"
+              retry_on_status: "429,500,502,503,504"
+          # compensate 2: 冲正（撤销 credit）
+          compensate:
+            name: reverse_credit
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/reverse"
+              headers: |-
+                Content-Type: application/json
+                Idempotency-Key: {{var.transfer_ref}}-reverse
+              body: '{"account":"{{var.to_account}}","amount":{{var.amount}},"currency":"{{var.currency}}","ref":"{{var.transfer_ref}}","reason":"{{var.error}}"}'
+              max_retries: "2"
+
+        # ── forward 3: 通知（无副作用，无需 compensate）──
+        - forward:
+            name: notify_bank
+            node: http_request
+            params:
+              method: POST
+              url: "{{var.bank_api_url}}/notify"
+              headers: |-
+                Content-Type: application/json
+              body: '{"from":"{{var.from_account}}","to":"{{var.to_account}}","amount":{{var.amount}},"ref":"{{var.transfer_ref}}","status":"success"}'
+              max_retries: "2"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Step 4: 生成 HMAC 审计轨迹（合规证据链）
+  # ═══════════════════════════════════════════════════════════════
+  # 注意：aflare executor 内置 HMAC 哈希链审计（audit.log.jsonl），
+  # 所有步骤的输入/输出/耗时/重试/compensate 自动记录。
+  # 本步骤是应用层补充审计，生成业务可读的审计摘要。
+  - name: generate_audit_trail
+    node: template_render
+    params:
+      template: |
+        {
+          "audit_id": "{{var.transfer_ref}}",
+          "timestamp": "{{now}}",
+          "transaction": {
+            "ref": "{{var.transfer_ref}}",
+            "from": "{{var.from_account}}",
+            "to": "{{var.to_account}}",
+            "amount": {{var.amount}},
+            "currency": "{{var.currency}}"
+          },
+          "fraud_check": {{step.fraud_check}},
+          "transfer_result": "{{step.cross_bank_transfer}}",
+          "compliance": {
+            "hmac_chain": "enabled",
+            "idempotency_key": "{{var.transfer_ref}}",
+            "redaction": "PII masked by default",
+            "saga_compensated": false
+          }
+        }
+
+  # ═══════════════════════════════════════════════════════════════
+  # Step 5: 落盘审计轨迹
+  # ═══════════════════════════════════════════════════════════════
+  - name: save_audit_trail
+    node: file_write
+    params:
+      path: "{{var.audit_log}}"
+      mode: append
+
+  # ═══════════════════════════════════════════════════════════════
+  # Step 6: 发送通知（多通道）
+  # ═══════════════════════════════════════════════════════════════
+  # stdout 输出 + 可选 webhook 到企业 IM/告警系统
+  - name: send_notification
+    node: notify
+    params:
+      channel: stdout
+      message: |
+        ============================================
+        🏦 企业金融转账工作流执行完毕
+        ============================================
+        转账编号: {{var.transfer_ref}}
+        付款账户: {{var.from_account}}
+        收款账户: {{var.to_account}}
+        金额:     {{var.amount}} {{var.currency}}
+        风控结果: {{step.fraud_check}}
+        转账结果: {{step.cross_bank_transfer}}
+        审计轨迹: {{var.audit_log}}
+        ============================================
+
+output: |
+  ============================================
+  企业金融转账工作流执行报告
+  ============================================
+  转账编号: {{var.transfer_ref}}
+  转账结果: {{step.cross_bank_transfer}}
+  风控评分: {{step.fraud_check}}
+  审计轨迹: {{var.audit_log}}

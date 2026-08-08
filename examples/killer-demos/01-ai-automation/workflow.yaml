@@ -1,0 +1,250 @@
+name: AI Daily Automation
+description: |
+  AI-powered daily automation: email digest, BTC monitoring, and news summary.
+  Runs every morning at 8:00 AM to give you a comprehensive daily briefing
+  before you start your day.
+
+  DAG Architecture:
+    ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+    │  fetch_emails    │  │   fetch_btc      │  │  fetch_news      │
+    │  (IMAP unread)   │  │  (CoinGecko)     │  │  (search_agg)    │
+    └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘
+             │                     │                     │
+             └─────────────────────┼─────────────────────┘
+                                   │
+                          ┌────────▼────────┐
+                          │  generate_digest │
+                          │  (LLM agent)     │
+                          └────────┬────────┘
+                                   │
+                    ┌──────────────┼──────────────┐
+                    │              │              │
+           ┌────────▼────────┐ ┌──▼──────────┐ ┌─▼───────────┐
+           │   save_report   │ │ telegram    │ │  console    │
+           │   (file_write)  │ │ (notify)    │ │ (notify)    │
+           └─────────────────┘ └─────────────┘ └─────────────┘
+
+  Usage:
+    aflare run workflow.yaml
+    aflare schedule --cron "0 8 * * *" workflow.yaml
+
+schedule:
+  cron: "0 8 * * *"
+  enabled: true
+
+vars:
+  # ── Email (IMAP) ──
+  # Override via aflare secrets set or environment variables
+  imap_server: "{{secret.email.imap_server}}"
+  imap_port: "993"
+  email_user: "{{secret.email.user}}"
+  email_pass: "{{secret.email.pass}}"
+  max_emails: "20"
+
+  # ── BTC Price ──
+  btc_api_url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_market_cap=true"
+
+  # ── AI News ──
+  news_query: "artificial intelligence"
+  news_sources: "hn,reddit,news"
+  news_limit: "8"
+
+  # ── LLM ──
+  provider: openai
+  model: gpt-4o
+  # provider: deepseek
+  # model: deepseek-chat
+
+  # ── Output ──
+  reports_dir: "reports"
+  report_filename: "daily-digest"
+
+  # ── Telegram ──
+  telegram_token: "{{secret.telegram.token}}"
+  telegram_chat_id: "{{secret.telegram.chat_id}}"
+
+steps:
+  # ═══════════════════════════════════════════════════════════════
+  # Stage 1: DAG Parallel Data Collection
+  # Three independent branches run concurrently:
+  #   - IMAP email fetch
+  #   - BTC price from CoinGecko
+  #   - AI news from search aggregator
+  # ═══════════════════════════════════════════════════════════════
+  - name: collect_data
+    parallel:
+      # ── Branch A: Fetch unread emails via IMAP ──
+      - name: fetch_emails
+        node: execute
+        params:
+          command: |
+            python3 -c "
+            import imaplib, email, json, sys, os
+            from datetime import datetime
+
+            def safe_decode(payload):
+                if payload is None:
+                    return ''
+                if isinstance(payload, bytes):
+                    return payload.decode('utf-8', errors='ignore')
+                return str(payload)
+
+            try:
+                mail = imaplib.IMAP4_SSL(os.environ.get('IMAP_SERVER', '{{var.imap_server}}'), int(os.environ.get('IMAP_PORT', '{{var.imap_port}}')))
+                mail.login(os.environ.get('IMAP_USER', '{{var.email_user}}'), os.environ.get('IMAP_PASS', '{{var.email_pass}}'))
+                mail.select('INBOX')
+
+                status, data = mail.search(None, 'UNSEEN')
+                if status != 'OK':
+                    print(json.dumps({'error': 'Failed to search inbox', 'count': 0, 'emails': []}))
+                    sys.exit(0)
+
+                email_ids = data[0].split()
+                max_emails = int(os.environ.get('MAX_EMAILS', '{{var.max_emails}}'))
+                email_ids = email_ids[-max_emails:]
+
+                emails = []
+                for num in email_ids:
+                    try:
+                        status, msg_data = mail.fetch(num, '(RFC822)')
+                        if status != 'OK':
+                            continue
+                        msg = email.message_from_bytes(msg_data[0][1])
+
+                        body = ''
+                        if msg.is_multipart():
+                            for part in msg.walk():
+                                if part.get_content_type() == 'text/plain':
+                                    body = safe_decode(part.get_payload(decode=True))
+                                    break
+                        else:
+                            body = safe_decode(msg.get_payload(decode=True))
+
+                        emails.append({
+                            'from': str(msg['From'] or ''),
+                            'subject': str(msg['Subject'] or '(No Subject)'),
+                            'date': str(msg['Date'] or ''),
+                            'body': body[:800]
+                        })
+                    except Exception:
+                        continue
+
+                mail.logout()
+                print(json.dumps({'count': len(emails), 'emails': emails}, indent=2, ensure_ascii=False))
+            except imaplib.IMAP4.error as e:
+                print(json.dumps({'error': f'IMAP auth failed: {e}', 'count': 0, 'emails': []}))
+            except Exception as e:
+                print(json.dumps({'error': str(e), 'count': 0, 'emails': []}))
+            "
+          timeout: "120s"
+        continue_on_error: true
+        retry: 1
+        backoff: { exponential: true, base: "5s", max_delay: "30s" }
+
+      # ── Branch B: Fetch BTC price from CoinGecko ──
+      - name: fetch_btc
+        node: http_request
+        params:
+          url: "{{var.btc_api_url}}"
+          method: GET
+          timeout: "30s"
+          headers: |
+            {
+              "Accept": "application/json"
+            }
+        continue_on_error: true
+        retry: 2
+        backoff: { exponential: true, base: "1s", max_delay: "10s" }
+
+      # ── Branch C: Fetch AI news headlines ──
+      - name: fetch_news
+        node: search_aggregate
+        params:
+          sources: "{{var.news_sources}}"
+          limit: "{{var.news_limit}}"
+          time_range: "day"
+          sort_by: "signal"
+          output: "markdown"
+        input: "{{var.news_query}}"
+        continue_on_error: true
+
+    output_strategy: join
+    id: raw_data
+
+  # ═══════════════════════════════════════════════════════════════
+  # Stage 2: LLM Digest Generation
+  # An agent node processes the raw data and produces a structured
+  # daily digest with categorized emails, BTC analysis, and news
+  # ═══════════════════════════════════════════════════════════════
+  - name: generate_digest
+    node: agent
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      system: |
+        You are a professional executive assistant AI. Your task is to generate a
+        comprehensive daily briefing digest in Markdown format.
+
+        Follow these rules:
+        1. For emails: categorize each by priority (🔴 Critical / 🟡 High / 🟢 Medium / ⚪ Low)
+           and type (Work / Personal / Finance / Newsletter / Action Required).
+           Provide a one-line summary and suggest next actions.
+        2. For BTC: present the price clearly with 24h change and market cap if available.
+           Add a brief market sentiment note.
+        3. For news: select the 5 most impactful stories. Provide title, source, and a
+           one-sentence takeaway for each.
+        4. End with a "Today's Focus" section listing 3 actionable priorities.
+
+        Output ONLY valid Markdown. Do not include any preamble or meta-commentary.
+      max_iterations: "5"
+      tools: json_parse,transform
+      enable_thinking: "true"
+    input: |
+      ## Raw Data Collected
+
+      {{step.collect_data}}
+
+      ---
+      Generate a structured daily digest from the above data. Include:
+      - Email summary table with priority/category/action
+      - BTC price dashboard with key metrics
+      - Top 5 AI news with takeaways
+      - Today's focus priorities
+
+  # ═══════════════════════════════════════════════════════════════
+  # Stage 3: Output — Save report, notify via Telegram, and print
+  # ═══════════════════════════════════════════════════════════════
+  - name: save_report
+    node: file_write
+    params:
+      path: "{{var.reports_dir}}/{{var.report_filename}}-{{env.DATE}}.md"
+      mode: write
+
+  - name: notify_telegram
+    node: notify
+    params:
+      channel: telegram
+      token: "{{var.telegram_token}}"
+      chat_id: "{{var.telegram_chat_id}}"
+      message: |
+        📊 *Daily Digest Ready*
+
+        🗓 {{env.DATE}}
+        📧 Emails processed
+        💰 BTC price updated
+        🤖 AI news curated
+
+        Full report: `{{var.reports_dir}}/{{var.report_filename}}-{{env.DATE}}.md`
+
+  - name: console
+    node: notify
+    params:
+      channel: stdout
+      message: |
+        ✅  Daily digest complete!
+        📄 Report: {{var.reports_dir}}/{{var.report_filename}}-{{env.DATE}}.md
+        📧 Emails: processed
+        💰 BTC: fetched
+        🤖 News: aggregated
+
+output: "{{step.generate_digest}}"
