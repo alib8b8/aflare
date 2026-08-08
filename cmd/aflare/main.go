@@ -306,6 +306,19 @@ func handleReview(args []string) {
 		os.Exit(1)
 	}
 
+	// Check file size before reading to avoid OOM on unexpectedly large files.
+	// Workflow YAML files are typically a few KB; 10 MB is a generous upper bound.
+	const maxFileSize = 10 * 1024 * 1024 // 10 MB
+	fi, err := os.Stat(args[0])
+	if err != nil {
+		fmt.Printf("❌ Failed to stat workflow file: %v\n", err)
+		os.Exit(1)
+	}
+	if fi.Size() > maxFileSize {
+		fmt.Printf("❌ Workflow file too large (%d bytes). Max allowed: %d bytes (10 MB).\n", fi.Size(), maxFileSize)
+		os.Exit(1)
+	}
+
 	data, err := os.ReadFile(args[0])
 	if err != nil {
 		fmt.Printf("❌ Failed to read workflow file: %v\n", err)

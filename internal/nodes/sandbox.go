@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -139,7 +140,10 @@ func (n *SandboxNode) Execute(ctx context.Context, input string, params map[stri
 	workDir := getParam(params, "work_dir", "/tmp/aflare-sandbox")
 	safeMode := strings.ToLower(getParam(params, "safe_mode", "true")) == "true"
 
-	envVars := parseEnvVars(getParam(params, "env", "{}"))
+	envVars, envErr := parseEnvVars(getParam(params, "env", "{}"))
+	if envErr != nil {
+		return "", envErr
+	}
 
 	startTime := time.Now()
 
@@ -382,15 +386,16 @@ func validateShellCommand(cmd string) error {
 }
 
 // parseEnvVars parses a JSON string of environment variables.
-func parseEnvVars(envJSON string) map[string]string {
+// Returns an error if the JSON is malformed so the caller can surface it.
+func parseEnvVars(envJSON string) (map[string]string, error) {
 	if envJSON == "" || envJSON == "{}" {
-		return nil
+		return nil, nil
 	}
 	vars := make(map[string]string)
 	if err := json.Unmarshal([]byte(envJSON), &vars); err != nil {
-		return nil
+		return nil, fmt.Errorf("invalid env JSON: %w", err)
 	}
-	return vars
+	return vars, nil
 }
 
 // randomHex generates a cryptographically random hex string of the given byte length.
@@ -457,13 +462,16 @@ type sessionFile struct {
 
 // saveSessionToDisk persists the sandbox session state to disk.
 // Sessions are saved to ~/.aflare/sandboxes/<id>.json.
+// Errors are logged but not returned — persistence is best-effort.
 func saveSessionToDisk(id string, state *sandboxState) {
 	if !isValidSandboxID(id) {
-		return // reject invalid IDs to prevent path traversal
+		log.Printf("[sandbox] saveSessionToDisk: rejected invalid sandbox id %q", id)
+		return
 	}
 	sessDir := sandboxSessionsDir()
 	if err := os.MkdirAll(sessDir, 0700); err != nil {
-		return // silent fail — persistence is best-effort
+		log.Printf("[sandbox] saveSessionToDisk: failed to create sessions dir %s: %v", sessDir, err)
+		return
 	}
 
 	sf := sessionFile{
@@ -479,11 +487,14 @@ func saveSessionToDisk(id string, state *sandboxState) {
 
 	data, err := json.MarshalIndent(sf, "", "  ")
 	if err != nil {
+		log.Printf("[sandbox] saveSessionToDisk: failed to marshal session %s: %v", id, err)
 		return
 	}
 
 	sessPath := filepath.Join(sessDir, id+".json")
-	_ = os.WriteFile(sessPath, data, 0600)
+	if err := os.WriteFile(sessPath, data, 0600); err != nil {
+		log.Printf("[sandbox] saveSessionToDisk: failed to write session %s: %v", id, err)
+	}
 }
 
 // loadSessionFromDisk attempts to restore a sandbox session from disk.
