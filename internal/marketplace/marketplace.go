@@ -555,9 +555,9 @@ description: %s
 
 This skill contains an aflare workflow. Install aflare and run:
 
-` + "```bash\n" + `aflare install %s
+`+"```bash\n"+`aflare install %s
 aflare run %s
-` + "```\n" + `
+`+"```\n"+`
 `, pkg.Name, pkg.Description, pkg.Name, pkg.Description, pkg.Name, pkg.Name)
 	if err := os.WriteFile(filepath.Join(skillsDir, "SKILL.md"), []byte(skillContent), 0644); err != nil {
 		return "", fmt.Errorf("failed to write SKILL.md: %w", err)
