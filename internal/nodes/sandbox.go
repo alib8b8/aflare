@@ -17,6 +17,8 @@ package nodes
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -122,6 +124,8 @@ func (n *SandboxNode) Execute(ctx context.Context, input string, params map[stri
 	sandboxID := getParam(params, "sandbox_id", "")
 	if sandboxID == "" {
 		sandboxID = fmt.Sprintf("sandbox-%d-%s", time.Now().Unix(), randomHex(6))
+	} else if !isValidSandboxID(sandboxID) {
+		return "", fmt.Errorf("invalid sandbox_id: %q (must be alphanumeric, no path separators or ..)", sandboxID)
 	}
 
 	timeoutMs := parseIntSafe(getParam(params, "timeout_ms", "30000"), 30000)
@@ -154,6 +158,10 @@ func (n *SandboxNode) Execute(ctx context.Context, input string, params map[stri
 				envVars:   envVars,
 				cookies:   make(map[string]string),
 			}
+		} else {
+			// When loading from disk, sync the workDir to the current param value
+			// so that MkdirAll and executeShell use the same directory.
+			state.workDir = workDir
 		}
 		sandboxInstances[sandboxID] = state
 	}
@@ -164,8 +172,8 @@ func (n *SandboxNode) Execute(ctx context.Context, input string, params map[stri
 	}
 	sandboxInstancesMu.Unlock()
 
-	// Ensure work directory exists
-	if err := os.MkdirAll(workDir, 0755); err != nil {
+	// Ensure work directory exists (use state.workDir which is now synced)
+	if err := os.MkdirAll(state.workDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create work directory: %w", err)
 	}
 
@@ -385,15 +393,28 @@ func parseEnvVars(envJSON string) map[string]string {
 	return vars
 }
 
-// randomHex generates a random hex string of the given length.
+// randomHex generates a cryptographically random hex string of the given byte length.
 func randomHex(n int) string {
-	const letters = "0123456789abcdef"
 	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[time.Now().UnixNano()%int64(len(letters))]
-		time.Sleep(time.Nanosecond)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback: use time-based as last resort (should never happen)
+		for i := range b {
+			b[i] = byte(time.Now().UnixNano() & 0xFF)
+		}
 	}
-	return string(b)
+	return hex.EncodeToString(b)[:n]
+}
+
+// isValidSandboxID checks that a sandbox ID is safe for filesystem use.
+// Prevents path traversal attacks when the ID is used in file paths.
+func isValidSandboxID(id string) bool {
+	if id == "" || len(id) > 100 {
+		return false
+	}
+	if strings.Contains(id, "..") || strings.Contains(id, "/") || strings.Contains(id, "\\") {
+		return false
+	}
+	return true
 }
 
 // scheduleSandboxCleanup periodically cleans up expired sandboxes.
@@ -437,6 +458,9 @@ type sessionFile struct {
 // saveSessionToDisk persists the sandbox session state to disk.
 // Sessions are saved to ~/.aflare/sandboxes/<id>.json.
 func saveSessionToDisk(id string, state *sandboxState) {
+	if !isValidSandboxID(id) {
+		return // reject invalid IDs to prevent path traversal
+	}
 	sessDir := sandboxSessionsDir()
 	if err := os.MkdirAll(sessDir, 0700); err != nil {
 		return // silent fail — persistence is best-effort
@@ -465,6 +489,9 @@ func saveSessionToDisk(id string, state *sandboxState) {
 // loadSessionFromDisk attempts to restore a sandbox session from disk.
 // Returns nil if the session file doesn't exist or can't be parsed.
 func loadSessionFromDisk(id string) *sandboxState {
+	if !isValidSandboxID(id) {
+		return nil // reject invalid IDs to prevent path traversal
+	}
 	sessPath := filepath.Join(sandboxSessionsDir(), id+".json")
 	data, err := os.ReadFile(sessPath)
 	if err != nil {
