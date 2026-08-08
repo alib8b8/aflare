@@ -31,11 +31,11 @@ import (
 
 // Package represents a workflow package in the marketplace.
 type Package struct {
-	Name        string `yaml:"name" json:"name"`
-	Version     string `yaml:"version" json:"version"`
-	Description string `yaml:"description" json:"description"`
-	Category    string `yaml:"category" json:"category"`
-	Author      string `yaml:"author" json:"author"`
+	Name         string `yaml:"name" json:"name"`
+	Version      string `yaml:"version" json:"version"`
+	Description  string `yaml:"description" json:"description"`
+	Category     string `yaml:"category" json:"category"`
+	Author       string `yaml:"author" json:"author"`
 	WorkflowYAML string `yaml:"-" json:"-"`
 }
 

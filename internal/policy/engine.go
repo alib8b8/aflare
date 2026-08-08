@@ -88,24 +88,24 @@ type Policy struct {
 
 // FilesystemPolicy controls filesystem operations.
 type FilesystemPolicy struct {
-	Read    string `yaml:"read"`    // allowed | approval | denied
-	Write   string `yaml:"write"`   // allowed | approval | denied
-	Delete  string `yaml:"delete"`  // allowed | approval | denied
+	Read   string `yaml:"read"`   // allowed | approval | denied
+	Write  string `yaml:"write"`  // allowed | approval | denied
+	Delete string `yaml:"delete"` // allowed | approval | denied
 }
 
 // NetworkPolicy controls network access.
 type NetworkPolicy struct {
-	Outbound   string   `yaml:"outbound"`   // allowed | allowlist | denied
-	Allowlist  []string `yaml:"allowlist"`  // domains allowed when outbound=allowlist
-	Denylist   []string `yaml:"denylist"`   // domains blocked even when outbound=allowed
+	Outbound  string   `yaml:"outbound"`  // allowed | allowlist | denied
+	Allowlist []string `yaml:"allowlist"` // domains allowed when outbound=allowlist
+	Denylist  []string `yaml:"denylist"`  // domains blocked even when outbound=allowed
 }
 
 // ShellPolicy controls shell execution.
 type ShellPolicy struct {
-	Enabled         bool     `yaml:"enabled"`          // false = completely disabled
-	ApprovalRequired bool    `yaml:"approval_required"` // require human approval
-	Allowlist       []string `yaml:"allowlist"`        // allowed commands (when enabled)
-	Denylist        []string `yaml:"denylist"`         // blocked commands (even when enabled)
+	Enabled          bool     `yaml:"enabled"`           // false = completely disabled
+	ApprovalRequired bool     `yaml:"approval_required"` // require human approval
+	Allowlist        []string `yaml:"allowlist"`         // allowed commands (when enabled)
+	Denylist         []string `yaml:"denylist"`          // blocked commands (even when enabled)
 }
 
 // FinancialPolicy controls financial operations.
@@ -137,7 +137,7 @@ func DefaultPolicy() *Policy {
 			Outbound: "allowed",
 		},
 		Shell: ShellPolicy{
-			Enabled:         true,
+			Enabled:          true,
 			ApprovalRequired: false,
 		},
 		Financial: FinancialPolicy{
