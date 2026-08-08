@@ -17,9 +17,15 @@
 // manager that lets users discover, install, and manage workflow packages.
 // Workflows are installed from the marketplace registry into the user's
 // ~/.aflare/workflows/ directory.
+//
+// Agent Plugins 1.0.0 compatibility: packages can be exported as Agent Plugins
+// (plugin.json + skills/ + mcp.json) and imported from Agent Plugins format.
+// This enables aflare workflows to be packaged once and used across compatible
+// agent clients (VS Code, Cursor, GitHub Copilot, ChatGPT, etc.).
 package marketplace
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -458,6 +464,147 @@ func (r *Registry) Categories() []string {
 	}
 	sort.Strings(cats)
 	return cats
+}
+
+// ── Agent Plugins 1.0.0 Compatibility ──────────────────────────────────────
+//
+// Agent Plugins is an open, vendor-neutral specification (agent-plugins.org)
+// backed by OpenAI, Google, Amazon, Microsoft, Cursor, and Vercel. It defines
+// a common package format for Agent Skills and MCP servers so they can be
+// packaged once and used across compatible clients.
+//
+// aflare workflows can be exported as Agent Plugins, making them usable in
+// VS Code, Cursor, GitHub Copilot, ChatGPT, and other compatible clients.
+
+// PluginManifest represents the plugin.json manifest defined by the
+// Agent Plugins 1.0.0 specification.
+type PluginManifest struct {
+	Schema      string   `json:"$schema"`
+	Name        string   `json:"name"`
+	Version     string   `json:"version,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Author      string   `json:"author,omitempty"`
+	Homepage    string   `json:"homepage,omitempty"`
+	Repository  string   `json:"repository,omitempty"`
+	License     string   `json:"license,omitempty"`
+	Keywords    []string `json:"keywords,omitempty"`
+}
+
+// ToPluginManifest converts a marketplace Package into an Agent Plugins
+// plugin.json manifest.
+func (p *Package) ToPluginManifest() PluginManifest {
+	return PluginManifest{
+		Schema:      "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+		Name:        p.Name,
+		Version:     p.Version,
+		Description: p.Description,
+		Author:      p.Author,
+		License:     "AGPL-3.0",
+		Keywords:    []string{"aflare", "workflow", p.Category},
+	}
+}
+
+// ExportPlugin exports a marketplace package as an Agent Plugins-compatible
+// directory. The directory structure follows the Agent Plugins 1.0.0 spec:
+//
+//	<name>/
+//	├── plugin.json
+//	├── skills/
+//	│   └── <name>/
+//	│       └── SKILL.md
+//	└── mcp.json
+//
+// The workflow YAML is embedded as a Skill so compatible agents can discover
+// and execute it.
+func (r *Registry) ExportPlugin(name, targetDir string) (string, error) {
+	pkg, err := r.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	pluginDir := filepath.Join(targetDir, pkg.Name)
+	if err := os.MkdirAll(pluginDir, 0750); err != nil {
+		return "", fmt.Errorf("failed to create plugin directory: %w", err)
+	}
+
+	// Write plugin.json
+	manifest := pkg.ToPluginManifest()
+	manifestBytes, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal plugin.json: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginDir, "plugin.json"), manifestBytes, 0644); err != nil {
+		return "", fmt.Errorf("failed to write plugin.json: %w", err)
+	}
+
+	// Write skills/<name>/SKILL.md with the workflow YAML as instructions
+	skillsDir := filepath.Join(pluginDir, "skills", pkg.Name)
+	if err := os.MkdirAll(skillsDir, 0750); err != nil {
+		return "", fmt.Errorf("failed to create skills directory: %w", err)
+	}
+	skillContent := fmt.Sprintf(`---
+name: %s
+description: %s
+---
+
+# %s
+
+%s
+
+## Workflow YAML
+
+This skill contains an aflare workflow. Install aflare and run:
+
+` + "```bash\n" + `aflare install %s
+aflare run %s
+` + "```\n" + `
+`, pkg.Name, pkg.Description, pkg.Name, pkg.Description, pkg.Name, pkg.Name)
+	if err := os.WriteFile(filepath.Join(skillsDir, "SKILL.md"), []byte(skillContent), 0644); err != nil {
+		return "", fmt.Errorf("failed to write SKILL.md: %w", err)
+	}
+
+	// Write mcp.json with aflare MCP server config
+	mcpConfig := map[string]interface{}{
+		"$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+		"mcpServers": map[string]interface{}{
+			"aflare": map[string]interface{}{
+				"type":    "stdio",
+				"command": "aflare",
+				"args":    []string{"--mcp"},
+			},
+		},
+	}
+	mcpBytes, err := json.MarshalIndent(mcpConfig, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal mcp.json: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginDir, "mcp.json"), mcpBytes, 0644); err != nil {
+		return "", fmt.Errorf("failed to write mcp.json: %w", err)
+	}
+
+	return pluginDir, nil
+}
+
+// ImportPlugin scans a directory for an Agent Plugins-compatible plugin.json
+// and returns the extracted metadata. Returns an error if the directory does
+// not contain a valid plugin.json.
+func ImportPlugin(pluginDir string) (*PluginManifest, error) {
+	manifestPath := filepath.Join(pluginDir, "plugin.json")
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil, fmt.Errorf("plugin.json not found in %s: %w", pluginDir, err)
+	}
+
+	var manifest PluginManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return nil, fmt.Errorf("invalid plugin.json: %w", err)
+	}
+
+	if manifest.Schema == "" || manifest.Name == "" {
+		return nil, fmt.Errorf("plugin.json missing required fields ($schema, name)")
+	}
+
+	return &manifest, nil
 }
 
 // isValidPackageName checks that a package name is safe for filesystem use.

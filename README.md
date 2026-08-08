@@ -48,9 +48,10 @@ L1: AI Intent    —  "帮我监控 BTC，跌 5% 通知我"
                         ↓
 L2: Workflow     —  YAML 确定性工作流（schedule → get_price → condition → telegram）
                         ↓
-L3: Runtime      —  执行层
+L3: Harness + Runtime  —  确定性执行层
                     ├── DAG 并行调度
                     ├── Checkpoint / Resume（WAL 崩溃恢复）
+                    ├── Session 持久化（跨轮次上下文保持）
                     ├── Saga 事务补偿
                     ├── Idempotency（幂等）
                     ├── Retry / Rate Limit / Circuit Breaker
@@ -58,7 +59,9 @@ L3: Runtime      —  执行层
                     └── Secret 脱敏
 ```
 
-**aflare 的护城河不是 LLM，是 Runtime。**
+**aflare 的护城河不是 LLM，是 Harness + Runtime。**
+
+> Harness 工程是 AI 时代的「操作系统」——黄仁勋与 LangChain 对谈中定义的下一代软件范式：确定性执行与状态管理是 Agent 可靠性的基石。aflare 的 Checkpoint/Session 持久化机制正是 Harness 层的核心实现，确保 AI 工作流跨轮次、跨崩溃保持上下文一致。
 
 ---
 
@@ -98,7 +101,7 @@ aflare run btc-monitor.yaml
 
 ### Runtime 保障（确定性执行）
 - **DAG 并行调度** — 拓扑排序依赖调度，无依赖步骤并发执行
-- **WAL 崩溃恢复** — append-only 持久化 + CRC32 校验，`--resume` 从中断处恢复
+- **Harness 层：WAL 崩溃恢复 + Session 持久化** — append-only 持久化 + CRC32 校验，`--resume` 从中断处恢复；Session 跨轮次保持上下文，实现 Continual Harness
 - **Saga 事务补偿** — 多步骤写入失败自动反向回滚
 - **Idempotency** — Idempotency-Key + 原子占位 + 跨进程锁，防重复执行
 - **Retry / Rate Limit / Circuit Breaker** — 指数退避 + 令牌桶 + 熔断器状态机
@@ -135,11 +138,13 @@ aflare run btc-monitor.yaml
 │                    aflare Runtime                     │
 │                                                       │
 │  ┌──────────┐   ┌──────────┐   ┌──────────────────┐  │
-│  │ AI Intent │──▶│ Workflow │──▶│ Deterministic     │  │
-│  │ (LLM)    │   │ (YAML)   │   │ Executor          │  │
-│  └──────────┘   └──────────┘   │                    │  │
+│  │ AI Intent │──▶│ Workflow │──▶│ Harness +         │  │
+│  │ (LLM)    │   │ (YAML)   │   │ Deterministic     │  │
+│  └──────────┘   └──────────┘   │ Executor          │  │
+│                                 │                    │  │
 │                                 │ • DAG Scheduler   │  │
 │                                 │ • WAL / Checkpoint│  │
+│                                 │ • Session 持久化   │  │
 │                                 │ • Saga / Retry    │  │
 │                                 │ • Circuit Breaker │  │
 │                                 │ • Audit / HMAC    │  │
