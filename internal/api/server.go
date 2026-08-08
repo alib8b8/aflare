@@ -256,10 +256,10 @@ func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine timeout
+	// Determine timeout (capped at 30 minutes to prevent abuse)
 	timeout := workflow.DefaultWorkflowTimeout
 	if req.Timeout != "" {
-		if d, err := time.ParseDuration(req.Timeout); err == nil && d > 0 {
+		if d, err := time.ParseDuration(req.Timeout); err == nil && d > 0 && d <= 30*time.Minute {
 			timeout = d
 		}
 	}
@@ -396,6 +396,12 @@ func (s *Server) handleGetWorkflow(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimPrefix(r.URL.Path, "/api/v1/workflows/")
 	if name == "" {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "workflow name is required"})
+		return
+	}
+
+	// Prevent path traversal attacks: reject names containing .., /, or \
+	if strings.Contains(name, "..") || strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid workflow name"})
 		return
 	}
 

