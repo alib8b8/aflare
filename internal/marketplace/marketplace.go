@@ -316,6 +316,12 @@ func (r *Registry) Get(name string) (*Package, error) {
 // directory (~/.aflare/workflows/<name>.yaml). Returns the path where the
 // workflow YAML was written.
 func (r *Registry) Install(name string) (string, error) {
+	return r.InstallTo(name, filepath.Join(meta.DataDir(), "workflows"))
+}
+
+// InstallTo installs a workflow package by name into the specified target
+// directory. Returns the path where the workflow YAML was written.
+func (r *Registry) InstallTo(name, targetDir string) (string, error) {
 	pkg, err := r.Get(name)
 	if err != nil {
 		return "", err
@@ -329,12 +335,11 @@ func (r *Registry) Install(name string) (string, error) {
 		return "", err
 	}
 
-	workflowsDir := filepath.Join(meta.DataDir(), "workflows")
-	if err := os.MkdirAll(workflowsDir, 0750); err != nil {
-		return "", fmt.Errorf("failed to create workflows directory: %w", err)
+	if err := os.MkdirAll(targetDir, 0750); err != nil {
+		return "", fmt.Errorf("failed to create target directory: %w", err)
 	}
 
-	destPath := filepath.Join(workflowsDir, pkg.Name+".yaml")
+	destPath := filepath.Join(targetDir, pkg.Name+".yaml")
 	if err := os.WriteFile(destPath, []byte(pkg.WorkflowYAML), 0600); err != nil {
 		return "", fmt.Errorf("failed to write workflow file: %w", err)
 	}

@@ -14,64 +14,63 @@
 #   allowlist - Only hosts in the allowlist are permitted
 #   denied    - All outbound HTTP blocked
 
-policy:
-  filesystem:
-    # read: allowed | approval | denied
-    read: allowed
-    # write: allowed | approval | denied
-    write: approval
-    # delete: allowed | approval | denied
-    delete: denied
+filesystem:
+  # read: allowed | approval | denied
+  read: allowed
+  # write: allowed | approval | denied
+  write: approval
+  # delete: allowed | approval | denied
+  delete: denied
 
-  network:
-    # outbound: allowed | allowlist | denied
-    outbound: allowlist
-    allowlist:
-      - "api.github.com"
-      - "api.openai.com"
-      - "api.anthropic.com"
-      - "api.deepseek.com"
-      - "*.openai.com"
-      - "*.anthropic.com"
-    denylist:
-      - "169.254.169.254"  # AWS metadata endpoint
-      - "metadata.google.internal"  # GCP metadata endpoint
+network:
+  # outbound: allowed | allowlist | denied
+  outbound: allowlist
+  allowlist:
+    - "api.github.com"
+    - "api.openai.com"
+    - "api.anthropic.com"
+    - "api.deepseek.com"
+    - "*.openai.com"
+    - "*.anthropic.com"
+  denylist:
+    - "169.254.169.254"  # AWS metadata endpoint
+    - "metadata.google.internal"  # GCP metadata endpoint
 
-  shell:
-    # enabled: true | false (false = completely disabled)
-    enabled: false
-    # approval_required: true | false
-    approval_required: true
-    allowlist:
-      - "ls"
-      - "cat"
-      - "echo"
-      - "grep"
-      - "find"
-      - "wc"
-      - "head"
-      - "tail"
-      - "sort"
-      - "uniq"
-    denylist:
-      - "rm"
-      - "dd"
-      - "mkfs"
-      - "chmod"
-      - "chown"
-      - "sudo"
-      - "su"
-      - "curl"
-      - "wget"
-      - "nc"
-      - "telnet"
-      - "ssh"
-      - "scp"
+shell:
+  # enabled: true | false (false = completely disabled)
+  enabled: false
+  # approval_required: true | false
+  approval_required: true
+  allowlist:
+    - "ls"
+    - "cat"
+    - "echo"
+    - "grep"
+    - "find"
+    - "wc"
+    - "head"
+    - "tail"
+    - "sort"
+    - "uniq"
+  denylist:
+    - "rm"
+    - "dd"
+    - "mkfs"
+    - "chmod"
+    - "chown"
+    - "sudo"
+    - "su"
+    - "curl"
+    - "wget"
+    - "nc"
+    - "telnet"
+    - "ssh"
+    - "scp"
 
-  financial:
-    # transfer: allowed | approval_required | denied
-    transfer: approval_required
-    # max_amount: maximum transfer amount (e.g. "1000 USD")
-    max_amount: "1000 USD"
-    # approval_threshold: amount above which approval is required
-    approval_threshold: "100 USD"
+financial:
+  # transfer: allowed | approval_required | denied
+  transfer: approval_required
+  # max_amount: maximum transfer amount (e.g. "1000 USD")
+  max_amount: "1000 USD"
+  # approval_threshold: amount above which approval is required
+  approval_threshold: "100 USD"
