@@ -420,15 +420,6 @@ func (a *ReActAgent) callLLMWithTools(ctx context.Context, messages []LLMMessage
 	return choice.Message.Content, nil, nil
 }
 
-func (a *ReActAgent) callLLM(ctx context.Context, messages []LLMMessage) (string, error) {
-	switch a.provider {
-	case "ollama":
-		return a.callOllama(ctx, messages)
-	default:
-		return a.callOpenAICompatible(ctx, messages)
-	}
-}
-
 func (a *ReActAgent) callOllama(ctx context.Context, messages []LLMMessage) (string, error) {
 	node := &OllamaNode{}
 	params := map[string]string{
@@ -437,11 +428,6 @@ func (a *ReActAgent) callOllama(ctx context.Context, messages []LLMMessage) (str
 	}
 	fullPrompt := buildConversationPrompt(messages)
 	return node.Execute(ctx, fullPrompt, params)
-}
-
-func (a *ReActAgent) callOpenAICompatible(ctx context.Context, messages []LLMMessage) (string, error) {
-	content, _, err := a.callLLMWithTools(ctx, messages, nil)
-	return content, err
 }
 
 func buildConversationPrompt(messages []LLMMessage) string {

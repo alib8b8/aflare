@@ -26,6 +26,7 @@ package workflow
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -189,7 +190,8 @@ func ResumeWorkflow(ctx context.Context, runID string) (string, []StepResult, er
 	out, results, trace, err := exec.ExecuteWithTrace(ctx, wf, reg, nil)
 	if err != nil {
 		// If it's paused again, update the meta
-		if paused, ok := err.(*ErrWorkflowPaused); ok && paused != nil {
+		var pausedErr *ErrWorkflowPaused
+		if errors.As(err, &pausedErr) && pausedErr != nil {
 			_ = UpdateRunMetaStatus(runID, "paused")
 		} else {
 			_ = UpdateRunMetaStatus(runID, "failed")

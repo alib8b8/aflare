@@ -64,6 +64,7 @@ linters:
     paths:
       - vendor
       - grok-mcp-server
+      - examples/killer-demos  # 演示文件，故意包含 bug 供审查使用
     rules:
       - path: _test\.go
         linters:
