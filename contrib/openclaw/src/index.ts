@@ -1,7 +1,7 @@
 /**
- * llm-box OpenClaw Plugin
+ * aflare OpenClaw Plugin
  * 
- * This plugin exposes llm-box workflows as callable tools in OpenClaw conversations.
+ * This plugin exposes aflare workflows as callable tools in OpenClaw conversations.
  * Agents can list available workflows and execute them as part of their conversations.
  */
 
@@ -11,14 +11,14 @@ import { runWorkflow } from './tools/run_workflow.js';
 import { describeWorkflow } from './tools/describe_workflow.js';
 
 const plugin: Plugin = {
-  name: 'openclaw-llmbox',
+  name: 'openclaw-aflare',
   version: '1.0.0',
 
   tools: [
     {
-      name: 'llmbox_list_workflows',
+      name: 'aflare_list_workflows',
       description:
-        'List all available llm-box workflow files in the configured directory. ' +
+        'List all available aflare workflow files in the configured directory. ' +
         'Use this to discover what workflows are available before running one.',
       parameters: {
         type: 'object',
@@ -30,11 +30,11 @@ const plugin: Plugin = {
       },
     },
     {
-      name: 'llmbox_run_workflow',
+      name: 'aflare_run_workflow',
       description:
-        'Execute an llm-box workflow by its filename. ' +
+        'Execute an aflare workflow by its filename. ' +
         'The workflow must be a .yaml file in the configured workflows directory. ' +
-        'First use llmbox_list_workflows to discover available workflows.',
+        'First use aflare_list_workflows to discover available workflows.',
       parameters: {
         type: 'object',
         properties: {
@@ -55,7 +55,7 @@ const plugin: Plugin = {
       },
     },
     {
-      name: 'llmbox_describe_workflow',
+      name: 'aflare_describe_workflow',
       description:
         'Get the description and step details of a specific workflow. ' +
         'Use this to understand what a workflow does before executing it.',
@@ -82,9 +82,9 @@ const plugin: Plugin = {
         type: 'string',
         default: './workflows',
       },
-      llmboxPath: {
+      aflarePath: {
         type: 'string',
-        default: 'llm-box',
+        default: 'aflare',
       },
       enableAutoDiscovery: {
         type: 'boolean',

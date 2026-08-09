@@ -1,12 +1,11 @@
 <div align="center">
   <h1>aflare</h1>
-  <p>🌍
+  <p>
     <a href="README.md">中文</a> ·
     <strong>English</strong>
   </p>
-  <p><strong>AI shouldn't just answer your intent. It should execute it.</strong></p>
-  <p><em>aflare — Deterministic Execution Runtime for AI</em></p>
-  <p>Natural language describes intent → YAML workflow → Deterministic execution. AI is the brain, Workflow is the skeleton, Runtime is the hands.</p>
+  <p><strong>Natural language describes intent → YAML workflow → Deterministic execution</strong></p>
+  <p><em>Deterministic Execution Runtime for AI</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
@@ -26,9 +25,31 @@
 
 ---
 
+## Quick Start
+
+```bash
+# Install
+brew install alib8b8/tap/aflare
+# or: curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash
+```
+
+```bash
+# Generate and run a workflow in one line
+aflare create "monitor BTC price every 10 minutes, alert via Telegram when > 70000"
+aflare run btc-monitor.yaml
+```
+
+---
+
+## Project Status
+
+aflare is currently in **early-stage v0.7**. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. Some advanced features (domestic chip support, Unitree robot) are experimental. Feedback and contributions welcome.
+
+---
+
 ## What is this?
 
-aflare is a **deterministic execution runtime for AI**. It separates AI's "understanding" from "execution":
+aflare separates AI's "understanding" from "execution":
 
 ```
 Your words  →  AI translates intent  →  YAML Workflow  →  Runtime executes
@@ -51,6 +72,7 @@ L2: Workflow     —  YAML deterministic workflow (schedule → get_price → co
 L3: Runtime      —  Execution layer
                     ├── DAG parallel scheduling
                     ├── Checkpoint / Resume (WAL crash recovery)
+                    ├── Session persistence (cross-turn context)
                     ├── Saga transaction compensation
                     ├── Idempotency
                     ├── Retry / Rate Limit / Circuit Breaker
@@ -58,47 +80,23 @@ L3: Runtime      —  Execution layer
                     └── Secret redaction
 ```
 
-**aflare's moat is not the LLM. It's the Runtime.**
-
 ---
 
-## 🚀 Quick Start
-
-```bash
-# Install (macOS / Linux / Windows)
-brew install alib8b8/tap/aflare
-curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash
-```
-
-```bash
-# Generate a workflow in one line
-aflare create "monitor BTC price every 10 minutes and send telegram alert when > 70000"
-
-# Run it
-aflare run btc-monitor.yaml
-```
-
-📖 [Full Getting Started →](docs/getting-started.md)
-
----
-
-## 💡 How is this different?
+## How is this different?
 
 | Tool | Problem | aflare |
 |------|---------|--------|
 | **AI Agent** | LLM decides execution — unpredictable, hard to audit | AI only translates intent, YAML guarantees execution |
-| **n8n** | Visual workflow, but heavy (Docker), no AI layer | Single binary, terminal-native, AI generates workflows |
+| **n8n** | Visual workflow, but heavier (Docker), no AI layer | Single binary, terminal-native, AI generates workflows |
 | **Bash** | Hard to write and maintain, no error recovery | NL generation, built-in retry/circuit-breaking/checkpoint |
-
-**aflare is not an AI assistant, nor a workflow tool — it's a layer between AI and the OS: an AI Execution Runtime.**
 
 ---
 
-## ✨ Core Capabilities
+## Core Capabilities
 
 ### Runtime Guarantees (Deterministic Execution)
 - **DAG Parallel Scheduling** — topological sort dependency scheduling, independent steps run concurrently
-- **WAL Crash Recovery** — append-only persistence + CRC32, `--resume` recovers from interruption
+- **WAL Crash Recovery + Session Persistence** — append-only persistence + CRC32, `--resume` recovers from interruption; Session preserves context across turns
 - **Saga Transaction Compensation** — multi-step write failures auto-rolled-back in reverse
 - **Idempotency** — Idempotency-Key + atomic placeholder + cross-process lock, prevents duplicate execution
 - **Retry / Rate Limit / Circuit Breaker** — exponential backoff + token bucket + breaker state machine
@@ -112,23 +110,25 @@ aflare run btc-monitor.yaml
 
 ### AI Integration
 - Natural language → YAML workflow generation
-- 22+ model support (OpenAI / DeepSeek / Qwen / GLM / Kimi / Ascend / Cambricon / Hygon)
+- 22+ model support (OpenAI / DeepSeek / Qwen / GLM / Kimi, etc.)
 - Fully offline capable (Ollama local LLM)
 - LLM smart routing (EWMA latency prediction + Pareto cost sorting)
-- 100+ built-in templates, ready to use
+- 100+ built-in templates
 
-### Engineering Depth
+### Engineering
 - Expression engine: bytecode IR + vectorized batch evaluation
-- TLA+ formal verification of DAG scheduler
+- DAG scheduler formally verified with TLA+ (spec at [`docs/tla/dag_scheduler.tla`](docs/tla/dag_scheduler.tla), bounded model-checking via `dag_formal_test.go`)
 - Prometheus metrics endpoint
 - Single binary, zero runtime dependencies
-- CI validates both architectures (x86-64 + ARM64 Kunpeng)
+- CI validates both architectures (x86-64 + ARM64)
 
-📖 Full capabilities: [Docs](docs/) · [Node Reference](docs/custom-nodes.md)
+#### Experimental
+- Ascend / Cambricon / Hygon domestic chip support (basic functionality available, under active development)
+- Unitree robot integration (simulate mode available, physical mode requires hardware)
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -140,6 +140,7 @@ aflare run btc-monitor.yaml
 │  └──────────┘   └──────────┘   │                    │  │
 │                                 │ • DAG Scheduler   │  │
 │                                 │ • WAL / Checkpoint│  │
+│                                 │ • Session Persist │  │
 │                                 │ • Saga / Retry    │  │
 │                                 │ • Circuit Breaker │  │
 │                                 │ • Audit / HMAC    │  │
@@ -155,27 +156,27 @@ aflare run btc-monitor.yaml
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 | Version | Status | Focus |
 |---------|--------|-------|
-| v0.6 | ✅ | Agent memory infrastructure, voice AI toolchain, WAL persistence, TLA+ verification |
-| **v0.7** | **Current** | Financial scenario (Saga / Idempotency / Audit chain), triple-chip Xinchuang (Ascend / Cambricon / Hygon), Unitree robot |
-| v1.0 | 📅 | Stable API, LTS |
+| v0.6 | Done | Agent memory infrastructure, voice AI toolchain, WAL persistence, TLA+ verification |
+| **v0.7** | **Current** | Financial scenario (Saga / Idempotency / Audit chain), experimental domestic chip support, experimental Unitree robot |
+| v1.0 | Planned | Stable API, LTS |
 
-📖 [Full Roadmap →](ROADMAP.md)
+[Full Roadmap →](ROADMAP.md)
 
 ---
 
-## 🔒 Security
+## Security
 
 aflare has built-in multi-layer security: SSRF protection, Path Traversal defense, Command Injection whitelist, AES-GCM encryption, Secret redaction, HMAC audit chain, circuit breakers, outbound monitoring. CI auto-runs `gofmt` / `go vet` / `gosec` / `govulncheck`.
 
-📖 [Security Guide →](SECURITY.md)
+[Security Guide →](SECURITY.md)
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 - [Getting Started](docs/getting-started.md) · [YAML Syntax](docs/getting-started.md#workflow-configuration)
 - [Dataflow](docs/dataflow.md) · [Scheduling](docs/scheduling.md) · [MCP](docs/mcp.md) · [Plugins](docs/plugins.md)
@@ -183,22 +184,21 @@ aflare has built-in multi-layer security: SSRF protection, Path Traversal defens
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Fork → branch → change → `go test ./...` → PR.
 
-📖 [Contributing →](CONTRIBUTING.md)
+[Contributing →](CONTRIBUTING.md)
 
 ---
 
-## 📄 License
+## License
 
 GNU Affero General Public License v3.0 — [LICENSE](LICENSE)
 
 ---
 
 <div align="center">
-  <p>Built with ❤️ for developers who want AI to actually execute.</p>
   <p>
     <a href="https://github.com/alib8b8/aflare">GitHub</a>
     ·

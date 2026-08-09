@@ -1,7 +1,7 @@
 /**
- * llmbox_run_workflow Tool
+ * aflare_run_workflow Tool
  * 
- * Executes an llm-box workflow by its filename.
+ * Executes an aflare workflow by its filename.
  * The workflow must be a .yaml file in the configured workflows directory.
  */
 
@@ -9,7 +9,7 @@ import { spawn } from 'child_process';
 import type { RunWorkflowResult, StepResult } from './types.js';
 
 /**
- * Execute an llm-box workflow
+ * Execute an aflare workflow
  */
 export async function runWorkflow(
   workflowFile: string,
@@ -30,14 +30,14 @@ export async function runWorkflow(
   }
 
   // Build the command
-  // llm-box run <workflow_file> [--input <input_text>]
+  // aflare run <workflow_file> [--input <input_text>]
   const args = ['run', workflowFile];
   if (input) {
     args.push('--input', input);
   }
 
   try {
-    const output = await executeCommand('llm-box', args);
+    const output = await executeCommand('aflare', args);
     
     return {
       workflow: workflowFile,
@@ -94,10 +94,10 @@ function executeCommand(command: string, args: string[]): Promise<string> {
 }
 
 /**
- * Parse step results from llm-box output
+ * Parse step results from aflare output
  */
 function parseStepsFromOutput(output: string): StepResult[] {
-  // Parse llm-box's structured output
+  // Parse aflare's structured output
   // Format: [STEP 1] node_name | status: success/error | duration: Xms
   const steps: StepResult[] = [];
   const lines = output.split('\n');

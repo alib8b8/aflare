@@ -1,5 +1,5 @@
 /**
- * llmbox_describe_workflow Tool
+ * aflare_describe_workflow Tool
  * 
  * Gets detailed information about a specific workflow including
  * its description and all steps.
@@ -93,7 +93,7 @@ export async function describeWorkflow(
 }
 
 /**
- * Type for llm-box workflow YAML structure
+ * Type for aflare workflow YAML structure
  */
 interface WorkflowYaml {
   name?: string;

@@ -1,10 +1,10 @@
 /**
- * Type definitions for llm-box OpenClaw Plugin
+ * Type definitions for aflare OpenClaw Plugin
  */
 
-export interface LlmBoxConfig {
+export interface AflareConfig {
   workflowDir: string;
-  llmboxPath: string;
+  aflarePath: string;
   enableAutoDiscovery: boolean;
 }
 

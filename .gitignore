@@ -1,6 +1,6 @@
 # Binaries
-/llm-box
-/llm-box-*
+/aflare
+/aflare-*
 *.exe
 
 # Go

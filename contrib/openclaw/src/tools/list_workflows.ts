@@ -1,7 +1,7 @@
 /**
- * llmbox_list_workflows Tool
+ * aflare_list_workflows Tool
  * 
- * Lists all available llm-box workflow files in the configured directory.
+ * Lists all available aflare workflow files in the configured directory.
  * This helps discover what workflows are available before running one.
  */
 
