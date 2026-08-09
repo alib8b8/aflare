@@ -75,7 +75,7 @@ func main() {
 	case "create":
 		cli.HandleCreate(args, aiMode)
 	case "run":
-		cli.HandleRun(args, dryRun)
+		cli.HandleRun(args, dryRun, safeMode)
 	case "install":
 		cli.HandleInstall(args)
 	case "uninstall":
@@ -115,6 +115,6 @@ func main() {
 	case "resume":
 		cli.HandleResume(args)
 	default:
-		cli.HandleRunFile(command, dryRun, false, "")
+		cli.HandleRunFile(command, dryRun, false, "", safeMode)
 	}
 }

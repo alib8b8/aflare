@@ -62,7 +62,7 @@ func redactParams(params map[string]string) map[string]string {
 }
 
 // HandleRun handles the "run" command.
-func HandleRun(args []string, dryRun bool) {
+func HandleRun(args []string, dryRun bool, safeMode bool) {
 	// Parse --resume flag. Two forms are supported:
 	//   aflare run --resume my-workflow.yaml
 	//     → boolean flag; checkpoint defaults to ~/.aflare/checkpoints/<name>.json
@@ -92,11 +92,11 @@ func HandleRun(args []string, dryRun bool) {
 		fmt.Println(i18n.T("run.usage"))
 		os.Exit(1)
 	}
-	HandleRunFile(filtered[0], dryRun, resumeEnabled, resumePath)
+	HandleRunFile(filtered[0], dryRun, resumeEnabled, resumePath, safeMode)
 }
 
 // HandleRunFile runs a workflow file with optional resume support.
-func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath string) {
+func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath string, safeMode bool) {
 	wf, reg, err := PrepareWorkflow(wfPath)
 	if err != nil {
 		fmt.Printf("Error preparing workflow: %v\n", err)
@@ -130,9 +130,9 @@ func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath st
 	}
 
 	if isatty.IsTerminal(os.Stdout.Fd()) {
-		RunTUI(wfPath, wf, reg, statePath)
+		RunTUI(wfPath, wf, reg, statePath, safeMode)
 	} else {
-		RunCLI(wf, reg, statePath)
+		RunCLI(wf, reg, statePath, safeMode)
 	}
 }
 
@@ -200,7 +200,7 @@ func acquireAuditLock(dir string) (func(), error) {
 // auditDir is passed through to WithAuditLog unchanged ("" means "use the
 // history default"); the lock is taken on the resolved directory so the
 // default directory is also protected.
-func newAuditEnabledExecutor(auditDir string) (*workflow.PolicyExecutor, func()) {
+func newAuditEnabledExecutor(auditDir string, safeMode bool) (*workflow.PolicyExecutor, func()) {
 	var exec *workflow.Executor
 	resolved := resolveAuditDir(auditDir)
 	if resolved == "" {
@@ -213,18 +213,26 @@ func newAuditEnabledExecutor(auditDir string) (*workflow.PolicyExecutor, func())
 			exec = workflow.NewExecutor().WithAuditLog(false, "")
 		} else {
 			exec = workflow.NewExecutor().WithAuditLog(true, auditDir)
-			// Wrap with policy engine for security validation.
-			policyEngine := policy.NewEngine(policy.DefaultPolicy(), nil)
+			policyEngine := newPolicyEngine(safeMode)
 			return workflow.NewPolicyExecutor(exec, policyEngine), release
 		}
 	}
-	// Wrap with policy engine for security validation.
-	policyEngine := policy.NewEngine(policy.DefaultPolicy(), nil)
+	policyEngine := newPolicyEngine(safeMode)
 	return workflow.NewPolicyExecutor(exec, policyEngine), func() {}
 }
 
+// newPolicyEngine returns a policy engine based on the safeMode flag.
+// In safe mode, StrictPolicy is used (shell disabled, network allowlist, delete denied).
+// In normal mode, DefaultPolicy is used (permissive for development).
+func newPolicyEngine(safeMode bool) *policy.Engine {
+	if safeMode {
+		return policy.NewEngine(policy.StrictPolicy(), nil)
+	}
+	return policy.NewEngine(policy.DefaultPolicy(), nil)
+}
+
 // RunTUI runs a workflow in interactive TUI mode.
-func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string) {
+func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, safeMode bool) {
 	model := tui.NewModel(wf.Name, wfPath, len(wf.Steps))
 	program := tea.NewProgram(model, tea.WithAltScreen())
 
@@ -232,7 +240,7 @@ func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 	defer cancel()
 
 	go func() {
-		exec, releaseAudit := newAuditEnabledExecutor("")
+		exec, releaseAudit := newAuditEnabledExecutor("", safeMode)
 		defer releaseAudit()
 		if statePath != "" {
 			exec = exec.WithCheckpoint(statePath)
@@ -253,7 +261,7 @@ func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 }
 
 // RunCLI runs a workflow in CLI (non-interactive) mode.
-func RunCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string) {
+func RunCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string, safeMode bool) {
 	if wf.Name != "" {
 		fmt.Printf("%s\n", i18n.T("workflow.name", wf.Name))
 	}
@@ -273,7 +281,7 @@ func RunCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string) {
 	var finalOutput string
 	var stepResults []workflow.StepResult
 	var execErr error
-	exec, releaseAudit := newAuditEnabledExecutor("")
+	exec, releaseAudit := newAuditEnabledExecutor("", safeMode)
 	defer releaseAudit()
 	if statePath != "" {
 		exec = exec.WithCheckpoint(statePath)
