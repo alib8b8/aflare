@@ -222,19 +222,32 @@ func PauseWorkflow(wfPath string, wf *Workflow, stepIndex int, stepName string, 
 		return nil, fmt.Errorf("failed to create run dir: %w", err)
 	}
 
-	// Copy the workflow file for reference
+	// Copy the workflow file for reference (atomic write).
 	if wfPath != "" {
 		wfData, err := os.ReadFile(wfPath)
 		if err == nil {
-			_ = os.WriteFile(WorkflowPath(runID), wfData, 0600)
+			wfDest := WorkflowPath(runID)
+			wfTmp := wfDest + ".tmp"
+			if writeErr := os.WriteFile(wfTmp, wfData, 0600); writeErr == nil {
+				_ = os.Rename(wfTmp, wfDest)
+			} else {
+				_ = os.Remove(wfTmp)
+			}
 		}
 	}
 
 	// Copy the WAL file so the resume can replay from the last checkpoint
+	// (atomic write to prevent corruption on partial copy).
 	if sourceWALPath != "" {
 		walData, err := os.ReadFile(sourceWALPath)
 		if err == nil {
-			_ = os.WriteFile(WALPath(runID), walData, 0600)
+			walDest := WALPath(runID)
+			walTmp := walDest + ".tmp"
+			if writeErr := os.WriteFile(walTmp, walData, 0600); writeErr == nil {
+				_ = os.Rename(walTmp, walDest)
+			} else {
+				_ = os.Remove(walTmp)
+			}
 		}
 	}
 
