@@ -482,7 +482,7 @@ func TestRunWorkflow_Success(t *testing.T) {
 	wf := &workflow.Workflow{
 		Name: "Test Workflow",
 		Steps: []workflow.WorkflowStep{
-			{Node: "execute", Params: map[string]string{"command": "echo 'hello world'"}},
+			{Node: "execute", Params: map[string]string{"command": "echo hello world"}},
 		},
 	}
 
