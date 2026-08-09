@@ -338,14 +338,26 @@ func SelfUpdate(repo string) (string, error) {
 
 	if checksumsURL := findChecksumsURL(release); checksumsURL != "" {
 		checksums, err := downloadChecksums(checksumsURL)
-		if err == nil && len(checksums) > 0 {
-			if expected, ok := checksums[assetName]; ok {
-				if err := verifyChecksum(tmpPath, expected); err != nil {
-					_ = os.Remove(tmpPath) // best-effort cleanup
-					return "", fmt.Errorf("checksum verification failed: %w", err)
-				}
-			}
+		if err != nil {
+			_ = os.Remove(tmpPath)
+			return "", fmt.Errorf("failed to download checksums: %w (refusing to install without verification)", err)
 		}
+		if len(checksums) == 0 {
+			_ = os.Remove(tmpPath)
+			return "", fmt.Errorf("checksums file is empty (refusing to install without verification)")
+		}
+		expected, ok := checksums[assetName]
+		if !ok {
+			_ = os.Remove(tmpPath)
+			return "", fmt.Errorf("no checksum found for asset %q (refusing to install without verification)", assetName)
+		}
+		if err := verifyChecksum(tmpPath, expected); err != nil {
+			_ = os.Remove(tmpPath)
+			return "", fmt.Errorf("checksum verification failed: %w", err)
+		}
+	} else {
+		_ = os.Remove(tmpPath)
+		return "", fmt.Errorf("release has no checksums file (refusing to install without verification)")
 	}
 
 	backupPath := exePath + ".bak"
