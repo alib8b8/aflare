@@ -42,6 +42,7 @@ func init() {
 	// 用户主动关闭安全模式时才关白名单
 	if os.Getenv("AFLARE_EXECUTE_UNSAFE") == "1" {
 		allowListEnabled = false
+		fmt.Fprintln(os.Stderr, "AFLARE_EXECUTE_UNSAFE=1: command allowlist disabled, arbitrary commands can be executed")
 	}
 	home, err := os.UserHomeDir()
 	if err == nil {
@@ -108,6 +109,15 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 			cmdName := filepath.Base(firstWord[0])
 			if !SafeCommandWhitelist[cmdName] {
 				return "", fmt.Errorf("command %q is not in the allowed list (set AFLARE_EXECUTE_UNSAFE=1 to disable allowlist)", cmdName)
+			}
+			// sed and awk are read-only commands in the whitelist, but their
+			// -i flag enables in-place file modification. Block it explicitly.
+			if cmdName == "sed" || cmdName == "awk" {
+				for _, arg := range firstWord[1:] {
+					if arg == "-i" || strings.HasPrefix(arg, "-i") {
+						return "", fmt.Errorf("in-place edit (-i) is not allowed for %s under allowlist mode", cmdName)
+					}
+				}
 			}
 		}
 	}

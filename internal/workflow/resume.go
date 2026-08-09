@@ -100,7 +100,14 @@ func SaveRunMeta(meta *RunMeta) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal run meta: %w", err)
 	}
-	return os.WriteFile(MetaPath(meta.RunID), data, 0600)
+	// Atomic write: write to temp file first, then rename to avoid
+	// corrupting the meta file on partial write (e.g. disk full, crash).
+	target := MetaPath(meta.RunID)
+	tmp := target + ".tmp"
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
+		return fmt.Errorf("failed to write run meta: %w", err)
+	}
+	return os.Rename(tmp, target)
 }
 
 // LoadRunMeta loads the run metadata from disk.

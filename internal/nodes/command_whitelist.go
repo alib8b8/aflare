@@ -18,6 +18,10 @@ package nodes
 // SafeCommandWhitelist defines the shared set of safe commands allowed in
 // both execute and sandbox nodes when allowlist mode is enabled.
 //
+// These are read-only (or read-mostly) commands. sed and awk are included
+// for text processing but their -i (in-place edit) flag is explicitly blocked
+// in the allowlist enforcement path (execute.go) to prevent file modification.
+//
 // curl, wget, rm, git, go are intentionally excluded — use:
 //   - http_request node for HTTP operations
 //   - file_write node for file operations
