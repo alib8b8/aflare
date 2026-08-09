@@ -483,7 +483,7 @@ func (s *Server) writeJSON(w http.ResponseWriter, status int, data interface{}) 
 
 // resumeWorkflowRequest is the JSON request body for resuming a paused workflow.
 type resumeWorkflowRequest struct {
-	RunID       string `json:"run_id"`
+	RunID        string `json:"run_id"`
 	WebhookToken string `json:"webhook_token,omitempty"`
 }
 

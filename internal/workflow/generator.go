@@ -431,10 +431,10 @@ type llmChatMessage struct {
 
 // llmChatRequest is the request body for an OpenAI-compatible /chat/completions call.
 type llmChatRequest struct {
-	Model       string          `json:"model"`
+	Model       string           `json:"model"`
 	Messages    []llmChatMessage `json:"messages"`
-	MaxTokens   int             `json:"max_tokens,omitempty"`
-	Temperature float64         `json:"temperature,omitempty"`
+	MaxTokens   int              `json:"max_tokens,omitempty"`
+	Temperature float64          `json:"temperature,omitempty"`
 }
 
 // llmChatResponse is the response from an OpenAI-compatible /chat/completions call.

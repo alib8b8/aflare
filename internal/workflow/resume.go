@@ -40,11 +40,11 @@ import (
 // rather than failed. The RunID field identifies the paused run so it can be
 // resumed later.
 type ErrWorkflowPaused struct {
-	RunID      string
-	StepIndex  int
-	StepName   string
+	RunID        string
+	StepIndex    int
+	StepName     string
 	WorkflowName string
-	Message    string
+	Message      string
 }
 
 func (e *ErrWorkflowPaused) Error() string {
