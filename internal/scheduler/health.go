@@ -238,9 +238,9 @@ func (m *HealthMonitor) checkHealth(now time.Time) {
 	// callbacks outside the lock to prevent deadlocks if the callback tries
 	// to call Heartbeat/Register/Unregister on the same monitor.
 	type deadWorker struct {
-		id       string
-		onDead   func(string)
-		restart  func(string)
+		id      string
+		onDead  func(string)
+		restart func(string)
 	}
 	var deadWorkers []deadWorker
 
