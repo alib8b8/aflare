@@ -234,9 +234,17 @@ func (m *HealthMonitor) run() {
 }
 
 func (m *HealthMonitor) checkHealth(now time.Time) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	// Collect dead workers and their callbacks under the lock, then invoke
+	// callbacks outside the lock to prevent deadlocks if the callback tries
+	// to call Heartbeat/Register/Unregister on the same monitor.
+	type deadWorker struct {
+		id       string
+		onDead   func(string)
+		restart  func(string)
+	}
+	var deadWorkers []deadWorker
 
+	m.mu.Lock()
 	for id, w := range m.workers {
 		elapsed := now.Sub(w.LastHeartbeat)
 
@@ -251,9 +259,7 @@ func (m *HealthMonitor) checkHealth(now time.Time) {
 				"restart_count", w.restartCount,
 			)
 
-			if w.OnDead != nil {
-				w.OnDead(id)
-			}
+			dw := deadWorker{id: id, onDead: w.OnDead}
 
 			// Attempt auto-restart if within the restart limit.
 			if w.OnRestart != nil && (w.MaxRestarts == 0 || w.restartCount < w.MaxRestarts) {
@@ -265,8 +271,10 @@ func (m *HealthMonitor) checkHealth(now time.Time) {
 				)
 				w.LastHeartbeat = now // reset so we don't immediately re-dead
 				w.Status = WorkerHealthy
-				go w.OnRestart(id)
+				dw.restart = w.OnRestart
 			}
+
+			deadWorkers = append(deadWorkers, dw)
 
 		case elapsed > w.Timeout/2 && w.Status == WorkerHealthy:
 			// Worker is late but not yet timed out.
@@ -276,6 +284,17 @@ func (m *HealthMonitor) checkHealth(now time.Time) {
 				"elapsed", elapsed,
 				"timeout", w.Timeout,
 			)
+		}
+	}
+	m.mu.Unlock()
+
+	// Invoke callbacks outside the lock to avoid deadlocks.
+	for _, dw := range deadWorkers {
+		if dw.onDead != nil {
+			dw.onDead(dw.id)
+		}
+		if dw.restart != nil {
+			go dw.restart(dw.id)
 		}
 	}
 }

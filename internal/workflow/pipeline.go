@@ -38,8 +38,21 @@ import (
 	"github.com/alib8b8/aflare/internal/nodes"
 )
 
-// OnFailurePolicy defines how a pipeline handles a stage failure.
+// OnFailurePolicy defines the pipeline's behavior when a stage fails.
 type OnFailurePolicy string
+
+// Security limits for pipeline execution.
+const (
+	// MaxPipelineStages is the maximum number of stages allowed in a pipeline.
+	MaxPipelineStages = 100
+	// MaxPipelineConcurrency caps the number of concurrent stages to prevent
+	// goroutine exhaustion from a malicious pipeline YAML.
+	MaxPipelineConcurrency = 50
+	// MaxPipelineRetries caps the retry count per stage.
+	MaxPipelineRetries = 10
+	// MaxPipelineTimeout is the maximum per-stage timeout.
+	MaxPipelineTimeout = 30 * time.Minute
+)
 
 const (
 	// OnFailureStop aborts the entire pipeline on the first stage failure.
@@ -195,6 +208,11 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, p *Pipeline) (*Pipeline
 		StageResults: make(map[string]StageResult),
 	}
 
+	// Validate stage count is within limits.
+	if len(p.Stages) > MaxPipelineStages {
+		return nil, fmt.Errorf("pipeline has %d stages, max is %d", len(p.Stages), MaxPipelineStages)
+	}
+
 	// Validate stage names are unique.
 	seen := make(map[string]bool)
 	for _, stage := range p.Stages {
@@ -228,7 +246,11 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, p *Pipeline) (*Pipeline
 
 	sem := make(chan struct{}, 1)
 	if p.MaxConcurrency > 1 {
-		sem = make(chan struct{}, p.MaxConcurrency)
+		concurrency := p.MaxConcurrency
+		if concurrency > MaxPipelineConcurrency {
+			concurrency = MaxPipelineConcurrency
+		}
+		sem = make(chan struct{}, concurrency)
 	}
 
 	for _, batch := range execOrder {
@@ -275,40 +297,41 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, p *Pipeline) (*Pipeline
 				}
 			}
 
+			// Pre-compute input data from upstream stages before launching
+			// the goroutine. This avoids a data race on the completed map
+			// (Go maps are not safe for concurrent read+write even on
+			// different keys).
+			stageInput := ""
+			if stage.InputExpr != "" {
+				engine := NewExpressionEngine()
+				for name, sr := range completed {
+					engine.SetVariable("stage."+name+".output", sr.Output)
+				}
+				var evalErr error
+				stageInput, evalErr = engine.Evaluate(stage.InputExpr, "")
+				if evalErr != nil {
+					logger.Warn("pipeline stage input expression failed",
+						"pipeline", p.Name,
+						"stage", stage.Name,
+						"error", evalErr,
+					)
+				}
+			} else if len(stage.DependsOn) > 0 {
+				// Default: use the output of the last dependency.
+				lastDep := stage.DependsOn[len(stage.DependsOn)-1]
+				if sr, ok := completed[lastDep]; ok {
+					stageInput = sr.Output
+				}
+			}
+
 			wg.Add(1)
-			go func(s *PipelineStage) {
+			go func(s *PipelineStage, input string) {
 				defer wg.Done()
 
-				if sem != nil {
-					sem <- struct{}{}
-					defer func() { <-sem }()
-				}
+				sem <- struct{}{}
+				defer func() { <-sem }()
 
 				stageStart := time.Now()
-
-				// Determine input data from upstream stages.
-				input := ""
-				if s.InputExpr != "" {
-					engine := NewExpressionEngine()
-					for name, sr := range completed {
-						engine.SetVariable("stage."+name+".output", sr.Output)
-					}
-					var evalErr error
-					input, evalErr = engine.Evaluate(s.InputExpr, "")
-					if evalErr != nil {
-						logger.Warn("pipeline stage input expression failed",
-							"pipeline", p.Name,
-							"stage", s.Name,
-							"error", evalErr,
-						)
-					}
-				} else if len(s.DependsOn) > 0 {
-					// Default: use the output of the last dependency.
-					lastDep := s.DependsOn[len(s.DependsOn)-1]
-					if sr, ok := completed[lastDep]; ok {
-						input = sr.Output
-					}
-				}
 
 				// Execute the stage's workflow.
 				sr, execErr := pe.executeStage(ctx, s, input, p.DefaultTimeout)
@@ -321,7 +344,7 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, p *Pipeline) (*Pipeline
 					batchErrors = append(batchErrors, execErr)
 				}
 				mu.Unlock()
-			}(stage)
+			}(stage, stageInput)
 		}
 
 		wg.Wait()
@@ -354,6 +377,9 @@ func (pe *PipelineExecutor) executeStage(ctx context.Context, stage *PipelineSta
 	if maxRetries <= 0 {
 		maxRetries = 3
 	}
+	if maxRetries > MaxPipelineRetries {
+		maxRetries = MaxPipelineRetries
+	}
 
 	onRetryExhausted := stage.OnRetryExhausted
 	if onRetryExhausted == "" {
@@ -371,6 +397,9 @@ func (pe *PipelineExecutor) executeStage(ctx context.Context, stage *PipelineSta
 	timeoutDuration, err := time.ParseDuration(timeout)
 	if err != nil {
 		timeoutDuration = 5 * time.Minute
+	}
+	if timeoutDuration > MaxPipelineTimeout {
+		timeoutDuration = MaxPipelineTimeout
 	}
 
 	var lastErr error
