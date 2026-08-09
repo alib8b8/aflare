@@ -255,7 +255,7 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, p *Pipeline) (*Pipeline
 
 	for _, batch := range execOrder {
 		var wg sync.WaitGroup
-		var mu sync.Mutex
+		var mu sync.RWMutex
 		batchErrors := make([]error, 0)
 
 		for _, stageName := range batch {
@@ -264,9 +264,11 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, p *Pipeline) (*Pipeline
 				continue
 			}
 
-			// Check condition.
+			// Check condition. Reads from completed are protected by RLock
+			// to avoid a data race with goroutine writes under Lock().
 			if stage.Condition != "" {
 				condEngine := NewExpressionEngine()
+				mu.RLock()
 				for name, sr := range completed {
 					condEngine.SetVariable("stage."+name+".output", sr.Output)
 				}
@@ -278,6 +280,7 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, p *Pipeline) (*Pipeline
 						condInput = sr.Output
 					}
 				}
+				mu.RUnlock()
 				pass, evalErr := evaluateCondition(stage.Condition, condInput, condEngine)
 				if evalErr != nil {
 					logger.Warn("pipeline stage condition evaluation failed",
@@ -298,10 +301,10 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, p *Pipeline) (*Pipeline
 			}
 
 			// Pre-compute input data from upstream stages before launching
-			// the goroutine. This avoids a data race on the completed map
-			// (Go maps are not safe for concurrent read+write even on
-			// different keys).
+			// the goroutine. Reads are protected by RLock to avoid a data
+			// race with goroutine writes under Lock().
 			stageInput := ""
+			mu.RLock()
 			if stage.InputExpr != "" {
 				engine := NewExpressionEngine()
 				for name, sr := range completed {
@@ -323,6 +326,7 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, p *Pipeline) (*Pipeline
 					stageInput = sr.Output
 				}
 			}
+			mu.RUnlock()
 
 			wg.Add(1)
 			go func(s *PipelineStage, input string) {
