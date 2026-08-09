@@ -29,6 +29,7 @@ import (
 	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/meta"
 	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/policy"
 	"github.com/alib8b8/aflare/internal/tui"
 	"github.com/alib8b8/aflare/internal/workflow"
 	tea "github.com/charmbracelet/bubbletea"
@@ -199,18 +200,27 @@ func acquireAuditLock(dir string) (func(), error) {
 // auditDir is passed through to WithAuditLog unchanged ("" means "use the
 // history default"); the lock is taken on the resolved directory so the
 // default directory is also protected.
-func newAuditEnabledExecutor(auditDir string) (*workflow.Executor, func()) {
+func newAuditEnabledExecutor(auditDir string) (*workflow.PolicyExecutor, func()) {
+	var exec *workflow.Executor
 	resolved := resolveAuditDir(auditDir)
 	if resolved == "" {
-		return workflow.NewExecutor().WithAuditLog(true, ""), func() {}
+		exec = workflow.NewExecutor().WithAuditLog(true, "")
+	} else {
+		release, err := acquireAuditLock(resolved)
+		if err != nil {
+			logger.Warn("audit lock failed; disabling audit for this process to avoid cross-process hash-chain corruption",
+				"dir", resolved, "error", err)
+			exec = workflow.NewExecutor().WithAuditLog(false, "")
+		} else {
+			exec = workflow.NewExecutor().WithAuditLog(true, auditDir)
+			// Wrap with policy engine for security validation.
+			policyEngine := policy.NewEngine(policy.DefaultPolicy(), nil)
+			return workflow.NewPolicyExecutor(exec, policyEngine), release
+		}
 	}
-	release, err := acquireAuditLock(resolved)
-	if err != nil {
-		logger.Warn("audit lock failed; disabling audit for this process to avoid cross-process hash-chain corruption",
-			"dir", resolved, "error", err)
-		return workflow.NewExecutor().WithAuditLog(false, ""), func() {}
-	}
-	return workflow.NewExecutor().WithAuditLog(true, auditDir), release
+	// Wrap with policy engine for security validation.
+	policyEngine := policy.NewEngine(policy.DefaultPolicy(), nil)
+	return workflow.NewPolicyExecutor(exec, policyEngine), func() {}
 }
 
 // RunTUI runs a workflow in interactive TUI mode.
@@ -226,6 +236,10 @@ func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 		defer releaseAudit()
 		if statePath != "" {
 			exec = exec.WithCheckpoint(statePath)
+		}
+		if err := exec.ValidateWorkflow(ctx, wf); err != nil {
+			log.Printf("Policy validation failed: %v", err)
+			return
 		}
 		if _, _, _, err := exec.ExecuteWithTrace(ctx, wf, reg, program); err != nil {
 			log.Printf("Workflow execution error: %v", err)
@@ -263,6 +277,10 @@ func RunCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string) {
 	defer releaseAudit()
 	if statePath != "" {
 		exec = exec.WithCheckpoint(statePath)
+	}
+	if err := exec.ValidateWorkflow(context.Background(), wf); err != nil {
+		fmt.Printf("Policy validation failed: %v\n", err)
+		os.Exit(1)
 	}
 	finalOutput, stepResults, execErr = exec.Execute(context.Background(), wf, reg)
 

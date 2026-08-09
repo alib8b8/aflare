@@ -144,3 +144,10 @@ func (pe *PolicyExecutor) validateStep(ctx context.Context, index int, step *Wor
 func (pe *PolicyExecutor) Engine() *policy.Engine {
 	return pe.policyEngine
 }
+
+// WithCheckpoint enables checkpoint-based resume on the underlying executor,
+// returning the PolicyExecutor so the policy wrapper is preserved.
+func (pe *PolicyExecutor) WithCheckpoint(path string) *PolicyExecutor {
+	pe.Executor = pe.Executor.WithCheckpoint(path)
+	return pe
+}
