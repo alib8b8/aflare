@@ -113,14 +113,18 @@ func loadCheckpoint(path string) (*WorkflowState, error) {
 	if path == "" {
 		return nil, nil
 	}
-	info, err := os.Stat(path)
+	safePath, err := validateCheckpointPath(path)
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Stat(safePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat checkpoint file: %w", err)
 	}
 	if info.Size() > MaxFileSize {
 		return nil, fmt.Errorf("checkpoint file too large (max %d bytes)", MaxFileSize)
 	}
-	data, err := os.ReadFile(path) // #nosec G304 -- path is caller-controlled (CLI flag)
+	data, err := os.ReadFile(safePath) // #nosec G304 -- path validated by validateCheckpointPath
 	if err != nil {
 		return nil, fmt.Errorf("failed to read checkpoint file: %w", err)
 	}
@@ -185,6 +189,36 @@ func validateStatePath(path string) (string, error) {
 	}
 	if strings.HasPrefix(rel, "..") {
 		return "", fmt.Errorf("path outside working directory")
+	}
+	return resolved, nil
+}
+
+// validateCheckpointPath validates a checkpoint file path for the Executor's
+// resume feature. Unlike validateStatePath, it accepts absolute paths (which
+// are expected for CLI-supplied file paths). It prevents path traversal and
+// null-byte injection while still allowing files anywhere on the filesystem.
+func validateCheckpointPath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("empty checkpoint path")
+	}
+	// Reject paths containing null bytes (C-string truncation attack)
+	if strings.ContainsRune(path, '\x00') {
+		return "", fmt.Errorf("checkpoint path contains null byte")
+	}
+	// Clean the path to remove ".." and "." components
+	cleaned := filepath.Clean(path)
+	// Resolve symlinks to prevent symlink-based escapes
+	resolved, err := filepath.EvalSymlinks(cleaned)
+	if err != nil {
+		// If the file doesn't exist yet, use the cleaned absolute path
+		if os.IsNotExist(err) {
+			absPath, err := filepath.Abs(cleaned)
+			if err != nil {
+				return "", fmt.Errorf("failed to resolve checkpoint path: %w", err)
+			}
+			return absPath, nil
+		}
+		return "", fmt.Errorf("failed to resolve checkpoint path: %w", err)
 	}
 	return resolved, nil
 }

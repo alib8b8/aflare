@@ -216,7 +216,7 @@ func (n *SandboxNode) executeShell(ctx context.Context, input string, state *san
 	execCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
 
-	cmd := exec.CommandContext(execCtx, "sh", "-c", input)
+	cmd := exec.CommandContext(execCtx, "sh", "-c", input) // #nosec G204 -- safeMode validates input; sandbox is designed to execute shell commands
 	cmd.Dir = state.workDir
 
 	// Set environment variables

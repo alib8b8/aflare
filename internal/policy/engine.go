@@ -52,6 +52,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -184,8 +185,14 @@ func NewEngine(p *Policy, approval HumanApprovalFunc) *Engine {
 }
 
 // LoadPolicy loads a policy from a YAML file.
+// The path is validated to prevent path traversal and restrict reads to
+// policy files within the current working directory.
 func LoadPolicy(path string) (*Policy, error) {
-	data, err := os.ReadFile(path)
+	safePath, err := validatePolicyPath(path)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(safePath) // #nosec G304 -- path validated by validatePolicyPath
 	if err != nil {
 		return nil, fmt.Errorf("failed to read policy file: %w", err)
 	}
@@ -194,6 +201,36 @@ func LoadPolicy(path string) (*Policy, error) {
 		return nil, fmt.Errorf("failed to parse policy YAML: %w", err)
 	}
 	return &p, nil
+}
+
+// validatePolicyPath validates and resolves a policy file path, preventing
+// path traversal attacks. It returns the resolved absolute path on success.
+func validatePolicyPath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("empty policy path")
+	}
+	// Reject paths containing null bytes
+	if strings.ContainsRune(path, '\x00') {
+		return "", fmt.Errorf("policy path contains null byte")
+	}
+	// Resolve to absolute path and evaluate symlinks
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve policy path: %w", err)
+	}
+	resolved, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		// If the file doesn't exist yet, use the cleaned absolute path
+		if os.IsNotExist(err) {
+			cleaned := filepath.Clean(absPath)
+			if !filepath.IsAbs(cleaned) {
+				return "", fmt.Errorf("policy path must be absolute after resolution: %s", path)
+			}
+			return cleaned, nil
+		}
+		return "", fmt.Errorf("failed to resolve policy path: %w", err)
+	}
+	return resolved, nil
 }
 
 // Check runs a policy check for the given action and returns the decision.

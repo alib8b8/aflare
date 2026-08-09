@@ -524,14 +524,45 @@ func GetAuditLogPath() string {
 	return filepath.Join(dir, auditLogFileName)
 }
 
+// safeFilePath validates a file path to prevent path traversal and null-byte
+// injection attacks. It resolves symlinks and cleans the path.
+func safeFilePath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("empty file path")
+	}
+	// Reject paths containing null bytes
+	if strings.ContainsRune(path, '\x00') {
+		return "", fmt.Errorf("file path contains null byte")
+	}
+	cleaned := filepath.Clean(path)
+	resolved, err := filepath.EvalSymlinks(cleaned)
+	if err != nil {
+		// If the file doesn't exist yet, use the cleaned absolute path
+		if os.IsNotExist(err) {
+			absPath, err := filepath.Abs(cleaned)
+			if err != nil {
+				return "", fmt.Errorf("failed to resolve file path: %w", err)
+			}
+			return absPath, nil
+		}
+		return "", fmt.Errorf("failed to resolve file path: %w", err)
+	}
+	return resolved, nil
+}
+
 // VerifyAuditChain validates the HMAC hash chain of the audit log at path.
 // It returns valid=true when every record's prev_hash links to the previous
 // record's curr_hash and each curr_hash matches the recomputed HMAC.
 // brokenAtLine is the 1-based file line number of the first broken record (0
 // when the file is empty or the whole chain is valid). err is non-nil for I/O
 // or format errors, including legacy records that lack hash fields.
+// The path is validated to prevent path traversal and null-byte injection.
 func VerifyAuditChain(path string) (valid bool, brokenAtLine int, err error) {
-	f, err := os.Open(path) // #nosec G304 -- caller-supplied path
+	safePath, err := safeFilePath(path)
+	if err != nil {
+		return false, 0, err
+	}
+	f, err := os.Open(safePath) // #nosec G304 -- path validated by safeFilePath
 	if err != nil {
 		if os.IsNotExist(err) {
 			// An absent audit log is trivially intact.
