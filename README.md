@@ -4,8 +4,8 @@
     <strong>中文</strong> ·
     <a href="README.en.md">English</a>
   </p>
-  <p><strong>自然语言描述意图 → YAML 工作流 → 确定性执行</strong></p>
-  <p><em>AI 确定性执行运行时</em></p>
+  <p><strong>关键词描述意图 → YAML 工作流 → 确定性执行</strong></p>
+  <p><em>确定性工作流执行运行时</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
@@ -34,7 +34,7 @@ brew install alib8b8/tap/aflare
 ```
 
 ```bash
-# 一句话生成工作流并运行
+# 关键词生成工作流并运行
 aflare create "每 10 分钟检查 BTC 价格，超过 70000 发 Telegram 通知"
 aflare run btc-monitor.yaml
 ```
@@ -49,26 +49,24 @@ aflare 目前处于 **v0.7 早期阶段**。核心 Runtime 能力（DAG 调度�
 
 ## 这是什么？
 
-aflare 把 AI 的「理解能力」和「执行能力」分开：
+aflare 把工作流的「描述」和「执行」分开：
 
 ```
-你说的话  →  AI 翻译成意图  →  YAML 工作流  →  Runtime 执行
-(自然语言)    (LLM)            (确定性)       (DAG / WAL / Saga / Retry / Audit)
+你说的话  →  关键词匹配  →  YAML 工作流  →  Runtime 执行
+(描述)      (正则+关键词)    (确定性)       (DAG / WAL / Saga / Retry / Audit)
 ```
 
-传统 AI Agent 的问题：LLM 既负责理解，又负责决策执行——不稳定、不可预测、难审计。
-
-aflare 的思路：**AI 只负责翻译，执行由 Runtime 保证**。YAML 工作流确定了每一步做什么、依赖谁、失败怎么办。Runtime 负责 DAG 调度、检查点恢复、Saga 事务补偿、熔断、审计——所有操作可追溯、可回放、可验证。
+`aflare create` 通过正则和关键词匹配将描述转为 YAML 工作流（**不是 LLM 生成**，见 [`generator.go`](internal/workflow/generator.go)）。YAML 工作流确定了每一步做什么、依赖谁、失败怎么办。Runtime 负责 DAG 调度、检查点恢复、Saga 事务补偿、熔断、审计——所有操作可追溯、可回放、可验证。
 
 ---
 
 ## 三层模型
 
 ```
-L1: AI Intent    —  "帮我监控 BTC，跌 5% 通知我"
-                        ↓
+L1: Intent       —  "帮我监控 BTC，跌 5% 通知我"
+                       ↓
 L2: Workflow     —  YAML 确定性工作流（schedule → get_price → condition → telegram）
-                        ↓
+                       ↓
 L3: Runtime      —  确定性执行层
                     ├── DAG 并行调度
                     ├── Checkpoint / Resume（WAL 崩溃恢复）
@@ -86,9 +84,9 @@ L3: Runtime      —  确定性执行层
 
 | 工具 | 问题 | aflare |
 |------|------|--------|
-| **AI Agent** | LLM 决定执行，不可预测，难审计 | AI 只翻译意图，YAML 保证执行 |
-| **n8n** | 可视化工作流，但较重（Docker），不含 AI 层 | 单二进制，终端原生，AI 生成工作流 |
-| **Bash** | 难写难维护，无错误恢复 | 自然语言生成，内置重试/熔断/检查点 |
+| **AI Agent** | LLM 决定执行，不可预测，难审计 | 确定性 YAML 工作流，执行可追溯、可回放 |
+| **n8n** | 可视化工作流，但较重（Docker），无内置生成 | 单二进制，终端原生，关键词匹配生成工作流 |
+| **Bash** | 难写难维护，无错误恢复 | 描述生成，内置重试/熔断/检查点 |
 
 ---
 
@@ -108,12 +106,14 @@ L3: Runtime      —  确定性执行层
 - SSRF 防护 / Path Traversal / Command Injection 白名单
 - 出站数据量异常监控 + 熔断器自动隔离
 
-### AI 集成
-- 自然语言 → YAML 工作流生成
+### 工作流生成
+- 关键词匹配生成 YAML 工作流（`aflare create`，见 [`generator.go`](internal/workflow/generator.go)）
+- 100+ 内置模板
+
+### LLM 节点（工作流中调用 LLM API）
 - 22+ 模型支持（OpenAI / DeepSeek / Qwen / GLM / Kimi 等）
 - 完全离线运行（Ollama 本地 LLM）
 - LLM 智能路由（EWMA 延迟预测 + 帕累托成本排序）
-- 100+ 内置模板
 
 ### 工程能力
 - 表达式引擎：字节码 IR + 向量化批量求值
@@ -135,8 +135,8 @@ L3: Runtime      —  确定性执行层
 │                    aflare Runtime                     │
 │                                                       │
 │  ┌──────────┐   ┌──────────┐   ┌──────────────────┐  │
-│  │ AI Intent │──▶│ Workflow │──▶│ Deterministic     │  │
-│  │ (LLM)    │   │ (YAML)   │   │ Executor          │  │
+│  │ Intent   │──▶│ Workflow │──▶│ Deterministic     │  │
+│  │ (描述)   │   │ (YAML)   │   │ Executor          │  │
 │  └──────────┘   └──────────┘   │                    │  │
 │                                 │ • DAG Scheduler   │  │
 │                                 │ • WAL / Checkpoint│  │

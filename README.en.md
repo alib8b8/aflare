@@ -4,8 +4,8 @@
     <a href="README.md">中文</a> ·
     <strong>English</strong>
   </p>
-  <p><strong>Natural language describes intent → YAML workflow → Deterministic execution</strong></p>
-  <p><em>Deterministic Execution Runtime for AI</em></p>
+  <p><strong>Keywords describe intent → YAML workflow → Deterministic execution</strong></p>
+  <p><em>Deterministic Workflow Execution Runtime</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
@@ -34,7 +34,7 @@ brew install alib8b8/tap/aflare
 ```
 
 ```bash
-# Generate and run a workflow in one line
+# Generate workflow from keywords and run
 aflare create "monitor BTC price every 10 minutes, alert via Telegram when > 70000"
 aflare run btc-monitor.yaml
 ```
@@ -49,23 +49,21 @@ aflare is currently in **early-stage v0.7**. Core Runtime capabilities (DAG sche
 
 ## What is this?
 
-aflare separates AI's "understanding" from "execution":
+aflare separates the "description" of a workflow from its "execution":
 
 ```
-Your words  →  AI translates intent  →  YAML Workflow  →  Runtime executes
-(NL)           (LLM)                    (deterministic)    (DAG / WAL / Saga / Retry / Audit)
+Your words  →  Keyword matching  →  YAML Workflow  →  Runtime executes
+(description)  (regex + keywords)    (deterministic)    (DAG / WAL / Saga / Retry / Audit)
 ```
 
-The problem with traditional AI Agents: the LLM both understands and decides execution — unstable, unpredictable, hard to audit.
-
-aflare's approach: **AI only translates. The Runtime guarantees execution.** The YAML workflow defines exactly what each step does, what it depends on, and what happens on failure. The Runtime handles DAG scheduling, checkpoint recovery, Saga transaction compensation, circuit breaking, and auditing — every operation is traceable, replayable, and verifiable.
+`aflare create` converts descriptions into YAML workflows via regex and keyword matching (**not LLM-generated**, see [`generator.go`](internal/workflow/generator.go)). The YAML workflow defines exactly what each step does, what it depends on, and what happens on failure. The Runtime handles DAG scheduling, checkpoint recovery, Saga transaction compensation, circuit breaking, and auditing — every operation is traceable, replayable, and verifiable.
 
 ---
 
 ## Three-Layer Model
 
 ```
-L1: AI Intent    —  "Monitor BTC, notify me if it drops 5%"
+L1: Intent       —  "Monitor BTC, notify me if it drops 5%"
                         ↓
 L2: Workflow     —  YAML deterministic workflow (schedule → get_price → condition → telegram)
                         ↓
@@ -86,9 +84,9 @@ L3: Runtime      —  Execution layer
 
 | Tool | Problem | aflare |
 |------|---------|--------|
-| **AI Agent** | LLM decides execution — unpredictable, hard to audit | AI only translates intent, YAML guarantees execution |
-| **n8n** | Visual workflow, but heavier (Docker), no AI layer | Single binary, terminal-native, AI generates workflows |
-| **Bash** | Hard to write and maintain, no error recovery | NL generation, built-in retry/circuit-breaking/checkpoint |
+| **AI Agent** | LLM decides execution — unpredictable, hard to audit | Deterministic YAML workflows, execution is traceable and replayable |
+| **n8n** | Visual workflow, but heavier (Docker), no built-in generation | Single binary, terminal-native, keyword-based workflow generation |
+| **Bash** | Hard to write and maintain, no error recovery | Description-based generation, built-in retry/circuit-breaking/checkpoint |
 
 ---
 
@@ -108,12 +106,14 @@ L3: Runtime      —  Execution layer
 - SSRF protection / Path Traversal / Command Injection whitelist
 - Outbound data volume anomaly monitor + circuit breaker auto-isolation
 
-### AI Integration
-- Natural language → YAML workflow generation
+### Workflow Generation
+- Keyword-based YAML workflow generation (`aflare create`, see [`generator.go`](internal/workflow/generator.go))
+- 100+ built-in templates
+
+### LLM Nodes (call LLM APIs within workflows)
 - 22+ model support (OpenAI / DeepSeek / Qwen / GLM / Kimi, etc.)
 - Fully offline capable (Ollama local LLM)
 - LLM smart routing (EWMA latency prediction + Pareto cost sorting)
-- 100+ built-in templates
 
 ### Engineering
 - Expression engine: bytecode IR + vectorized batch evaluation
@@ -135,8 +135,8 @@ L3: Runtime      —  Execution layer
 │                    aflare Runtime                     │
 │                                                       │
 │  ┌──────────┐   ┌──────────┐   ┌──────────────────┐  │
-│  │ AI Intent │──▶│ Workflow │──▶│ Deterministic     │  │
-│  │ (LLM)    │   │ (YAML)   │   │ Executor          │  │
+│  │ Intent   │──▶│ Workflow │──▶│ Deterministic     │  │
+│  │ (desc.)  │   │ (YAML)   │   │ Executor          │  │
 │  └──────────┘   └──────────┘   │                    │  │
 │                                 │ • DAG Scheduler   │  │
 │                                 │ • WAL / Checkpoint│  │
