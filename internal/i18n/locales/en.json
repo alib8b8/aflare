@@ -149,5 +149,14 @@
   "node.openai_compatible.description": "Call OpenAI-compatible API",
   "tui.completed": "Completed",
   "tui.press_q": "Press Q to quit",
-  "tui.failed": "Failed"
+  "tui.failed": "Failed",
+  "usage.resume": "Resume a paused workflow",
+  "resume.usage": "Usage: aflare resume <run-id>\n       aflare resume list",
+  "resume.list_empty": "No paused workflows.",
+  "resume.list_title": "Paused workflows (%d):",
+  "resume.resuming": "Resuming workflow %q (run-id: %s, paused at step %d: %s)...",
+  "resume.completed": "Workflow resumed and completed successfully.",
+  "resume.failed": "resume failed: %v",
+  "resume.not_paused": "run %q is not paused (status: %s)",
+  "resume.load_failed": "failed to load run %q: %v"
 }

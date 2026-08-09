@@ -1,0 +1,217 @@
+name: Code Review Pipeline
+description: |
+  代码审查流水线：git diff → 多 LLM 审查 → 汇总报告。
+
+  在提交代码前，一键运行多模型交叉审查：
+  1. 规则引擎快速扫描（NPE、线程安全、硬编码密钥）
+  2. 主 LLM 深度分析（语义理解、逻辑缺陷、性能隐患）
+  3. 副 LLM 交叉验证（第二意见，减少幻觉）
+  4. 汇总生成结构化 Markdown 报告
+
+  架构：
+    ┌──────────────┐
+    │  read_source │  读取目标源文件
+    └──────┬───────┘
+           │
+    ┌──────▼───────┐
+    │  git_diff     │  获取变更内容
+    └──────┬───────┘
+           │
+    ┌──────▼──────────────────────────────────┐
+    │  hybrid_review (code_review node)        │
+    │  规则引擎 + LLM 混合审查                  │
+    └──────┬───────────────────────────────────┘
+           │
+    ┌──────▼───────┐  ┌──────────────┐
+    │  second_opinion│  │  rules_report │
+    │  (LLM 交叉验证)│  │  (规则引擎结果)│
+    └──────┬───────┘  └──────┬───────┘
+           │                 │
+           └────────┬────────┘
+                    │
+           ┌────────▼────────┐
+           │  compose_report │  汇总报告
+           └────────┬────────┘
+                    │
+         ┌──────────┼──────────┐
+         │          │          │
+    ┌────▼───┐ ┌───▼────┐ ┌───▼────┐
+    │ save   │ │notify  │ │console │
+    │report  │ │stdout  │ │summary │
+    └────────┘ └────────┘ └────────┘
+
+  使用方式：
+    aflare run workflow.yaml --var target_file=path/to/file.go
+
+vars:
+  target_file: "mock-source.go"
+  language: "go"
+  focus: "all"
+  severity: "medium"
+  provider: "ollama"
+  model: "llama3"
+  second_provider: "ollama"
+  second_model: "llama3"
+  report_path: "code-review-report.md"
+
+steps:
+  # ═══════════════════════════════════════════════════════════════
+  # Step 1: 读取源代码
+  # ═══════════════════════════════════════════════════════════════
+  - name: read_source
+    node: file_read
+    params:
+      path: "{{var.target_file}}"
+      redact: "false"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Step 2: 获取 git diff（变更内容）
+  # ═══════════════════════════════════════════════════════════════
+  # 使用 execute 节点运行 git diff，获取本次变更
+  - name: git_diff
+    node: execute
+    params:
+      command: "git diff HEAD -- {{var.target_file}} 2>/dev/null || echo '(no diff available — reviewing entire file)'"
+      timeout: "30s"
+    continue_on_error: true
+
+  # ═══════════════════════════════════════════════════════════════
+  # Step 3: 混合审查（规则引擎 + LLM 深度分析）
+  # ═══════════════════════════════════════════════════════════════
+  # code_review 节点内部同时运行：
+  #   - 确定性规则引擎：NPE、线程安全、安全漏洞（不依赖 LLM）
+  #   - LLM 分析：语义理解、逻辑缺陷、性能、可维护性
+  - name: hybrid_review
+    node: code_review
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      language: "{{var.language}}"
+      focus: "{{var.focus}}"
+      severity: "{{var.severity}}"
+      use_rules: "true"
+      use_llm: "true"
+    input: |
+      ## Source Code
+      ```
+      {{step.read_source}}
+      ```
+
+      ## Git Diff
+      ```
+      {{step.git_diff}}
+      ```
+
+  # ═══════════════════════════════════════════════════════════════
+  # Step 4: 第二意见（交叉验证，减少 LLM 幻觉）
+  # ═══════════════════════════════════════════════════════════════
+  # 用另一个 LLM 对审查结果做交叉验证，标记不一致的发现
+  - name: second_opinion
+    node: openai
+    params:
+      provider: "{{var.second_provider}}"
+      model: "{{var.second_model}}"
+      system: |
+        You are a senior code reviewer providing a second opinion on a code review.
+        Your task is to validate or challenge the findings from the primary reviewer.
+
+        Rules:
+        1. For each finding, mark it as: CONFIRMED, DISPUTED, or MISSED
+        2. If CONFIRMED: add any additional context or severity adjustment
+        3. If DISPUTED: explain why the finding may be a false positive
+        4. If you find issues the primary reviewer MISSED: add them
+        5. Output ONLY a concise Markdown summary of your second opinion
+      prompt: |
+        ## Primary Review Findings
+        {{step.hybrid_review}}
+
+        ## Source Code (for reference)
+        ```
+        {{step.read_source}}
+        ```
+
+        ## Git Diff
+        ```
+        {{step.git_diff}}
+        ```
+
+        Please provide your second opinion on the above review.
+    continue_on_error: true
+    retry: 1
+
+  # ═══════════════════════════════════════════════════════════════
+  # Step 5: 汇总报告
+  # ═══════════════════════════════════════════════════════════════
+  - name: compose_report
+    node: template_render
+    params:
+      template: |
+        # Code Review Report
+
+        **Target file:** `{{var.target_file}}`
+        **Language:** {{var.language}} · **Focus:** {{var.focus}} · **Min Severity:** {{var.severity}}
+        **Primary:** {{var.provider}}/{{var.model}} · **Second Opinion:** {{var.second_provider}}/{{var.second_model}}
+
+        ---
+
+        ## 📊 Review Summary
+
+        | Metric | Value |
+        |--------|-------|
+        | File | `{{var.target_file}}` |
+        | Review Method | Rules Engine + LLM + Second Opinion |
+        | Primary Reviewer | {{var.provider}}/{{var.model}} |
+        | Second Opinion | {{var.second_provider}}/{{var.second_model}} |
+
+        ---
+
+        ## 🔍 Primary Review (Rules + LLM)
+
+        {{step.hybrid_review}}
+
+        ---
+
+        ## 🧐 Second Opinion
+
+        {{step.second_opinion}}
+
+        {{#unless step.second_opinion}}
+        > ⚠️ Second opinion unavailable — review based on primary analysis only.
+        {{/unless}}
+
+        ---
+
+        ## 📝 Source Diff
+
+        ```diff
+        {{step.git_diff}}
+        ```
+
+        ---
+
+        _Generated by aflare Code Review Pipeline._
+
+  # ═══════════════════════════════════════════════════════════════
+  # Step 6: 保存报告
+  # ═══════════════════════════════════════════════════════════════
+  - name: save_report
+    node: file_write
+    params:
+      path: "{{var.report_path}}"
+      mode: write
+
+  # ═══════════════════════════════════════════════════════════════
+  # Step 7: 通知
+  # ═══════════════════════════════════════════════════════════════
+  - name: notify
+    node: notify
+    params:
+      channel: stdout
+      message: |
+        ✅  Code Review Complete!
+        📄 Report: {{var.report_path}}
+        🔍 File: {{var.target_file}}
+        👀 Primary: {{var.provider}}/{{var.model}}
+        🧐 Second Opinion: {{var.second_provider}}/{{var.second_model}}
+
+output: "{{step.compose_report}}"

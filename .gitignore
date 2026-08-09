@@ -25,3 +25,4 @@ build/
 
 # Maintenance reports
 maintenance_report_*.txt
+__pycache__/

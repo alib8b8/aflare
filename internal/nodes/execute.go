@@ -27,29 +27,21 @@ import (
 	"time"
 )
 
-var allowedCommands = map[string]bool{
-	"echo": true, "cat": true, "ls": true, "pwd": true,
-	"grep": true, "sed": true, "awk": true, "sort": true,
-	"wc": true, "head": true, "tail": true, "cut": true,
-	"tr": true, "uniq": true, "find": true, "date": true,
-	"curl": true, "wget": true, "jq": true,
-	"git": true, "go": true,
-}
-
 // shellMetachars detects shell metacharacters that can be used for command
 // injection. Note: space is intentionally NOT included here so that commands
 // with arguments (e.g. "ls -la", "echo hello") still work under allowlist mode.
 var shellMetachars = regexp.MustCompile("[;|&$`(){}<>\\\\*?!~='\"]")
 
-var allowListEnabled = false
+var allowListEnabled = true // 默认开启白名单
 var auditLogFile string
 
 type ExecuteNode struct{}
 
 func init() {
 	Register(&ExecuteNode{})
-	if os.Getenv("AFLARE_EXECUTE_ALLOWLIST") == "1" {
-		allowListEnabled = true
+	// 用户主动关闭安全模式时才关白名单
+	if os.Getenv("AFLARE_EXECUTE_UNSAFE") == "1" {
+		allowListEnabled = false
 	}
 	home, err := os.UserHomeDir()
 	if err == nil {
@@ -76,6 +68,7 @@ func (n *ExecuteNode) Schema() NodeSchema {
 			{Name: "dry_run", Type: "string", Description: "If true, preview the command without executing (default: false)", Required: false, Default: "false"},
 			{Name: "timeout", Type: "string", Description: "Command timeout, e.g. 30s, 5m, 1h (default: 5m)", Required: false, Default: "5m"},
 		},
+		Notes: "WARNING: Setting AFLARE_EXECUTE_UNSAFE=1 removes all command execution security restrictions and may expose your system to risks.",
 	}
 }
 
@@ -113,8 +106,8 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 		firstWord := strings.Fields(command)
 		if len(firstWord) > 0 {
 			cmdName := filepath.Base(firstWord[0])
-			if !allowedCommands[cmdName] {
-				return "", fmt.Errorf("command %q is not in the allowed list (enable via AFLARE_EXECUTE_ALLOWLIST=1)", cmdName)
+			if !SafeCommandWhitelist[cmdName] {
+				return "", fmt.Errorf("command %q is not in the allowed list (set AFLARE_EXECUTE_UNSAFE=1 to disable allowlist)", cmdName)
 			}
 		}
 	}

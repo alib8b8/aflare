@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
 const defaultMaxAgentIterations = 10
@@ -66,11 +68,41 @@ func NewReActAgent(provider, model, apiKey, endpoint, systemPrompt string, maxIt
 	}
 }
 
+// buildToolDefinitions converts agent tools to OpenAI-compatible ToolDefinition
+// schemas for native function calling.
+func (a *ReActAgent) buildToolDefinitions() []core.ToolDefinition {
+	if len(a.tools) == 0 {
+		return nil
+	}
+	defs := make([]core.ToolDefinition, 0, len(a.tools))
+	for _, t := range a.tools {
+		defs = append(defs, core.ToolDefinition{
+			Type: "function",
+			Function: core.ToolFunction{
+				Name:        t.Name,
+				Description: t.Description,
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"input": map[string]interface{}{
+							"type":        "string",
+							"description": "The input to pass to the tool",
+						},
+					},
+					"required": []string{"input"},
+				},
+			},
+		})
+	}
+	return defs
+}
+
 func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
 	if strings.TrimSpace(input) == "" {
 		return "", fmt.Errorf("agent input cannot be empty")
 	}
 
+	toolDefs := a.buildToolDefinitions()
 	toolDescs := a.buildToolDescriptions()
 	systemPrompt := a.buildSystemPrompt(toolDescs)
 
@@ -83,11 +115,59 @@ func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
 	var lastAnswer string
 
 	for i := 0; i < a.maxIters; i++ {
-		response, err := a.callLLM(ctx, conversation)
+		// Try native function calling first (when tools are available and provider supports it).
+		// Falls back to JSON parsing if the model doesn't return tool_calls.
+		response, toolCalls, err := a.callLLMWithTools(ctx, conversation, toolDefs)
 		if err != nil {
 			return "", fmt.Errorf("agent iteration %d failed: %w", i, err)
 		}
 
+		// ── Path 1: Native function calling (tool_calls from the model) ──
+		if len(toolCalls) > 0 {
+			if a.enableThinking {
+				thoughtChain = append(thoughtChain, fmt.Sprintf("[Step %d] Calling tools via native function calling", i+1))
+			}
+
+			// Record the assistant message with tool_calls
+			assistantMsg := LLMMessage{
+				Role:    "assistant",
+				Content: response,
+			}
+			conversation = append(conversation, assistantMsg)
+
+			// Execute all tool calls in parallel
+			for _, call := range toolCalls {
+				obs, toolErr := a.executeTool(ctx, call.Function.Name, call.Function.Arguments)
+				if toolErr != nil {
+					obs = fmt.Sprintf("Error: %v", toolErr)
+				}
+				if a.enableThinking {
+					thoughtChain = append(thoughtChain, fmt.Sprintf("[Step %d Tool: %s] %s", i+1, call.Function.Name, truncate(obs, 200)))
+				}
+				// Append tool result as a tool-role message
+				conversation = append(conversation, LLMMessage{
+					Role:    "tool",
+					Content: obs,
+				})
+			}
+
+			// Check if we're at max iterations — force final answer
+			if i == a.maxIters-1 {
+				conversation = append(conversation, LLMMessage{
+					Role:    "user",
+					Content: "You have reached the maximum number of iterations. Please provide your best final answer now.",
+				})
+				finalResp, _, finalErr := a.callLLMWithTools(ctx, conversation, toolDefs)
+				if finalErr == nil {
+					lastAnswer = finalResp
+				} else {
+					lastAnswer = response
+				}
+			}
+			continue
+		}
+
+		// ── Path 2: JSON parsing fallback (legacy ReAct format) ──
 		thought, err := parseReActResponse(response)
 		if err != nil {
 			conversation = append(conversation,
@@ -127,7 +207,7 @@ func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
 				Role:    "user",
 				Content: "You have reached the maximum number of iterations. Please provide your best final answer now using action: final_answer.",
 			})
-			finalResp, err := a.callLLM(ctx, conversation)
+			finalResp, _, err := a.callLLMWithTools(ctx, conversation, toolDefs)
 			if err == nil {
 				finalThought, parseErr := parseReActResponse(finalResp)
 				if parseErr == nil && finalThought.FinalAnswer != "" {
@@ -189,7 +269,9 @@ Follow the ReAct (Reason + Act) pattern strictly.
 Available tools:
 %s
 
-Response format (MUST be valid JSON):
+You can use tools by calling them as functions. When you have enough information, provide your final answer directly.
+
+Response format when NOT using tools (MUST be valid JSON):
 {
   "thought": "your reasoning about what to do next",
   "action": "tool_name to use, or 'final_answer' when done",
@@ -198,10 +280,11 @@ Response format (MUST be valid JSON):
 }
 
 Rules:
-1. Always respond with valid JSON only — no extra text, no markdown code blocks
-2. Use tools to gather information before giving a final answer
-3. If you have enough information, use action: "final_answer" and put the answer in final_answer
-4. Be concise and focused on the task`
+1. Prefer using function calls to invoke tools when available
+2. Always respond with valid JSON only when not using function calls — no extra text, no markdown code blocks
+3. Use tools to gather information before giving a final answer
+4. If you have enough information, provide your final answer directly
+5. Be concise and focused on the task`
 
 	if a.systemPrompt != "" {
 		basePrompt = a.systemPrompt + "\n\n" + basePrompt
@@ -260,6 +343,10 @@ func (a *ReActAgent) executeTool(ctx context.Context, toolName, toolInput string
 		return "", fmt.Errorf("tool node %q not found in registry", targetTool.NodeName)
 	}
 
+	// For native function calling, the arguments come as a JSON string like {"input":"..."}
+	// Try to extract the "input" field from the JSON.
+	toolInput = extractToolInput(toolInput)
+
 	result, err := node.Execute(ctx, toolInput, map[string]string{})
 	if err != nil {
 		return "", fmt.Errorf("tool %s execution failed: %w", toolName, err)
@@ -272,12 +359,65 @@ func (a *ReActAgent) executeTool(ctx context.Context, toolName, toolInput string
 	return result, nil
 }
 
+// extractToolInput extracts the "input" field from a JSON tool call argument string.
+// If the argument is not valid JSON or doesn't have an "input" field, returns the original string.
+func extractToolInput(rawArgs string) string {
+	rawArgs = strings.TrimSpace(rawArgs)
+	if rawArgs == "" || !strings.HasPrefix(rawArgs, "{") {
+		return rawArgs
+	}
+	var args map[string]interface{}
+	if err := json.Unmarshal([]byte(rawArgs), &args); err != nil {
+		return rawArgs
+	}
+	if input, ok := args["input"]; ok {
+		if s, ok := input.(string); ok {
+			return s
+		}
+	}
+	return rawArgs
+}
+
 func (a *ReActAgent) toolNames() string {
 	var names []string
 	for _, t := range a.tools {
 		names = append(names, t.Name)
 	}
 	return strings.Join(names, ", ")
+}
+
+// callLLMWithTools sends messages to the LLM with optional tool definitions.
+// Returns the response content text and any tool_calls the model requested.
+// For native function calling, the content may be empty (tool_calls are populated).
+func (a *ReActAgent) callLLMWithTools(ctx context.Context, messages []LLMMessage, tools []core.ToolDefinition) (content string, toolCalls []core.LLMToolCall, err error) {
+	// Ollama path: use JSON-based ReAct (no native function calling via this path)
+	if a.provider == "ollama" {
+		content, err = a.callOllama(ctx, messages)
+		return content, nil, err
+	}
+
+	compatNode := NewOpenAICompatibleNode(LLMNodeConfig{
+		Name:            a.provider,
+		DefaultModel:    a.model,
+		DefaultEndpoint: a.endpoint,
+		EnvAPIKey:       strings.ToUpper(a.provider) + "_API_KEY",
+		ProviderName:    a.provider,
+	})
+
+	resp, err := compatNode.CallWithTools(ctx, messages, a.model, a.apiKey, a.endpoint, tools, nil)
+	if err != nil {
+		return "", nil, err
+	}
+
+	choice := resp.Choices[0]
+
+	// Check for native tool calls first
+	if len(choice.Message.ToolCalls) > 0 {
+		return choice.Message.Content, choice.Message.ToolCalls, nil
+	}
+
+	// No tool calls — return content for JSON parsing fallback
+	return choice.Message.Content, nil, nil
 }
 
 func (a *ReActAgent) callLLM(ctx context.Context, messages []LLMMessage) (string, error) {
@@ -300,20 +440,8 @@ func (a *ReActAgent) callOllama(ctx context.Context, messages []LLMMessage) (str
 }
 
 func (a *ReActAgent) callOpenAICompatible(ctx context.Context, messages []LLMMessage) (string, error) {
-	compatNode := NewOpenAICompatibleNode(LLMNodeConfig{
-		Name:            a.provider,
-		DefaultModel:    a.model,
-		DefaultEndpoint: a.endpoint,
-		EnvAPIKey:       strings.ToUpper(a.provider) + "_API_KEY",
-		ProviderName:    a.provider,
-	})
-	params := map[string]string{
-		"model":    a.model,
-		"api_key":  a.apiKey,
-		"endpoint": a.endpoint,
-	}
-	fullPrompt := buildConversationPrompt(messages)
-	return compatNode.Execute(ctx, fullPrompt, params)
+	content, _, err := a.callLLMWithTools(ctx, messages, nil)
+	return content, err
 }
 
 func buildConversationPrompt(messages []LLMMessage) string {

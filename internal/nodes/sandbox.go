@@ -49,21 +49,9 @@ var (
 		sandboxDesktop: true,
 	}
 
-	// sandboxCommandWhitelist defines safe commands allowed in shell mode.
-	// Note: curl, wget, rm are excluded from safe mode because they can
-	// exfiltrate data, download malicious payloads, or delete files.
-	// Use http_request node for HTTP operations and file_write for file ops.
-	sandboxCommandWhitelist = map[string]bool{
-		"ls": true, "cat": true, "head": true, "tail": true, "wc": true,
-		"grep": true, "awk": true, "sed": true, "find": true, "sort": true,
-		"uniq": true, "cut": true, "tr": true, "echo": true, "date": true,
-		"pwd": true, "whoami": true, "uname": true, "df": true, "du": true,
-		"free": true, "ps": true, "top": true, "uptime": true, "env": true,
-		"ping": true, "nslookup": true,
-		"python3": true, "python": true, "node": true, "ruby": true,
-		"git": true, "make": true, "go": true, "java": true,
-		"mkdir": true, "cp": true, "mv": true, "chmod": true,
-	}
+	// sandboxCommandWhitelist is deprecated; use SafeCommandWhitelist instead.
+	// Retained for backward compatibility in tests that reference this symbol.
+	sandboxCommandWhitelist = SafeCommandWhitelist
 
 	// sandboxBlockedPatterns are patterns that are never allowed.
 	sandboxBlockedPatterns = []string{

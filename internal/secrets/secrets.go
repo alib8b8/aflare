@@ -31,7 +31,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zalando/go-keyring"
 	"golang.org/x/crypto/pbkdf2"
+	"golang.org/x/term"
 )
 
 const (
@@ -175,8 +177,18 @@ func (sm *SecretManager) SaveToFile(path string) error {
 	output = append(output, sm.salt...)
 	output = append(output, ciphertext...)
 
-	if err := os.WriteFile(path, output, 0600); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
+	// Atomic write: write to .tmp first, then rename to final path.
+	// This prevents file corruption on partial writes (e.g. crash mid-write).
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, output, 0600); err != nil {
+		return fmt.Errorf("failed to write temporary file: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("failed to rename temporary file: %w", err)
 	}
 
 	return nil
@@ -423,13 +435,53 @@ func (sm *SecretManager) GetAllVars() map[string]string {
 	return vars
 }
 
+const keyringService = "aflare-secrets"
+
+// GetMasterPassword retrieves the master password using the following priority:
+//  1. System keyring (Linux secret-service, macOS Keychain, Windows Credential Manager)
+//  2. AFLARE_SECRETS_PASSWORD environment variable
+//  3. Interactive terminal prompt (input is not echoed)
+//
+// On success with keyring or env, the password is stored in keyring for future use.
+func GetMasterPassword() (string, error) {
+	// 1. Try system keyring
+	if password, err := keyring.Get(keyringService, "master"); err == nil {
+		return password, nil
+	}
+
+	// 2. Try environment variable
+	if password := os.Getenv("AFLARE_SECRETS_PASSWORD"); password != "" {
+		// Store in keyring for future use (best-effort)
+		_ = keyring.Set(keyringService, "master", password)
+		return password, nil
+	}
+
+	// 3. Interactive prompt (only if stdin is a terminal)
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		fmt.Fprint(os.Stderr, "Enter master password: ")
+		password, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return "", fmt.Errorf("failed to read password: %w", err)
+		}
+		if len(password) == 0 {
+			return "", errors.New("master password cannot be empty")
+		}
+		// Store in keyring for future use (best-effort)
+		_ = keyring.Set(keyringService, "master", string(password))
+		return string(password), nil
+	}
+
+	return "", fmt.Errorf("secrets password not set - set AFLARE_SECRETS_PASSWORD environment variable or run in a terminal for interactive input")
+}
+
 // GetSecretManager returns the global secret manager instance.
-// It reads the master password from AFLARE_SECRETS_PASSWORD environment variable.
+// It reads the master password via GetMasterPassword().
 // If the file doesn't exist, it creates a new empty secret manager.
 func GetSecretManager() (*SecretManager, error) {
-	password := os.Getenv("AFLARE_SECRETS_PASSWORD")
-	if password == "" {
-		return nil, fmt.Errorf("secrets password not set - set AFLARE_SECRETS_PASSWORD environment variable")
+	password, err := GetMasterPassword()
+	if err != nil {
+		return nil, err
 	}
 	return LoadFromFile(defaultSecretsPath, password)
 }

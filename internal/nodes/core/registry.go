@@ -56,6 +56,7 @@ type NodeSchema struct {
 	Input       string        `json:"input"`
 	Output      string        `json:"output"`
 	Params      []ParamSchema `json:"params"`
+	Notes       string        `json:"notes,omitempty"`
 }
 
 // Node defines the interface that all workflow nodes must implement

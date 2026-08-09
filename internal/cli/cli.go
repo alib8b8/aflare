@@ -31,8 +31,8 @@ import (
 )
 
 // ParseArgs parses the command-line arguments and returns the command and its arguments.
-// It also detects the --safe-mode, --dry-run, --mcp-server, --lang, and --concise flags.
-func ParseArgs(args []string) (command string, commandArgs []string, safeMode bool, dryRun bool, mcpServer bool, lang string, concise bool, initMCP string, initAgent string, updateChannel string, serveMode bool) {
+// It also detects the --safe-mode, --dry-run, --mcp-server, --lang, --concise, and --ai flags.
+func ParseArgs(args []string) (command string, commandArgs []string, safeMode bool, dryRun bool, mcpServer bool, lang string, concise bool, initMCP string, initAgent string, updateChannel string, serveMode bool, aiMode bool) {
 	safeMode = false
 	dryRun = false
 	mcpServer = false
@@ -42,6 +42,7 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 	initAgent = ""
 	updateChannel = ""
 	serveMode = false
+	aiMode = false
 	var filtered []string
 	skipNext := false
 	for i, arg := range args {
@@ -91,6 +92,8 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 			updateChannel = strings.TrimPrefix(arg, "--channel=")
 		} else if arg == "--serve" {
 			serveMode = true
+		} else if arg == "--ai" {
+			aiMode = true
 		} else {
 			filtered = append(filtered, arg)
 		}
@@ -112,7 +115,7 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 	}
 
 	if len(filtered) == 0 {
-		return "", nil, safeMode, dryRun, mcpServer, lang, concise, initMCP, initAgent, updateChannel, serveMode
+		return "", nil, safeMode, dryRun, mcpServer, lang, concise, initMCP, initAgent, updateChannel, serveMode, aiMode
 	}
 
 	command = filtered[0]
@@ -126,7 +129,7 @@ func ValidateCommand(command string) error {
 		return fmt.Errorf("no command provided")
 	}
 	switch command {
-	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "review", "version", "--version", "-v", "self-update", "update", "autoupgrade", "au", "init", "webui", "skills", "schedule", "audit", "serve", "marketplace":
+	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "review", "version", "--version", "-v", "self-update", "update", "autoupgrade", "au", "init", "webui", "skills", "schedule", "audit", "serve", "marketplace", "secrets", "resume":
 		return nil
 	}
 	return fmt.Errorf("unknown command: %s", command)
@@ -169,6 +172,7 @@ func PrintUsage() string {
   aflare version                         %s
   aflare self-update                     %s
   aflare autoupgrade <cmd>               %s
+  aflare resume <run-id>                  %s
   aflare help                            %s
 
 %s:
@@ -195,6 +199,7 @@ func PrintUsage() string {
 		i18n.T("usage.version"),
 		i18n.T("usage.self_update"),
 		i18n.T("usage.autoupgrade"),
+		i18n.T("usage.resume"),
 		i18n.T("usage.help"),
 		i18n.T("options"),
 		i18n.T("usage.safe_mode"),

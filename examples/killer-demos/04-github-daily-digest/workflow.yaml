@@ -1,0 +1,182 @@
+name: GitHub Daily Digest
+description: |
+  GitHub 每日摘要：抓取 GitHub 动态 → LLM 智能摘要 → Telegram 推送。
+
+  每天早上自动运行，让你在开始工作前就知道：
+  - 你关注的仓库有什么新动态
+  - 今天的 Trending 仓库有哪些
+  - 你的 PR/Issue 进展如何
+
+  架构：
+    ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+    │  fetch_activity  │  │  fetch_trending  │  │  fetch_prs       │
+    │  (GitHub API)    │  │  (GitHub API)    │  │  (GitHub API)    │
+    └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘
+             │                     │                     │
+             └─────────────────────┼─────────────────────┘
+                                   │
+                          ┌────────▼────────┐
+                          │  generate_digest │
+                          │  (LLM agent)     │
+                          └────────┬────────┘
+                                   │
+                    ┌──────────────┼──────────────┐
+                    │              │              │
+           ┌────────▼────────┐ ┌──▼──────────┐ ┌─▼───────────┐
+           │   save_report   │ │ telegram    │ │  console    │
+           │   (file_write)  │ │ (notify)    │ │ (notify)    │
+           └─────────────────┘ └─────────────┘ └─────────────┘
+
+  使用方式：
+    aflare run workflow.yaml
+    aflare schedule --cron "0 8 * * *" workflow.yaml
+
+vars:
+  # ── GitHub API ──
+  # 使用 mock server 时指向 localhost，真实使用改为 api.github.com
+  github_api_url: "http://localhost:17902"
+  github_username: "your-username"
+  github_token: "{{secret.github.token}}"
+
+  # ── LLM ──
+  provider: openai
+  model: gpt-4o
+  # 国内推荐: provider: deepseek, model: deepseek-chat
+  # 本地: provider: ollama, model: llama3
+
+  # ── Output ──
+  report_path: "github-digest.md"
+
+  # ── Telegram ──
+  telegram_token: "{{secret.telegram.token}}"
+  telegram_chat_id: "{{secret.telegram.chat_id}}"
+
+steps:
+  # ═══════════════════════════════════════════════════════════════
+  # Stage 1: DAG 并行数据采集
+  # 三路并发：个人动态、Trending 仓库、PR/Issue 状态
+  # ═══════════════════════════════════════════════════════════════
+  - name: collect_data
+    parallel:
+      # ── Branch A: 用户动态（Star/Watch/Fork/Release）──
+      - name: fetch_activity
+        node: http_request
+        params:
+          method: GET
+          url: "{{var.github_api_url}}/users/{{var.github_username}}/events"
+          headers: |
+            {
+              "Accept": "application/vnd.github+json",
+              "Authorization": "Bearer {{var.github_token}}"
+            }
+          timeout: "30s"
+        continue_on_error: true
+        retry: 2
+        backoff: { exponential: true, base: "1s", max_delay: "10s" }
+
+      # ── Branch B: Trending 仓库 ──
+      - name: fetch_trending
+        node: http_request
+        params:
+          method: GET
+          url: "{{var.github_api_url}}/trending"
+          headers: |
+            {
+              "Accept": "application/json"
+            }
+          timeout: "30s"
+        continue_on_error: true
+        retry: 2
+        backoff: { exponential: true, base: "1s", max_delay: "10s" }
+
+      # ── Branch C: PR/Issue 状态 ──
+      - name: fetch_prs
+        node: http_request
+        params:
+          method: GET
+          url: "{{var.github_api_url}}/search/issues?q=author:{{var.github_username}}+type:pr+state:open"
+          headers: |
+            {
+              "Accept": "application/vnd.github+json",
+              "Authorization": "Bearer {{var.github_token}}"
+            }
+          timeout: "30s"
+        continue_on_error: true
+        retry: 2
+        backoff: { exponential: true, base: "1s", max_delay: "10s" }
+
+    output_strategy: join
+
+  # ═══════════════════════════════════════════════════════════════
+  # Stage 2: LLM 生成摘要
+  # Agent 节点自动解析数据、分类、生成结构化日报
+  # ═══════════════════════════════════════════════════════════════
+  - name: generate_digest
+    node: agent
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      system: |
+        You are a developer productivity assistant. Your task is to generate a
+        concise GitHub daily digest in Markdown.
+
+        Follow these rules:
+        1. For user activity: list the most important events (max 10). Categorize
+           by type: Push, PR, Issue, Star, Release. Highlight anything needing
+           action (e.g. "review requested", "CI failed").
+        2. For trending repos: pick the top 5 most interesting ones. Include
+           description, stars, and language. Focus on repos relevant to the user's
+           tech stack.
+        3. For PRs/Issues: list open PRs and issues with status. Note any that
+           are blocked or need review.
+        4. End with a "Today's Focus" section: 3 actionable items.
+
+        Output ONLY valid Markdown. No preamble.
+      max_iterations: "5"
+      tools: json_parse,transform
+      enable_thinking: "true"
+    input: |
+      ## Raw GitHub Data
+
+      {{step.collect_data}}
+
+      ---
+      Generate a structured daily digest from the above data. Include:
+      - Your activity summary
+      - Trending repositories
+      - Open PRs and issues
+      - Today's focus items
+
+  # ═══════════════════════════════════════════════════════════════
+  # Stage 3: 输出 — 保存报告 + Telegram 推送 + 控制台输出
+  # ═══════════════════════════════════════════════════════════════
+  - name: save_report
+    node: file_write
+    params:
+      path: "{{var.report_path}}"
+      mode: write
+
+  - name: notify_telegram
+    node: notify
+    params:
+      channel: telegram
+      token: "{{var.telegram_token}}"
+      chat_id: "{{var.telegram_chat_id}}"
+      message: |
+        📊 *GitHub Daily Digest*
+
+        🗓 {{now}}
+        👤 {{var.github_username}}
+
+        Full report saved to `{{var.report_path}}`
+
+  - name: console
+    node: notify
+    params:
+      channel: stdout
+      message: |
+        ✅  GitHub Daily Digest complete!
+        📄 Report: {{var.report_path}}
+        👤 User: {{var.github_username}}
+
+output: "{{step.generate_digest}}"

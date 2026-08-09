@@ -92,6 +92,23 @@ L3: Runtime      —  Execution layer
 
 ## Core Capabilities
 
+### Feature Matrix
+
+| Feature | Status | Verification |
+|---------|--------|-------------|
+| DAG Parallel Scheduling | ✅ | Tested + TLA+ formal verification |
+| WAL Crash Recovery + Session Persistence | ✅ | Tested |
+| Saga Transaction Compensation | ✅ | Tested |
+| Idempotency | ✅ | Tested |
+| Retry / Rate Limit / Circuit Breaker | ✅ | Tested |
+| HMAC Audit Chain | ✅ | Tested |
+| Secret Redaction | ✅ | Tested |
+| Expression Engine (bytecode IR + vectorized) | ✅ | Tested |
+| Keyword-based Workflow Generation | ✅ | Tested |
+| LLM Nodes (22+ models) | ✅ | Tested |
+| Domestic Chip Support (Ascend/Cambricon/Hygon) | Experimental | No tests, unverified |
+| Unitree Robot Integration | Experimental | No tests, proof-of-concept |
+
 ### Runtime Guarantees (Deterministic Execution)
 - **DAG Parallel Scheduling** — topological sort dependency scheduling, independent steps run concurrently
 - **WAL Crash Recovery + Session Persistence** — append-only persistence + CRC32, `--resume` recovers from interruption; Session preserves context across turns

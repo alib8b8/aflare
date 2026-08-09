@@ -100,9 +100,12 @@ type content struct {
 	Text string `json:"text"`
 }
 
-// Server implements an MCP server over stdio using JSON-RPC 2.0
+// Server implements an MCP server over stdio (or network) using JSON-RPC 2.0.
+// When bound to a network port (AFLARE_MCP_BIND), token authentication is required.
 type Server struct {
-	scanner *bufio.Scanner
+	scanner      *bufio.Scanner
+	authToken    string // required when network-bound
+	networkBound bool   // true if AFLARE_MCP_BIND is set
 }
 
 // NewServer creates a new MCP server reading from stdin and writing to stdout
@@ -112,8 +115,19 @@ func NewServer() *Server {
 	}
 }
 
-// Run starts the MCP server, reading JSON-RPC messages from stdin
+// Run starts the MCP server. If AFLARE_MCP_BIND is set, it requires
+// AFLARE_MCP_TOKEN for authentication. Without a bind address, it runs
+// in stdio mode with no authentication.
 func (s *Server) Run() error {
+	if bind := os.Getenv("AFLARE_MCP_BIND"); bind != "" {
+		s.networkBound = true
+		token := os.Getenv("AFLARE_MCP_TOKEN")
+		if token == "" {
+			return fmt.Errorf("MCP server bound to network (%s) but no AFLARE_MCP_TOKEN set", bind)
+		}
+		s.authToken = token
+	}
+
 	for s.scanner.Scan() {
 		line := s.scanner.Text()
 		if line == "" {
@@ -126,12 +140,41 @@ func (s *Server) Run() error {
 			continue
 		}
 
+		// When network-bound, validate the auth token on every request
+		if s.networkBound {
+			if !s.validateToken(&req) {
+				s.sendError(req.ID, -32001, "Unauthorized: invalid or missing token")
+				continue
+			}
+		}
+
 		resp := s.handleRequest(&req)
 		if resp != nil {
 			s.send(resp)
 		}
 	}
 	return s.scanner.Err()
+}
+
+// validateToken checks that the request carries a valid auth token.
+// The token is expected in the params._auth field for JSON-RPC transport,
+// or in a custom X-MCP-Token header for HTTP transport.
+func (s *Server) validateToken(req *rpcRequest) bool {
+	if s.authToken == "" {
+		return true // no auth required
+	}
+
+	// Check params._auth field for JSON-RPC token
+	var params map[string]interface{}
+	if req.Params != nil {
+		if err := json.Unmarshal(req.Params, &params); err == nil {
+			if auth, ok := params["_auth"].(string); ok && auth == s.authToken {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (s *Server) handleRequest(req *rpcRequest) *rpcResponse {

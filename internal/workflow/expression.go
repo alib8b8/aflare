@@ -133,6 +133,43 @@ func (e *ExpressionEngine) SnapshotVars() map[string]string {
 	return out
 }
 
+// snapshot returns a deep copy of the engine that is safe for concurrent use.
+// The returned engine shares no mutable state with the original — all maps are
+// deep-copied — so it can be passed to a worker goroutine without data races.
+func (e *ExpressionEngine) snapshot() *ExpressionEngine {
+	s := &ExpressionEngine{
+		stepOutputs:  make(map[string]string, len(e.stepOutputs)),
+		stepNames:    make(map[int]string, len(e.stepNames)),
+		variables:    make(map[string]string, len(e.variables)),
+		secretGetter: e.secretGetter, // immutable func pointer, safe to share
+	}
+	for k, v := range e.stepOutputs {
+		s.stepOutputs[k] = v
+	}
+	for k, v := range e.stepNames {
+		s.stepNames[k] = v
+	}
+	for k, v := range e.variables {
+		s.variables[k] = v
+	}
+	if e.loopVars != nil {
+		s.loopVars = make(map[string]string, len(e.loopVars))
+		for k, v := range e.loopVars {
+			s.loopVars[k] = v
+		}
+	}
+	return s
+}
+
+// WithOutput returns a snapshot of the engine with an additional step output
+// pre-registered. The returned engine is independent — DAG workers can safely
+// evaluate expressions on it concurrently without data races on the original.
+func (e *ExpressionEngine) WithOutput(name, value string) *ExpressionEngine {
+	snapshot := e.snapshot()
+	snapshot.stepOutputs["name:"+name] = value
+	return snapshot
+}
+
 // SetLoopVars sets the current loop context variables.
 // NOT thread-safe: must be called from the same goroutine that owns the engine.
 func (e *ExpressionEngine) SetLoopVars(item string, index, count int) {

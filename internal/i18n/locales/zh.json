@@ -149,5 +149,14 @@
   "node.openai_compatible.description": "调用 OpenAI 兼容 API",
   "tui.completed": "已完成",
   "tui.press_q": "按 Q 退出",
-  "tui.failed": "失败"
+  "tui.failed": "失败",
+  "usage.resume": "恢复已暂停的工作流",
+  "resume.usage": "用法：aflare resume <run-id>\n       aflare resume list",
+  "resume.list_empty": "没有已暂停的工作流。",
+  "resume.list_title": "已暂停的工作流（%d）：",
+  "resume.resuming": "正在恢复工作流 %q（run-id: %s，暂停于第 %d 步：%s）...",
+  "resume.completed": "工作流已恢复并成功完成。",
+  "resume.failed": "恢复失败：%v",
+  "resume.not_paused": "run %q 未处于暂停状态（状态：%s）",
+  "resume.load_failed": "加载 run %q 失败：%v"
 }

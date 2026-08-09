@@ -84,6 +84,23 @@ type WorkflowStep struct {
 	// without any DependsOn remain backward compatible with the original
 	// sequential execution model.
 	DependsOn []string `yaml:"depends_on,omitempty"`
+	// Resumable marks this step as resumable: when the step fails (e.g. a
+	// human_in_loop node waiting for approval), the workflow is paused rather
+	// than failed. The WAL is saved and the workflow can be resumed later
+	// via `aflare resume <run-id>` or a webhook.
+	Resumable bool `yaml:"resumable,omitempty"`
+	// Timeout is the step-level timeout for resumable steps. When set, the
+	// step runs with this timeout; if it expires, the workflow is paused.
+	// This is separate from the params._timeout mechanism and supports
+	// durations like 72h that exceed MaxStepTimeout.
+	Timeout string `yaml:"timeout,omitempty"`
+	// ResumeOn controls how a paused workflow can be resumed. Supported
+	// values: "webhook" (resume via HTTP webhook), "manual" (resume via
+	// `aflare resume` CLI). Defaults to "manual".
+	ResumeOn string `yaml:"resume_on,omitempty"`
+	// WebhookToken is a secret token required to resume via webhook. When
+	// ResumeOn is "webhook" and this is empty, a random token is generated.
+	WebhookToken string `yaml:"webhook_token,omitempty"`
 }
 
 // MapConfig configures iteration over a list of items where each item is
@@ -253,6 +270,27 @@ func (s *WorkflowStep) IsSaga() bool {
 // HasCaptureError reports whether this step declares a capture_error branch.
 func (s *WorkflowStep) HasCaptureError() bool {
 	return len(s.CaptureError) > 0
+}
+
+// IsResumable reports whether this step is marked as resumable.
+func (s *WorkflowStep) IsResumable() bool {
+	return s.Resumable
+}
+
+// GetResumeTimeout returns the step-level timeout duration for resumable steps.
+// Supports durations like "72h" that exceed MaxStepTimeout. Returns 0 if not set.
+func (s *WorkflowStep) GetResumeTimeout() time.Duration {
+	if s.Timeout == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(s.Timeout)
+	if err != nil {
+		return 0
+	}
+	if d > 0 {
+		return d
+	}
+	return 0
 }
 
 // GetSplitBy returns the delimiter for splitting loop items (default: newline).

@@ -136,7 +136,7 @@ func ExecuteWorkflowWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Regi
 		recordWorkflowMetrics(trace, err)
 		return out, results, trace, err
 	}
-	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, "", "", DefaultWorkflowTimeout)
+	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, "", "", "", DefaultWorkflowTimeout)
 	recordWorkflowMetrics(trace, err)
 	return out, results, trace, err
 }
@@ -158,7 +158,7 @@ func ExecuteWorkflowWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Regi
 // Callers that go through an Executor pass e.workflowTimeout; the legacy
 // ExecuteWorkflowWithTrace global entry point passes the package-level
 // WorkflowTimeout.
-func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, statePath string, walPath string, timeout time.Duration) (string, []StepResult, *WorkflowTrace, error) {
+func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, statePath string, walPath string, wfPath string, timeout time.Duration) (string, []StepResult, *WorkflowTrace, error) {
 	// Validate step count
 	if len(wf.Steps) > MaxSteps {
 		return "", nil, nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
@@ -630,8 +630,15 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		if retryCount > MaxRetry {
 			retryCount = MaxRetry
 		}
+		// For resumable steps, use the step-level timeout (e.g. 72h) which
+		// may exceed MaxStepTimeout. For non-resumable steps, the standard
+		// params._timeout is capped at MaxStepTimeout as before.
 		stepTimeout := wStep.GetTimeout()
-		if stepTimeout > MaxStepTimeout {
+		if wStep.IsResumable() {
+			if rt := wStep.GetResumeTimeout(); rt > 0 {
+				stepTimeout = rt
+			}
+		} else if stepTimeout > MaxStepTimeout {
 			stepTimeout = MaxStepTimeout
 		}
 
@@ -773,6 +780,35 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		}
 
 		if execErr != nil {
+			if wStep.IsResumable() {
+				// Close the WAL so it's flushed to disk before copying
+				if wal != nil {
+					_ = wal.Close()
+					wal = nil // prevent double-close in defer
+				}
+				// Save the last checkpoint to the WAL before pausing
+				// (the last completed step is i-1, save it now)
+				if i > 0 {
+					saveCheckpointIfEnabled(i - 1)
+				}
+				resumeOn := wStep.ResumeOn
+				if resumeOn == "" {
+					resumeOn = "manual"
+				}
+				paused, pauseErr := PauseWorkflow(wfPath, wf, i, wStep.Name, resumeOn, execErr.Error(), walPath)
+				if pauseErr != nil {
+					logger.Error("failed to pause workflow", "name", wf.Name, "step", i, "error", pauseErr)
+					if program != nil {
+						program.Send(tui.WorkflowEndMsg{Success: false})
+					}
+					return "", results, trace, fmt.Errorf("step %d (%s) failed: %w", i+1, wStep.Node, execErr)
+				}
+				logger.Info("workflow paused", "name", wf.Name, "step", i, "node", wStep.Node, "run_id", paused.RunID, "resume_on", resumeOn)
+				if program != nil {
+					program.Send(tui.WorkflowEndMsg{Success: false})
+				}
+				return "", results, trace, paused
+			}
 			if program != nil {
 				program.Send(tui.WorkflowEndMsg{Success: false})
 			}
@@ -840,6 +876,9 @@ type Executor struct {
 	// WithIdempotencyKey when nil, and can be overridden via
 	// WithIdempotencyStore (mainly for tests).
 	idempotencyStore IdempotencyStore
+	// wfPath is the original workflow file path, used for pause-resume
+	// metadata when a resumable step is paused.
+	wfPath string
 }
 
 // NewExecutor returns an Executor with no checkpoint configured and the
@@ -952,6 +991,14 @@ func (e *Executor) WithIdempotencyKey(key string) *Executor {
 // activate idempotency. Returns the receiver for chaining.
 func (e *Executor) WithIdempotencyStore(store IdempotencyStore) *Executor {
 	e.idempotencyStore = store
+	return e
+}
+
+// WithWorkflowPath sets the original workflow file path for pause-resume
+// metadata. When a resumable step is paused, this path is stored in the
+// run metadata so the resume command can locate the original workflow.
+func (e *Executor) WithWorkflowPath(path string) *Executor {
+	e.wfPath = path
 	return e
 }
 
@@ -1088,7 +1135,7 @@ func (e *Executor) ExecuteWithTrace(ctx context.Context, wf *Workflow, reg *node
 		if walPath != "" {
 			statePath = "" // WAL path is the source of truth
 		}
-		out, results, trace, err = executeWorkflowSequential(ctx, wf, reg, program, statePath, walPath, e.workflowTimeout)
+		out, results, trace, err = executeWorkflowSequential(ctx, wf, reg, program, statePath, walPath, e.wfPath, e.workflowTimeout)
 	}
 	recordWorkflowMetrics(trace, err)
 	audit.recordCompletion(results, trace, err)

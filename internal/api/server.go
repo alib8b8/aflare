@@ -73,6 +73,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/api/v1/metrics", s.handleMetrics)
 	mux.HandleFunc("/api/v1/workflows/run", s.handleRunWorkflow)
+	mux.HandleFunc("/api/v1/workflows/resume", s.handleResumeWorkflow)
 	mux.HandleFunc("/api/v1/workflows", s.handleListWorkflows)
 	mux.HandleFunc("/api/v1/workflows/", s.handleGetWorkflow)
 
@@ -478,4 +479,120 @@ func (s *Server) writeJSON(w http.ResponseWriter, status int, data interface{}) 
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		log.Printf("[api] failed to write JSON response: %v", err)
 	}
+}
+
+// resumeWorkflowRequest is the JSON request body for resuming a paused workflow.
+type resumeWorkflowRequest struct {
+	RunID       string `json:"run_id"`
+	WebhookToken string `json:"webhook_token,omitempty"`
+}
+
+// resumeWorkflowResponse is the JSON response for a workflow resume.
+type resumeWorkflowResponse struct {
+	Success     bool                 `json:"success"`
+	RunID       string               `json:"run_id"`
+	Output      string               `json:"output,omitempty"`
+	StepResults []workflowStepResult `json:"step_results,omitempty"`
+	Error       string               `json:"error,omitempty"`
+	Duration    string               `json:"duration"`
+}
+
+// handleResumeWorkflow resumes a paused workflow via webhook.
+// POST /api/v1/workflows/resume
+func (s *Server) handleResumeWorkflow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+
+	var req resumeWorkflowRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("invalid request body: %v", err),
+		})
+		return
+	}
+
+	if req.RunID == "" {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "run_id is required",
+		})
+		return
+	}
+
+	// Validate run-id: reject path traversal attempts
+	if strings.Contains(req.RunID, "/") || strings.Contains(req.RunID, "\\") || strings.Contains(req.RunID, "..") {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "invalid run_id",
+		})
+		return
+	}
+
+	// Load run metadata to verify it exists and check webhook token
+	meta, err := workflow.LoadRunMeta(req.RunID)
+	if err != nil {
+		s.writeJSON(w, http.StatusNotFound, map[string]string{
+			"error": fmt.Sprintf("run not found: %v", err),
+		})
+		return
+	}
+
+	if meta.Status != "paused" {
+		s.writeJSON(w, http.StatusConflict, map[string]string{
+			"error": fmt.Sprintf("run is not paused (status: %s)", meta.Status),
+		})
+		return
+	}
+
+	// If the step requires webhook resume, validate the webhook token
+	if meta.ResumeOn == "webhook" && meta.WebhookToken != "" {
+		if req.WebhookToken == "" || req.WebhookToken != meta.WebhookToken {
+			s.writeJSON(w, http.StatusUnauthorized, map[string]string{
+				"error": "invalid or missing webhook token",
+			})
+			return
+		}
+	}
+
+	atomic.AddUint64(&s.workflowsRun, 1)
+
+	start := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), 7*24*time.Hour)
+	defer cancel()
+
+	output, stepResults, execErr := workflow.ResumeWorkflow(ctx, req.RunID)
+	duration := time.Since(start)
+
+	resp := resumeWorkflowResponse{
+		Success:  execErr == nil,
+		RunID:    req.RunID,
+		Output:   output,
+		Duration: duration.String(),
+	}
+
+	if execErr != nil {
+		atomic.AddUint64(&s.workflowsFailed, 1)
+		resp.Error = execErr.Error()
+	}
+
+	for _, sr := range stepResults {
+		wsr := workflowStepResult{
+			StepIndex: sr.StepIndex,
+			NodeName:  sr.NodeName,
+			Input:     sr.Input,
+			Output:    sr.Output,
+			Duration:  sr.Duration.String(),
+		}
+		if sr.Error != nil {
+			wsr.Error = sr.Error.Error()
+		}
+		resp.StepResults = append(resp.StepResults, wsr)
+	}
+
+	status := http.StatusOK
+	if execErr != nil {
+		status = http.StatusInternalServerError
+	}
+
+	s.writeJSON(w, status, resp)
 }

@@ -966,3 +966,91 @@ func parseIntParam(v, name string) (int, error) {
 	}
 	return n, nil
 }
+
+// CallWithTools sends a chat completion request with structured messages and
+// tool definitions, returning the full LLMResponse so the caller can inspect
+// tool_calls for native function calling. This is the low-level API used by
+// the ReAct agent; the higher-level Execute method flattens the response to a
+// string for non-agent callers.
+//
+// When tools is non-empty, the request includes the tools array and
+// tool_choice: "auto" so the model can choose to invoke functions.
+func (n *OpenAICompatibleNode) CallWithTools(ctx context.Context, messages []LLMMessage, model, apiKey, endpoint string, tools []ToolDefinition, params map[string]string) (*LLMResponse, error) {
+	if apiKey == "" {
+		apiKey = config.GetAPIKey(n.config.Name, n.config.EnvAPIKey)
+	}
+	if apiKey == "" {
+		return nil, fmt.Errorf("%s API key required. Set %s env var, add to config file, or pass api_key param",
+			n.config.ProviderName, n.config.EnvAPIKey)
+	}
+	if endpoint == "" {
+		endpoint = config.GetEndpoint(n.config.Name, n.config.EnvAPIKey+"_ENDPOINT", n.config.DefaultEndpoint)
+	}
+	if model == "" {
+		model = n.config.DefaultModel
+	}
+	if err := ValidateLMLEndpoint(endpoint); err != nil {
+		return nil, fmt.Errorf("endpoint URL validation failed: %w", err)
+	}
+
+	generateURL := fmt.Sprintf("%s/chat/completions", endpoint)
+
+	reqBody := LLMRequest{
+		Model:    model,
+		Messages: messages,
+		Stream:   false,
+	}
+	if len(tools) > 0 {
+		reqBody.Tools = tools
+		reqBody.ToolChoice = json.RawMessage(`"auto"`)
+	}
+	if params != nil {
+		if err := applyLLMRequestParams(&reqBody, params); err != nil {
+			return nil, err
+		}
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, generateURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{
+		Timeout:       DefaultLLMTimeout,
+		Transport:     SafeLLMHTTPClient.Transport,
+		CheckRedirect: HTTPRedirectValidator(ValidateLMLEndpoint),
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call %s API: %w", n.config.ProviderName, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp LLMResponse
+		_ = json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&errResp)
+		if errResp.Error != nil && errResp.Error.Message != "" {
+			return nil, fmt.Errorf("%s API error (%d): %s", n.config.ProviderName, resp.StatusCode, errResp.Error.Message)
+		}
+		return nil, fmt.Errorf("%s API returned status %d", n.config.ProviderName, resp.StatusCode)
+	}
+
+	var llmResp LLMResponse
+	if err := json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&llmResp); err != nil {
+		return nil, fmt.Errorf("failed to parse %s response: %w", n.config.ProviderName, err)
+	}
+
+	if len(llmResp.Choices) == 0 {
+		return nil, fmt.Errorf("no choices in %s response", n.config.ProviderName)
+	}
+
+	return &llmResp, nil
+}
