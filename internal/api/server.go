@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -200,10 +201,9 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 
 // isLocalhost checks whether the request originates from the local machine.
 func isLocalhost(r *http.Request) bool {
-	host := r.RemoteAddr
-	// Strip port if present
-	if idx := strings.LastIndex(host, ":"); idx != -1 {
-		host = host[:idx]
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
 	}
 	return host == "127.0.0.1" || host == "::1" || host == "localhost"
 }
