@@ -144,6 +144,7 @@ func (s *Server) metricsMiddleware(next http.Handler) http.Handler {
 }
 
 // authMiddleware validates the API key header if an API key is configured.
+// When no API key is set, only localhost requests are allowed through.
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Health and metrics are publicly accessible
@@ -153,7 +154,14 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		}
 
 		if s.apiKey == "" {
-			next.ServeHTTP(w, r)
+			// 无认证时只允许 localhost
+			if isLocalhost(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			s.writeJSON(w, http.StatusUnauthorized, map[string]string{
+				"error": "API key required for non-localhost access",
+			})
 			return
 		}
 
@@ -172,6 +180,16 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isLocalhost checks whether the request originates from the local machine.
+func isLocalhost(r *http.Request) bool {
+	host := r.RemoteAddr
+	// Strip port if present
+	if idx := strings.LastIndex(host, ":"); idx != -1 {
+		host = host[:idx]
+	}
+	return host == "127.0.0.1" || host == "::1" || host == "localhost"
 }
 
 // handleHealth serves the health check endpoint.

@@ -24,7 +24,7 @@ import (
 
 // HandleServe handles the "serve" command (HTTP API server mode).
 func HandleServe(args []string) {
-	host := ""
+	host := "127.0.0.1" // 默认只绑定本地，防止未授权外部访问
 	port := "8080"
 	apiKey := ""
 	workflowsDir := ""
@@ -66,6 +66,16 @@ func HandleServe(args []string) {
 		server.SetWorkflowsDir(workflowsDir)
 	}
 
+	// 启动前安全检查：禁止无认证时绑定所有接口
+	if host == "" || host == "0.0.0.0" {
+		if apiKey == "" {
+			fmt.Fprintln(os.Stderr,
+				"Refusing to start: API server would bind to all interfaces "+
+					"with no authentication. Use --api-key <key> or --host 127.0.0.1.")
+			os.Exit(1)
+		}
+	}
+
 	fmt.Printf("Starting API server on http://localhost:%s\n", port)
 	fmt.Println("Endpoints:")
 	fmt.Println("  GET  /health               - Health check")
@@ -86,7 +96,7 @@ func PrintServeUsage() {
 	fmt.Println("Usage: aflare serve [options]")
 	fmt.Println("\nOptions:")
 	fmt.Println("  --port, -p <port>      - API server port (default: 8080)")
-	fmt.Println("  --host, -H <host>      - API server host (default: 0.0.0.0)")
+	fmt.Println("  --host, -H <host>      - API server host (default: 127.0.0.1)")
 	fmt.Println("  --api-key, -k <key>    - API key for authentication")
 	fmt.Println("  --dir, -d <dir>        - Workflows directory")
 	fmt.Println("  --help, -h             - Show this help")
