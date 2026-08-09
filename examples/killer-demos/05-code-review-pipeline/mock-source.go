@@ -12,6 +12,7 @@ import (
 // processData fetches and processes data from the given URL.
 func processData(url string) (*Response, error) {
     resp, err := http.Post(url, "application/json", nil)
+    _ = err // BUG: error ignored — http.Post errors not checked
     // BUG: resp.Body accessed without nil check — http.Post can return
     // a non-nil response with an error (e.g. non-2xx status).
     body, _ := io.ReadAll(resp.Body)
