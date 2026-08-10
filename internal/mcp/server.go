@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/alib8b8/aflare/internal/config"
@@ -277,9 +278,9 @@ func (s *Server) runWorkflow(args map[string]interface{}) (*toolCallResult, erro
 		return nil, fmt.Errorf("file parameter is required")
 	}
 
-	// Security: block path traversal attempts
-	if strings.Contains(file, "..") {
-		return nil, fmt.Errorf("invalid file path: path traversal is not allowed")
+	// Security: block path traversal and restrict to .yaml/.yml files
+	if err := validateWorkflowFilePath(file); err != nil {
+		return nil, err
 	}
 
 	wf, err := workflow.ParseWorkflow(file)
@@ -364,9 +365,9 @@ func (s *Server) validateWorkflow(args map[string]interface{}) (*toolCallResult,
 		return nil, fmt.Errorf("file parameter is required")
 	}
 
-	// Security: block path traversal attempts
-	if strings.Contains(file, "..") {
-		return nil, fmt.Errorf("invalid file path: path traversal is not allowed")
+	// Security: block path traversal and restrict to .yaml/.yml files
+	if err := validateWorkflowFilePath(file); err != nil {
+		return nil, err
 	}
 
 	wf, err := workflow.ParseWorkflow(file)
@@ -405,6 +406,36 @@ func (s *Server) validateWorkflow(args map[string]interface{}) (*toolCallResult,
 			{Type: "text", Text: sb.String()},
 		},
 	}, nil
+}
+
+// validateWorkflowFilePath validates that a file path is safe to read as a
+// workflow. It blocks:
+//   - path traversal (.., ../, ..\) after filepath.Clean
+//   - non-.yaml/.yml extensions
+//
+// The previous check only tested strings.Contains(file, ".."), which did not
+// block symlink escapes or non-yaml files. Absolute paths are allowed (users
+// may reference workflows at arbitrary locations) as long as the extension
+// is .yaml/.yml and no traversal is attempted.
+func validateWorkflowFilePath(file string) error {
+	if file == "" {
+		return fmt.Errorf("file path is required")
+	}
+
+	cleaned := filepath.Clean(file)
+
+	// Reject path traversal (post-clean)
+	if strings.HasPrefix(cleaned, "..") || strings.Contains(cleaned, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("path traversal is not allowed: %s", file)
+	}
+
+	// Only allow .yaml/.yml extensions
+	ext := strings.ToLower(filepath.Ext(cleaned))
+	if ext != ".yaml" && ext != ".yml" {
+		return fmt.Errorf("only .yaml/.yml files are allowed, got: %s", ext)
+	}
+
+	return nil
 }
 
 func (s *Server) send(resp *rpcResponse) {
