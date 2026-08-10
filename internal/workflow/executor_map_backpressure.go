@@ -76,8 +76,3 @@ func (p *backpressurePool) submit(mi mapItem) bool {
 func (p *backpressurePool) close() {
 	close(p.queue)
 }
-
-// dropped returns the number of items skipped due to a full queue (drop mode).
-func (p *backpressurePool) dropped() int64 {
-	return atomic.LoadInt64(&p.drops)
-}

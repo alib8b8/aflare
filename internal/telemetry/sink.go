@@ -16,6 +16,8 @@
 package telemetry
 
 import (
+	"context"
+
 	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
@@ -49,7 +51,7 @@ func (s *OtelLLMCallSink) RecordLLMCall(t core.LLMCallTelemetry) {
 		// to inject the step span context into the sink, which adds
 		// complexity for marginal gain. The attributes (model, provider,
 		// tokens, cost) are the high-value data for Jaeger/Tempo.
-		_, span := StartLLMSpan(nil, t.Model, t.Provider) // nil context = background
+		_, span := StartLLMSpan(context.Background(), t.Model, t.Provider)
 
 		var err error
 		if t.ErrText != "" {

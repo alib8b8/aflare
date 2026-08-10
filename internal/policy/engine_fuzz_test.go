@@ -69,14 +69,14 @@ func FuzzLoadPolicy(f *testing.F) {
 
 			tmpFile, err := os.CreateTemp(tmpDir, "fuzz-*.yaml")
 			if err != nil {
-				t.Skipf("failed to create temp file: %v", err)
+				t.Errorf("failed to create temp file: %v", err)
 				return
 			}
 			path := tmpFile.Name()
 
 			if _, err := tmpFile.WriteString(content); err != nil {
 				tmpFile.Close()
-				t.Skipf("failed to write temp file: %v", err)
+				t.Errorf("failed to write temp file: %v", err)
 				return
 			}
 			tmpFile.Close()

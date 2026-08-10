@@ -22,6 +22,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 const (
@@ -229,5 +230,5 @@ func LLMSpanEnd(span trace.Span, err error, latencyMs int64, promptTokens, compl
 var noopSpan trace.Span
 
 func init() {
-	_, noopSpan = trace.NewNoopTracerProvider().Tracer(tracerName).Start(context.Background(), "noop")
+	_, noopSpan = noop.NewTracerProvider().Tracer(tracerName).Start(context.Background(), "noop")
 }
