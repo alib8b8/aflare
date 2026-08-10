@@ -4,51 +4,42 @@ name: Image Optimizer
 #        aflare run image-optimizer/workflow.yaml
 
 steps:
-  - node: execute
+  - node: code_interpreter
     params:
-      command: |
-        DIR="{{ .params.directory }}"
-        echo "=== Before ==="
-        du -sh "$DIR"
-        find "$DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) | wc -l
-        echo "images found"
-    id: before
+      language: python
+      code: |
+        import os, shutil, glob as globmod
 
-  - node: execute
-    params:
-      command: |
-        DIR="{{ .params.directory }}"
-        QUALITY="{{ .params.quality | default 80 }}"
-        mkdir -p "$DIR/optimized"
-        for img in "$DIR"/*.jpg "$DIR"/*.jpeg "$DIR"/*.png; do
-          [ -f "$img" ] || continue
-          fname=$(basename "$img")
-          if command -v convert &> /dev/null; then
-            convert "$img" -quality "$QUALITY" "$DIR/optimized/$fname"
-          else
-            cp "$img" "$DIR/optimized/$fname"
-          fi
-        done
-        echo "Optimization complete"
+        directory = "{{ .params.directory }}"
+        quality = int("{{ .params.quality | default 80 }}")
+
+        before_size = sum(os.path.getsize(os.path.join(directory, f)) for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)))
+        image_exts = [".jpg", ".jpeg", ".png", ".webp"]
+        image_files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and os.path.splitext(f)[1].lower() in image_exts]
+        print("=== Before ===")
+        print(f"Directory size: {before_size} bytes")
+        print(f"{len(image_files)} images found")
+
+        optimized_dir = os.path.join(directory, "optimized")
+        os.makedirs(optimized_dir, exist_ok=True)
+        for img in image_files:
+            src = os.path.join(directory, img)
+            dst = os.path.join(optimized_dir, img)
+            try:
+                from PIL import Image
+                im = Image.open(src)
+                im.save(dst, quality=quality)
+            except:
+                shutil.copy2(src, dst)
+        print("Optimization complete")
+
+        after_size = sum(os.path.getsize(os.path.join(optimized_dir, f)) for f in os.listdir(optimized_dir) if os.path.isfile(os.path.join(optimized_dir, f)))
+        print("=== After ===")
+        print(f"Optimized size: {after_size} bytes")
+        if before_size > 0:
+            saved_pct = (before_size - after_size) * 100 / before_size
+            print(f"Saved: {saved_pct:.1f}%")
     id: optimize
-
-  - node: execute
-    params:
-      command: |
-        DIR="{{ .params.directory }}"
-        echo "=== After ==="
-        du -sh "$DIR/optimized"
-        echo ""
-        echo "=== Savings ==="
-        original=$(du -sb "$DIR" | cut -f1)
-        optimized=$(du -sb "$DIR/optimized" | cut -f1)
-        echo "Original: $original bytes"
-        echo "Optimized: $optimized bytes"
-        if [ $original -gt 0 ]; then
-          saved=$(( (original - optimized) * 100 / original ))
-          echo "Saved: $saved%"
-        fi
-    id: after
 
   - node: template_render
     params:
@@ -58,11 +49,7 @@ steps:
         Directory: {{ .params.directory }}
         Quality: {{ .params.quality | default 80 }}%
         
-        ## Before
-        {{ .before }}
-        
-        ## After
-        {{ .after }}
+        {{ .optimize }}
     id: report
 
   - node: file_write

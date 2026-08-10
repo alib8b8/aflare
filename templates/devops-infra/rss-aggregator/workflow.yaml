@@ -4,14 +4,22 @@ name: RSS Feed Aggregator
 #        aflare run rss-aggregator/workflow.yaml
 
 steps:
-  - node: execute
+  - node: code_interpreter
     params:
-      command: |
-        for feed in {{ .params.feeds }}; do
-          echo "=== $feed ==="
-          curl -s "$feed" 2>/dev/null | head -200
-          echo ""
-        done
+      language: python
+      code: |
+        import urllib.request
+
+        feeds = "{{ .params.feeds }}".split()
+        for feed in feeds:
+            print(f"=== {feed} ===")
+            try:
+                with urllib.request.urlopen(feed, timeout=30) as resp:
+                    data = resp.read().decode("utf-8", errors="replace")
+                    print(data[:2000])
+            except Exception as e:
+                print(f"Error fetching feed: {e}")
+            print()
     id: feed_data
 
   - node: agent

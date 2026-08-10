@@ -4,31 +4,39 @@ name: Backup Automation
 #        aflare run backup-automation/workflow.yaml
 
 steps:
-  - node: execute
+  - node: code_interpreter
     params:
-      command: echo "Starting backup at $(date)"
-    id: start
+      language: python
+      code: |
+        import os, tarfile, datetime, glob as globmod, time
 
-  - node: execute
-    params:
-      command: |
-        BACKUP_DIR="{{ .params.backup_dir }}"
-        DEST="{{ .params.destination }}"
-        tar -czf "$DEST/backup-$(date +%Y%m%d-%H%M%S).tar.gz" "$BACKUP_DIR" 2>&1
-        echo "Backup completed"
-    id: backup
+        backup_dir = "{{ .params.backup_dir }}"
+        dest = "{{ .params.destination }}"
+        retention_days = int("{{ .params.retention_days }}")
 
-  - node: execute
-    params:
-      command: ls -lh "{{ .params.destination }}" | tail -5
-    id: verification
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        archive_name = os.path.join(dest, f"backup-{timestamp}.tar.gz")
+        os.makedirs(dest, exist_ok=True)
 
-  - node: execute
-    params:
-      command: |
-        find "{{ .params.destination }}" -name "*.tar.gz" -mtime +{{ .params.retention_days }} -delete
-        echo "Old backups cleaned up"
-    id: cleanup
+        with tarfile.open(archive_name, "w:gz") as tar:
+            tar.add(backup_dir, arcname=os.path.basename(backup_dir))
+        print("Backup completed")
+        print(f"Archive: {archive_name}")
+
+        # Verification
+        print("=== Recent backups ===")
+        for f in sorted(globmod.glob(os.path.join(dest, "*.tar.gz")), key=os.path.getmtime, reverse=True)[:5]:
+            size = os.path.getsize(f)
+            print(f"{os.path.basename(f)}: {size} bytes")
+
+        # Cleanup
+        cutoff = time.time() - retention_days * 86400
+        for f in globmod.glob(os.path.join(dest, "*.tar.gz")):
+            if os.path.getmtime(f) < cutoff:
+                os.remove(f)
+                print(f"Removed old backup: {os.path.basename(f)}")
+        print("Old backups cleaned up")
+    id: backup_ops
 
   - node: template_render
     params:
@@ -40,8 +48,7 @@ steps:
         Backup source: {{ .params.backup_dir }}
         Destination: {{ .params.destination }}
         
-        Recent backups:
-        {{ .verification }}
+        {{ .backup_ops }}
         
         Cleanup: Old backups (> {{ .params.retention_days }} days) removed
     id: report

@@ -4,66 +4,137 @@ name: Config Auditor
 #        aflare run config-auditor/workflow.yaml
 
 steps:
-  - node: execute
+  - node: code_interpreter
     params:
-      command: |
-        echo "=== Environment Files ==="
-        find {{ .params.config_path }} -name ".env*" -o -name "*.env" 2>/dev/null | head -10
-        echo "=== YAML Config Files ==="
-        find {{ .params.config_path }} -name "*.yaml" -o -name "*.yml" 2>/dev/null | head -20
-        echo "=== JSON Config Files ==="
-        find {{ .params.config_path }} -name "*.json" 2>/dev/null | head -20
-        echo "=== TOML Config Files ==="
-        find {{ .params.config_path }} -name "*.toml" 2>/dev/null | head -10
-        echo "=== INI Config Files ==="
-        find {{ .params.config_path }} -name "*.ini" -o -name "*.conf" 2>/dev/null | head -10
-        echo "=== Docker/K8s Configs ==="
-        find {{ .params.config_path }} -name "Dockerfile*" -o -name "docker-compose*" -o -name "*.k8s.yaml" 2>/dev/null | head -10
+      language: python
+      code: |
+        import os, glob as globmod
+
+        config_path = "{{ .params.config_path }}"
+
+        print("=== Environment Files ===")
+        for pattern in ["**/.env*", "**/*.env"]:
+            for f in globmod.glob(pattern, root_dir=config_path, recursive=True):
+                print(f)
+                break
+
+        print("=== YAML Config Files ===")
+        for pattern in ["**/*.yaml", "**/*.yml"]:
+            for f in globmod.glob(pattern, root_dir=config_path, recursive=True):
+                print(f)
+                break
+
+        print("=== JSON Config Files ===")
+        for pattern in ["**/*.json"]:
+            for f in globmod.glob(pattern, root_dir=config_path, recursive=True):
+                print(f)
+                break
+
+        print("=== TOML Config Files ===")
+        for pattern in ["**/*.toml"]:
+            for f in globmod.glob(pattern, root_dir=config_path, recursive=True):
+                print(f)
+                break
+
+        print("=== INI Config Files ===")
+        for pattern in ["**/*.ini", "**/*.conf"]:
+            for f in globmod.glob(pattern, root_dir=config_path, recursive=True):
+                print(f)
+                break
+
+        print("=== Docker/K8s Configs ===")
+        for pattern in ["**/Dockerfile*", "**/docker-compose*", "**/*.k8s.yaml"]:
+            for f in globmod.glob(pattern, root_dir=config_path, recursive=True):
+                print(f)
+                break
     id: config_files
 
-  - node: execute
+  - node: code_interpreter
     params:
-      command: |
-        echo "=== Hardcoded Secrets ==="
-        grep -rn "password\|secret\|api_key\|token\|private_key\|access_key" \
-          --include="*.yaml" --include="*.yml" --include="*.json" --include="*.env" --include="*.toml" \
-          {{ .params.config_path }} 2>/dev/null | grep -v ".git" | head -30
-        echo "=== Default Credentials ==="
-        grep -rn "admin\|root\|default\|guest\|test" \
-          --include="*.yaml" --include="*.yml" --include="*.json" --include="*.env" \
-          {{ .params.config_path }} 2>/dev/null | grep -v ".git" | head -20
-        echo "=== Insecure Protocols ==="
-        grep -rn "http://\|ftp://\|telnet" \
-          --include="*.yaml" --include="*.yml" --include="*.json" \
-          {{ .params.config_path }} 2>/dev/null | grep -v ".git" | head -15
-        echo "=== Debug Mode Enabled ==="
-        grep -rn "debug.*true\|DEBUG.*true\|debug.*1\|DEBUG=1" \
-          --include="*.yaml" --include="*.yml" --include="*.env" \
-          {{ .params.config_path }} 2>/dev/null | grep -v ".git" | head -15
+      language: python
+      code: |
+        import os, re, subprocess
+
+        config_path = "{{ .params.config_path }}"
+
+        print("=== Hardcoded Secrets ===")
+        r = subprocess.run(
+            ["grep", "-rn", "password|secret|api_key|token|private_key|access_key",
+             "--include=*.yaml", "--include=*.yml", "--include=*.json", "--include=*.env", "--include=*.toml",
+             config_path],
+            capture_output=True, text=True
+        )
+        lines = [l for l in r.stdout.split("\n") if ".git" not in l][:30]
+        print("\n".join(lines) or "(none found)")
+
+        print("=== Default Credentials ===")
+        r = subprocess.run(
+            ["grep", "-rn", "admin|root|default|guest|test",
+             "--include=*.yaml", "--include=*.yml", "--include=*.json", "--include=*.env",
+             config_path],
+            capture_output=True, text=True
+        )
+        lines = [l for l in r.stdout.split("\n") if ".git" not in l][:20]
+        print("\n".join(lines) or "(none found)")
+
+        print("=== Insecure Protocols ===")
+        r = subprocess.run(
+            ["grep", "-rn", "http://|ftp://|telnet",
+             "--include=*.yaml", "--include=*.yml", "--include=*.json",
+             config_path],
+            capture_output=True, text=True
+        )
+        lines = [l for l in r.stdout.split("\n") if ".git" not in l][:15]
+        print("\n".join(lines) or "(none found)")
+
+        print("=== Debug Mode Enabled ===")
+        r = subprocess.run(
+            ["grep", "-rn", "debug.*true|DEBUG.*true|debug.*1|DEBUG=1",
+             "--include=*.yaml", "--include=*.yml", "--include=*.env",
+             config_path],
+            capture_output=True, text=True
+        )
+        lines = [l for l in r.stdout.split("\n") if ".git" not in l][:15]
+        print("\n".join(lines) or "(none found)")
     id: security_scan
 
-  - node: execute
+  - node: code_interpreter
     params:
-      command: |
-        echo "=== Duplicate Config Keys ==="
-        for f in $(find {{ .params.config_path }} -name "*.yaml" -o -name "*.yml" 2>/dev/null | head -20); do
-          echo "--- $f ---"
-          python3 -c "
-import yaml, sys
-try:
-    with open('$f') as fh:
-        data = yaml.safe_load(fh)
-    if isinstance(data, dict):
-        keys = list(data.keys())
-        if len(keys) != len(set(keys)):
-            print('WARNING: Duplicate keys detected')
-        print(f'  Top-level keys: {len(keys)}')
-except Exception as e:
-    print(f'  Parse error: {e}')
-" 2>/dev/null
-        done
-        echo "=== Large Config Files (>1000 lines) ==="
-        find {{ .params.config_path }} -name "*.yaml" -o -name "*.yml" -o -name "*.json" 2>/dev/null | xargs wc -l 2>/dev/null | awk '$1 > 1000 {print}' | head -10
+      language: python
+      code: |
+        import os, subprocess, glob as globmod, yaml
+
+        config_path = "{{ .params.config_path }}"
+
+        print("=== Duplicate Config Keys ===")
+        yaml_files = []
+        for pattern in ["**/*.yaml", "**/*.yml"]:
+            yaml_files.extend(globmod.glob(pattern, root_dir=config_path, recursive=True))
+        for f in yaml_files[:20]:
+            full = os.path.join(config_path, f)
+            print(f"--- {f} ---")
+            try:
+                with open(full) as fh:
+                    data = yaml.safe_load(fh)
+                if isinstance(data, dict):
+                    keys = list(data.keys())
+                    if len(keys) != len(set(keys)):
+                        print("WARNING: Duplicate keys detected")
+                    print(f"  Top-level keys: {len(keys)}")
+            except Exception as e:
+                print(f"  Parse error: {e}")
+
+        print("=== Large Config Files (>1000 lines) ===")
+        for pattern in ["**/*.yaml", "**/*.yml", "**/*.json"]:
+            for f in globmod.glob(pattern, root_dir=config_path, recursive=True):
+                full = os.path.join(config_path, f)
+                try:
+                    with open(full) as fh:
+                        lines = sum(1 for _ in fh)
+                    if lines > 1000:
+                        print(f"{f}: {lines} lines")
+                except:
+                    pass
     id: config_quality
 
   - node: agent

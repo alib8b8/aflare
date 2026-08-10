@@ -4,37 +4,51 @@ name: File Organizer
 #        aflare run file-organizer/workflow.yaml
 
 steps:
-  - node: execute
+  - node: code_interpreter
     params:
-      command: ls -la "{{ .params.directory }}" | head -30
-    id: file_list
+      language: python
+      code: |
+        import os, shutil
 
-  - node: execute
-    params:
-      command: |
-        DIR="{{ .params.directory }}"
-        cd "$DIR"
-        mkdir -p images documents archives code audio video other
-        find . -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.svg" -o -iname "*.webp" \) -exec mv {} images/ \; 2>/dev/null || true
-        find . -maxdepth 1 -type f \( -iname "*.pdf" -o -iname "*.doc" -o -iname "*.docx" -o -iname "*.txt" -o -iname "*.md" -o -iname "*.xls" -o -iname "*.xlsx" -o -iname "*.ppt" -o -iname "*.pptx" \) -exec mv {} documents/ \; 2>/dev/null || true
-        find . -maxdepth 1 -type f \( -iname "*.zip" -o -iname "*.tar.gz" -o -iname "*.rar" -o -iname "*.7z" \) -exec mv {} archives/ \; 2>/dev/null || true
-        find . -maxdepth 1 -type f \( -iname "*.py" -o -iname "*.js" -o -iname "*.go" -o -iname "*.java" -o -iname "*.cpp" -o -iname "*.rs" -o -iname "*.ts" \) -exec mv {} code/ \; 2>/dev/null || true
-        find . -maxdepth 1 -type f \( -iname "*.mp3" -o -iname "*.wav" -o -iname "*.flac" -o -iname "*.aac" \) -exec mv {} audio/ \; 2>/dev/null || true
-        find . -maxdepth 1 -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" -o -iname "*.webm" \) -exec mv {} video/ \; 2>/dev/null || true
-        find . -maxdepth 1 -type f -exec mv {} other/ \; 2>/dev/null || true
-        echo "Organization complete"
+        directory = "{{ .params.directory }}"
+        files = sorted(os.listdir(directory))[:30]
+        for f in files:
+            full = os.path.join(directory, f)
+            if os.path.isfile(full):
+                size = os.path.getsize(full)
+                print(f"{size:>10}  {f}")
+
+        # Organize by type
+        categories = {
+            "images": [".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp"],
+            "documents": [".pdf", ".doc", ".docx", ".txt", ".md", ".xls", ".xlsx", ".ppt", ".pptx"],
+            "archives": [".zip", ".tar.gz", ".rar", ".7z"],
+            "code": [".py", ".js", ".go", ".java", ".cpp", ".rs", ".ts"],
+            "audio": [".mp3", ".wav", ".flac", ".aac"],
+            "video": [".mp4", ".mkv", ".avi", ".mov", ".webm"],
+        }
+        for cat in categories:
+            os.makedirs(os.path.join(directory, cat), exist_ok=True)
+
+        moved = {}
+        for f in os.listdir(directory):
+            src = os.path.join(directory, f)
+            if not os.path.isfile(src):
+                continue
+            ext = os.path.splitext(f)[1].lower()
+            dest_cat = "other"
+            for cat, exts in categories.items():
+                if ext in exts:
+                    dest_cat = cat
+                    break
+            shutil.move(src, os.path.join(directory, dest_cat, f))
+            moved[dest_cat] = moved.get(dest_cat, 0) + 1
+
+        print("\nOrganization complete")
+        print("=== Directory Structure ===")
+        for cat in sorted(moved.keys()):
+            print(f"{cat}: {moved[cat]} files")
     id: organize
-
-  - node: execute
-    params:
-      command: |
-        DIR="{{ .params.directory }}"
-        echo "=== Directory Structure ==="
-        for d in "$DIR"/*/; do
-          count=$(find "$d" -type f | wc -l)
-          echo "$(basename $d): $count files"
-        done
-    id: result
 
   - node: template_render
     params:
@@ -44,7 +58,7 @@ steps:
         Directory: {{ .params.directory }}
         
         ## Result
-        {{ .result }}
+        {{ .organize }}
         
         Files organized by type into subdirectories.
     id: report

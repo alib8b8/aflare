@@ -4,14 +4,28 @@ name: SSL Certificate Checker
 #        aflare run ssl-cert-checker/workflow.yaml
 
 steps:
-  - node: execute
+  - node: code_interpreter
     params:
-      command: |
-        for domain in {{ .params.domains }}; do
-          echo "=== $domain ==="
-          echo | openssl s_client -servername $domain -connect $domain:443 2>/dev/null | openssl x509 -noout -dates -subject 2>/dev/null || echo "Failed to connect"
-          echo ""
-        done
+      language: python
+      code: |
+        import subprocess, ssl, socket, datetime
+
+        domains = "{{ .params.domains }}".split()
+        for domain in domains:
+            print(f"=== {domain} ===")
+            r = subprocess.run(
+                ["openssl", "s_client", "-servername", domain, "-connect", f"{domain}:443"],
+                input=b"", capture_output=True, text=True, timeout=10
+            )
+            if r.returncode == 0:
+                r2 = subprocess.run(
+                    ["openssl", "x509", "-noout", "-dates", "-subject"],
+                    input=r.stdout, capture_output=True, text=True
+                )
+                print(r2.stdout or "Failed to parse cert")
+            else:
+                print("Failed to connect")
+            print()
     id: cert_info
 
   - node: agent

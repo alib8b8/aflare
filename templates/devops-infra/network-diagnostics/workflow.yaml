@@ -4,30 +4,44 @@ name: Network Diagnostics
 #        aflare run network-diagnostics/workflow.yaml
 
 steps:
-  - node: execute
+  - node: code_interpreter
     params:
-      command: echo "=== Ping Test ===" && ping -c 4 "{{ .params.target }}" 2>&1 || echo "ping failed"
-    id: ping_test
+      language: python
+      code: |
+        import subprocess, sys
 
-  - node: execute
-    params:
-      command: echo "=== Traceroute ===" && traceroute "{{ .params.target }}" 2>&1 || tracepath "{{ .params.target }}" 2>&1 || echo "traceroute unavailable"
-    id: traceroute
+        target = "{{ .params.target }}"
 
-  - node: execute
-    params:
-      command: echo "=== DNS Lookup ===" && nslookup "{{ .params.target }}" 2>&1 && echo "=== DNS Dig ===" && dig "{{ .params.target }}" 2>&1 || echo "dig unavailable"
-    id: dns_lookup
+        print("=== Ping Test ===")
+        r = subprocess.run(["ping", "-c", "4", target], capture_output=True, text=True)
+        print(r.stdout or r.stderr or "ping failed")
 
-  - node: execute
-    params:
-      command: echo "=== Port Scan (common ports) ===" && (echo > /dev/tcp/"{{ .params.target }}"/80 2>&1 && echo "Port 80: OPEN" || echo "Port 80: closed") 2>&1 && (echo > /dev/tcp/"{{ .params.target }}"/443 2>&1 && echo "Port 443: OPEN" || echo "Port 443: closed") 2>&1 && (echo > /dev/tcp/"{{ .params.target }}"/22 2>&1 && echo "Port 22: OPEN" || echo "Port 22: closed") 2>&1
-    id: port_check
+        print("=== Traceroute ===")
+        r = subprocess.run(["traceroute", target], capture_output=True, text=True)
+        if r.returncode != 0:
+            r = subprocess.run(["tracepath", target], capture_output=True, text=True)
+        print(r.stdout or r.stderr or "traceroute unavailable")
 
-  - node: execute
-    params:
-      command: echo "=== Speed Test ===" && (curl -s -o /dev/null -w "Download speed: %{speed_download} bytes/sec\n" "https://speed.cloudflare.com/__down?bytes=10000000" 2>&1 || echo "speed test failed")
-    id: speed_test
+        print("=== DNS Lookup ===")
+        r = subprocess.run(["nslookup", target], capture_output=True, text=True)
+        print(r.stdout or r.stderr or "nslookup failed")
+        r = subprocess.run(["dig", target], capture_output=True, text=True)
+        print(r.stdout or r.stderr or "dig unavailable")
+
+        print("=== Port Check ===")
+        import socket
+        for port in [80, 443, 22]:
+            try:
+                s = socket.create_connection((target, port), timeout=3)
+                s.close()
+                print(f"Port {port}: OPEN")
+            except:
+                print(f"Port {port}: closed")
+
+        print("=== Speed Test ===")
+        r = subprocess.run(["curl", "-s", "-o", "/dev/null", "-w", "Download speed: %{speed_download} bytes/sec\\n", "https://speed.cloudflare.com/__down?bytes=10000000"], capture_output=True, text=True)
+        print(r.stdout or r.stderr or "speed test failed")
+    id: diagnostics
 
   - node: template_render
     params:
@@ -36,20 +50,7 @@ steps:
         Date: {{ .date }}
         Target: {{ .params.target }}
         
-        ## Ping Test
-        {{ .ping_test }}
-        
-        ## Traceroute
-        {{ .traceroute }}
-        
-        ## DNS Lookup
-        {{ .dns_lookup }}
-        
-        ## Port Check
-        {{ .port_check }}
-        
-        ## Speed Test
-        {{ .speed_test }}
+        {{ .diagnostics }}
     id: report
 
   - node: file_write

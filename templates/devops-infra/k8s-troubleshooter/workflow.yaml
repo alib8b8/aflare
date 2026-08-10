@@ -37,22 +37,35 @@ except: pass
         kubectl top pods --all-namespaces 2>/dev/null | head -20 || echo "Pod metrics not available"
     id: pod_events
 
-  - node: execute
+  - node: code_interpreter
     params:
-      command: |
-        echo "=== Error Logs ==="
-        if [ -n "{{ .params.error_logs }}" ]; then
-          echo "{{ .params.error_logs }}"
-        else
-          echo "No specific error logs provided. Checking common sources..."
-          kubectl logs -n kube-system -l component=kube-apiserver --tail=20 2>/dev/null || echo "Cannot access API server logs"
-          echo "---"
-          kubectl logs -n kube-system -l component=kube-controller-manager --tail=20 2>/dev/null || echo "Cannot access controller manager logs"
-        fi
-        echo "=== Target Namespace ==="
-        kubectl get all -n {{ .params.namespace }} 2>/dev/null || echo "Cannot access namespace {{ .params.namespace }}"
-        echo "=== Target Resource ==="
-        kubectl describe {{ .params.resource_type }} {{ .params.resource_name }} -n {{ .params.namespace }} 2>/dev/null || echo "Cannot describe resource"
+      language: python
+      code: |
+        import subprocess
+
+        namespace = "{{ .params.namespace }}"
+        resource_type = "{{ .params.resource_type }}"
+        resource_name = "{{ .params.resource_name }}"
+        error_logs = "{{ .params.error_logs }}"
+
+        print("=== Error Logs ===")
+        if error_logs:
+            print(error_logs)
+        else:
+            print("No specific error logs provided. Checking common sources...")
+            r = subprocess.run(["kubectl", "logs", "-n", "kube-system", "-l", "component=kube-apiserver", "--tail=20"], capture_output=True, text=True)
+            print(r.stdout or "Cannot access API server logs")
+            print("---")
+            r = subprocess.run(["kubectl", "logs", "-n", "kube-system", "-l", "component=kube-controller-manager", "--tail=20"], capture_output=True, text=True)
+            print(r.stdout or "Cannot access controller manager logs")
+
+        print("=== Target Namespace ===")
+        r = subprocess.run(["kubectl", "get", "all", "-n", namespace], capture_output=True, text=True)
+        print(r.stdout or f"Cannot access namespace {namespace}")
+
+        print("=== Target Resource ===")
+        r = subprocess.run(["kubectl", "describe", resource_type, resource_name, "-n", namespace], capture_output=True, text=True)
+        print(r.stdout or f"Cannot describe resource {resource_type}/{resource_name}")
     id: error_context
 
   - node: agent

@@ -9,9 +9,11 @@ steps:
       path: "{{ .params.sales_data }}"
     id: sales_data
 
-  - node: execute
+  - node: code_interpreter
     params:
-      command: echo "Analysis period: {{ .params.period }}"
+      language: python
+      code: |
+        print(f"Analysis period: {{ .params.period }}")
     id: period_info
 
   - node: agent

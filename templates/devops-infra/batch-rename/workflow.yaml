@@ -4,9 +4,16 @@ name: Rename Batch Tool
 #        aflare run batch-rename/workflow.yaml
 
 steps:
-  - node: execute
+  - node: code_interpreter
     params:
-      command: ls "{{ .params.directory }}" | head -30
+      language: python
+      code: |
+        import os
+
+        directory = "{{ .params.directory }}"
+        files = sorted(os.listdir(directory))[:30]
+        for f in files:
+            print(f)
     id: original_files
 
   - node: agent

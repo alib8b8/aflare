@@ -4,31 +4,36 @@ name: DNS Records Checker
 #        aflare run dns-checker/workflow.yaml
 
 steps:
-  - node: execute
+  - node: code_interpreter
     params:
-      command: |
-        DOMAIN="{{ .params.domain }}"
-        echo "=== DNS Records for $DOMAIN ==="
-        echo "A Records:"
-        dig +short A "$DOMAIN" 2>/dev/null || nslookup -type=A "$DOMAIN" 2>/dev/null
-        echo ""
-        echo "AAAA Records:"
-        dig +short AAAA "$DOMAIN" 2>/dev/null || echo "N/A"
-        echo ""
-        echo "MX Records:"
-        dig +short MX "$DOMAIN" 2>/dev/null || nslookup -type=MX "$DOMAIN" 2>/dev/null
-        echo ""
-        echo "NS Records:"
-        dig +short NS "$DOMAIN" 2>/dev/null || nslookup -type=NS "$DOMAIN" 2>/dev/null
-        echo ""
-        echo "TXT Records:"
-        dig +short TXT "$DOMAIN" 2>/dev/null || echo "N/A"
-        echo ""
-        echo "CNAME (www):"
-        dig +short CNAME "www.$DOMAIN" 2>/dev/null || echo "N/A"
-        echo ""
-        echo "SOA Record:"
-        dig +short SOA "$DOMAIN" 2>/dev/null || echo "N/A"
+      language: python
+      code: |
+        import subprocess
+
+        domain = "{{ .params.domain }}"
+
+        def run_dig(record_type, name):
+            r = subprocess.run(["dig", "+short", record_type, name], capture_output=True, text=True)
+            if r.returncode == 0 and r.stdout.strip():
+                return r.stdout.strip()
+            r = subprocess.run(["nslookup", f"-type={record_type}", name], capture_output=True, text=True)
+            return r.stdout.strip() or "N/A"
+
+        print(f"=== DNS Records for {domain} ===")
+        print("A Records:")
+        print(run_dig("A", domain))
+        print("\nAAAA Records:")
+        print(run_dig("AAAA", domain))
+        print("\nMX Records:")
+        print(run_dig("MX", domain))
+        print("\nNS Records:")
+        print(run_dig("NS", domain))
+        print("\nTXT Records:")
+        print(run_dig("TXT", domain))
+        print("\nCNAME (www):")
+        print(run_dig("CNAME", f"www.{domain}"))
+        print("\nSOA Record:")
+        print(run_dig("SOA", domain))
     id: dns_records
 
   - node: template_render

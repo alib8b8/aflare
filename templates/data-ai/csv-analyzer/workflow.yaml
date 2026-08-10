@@ -9,9 +9,28 @@ steps:
       path: "{{ .params.csv_path }}"
     id: csv_data
 
-  - node: execute
+  - node: code_interpreter
     params:
-      command: head -5 "{{ .params.csv_path }}" && echo "---" && wc -l "{{ .params.csv_path }}" && echo "---" && awk -F',' 'NR==1{print "Columns:", NF; for(i=1;i<=NF;i++) print i": "$i}' "{{ .params.csv_path }}"
+      language: python
+      code: |
+        import csv, os
+
+        path = "{{ .params.csv_path }}"
+        with open(path) as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            line_count = sum(1 for _ in reader) + 1
+
+        print(f"Columns: {len(header)}")
+        for i, col in enumerate(header, 1):
+            print(f"{i}: {col}")
+        print(f"---")
+        print(f"Total lines: {line_count}")
+        print(f"---")
+        with open(path) as f:
+            for i, line in enumerate(f):
+                if i < 5:
+                    print(line.rstrip())
     id: csv_stats
 
   - node: agent

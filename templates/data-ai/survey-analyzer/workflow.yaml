@@ -9,9 +9,13 @@ steps:
       path: "{{ .params.survey_file }}"
     id: survey_data
 
-  - node: execute
+  - node: code_interpreter
     params:
-      command: echo "Total responses: $(wc -l < "{{ .params.survey_file }}")"
+      language: python
+      code: |
+        with open("{{ .params.survey_file }}") as f:
+            count = sum(1 for _ in f)
+        print(f"Total responses: {count}")
     id: response_count
 
   - node: agent

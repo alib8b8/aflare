@@ -4,65 +4,64 @@ name: Anomaly Detector
 #        aflare run anomaly-detector/workflow.yaml
 
 steps:
-  - node: execute
+  - node: code_interpreter
     params:
-      command: |
-        python3 -c "
-import pandas as pd
-import numpy as np
-from scipy import stats
-import json
+      language: python
+      code: |
+        import pandas as pd
+        import numpy as np
+        from scipy import stats
+        import json
 
-# Load dataset
-df = pd.read_csv('{{ .params.dataset_path }}')
+        # Load dataset
+        df = pd.read_csv("{{ .params.dataset_path }}")
 
-# Basic stats
-result = {}
-result['shape'] = list(df.shape)
-result['columns'] = df.columns.tolist()
-result['dtypes'] = {col: str(dt) for col, dt in df.dtypes.items()}
-result['missing'] = df.isnull().sum().to_dict()
-result['missing_pct'] = (df.isnull().sum() / len(df) * 100).round(2).to_dict()
+        # Basic stats
+        result = {}
+        result['shape'] = list(df.shape)
+        result['columns'] = df.columns.tolist()
+        result['dtypes'] = {col: str(dt) for col, dt in df.dtypes.items()}
+        result['missing'] = df.isnull().sum().to_dict()
+        result['missing_pct'] = (df.isnull().sum() / len(df) * 100).round(2).to_dict()
 
-# Statistical summary for numeric columns
-numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-result['numeric_columns'] = numeric_cols
-result['describe'] = df[numeric_cols].describe().to_dict()
+        # Statistical summary for numeric columns
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        result['numeric_columns'] = numeric_cols
+        result['describe'] = df[numeric_cols].describe().to_dict()
 
-# Z-score based anomaly detection
-anomalies = {}
-for col in numeric_cols:
-    z_scores = np.abs(stats.zscore(df[col].dropna()))
-    anomaly_indices = np.where(z_scores > 3)[0].tolist()
-    if anomaly_indices:
-        anomalies[col] = {
-            'count': len(anomaly_indices),
-            'pct': round(len(anomaly_indices) / len(df) * 100, 2),
-            'indices': anomaly_indices[:20],
-            'threshold': '3 std deviations'
-        }
-result['zscore_anomalies'] = anomalies
+        # Z-score based anomaly detection
+        anomalies = {}
+        for col in numeric_cols:
+            z_scores = np.abs(stats.zscore(df[col].dropna()))
+            anomaly_indices = np.where(z_scores > 3)[0].tolist()
+            if anomaly_indices:
+                anomalies[col] = {
+                    'count': len(anomaly_indices),
+                    'pct': round(len(anomaly_indices) / len(df) * 100, 2),
+                    'indices': anomaly_indices[:20],
+                    'threshold': '3 std deviations'
+                }
+        result['zscore_anomalies'] = anomalies
 
-# IQR-based outlier detection
-iqr_anomalies = {}
-for col in numeric_cols:
-    Q1 = df[col].quantile(0.25)
-    Q3 = df[col].quantile(0.75)
-    IQR = Q3 - Q1
-    lower = Q1 - 1.5 * IQR
-    upper = Q3 + 1.5 * IQR
-    outlier_indices = df[(df[col] < lower) | (df[col] > upper)].index.tolist()
-    if outlier_indices:
-        iqr_anomalies[col] = {
-            'count': len(outlier_indices),
-            'pct': round(len(outlier_indices) / len(df) * 100, 2),
-            'lower_bound': round(lower, 4),
-            'upper_bound': round(upper, 4)
-        }
-result['iqr_anomalies'] = iqr_anomalies
+        # IQR-based outlier detection
+        iqr_anomalies = {}
+        for col in numeric_cols:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower = Q1 - 1.5 * IQR
+            upper = Q3 + 1.5 * IQR
+            outlier_indices = df[(df[col] < lower) | (df[col] > upper)].index.tolist()
+            if outlier_indices:
+                iqr_anomalies[col] = {
+                    'count': len(outlier_indices),
+                    'pct': round(len(outlier_indices) / len(df) * 100, 2),
+                    'lower_bound': round(lower, 4),
+                    'upper_bound': round(upper, 4)
+                }
+        result['iqr_anomalies'] = iqr_anomalies
 
-print(json.dumps(result, indent=2))
-" 2>&1
+        print(json.dumps(result, indent=2))
     id: anomaly_stats
 
   - node: agent

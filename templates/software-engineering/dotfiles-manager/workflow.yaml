@@ -14,21 +14,33 @@ steps:
         ls ~/.config/ 2>/dev/null
     id: dotfiles_list
 
-  - node: execute
+  - node: code_interpreter
     params:
-      command: |
-        BACKUP_DIR="{{ .params.backup_dir }}/dotfiles-$(date +%Y%m%d)"
-        mkdir -p "$BACKUP_DIR"
+      language: python
+      code: |
+        import os, shutil, datetime, glob
+
+        backup_dir = os.path.join("{{ .params.backup_dir }}", f"dotfiles-{datetime.date.today().strftime('%Y%m%d')}")
+        os.makedirs(backup_dir, exist_ok=True)
+
         # Backup common dotfiles
-        for f in ~/.bashrc ~/.bash_profile ~/.zshrc ~/.vimrc ~/.gitconfig ~/.tmux.conf ~/.profile ~/.aliases; do
-          [ -f "$f" ] && cp "$f" "$BACKUP_DIR/"
-        done
+        home = os.path.expanduser("~")
+        dotfiles = [".bashrc", ".bash_profile", ".zshrc", ".vimrc", ".gitconfig", ".tmux.conf", ".profile", ".aliases"]
+        for f in dotfiles:
+            src = os.path.join(home, f)
+            if os.path.isfile(src):
+                shutil.copy2(src, backup_dir)
+
         # Backup .config directories
-        for d in nvim fish starship kitty; do
-          [ -d ~/.config/$d ] && cp -r ~/.config/$d "$BACKUP_DIR/"
-        done
-        echo "Backup complete: $BACKUP_DIR"
-        ls -la "$BACKUP_DIR"
+        config_dirs = ["nvim", "fish", "starship", "kitty"]
+        for d in config_dirs:
+            src = os.path.join(home, ".config", d)
+            if os.path.isdir(src):
+                shutil.copytree(src, os.path.join(backup_dir, d), dirs_exist_ok=True)
+
+        print(f"Backup complete: {backup_dir}")
+        for item in os.listdir(backup_dir):
+            print(item)
     id: backup
 
   - node: template_render
