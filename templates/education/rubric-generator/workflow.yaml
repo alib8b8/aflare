@@ -1,7 +1,7 @@
 name: rubric-generator
 description: Assessment rubric creator with customizable criteria, levels, and scoring
 version: "1.0.0"
-params:
+input_schema:
   - name: assignment_type
     type: string
     required: true

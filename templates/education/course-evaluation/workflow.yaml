@@ -1,7 +1,7 @@
 name: course-evaluation
 description: Course evaluation and feedback analysis with sentiment analysis and actionable insights
 version: "1.0.0"
-params:
+input_schema:
   - name: course_name
     type: string
     required: true

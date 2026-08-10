@@ -1,7 +1,7 @@
 name: cross-sell-engine
 description: Cross-sell and bundle recommendation engine using purchase pattern analysis
 version: "1.0"
-params:
+input_schema:
   - name: product_id
     type: string
     required: true

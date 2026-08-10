@@ -1,7 +1,7 @@
 name: sensor-data-pipeline
 description: IoT sensor data ingestion and processing pipeline with validation, enrichment, and storage
 version: "1.0.0"
-params:
+input_schema:
   - name: mqtt_topic
     type: string
     default: "sensors/+/data"

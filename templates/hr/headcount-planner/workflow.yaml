@@ -1,6 +1,6 @@
 name: headcount-planner
 description: Workforce headcount planning with budget modeling and scenario analysis
-params:
+input_schema:
   - name: departments
     type: array
     required: true

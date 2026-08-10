@@ -1,7 +1,7 @@
 name: price-optimizer
 description: Dynamic pricing optimization using market data, competitor analysis, and demand signals
 version: "1.0"
-params:
+input_schema:
   - name: product_id
     type: string
     required: true

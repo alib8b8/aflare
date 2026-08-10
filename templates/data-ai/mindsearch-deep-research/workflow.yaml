@@ -4,7 +4,7 @@ version: "1.0"
 category: research
 tags: [research, mindsearch, deep-research, exploration, graph]
 
-params:
+input_schema:
   - name: topic
     description: 研究主题或问题
     required: true

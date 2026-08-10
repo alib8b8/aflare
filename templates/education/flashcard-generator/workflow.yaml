@@ -1,7 +1,7 @@
 name: flashcard-generator
 description: Flashcard deck generator from study materials with spaced repetition support
 version: "1.0.0"
-params:
+input_schema:
   - name: source_text
     type: string
     required: true

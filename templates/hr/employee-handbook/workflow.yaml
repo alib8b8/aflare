@@ -1,6 +1,6 @@
 name: employee-handbook
 description: Employee handbook generator with policy customization and compliance
-params:
+input_schema:
   - name: company_name
     type: string
     required: true

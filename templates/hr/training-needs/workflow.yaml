@@ -1,6 +1,6 @@
 name: training-needs
 description: Training needs assessment and skills gap analysis workflow
-params:
+input_schema:
   - name: department
     type: string
     required: true

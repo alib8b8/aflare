@@ -1,6 +1,6 @@
 name: 360-feedback
 description: 360-degree feedback collection, aggregation, and analysis workflow
-params:
+input_schema:
   - name: subject_name
     type: string
     required: true

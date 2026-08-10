@@ -4,7 +4,7 @@ version: "1.0"
 category: health
 tags: [health, medical, consultation, sop, moe]
 
-params:
+input_schema:
   - name: symptoms
     description: 症状描述
     required: true

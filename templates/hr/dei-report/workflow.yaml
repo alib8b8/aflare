@@ -1,6 +1,6 @@
 name: dei-report
 description: Diversity, equity, and inclusion report generator with metrics analysis
-params:
+input_schema:
   - name: workforce_demographics
     type: object
     required: true

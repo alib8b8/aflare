@@ -1,7 +1,7 @@
 name: telemetry-dashboard
 description: Real-time telemetry dashboard generator for IoT device metrics visualization
 version: "1.0.0"
-params:
+input_schema:
   - name: device_ids
     type: string
     default: ""

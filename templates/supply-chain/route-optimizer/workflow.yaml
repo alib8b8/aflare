@@ -1,7 +1,7 @@
 name: route-optimizer
 description: Delivery route optimization using multi-stop distance minimization
 version: "1.0.0"
-params:
+input_schema:
   - name: depot_address
     type: string
     required: true

@@ -1,7 +1,7 @@
 name: return-analyzer
 description: Analyze return reasons, identify patterns, and generate prevention strategies
 version: "1.0"
-params:
+input_schema:
   - name: date_range
     type: string
     default: "90d"

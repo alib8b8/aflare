@@ -1,7 +1,7 @@
 name: mqtt-bridge
 description: MQTT protocol bridge and message router with topic mapping, transformation, and multi-broker support
 version: "1.0.0"
-params:
+input_schema:
   - name: source_broker
     type: string
     default: "mqtt://broker-source.local:1883"

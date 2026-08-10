@@ -1,7 +1,7 @@
 name: intellectual-property
 description: "IP portfolio management and analysis workflow"
 version: "1.0.0"
-params:
+input_schema:
   - name: portfolio_name
     type: string
     required: true

@@ -1,7 +1,7 @@
 name: ccpa-compliance
 description: "CCPA (California Consumer Privacy Act) compliance workflow"
 version: "1.0.0"
-params:
+input_schema:
   - name: organization_name
     type: string
     required: true

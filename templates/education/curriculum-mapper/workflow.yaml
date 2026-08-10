@@ -1,7 +1,7 @@
 name: curriculum-mapper
 description: Curriculum mapping and standards alignment tool for course design
 version: "1.0.0"
-params:
+input_schema:
   - name: course_name
     type: string
     required: true

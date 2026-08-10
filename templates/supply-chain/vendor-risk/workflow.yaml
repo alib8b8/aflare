@@ -1,7 +1,7 @@
 name: vendor-risk
 description: Vendor risk assessment and continuous monitoring
 version: "1.0.0"
-params:
+input_schema:
   - name: vendor_list
     type: string
     required: true

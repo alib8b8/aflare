@@ -1,7 +1,7 @@
 name: delivery-scheduler
 description: Last-mile delivery scheduling with time window optimization
 version: "1.0.0"
-params:
+input_schema:
   - name: orders_data
     type: string
     required: true

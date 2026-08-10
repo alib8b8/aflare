@@ -1,7 +1,7 @@
 name: last-mile-optimizer
 description: Last-mile delivery cost optimization with mode selection
 version: "1.0.0"
-params:
+input_schema:
   - name: delivery_zone
     type: string
     required: true

@@ -1,7 +1,7 @@
 name: lesson-plan
 description: Detailed lesson plan generator with learning objectives and activities
 version: "1.0.0"
-params:
+input_schema:
   - name: lesson_title
     type: string
     required: true

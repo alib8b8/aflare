@@ -1,6 +1,6 @@
 name: performance-review
 description: Performance review document generator with goal tracking, competency assessment, and development planning
-params:
+input_schema:
   - name: employee_name
     type: string
     required: true

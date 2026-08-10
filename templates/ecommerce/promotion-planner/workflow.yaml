@@ -1,7 +1,7 @@
 name: promotion-planner
 description: AI-powered promotional campaign planning with budget allocation and impact forecasting
 version: "1.0"
-params:
+input_schema:
   - name: campaign_goal
     type: string
     required: true

@@ -1,7 +1,7 @@
 name: environmental-monitor
 description: Environmental sensor monitoring for temperature, humidity, and air quality with trend analysis
 version: "1.0.0"
-params:
+input_schema:
   - name: sensor_ids
     type: string
     default: ""

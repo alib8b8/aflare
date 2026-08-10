@@ -1,7 +1,7 @@
 name: supplier-evaluation
 description: Supplier scorecard and evaluation with weighted KPIs
 version: "1.0.0"
-params:
+input_schema:
   - name: supplier_data_endpoint
     type: string
     required: true

@@ -1,7 +1,7 @@
 name: employment-agreement
 description: "Employment contract generator with role-specific clauses"
 version: "1.0.0"
-params:
+input_schema:
   - name: employer_name
     type: string
     required: true

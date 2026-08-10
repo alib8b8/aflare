@@ -1,7 +1,7 @@
 name: grading-assistant
 description: Automated essay and assignment grading with rubric-based scoring
 version: "1.0.0"
-params:
+input_schema:
   - name: assignment_text
     type: string
     required: true

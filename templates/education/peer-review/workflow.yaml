@@ -1,7 +1,7 @@
 name: peer-review
 description: Peer review workflow and rubric for structured student-to-student feedback
 version: "1.0.0"
-params:
+input_schema:
   - name: assignment_type
     type: string
     required: true

@@ -1,7 +1,7 @@
 name: quality-inspection
 description: Quality control inspection workflow with AQL sampling
 version: "1.0.0"
-params:
+input_schema:
   - name: lot_data
     type: string
     required: true

@@ -1,7 +1,7 @@
 name: customs-clearance
 description: Customs documentation generation and clearance workflow
 version: "1.0.0"
-params:
+input_schema:
   - name: shipment_data
     type: string
     required: true

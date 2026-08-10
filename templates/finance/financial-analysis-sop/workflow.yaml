@@ -4,7 +4,7 @@ version: "1.0"
 category: finance
 tags: [finance, analysis, investment, risk, sop]
 
-params:
+input_schema:
   - name: company_name
     description: 公司名称或标的
     required: true

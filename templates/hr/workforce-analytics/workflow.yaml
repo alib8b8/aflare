@@ -1,6 +1,6 @@
 name: workforce-analytics
 description: HR workforce analytics dashboard with KPIs, trends, and predictive insights
-params:
+input_schema:
   - name: workforce_data
     type: object
     required: true

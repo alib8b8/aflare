@@ -1,7 +1,7 @@
 name: privacy-policy-audit
 description: "Privacy policy compliance audit against global regulations"
 version: "1.0.0"
-params:
+input_schema:
   - name: policy_url
     type: string
     required: false

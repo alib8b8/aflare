@@ -1,7 +1,7 @@
 name: device-health-monitor
 description: IoT device health and uptime monitoring with heartbeat tracking, diagnostics, and SLA reporting
 version: "1.0.0"
-params:
+input_schema:
   - name: device_ids
     type: string
     default: ""

@@ -1,7 +1,7 @@
 name: language-exercise
 description: Language learning exercise generator with vocabulary, grammar, and conversation practice
 version: "1.0.0"
-params:
+input_schema:
   - name: target_language
     type: string
     required: true

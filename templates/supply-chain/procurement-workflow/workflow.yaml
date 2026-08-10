@@ -1,7 +1,7 @@
 name: procurement-workflow
 description: Purchase order creation and procurement automation
 version: "1.0.0"
-params:
+input_schema:
   - name: requisition_data
     type: string
     required: true

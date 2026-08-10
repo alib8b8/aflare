@@ -1,7 +1,7 @@
 name: cold-chain-monitor
 description: Cold chain temperature monitoring and compliance tracking
 version: "1.0.0"
-params:
+input_schema:
   - name: sensor_data_endpoint
     type: string
     required: true

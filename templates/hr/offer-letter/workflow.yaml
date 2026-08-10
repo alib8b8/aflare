@@ -1,6 +1,6 @@
 name: offer-letter
 description: AI-generated offer letter with compensation details and custom terms
-params:
+input_schema:
   - name: candidate_name
     type: string
     required: true

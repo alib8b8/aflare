@@ -1,6 +1,6 @@
 name: org-chart
 description: Organizational chart generator with reporting hierarchy and team analytics
-params:
+input_schema:
   - name: organization_name
     type: string
     required: true

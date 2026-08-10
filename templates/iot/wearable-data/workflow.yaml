@@ -1,7 +1,7 @@
 name: wearable-data
 description: Wearable device data aggregation with health metrics analysis, activity tracking, and wellness insights
 version: "1.0.0"
-params:
+input_schema:
   - name: user_ids
     type: string
     default: ""

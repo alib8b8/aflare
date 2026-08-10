@@ -1,7 +1,7 @@
 name: vehicle-telematics
 description: Vehicle telematics data processing with GPS tracking, driver behavior analysis, and fleet optimization
 version: "1.0.0"
-params:
+input_schema:
   - name: vehicle_ids
     type: string
     default: ""

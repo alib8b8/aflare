@@ -1,7 +1,7 @@
 name: thesis-outline
 description: Thesis and dissertation outline builder with chapter structure and content planning
 version: "1.0.0"
-params:
+input_schema:
   - name: thesis_title
     type: string
     required: true

@@ -1,7 +1,7 @@
 name: predictive-maintenance
 description: Predictive maintenance for industrial equipment using vibration analysis, temperature trends, and failure prediction
 version: "1.0.0"
-params:
+input_schema:
   - name: equipment_ids
     type: string
     default: ""

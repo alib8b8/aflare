@@ -1,7 +1,7 @@
 name: legal-research
 description: "Legal research and case law search workflow"
 version: "1.0.0"
-params:
+input_schema:
   - name: query
     type: string
     required: true

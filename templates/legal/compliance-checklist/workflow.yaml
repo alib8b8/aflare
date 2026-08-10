@@ -1,7 +1,7 @@
 name: compliance-checklist
 description: "Regulatory compliance checklist generator for any industry"
 version: "1.0.0"
-params:
+input_schema:
   - name: industry
     type: string
     required: true

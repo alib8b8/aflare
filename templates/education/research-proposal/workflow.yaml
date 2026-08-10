@@ -1,7 +1,7 @@
 name: research-proposal
 description: Academic research proposal generator with literature review and methodology
 version: "1.0.0"
-params:
+input_schema:
   - name: research_topic
     type: string
     required: true

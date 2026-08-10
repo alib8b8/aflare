@@ -1,7 +1,7 @@
 name: dynamic-pricing
 description: Real-time dynamic pricing engine with demand elasticity, competitor tracking, and margin optimization
 version: "1.0"
-params:
+input_schema:
   - name: product_ids
     type: array
     required: true

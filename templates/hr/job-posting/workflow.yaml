@@ -1,6 +1,6 @@
 name: job-posting
 description: AI-powered job posting and description generator with SEO optimization
-params:
+input_schema:
   - name: job_title
     type: string
     required: true

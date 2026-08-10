@@ -1,7 +1,7 @@
 name: alert-threshold
 description: Sensor threshold alerting and notification pipeline with multi-channel delivery
 version: "1.0.0"
-params:
+input_schema:
   - name: sensor_id
     type: string
     default: ""

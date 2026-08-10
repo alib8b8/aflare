@@ -1,7 +1,7 @@
 name: learning-path
 description: Personalized learning path designer with adaptive milestones and resources
 version: "1.0.0"
-params:
+input_schema:
   - name: subject
     type: string
     required: true

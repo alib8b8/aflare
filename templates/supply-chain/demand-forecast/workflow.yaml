@@ -1,7 +1,7 @@
 name: demand-forecast
 description: Demand forecasting with time series analysis using historical sales data
 version: "1.0.0"
-params:
+input_schema:
   - name: product_id
     type: string
     required: true

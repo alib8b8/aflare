@@ -1,7 +1,7 @@
 name: Multi-Role Business Agent
 description: Three-roles-in-one business agent (Marketing + BD + IR) for content creation, lead hunting, investor relations, and market research through a single unified interface.
 version: "1.0.0"
-params:
+input_schema:
   - name: task
     type: string
     required: true

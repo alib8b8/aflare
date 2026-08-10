@@ -1,7 +1,7 @@
 name: customer-segmentation
 description: RFM customer segmentation with targeted marketing strategy generation
 version: "1.0"
-params:
+input_schema:
   - name: segmentation_model
     type: string
     default: "rfm"

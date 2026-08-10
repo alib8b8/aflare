@@ -1,7 +1,7 @@
 name: syllabus-builder
 description: Course syllabus and schedule builder with calendar integration
 version: "1.0.0"
-params:
+input_schema:
   - name: course_name
     type: string
     required: true

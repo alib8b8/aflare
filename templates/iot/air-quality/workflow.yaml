@@ -1,7 +1,7 @@
 name: air-quality
 description: Air quality monitoring and reporting with pollutant analysis, AQI calculation, health advisories, and trend prediction
 version: "1.0.0"
-params:
+input_schema:
   - name: monitor_ids
     type: string
     default: ""

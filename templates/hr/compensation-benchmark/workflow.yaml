@@ -1,6 +1,6 @@
 name: compensation-benchmark
 description: Salary benchmarking and market analysis with compa-ratio calculation
-params:
+input_schema:
   - name: positions
     type: array
     required: true

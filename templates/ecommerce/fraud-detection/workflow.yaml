@@ -1,7 +1,7 @@
 name: fraud-detection
 description: E-commerce fraud detection with multi-signal analysis and risk scoring
 version: "1.0"
-params:
+input_schema:
   - name: order_id
     type: string
     required: true

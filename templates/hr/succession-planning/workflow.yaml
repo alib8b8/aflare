@@ -1,6 +1,6 @@
 name: succession-planning
 description: Succession planning and talent readiness assessment workflow
-params:
+input_schema:
   - name: critical_roles
     type: array
     required: true

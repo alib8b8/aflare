@@ -1,6 +1,6 @@
 name: onboarding-checklist
 description: New hire onboarding checklist generator with role-based customization
-params:
+input_schema:
   - name: employee_name
     type: string
     required: true

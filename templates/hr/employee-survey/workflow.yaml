@@ -1,6 +1,6 @@
 name: employee-survey
 description: Employee engagement survey creation, distribution, and analysis workflow
-params:
+input_schema:
   - name: survey_title
     type: string
     required: true

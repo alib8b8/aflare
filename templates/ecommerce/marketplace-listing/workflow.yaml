@@ -1,7 +1,7 @@
 name: marketplace-listing
 description: Multi-marketplace listing optimization with platform-specific content adaptation
 version: "1.0"
-params:
+input_schema:
   - name: product_id
     type: string
     required: true

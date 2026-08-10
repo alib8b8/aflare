@@ -1,7 +1,7 @@
 name: industrial-plc
 description: Industrial PLC data collection and monitoring with protocol translation, real-time analytics, and alarm management
 version: "1.0.0"
-params:
+input_schema:
   - name: plc_ids
     type: string
     default: ""

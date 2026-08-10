@@ -1,7 +1,7 @@
 name: trademark-monitor
 description: "Trademark monitoring and infringement detection workflow"
 version: "1.0.0"
-params:
+input_schema:
   - name: trademark
     type: string
     required: true

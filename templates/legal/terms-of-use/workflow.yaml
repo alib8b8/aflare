@@ -1,7 +1,7 @@
 name: terms-of-use
 description: "Terms of Use / Terms of Service generator for websites and applications"
 version: "1.0.0"
-params:
+input_schema:
   - name: company_name
     type: string
     required: true

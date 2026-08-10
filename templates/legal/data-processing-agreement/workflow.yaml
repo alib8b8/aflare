@@ -1,7 +1,7 @@
 name: data-processing-agreement
 description: "Data Processing Agreement (DPA) generator for GDPR compliance"
 version: "1.0.0"
-params:
+input_schema:
   - name: controller_name
     type: string
     required: true

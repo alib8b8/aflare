@@ -1,6 +1,6 @@
 name: talent-pipeline
 description: Talent pipeline and recruitment funnel analytics workflow
-params:
+input_schema:
   - name: pipeline_data
     type: object
     required: true

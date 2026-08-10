@@ -1,7 +1,7 @@
 name: customer-lifetime-value
 description: Customer lifetime value calculation and segmentation for strategic marketing
 version: "1.0"
-params:
+input_schema:
   - name: segment_field
     type: string
     default: "clv_tier"

@@ -1,7 +1,7 @@
 name: patent-search
 description: "Patent search and prior art analysis workflow"
 version: "1.0.0"
-params:
+input_schema:
   - name: invention_title
     type: string
     required: true

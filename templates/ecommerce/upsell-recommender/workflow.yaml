@@ -1,7 +1,7 @@
 name: upsell-recommender
 description: Post-purchase upsell recommendation engine with timing and offer optimization
 version: "1.0"
-params:
+input_schema:
   - name: customer_id
     type: string
     required: true

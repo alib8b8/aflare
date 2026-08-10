@@ -1,7 +1,7 @@
 name: cross-docking-planner
 description: Cross-docking schedule optimization for inbound/outbound synchronization
 version: "1.0.0"
-params:
+input_schema:
   - name: inbound_shipments
     type: string
     required: true

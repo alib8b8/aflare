@@ -1,7 +1,7 @@
 name: study-guide
 description: Comprehensive study guide generator with chapter summaries and practice questions
 version: "1.0.0"
-params:
+input_schema:
   - name: subject
     type: string
     required: true

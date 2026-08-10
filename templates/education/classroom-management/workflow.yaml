@@ -1,7 +1,7 @@
 name: classroom-management
 description: Classroom management and behavior tracking with intervention strategies
 version: "1.0.0"
-params:
+input_schema:
   - name: class_name
     type: string
     required: true

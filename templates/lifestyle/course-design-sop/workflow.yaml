@@ -4,7 +4,7 @@ version: "1.0"
 category: education
 tags: [education, course, design, curriculum, sop]
 
-params:
+input_schema:
   - name: topic
     description: 课程主题
     required: true

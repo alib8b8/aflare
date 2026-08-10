@@ -1,7 +1,7 @@
 name: review-analyzer
 description: Customer review sentiment analysis and insight extraction for product improvement
 version: "1.0"
-params:
+input_schema:
   - name: product_id
     type: string
     required: true

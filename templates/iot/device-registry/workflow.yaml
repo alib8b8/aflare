@@ -1,7 +1,7 @@
 name: device-registry
 description: IoT device registry and metadata management with CRUD operations and lifecycle tracking
 version: "1.0.0"
-params:
+input_schema:
   - name: registry_api
     type: string
     default: "https://api.iot-registry.local/v1"

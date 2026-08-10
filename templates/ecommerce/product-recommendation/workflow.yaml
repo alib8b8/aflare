@@ -1,7 +1,7 @@
 name: product-recommendation
 description: AI-powered product recommendation engine using customer behavior and preferences
 version: "1.0"
-params:
+input_schema:
   - name: customer_id
     type: string
     required: true

@@ -1,7 +1,7 @@
 name: gdpr-compliance
 description: "GDPR compliance checklist and assessment workflow"
 version: "1.0.0"
-params:
+input_schema:
   - name: organization_name
     type: string
     required: true

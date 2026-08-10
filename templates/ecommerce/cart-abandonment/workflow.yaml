@@ -1,7 +1,7 @@
 name: cart-abandonment
 description: Cart abandonment recovery workflow with intelligent retargeting and incentive optimization
 version: "1.0"
-params:
+input_schema:
   - name: abandonment_threshold_minutes
     type: integer
     default: 30

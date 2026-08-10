@@ -1,7 +1,7 @@
 name: energy-monitor
 description: Smart energy consumption monitoring with usage analytics, cost prediction, and optimization recommendations
 version: "1.0.0"
-params:
+input_schema:
   - name: meter_ids
     type: string
     default: ""

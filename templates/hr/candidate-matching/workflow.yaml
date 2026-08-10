@@ -1,6 +1,6 @@
 name: candidate-matching
 description: Job-candidate matching and scoring with multi-dimensional fit analysis
-params:
+input_schema:
   - name: job_requisition
     type: object
     required: true

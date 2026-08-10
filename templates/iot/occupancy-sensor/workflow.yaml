@@ -1,7 +1,7 @@
 name: occupancy-sensor
 description: Occupancy and space utilization tracking with real-time analytics, heatmap generation, and workspace optimization
 version: "1.0.0"
-params:
+input_schema:
   - name: space_ids
     type: string
     default: ""

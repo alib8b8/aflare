@@ -1,7 +1,7 @@
 name: packaging-optimizer
 description: Packaging size and cost optimization with dimensional weight analysis
 version: "1.0.0"
-params:
+input_schema:
   - name: product_catalog
     type: string
     required: true

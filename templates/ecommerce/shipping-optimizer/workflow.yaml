@@ -1,7 +1,7 @@
 name: shipping-optimizer
 description: Shipping cost and carrier optimization with rate comparison and delivery time analysis
 version: "1.0"
-params:
+input_schema:
   - name: order_id
     type: string
     required: false

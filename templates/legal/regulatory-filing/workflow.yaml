@@ -1,7 +1,7 @@
 name: regulatory-filing
 description: "Regulatory filing preparation workflow"
 version: "1.0.0"
-params:
+input_schema:
   - name: filing_type
     type: string
     required: true

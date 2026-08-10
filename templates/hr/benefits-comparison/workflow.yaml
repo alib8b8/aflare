@@ -1,6 +1,6 @@
 name: benefits-comparison
 description: Employee benefits comparison analyzer with cost modeling and recommendations
-params:
+input_schema:
   - name: current_benefits
     type: object
     required: true

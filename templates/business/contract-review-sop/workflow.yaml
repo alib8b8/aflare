@@ -4,7 +4,7 @@ version: "1.0"
 category: legal
 tags: [legal, contract, review, sop, moe]
 
-params:
+input_schema:
   - name: contract_file
     description: 合同文件路径
     required: true

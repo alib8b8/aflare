@@ -1,7 +1,7 @@
 name: citation-generator
 description: Bibliography and citation formatter supporting multiple academic styles
 version: "1.0.0"
-params:
+input_schema:
   - name: sources
     type: array
     required: true

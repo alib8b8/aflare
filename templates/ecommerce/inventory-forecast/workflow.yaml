@@ -1,7 +1,7 @@
 name: inventory-forecast
 description: AI-driven inventory demand forecasting to optimize stock levels and prevent stockouts
 version: "1.0"
-params:
+input_schema:
   - name: product_ids
     type: array
     required: false

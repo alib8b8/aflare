@@ -1,7 +1,7 @@
 name: nda-generator
 description: "Automated Non-Disclosure Agreement (NDA) generator"
 version: "1.0.0"
-params:
+input_schema:
   - name: disclosing_party
     type: string
     required: true

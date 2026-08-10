@@ -1,6 +1,6 @@
 name: exit-interview
 description: Exit interview analysis and insights generation workflow
-params:
+input_schema:
   - name: exit_interviews
     type: array
     required: true

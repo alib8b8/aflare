@@ -1,7 +1,7 @@
 name: math-problem-generator
 description: Math problem and solution generator with step-by-step explanations
 version: "1.0.0"
-params:
+input_schema:
   - name: topic
     type: string
     required: true

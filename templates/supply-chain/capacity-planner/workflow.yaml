@@ -1,7 +1,7 @@
 name: capacity-planner
 description: Production capacity planning with constraint analysis
 version: "1.0.0"
-params:
+input_schema:
   - name: production_lines
     type: string
     required: true

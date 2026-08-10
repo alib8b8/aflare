@@ -1,7 +1,7 @@
 name: lead-time-predictor
 description: Supplier lead time prediction using historical performance data
 version: "1.0.0"
-params:
+input_schema:
   - name: supplier_history_api
     type: string
     required: true

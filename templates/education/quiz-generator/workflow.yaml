@@ -1,7 +1,7 @@
 name: quiz-generator
 description: Auto-generate quizzes with multiple question types from source material
 version: "1.0.0"
-params:
+input_schema:
   - name: topic
     type: string
     required: true

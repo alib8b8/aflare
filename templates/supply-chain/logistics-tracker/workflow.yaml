@@ -1,7 +1,7 @@
 name: logistics-tracker
 description: Real-time shipment and logistics tracking across carriers
 version: "1.0.0"
-params:
+input_schema:
   - name: tracking_numbers
     type: string
     required: true

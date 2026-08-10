@@ -1,7 +1,7 @@
 name: firmware-update
 description: OTA firmware update management with rollback, validation, and device targeting
 version: "1.0.0"
-params:
+input_schema:
   - name: firmware_version
     type: string
     default: ""

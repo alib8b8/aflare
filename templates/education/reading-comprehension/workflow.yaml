@@ -1,7 +1,7 @@
 name: reading-comprehension
 description: Reading comprehension test generator with leveled passages and questions
 version: "1.0.0"
-params:
+input_schema:
   - name: passage_topic
     type: string
     required: true

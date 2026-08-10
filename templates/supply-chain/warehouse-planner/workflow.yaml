@@ -1,7 +1,7 @@
 name: warehouse-planner
 description: Warehouse layout and slotting optimization for efficient storage
 version: "1.0.0"
-params:
+input_schema:
   - name: warehouse_dimensions
     type: string
     required: true

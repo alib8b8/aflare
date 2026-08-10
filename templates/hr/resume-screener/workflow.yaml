@@ -1,6 +1,6 @@
 name: resume-screener
 description: AI-powered resume screening and ranking workflow
-params:
+input_schema:
   - name: job_description
     type: string
     required: true

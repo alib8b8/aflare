@@ -1,7 +1,7 @@
 name: contract-review
 description: "AI-powered contract review and risk analysis workflow"
 version: "1.0.0"
-params:
+input_schema:
   - name: contract_text
     type: string
     required: true

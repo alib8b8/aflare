@@ -1,7 +1,7 @@
 name: smart-building
 description: Smart building automation and monitoring with HVAC, lighting, access control, and energy optimization
 version: "1.0.0"
-params:
+input_schema:
   - name: building_id
     type: string
     default: ""

@@ -1,7 +1,7 @@
 name: plagiarism-checker
 description: Text similarity and plagiarism detection with detailed similarity reports
 version: "1.0.0"
-params:
+input_schema:
   - name: text
     type: string
     required: true

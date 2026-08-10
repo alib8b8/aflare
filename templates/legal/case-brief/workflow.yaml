@@ -1,7 +1,7 @@
 name: case-brief
 description: "Legal case brief generator from court opinions"
 version: "1.0.0"
-params:
+input_schema:
   - name: case_text
     type: string
     required: false

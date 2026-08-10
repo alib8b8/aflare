@@ -1,7 +1,7 @@
 name: essay-grader
 description: Essay grading with rubric-based scoring, detailed feedback, and improvement suggestions
 version: "1.0.0"
-params:
+input_schema:
   - name: essay_text
     type: string
     required: true

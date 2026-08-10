@@ -1,7 +1,7 @@
 name: smart-agriculture
 description: Smart agriculture sensor monitoring for soil moisture, temperature, light, and irrigation control
 version: "1.0.0"
-params:
+input_schema:
   - name: field_ids
     type: string
     default: ""

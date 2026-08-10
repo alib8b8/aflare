@@ -1,7 +1,7 @@
 name: msa-generator
 description: "Master Service Agreement (MSA) generator"
 version: "1.0.0"
-params:
+input_schema:
   - name: provider_name
     type: string
     required: true

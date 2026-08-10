@@ -1,7 +1,7 @@
 name: category-optimizer
 description: Product category performance analysis and optimization recommendations
 version: "1.0"
-params:
+input_schema:
   - name: category_ids
     type: array
     required: false

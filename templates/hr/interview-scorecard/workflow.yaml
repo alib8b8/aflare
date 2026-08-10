@@ -1,6 +1,6 @@
 name: interview-scorecard
 description: Structured interview scorecard and evaluation workflow
-params:
+input_schema:
   - name: candidate_name
     type: string
     required: true

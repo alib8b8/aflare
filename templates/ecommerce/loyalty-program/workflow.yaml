@@ -1,7 +1,7 @@
 name: loyalty-program
 description: Loyalty program design and optimization with tier structure, rewards, and engagement analysis
 version: "1.0"
-params:
+input_schema:
   - name: program_type
     type: string
     default: "points_based"

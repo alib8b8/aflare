@@ -1,7 +1,7 @@
 name: smart-home-automation
 description: Smart home automation rule engine with conditional logic and device control
 version: "1.0.0"
-params:
+input_schema:
   - name: home_id
     type: string
     default: ""

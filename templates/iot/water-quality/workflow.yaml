@@ -1,7 +1,7 @@
 name: water-quality
 description: Water quality monitoring and alerting with multi-parameter analysis, contamination detection, and compliance reporting
 version: "1.0.0"
-params:
+input_schema:
   - name: station_ids
     type: string
     default: ""

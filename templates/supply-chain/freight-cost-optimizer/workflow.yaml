@@ -1,7 +1,7 @@
 name: freight-cost-optimizer
 description: Freight cost comparison and optimization across carriers
 version: "1.0.0"
-params:
+input_schema:
   - name: shipment_details
     type: string
     required: true

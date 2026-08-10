@@ -1,7 +1,7 @@
 name: product-catalog
 description: Product catalog enrichment with AI-generated descriptions, attributes, and SEO optimization
 version: "1.0"
-params:
+input_schema:
   - name: product_ids
     type: array
     required: false

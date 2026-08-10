@@ -1,7 +1,7 @@
 name: sustainability-tracker
 description: Supply chain carbon footprint tracking and reporting
 version: "1.0.0"
-params:
+input_schema:
   - name: supply_chain_data
     type: string
     required: true

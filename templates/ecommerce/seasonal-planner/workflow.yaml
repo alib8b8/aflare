@@ -1,7 +1,7 @@
 name: seasonal-planner
 description: Seasonal inventory and promotion planning with demand forecasting and budget allocation
 version: "1.0"
-params:
+input_schema:
   - name: season
     type: string
     required: true

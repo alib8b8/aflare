@@ -1,7 +1,7 @@
 name: settlement-agreement
 description: "Settlement agreement generator for dispute resolution"
 version: "1.0.0"
-params:
+input_schema:
   - name: plaintiff
     type: string
     required: true

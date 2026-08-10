@@ -1,7 +1,7 @@
 name: edge-computing
 description: Edge computing workload distribution and task orchestration across IoT edge nodes
 version: "1.0.0"
-params:
+input_schema:
   - name: edge_nodes
     type: string
     default: ""
