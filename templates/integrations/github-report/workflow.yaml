@@ -5,19 +5,31 @@ name: GitHub Weekly Report
 # Config: Set REPO and AUTHOR in params below
 
 steps:
-  - node: execute
+  - node: code_interpreter
     params:
-      command: gh issue list --repo {{ .repo }} --since "1 week ago" --state all --limit 20 --json number,title,state,labels,createdAt
+      language: python
+      code: |
+        import subprocess
+        r = subprocess.run(["gh", "issue", "list", "--repo", "{{ .repo }}", "--since", "1 week ago", "--state", "all", "--limit", "20", "--json", "number,title,state,labels,createdAt"], capture_output=True, text=True)
+        print(r.stdout or r.stderr or "")
     id: issues
 
-  - node: execute
+  - node: code_interpreter
     params:
-      command: gh pr list --repo {{ .repo }} --since "1 week ago" --state all --limit 20 --json number,title,state,createdAt
+      language: python
+      code: |
+        import subprocess
+        r = subprocess.run(["gh", "pr", "list", "--repo", "{{ .repo }}", "--since", "1 week ago", "--state", "all", "--limit", "20", "--json", "number,title,state,createdAt"], capture_output=True, text=True)
+        print(r.stdout or r.stderr or "")
     id: prs
 
-  - node: execute
+  - node: code_interpreter
     params:
-      command: git log --author="{{ .author }}" --since="1 week ago" --pretty=format:"%h %s" --shortstat
+      language: python
+      code: |
+        import subprocess
+        r = subprocess.run(["git", "log", "--author={{ .author }}", "--since=1 week ago", "--pretty=format:%h %s", "--shortstat"], capture_output=True, text=True)
+        print(r.stdout or r.stderr or "")
     id: commits
 
   - node: agent
