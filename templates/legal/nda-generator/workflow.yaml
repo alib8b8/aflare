@@ -35,7 +35,7 @@ steps:
     node: agent
     description: "Generate NDA clauses based on parameters"
     config:
-      model: "{{ .params.model | default "gpt-4" }}"
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
       system_prompt: |
         You are a legal document drafter specializing in NDAs. Generate the full text of a Non-Disclosure Agreement
         including all standard clauses: definition of confidential information, obligations, exclusions,
@@ -53,7 +53,7 @@ steps:
     node: agent
     description: "Validate NDA against legal requirements"
     config:
-      model: "{{ .params.model | default "gpt-4" }}"
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
       system_prompt: |
         You are a compliance attorney. Review the generated NDA for legal completeness and compliance
         with standard requirements. Check for: missing essential clauses, enforceability concerns,
@@ -67,7 +67,7 @@ steps:
     node: file_write
     description: "Save the generated NDA to a file"
     config:
-      path: "{{ .params.output_path | default "output/nda_agreement.md" }}"
+      path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }output/nda_agreement.md{{ end }}'
       content: |
         # Non-Disclosure Agreement
         

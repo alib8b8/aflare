@@ -29,7 +29,7 @@ steps:
     node: agent
     description: "Determine if CCPA applies to the organization"
     config:
-      model: "{{ .params.model | default "gpt-4" }}"
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
       system_prompt: |
         You are a CCPA compliance expert. Determine if the organization meets CCPA applicability
         thresholds based on: annual revenue, data volume, and data sales. Provide a detailed
@@ -45,7 +45,7 @@ steps:
     node: agent
     description: "Map CCPA consumer rights requirements"
     config:
-      model: "{{ .params.model | default "gpt-4" }}"
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
       system_prompt: |
         You are a CCPA compliance specialist. For each CCPA consumer right, provide:
         the right description, implementation requirements, operational impact,
@@ -62,7 +62,7 @@ steps:
     node: agent
     description: "Generate required CCPA notice content"
     config:
-      model: "{{ .params.model | default "gpt-4" }}"
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
       system_prompt: |
         You are a privacy notice drafter. Generate the required CCPA notice content including:
         notice at collection, privacy policy updates, and opt-out notice. Ensure all required
@@ -100,7 +100,7 @@ steps:
     node: file_write
     description: "Save CCPA compliance report"
     config:
-      path: "{{ .params.output_path | default "output/ccpa_compliance_report.md" }}"
+      path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }output/ccpa_compliance_report.md{{ end }}'
       content: |
         # CCPA Compliance Report
         ## Organization: {{ .params.organization_name }}

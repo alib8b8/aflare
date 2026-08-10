@@ -39,7 +39,7 @@ steps:
     node: agent
     description: "Research applicable law and precedents"
     config:
-      model: "{{ .params.model | default "gpt-4" }}"
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
       system_prompt: |
         You are a legal researcher. Research the applicable law, statutes, regulations,
         and relevant case precedents for the legal questions. Provide a comprehensive
@@ -55,7 +55,7 @@ steps:
     node: agent
     description: "Analyze facts against legal framework"
     config:
-      model: "{{ .params.model | default "gpt-4" }}"
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
       system_prompt: |
         You are a senior legal analyst. Apply the legal framework to the facts. For each
         legal question, analyze: how the law applies to the specific facts, relevant
@@ -71,7 +71,7 @@ steps:
     node: agent
     description: "Draft the formal legal opinion"
     config:
-      model: "{{ .params.model | default "gpt-4" }}"
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
       system_prompt: |
         You are a senior partner at a law firm. Draft a formal legal opinion letter with:
         executive summary, statement of facts, legal framework, analysis of each question,
@@ -112,7 +112,7 @@ steps:
     node: file_write
     description: "Save the legal opinion"
     config:
-      path: "{{ .params.output_path | default "output/legal_opinion.md" }}"
+      path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }output/legal_opinion.md{{ end }}'
       content: |
         # Legal Opinion
         ## Matter: {{ .params.matter }}
