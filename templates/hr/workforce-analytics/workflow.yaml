@@ -1,0 +1,192 @@
+name: workforce-analytics
+description: HR workforce analytics dashboard with KPIs, trends, and predictive insights
+params:
+  - name: workforce_data
+    type: object
+    required: true
+    description: Comprehensive workforce data
+  - name: reporting_period
+    type: object
+    required: true
+    description: Reporting period
+  - name: kpi_targets
+    type: object
+    required: false
+    default: {}
+    description: Target values for KPIs
+  - name: include_predictions
+    type: boolean
+    required: false
+    default: true
+    description: Include predictive analytics
+  - name: dashboard_sections
+    type: array
+    required: false
+    default:
+      - headcount
+      - turnover
+      - diversity
+      - compensation
+      - hiring
+    description: Dashboard sections to include
+  - name: comparison_period
+    type: string
+    required: false
+    default: "previous_year"
+    description: Comparison period - previous_year, previous_quarter, previous_month
+
+steps:
+  - id: compute_headcount_kpis
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        data = workforce_data
+        period = reporting_period
+
+        hc = data.get("headcount", {})
+        current = hc.get("current", 0)
+        start = hc.get("period_start", 0)
+        growth = round((current - start) / start * 100, 1) if start > 0 else 0
+        approved = hc.get("approved", 0)
+        filled_pct = round(current / approved * 100, 1) if approved > 0 else 0
+
+        headcount = {
+            "current_headcount": current,
+            "period_start_headcount": start,
+            "net_change": current - start,
+            "growth_rate_pct": growth,
+            "approved_headcount": approved,
+            "filled_pct": filled_pct,
+            "open_positions": approved - current,
+            "by_department": hc.get("by_department", {}),
+            "by_location": hc.get("by_location", {}),
+            "by_employment_type": hc.get("by_type", {})
+        }
+        print(json.dumps(headcount, indent=2))
+      inputs:
+        workforce_data: "{{ .params.workforce_data }}"
+        reporting_period: "{{ .params.reporting_period }}"
+      output: headcount_kpis
+
+  - id: compute_turnover_kpis
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        data = workforce_data
+        turnover = data.get("turnover", {})
+
+        total_exits = turnover.get("total_exits", 0)
+        voluntary = turnover.get("voluntary", 0)
+        involuntary = turnover.get("involuntary", 0)
+        avg_headcount = turnover.get("avg_headcount", 1)
+
+        voluntary_rate = round(voluntary / avg_headcount * 100, 1)
+        total_rate = round(total_exits / avg_headcount * 100, 1)
+        regret_rate = turnover.get("regrettable", 0)
+        regret_pct = round(regret_rate / total_exits * 100, 1) if total_exits > 0 else 0
+
+        # First year turnover
+        first_year = turnover.get("first_year_exits", 0)
+        first_year_rate = round(first_year / avg_headcount * 100, 1)
+
+        turnover_kpis = {
+            "total_turnover_rate": total_rate,
+            "voluntary_turnover_rate": voluntary_rate,
+            "involuntary_turnover_rate": round(involuntary / avg_headcount * 100, 1),
+            "regrettable_turnover_rate": round(regret_rate / avg_headcount * 100, 1),
+            "regrettable_pct_of_total": regret_pct,
+            "first_year_turnover_rate": first_year_rate,
+            "total_exits": total_exits,
+            "by_department": turnover.get("by_department", {}),
+            "by_tenure": turnover.get("by_tenure", {}),
+            "by_reason": turnover.get("by_reason", {})
+        }
+        print(json.dumps(turnover_kpis, indent=2))
+      inputs:
+        workforce_data: "{{ .params.workforce_data }}"
+      output: turnover_kpis
+
+  - id: compute_compensation_kpis
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        data = workforce_data
+        comp = data.get("compensation", {})
+
+        avg_salary = comp.get("average_salary", 0)
+        median_salary = comp.get("median_salary", 0)
+        total_payroll = comp.get("total_payroll", 0)
+        headcount = data.get("headcount", {}).get("current", 1)
+
+        comp_kpis = {
+            "average_salary": avg_salary,
+            "median_salary": median_salary,
+            "total_payroll": total_payroll,
+            "payroll_per_head": round(total_payroll / headcount, 2) if headcount > 0 else 0,
+            "salary_bands": comp.get("salary_bands", {}),
+            "compa_ratio_avg": comp.get("avg_compa_ratio", 0),
+            "promotion_rate": round(comp.get("promotions", 0) / headcount * 100, 1),
+            "avg_merit_increase_pct": comp.get("avg_merit_increase", 0),
+            "by_department": comp.get("by_department", {}),
+            "by_level": comp.get("by_level", {})
+        }
+        print(json.dumps(comp_kpis, indent=2))
+      inputs:
+        workforce_data: "{{ .params.workforce_data }}"
+      output: compensation_kpis
+
+  - id: generate_insights
+    type: agent
+    config:
+      instruction: |
+        Analyze the workforce KPIs and generate strategic insights for the HR dashboard.
+
+        Dashboard sections: {{ .params.dashboard_sections }}
+
+        For each section, provide:
+        1. **Key Metrics Summary**: Top-line numbers with trend indicators
+        2. **Trend Analysis**: Pattern analysis vs {{ .params.comparison_period }}
+        3. **Red Flags**: Metrics exceeding thresholds or trending negatively
+        4. **Opportunities**: Areas for improvement
+        5. **Predictive Insights**: {{ if .params.include_predictions }}Forecast next quarter metrics based on current trends{{ else }}Not included{{ end }}
+        6. **Executive Summary**: 3-5 bullet points for leadership
+
+        KPI targets: {{ .params.kpi_targets }}
+
+        Return comprehensive dashboard insights as structured JSON.
+      input:
+        headcount_kpis: "{{ .steps.compute_headcount_kpis.output.headcount_kpis }}"
+        turnover_kpis: "{{ .steps.compute_turnover_kpis.output.turnover_kpis }}"
+        compensation_kpis: "{{ .steps.compute_compensation_kpis.output.compensation_kpis }}"
+        dashboard_sections: "{{ .params.dashboard_sections }}"
+        kpi_targets: "{{ .params.kpi_targets }}"
+        include_predictions: "{{ .params.include_predictions }}"
+        comparison_period: "{{ .params.comparison_period }}"
+      output: dashboard_insights
+
+  - id: save_dashboard
+    type: file_write
+    config:
+      filename: "{{ .params.output_file | default \"workforce_analytics_dashboard.json\" }}"
+      content: |
+        {
+          "metadata": {
+            "reporting_period": {{ .params.reporting_period | toJson }},
+            "comparison_period": "{{ .params.comparison_period }}",
+            "generated_at": "{{ now | date \"2006-01-02T15:04:05Z\" }}"
+          },
+          "kpis": {
+            "headcount": {{ .steps.compute_headcount_kpis.output.headcount_kpis | toJson }},
+            "turnover": {{ .steps.compute_turnover_kpis.output.turnover_kpis | toJson }},
+            "compensation": {{ .steps.compute_compensation_kpis.output.compensation_kpis | toJson }}
+          },
+          "insights": {{ .steps.generate_insights.output.dashboard_insights | toJson }},
+          "targets": {{ .params.kpi_targets | toJson }}
+        }
+      format: json

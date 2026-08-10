@@ -1,0 +1,13 @@
+{
+  "id": "hr/training-needs",
+  "name": "Training Needs Assessment",
+  "version": "1.0.0",
+  "description": "Comprehensive training needs assessment and skills gap analysis workflow with priority scoring, budget-aware planning, quarterly training calendar, and individual development paths.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["training", "skills-gap", "learning", "development", "assessment", "L&D"],
+  "keywords": ["training", "skills", "gap-analysis", "learning", "development", "L&D", "competency", "assessment", "upskilling"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

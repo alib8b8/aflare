@@ -1,0 +1,78 @@
+name: nda-generator
+description: "Automated Non-Disclosure Agreement (NDA) generator"
+version: "1.0.0"
+params:
+  - name: disclosing_party
+    type: string
+    required: true
+    description: "Name of the disclosing party"
+  - name: receiving_party
+    type: string
+    required: true
+    description: "Name of the receiving party"
+  - name: purpose
+    type: string
+    required: true
+    description: "Purpose of the disclosure"
+  - name: duration_months
+    type: integer
+    required: false
+    default: 24
+    description: "Confidentiality duration in months"
+  - name: governing_law
+    type: string
+    required: false
+    default: "State of Delaware"
+    description: "Governing law jurisdiction"
+  - name: mutual
+    type: boolean
+    required: false
+    default: false
+    description: "Whether this is a mutual NDA"
+
+steps:
+  - id: generate_clauses
+    node: agent
+    description: "Generate NDA clauses based on parameters"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a legal document drafter specializing in NDAs. Generate the full text of a Non-Disclosure Agreement
+        including all standard clauses: definition of confidential information, obligations, exclusions,
+        term and termination, return of materials, remedies, governing law, and miscellaneous provisions.
+        Output the complete NDA as a single markdown document.
+      prompt: |
+        Generate a {{ if .params.mutual }}mutual{{ else }}unilateral{{ end }} Non-Disclosure Agreement with:
+        - Disclosing Party: {{ .params.disclosing_party }}
+        - Receiving Party: {{ .params.receiving_party }}
+        - Purpose: {{ .params.purpose }}
+        - Duration: {{ .params.duration_months }} months
+        - Governing Law: {{ .params.governing_law }}
+
+  - id: validate_compliance
+    node: agent
+    description: "Validate NDA against legal requirements"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a compliance attorney. Review the generated NDA for legal completeness and compliance
+        with standard requirements. Check for: missing essential clauses, enforceability concerns,
+        ambiguous language, and jurisdictional issues.
+      prompt: |
+        NDA text: {{ index .steps.generate_clauses.outputs "nda_text" }}
+        Governing law: {{ .params.governing_law }}
+        Please validate and provide any corrections or improvements needed.
+
+  - id: save_nda
+    node: file_write
+    description: "Save the generated NDA to a file"
+    config:
+      path: "{{ .params.output_path | default "output/nda_agreement.md" }}"
+      content: |
+        # Non-Disclosure Agreement
+        
+        {{ index .steps.generate_clauses.outputs "nda_text" }}
+        
+        ---
+        ## Compliance Validation Notes
+        {{ index .steps.validate_compliance.outputs "validation_notes" }}

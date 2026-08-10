@@ -1,0 +1,116 @@
+name: flashcard-generator
+description: Flashcard deck generator from study materials with spaced repetition support
+version: "1.0.0"
+params:
+  - name: source_text
+    type: string
+    required: true
+    description: Source study material or topic
+  - name: card_count
+    type: integer
+    required: false
+    default: 20
+    description: Number of flashcards to generate
+  - name: card_format
+    type: string
+    required: false
+    default: front_back
+    description: Card format (front_back, cloze, multiple_choice)
+  - name: categories
+    type: array
+    required: false
+    default: []
+    description: Categories to organize cards by
+  - name: difficulty_levels
+    type: boolean
+    required: false
+    default: true
+    description: Include difficulty ratings on cards
+steps:
+  - id: extract_knowledge
+    node: agent
+    prompt: |
+      Analyze the following study material and extract {{ .params.card_count }} key concepts, facts, definitions, and relationships:
+      
+      {{ .params.source_text }}
+      
+      For each item, identify:
+      - The core concept or term
+      - The definition or explanation
+      - Supporting examples
+      - Related concepts
+      - Category (from: {{ .params.categories }})
+    output: knowledge_items
+
+  - id: generate_cards
+    node: agent
+    prompt: |
+      Convert these knowledge items into {{ .params.card_format }} format flashcards:
+      
+      {{ .knowledge_items }}
+      
+      Format: {{ .params.card_format }}
+      Include difficulty: {{ .params.difficulty_levels }}
+      
+      For each card, create:
+      - Front side (question, term, or prompt)
+      - Back side (answer, definition, or explanation)
+      - Hint (optional memory aid)
+      - Difficulty rating (1-5)
+      - Category tag
+    output: flashcards
+
+  - id: analyze_deck
+    node: code_interpreter
+    language: python
+    code: |
+      import json
+      
+      cards = json.loads('''{{ .flashcards }}''')
+      
+      total = len(cards)
+      categories = {}
+      difficulties = {}
+      
+      for c in cards:
+          cat = c.get('category', 'general')
+          diff = c.get('difficulty', 3)
+          categories[cat] = categories.get(cat, 0) + 1
+          difficulties[str(diff)] = difficulties.get(str(diff), 0) + 1
+      
+      stats = {
+          "total_cards": total,
+          "category_distribution": categories,
+          "difficulty_distribution": difficulties,
+          "estimated_study_sessions": max(1, total // 10),
+          "format": "{{ .params.card_format }}"
+      }
+      
+      print(json.dumps(stats, indent=2))
+    output: deck_stats
+
+  - id: format_deck
+    node: transform
+    input:
+      cards: "{{ .flashcards }}"
+      stats: "{{ .deck_stats }}"
+    template: |
+      # Flashcard Deck
+      **Total Cards:** {{ .stats.total_cards }} | **Format:** {{ .stats.format }}
+      
+      {{ range $index, $card := .cards }}
+      ---
+      ## Card {{ $index | add 1 }}
+      **Front:** {{ $card.front }}
+      **Back:** {{ $card.back }}
+      **Hint:** {{ $card.hint }}
+      **Difficulty:** {{ $card.difficulty }}/5 | **Category:** {{ $card.category }}
+      {{ end }}
+    output: formatted_deck
+
+  - id: save_flashcards
+    node: file_write
+    filename: "flashcards_deck.json"
+    content: |
+      {"deck_stats": {{ .deck_stats }}, "cards": {{ .flashcards }}}
+    output: file_path

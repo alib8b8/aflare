@@ -1,0 +1,13 @@
+{
+  "id": "education/lesson-plan",
+  "name": "Lesson Plan Generator",
+  "version": "1.0.0",
+  "description": "Detailed lesson plan generator with learning objectives, timed activities, differentiation strategies, and standards alignment.",
+  "author": "aflare community",
+  "category": "education",
+  "tags": ["lesson", "planning", "teaching", "activities", "curriculum"],
+  "keywords": ["lesson", "plan", "teaching", "classroom", "activities", "instruction", "pedagogy"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,13 @@
+{
+  "id": "hr/candidate-matching",
+  "name": "Candidate Matching",
+  "version": "1.0.0",
+  "description": "Multi-dimensional job-candidate matching and scoring workflow that computes fit across skills, experience, education, location, and salary dimensions with weighted scoring.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["recruitment", "matching", "scoring", "talent-acquisition", "candidate-evaluation"],
+  "keywords": ["candidate", "matching", "scoring", "job-fit", "recruitment", "hiring", "talent", "ATS"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,175 @@
+name: training-needs
+description: Training needs assessment and skills gap analysis workflow
+params:
+  - name: department
+    type: string
+    required: true
+    description: Department to assess
+  - name: employee_skills
+    type: array
+    required: true
+    description: Current employee skills inventory
+  - name: required_competencies
+    type: array
+    required: true
+    description: Required competencies for current and future roles
+  - name: strategic_priorities
+    type: array
+    required: false
+    default: []
+    description: Company strategic priorities driving skill needs
+  - name: budget_constraint
+    type: number
+    required: false
+    default: 0
+    description: Annual training budget (0 = no constraint)
+  - name: assessment_method
+    type: string
+    required: false
+    default: "self_assessment"
+    description: Assessment method - self_assessment, manager, 360, skills_test
+
+steps:
+  - id: identify_gaps
+    type: agent
+    config:
+      instruction: |
+        Analyze the current employee skills against required competencies and identify gaps.
+
+        For each employee:
+        1. Map current skills to required competencies
+        2. Calculate proficiency gaps (required level vs current level)
+        3. Identify missing critical skills
+        4. Assess gap severity: Critical (blocking role effectiveness), High (significant impact), Medium (moderate impact), Low (minor impact)
+
+        For the department:
+        1. Aggregate skill gaps across the team
+        2. Identify common gaps affecting multiple employees
+        3. Highlight emerging skill needs based on strategic priorities: {{ .params.strategic_priorities }}
+        4. Calculate team readiness score for each strategic priority
+
+        Return detailed gap analysis as structured JSON.
+      input:
+        department: "{{ .params.department }}"
+        employee_skills: "{{ .params.employee_skills }}"
+        required_competencies: "{{ .params.required_competencies }}"
+        strategic_priorities: "{{ .params.strategic_priorities }}"
+        assessment_method: "{{ .params.assessment_method }}"
+      output: gap_analysis
+
+  - id: prioritize_training
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        gaps = gap_analysis
+        budget = budget_constraint
+
+        # Aggregate and prioritize gaps
+        all_gaps = []
+        for emp in gaps.get("employee_gaps", []):
+            for gap in emp.get("gaps", []):
+                all_gaps.append({
+                    "employee": emp.get("name"),
+                    "skill": gap.get("skill"),
+                    "current_level": gap.get("current_level", 0),
+                    "required_level": gap.get("required_level", 0),
+                    "gap_size": gap.get("gap_size", 0),
+                    "severity": gap.get("severity", "Medium"),
+                    "category": gap.get("category", "Technical")
+                })
+
+        # Group by skill for common training needs
+        skill_groups = {}
+        for g in all_gaps:
+            skill = g["skill"]
+            if skill not in skill_groups:
+                skill_groups[skill] = {"skill": skill, "affected_employees": 0, "total_gap": 0, "severity_distribution": {}, "category": g["category"]}
+            skill_groups[skill]["affected_employees"] += 1
+            skill_groups[skill]["total_gap"] += g["gap_size"]
+            sev = g["severity"]
+            skill_groups[skill]["severity_distribution"][sev] = skill_groups[skill]["severity_distribution"].get(sev, 0) + 1
+
+        # Priority scoring
+        for skill, data in skill_groups.items():
+            severity_weight = data["severity_distribution"].get("Critical", 0) * 10 + data["severity_distribution"].get("High", 0) * 5 + data["severity_distribution"].get("Medium", 0) * 2
+            data["priority_score"] = data["affected_employees"] * data["total_gap"] / len(all_gaps) + severity_weight
+
+        sorted_skills = sorted(skill_groups.values(), key=lambda x: x["priority_score"], reverse=True)
+
+        # Budget-aware top recommendations
+        top_training = []
+        remaining_budget = budget if budget > 0 else float("inf")
+        est_cost_per_person = 500  # Default if no cost data
+
+        for skill in sorted_skills:
+            num_people = skill["affected_employees"]
+            total_cost = num_people * est_cost_per_person
+            if total_cost <= remaining_budget or budget == 0:
+                top_training.append(skill)
+                if budget > 0:
+                    remaining_budget -= total_cost
+
+        result = {
+            "summary": {
+                "total_employees_assessed": len(gaps.get("employee_gaps", [])),
+                "total_skill_gaps": len(all_gaps),
+                "unique_skills_needed": len(skill_groups),
+                "critical_gaps": len([g for g in all_gaps if g["severity"] == "Critical"]),
+                "high_gaps": len([g for g in all_gaps if g["severity"] == "High"]),
+                "team_readiness": gaps.get("team_readiness", {})
+            },
+            "priority_training": top_training[:10],
+            "all_gaps_by_skill": sorted_skills,
+            "budget_utilization": round(budget - remaining_budget, 2) if budget > 0 else "N/A"
+        }
+        print(json.dumps(result, indent=2))
+      inputs:
+        gap_analysis: "{{ .steps.identify_gaps.output.gap_analysis }}"
+        budget_constraint: "{{ .params.budget_constraint }}"
+      output: prioritized_training
+
+  - id: generate_training_plan
+    type: agent
+    config:
+      instruction: |
+        Create a comprehensive training plan based on the prioritized training needs.
+
+        For each priority skill area:
+        1. Recommend training modality: In-person workshop, Online course, Mentorship, Job rotation, Conference, Certification
+        2. Suggest specific providers or internal resources
+        3. Estimate duration and cost per participant
+        4. Propose timeline (Q1, Q2, Q3, Q4)
+        5. Define success metrics (e.g., proficiency improvement, certification rate)
+        6. Identify dependencies (prerequisites, manager support)
+
+        Include:
+        - Executive summary with ROI justification
+        - Quarterly training calendar
+        - Individual development paths for employees with critical gaps
+        - Budget allocation recommendations
+        - Measurement and evaluation framework
+
+        Budget constraint: {{ .params.budget_constraint }}
+        Return as structured JSON.
+      input:
+        prioritized_training: "{{ .steps.prioritize_training.output.prioritized_training }}"
+        department: "{{ .params.department }}"
+        budget_constraint: "{{ .params.budget_constraint }}"
+        strategic_priorities: "{{ .params.strategic_priorities }}"
+      output: training_plan
+
+  - id: save_plan
+    type: file_write
+    config:
+      filename: "{{ .params.output_file | default \"training_needs_plan.json\" }}"
+      content: |
+        {
+          "department": "{{ .params.department }}",
+          "assessment_method": "{{ .params.assessment_method }}",
+          "gap_analysis": {{ .steps.identify_gaps.output.gap_analysis | toJson }},
+          "prioritized_needs": {{ .steps.prioritize_training.output.prioritized_training | toJson }},
+          "training_plan": {{ .steps.generate_training_plan.output.training_plan | toJson }}
+        }
+      format: json

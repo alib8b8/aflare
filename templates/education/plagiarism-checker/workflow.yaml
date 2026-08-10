@@ -1,0 +1,136 @@
+name: plagiarism-checker
+description: Text similarity and plagiarism detection with detailed similarity reports
+version: "1.0.0"
+params:
+  - name: text
+    type: string
+    required: true
+    description: Text to check for plagiarism
+  - name: reference_texts
+    type: array
+    required: false
+    default: []
+    description: Reference texts to compare against
+  - name: check_web
+    type: boolean
+    required: false
+    default: true
+    description: Search the web for similar content
+  - name: sensitivity
+    type: string
+    required: false
+    default: medium
+    description: Detection sensitivity (low, medium, high)
+  - name: min_match_length
+    type: integer
+    required: false
+    default: 10
+    description: Minimum word sequence length to flag
+  - name: report_format
+    type: string
+    required: false
+    default: detailed
+    description: Report detail level (summary, detailed, comprehensive)
+steps:
+  - id: search_web
+    node: http_request
+    method: GET
+    url: "https://api.openalex.org/works?search={{ .params.text | trunc 200 | urlquery }}&per_page=10"
+    headers:
+      Accept: application/json
+    output: web_results
+
+  - id: analyze_similarity
+    node: agent
+    prompt: |
+      Analyze the following text for potential plagiarism:
+      
+      TEXT TO CHECK:
+      {{ .params.text }}
+      
+      Sensitivity: {{ .params.sensitivity }}
+      Minimum Match Length: {{ .params.min_match_length }} words
+      
+      Compare against:
+      {{ if .params.reference_texts }}
+      REFERENCE TEXTS: {{ .params.reference_texts }}
+      {{ end }}
+      {{ if .params.check_web }}
+      WEB RESULTS: {{ .web_results }}
+      {{ end }}
+      
+      For each potential match, identify:
+      1. The matched passage(s)
+      2. The source of the match
+      3. Similarity percentage
+      4. Type of similarity (exact, paraphrased, structural)
+      5. Whether it constitutes plagiarism
+    output: similarity_analysis
+
+  - id: compute_similarity_scores
+    node: code_interpreter
+    language: python
+    code: |
+      import json
+      import re
+      
+      analysis = json.loads('''{{ .similarity_analysis }}''')
+      matches = analysis.get('matches', [])
+      
+      total = len(matches)
+      exact = sum(1 for m in matches if m.get('type') == 'exact')
+      paraphrased = sum(1 for m in matches if m.get('type') == 'paraphrased')
+      structural = sum(1 for m in matches if m.get('type') == 'structural')
+      
+      avg_similarity = round(sum(m.get('similarity_pct', 0) for m in matches) / max(1, total), 1)
+      
+      if avg_similarity < 10:
+          risk = 'Low'
+      elif avg_similarity < 25:
+          risk = 'Medium'
+      elif avg_similarity < 50:
+          risk = 'High'
+      else:
+          risk = 'Critical'
+      
+      scores = {
+          "total_matches": total,
+          "exact_matches": exact,
+          "paraphrased_matches": paraphrased,
+          "structural_matches": structural,
+          "average_similarity_pct": avg_similarity,
+          "plagiarism_risk": risk,
+          "text_length": len('''{{ .params.text }}'''.split()),
+          "sensitivity": "{{ .params.sensitivity }}"
+      }
+      
+      print(json.dumps(scores, indent=2))
+    output: similarity_scores
+
+  - id: generate_report
+    node: agent
+    prompt: |
+      Generate a {{ .params.report_format }} plagiarism report:
+      
+      Similarity Scores: {{ .similarity_scores }}
+      Analysis: {{ .similarity_analysis }}
+      
+      Include:
+      1. Executive summary
+      2. Overall similarity score
+      3. Match-by-match breakdown
+      4. Risk assessment
+      5. Recommendations for proper citation
+      6. Originality percentage
+    output: plagiarism_report
+
+  - id: save_report
+    node: file_write
+    filename: "plagiarism_report.json"
+    content: |
+      {
+        "report": "{{ .plagiarism_report }}",
+        "scores": {{ .similarity_scores }},
+        "detailed_analysis": {{ .similarity_analysis }}
+      }
+    output: file_path

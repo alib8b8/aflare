@@ -1,0 +1,13 @@
+{
+  "id": "iot/vehicle-telematics",
+  "name": "Vehicle Telematics",
+  "version": "1.0.0",
+  "description": "Vehicle telematics data processing with GPS tracking, driver behavior analysis, geofence violation detection, and AI-powered fleet optimization insights",
+  "author": "aflare community",
+  "category": "iot",
+  "tags": ["telematics", "vehicle", "fleet", "gps", "driver-behavior"],
+  "keywords": ["iot", "vehicle", "telematics", "fleet", "gps-tracking"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

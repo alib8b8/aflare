@@ -1,0 +1,148 @@
+name: succession-planning
+description: Succession planning and talent readiness assessment workflow
+params:
+  - name: critical_roles
+    type: array
+    required: true
+    description: List of critical roles with incumbent details
+  - name: talent_pool
+    type: array
+    required: true
+    description: Internal talent pool with skills, performance, potential ratings
+  - name: time_horizon
+    type: string
+    required: false
+    default: "immediate"
+    description: Planning horizon - immediate, 1-2_years, 3-5_years
+  - name: organization
+    type: object
+    required: false
+    default: {}
+    description: Organization context (name, size, industry)
+  - name: risk_tolerance
+    type: string
+    required: false
+    default: "moderate"
+    description: Risk tolerance - low, moderate, high
+
+steps:
+  - id: assess_readiness
+    type: agent
+    config:
+      instruction: |
+        For each critical role, assess the readiness of potential successors from the talent pool.
+
+        For each candidate, evaluate:
+        - Performance track record (last 2-3 review cycles)
+        - Leadership competencies demonstrated
+        - Technical/functional expertise match
+        - Readiness level: Ready Now (0-1 year), Ready in 1-2 Years, Ready in 3-5 Years
+        - Development gaps to address
+        - Flight risk assessment (Low/Medium/High)
+
+        For each critical role, identify:
+        - Number of ready-now successors
+        - Emergency backup candidates
+        - Vacancy risk level (Critical/High/Moderate/Low)
+        - Impact of vacancy on business operations
+
+        Return structured assessment as JSON.
+      input:
+        critical_roles: "{{ .params.critical_roles }}"
+        talent_pool: "{{ .params.talent_pool }}"
+        time_horizon: "{{ .params.time_horizon }}"
+        organization: "{{ .params.organization }}"
+      output: readiness_assessment
+
+  - id: build_succession_matrix
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        assessment = readiness_assessment
+        roles = critical_roles_input
+
+        matrix = []
+        vacancy_risks = {"Critical": 0, "High": 0, "Moderate": 0, "Low": 0}
+        total_ready_now = 0
+        total_bench = 0
+
+        for role in roles:
+            role_title = role.get("title", "Unknown")
+            role_assessment = next((r for r in assessment if r.get("role") == role_title), {})
+
+            successors = role_assessment.get("successors", [])
+            ready_now = [s for s in successors if s.get("readiness") == "Ready Now"]
+            bench = successors
+
+            total_ready_now += len(ready_now)
+            total_bench += len(bench)
+            risk = role_assessment.get("vacancy_risk", "High")
+            vacancy_risks[risk] = vacancy_risks.get(risk, 0) + 1
+
+            matrix.append({
+                "role": role_title,
+                "incumbent": role.get("incumbent", "Unknown"),
+                "vacancy_risk": risk,
+                "successor_count": len(successors),
+                "ready_now_count": len(ready_now),
+                "succession_depth": "Strong" if len(ready_now) >= 2 else "Adequate" if len(ready_now) >= 1 else "Thin" if len(bench) > 0 else "Critical Gap",
+                "top_successors": [{
+                    "name": s.get("name"),
+                    "readiness": s.get("readiness"),
+                    "development_gaps": s.get("development_gaps", [])
+                } for s in successors[:3]]
+            })
+
+        summary = {
+            "total_critical_roles": len(roles),
+            "total_ready_now_successors": total_ready_now,
+            "total_bench_candidates": total_bench,
+            "coverage_ratio": round(total_ready_now / len(roles), 2) if roles else 0,
+            "vacancy_risk_distribution": vacancy_risks,
+            "critical_gaps": [r for r in matrix if r["succession_depth"] == "Critical Gap"]
+        }
+
+        output = {"summary": summary, "succession_matrix": matrix}
+        print(json.dumps(output, indent=2))
+      inputs:
+        readiness_assessment: "{{ .steps.assess_readiness.output.readiness_assessment }}"
+        critical_roles_input: "{{ .params.critical_roles }}"
+      output: succession_matrix
+
+  - id: generate_development_plan
+    type: agent
+    config:
+      instruction: |
+        Generate individual development plans for high-potential successors identified in the succession matrix.
+
+        For each successor with readiness "Ready in 1-2 Years" or "Ready in 3-5 Years":
+        1. Identify specific development gaps
+        2. Recommend targeted experiences (stretch assignments, rotations, projects)
+        3. Suggest formal learning (courses, certifications, conferences)
+        4. Propose mentorship and coaching opportunities
+        5. Define timeline with milestones
+        6. Assign estimated investment (time and budget)
+
+        Also create a retention strategy for ready-now candidates with high flight risk.
+
+        Return development plans as structured JSON.
+      input:
+        succession_matrix: "{{ .steps.build_succession_matrix.output.succession_matrix }}"
+        time_horizon: "{{ .params.time_horizon }}"
+        risk_tolerance: "{{ .params.risk_tolerance }}"
+      output: development_plans
+
+  - id: save_plan
+    type: file_write
+    config:
+      filename: "{{ .params.output_file | default \"succession_plan.json\" }}"
+      content: |
+        {
+          "organization": {{ .params.organization | toJson }},
+          "planning_horizon": "{{ .params.time_horizon }}",
+          "succession_matrix": {{ .steps.build_succession_matrix.output.succession_matrix | toJson }},
+          "development_plans": {{ .steps.generate_development_plan.output.development_plans | toJson }}
+        }
+      format: json

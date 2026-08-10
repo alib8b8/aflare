@@ -1,0 +1,13 @@
+{
+  "id": "hr/workforce-analytics",
+  "name": "Workforce Analytics Dashboard",
+  "version": "1.0.0",
+  "description": "Comprehensive HR workforce analytics dashboard with headcount, turnover, diversity, and compensation KPIs, trend analysis, predictive insights, and executive summaries.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["analytics", "dashboard", "KPIs", "workforce", "trends", "predictive", "reporting"],
+  "keywords": ["analytics", "dashboard", "workforce", "KPIs", "headcount", "turnover", "compensation", "trends", "predictive", "HR"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

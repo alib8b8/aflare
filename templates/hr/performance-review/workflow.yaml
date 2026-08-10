@@ -1,0 +1,161 @@
+name: performance-review
+description: Performance review document generator with goal tracking, competency assessment, and development planning
+params:
+  - name: employee_name
+    type: string
+    required: true
+    description: Employee full name
+  - name: employee_title
+    type: string
+    required: true
+    description: Current job title
+  - name: department
+    type: string
+    required: true
+    description: Department name
+  - name: review_period
+    type: object
+    required: true
+    description: Review period with start and end dates
+  - name: review_type
+    type: string
+    required: false
+    default: "annual"
+    description: Review type - annual, semi-annual, quarterly, probation
+  - name: goals
+    type: array
+    required: true
+    description: List of goals with target, actual, and weight
+  - name: competencies
+    type: array
+    required: false
+    default: []
+    description: Competency ratings (self, manager, peer)
+  - name: manager_name
+    type: string
+    required: true
+    description: Reviewing manager name
+  - name: self_assessment
+    type: string
+    required: false
+    default: ""
+    description: Employee self-assessment text
+
+steps:
+  - id: calculate_goal_scores
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        goals = goals_input
+        total_weighted_score = 0
+        total_weight = 0
+        goal_details = []
+
+        for g in goals:
+            weight = g.get("weight", 0)
+            target = g.get("target", 0)
+            actual = g.get("actual", 0)
+            achievement_pct = (actual / target * 100) if target > 0 else 0
+            weighted_score = min(achievement_pct * weight / 100, weight)
+            total_weighted_score += weighted_score
+            total_weight += weight
+            goal_details.append({
+                "name": g.get("name", "Unnamed"),
+                "weight": weight,
+                "target": target,
+                "actual": actual,
+                "achievement_pct": round(achievement_pct, 1),
+                "weighted_score": round(weighted_score, 2),
+                "rating": "Exceeds" if achievement_pct >= 110 else "Meets" if achievement_pct >= 85 else "Below" if achievement_pct >= 60 else "Unsatisfactory"
+            })
+
+        overall_goal_score = round((total_weighted_score / total_weight * 100), 1) if total_weight > 0 else 0
+
+        result = {
+            "goal_details": goal_details,
+            "overall_goal_score": overall_goal_score,
+            "overall_goal_rating": "Exceeds" if overall_goal_score >= 90 else "Meets" if overall_goal_score >= 70 else "Below" if overall_goal_score >= 50 else "Unsatisfactory"
+        }
+        print(json.dumps(result, indent=2))
+      inputs:
+        goals_input: "{{ .params.goals }}"
+      output: goal_results
+
+  - id: calculate_competency_scores
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        comps = competencies_input
+        if not comps:
+            result = {"overall_competency_score": 0, "competency_details": [], "note": "No competency data provided"}
+            print(json.dumps(result, indent=2))
+        else:
+            details = []
+            total = 0
+            for c in comps:
+                self_score = c.get("self_rating", 0)
+                mgr_score = c.get("manager_rating", 0)
+                peer_avg = sum(c.get("peer_ratings", [])) / len(c.get("peer_ratings", [1])) if c.get("peer_ratings") else 0
+                composite = round(self_score * 0.2 + mgr_score * 0.5 + peer_avg * 0.3, 1)
+                total += composite
+                details.append({
+                    "competency": c.get("name", "Unnamed"),
+                    "self_rating": self_score,
+                    "manager_rating": mgr_score,
+                    "peer_average": round(peer_avg, 1),
+                    "composite_score": composite
+                })
+            overall = round(total / len(comps), 1) if comps else 0
+            result = {
+                "overall_competency_score": overall,
+                "competency_details": details
+            }
+            print(json.dumps(result, indent=2))
+      inputs:
+        competencies_input: "{{ .params.competencies }}"
+      output: competency_results
+
+  - id: generate_review_document
+    type: agent
+    config:
+      instruction: |
+        Generate a comprehensive performance review document for {{ .params.employee_name }} ({{ .params.employee_title }}, {{ .params.department }}).
+
+        Review type: {{ .params.review_type }}
+        Review period: {{ .params.review_period }}
+
+        Include these sections:
+        1. **Employee Information** - Name, title, department, review period, manager
+        2. **Goal Achievement Summary** - Overall score and rating, with detailed goal-by-goal breakdown
+        3. **Competency Assessment** - Composite scores with self/manager/peer comparison
+        4. **Key Achievements** - Highlight major accomplishments
+        5. **Areas for Development** - Constructive feedback with growth opportunities
+        6. **Self-Assessment Summary** - If provided: {{ .params.self_assessment }}
+        7. **Overall Performance Rating** - Calculated from goal (60%) and competency (40%) scores
+        8. **Development Plan** - Specific training, mentorship, and growth goals for next period
+        9. **Manager Comments** - Space for manager narrative
+        10. **Sign-off Section** - Employee and manager acknowledgment
+
+        Format as a professional markdown document.
+      input:
+        employee_name: "{{ .params.employee_name }}"
+        employee_title: "{{ .params.employee_title }}"
+        department: "{{ .params.department }}"
+        review_period: "{{ .params.review_period }}"
+        review_type: "{{ .params.review_type }}"
+        manager_name: "{{ .params.manager_name }}"
+        goal_results: "{{ .steps.calculate_goal_scores.output.goal_results }}"
+        competency_results: "{{ .steps.calculate_competency_scores.output.competency_results }}"
+        self_assessment: "{{ .params.self_assessment }}"
+      output: review_document
+
+  - id: save_review
+    type: file_write
+    config:
+      filename: "{{ .params.output_file | default (printf \"performance_review_%s.md\" .params.employee_name | replace \" \" \"_\") }}"
+      content: "{{ .steps.generate_review_document.output.review_document }}"
+      format: markdown

@@ -1,0 +1,127 @@
+name: energy-monitor
+description: Smart energy consumption monitoring with usage analytics, cost prediction, and optimization recommendations
+version: "1.0.0"
+params:
+  - name: meter_ids
+    type: string
+    default: ""
+    description: Comma-separated smart meter IDs
+  - name: billing_period
+    type: string
+    default: "monthly"
+    description: Billing period - hourly, daily, weekly, or monthly
+  - name: cost_per_kwh
+    type: number
+    default: 0.12
+    description: Cost per kWh in local currency
+  - name: carbon_factor
+    type: number
+    default: 0.5
+    description: Carbon emission factor (kg CO2 per kWh)
+  - name: energy_api
+    type: string
+    default: "https://api.energy.local/v1"
+    description: Energy monitoring API endpoint
+
+steps:
+  - id: fetch_consumption
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.energy_api }}/meters/consumption"
+      headers:
+        Authorization: "Bearer {{ .env.ENERGY_API_TOKEN }}"
+        Content-Type: application/json
+      body: |
+        {
+          "meter_ids": {{ .params.meter_ids | split "," | toJson }},
+          "period": "{{ .params.billing_period }}"
+        }
+    description: Fetch energy consumption data from smart meters
+
+  - id: analyze_usage
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        import numpy as np
+
+        data = {{ .steps.fetch_consumption.output | toJson }}
+        cost_per_kwh = {{ .params.cost_per_kwh }}
+        carbon_factor = {{ .params.carbon_factor }}
+
+        meters = []
+        total_kwh = 0
+        total_cost = 0
+        total_carbon = 0
+
+        for m in data.get("meters", []):
+            consumption = m.get("consumption_kwh", [])
+            kwh = sum(consumption) if isinstance(consumption, list) else consumption
+            cost = round(kwh * cost_per_kwh, 2)
+            carbon = round(kwh * carbon_factor, 2)
+
+            peak_idx = np.argmax(consumption) if isinstance(consumption, list) and consumption else -1
+
+            meters.append({
+                "meter_id": m["meter_id"],
+                "location": m.get("location", ""),
+                "total_kwh": round(kwh, 2),
+                "avg_daily_kwh": round(kwh / max(len(consumption), 1), 2) if isinstance(consumption, list) else round(kwh, 2),
+                "peak_usage_kwh": max(consumption) if isinstance(consumption, list) and consumption else kwh,
+                "peak_period": f"period_{peak_idx}" if peak_idx >= 0 else "unknown",
+                "cost": cost,
+                "carbon_kg": carbon
+            })
+            total_kwh += kwh
+            total_cost += cost
+            total_carbon += carbon
+
+        result = {
+            "period": "{{ .params.billing_period }}",
+            "total_kwh": round(total_kwh, 2),
+            "total_cost": round(total_cost, 2),
+            "total_carbon_kg": round(total_carbon, 2),
+            "meters": meters
+        }
+        print(json.dumps(result))
+    description: Compute energy consumption analytics and cost
+
+  - id: optimize_recommendations
+    node: agent
+    config:
+      prompt: |
+        Analyze the energy consumption data and provide optimization recommendations:
+
+        {{ .steps.analyze_usage.output | toJson }}
+
+        Provide:
+        1. Top 3 energy saving opportunities
+        2. Peak usage reduction strategies
+        3. Cost optimization recommendations
+        4. Carbon footprint reduction plan
+        5. Predicted next period usage
+
+        Return as JSON with "recommendations" key.
+      output_format: json
+    description: AI-powered energy optimization recommendations
+
+  - id: generate_report
+    node: file_write
+    config:
+      file_path: "/data/energy_reports/{{ now | date \"2006-01-02\" }}/energy_{{ .params.billing_period }}.json"
+      content: |
+        {
+          "report_id": "{{ uuid }}",
+          "generated_at": "{{ now }}",
+          "period": "{{ .params.billing_period }}",
+          "summary": {
+            "total_kwh": {{ .steps.analyze_usage.output.total_kwh }},
+            "total_cost": {{ .steps.analyze_usage.output.total_cost }},
+            "total_carbon_kg": {{ .steps.analyze_usage.output.total_carbon_kg }}
+          },
+          "meters": {{ .steps.analyze_usage.output.meters | toJson }},
+          "recommendations": {{ .steps.optimize_recommendations.output | toJson }}
+        }
+    description: Generate and persist energy report

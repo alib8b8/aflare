@@ -1,0 +1,13 @@
+{
+  "id": "supply-chain/vendor-risk",
+  "name": "Vendor Risk",
+  "version": "1.0.0",
+  "description": "Multi-dimensional vendor risk assessment and continuous monitoring. Evaluates financial, compliance, operational, and geopolitical risks with configurable thresholds, generating AI-powered mitigation strategies for at-risk vendors.",
+  "author": "aflare community",
+  "category": "supply-chain",
+  "tags": ["risk", "vendor", "compliance", "monitoring", "assessment"],
+  "keywords": ["vendor risk", "supplier risk", "risk assessment", "compliance monitoring", "mitigation strategy"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,118 @@
+name: smart-home-automation
+description: Smart home automation rule engine with conditional logic and device control
+version: "1.0.0"
+params:
+  - name: home_id
+    type: string
+    default: ""
+    description: Unique identifier for the smart home
+  - name: rules_config
+    type: string
+    default: ""
+    description: JSON string of automation rules
+  - name: device_api_endpoint
+    type: string
+    default: "https://api.smarthome.local/v1"
+    description: API endpoint for device control
+  - name: execution_mode
+    type: string
+    default: "simulate"
+    description: Execution mode - simulate or live
+
+steps:
+  - id: fetch_state
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.device_api_endpoint }}/homes/{{ .params.home_id }}/state"
+      headers:
+        Authorization: "Bearer {{ .env.SMART_HOME_TOKEN }}"
+    description: Fetch current state of all devices in the home
+
+  - id: evaluate_rules
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        from datetime import datetime
+
+        state = {{ .steps.fetch_state.output | toJson }}
+        rules = json.loads('''{{ .params.rules_config }}''')
+
+        actions = []
+        for rule in rules:
+            condition = rule.get("condition", {})
+            device = state.get("devices", {}).get(condition.get("device_id"), {})
+            triggered = False
+
+            if condition.get("type") == "threshold":
+                val = device.get(condition["property"], 0)
+                op = condition.get("operator", ">")
+                target = condition.get("value", 0)
+                triggered = eval(f"{val} {op} {target}")
+
+            if triggered:
+                for action in rule.get("actions", []):
+                    actions.append({
+                        "rule_id": rule["id"],
+                        "rule_name": rule.get("name", ""),
+                        "device_id": action["device_id"],
+                        "command": action["command"],
+                        "params": action.get("params", {}),
+                        "triggered_at": datetime.utcnow().isoformat(),
+                        "trigger_reason": f"{condition['property']} {op} {target} (actual: {val})"
+                    })
+
+        result = {
+            "evaluated_rules": len(rules),
+            "triggered_actions": len(actions),
+            "actions": actions,
+            "mode": "{{ .params.execution_mode }}"
+        }
+        print(json.dumps(result))
+    description: Evaluate automation rules against current device state
+
+  - id: execute_actions
+    node: agent
+    config:
+      prompt: |
+        You are a smart home automation controller. Review the following triggered actions and decide if they should be executed:
+
+        Actions: {{ .steps.evaluate_rules.output.actions | toJson }}
+        Execution Mode: {{ .params.execution_mode }}
+
+        For each action:
+        1. Validate it is safe to execute
+        2. Check for conflicting actions
+        3. Prioritize safety-critical actions first
+        4. Return the final execution plan as JSON
+
+        Return a JSON object with "execution_plan" containing the ordered list of actions to execute.
+      output_format: json
+    description: AI validation and prioritization of automation actions
+
+  - id: dispatch_commands
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.device_api_endpoint }}/homes/{{ .params.home_id }}/commands"
+      headers:
+        Authorization: "Bearer {{ .env.SMART_HOME_TOKEN }}"
+        Content-Type: application/json
+      body: |
+        {{ .steps.execute_actions.output.execution_plan | toJson }}
+    description: Dispatch validated commands to smart home devices
+
+  - id: log_automation
+    node: file_write
+    config:
+      file_path: "/data/automation_logs/{{ .params.home_id }}/{{ now | date \"2006-01-02\" }}.json"
+      content: |
+        {
+          "timestamp": "{{ now }}",
+          "home_id": "{{ .params.home_id }}",
+          "actions_executed": {{ .steps.evaluate_rules.output.triggered_actions }},
+          "plan": {{ .steps.execute_actions.output | toJson }}
+        }
+    description: Log automation execution for audit trail

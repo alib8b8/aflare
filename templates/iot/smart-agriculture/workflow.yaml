@@ -1,0 +1,151 @@
+name: smart-agriculture
+description: Smart agriculture sensor monitoring for soil moisture, temperature, light, and irrigation control
+version: "1.0.0"
+params:
+  - name: field_ids
+    type: string
+    default: ""
+    description: Comma-separated field or zone IDs
+  - name: crop_type
+    type: string
+    default: ""
+    description: Type of crop being cultivated
+  - name: soil_metrics
+    type: string
+    default: "moisture,temperature,ph,nitrogen,phosphorus,potassium"
+    description: Comma-separated soil metrics to monitor
+  - name: irrigation_threshold
+    type: number
+    default: 30
+    description: Soil moisture percentage below which irrigation is triggered
+  - name: agri_api
+    type: string
+    default: "https://api.agriculture.local/v1"
+    description: Smart agriculture API endpoint
+
+steps:
+  - id: fetch_field_data
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.agri_api }}/fields/readings"
+      headers:
+        Authorization: "Bearer {{ .env.AGRI_API_TOKEN }}"
+        Content-Type: application/json
+      body: |
+        {
+          "field_ids": {{ .params.field_ids | split "," | toJson }},
+          "metrics": {{ .params.soil_metrics | split "," | toJson }}
+        }
+    description: Fetch soil sensor readings from agricultural fields
+
+  - id: analyze_soil_health
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        import numpy as np
+
+        data = {{ .steps.fetch_field_data.output | toJson }}
+        crop = "{{ .params.crop_type }}"
+        irr_threshold = {{ .params.irrigation_threshold }}
+
+        crop_optimal = {
+            "wheat": {"ph": (6.0, 7.0), "moisture": (40, 60), "nitrogen": (30, 50)},
+            "rice": {"ph": (5.5, 6.5), "moisture": (60, 80), "nitrogen": (20, 40)},
+            "corn": {"ph": (5.8, 7.0), "moisture": (50, 70), "nitrogen": (25, 45)},
+            "default": {"ph": (6.0, 7.0), "moisture": (40, 60), "nitrogen": (20, 50)}
+        }
+        optimal = crop_optimal.get(crop, crop_optimal["default"])
+
+        fields = []
+        irrigation_needed = []
+        for f in data.get("fields", []):
+            readings = f.get("readings", {})
+            moisture = readings.get("moisture", {}).get("value", 0)
+            ph = readings.get("ph", {}).get("value", 7)
+            nitrogen = readings.get("nitrogen", {}).get("value", 0)
+
+            health_score = 100
+            issues = []
+
+            if moisture < irr_threshold:
+                issues.append("low_moisture")
+                irrigation_needed.append({"field_id": f["field_id"], "moisture": moisture, "threshold": irr_threshold})
+                health_score -= 20
+
+            if ph < optimal["ph"][0] or ph > optimal["ph"][1]:
+                issues.append("ph_out_of_range")
+                health_score -= 15
+
+            if nitrogen < optimal["nitrogen"][0]:
+                issues.append("low_nitrogen")
+                health_score -= 15
+
+            fields.append({
+                "field_id": f["field_id"],
+                "crop": crop,
+                "readings": readings,
+                "health_score": max(health_score, 0),
+                "issues": issues,
+                "needs_irrigation": moisture < irr_threshold,
+                "needs_fertilizer": nitrogen < optimal["nitrogen"][0]
+            })
+
+        result = {
+            "crop": crop,
+            "fields": fields,
+            "irrigation_required": irrigation_needed,
+            "irrigation_threshold": irr_threshold
+        }
+        print(json.dumps(result))
+    description: Analyze soil health and determine irrigation needs
+
+  - id: generate_recommendations
+    node: agent
+    config:
+      prompt: |
+        Analyze the smart agriculture sensor data and provide farming recommendations:
+
+        {{ .steps.analyze_soil_health.output | toJson }}
+
+        Provide:
+        1. Irrigation schedule recommendations
+        2. Fertilizer application plan
+        3. Soil amendment suggestions
+        4. Crop health risk assessment
+        5. Yield optimization strategies
+
+        Return as JSON with "farming_recommendations" key.
+      output_format: json
+    description: AI-powered farming recommendations
+
+  - id: trigger_irrigation
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.agri_api }}/irrigation/trigger"
+      headers:
+        Authorization: "Bearer {{ .env.AGRI_API_TOKEN }}"
+        Content-Type: application/json
+      body: |
+        {
+          "zones": {{ .steps.analyze_soil_health.output.irrigation_required | toJson }}
+        }
+    description: Trigger automated irrigation for fields below threshold
+
+  - id: save_agri_report
+    node: file_write
+    config:
+      file_path: "/data/agriculture/{{ now | date \"2006-01-02\" }}/field_{{ .params.crop_type }}.json"
+      content: |
+        {
+          "report_id": "{{ uuid }}",
+          "timestamp": "{{ now }}",
+          "crop": "{{ .params.crop_type }}",
+          "fields": {{ .steps.analyze_soil_health.output.fields | toJson }},
+          "irrigation": {{ .steps.trigger_irrigation.output | toJson }},
+          "recommendations": {{ .steps.generate_recommendations.output | toJson }}
+        }
+    description: Save agriculture monitoring report

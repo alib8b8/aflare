@@ -1,0 +1,89 @@
+name: research-proposal
+description: Academic research proposal generator with literature review and methodology
+version: "1.0.0"
+params:
+  - name: research_topic
+    type: string
+    required: true
+    description: Research topic or question
+  - name: field
+    type: string
+    required: true
+    description: Academic field/discipline
+  - name: proposal_type
+    type: string
+    required: false
+    default: dissertation
+    description: Type of proposal (dissertation, thesis, grant, conference)
+  - name: keywords
+    type: array
+    required: false
+    default: []
+    description: Research keywords
+  - name: word_limit
+    type: integer
+    required: false
+    default: 3000
+    description: Target word count
+  - name: methodology_preference
+    type: string
+    required: false
+    default: ""
+    description: Preferred methodology (qualitative, quantitative, mixed)
+steps:
+  - id: search_literature
+    node: http_request
+    method: GET
+    url: "https://api.openalex.org/works?search={{ .params.research_topic | urlquery }}&per_page=15&filter=type:article"
+    headers:
+      Accept: application/json
+    output: literature_results
+
+  - id: draft_proposal
+    node: agent
+    prompt: |
+      Create a {{ .params.proposal_type }} research proposal for:
+      
+      Topic: {{ .params.research_topic }}
+      Field: {{ .params.field }}
+      Keywords: {{ .params.keywords }}
+      Methodology: {{ .params.methodology_preference }}
+      Word Limit: {{ .params.word_limit }}
+      
+      Include:
+      1. Title and abstract
+      2. Introduction and background
+      3. Research questions/hypotheses
+      4. Literature review (incorporating findings from: {{ .literature_results }})
+      5. Proposed methodology
+      6. Expected outcomes and significance
+      7. Timeline and milestones
+      8. Bibliography
+    output: proposal_draft
+
+  - id: refine_proposal
+    node: agent
+    prompt: |
+      Review and refine this research proposal:
+      
+      {{ .proposal_draft }}
+      
+      Check for:
+      1. Logical flow and coherence
+      2. Methodological rigor
+      3. Feasibility
+      4. Originality and contribution
+      5. Alignment with {{ .params.field }} standards
+      6. Grammar and academic style
+      
+      Provide the refined version with tracked improvements.
+    output: final_proposal
+
+  - id: save_proposal
+    node: file_write
+    filename: "research_proposal_{{ .params.research_topic | sanitize | trunc 50 }}.md"
+    content: |
+      # Research Proposal: {{ .params.research_topic }}
+      
+      {{ .final_proposal }}
+    output: file_path

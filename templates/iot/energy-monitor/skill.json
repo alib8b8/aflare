@@ -1,0 +1,13 @@
+{
+  "id": "iot/energy-monitor",
+  "name": "Energy Monitor",
+  "version": "1.0.0",
+  "description": "Smart energy consumption monitoring with usage analytics, cost prediction, carbon footprint tracking, and AI-powered optimization recommendations",
+  "author": "aflare community",
+  "category": "iot",
+  "tags": ["energy", "monitoring", "consumption", "cost", "carbon"],
+  "keywords": ["iot", "energy", "monitoring", "smart-meter", "optimization"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

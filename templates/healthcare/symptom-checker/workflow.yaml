@@ -1,0 +1,131 @@
+name: Symptom Checker
+# AI symptom analysis with possible condition suggestions
+# Usage: aflare install healthcare/symptom-checker
+#        aflare run symptom-checker/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: http_request
+      max_iterations: 4
+    input: |
+      Analyze the following symptoms and provide a structured differential diagnosis.
+
+      Primary symptoms: {{ .params.symptoms }}
+      Duration: {{ .params.duration }}
+      Severity: {{ .params.severity }}
+      Age: {{ .params.age }}
+      Gender: {{ .params.gender }}
+      Existing conditions: {{ .params.existing_conditions }}
+      Medications: {{ .params.medications }}
+      Recent travel: {{ .params.recent_travel }}
+      Lifestyle factors: {{ .params.lifestyle }}
+
+      For each symptom, identify:
+      1. Possible conditions (ranked by likelihood)
+      2. Key distinguishing features
+      3. Red flag symptoms that require immediate attention
+      4. Recommended diagnostic tests
+      5. Self-care measures (if appropriate)
+      6. When to seek emergency care
+    id: symptom_analysis
+
+  - node: http_request
+    params:
+      url: "https://api.fda.gov/drug/event.json?search=patient.drug.medicinalproduct:{{ .params.medications | urlquery }}&limit=5"
+      method: GET
+      timeout: 15s
+    id: drug_safety_data
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: code_interpreter
+      max_iterations: 3
+    input: |
+      Cross-reference the symptom analysis with drug safety data to check for potential adverse drug reactions.
+
+      Symptom analysis: {{ .symptom_analysis }}
+      Drug safety data: {{ .drug_safety_data }}
+      Current medications: {{ .params.medications }}
+
+      Determine:
+      1. Could any symptoms be drug side effects?
+      2. Are there any drug-drug interactions contributing?
+      3. Should any medications be flagged for review?
+      4. What is the likelihood that symptoms are medication-related vs. new condition?
+    id: cross_reference
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 30s
+    input: |
+      import json
+
+      symptoms = {{ .params.symptoms | toJSON }}
+      analysis = {{ .symptom_analysis | toJSON }}
+
+      # Calculate a concern index based on symptom count and severity
+      severity_map = {"mild": 1, "moderate": 2, "severe": 3, "critical": 5}
+      severity_score = severity_map.get("{{ .params.severity }}", 1)
+
+      symptom_count = len(symptoms.split(",")) if symptoms else 1
+      concern_index = symptom_count * severity_score
+
+      recommendation = "routine"
+      if concern_index >= 10:
+          recommendation = "emergency"
+      elif concern_index >= 6:
+          recommendation = "urgent"
+      elif concern_index >= 3:
+          recommendation = "schedule_appointment"
+
+      print(json.dumps({
+          "concern_index": concern_index,
+          "recommendation": recommendation,
+          "symptom_count": symptom_count,
+          "severity_score": severity_score
+      }))
+    id: concern_score
+
+  - node: transform
+    params:
+      template: |
+        # Symptom Checker Report
+        ---
+        **Assessment Date:** {{ .params.assessment_date }}
+        **Concern Level:** {{ .concern_score.recommendation | upper }}
+        **Concern Index:** {{ .concern_score.concern_index }}/15
+
+        ## Symptom Analysis
+        {{ .symptom_analysis }}
+
+        ## Medication Safety Check
+        {{ .cross_reference }}
+
+        ## Recommendation
+        {{ if eq .concern_score.recommendation "emergency" }}
+        **SEEK EMERGENCY CARE IMMEDIATELY.** Call 911 or go to the nearest emergency department.
+        {{ else if eq .concern_score.recommendation "urgent" }}
+        **Urgent care recommended.** Schedule an appointment within 24 hours.
+        {{ else }}
+        **Schedule a routine appointment** with your primary care provider.
+        {{ end }}
+
+        ---
+        *Disclaimer: This is not a medical diagnosis. Always consult a healthcare professional.*
+    input:
+      symptom_analysis: symptom_analysis
+      cross_reference: cross_reference
+      concern_score: concern_score
+    id: symptom_report
+
+  - node: file_write
+    params:
+      path: "{{ .params.output_path | default \"symptom-checker-report.md\" }}"
+    input: symptom_report
+    id: save_report

@@ -1,0 +1,13 @@
+{
+  "id": "iot/sensor-data-pipeline",
+  "name": "Sensor Data Pipeline",
+  "version": "1.0.0",
+  "description": "End-to-end IoT sensor data ingestion and processing pipeline with validation, anomaly detection, AI enrichment, and storage",
+  "author": "aflare community",
+  "category": "iot",
+  "tags": ["sensor", "data-pipeline", "ingestion", "anomaly-detection", "mqtt"],
+  "keywords": ["iot", "sensor", "pipeline", "data-processing", "analytics"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

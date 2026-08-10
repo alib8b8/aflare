@@ -1,0 +1,148 @@
+name: employee-survey
+description: Employee engagement survey creation, distribution, and analysis workflow
+params:
+  - name: survey_title
+    type: string
+    required: true
+    description: Title of the engagement survey
+  - name: survey_focus
+    type: array
+    required: false
+    default:
+      - engagement
+      - satisfaction
+      - culture
+    description: Focus areas for the survey
+  - name: target_audience
+    type: object
+    required: false
+    default:
+      all: true
+    description: Target audience filter (department, location, level)
+  - name: anonymous_mode
+    type: boolean
+    required: false
+    default: true
+    description: Whether survey responses are anonymous
+  - name: custom_questions
+    type: array
+    required: false
+    default: []
+    description: Custom questions to append to the survey
+  - name: survey_duration_days
+    type: integer
+    required: false
+    default: 14
+    description: Number of days the survey stays open
+  - name: previous_survey_data
+    type: string
+    required: false
+    default: ""
+    description: Path or reference to previous survey data for trend analysis
+
+steps:
+  - id: generate_survey_questions
+    type: agent
+    config:
+      instruction: |
+        Generate a comprehensive employee engagement survey with questions organized by focus areas.
+        Focus areas: {{ .params.survey_focus }}
+
+        For each focus area, create 5-8 Likert-scale questions (1-5) plus 1-2 open-ended questions.
+        Include:
+        - Clear, unbiased question wording
+        - Question category (engagement, satisfaction, culture, leadership, growth, well-being)
+        - Whether the question is required
+        - Reverse scoring indicator where applicable
+
+        Append any custom questions from: {{ .params.custom_questions }}
+        Return as structured JSON with survey metadata.
+      input:
+        survey_title: "{{ .params.survey_title }}"
+        survey_focus: "{{ .params.survey_focus }}"
+        custom_questions: "{{ .params.custom_questions }}"
+      output: survey_questions
+
+  - id: distribute_survey
+    type: http_request
+    config:
+      method: POST
+      url: "{{ .params.survey_api_url | default \"https://api.surveys.internal/engage/create\" }}"
+      headers:
+        Authorization: "Bearer {{ .params.api_token }}"
+        Content-Type: "application/json"
+      body: |
+        {
+          "title": "{{ .params.survey_title }}",
+          "questions": {{ .steps.generate_survey_questions.output.survey_questions | toJson }},
+          "audience": {{ .params.target_audience | toJson }},
+          "anonymous": {{ .params.anonymous_mode }},
+          "duration_days": {{ .params.survey_duration_days }}
+        }
+      output: distribution_result
+
+  - id: analyze_responses
+    type: agent
+    config:
+      instruction: |
+        Analyze the survey responses and generate insights:
+        1. Calculate engagement score (weighted average across all Likert questions)
+        2. Compute scores by focus area and identify top/bottom areas
+        3. Perform sentiment analysis on open-ended responses
+        4. Identify key themes and patterns in qualitative feedback
+        5. Generate demographic breakdowns if available
+        6. Compare with previous survey data for trend analysis if provided: {{ .params.previous_survey_data }}
+        7. Create actionable recommendations with priority levels
+
+        Return comprehensive analysis as structured JSON.
+      input:
+        survey_title: "{{ .params.survey_title }}"
+        survey_questions: "{{ .steps.generate_survey_questions.output.survey_questions }}"
+        responses: "{{ .steps.distribute_survey.output.distribution_result }}"
+        previous_survey_data: "{{ .params.previous_survey_data }}"
+      output: analysis_results
+
+  - id: generate_report
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        analysis = analysis_results
+        questions = survey_questions
+
+        # Build executive summary
+        engagement_score = analysis.get("engagement_score", 0)
+        focus_areas = analysis.get("scores_by_focus_area", {})
+        themes = analysis.get("key_themes", [])
+        recommendations = analysis.get("recommendations", [])
+
+        # Sort focus areas by score
+        sorted_areas = sorted(focus_areas.items(), key=lambda x: x[1], reverse=True) if isinstance(focus_areas, dict) else []
+
+        report = {
+            "executive_summary": {
+                "overall_engagement_score": engagement_score,
+                "score_trend": "Improved" if analysis.get("previous_score", 0) < engagement_score else "Declined" if analysis.get("previous_score", 0) > engagement_score else "Stable",
+                "response_rate": analysis.get("response_rate", "N/A"),
+                "top_strength": sorted_areas[0] if sorted_areas else "N/A",
+                "top_opportunity": sorted_areas[-1] if sorted_areas else "N/A"
+            },
+            "focus_area_scores": dict(sorted_areas),
+            "key_themes": themes,
+            "sentiment_summary": analysis.get("sentiment_summary", {}),
+            "recommendations": [r for r in recommendations if r.get("priority") == "High"][:5],
+            "detailed_analysis": analysis
+        }
+        print(json.dumps(report, indent=2))
+      inputs:
+        analysis_results: "{{ .steps.analyze_responses.output.analysis_results }}"
+        survey_questions: "{{ .steps.generate_survey_questions.output.survey_questions }}"
+      output: final_report
+
+  - id: save_report
+    type: file_write
+    config:
+      filename: "{{ .params.output_file | default \"employee_survey_report.json\" }}"
+      content: "{{ .steps.generate_report.output.final_report }}"
+      format: json

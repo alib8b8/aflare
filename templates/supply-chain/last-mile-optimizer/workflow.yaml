@@ -1,0 +1,171 @@
+name: last-mile-optimizer
+description: Last-mile delivery cost optimization with mode selection
+version: "1.0.0"
+params:
+  - name: delivery_zone
+    type: string
+    required: true
+    description: JSON with delivery zone geography, density, and average distance
+  - name: order_volume
+    type: integer
+    required: true
+    description: Number of daily deliveries in the zone
+  - name: available_modes
+    type: string
+    required: false
+    default: '["van","bike","cargo-bike","walking","crowdsourced","locker"]'
+    description: JSON array of available delivery modes
+  - name: cost_constraints
+    type: string
+    required: false
+    default: '{"max_cost_per_delivery": 8.00, "max_time_minutes": 60}'
+    description: JSON with cost and time constraints per delivery
+  - name: output_file
+    type: string
+    required: false
+    default: /tmp/last_mile_optimization.json
+    description: Output file for optimization results
+
+steps:
+  - id: compute_mode_costs
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+
+        zone = json.loads('''{{ .params.delivery_zone }}''')
+        volume = {{ .params.order_volume }}
+        modes = json.loads('''{{ .params.available_modes }}''')
+        constraints = json.loads('''{{ .params.cost_constraints }}''')
+
+        density = zone.get("density", "medium")
+        avg_distance_km = zone.get("avg_distance_km", 3.0)
+
+        # Delivery mode cost models
+        mode_models = {
+            "van": {
+                "fixed_cost_per_day": 120,
+                "cost_per_km": 0.45,
+                "capacity_per_day": 120,
+                "avg_speed_kmh": 25,
+                "co2_per_km": 0.25,
+                "parking_cost_per_stop": 1.50
+            },
+            "bike": {
+                "fixed_cost_per_day": 30,
+                "cost_per_km": 0.05,
+                "capacity_per_day": 30,
+                "avg_speed_kmh": 15,
+                "co2_per_km": 0.0,
+                "parking_cost_per_stop": 0.0
+            },
+            "cargo-bike": {
+                "fixed_cost_per_day": 45,
+                "cost_per_km": 0.08,
+                "capacity_per_day": 50,
+                "avg_speed_kmh": 12,
+                "co2_per_km": 0.0,
+                "parking_cost_per_stop": 0.0
+            },
+            "walking": {
+                "fixed_cost_per_day": 20,
+                "cost_per_km": 0.0,
+                "capacity_per_day": 15,
+                "avg_speed_kmh": 5,
+                "co2_per_km": 0.0,
+                "parking_cost_per_stop": 0.0
+            },
+            "crowdsourced": {
+                "fixed_cost_per_day": 0,
+                "cost_per_km": 1.20,
+                "capacity_per_day": 200,
+                "avg_speed_kmh": 20,
+                "co2_per_km": 0.18,
+                "parking_cost_per_stop": 0.0
+            },
+            "locker": {
+                "fixed_cost_per_day": 15,
+                "cost_per_km": 0.0,
+                "capacity_per_day": 100,
+                "avg_speed_kmh": 999,
+                "co2_per_km": 0.05,
+                "parking_cost_per_stop": 0.0
+            }
+        }
+
+        # Density multipliers
+        density_mult = {"urban": 1.0, "suburban": 1.3, "medium": 1.15, "rural": 1.8}
+
+        results = []
+        for mode in modes:
+            if mode not in mode_models:
+                continue
+            m = mode_models[mode]
+            mult = density_mult.get(density, 1.0)
+
+            vehicles_needed = max(1, (volume + m["capacity_per_day"] - 1) // m["capacity_per_day"])
+            fixed_cost = vehicles_needed * m["fixed_cost_per_day"]
+            total_km = volume * avg_distance_km * mult * 2
+            variable_cost = total_km * m["cost_per_km"]
+            parking_cost = volume * m["parking_cost_per_stop"]
+            total_cost = round(fixed_cost + variable_cost + parking_cost, 2)
+            cost_per_delivery = round(total_cost / volume, 2) if volume > 0 else 0
+
+            avg_time = round((avg_distance_km * mult / m["avg_speed_kmh"]) * 60 + 5, 1)
+            co2_total = round(total_km * m["co2_per_km"], 2)
+
+            feasible = cost_per_delivery <= constraints.get("max_cost_per_delivery", 999) and avg_time <= constraints.get("max_time_minutes", 999)
+
+            results.append({
+                "mode": mode,
+                "vehicles_needed": vehicles_needed,
+                "fixed_cost": round(fixed_cost, 2),
+                "variable_cost": round(variable_cost, 2),
+                "parking_cost": round(parking_cost, 2),
+                "total_daily_cost": total_cost,
+                "cost_per_delivery": cost_per_delivery,
+                "avg_delivery_time_min": avg_time,
+                "co2_kg_per_day": co2_total,
+                "feasible": feasible
+            })
+
+        results.sort(key=lambda x: x["cost_per_delivery"])
+        best = results[0] if results else None
+
+        result = {
+            "zone": zone,
+            "daily_volume": volume,
+            "modes_evaluated": len(results),
+            "best_mode": best,
+            "potential_savings": round((results[-1]["cost_per_delivery"] - best["cost_per_delivery"]) * volume, 2) if len(results) > 1 and best else 0,
+            "mode_comparison": results
+        }
+        print(json.dumps(result))
+    description: Compute cost and performance metrics for each delivery mode
+
+  - id: recommend_mode_mix
+    node: agent
+    config:
+      prompt: |
+        Analyze the last-mile delivery mode comparison and recommend an optimal mode mix:
+        {{ index .steps "compute_mode_costs" "output" }}
+
+        Provide:
+        1. Recommended primary and secondary delivery modes
+        2. Optimal mode mix percentages for the zone
+        3. Cost savings projection vs. current approach
+        4. Sustainability impact analysis
+        5. Implementation roadmap (phased rollout plan)
+    description: Generate AI-powered mode mix recommendations
+
+  - id: save_optimization
+    node: file_write
+    config:
+      path: "{{ .params.output_file }}"
+      content: |
+        {
+          "mode_comparison": {{ index .steps "compute_mode_costs" "output" }},
+          "mode_mix_recommendation": {{ index .steps "recommend_mode_mix" "output" }}
+        }
+    description: Save last-mile optimization results to output file

@@ -1,0 +1,124 @@
+name: intellectual-property
+description: "IP portfolio management and analysis workflow"
+version: "1.0.0"
+params:
+  - name: portfolio_name
+    type: string
+    required: true
+    description: "Name of the IP portfolio"
+  - name: assets
+    type: array
+    required: true
+    description: "List of IP assets with details"
+  - name: analysis_type
+    type: string
+    required: false
+    default: "comprehensive"
+    description: "Type of analysis (valuation, gap-analysis, risk-assessment, comprehensive)"
+  - name: industry
+    type: string
+    required: false
+    default: "technology"
+    description: "Industry sector for competitive analysis"
+  - name: jurisdiction
+    type: string
+    required: false
+    default: "US"
+    description: "Primary jurisdiction for IP protection"
+
+steps:
+  - id: categorize_assets
+    node: agent
+    description: "Categorize and classify IP assets"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are an IP portfolio manager. Categorize the IP assets by type: patents, trademarks,
+        copyrights, trade secrets, design rights. For each asset, assess: protection status,
+        registration status, geographic coverage, remaining term, and commercial value.
+        Output in structured JSON format.
+      prompt: |
+        Portfolio: {{ .params.portfolio_name }}
+        Assets: {{ .params.assets }}
+        Jurisdiction: {{ .params.jurisdiction }}
+        Categorize and classify all IP assets.
+
+  - id: gap_analysis
+    node: agent
+    description: "Identify gaps in IP protection"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are an IP strategy consultant. Analyze the IP portfolio for gaps in protection.
+        Identify: unprotected assets, jurisdictions without coverage, expiring protections,
+        enforcement vulnerabilities, and missed registration opportunities. Provide
+        prioritized recommendations for strengthening the portfolio.
+      prompt: |
+        Categorized assets: {{ index .steps.categorize_assets.outputs "categorized_assets" }}
+        Industry: {{ .params.industry }}
+        Perform a gap analysis of the IP portfolio.
+
+  - id: valuation_estimate
+    node: code_interpreter
+    description: "Estimate portfolio valuation"
+    config:
+      language: python
+      code: |
+        import json, math
+        assets = {{ index .steps.categorize_assets.outputs "categorized_assets" | toJson }}
+        valuation = {"total_estimated_value": 0, "asset_valuations": []}
+        if isinstance(assets, dict):
+            categories = assets.get("categories", assets)
+        else:
+            categories = assets
+        
+        base_values = {
+            "patent": 500000, "trademark": 100000,
+            "copyright": 50000, "trade_secret": 200000, "design_right": 75000
+        }
+        
+        total = 0
+        if isinstance(categories, dict):
+            for cat, items in categories.items():
+                count = len(items) if isinstance(items, list) else 1
+                base = base_values.get(cat, 50000)
+                cat_value = base * count * (1 + 0.1 * count)
+                total += cat_value
+                valuation["asset_valuations"].append({"category": cat, "count": count, "estimated_value": round(cat_value, 2)})
+        valuation["total_estimated_value"] = round(total, 2)
+        print(json.dumps(valuation, indent=2))
+
+  - id: strategy_recommendations
+    node: agent
+    description: "Generate IP strategy recommendations"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are an IP strategist. Based on the portfolio analysis, generate strategic
+        recommendations for: commercialization opportunities, licensing strategies,
+        enforcement priorities, portfolio optimization, and future acquisition targets.
+      prompt: |
+        Analysis: {{ index .steps.categorize_assets.outputs "categorized_assets" }}
+        Gaps: {{ index .steps.gap_analysis.outputs "gaps" }}
+        Valuation: {{ index .steps.valuation_estimate.outputs "valuation" }}
+        Generate strategic IP portfolio recommendations.
+
+  - id: save_report
+    node: file_write
+    description: "Save IP portfolio analysis report"
+    config:
+      path: "{{ .params.output_path | default "output/ip_portfolio_report.md" }}"
+      content: |
+        # IP Portfolio Analysis: {{ .params.portfolio_name }}
+        
+        ## Asset Classification
+        {{ index .steps.categorize_assets.outputs "categorized_assets" }}
+        
+        ## Valuation Estimate
+        {{ index .steps.valuation_estimate.outputs "valuation" }}
+        
+        ## Gap Analysis
+        {{ index .steps.gap_analysis.outputs "gaps" }}
+        
+        ## Strategic Recommendations
+        {{ index .steps.strategy_recommendations.outputs "recommendations" }}

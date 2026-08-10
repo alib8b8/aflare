@@ -1,0 +1,86 @@
+name: Medical Report Summarizer
+# Summarize complex medical reports into patient-friendly language
+# Usage: aflare install healthcare/medical-report-summarizer
+#        aflare run medical-report-summarizer/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: http_request
+      max_iterations: 3
+    input: |
+      Analyze the following medical report and extract key clinical findings.
+
+      Report type: {{ .params.report_type }}
+      Report content: {{ .params.report_content }}
+      Specialty: {{ .params.specialty }}
+
+      Extract:
+      1. Key findings and abnormalities
+      2. Critical values (if any)
+      3. Normal results
+      4. Comparison with prior results (if available)
+      5. Clinical significance of each finding
+      6. Recommended follow-up actions
+    id: clinical_analysis
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 2
+    input: |
+      Convert the following clinical analysis into a patient-friendly summary.
+
+      Clinical analysis: {{ .clinical_analysis }}
+
+      Guidelines:
+      - Use plain language at a 6th-8th grade reading level
+      - Explain all medical terms in parentheses
+      - Use analogies where helpful
+      - Highlight what is normal vs. needs attention
+      - Include clear next steps
+      - Maintain a reassuring but honest tone
+      - Do NOT provide a diagnosis - only explain findings
+      - Add disclaimer about consulting their physician
+    id: patient_summary
+
+  - node: transform
+    params:
+      template: |
+        # Your Medical Report Summary
+        ---
+        **Report Type:** {{ .params.report_type }}
+        **Date:** {{ .params.report_date }}
+        **Prepared for:** {{ .params.patient_name }}
+
+        ## What This Report Means For You
+        {{ .patient_summary }}
+
+        ## Key Takeaways
+        {{ .clinical_analysis.key_findings }}
+
+        ## Next Steps
+        {{ .clinical_analysis.recommended_followup }}
+
+        ---
+        *Disclaimer: This summary is for informational purposes only. Please discuss all results with your healthcare provider.*
+    input:
+      clinical_analysis: clinical_analysis
+      patient_summary: patient_summary
+    id: final_report
+
+  - node: file_write
+    params:
+      path: "{{ .params.output_path | default \"medical-report-summary.md\" }}"
+    input: final_report
+    id: save_report
+
+  - node: notify
+    params:
+      channel: stdout
+    input: final_report
+    id: notify_done

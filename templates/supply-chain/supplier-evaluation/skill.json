@@ -1,0 +1,13 @@
+{
+  "id": "supply-chain/supplier-evaluation",
+  "name": "Supplier Evaluation",
+  "version": "1.0.0",
+  "description": "Weighted supplier scorecard and evaluation system. Computes multi-dimensional KPI scores across quality, delivery, cost, responsiveness, and compliance to assign tier ratings and generate strategic sourcing recommendations.",
+  "author": "aflare community",
+  "category": "supply-chain",
+  "tags": ["supplier", "scorecard", "evaluation", "sourcing", "procurement"],
+  "keywords": ["supplier evaluation", "vendor scorecard", "KPI scoring", "supplier tiering", "strategic sourcing"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

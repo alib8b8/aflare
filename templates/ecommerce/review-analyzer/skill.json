@@ -1,0 +1,13 @@
+{
+  "id": "ecommerce/review-analyzer",
+  "name": "Customer Review Analyzer",
+  "version": "1.0.0",
+  "description": "Customer review sentiment analysis and insight extraction engine that processes product reviews, classifies sentiment, identifies key topics, and generates actionable product improvement recommendations.",
+  "author": "aflare community",
+  "category": "ecommerce",
+  "tags": ["reviews", "sentiment", "nlp", "customer-feedback", "insights"],
+  "keywords": ["review analysis", "sentiment analysis", "customer feedback", "product insights", "voice of customer"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

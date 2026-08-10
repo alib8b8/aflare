@@ -1,0 +1,149 @@
+name: shipping-optimizer
+description: Shipping cost and carrier optimization with rate comparison and delivery time analysis
+version: "1.0"
+params:
+  - name: order_id
+    type: string
+    required: false
+    description: Specific order to optimize shipping for
+  - name: origin_zip
+    type: string
+    required: true
+    description: Origin warehouse zip code
+  - name: destination_zip
+    type: string
+    required: true
+    description: Destination zip code
+  - name: package_weight
+    type: number
+    required: true
+    description: Package weight in pounds
+  - name: package_dimensions
+    type: object
+    required: false
+    description: Package dimensions (length, width, height in inches)
+  - name: delivery_preference
+    type: string
+    default: "balanced"
+    description: Preference (cheapest, fastest, balanced, reliable)
+
+steps:
+  - id: fetch_carrier_rates
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.api_base }}/shipping/rates"
+      body:
+        origin_zip: "{{ .params.origin_zip }}"
+        destination_zip: "{{ .params.destination_zip }}"
+        weight: "{{ .params.package_weight }}"
+        dimensions: "{{ .params.package_dimensions }}"
+        carriers: "{{ .params.carriers | default (list \"ups\" \"fedex\" \"usps\" \"dhl\") }}"
+
+  - id: fetch_delivery_performance
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.api_base }}/shipping/performance"
+      params:
+        origin_zip: "{{ .params.origin_zip }}"
+        destination_zip: "{{ .params.destination_zip }}"
+        days: "30"
+
+  - id: compute_optimal_shipping
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+
+        rates = {{ .steps.fetch_carrier_rates.response | toJSON }}
+        performance = {{ .steps.fetch_delivery_performance.response | toJSON }}
+        preference = "{{ .params.delivery_preference }}"
+        weight = {{ .params.package_weight }}
+
+        carriers = rates.get("rates", [])
+        perf_data = performance.get("carrier_performance", {})
+
+        scored = []
+        for carrier in carriers:
+            carrier_name = carrier.get("carrier", "")
+            service = carrier.get("service", "")
+            base_rate = carrier.get("rate", 0)
+            delivery_days = carrier.get("estimated_days", 5)
+            
+            # Performance metrics
+            perf = perf_data.get(carrier_name, {})
+            on_time_rate = perf.get("on_time_rate", 0.95)
+            damage_rate = perf.get("damage_rate", 0.01)
+            
+            # Calculate scores
+            cost_score = max(0, 100 - (base_rate / weight * 10))
+            speed_score = max(0, 100 - (delivery_days * 10))
+            reliability_score = on_time_rate * 100 * (1 - damage_rate)
+            
+            # Weighted total based on preference
+            if preference == "cheapest":
+                total_score = cost_score * 0.6 + speed_score * 0.2 + reliability_score * 0.2
+            elif preference == "fastest":
+                total_score = cost_score * 0.2 + speed_score * 0.6 + reliability_score * 0.2
+            elif preference == "reliable":
+                total_score = cost_score * 0.2 + speed_score * 0.2 + reliability_score * 0.6
+            else:  # balanced
+                total_score = cost_score * 0.33 + speed_score * 0.33 + reliability_score * 0.34
+            
+            scored.append({
+                "carrier": carrier_name,
+                "service": service,
+                "rate": base_rate,
+                "estimated_days": delivery_days,
+                "on_time_rate": round(on_time_rate, 4),
+                "damage_rate": round(damage_rate, 4),
+                "cost_score": round(cost_score, 1),
+                "speed_score": round(speed_score, 1),
+                "reliability_score": round(reliability_score, 1),
+                "total_score": round(total_score, 1)
+            })
+
+        scored.sort(key=lambda x: x["total_score"], reverse=True)
+        
+        best = scored[0] if scored else None
+        savings = None
+        if best and len(scored) > 1:
+            most_expensive = max(scored, key=lambda x: x["rate"])
+            savings = round(most_expensive["rate"] - best["rate"], 2)
+
+        result = {
+            "preference": preference,
+            "options": scored,
+            "recommended": best,
+            "potential_savings": savings,
+            "total_options": len(scored)
+        }
+        print(json.dumps(result))
+
+  - id: generate_shipping_label
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.api_base }}/shipping/label"
+      body:
+        carrier: "{{ .steps.compute_optimal_shipping.response.recommended.carrier }}"
+        service: "{{ .steps.compute_optimal_shipping.response.recommended.service }}"
+        rate: "{{ .steps.compute_optimal_shipping.response.recommended.rate }}"
+    condition: "{{ .params.auto_generate_label | default false }}"
+
+  - id: save_shipping_report
+    node: file_write
+    config:
+      path: "/output/shipping/shipping_optimization_{{ .params.timestamp }}.json"
+      content: |
+        {
+          "generated_at": "{{ .params.timestamp }}",
+          "origin": "{{ .params.origin_zip }}",
+          "destination": "{{ .params.destination_zip }}",
+          "weight_lbs": {{ .params.package_weight }},
+          "preference": "{{ .params.delivery_preference }}",
+          "optimization": {{ .steps.compute_optimal_shipping.response | toJSON }},
+          "label": {{ .steps.generate_shipping_label.response | toJSON }}
+        }

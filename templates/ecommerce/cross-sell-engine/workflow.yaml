@@ -1,0 +1,111 @@
+name: cross-sell-engine
+description: Cross-sell and bundle recommendation engine using purchase pattern analysis
+version: "1.0"
+params:
+  - name: product_id
+    type: string
+    required: true
+    description: Source product for cross-sell recommendations
+  - name: bundle_size
+    type: integer
+    default: 3
+    description: Maximum items in bundle
+  - name: discount_threshold
+    type: number
+    default: 0.10
+    description: Maximum bundle discount rate
+  - name: strategy
+    type: string
+    default: "complementary"
+    description: Cross-sell strategy (complementary, upgrade, accessory, bundle)
+
+steps:
+  - id: fetch_product_info
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.api_base }}/products/{{ .params.product_id }}"
+      params:
+        include_attributes: "true"
+        include_price: "true"
+
+  - id: find_cross_sell_candidates
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.api_base }}/recommendations/cross-sell"
+      body:
+        source_product_id: "{{ .params.product_id }}"
+        strategy: "{{ .params.strategy }}"
+        max_candidates: "{{ mul .params.bundle_size 3 }}"
+
+  - id: compute_bundle_options
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        from itertools import combinations
+
+        source = {{ .steps.fetch_product_info.response | toJSON }}
+        candidates = {{ .steps.find_cross_sell_candidates.response | toJSON }}
+        bundle_size = {{ .params.bundle_size }}
+        max_discount = {{ .params.discount_threshold }}
+
+        source_price = source.get("price", 0)
+        candidate_items = candidates.get("recommendations", [])
+
+        # Generate bundle combinations
+        bundles = []
+        for r in range(1, min(bundle_size, len(candidate_items) + 1)):
+            for combo in combinations(candidate_items, r):
+                total_price = source_price + sum(c.get("price", 0) for c in combo)
+                discount = min(max_discount, 0.05 * len(combo))
+                bundle_price = round(total_price * (1 - discount), 2)
+                savings = round(total_price - bundle_price, 2)
+
+                bundles.append({
+                    "source_product": {"id": source["id"], "name": source.get("name", ""), "price": source_price},
+                    "bundle_items": [{"id": c["id"], "name": c.get("name", ""), "price": c.get("price", 0)} for c in combo],
+                    "total_original": total_price,
+                    "bundle_price": bundle_price,
+                    "discount_rate": round(discount, 4),
+                    "savings": savings,
+                    "item_count": len(combo) + 1
+                })
+
+        bundles.sort(key=lambda x: x["savings"], reverse=True)
+        result = {"bundles": bundles[:10], "total_options": len(bundles)}
+        print(json.dumps(result))
+
+  - id: generate_bundle_descriptions
+    node: agent
+    config:
+      model: "{{ .params.model | default \"gpt-4\" }}"
+      temperature: 0.5
+      prompt: |
+        Generate compelling marketing descriptions for each bundle:
+        
+        Bundle Options: {{ .steps.compute_bundle_options.response | toJSON }}
+        
+        For each bundle, create:
+        1. Bundle name/title
+        2. Marketing tagline
+        3. Value proposition
+        4. Why these items work together
+        5. Suggested display position (homepage, product page, cart, checkout)
+        
+        Output as JSON array.
+
+  - id: save_cross_sell_results
+    node: file_write
+    config:
+      path: "/output/cross-sell/{{ .params.product_id }}_bundles_{{ .params.timestamp }}.json"
+      content: |
+        {
+          "source_product_id": "{{ .params.product_id }}",
+          "strategy": "{{ .params.strategy }}",
+          "generated_at": "{{ .params.timestamp }}",
+          "bundles": {{ .steps.compute_bundle_options.response | toJSON }},
+          "marketing": {{ .steps.generate_bundle_descriptions.response | toJSON }}
+        }

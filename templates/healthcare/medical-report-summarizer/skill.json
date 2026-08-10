@@ -1,0 +1,22 @@
+{
+  "id": "healthcare/medical-report-summarizer",
+  "name": "medical-report-summarizer",
+  "version": "1.0.0",
+  "description": "Summarize complex medical reports into patient-friendly language",
+  "author": "aflare community",
+  "category": "healthcare",
+  "tags": [
+    "healthcare",
+    "workflow",
+    "summarization"
+  ],
+  "keywords": [
+    "medical-report-summarizer",
+    "healthcare",
+    "report",
+    "patient-education"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

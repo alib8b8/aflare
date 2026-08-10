@@ -1,0 +1,13 @@
+{
+  "id": "supply-chain/delivery-scheduler",
+  "name": "Delivery Scheduler",
+  "version": "1.0.0",
+  "description": "Last-mile delivery scheduling with time window constraints. Parses orders, assigns to vehicles using round-robin with priority weighting, builds time-slotted schedules, and generates AI optimization recommendations.",
+  "author": "aflare community",
+  "category": "supply-chain",
+  "tags": ["delivery", "scheduling", "last-mile", "fleet", "time-window"],
+  "keywords": ["delivery scheduling", "last mile", "fleet assignment", "time windows", "route planning"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

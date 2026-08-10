@@ -1,0 +1,108 @@
+name: privacy-policy-audit
+description: "Privacy policy compliance audit against global regulations"
+version: "1.0.0"
+params:
+  - name: policy_url
+    type: string
+    required: false
+    description: "URL of the privacy policy to audit"
+  - name: policy_text
+    type: string
+    required: false
+    description: "Full text of the privacy policy (alternative to URL)"
+  - name: regulations
+    type: array
+    required: false
+    default: ["GDPR", "CCPA", "PIPEDA"]
+    description: "List of regulations to audit against"
+  - name: industry
+    type: string
+    required: false
+    default: "general"
+    description: "Industry sector for additional compliance checks"
+
+steps:
+  - id: fetch_policy
+    node: http_request
+    description: "Fetch privacy policy from URL if provided"
+    config:
+      method: GET
+      url: "{{ .params.policy_url }}"
+      headers:
+        User-Agent: "LegalAuditBot/1.0"
+    condition: "{{ .params.policy_url | ne "" }}"
+
+  - id: extract_data_practices
+    node: agent
+    description: "Extract data collection and processing practices"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a privacy compliance analyst. Extract all data practices from the privacy policy:
+        data collected, collection methods, purposes of processing, third-party sharing,
+        data retention periods, user rights, cookie usage, international transfers, and
+        children's data handling. Output in structured JSON format.
+      prompt: |
+        {{ if .params.policy_url }}Policy from URL: {{ index .steps.fetch_policy.outputs "body" }}{{ else }}Policy text: {{ .params.policy_text }}{{ end }}
+        Industry: {{ .params.industry }}
+        Extract all data practices in JSON format.
+
+  - id: audit_compliance
+    node: agent
+    description: "Audit privacy practices against selected regulations"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a regulatory compliance auditor. For each regulation specified, audit the privacy
+        practices against requirements. Flag violations, gaps, and areas of concern. Rate overall
+        compliance level per regulation. Provide specific remediation recommendations.
+      prompt: |
+        Regulations to audit: {{ .params.regulations }}
+        Data practices: {{ index .steps.extract_data_practices.outputs "practices" }}
+        Industry: {{ .params.industry }}
+        Perform a comprehensive compliance audit in JSON format.
+
+  - id: score_calculate
+    node: code_interpreter
+    description: "Calculate compliance scores and generate statistics"
+    config:
+      language: python
+      code: |
+        import json
+        audit = {{ index .steps.audit_compliance.outputs "audit_results" | toJson }}
+        scores = {}
+        for reg in audit:
+            violations = reg.get("violations", [])
+            critical = sum(1 for v in violations if v.get("severity") == "critical")
+            high = sum(1 for v in violations if v.get("severity") == "high")
+            medium = sum(1 for v in violations if v.get("severity") == "medium")
+            low = sum(1 for v in violations if v.get("severity") == "low")
+            total_weight = len(violations) * 4 if violations else 1
+            penalty = critical * 4 + high * 3 + medium * 2 + low * 1
+            score = max(0, 100 - (penalty / total_weight * 100))
+            scores[reg["regulation"]] = {
+                "score": round(score, 1),
+                "total_violations": len(violations),
+                "critical": critical,
+                "high": high,
+                "medium": medium,
+                "low": low
+            }
+        print(json.dumps({"compliance_scores": scores}, indent=2))
+
+  - id: save_report
+    node: file_write
+    description: "Save the audit report to a file"
+    config:
+      path: "{{ .params.output_path | default "output/privacy_audit_report.md" }}"
+      content: |
+        # Privacy Policy Compliance Audit Report
+        
+        ## Data Practices Summary
+        {{ index .steps.extract_data_practices.outputs "practices" }}
+        
+        ## Compliance Scores
+        {{ index .steps.score_calculate.outputs "compliance_scores" }}
+        
+        ## Detailed Audit
+        {{ index .steps.audit_compliance.outputs "audit_results" }}

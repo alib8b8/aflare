@@ -1,0 +1,13 @@
+{
+  "id": "supply-chain/last-mile-optimizer",
+  "name": "Last Mile Optimizer",
+  "version": "1.0.0",
+  "description": "Last-mile delivery cost optimization with multi-mode comparison. Evaluates van, bike, cargo-bike, walking, crowdsourced, and locker delivery modes against cost and time constraints with density-adjusted metrics.",
+  "author": "aflare community",
+  "category": "supply-chain",
+  "tags": ["last-mile", "cost-optimization", "delivery-modes", "sustainability", "urban-logistics"],
+  "keywords": ["last mile", "delivery optimization", "mode selection", "cost per delivery", "urban logistics"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

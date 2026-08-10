@@ -1,0 +1,13 @@
+{
+  "id": "supply-chain/route-optimizer",
+  "name": "Route Optimizer",
+  "version": "1.0.0",
+  "description": "Multi-stop delivery route optimization using nearest-neighbor heuristic and distance matrix computation. Generates vehicle assignments, turn-by-turn plans, and fuel cost estimates.",
+  "author": "aflare community",
+  "category": "supply-chain",
+  "tags": ["routing", "optimization", "logistics", "delivery", "fleet"],
+  "keywords": ["route optimization", "delivery routing", "fleet management", "distance matrix", "vehicle routing"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

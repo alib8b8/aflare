@@ -1,0 +1,159 @@
+name: upsell-recommender
+description: Post-purchase upsell recommendation engine with timing and offer optimization
+version: "1.0"
+params:
+  - name: customer_id
+    type: string
+    required: true
+    description: Customer to generate upsell recommendations for
+  - name: order_id
+    type: string
+    required: true
+    description: Recent order for context
+  - name: upsell_type
+    type: string
+    default: "post_purchase"
+    description: Upsell timing (post_purchase, delayed, subscription, upgrade)
+  - name: max_upsell_value
+    type: number
+    default: 1.5
+    description: Maximum upsell as multiple of original purchase
+
+steps:
+  - id: fetch_recent_order
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.api_base }}/orders/{{ .params.order_id }}"
+      params:
+        include_items: "true"
+        include_payment: "true"
+
+  - id: fetch_customer_profile
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.api_base }}/customers/{{ .params.customer_id }}/profile"
+      params:
+        include_preferences: "true"
+        include_history: "true"
+
+  - id: find_upsell_opportunities
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.api_base }}/recommendations/upsell"
+      body:
+        customer_id: "{{ .params.customer_id }}"
+        purchased_items: "{{ .steps.fetch_recent_order.response.items | toJSON }}"
+        upsell_type: "{{ .params.upsell_type }}"
+        max_value: "{{ .params.max_upsell_value }}"
+
+  - id: optimize_upsell_offers
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        from datetime import datetime, timedelta
+
+        order = {{ .steps.fetch_recent_order.response | toJSON }}
+        customer = {{ .steps.fetch_customer_profile.response | toJSON }}
+        opportunities = {{ .steps.find_upsell_opportunities.response | toJSON }}
+        upsell_type = "{{ .params.upsell_type }}"
+        max_multiple = {{ .params.max_upsell_value }}
+
+        order_total = order.get("total", 0)
+        items = opportunities.get("recommendations", [])
+
+        # Determine optimal timing
+        timing_map = {
+            "post_purchase": {"delay_hours": 1, "channel": "email", "subject_prefix": "Complete your purchase with"},
+            "delayed": {"delay_hours": 72, "channel": "email", "subject_prefix": "You might also like"},
+            "subscription": {"delay_hours": 24, "channel": "both", "subject_prefix": "Save with a subscription"},
+            "upgrade": {"delay_hours": 48, "channel": "email", "subject_prefix": "Upgrade your experience"}
+        }
+        timing = timing_map.get(upsell_type, timing_map["post_purchase"])
+
+        offers = []
+        for item in items:
+            item_price = item.get("price", 0)
+            if item_price <= order_total * max_multiple:
+                discount = min(0.15, 0.05 * item.get("relevance_score", 0.5))
+                offer_price = round(item_price * (1 - discount), 2)
+                savings = round(item_price - offer_price, 2)
+
+                offers.append({
+                    "product_id": item["id"],
+                    "product_name": item.get("name", ""),
+                    "original_price": item_price,
+                    "offer_price": offer_price,
+                    "discount_pct": round(discount * 100, 1),
+                    "savings": savings,
+                    "relevance_score": item.get("relevance_score", 0.5),
+                    "reason": item.get("reason", "Based on your purchase")
+                })
+
+        offers.sort(key=lambda x: x["relevance_score"], reverse=True)
+
+        result = {
+            "upsell_type": upsell_type,
+            "timing": {
+                "delay_hours": timing["delay_hours"],
+                "send_at": (datetime.now() + timedelta(hours=timing["delay_hours"])).isoformat(),
+                "channel": timing["channel"]
+            },
+            "order_total": order_total,
+            "max_upsell_value": round(order_total * max_multiple, 2),
+            "offers": offers[:5],
+            "total_offers": len(offers)
+        }
+        print(json.dumps(result))
+
+  - id: generate_upsell_messages
+    node: agent
+    config:
+      model: "{{ .params.model | default \"gpt-4\" }}"
+      temperature: 0.5
+      prompt: |
+        Generate compelling upsell messages for each offer:
+        
+        Upsell Offers: {{ .steps.optimize_upsell_offers.response | toJSON }}
+        Customer Profile: {{ .steps.fetch_customer_profile.response | toJSON }}
+        
+        For each offer, create:
+        1. Email subject line
+        2. Email body (personalized)
+        3. Push notification text (if applicable)
+        4. Value proposition
+        5. Urgency element (if applicable)
+        6. Call-to-action
+        
+        Personalize based on customer's purchase history and preferences.
+        Output as JSON array.
+
+  - id: schedule_upsell_campaign
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.api_base }}/marketing/upsell/schedule"
+      body:
+        customer_id: "{{ .params.customer_id }}"
+        offers: "{{ .steps.optimize_upsell_offers.response.offers | toJSON }}"
+        messages: "{{ .steps.generate_upsell_messages.response | toJSON }}"
+        timing: "{{ .steps.optimize_upsell_offers.response.timing | toJSON }}"
+
+  - id: save_upsell_report
+    node: file_write
+    config:
+      path: "/output/upsell/upsell_{{ .params.customer_id }}_{{ .params.timestamp }}.json"
+      content: |
+        {
+          "customer_id": "{{ .params.customer_id }}",
+          "order_id": "{{ .params.order_id }}",
+          "upsell_type": "{{ .params.upsell_type }}",
+          "generated_at": "{{ .params.timestamp }}",
+          "offers": {{ .steps.optimize_upsell_offers.response | toJSON }},
+          "messages": {{ .steps.generate_upsell_messages.response | toJSON }},
+          "campaign": {{ .steps.schedule_upsell_campaign.response | toJSON }}
+        }

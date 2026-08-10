@@ -1,0 +1,13 @@
+{
+  "id": "iot/device-health-monitor",
+  "name": "Device Health Monitor",
+  "version": "1.0.0",
+  "description": "IoT device health and uptime monitoring with heartbeat tracking, SLA compliance reporting, AI-powered diagnostics, and remediation recommendations",
+  "author": "aflare community",
+  "category": "iot",
+  "tags": ["health", "uptime", "monitoring", "sla", "diagnostics"],
+  "keywords": ["iot", "health", "monitoring", "uptime", "diagnostics"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

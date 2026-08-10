@@ -1,0 +1,13 @@
+{
+  "id": "education/math-problem-generator",
+  "name": "Math Problem Generator",
+  "version": "1.0.0",
+  "description": "Math problem and solution generator with step-by-step explanations, hints, common mistakes, and solution verification.",
+  "author": "aflare community",
+  "category": "education",
+  "tags": ["math", "problems", "solutions", "algebra", "calculus", "geometry"],
+  "keywords": ["math", "problem", "solution", "algebra", "calculus", "geometry", "practice"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,156 @@
+name: vendor-risk
+description: Vendor risk assessment and continuous monitoring
+version: "1.0.0"
+params:
+  - name: vendor_list
+    type: string
+    required: true
+    description: JSON array of vendor IDs and names to assess
+  - name: risk_data_api
+    type: string
+    required: true
+    description: API endpoint for vendor risk data (financial, compliance, geopolitical)
+  - name: risk_thresholds
+    type: string
+    required: false
+    default: '{"financial": 70, "compliance": 80, "operational": 60, "geopolitical": 50}'
+    description: JSON risk score thresholds (0-100, lower = more risk)
+  - name: monitoring_frequency_days
+    type: integer
+    required: false
+    default: 30
+    description: Days between risk reassessments
+  - name: output_file
+    type: string
+    required: false
+    default: /tmp/vendor_risk_assessment.json
+    description: Output file for risk assessment
+
+steps:
+  - id: fetch_risk_data
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.risk_data_api }}"
+      headers:
+        Content-Type: application/json
+      body:
+        vendors: "{{ .params.vendor_list }}"
+    description: Fetch vendor risk data from external risk intelligence API
+
+  - id: compute_risk_scores
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+
+        risk_data = json.loads('''{{ index .steps "fetch_risk_data" "response" "body" }}''')
+        thresholds = json.loads('''{{ .params.risk_thresholds }}''')
+
+        vendors = risk_data.get("vendors", [])
+        assessments = []
+
+        for v in vendors:
+            scores = {}
+            issues = []
+
+            # Financial risk (0-100, higher = riskier)
+            financial_stability = v.get("financial_stability", 80)
+            payment_history = v.get("payment_history", 85)
+            financial = round((financial_stability * 0.6 + payment_history * 0.4), 1)
+            scores["financial"] = financial
+            if financial < thresholds.get("financial", 70):
+                issues.append(f"Financial risk: score {financial} below threshold {thresholds['financial']}")
+
+            # Compliance risk
+            compliance_score = v.get("compliance_score", 90)
+            sanctions_check = v.get("sanctions_clear", True)
+            compliance = round((compliance_score * 0.7 + (100 if sanctions_check else 0) * 0.3), 1)
+            scores["compliance"] = compliance
+            if compliance < thresholds.get("compliance", 80):
+                issues.append(f"Compliance risk: score {compliance} below threshold {thresholds['compliance']}")
+
+            # Operational risk
+            on_time = v.get("on_time_delivery", 90)
+            quality = v.get("quality_score", 85)
+            capacity = v.get("capacity_utilization", 70)
+            operational = round((on_time * 0.4 + quality * 0.4 + (100 - capacity) * 0.2), 1)
+            scores["operational"] = operational
+            if operational < thresholds.get("operational", 60):
+                issues.append(f"Operational risk: score {operational} below threshold {thresholds['operational']}")
+
+            # Geopolitical risk
+            geo_risk = v.get("geopolitical_risk", 20)
+            scores["geopolitical"] = round(100 - geo_risk, 1)
+            if scores["geopolitical"] < thresholds.get("geopolitical", 50):
+                issues.append(f"Geopolitical risk: score {scores['geopolitical']} below threshold {thresholds['geopolitical']}")
+
+            # Overall risk score (weighted average)
+            overall = round(
+                financial * 0.30 + compliance * 0.25 + operational * 0.30 + scores["geopolitical"] * 0.15, 1
+            )
+
+            # Risk level
+            if overall >= 80:
+                level = "Low"
+            elif overall >= 60:
+                level = "Medium"
+            elif overall >= 40:
+                level = "High"
+            else:
+                level = "Critical"
+
+            assessments.append({
+                "vendor_id": v["vendor_id"],
+                "vendor_name": v["vendor_name"],
+                "category_scores": scores,
+                "overall_score": overall,
+                "risk_level": level,
+                "issues": issues,
+                "issue_count": len(issues),
+                "last_assessed": v.get("last_assessed", "{{ now }}")
+            })
+
+        assessments.sort(key=lambda x: x["overall_score"])
+
+        result = {
+            "assessed_at": "{{ now }}",
+            "next_assessment_days": {{ .params.monitoring_frequency_days }},
+            "total_vendors": len(assessments),
+            "risk_distribution": {
+                "Critical": sum(1 for a in assessments if a["risk_level"] == "Critical"),
+                "High": sum(1 for a in assessments if a["risk_level"] == "High"),
+                "Medium": sum(1 for a in assessments if a["risk_level"] == "Medium"),
+                "Low": sum(1 for a in assessments if a["risk_level"] == "Low")
+            },
+            "assessments": assessments
+        }
+        print(json.dumps(result))
+    description: Compute multi-dimensional risk scores and classifications
+
+  - id: generate_mitigation_plan
+    node: agent
+    config:
+      prompt: |
+        Analyze the vendor risk assessment and generate mitigation strategies:
+        {{ index .steps "compute_risk_scores" "output" }}
+
+        For each Critical and High risk vendor, provide:
+        1. Root cause analysis of the risk factors
+        2. Immediate mitigation actions (next 7 days)
+        3. Medium-term risk reduction strategies (30-90 days)
+        4. Alternative supplier recommendations
+        5. Monitoring escalation triggers
+    description: Generate AI-powered risk mitigation strategies
+
+  - id: save_risk_assessment
+    node: file_write
+    config:
+      path: "{{ .params.output_file }}"
+      content: |
+        {
+          "risk_assessment": {{ index .steps "compute_risk_scores" "output" }},
+          "mitigation_plan": {{ index .steps "generate_mitigation_plan" "output" }}
+        }
+    description: Save risk assessment and mitigation plan to output file

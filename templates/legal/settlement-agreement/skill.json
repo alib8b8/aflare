@@ -1,0 +1,13 @@
+{
+  "id": "legal/settlement-agreement",
+  "name": "Settlement Agreement Generator",
+  "version": "1.0.0",
+  "description": "Generates comprehensive settlement agreements and releases for dispute resolution. Analyzes dispute context, drafts enforceable agreements, and reviews for legal enforceability.",
+  "author": "aflare community",
+  "category": "legal",
+  "tags": ["settlement", "agreement", "release", "dispute", "resolution", "legal"],
+  "keywords": ["settlement agreement", "release", "dispute resolution", "settlement", "legal settlement"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

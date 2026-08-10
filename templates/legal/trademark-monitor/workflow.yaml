@@ -1,0 +1,121 @@
+name: trademark-monitor
+description: "Trademark monitoring and infringement detection workflow"
+version: "1.0.0"
+params:
+  - name: trademark
+    type: string
+    required: true
+    description: "The trademark to monitor"
+  - name: registration_number
+    type: string
+    required: false
+    description: "Trademark registration number"
+  - name: goods_services
+    type: array
+    required: true
+    description: "Goods and services classes"
+  - name: jurisdictions
+    type: array
+    required: false
+    default: ["US"]
+    description: "Jurisdictions to monitor"
+  - name: similar_marks
+    type: array
+    required: false
+    default: []
+    description: "Known similar marks to watch"
+  - name: alert_threshold
+    type: string
+    required: false
+    default: "medium"
+    description: "Alert sensitivity threshold (low, medium, high)"
+
+steps:
+  - id: check_registry
+    node: http_request
+    description: "Check trademark registry for similar marks"
+    config:
+      method: GET
+      url: "https://api.uspto.gov/trademarks/v1/search?q={{ .params.trademark }}&rows=20"
+      headers:
+        Accept: "application/json"
+    condition: "{{ .params.jurisdictions | includes "US" }}"
+
+  - id: analyze_new_filings
+    node: agent
+    description: "Analyze new trademark filings for potential conflicts"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a trademark monitoring specialist. Analyze new trademark filings and identify
+        potential conflicts or infringements. For each potential conflict, assess: similarity
+        of marks, relatedness of goods/services, likelihood of confusion factors, and
+        recommended action (oppose, monitor, no action). Output in structured JSON.
+      prompt: |
+        Trademark: {{ .params.trademark }}
+        Registration: {{ .params.registration_number }}
+        Goods/Services: {{ .params.goods_services }}
+        Similar marks to watch: {{ .params.similar_marks }}
+        {{ if index .steps "check_registry" }}Registry data: {{ index .steps.check_registry.outputs "body" }}{{ end }}
+        Analyze for potential conflicts and infringements.
+
+  - id: risk_scoring
+    node: code_interpreter
+    description: "Calculate conflict risk scores"
+    config:
+      language: python
+      code: |
+        import json
+        conflicts = {{ index .steps.analyze_new_filings.outputs "conflicts" | toJson }}
+        conflict_list = conflicts if isinstance(conflicts, list) else conflicts.get("conflicts", [])
+        scored = []
+        for c in conflict_list:
+            sim = c.get("similarity_score", 50)
+            rel = c.get("goods_relatedness", 50)
+            risk = round((sim * 0.6 + rel * 0.4), 1)
+            action = "oppose" if risk >= 80 else "monitor_closely" if risk >= 60 else "watch" if risk >= 40 else "low_priority"
+            c["composite_risk_score"] = risk
+            c["recommended_action"] = action
+            scored.append(c)
+        
+        high_risk = sum(1 for c in scored if c["composite_risk_score"] >= 70)
+        result = {
+            "total_conflicts": len(scored),
+            "high_risk_conflicts": high_risk,
+            "scored_conflicts": scored,
+            "overall_threat_level": "HIGH" if high_risk >= 3 else "MEDIUM" if high_risk >= 1 else "LOW"
+        }
+        print(json.dumps(result, indent=2))
+
+  - id: generate_alerts
+    node: agent
+    description: "Generate monitoring alerts and recommendations"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a trademark enforcement attorney. Based on the risk analysis, generate
+        prioritized alerts and recommended actions. For high-risk conflicts, provide:
+        opposition strategy, evidence gathering recommendations, and estimated costs.
+        For medium-risk, provide monitoring protocols and escalation triggers.
+      prompt: |
+        Trademark: {{ .params.trademark }}
+        Risk analysis: {{ index .steps.risk_scoring.outputs "risk_analysis" }}
+        Alert threshold: {{ .params.alert_threshold }}
+        Generate alerts and enforcement recommendations.
+
+  - id: save_report
+    node: file_write
+    description: "Save the trademark monitoring report"
+    config:
+      path: "{{ .params.output_path | default "output/trademark_monitor_report.md" }}"
+      content: |
+        # Trademark Monitoring Report: {{ .params.trademark }}
+        
+        ## Overall Threat Level
+        {{ index .steps.risk_scoring.outputs "risk_analysis" }}
+        
+        ## Conflict Analysis
+        {{ index .steps.analyze_new_filings.outputs "conflicts" }}
+        
+        ## Alerts & Recommendations
+        {{ index .steps.generate_alerts.outputs "alerts" }}

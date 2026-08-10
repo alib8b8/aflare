@@ -1,0 +1,13 @@
+{
+  "id": "education/citation-generator",
+  "name": "Citation Generator",
+  "version": "1.0.0",
+  "description": "Bibliography and citation formatter supporting multiple academic styles (APA, MLA, Chicago, Harvard, IEEE, Vancouver) with DOI integration.",
+  "author": "aflare community",
+  "category": "education",
+  "tags": ["citation", "bibliography", "references", "formatting", "academic"],
+  "keywords": ["citation", "bibliography", "references", "APA", "MLA", "Chicago", "formatting"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

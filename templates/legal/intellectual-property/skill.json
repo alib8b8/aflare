@@ -1,0 +1,13 @@
+{
+  "id": "legal/intellectual-property",
+  "name": "IP Portfolio Management & Analysis",
+  "version": "1.0.0",
+  "description": "Comprehensive IP portfolio management workflow that categorizes assets, performs gap analysis, estimates valuation, and generates strategic recommendations for commercialization and protection.",
+  "author": "aflare community",
+  "category": "legal",
+  "tags": ["ip", "intellectual-property", "portfolio", "patent", "trademark", "legal"],
+  "keywords": ["intellectual property", "ip portfolio", "patent analysis", "trademark management", "ip valuation"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

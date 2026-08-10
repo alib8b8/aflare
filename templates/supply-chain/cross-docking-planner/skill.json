@@ -1,0 +1,13 @@
+{
+  "id": "supply-chain/cross-docking-planner",
+  "name": "Cross Docking Planner",
+  "version": "1.0.0",
+  "description": "Cross-docking schedule optimization for inbound/outbound synchronization. Matches inbound shipments to outbound orders, assigns dock doors, and generates handling schedules with labor and equipment estimates.",
+  "author": "aflare community",
+  "category": "supply-chain",
+  "tags": ["cross-docking", "dock-scheduling", "warehouse", "synchronization", "handling"],
+  "keywords": ["cross docking", "dock scheduling", "inbound outbound sync", "warehouse optimization", "handling plan"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

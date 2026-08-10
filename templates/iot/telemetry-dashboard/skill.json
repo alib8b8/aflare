@@ -1,0 +1,13 @@
+{
+  "id": "iot/telemetry-dashboard",
+  "name": "Telemetry Dashboard",
+  "version": "1.0.0",
+  "description": "Real-time telemetry dashboard generator for IoT device metrics with aggregation, trend analysis, and AI-powered insights",
+  "author": "aflare community",
+  "category": "iot",
+  "tags": ["telemetry", "dashboard", "metrics", "visualization", "real-time"],
+  "keywords": ["iot", "telemetry", "dashboard", "monitoring", "analytics"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

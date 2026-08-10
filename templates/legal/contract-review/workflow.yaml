@@ -1,0 +1,107 @@
+name: contract-review
+description: "AI-powered contract review and risk analysis workflow"
+version: "1.0.0"
+params:
+  - name: contract_text
+    type: string
+    required: true
+    description: "Full text of the contract to review"
+  - name: contract_type
+    type: string
+    required: false
+    default: "general"
+    description: "Type of contract (e.g., employment, vendor, lease, msa)"
+  - name: jurisdiction
+    type: string
+    required: false
+    default: "US"
+    description: "Governing jurisdiction for legal analysis"
+  - name: risk_threshold
+    type: string
+    required: false
+    default: "medium"
+    description: "Risk sensitivity threshold (low, medium, high)"
+
+steps:
+  - id: classify_contract
+    node: agent
+    description: "Classify contract type and extract key metadata"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a legal contract analyst. Analyze the following contract text and classify it by type.
+        Extract: contract type, parties involved, effective date, term length, governing law, and key subject matter.
+      prompt: |
+        Contract text:
+        {{ .params.contract_text }}
+        
+        Jurisdiction: {{ .params.jurisdiction }}
+        Please classify this contract and extract key metadata in JSON format.
+
+  - id: risk_analysis
+    node: agent
+    description: "Identify and analyze legal risks in the contract"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a senior legal risk analyst. Review the contract for potential risks and issues.
+        For each risk found, provide: risk category, severity (Critical/High/Medium/Low), clause reference,
+        description of the risk, potential impact, and recommended mitigation.
+        Pay special attention to: indemnification, liability caps, termination rights, IP ownership,
+        payment terms, confidentiality, dispute resolution, and force majeure.
+      prompt: |
+        Contract classification: {{ index .steps.classify_contract.outputs "classification" }}
+        Contract text: {{ .params.contract_text }}
+        Risk threshold: {{ .params.risk_threshold }}
+        
+        Please provide a comprehensive risk analysis in JSON format.
+
+  - id: clause_check
+    node: agent
+    description: "Check for missing or problematic clauses"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a contract compliance specialist. Check if the contract includes all standard clauses
+        expected for this type of agreement. Identify missing clauses and flag problematic language.
+      prompt: |
+        Contract type: {{ .params.contract_type }}
+        Risk analysis: {{ index .steps.risk_analysis.outputs "risks" }}
+        Contract text: {{ .params.contract_text }}
+        
+        Provide a clause completeness check with missing and problematic clauses in JSON format.
+
+  - id: summary_report
+    node: agent
+    description: "Generate a consolidated review summary and recommendations"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a legal review partner. Synthesize all findings into a clear, actionable executive summary.
+        Include: overall risk rating, top 5 critical issues, negotiation recommendations, and a go/no-go recommendation.
+      prompt: |
+        Classification: {{ index .steps.classify_contract.outputs "classification" }}
+        Risk analysis: {{ index .steps.risk_analysis.outputs "risks" }}
+        Clause check: {{ index .steps.clause_check.outputs "clause_check" }}
+        
+        Generate a final executive summary report.
+
+  - id: save_report
+    node: file_write
+    description: "Save the contract review report to a file"
+    config:
+      path: "{{ .params.output_path | default "output/contract_review_report.md" }}"
+      content: |
+        # Contract Review Report
+        
+        ## Contract Classification
+        {{ index .steps.classify_contract.outputs "classification" }}
+        
+        ## Risk Analysis
+        {{ index .steps.risk_analysis.outputs "risks" }}
+        
+        ## Clause Completeness Check
+        {{ index .steps.clause_check.outputs "clause_check" }}
+        
+        ## Executive Summary
+        {{ index .steps.summary_report.outputs "summary" }}

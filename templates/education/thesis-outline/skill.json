@@ -1,0 +1,13 @@
+{
+  "id": "education/thesis-outline",
+  "name": "Thesis Outline Builder",
+  "version": "1.0.0",
+  "description": "Thesis and dissertation outline builder with chapter structure, content planning, writing timeline, and citation style integration.",
+  "author": "aflare community",
+  "category": "education",
+  "tags": ["thesis", "dissertation", "outline", "writing", "academic", "planning"],
+  "keywords": ["thesis", "dissertation", "outline", "chapters", "writing", "timeline", "academic"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

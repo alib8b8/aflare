@@ -1,0 +1,141 @@
+name: Patient Education Material Generator
+# Generate patient education materials in plain language
+# Usage: aflare install healthcare/patient-education
+#        aflare run patient-education/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: http_request
+      max_iterations: 3
+    input: |
+      Research the medical topic and gather evidence-based information.
+
+      Topic: {{ .params.topic }}
+      Condition: {{ .params.condition }}
+      Treatment: {{ .params.treatment }}
+      Target audience: {{ .params.target_audience }}
+      Reading level: {{ .params.reading_level }}
+      Language: {{ .params.language }}
+
+      Gather:
+      1. Condition overview (causes, symptoms, prevalence)
+      2. Treatment options with evidence basis
+      3. Self-management strategies
+      4. Lifestyle modifications
+      5. When to seek medical attention
+      6. Prognosis and expected outcomes
+      7. Common myths and misconceptions
+    id: clinical_content
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 2
+    input: |
+      Transform clinical content into patient-friendly education materials.
+
+      Clinical content: {{ .clinical_content }}
+      Reading level: {{ .params.reading_level }}
+      Target audience: {{ .params.target_audience }}
+
+      Guidelines:
+      - Use plain language at {{ .params.reading_level }} reading level
+      - Short sentences (15-20 words max)
+      - Active voice
+      - Define all medical terms in simple words
+      - Use analogies and examples
+      - Include "What to expect" timeline
+      - Use bullet points and short paragraphs
+      - Add motivational and empowering tone
+      - Include questions to ask the doctor
+      - Create a summary "Key Points" section
+    id: patient_content
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 30s
+    input: |
+      import json
+      import re
+
+      content = {{ .patient_content | toJSON }}
+      text = content.get("full_text", "")
+
+      # Calculate readability metrics
+      sentences = re.split(r'[.!?]+', text)
+      sentences = [s.strip() for s in sentences if s.strip()]
+      words = text.split()
+      word_count = len(words)
+      sentence_count = len(sentences)
+
+      # Count complex words (3+ syllables)
+      def count_syllables(word):
+          word = word.lower().strip(".,!?;:()[]")
+          if len(word) <= 3:
+              return 1
+          vowels = "aeiouy"
+          count = 0
+          prev_vowel = False
+          for ch in word:
+              if ch in vowels:
+                  if not prev_vowel:
+                      count += 1
+                  prev_vowel = True
+              else:
+                  prev_vowel = False
+          if word.endswith("e"):
+              count -= 1
+          return max(1, count)
+
+      complex_words = sum(1 for w in words if count_syllables(w) >= 3)
+
+      avg_sentence_length = word_count / sentence_count if sentence_count > 0 else 0
+      pct_complex = (complex_words / word_count * 100) if word_count > 0 else 0
+
+      # Flesch-Kincaid Grade Level approximation
+      grade_level = 0.39 * avg_sentence_length + 11.8 * (complex_words / word_count) - 15.59 if word_count > 0 else 0
+
+      readability = "easy"
+      if grade_level > 12:
+          readability = "difficult"
+      elif grade_level > 8:
+          readability = "moderate"
+
+      print(json.dumps({
+          "word_count": word_count,
+          "sentence_count": sentence_count,
+          "avg_sentence_length": round(avg_sentence_length, 1),
+          "complex_word_pct": round(pct_complex, 1),
+          "grade_level": round(grade_level, 1),
+          "readability": readability,
+          "target_level": "{{ .params.reading_level }}"
+      }))
+    id: readability_metrics
+
+  - node: file_write
+    params:
+      path: "{{ .params.output_path | default \"patient-education.md\" }}"
+    input: |
+      # {{ .params.topic }}: Patient Education Guide
+      ---
+      **Reading Level:** Grade {{ .readability_metrics.grade_level }} ({{ .readability_metrics.readability }})
+      **Target:** {{ .params.target_audience }}
+
+      {{ .patient_content }}
+
+      ## Key Points
+      {{ .patient_content.key_points }}
+
+      ## Questions to Ask Your Doctor
+      {{ .patient_content.doctor_questions }}
+
+      ---
+      *This material is for educational purposes. Always consult your healthcare provider for medical advice.*
+      *Sources: {{ .clinical_content.references }}*
+    id: save_material

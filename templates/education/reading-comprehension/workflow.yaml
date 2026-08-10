@@ -1,0 +1,135 @@
+name: reading-comprehension
+description: Reading comprehension test generator with leveled passages and questions
+version: "1.0.0"
+params:
+  - name: passage_topic
+    type: string
+    required: true
+    description: Topic for the reading passage
+  - name: reading_level
+    type: string
+    required: false
+    default: intermediate
+    description: Reading difficulty level
+  - name: passage_length
+    type: string
+    required: false
+    default: medium
+    description: Passage length (short, medium, long)
+  - name: question_types
+    type: array
+    required: false
+    default: ["main_idea", "detail", "inference", "vocabulary"]
+    description: Question types to include
+  - name: question_count
+    type: integer
+    required: false
+    default: 8
+    description: Number of questions
+  - name: include_answers
+    type: boolean
+    required: false
+    default: true
+    description: Include answer key
+steps:
+  - id: generate_passage
+    node: agent
+    prompt: |
+      Write a {{ .params.passage_length }} reading passage about "{{ .params.passage_topic }}" at a {{ .params.reading_level }} reading level.
+      
+      The passage should:
+      - Be engaging and age-appropriate
+      - Include a clear main idea and supporting details
+      - Contain vocabulary appropriate for {{ .params.reading_level }} level
+      - Have natural opportunities for inference questions
+      - Be between 200-800 words depending on {{ .params.passage_length }}
+    output: passage
+
+  - id: generate_questions
+    node: agent
+    prompt: |
+      Create {{ .params.question_count }} reading comprehension questions based on this passage:
+      
+      {{ .passage }}
+      
+      Question types to include: {{ .params.question_types }}
+      
+      For each question:
+      - Label the question type
+      - Write the question clearly
+      - Provide 4 answer choices (for multiple choice)
+      - Mark the correct answer
+      - Explain why the answer is correct
+      - Cite the relevant part of the passage
+    output: questions
+
+  - id: calculate_readability
+    node: code_interpreter
+    language: python
+    code: |
+      import json
+      
+      passage = '''{{ .passage }}'''
+      questions = json.loads('''{{ .questions }}''')
+      
+      words = passage.split()
+      sentences = [s.strip() for s in passage.replace('?', '.').replace('!', '.').split('.') if s.strip()]
+      
+      word_count = len(words)
+      sentence_count = max(1, len(sentences))
+      avg_words_per_sentence = round(word_count / sentence_count, 1)
+      
+      question_types = {}
+      for q in questions:
+          qt = q.get('type', 'unknown')
+          question_types[qt] = question_types.get(qt, 0) + 1
+      
+      stats = {
+          "word_count": word_count,
+          "sentence_count": sentence_count,
+          "avg_words_per_sentence": avg_words_per_sentence,
+          "reading_level": "{{ .params.reading_level }}",
+          "question_count": len(questions),
+          "question_type_distribution": question_types
+      }
+      
+      print(json.dumps(stats, indent=2))
+    output: readability_stats
+
+  - id: format_test
+    node: transform
+    input:
+      passage: "{{ .passage }}"
+      questions: "{{ .questions }}"
+      stats: "{{ .readability_stats }}"
+    template: |
+      # Reading Comprehension Test
+      **Reading Level:** {{ .stats.reading_level }} | **Passage Length:** {{ .stats.word_count }} words
+      
+      ## Passage
+      {{ .passage }}
+      
+      ## Questions
+      {{ range $index, $q := .questions }}
+      ### {{ $index | add 1 }}. {{ $q.question }}
+      **Type:** {{ $q.type }}
+      
+      A) {{ $q.choices[0] }}
+      B) {{ $q.choices[1] }}
+      C) {{ $q.choices[2] }}
+      D) {{ $q.choices[3] }}
+      {{ end }}
+      
+      {{ if .params.include_answers }}
+      ## Answer Key
+      {{ range $index, $q := .questions }}
+      **{{ $index | add 1 }}.** {{ $q.correct }} - {{ $q.explanation }}
+      {{ end }}
+      {{ end }}
+    output: formatted_test
+
+  - id: save_test
+    node: file_write
+    filename: "reading_test_{{ .params.passage_topic | sanitize }}.md"
+    content: "{{ .formatted_test }}"
+    output: file_path

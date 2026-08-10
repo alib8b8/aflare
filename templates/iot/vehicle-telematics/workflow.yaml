@@ -1,0 +1,147 @@
+name: vehicle-telematics
+description: Vehicle telematics data processing with GPS tracking, driver behavior analysis, and fleet optimization
+version: "1.0.0"
+params:
+  - name: vehicle_ids
+    type: string
+    default: ""
+    description: Comma-separated vehicle IDs
+  - name: fleet_id
+    type: string
+    default: ""
+    description: Fleet identifier for group analytics
+  - name: metrics
+    type: string
+    default: "speed,fuel,location,engine_rpm,odometer"
+    description: Comma-separated telemetry metrics
+  - name: geo_fence
+    type: string
+    default: "{}"
+    description: JSON geofence boundary definition
+  - name: telematics_api
+    type: string
+    default: "https://api.telematics.local/v1"
+    description: Vehicle telematics API endpoint
+
+steps:
+  - id: fetch_telematics
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.telematics_api }}/vehicles/telemetry"
+      headers:
+        Authorization: "Bearer {{ .env.TELEMATICS_TOKEN }}"
+        Content-Type: application/json
+      body: |
+        {
+          "vehicle_ids": {{ .params.vehicle_ids | split "," | toJson }},
+          "metrics": {{ .params.metrics | split "," | toJson }}
+        }
+    description: Fetch real-time telematics data from vehicles
+
+  - id: analyze_driving
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        import numpy as np
+        from datetime import datetime
+
+        data = {{ .steps.fetch_telematics.output | toJson }}
+        geo_fence = json.loads('''{{ .params.geo_fence }}''')
+
+        vehicles = []
+        fleet_speed = []
+        fleet_fuel = []
+        geo_violations = []
+
+        for v in data.get("vehicles", []):
+            telemetry = v.get("telemetry", {})
+            speed = telemetry.get("speed", {}).get("value", 0)
+            fuel = telemetry.get("fuel", {}).get("value", 0)
+            location = telemetry.get("location", {}).get("value", {})
+
+            behavior = "normal"
+            if speed > 120:
+                behavior = "speeding"
+            elif speed > 100:
+                behavior = "aggressive"
+
+            if geo_fence and location:
+                lat = location.get("lat", 0)
+                lon = location.get("lon", 0)
+                bounds = geo_fence.get("bounds", {})
+                if bounds:
+                    if not (bounds.get("min_lat", -90) <= lat <= bounds.get("max_lat", 90) and
+                            bounds.get("min_lon", -180) <= lon <= bounds.get("max_lon", 180)):
+                        geo_violations.append({
+                            "vehicle_id": v["vehicle_id"],
+                            "location": location,
+                            "timestamp": telemetry.get("timestamp", datetime.utcnow().isoformat())
+                        })
+
+            vehicles.append({
+                "vehicle_id": v["vehicle_id"],
+                "driver": v.get("driver", ""),
+                "speed": speed,
+                "fuel_level": fuel,
+                "location": location,
+                "engine_rpm": telemetry.get("engine_rpm", {}).get("value", 0),
+                "odometer": telemetry.get("odometer", {}).get("value", 0),
+                "behavior": behavior,
+                "timestamp": telemetry.get("timestamp", datetime.utcnow().isoformat())
+            })
+            fleet_speed.append(speed)
+            fleet_fuel.append(fuel)
+
+        result = {
+            "fleet_id": "{{ .params.fleet_id }}",
+            "vehicles": vehicles,
+            "fleet_summary": {
+                "total_vehicles": len(vehicles),
+                "avg_speed": round(np.mean(fleet_speed), 1) if fleet_speed else 0,
+                "avg_fuel": round(np.mean(fleet_fuel), 1) if fleet_fuel else 0,
+                "speeding_count": sum(1 for v in vehicles if v["behavior"] == "speeding"),
+                "aggressive_count": sum(1 for v in vehicles if v["behavior"] == "aggressive")
+            },
+            "geo_violations": geo_violations,
+            "geo_violation_count": len(geo_violations)
+        }
+        print(json.dumps(result))
+    description: Analyze driving behavior and detect geofence violations
+
+  - id: fleet_insights
+    node: agent
+    config:
+      prompt: |
+        Analyze the fleet telematics data and provide actionable insights:
+
+        {{ .steps.analyze_driving.output | toJson }}
+
+        Provide:
+        1. Fleet safety assessment
+        2. Fuel efficiency optimization recommendations
+        3. Driver behavior scoring
+        4. Route optimization suggestions
+        5. Maintenance alerts based on odometer/engine data
+
+        Return as JSON with "fleet_insights" key.
+      output_format: json
+    description: AI-powered fleet optimization insights
+
+  - id: log_telematics
+    node: file_write
+    config:
+      file_path: "/data/telematics/{{ .params.fleet_id }}/{{ now | date \"2006-01-02\" }}/fleet_{{ now | date \"150405\" }}.json"
+      content: |
+        {
+          "report_id": "{{ uuid }}",
+          "timestamp": "{{ now }}",
+          "fleet_id": "{{ .params.fleet_id }}",
+          "vehicles": {{ .steps.analyze_driving.output.vehicles | toJson }},
+          "summary": {{ .steps.analyze_driving.output.fleet_summary | toJson }},
+          "geo_violations": {{ .steps.analyze_driving.output.geo_violations | toJson }},
+          "insights": {{ .steps.fleet_insights.output | toJson }}
+        }
+    description: Log telematics data to persistent storage

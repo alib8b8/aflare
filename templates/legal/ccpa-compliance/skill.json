@@ -1,0 +1,13 @@
+{
+  "id": "legal/ccpa-compliance",
+  "name": "CCPA Compliance Workflow",
+  "version": "1.0.0",
+  "description": "California Consumer Privacy Act (CCPA) compliance assessment workflow that determines applicability, maps consumer rights requirements, generates required notices, and calculates compliance scores.",
+  "author": "aflare community",
+  "category": "legal",
+  "tags": ["ccpa", "compliance", "privacy", "california", "consumer-rights", "legal"],
+  "keywords": ["ccpa", "california privacy", "consumer rights", "privacy compliance", "data privacy"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

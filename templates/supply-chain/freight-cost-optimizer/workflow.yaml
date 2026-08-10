@@ -1,0 +1,136 @@
+name: freight-cost-optimizer
+description: Freight cost comparison and optimization across carriers
+version: "1.0.0"
+params:
+  - name: shipment_details
+    type: string
+    required: true
+    description: JSON with origin, destination, weight, dimensions, and freight class
+  - name: carrier_rates_api
+    type: string
+    required: true
+    description: API endpoint for carrier rate quotes
+  - name: service_levels
+    type: string
+    required: false
+    default: '["standard","expedited","overnight"]'
+    description: JSON array of desired service levels
+  - name: max_cost_threshold
+    type: number
+    required: false
+    default: 0
+    description: Maximum acceptable cost (0 = no limit)
+  - name: output_file
+    type: string
+    required: false
+    default: /tmp/freight_optimization.json
+    description: Output file for optimized freight plan
+
+steps:
+  - id: fetch_rates
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.carrier_rates_api }}"
+      headers:
+        Content-Type: application/json
+      body:
+        shipment: "{{ .params.shipment_details }}"
+        service_levels: "{{ .params.service_levels }}"
+    description: Fetch rate quotes from multiple carriers
+
+  - id: compare_rates
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+
+        quotes = json.loads('''{{ index .steps "fetch_rates" "response" "body" }}''')
+        shipment = json.loads('''{{ .params.shipment_details }}''')
+        max_cost = {{ .params.max_cost_threshold }}
+
+        carriers = quotes.get("quotes", [])
+        comparisons = []
+
+        for q in carriers:
+            base_cost = q.get("total_cost", 0)
+            transit_days = q.get("transit_days", 0)
+            reliability = q.get("reliability_score", 0)
+            co2_kg = q.get("co2_emissions_kg", 0)
+
+            # Cost per kg
+            weight_kg = shipment.get("weight_kg", 1)
+            cost_per_kg = round(base_cost / weight_kg, 2) if weight_kg > 0 else 0
+
+            # Cost per day (value of speed)
+            cost_per_day = round(base_cost / transit_days, 2) if transit_days > 0 else 0
+
+            # Composite score (lower cost, lower days, higher reliability = better)
+            max_cost_all = max(q.get("total_cost", 0) for q in carriers) if carriers else 1
+            max_days = max(q.get("transit_days", 0) for q in carriers) if carriers else 1
+
+            cost_score = 1 - (base_cost / max_cost_all) if max_cost_all > 0 else 0
+            time_score = 1 - (transit_days / max_days) if max_days > 0 else 0
+            rel_score = reliability / 100 if reliability > 0 else 0.5
+
+            composite = round((cost_score * 0.4 + time_score * 0.3 + rel_score * 0.3) * 100, 1)
+
+            # Check max threshold
+            exceeds_threshold = max_cost > 0 and base_cost > max_cost
+
+            comparisons.append({
+                "carrier": q.get("carrier_name"),
+                "service": q.get("service_level"),
+                "total_cost": base_cost,
+                "transit_days": transit_days,
+                "reliability_score": reliability,
+                "cost_per_kg": cost_per_kg,
+                "co2_emissions_kg": co2_kg,
+                "composite_score": composite,
+                "exceeds_threshold": exceeds_threshold
+            })
+
+        comparisons.sort(key=lambda x: x["composite_score"], reverse=True)
+        best = comparisons[0] if comparisons else None
+
+        result = {
+            "shipment_summary": {
+                "origin": shipment.get("origin"),
+                "destination": shipment.get("destination"),
+                "weight_kg": shipment.get("weight_kg"),
+                "freight_class": shipment.get("freight_class")
+            },
+            "carriers_compared": len(comparisons),
+            "best_option": best,
+            "savings_vs_worst": round(comparisons[-1]["total_cost"] - best["total_cost"], 2) if len(comparisons) > 1 and best else 0,
+            "all_quotes": comparisons
+        }
+        print(json.dumps(result))
+    description: Compare carrier rates and compute composite scores
+
+  - id: recommend_carrier
+    node: agent
+    config:
+      prompt: |
+        Analyze the freight rate comparison and recommend the optimal carrier selection:
+        {{ index .steps "compare_rates" "output" }}
+
+        Provide:
+        1. Recommended carrier and service level with justification
+        2. Cost savings analysis vs. alternatives
+        3. Transit time vs. cost trade-off analysis
+        4. Sustainability considerations (CO2 emissions)
+        5. Negotiation talking points for the selected carrier
+    description: Generate AI-powered carrier recommendation
+
+  - id: save_optimization
+    node: file_write
+    config:
+      path: "{{ .params.output_file }}"
+      content: |
+        {
+          "rate_comparison": {{ index .steps "compare_rates" "output" }},
+          "carrier_recommendation": {{ index .steps "recommend_carrier" "output" }}
+        }
+    description: Save freight optimization results to output file

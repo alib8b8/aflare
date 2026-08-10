@@ -1,0 +1,13 @@
+{
+  "id": "legal/deposition-summary",
+  "name": "Deposition Transcript Summarizer",
+  "version": "1.0.0",
+  "description": "Summarizes deposition transcripts with AI-powered analysis, extracts key testimony by topic, identifies contradictions and impeachment opportunities, and generates comprehensive litigation support summaries.",
+  "author": "aflare community",
+  "category": "legal",
+  "tags": ["deposition", "summary", "transcript", "impeachment", "litigation", "legal"],
+  "keywords": ["deposition summary", "transcript analysis", "impeachment", "trial preparation", "testimony"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

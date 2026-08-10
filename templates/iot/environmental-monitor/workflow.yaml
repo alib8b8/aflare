@@ -1,0 +1,131 @@
+name: environmental-monitor
+description: Environmental sensor monitoring for temperature, humidity, and air quality with trend analysis
+version: "1.0.0"
+params:
+  - name: sensor_ids
+    type: string
+    default: ""
+    description: Comma-separated environmental sensor IDs
+  - name: metrics
+    type: string
+    default: "temperature,humidity,pressure,air_quality"
+    description: Comma-separated environmental metrics
+  - name: aggregation_window
+    type: string
+    default: "24h"
+    description: Aggregation time window
+  - name: temp_unit
+    type: string
+    default: "celsius"
+    description: Temperature unit - celsius or fahrenheit
+  - name: env_api
+    type: string
+    default: "https://api.environment.local/v1"
+    description: Environmental monitoring API
+
+steps:
+  - id: fetch_environmental_data
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.env_api }}/sensors/readings"
+      headers:
+        Authorization: "Bearer {{ .env.ENV_API_TOKEN }}"
+        Content-Type: application/json
+      body: |
+        {
+          "sensor_ids": {{ .params.sensor_ids | split "," | toJson }},
+          "metrics": {{ .params.metrics | split "," | toJson }},
+          "window": "{{ .params.aggregation_window }}"
+        }
+    description: Fetch environmental readings from sensors
+
+  - id: compute_statistics
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        import numpy as np
+
+        data = {{ .steps.fetch_environmental_data.output | toJson }}
+        unit = "{{ .params.temp_unit }}"
+
+        sensors = []
+        for s in data.get("readings", []):
+            readings = s.get("values", {})
+            stats = {}
+            for metric, values in readings.items():
+                vals = values if isinstance(values, list) else [values]
+                if vals:
+                    stats[metric] = {
+                        "current": round(vals[-1], 2),
+                        "min": round(min(vals), 2),
+                        "max": round(max(vals), 2),
+                        "avg": round(np.mean(vals), 2),
+                        "std": round(np.std(vals), 2)
+                    }
+
+            comfort = "optimal"
+            if "temperature" in stats:
+                t = stats["temperature"]["current"]
+                if unit == "fahrenheit":
+                    t = (t - 32) * 5/9
+                if t < 18 or t > 28:
+                    comfort = "uncomfortable"
+                elif t < 20 or t > 26:
+                    comfort = "moderate"
+
+            if "humidity" in stats:
+                h = stats["humidity"]["current"]
+                if h < 30 or h > 70:
+                    comfort = "uncomfortable" if comfort == "optimal" else comfort
+
+            sensors.append({
+                "sensor_id": s["sensor_id"],
+                "location": s.get("location", ""),
+                "statistics": stats,
+                "comfort_level": comfort,
+                "unit": unit
+            })
+
+        result = {
+            "sensors": sensors,
+            "window": "{{ .params.aggregation_window }}",
+            "unit": unit
+        }
+        print(json.dumps(result))
+    description: Compute environmental statistics and comfort levels
+
+  - id: analyze_environment
+    node: agent
+    config:
+      prompt: |
+        Analyze the environmental sensor data and provide insights:
+
+        {{ .steps.compute_statistics.output | toJson }}
+
+        Provide:
+        1. Overall environmental quality assessment
+        2. Comfort level analysis per location
+        3. Trend detection for each metric
+        4. Health and safety recommendations
+        5. Energy efficiency suggestions for HVAC
+
+        Return as JSON with "environmental_analysis" key.
+      output_format: json
+    description: AI-powered environmental analysis and recommendations
+
+  - id: save_report
+    node: file_write
+    config:
+      file_path: "/data/environmental/{{ now | date \"2006-01-02\" }}/env_{{ now | date \"150405\" }}.json"
+      content: |
+        {
+          "report_id": "{{ uuid }}",
+          "timestamp": "{{ now }}",
+          "window": "{{ .params.aggregation_window }}",
+          "sensors": {{ .steps.compute_statistics.output.sensors | toJson }},
+          "analysis": {{ .steps.analyze_environment.output | toJson }}
+        }
+    description: Save environmental monitoring report

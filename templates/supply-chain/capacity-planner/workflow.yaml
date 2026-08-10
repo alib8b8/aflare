@@ -1,0 +1,138 @@
+name: capacity-planner
+description: Production capacity planning with constraint analysis
+version: "1.0.0"
+params:
+  - name: production_lines
+    type: string
+    required: true
+    description: JSON array of production lines with capacities and constraints
+  - name: demand_forecast
+    type: string
+    required: true
+    description: JSON with demand forecast per product per period
+  - name: planning_horizon_weeks
+    type: integer
+    required: false
+    default: 12
+    description: Number of weeks to plan ahead
+  - name: overtime_limit_pct
+    type: number
+    required: false
+    default: 20
+    description: Maximum overtime as percentage of regular hours
+  - name: output_file
+    type: string
+    required: false
+    default: /tmp/capacity_plan.json
+    description: Output file for capacity plan
+
+steps:
+  - id: analyze_capacity
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+
+        lines = json.loads('''{{ .params.production_lines }}''')
+        demand = json.loads('''{{ .params.demand_forecast }}''')
+        horizon = {{ .params.planning_horizon_weeks }}
+        overtime_limit = {{ .params.overtime_limit_pct }}
+
+        # Calculate capacity per line
+        line_capacity = {}
+        for line in lines:
+            line_id = line["line_id"]
+            hours_per_week = line.get("hours_per_week", 40)
+            units_per_hour = line.get("units_per_hour", 10)
+            max_overtime = hours_per_week * (overtime_limit / 100)
+            regular_capacity = hours_per_week * units_per_hour
+            overtime_capacity = max_overtime * units_per_hour
+            total_capacity = regular_capacity + overtime_capacity
+
+            line_capacity[line_id] = {
+                "name": line.get("name", line_id),
+                "regular_capacity_weekly": regular_capacity,
+                "overtime_capacity_weekly": overtime_capacity,
+                "total_capacity_weekly": total_capacity,
+                "products": line.get("products", []),
+                "setup_hours": line.get("setup_hours_per_change", 2),
+                "maintenance_hours": line.get("maintenance_hours_per_week", 2)
+            }
+
+        # Compare demand vs capacity
+        products = demand.get("products", [])
+        total_demand = sum(p.get("weekly_demand", 0) for p in products)
+        total_regular_capacity = sum(lc["regular_capacity_weekly"] for lc in line_capacity.values())
+        total_max_capacity = sum(lc["total_capacity_weekly"] for lc in line_capacity.values())
+
+        capacity_gap = total_demand - total_regular_capacity
+        capacity_gap_pct = round((capacity_gap / total_regular_capacity) * 100, 1) if total_regular_capacity > 0 else 0
+
+        # Weekly plan
+        weekly_plan = []
+        for week in range(1, horizon + 1):
+            week_demand = total_demand * (1 + week * 0.02)  # 2% weekly growth
+            overtime_needed = max(0, week_demand - total_regular_capacity)
+            overtime_pct = round((overtime_needed / total_regular_capacity) * 100, 1) if total_regular_capacity > 0 else 0
+            feasible = week_demand <= total_max_capacity
+
+            weekly_plan.append({
+                "week": week,
+                "forecast_demand": round(week_demand),
+                "regular_capacity": total_regular_capacity,
+                "overtime_required": round(overtime_needed),
+                "overtime_pct": overtime_pct,
+                "feasible": feasible,
+                "constraint": "none" if feasible else "exceeds_max_capacity"
+            })
+
+        result = {
+            "planning_horizon_weeks": horizon,
+            "total_regular_capacity": total_regular_capacity,
+            "total_max_capacity": total_max_capacity,
+            "current_weekly_demand": total_demand,
+            "capacity_gap": capacity_gap,
+            "capacity_gap_pct": capacity_gap_pct,
+            "capacity_status": "sufficient" if capacity_gap <= 0 else ("tight" if capacity_gap_pct <= 20 else "critical"),
+            "overtime_limit_pct": overtime_limit,
+            "production_lines": [
+                {
+                    "line_id": lid,
+                    "name": lc["name"],
+                    "regular_capacity": lc["regular_capacity_weekly"],
+                    "total_capacity": lc["total_capacity_weekly"],
+                    "utilization_pct": round((total_demand / len(line_capacity)) / lc["regular_capacity_weekly"] * 100, 1) if lc["regular_capacity_weekly"] > 0 else 0
+                }
+                for lid, lc in line_capacity.items()
+            ],
+            "weekly_plan": weekly_plan
+        }
+        print(json.dumps(result))
+    description: Analyze production capacity vs demand forecast
+
+  - id: generate_capacity_recommendations
+    node: agent
+    config:
+      prompt: |
+        Analyze the production capacity plan and generate recommendations:
+        {{ index .steps "analyze_capacity" "output" }}
+
+        Provide:
+        1. Capacity adequacy assessment for the planning horizon
+        2. Bottleneck identification and resolution strategies
+        3. Overtime and shift optimization recommendations
+        4. Capital investment suggestions (new lines, automation)
+        5. Make-vs-buy analysis for constrained products
+    description: Generate AI-powered capacity planning recommendations
+
+  - id: save_capacity_plan
+    node: file_write
+    config:
+      path: "{{ .params.output_file }}"
+      content: |
+        {
+          "capacity_analysis": {{ index .steps "analyze_capacity" "output" }},
+          "recommendations": {{ index .steps "generate_capacity_recommendations" "output" }}
+        }
+    description: Save capacity plan to output file

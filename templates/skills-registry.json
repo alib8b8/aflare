@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "count": 182,
+  "count": 323,
   "skills": [
     {
       "id": "business/business-plan",
@@ -130,6 +130,31 @@
       "keywords": [
         "job-description",
         "business"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "business/multi-role-agent",
+      "name": "multi-role-agent",
+      "version": "1.0.0",
+      "description": "Three-roles-in-one business agent (Marketing + BD + IR) for content creation, lead hunting, and investor relations",
+      "author": "aflare community",
+      "category": "business",
+      "tags": [
+        "business",
+        "marketing",
+        "bd",
+        "investor-relations",
+        "multi-agent"
+      ],
+      "keywords": [
+        "multi-agent",
+        "marketing",
+        "business-development",
+        "investor",
+        "content"
       ],
       "inputs": null,
       "outputs": null,
@@ -1581,6 +1606,1051 @@
       "dependencies": null
     },
     {
+      "id": "ecommerce/cart-abandonment",
+      "name": "Cart Abandonment Recovery",
+      "version": "1.0.0",
+      "description": "Cart abandonment recovery workflow that identifies abandoned carts, prioritizes high-value opportunities, generates personalized multi-channel recovery messages with optimized incentives, and executes recovery campaigns.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "cart",
+        "abandonment",
+        "recovery",
+        "retargeting",
+        "conversion"
+      ],
+      "keywords": [
+        "cart abandonment",
+        "cart recovery",
+        "retargeting",
+        "conversion optimization",
+        "incentive optimization"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/category-optimizer",
+      "name": "Category Performance Optimizer",
+      "version": "1.0.0",
+      "description": "Product category performance analysis and optimization engine that evaluates category health across multiple KPIs, benchmarks against market trends, and generates prioritized optimization plans with ROI projections.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "category",
+        "optimization",
+        "merchandising",
+        "performance",
+        "analytics"
+      ],
+      "keywords": [
+        "category optimization",
+        "product mix",
+        "merchandising",
+        "category management",
+        "performance analysis"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/cross-sell-engine",
+      "name": "Cross-Sell and Bundle Engine",
+      "version": "1.0.0",
+      "description": "Cross-sell and bundle recommendation engine that analyzes purchase patterns, product relationships, and customer behavior to generate optimized product bundles with pricing, discount strategies, and marketing descriptions.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "cross-sell",
+        "bundles",
+        "upsell",
+        "revenue",
+        "merchandising"
+      ],
+      "keywords": [
+        "cross-sell",
+        "product bundles",
+        "bundle pricing",
+        "complementary products",
+        "revenue optimization"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/customer-lifetime-value",
+      "name": "Customer Lifetime Value Calculator",
+      "version": "1.0.0",
+      "description": "Customer lifetime value calculation and segmentation engine that analyzes transaction history, predicts future CLV using discounted cash flow models, segments customers into tiers, and generates tailored marketing strategies for each segment.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "clv",
+        "customer",
+        "segmentation",
+        "analytics",
+        "marketing"
+      ],
+      "keywords": [
+        "customer lifetime value",
+        "CLV",
+        "customer segmentation",
+        "predictive analytics",
+        "customer value"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/customer-segmentation",
+      "name": "RFM Customer Segmentation",
+      "version": "1.0.0",
+      "description": "RFM (Recency, Frequency, Monetary) customer segmentation engine that analyzes transaction history to classify customers into actionable segments (champions, loyal, at-risk, lost) and generates targeted marketing strategies for each group.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "segmentation",
+        "rfm",
+        "customer",
+        "marketing",
+        "analytics"
+      ],
+      "keywords": [
+        "customer segmentation",
+        "RFM analysis",
+        "customer groups",
+        "targeted marketing",
+        "customer analytics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/dynamic-pricing",
+      "name": "Real-Time Dynamic Pricing Engine",
+      "version": "1.0.0",
+      "description": "Real-time dynamic pricing engine that continuously monitors competitor prices, demand signals, and inventory levels to automatically adjust prices using configurable rules (beat competition, match, premium, value-based) with floor and ceiling constraints.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "pricing",
+        "dynamic",
+        "real-time",
+        "competitor",
+        "automation"
+      ],
+      "keywords": [
+        "dynamic pricing",
+        "real-time pricing",
+        "competitor pricing",
+        "price automation",
+        "revenue management"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/fraud-detection",
+      "name": "E-commerce Fraud Detection",
+      "version": "1.0.0",
+      "description": "E-commerce fraud detection workflow that analyzes multiple risk signals including AVS/CVV verification, IP geolocation, order velocity, email domain analysis, and shipping-billing matching to compute risk scores and automate fraud decisions.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "fraud",
+        "security",
+        "risk",
+        "payment",
+        "detection"
+      ],
+      "keywords": [
+        "fraud detection",
+        "risk assessment",
+        "payment fraud",
+        "order verification",
+        "chargeback prevention"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/inventory-forecast",
+      "name": "Inventory Demand Forecasting",
+      "version": "1.0.0",
+      "description": "AI-driven inventory demand forecasting system that analyzes historical sales data, current inventory levels, and seasonal patterns to predict future demand, identify stockout risks, and generate optimal reorder recommendations.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "inventory",
+        "forecasting",
+        "supply-chain",
+        "demand-planning",
+        "stockout-prevention"
+      ],
+      "keywords": [
+        "inventory forecast",
+        "demand planning",
+        "stockout prevention",
+        "reorder optimization",
+        "supply chain"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/loyalty-program",
+      "name": "Loyalty Program Designer",
+      "version": "1.0.0",
+      "description": "Loyalty program design and optimization engine that analyzes customer engagement data to create tiered loyalty structures, calculate points economics, estimate program ROI, and generate complete program designs with earning rules, rewards, and communication plans.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "loyalty",
+        "rewards",
+        "retention",
+        "program-design",
+        "engagement"
+      ],
+      "keywords": [
+        "loyalty program",
+        "rewards program",
+        "customer retention",
+        "tier design",
+        "points program"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/marketplace-listing",
+      "name": "Multi-Marketplace Listing Optimizer",
+      "version": "1.0.0",
+      "description": "Multi-marketplace listing optimization engine that adapts product content for Amazon, eBay, Walmart, and other platforms with platform-specific requirements, search optimization, and content validation.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "marketplace",
+        "listing",
+        "multi-channel",
+        "amazon",
+        "ebay"
+      ],
+      "keywords": [
+        "marketplace listing",
+        "amazon optimization",
+        "ebay listing",
+        "multi-channel",
+        "listing optimization"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/order-fulfillment",
+      "name": "Order Fulfillment Automation",
+      "version": "1.0.0",
+      "description": "Automated order fulfillment workflow that orchestrates payment verification, inventory checking, shipping method selection, and fulfillment execution with intelligent decision-making for partial and multi-warehouse scenarios.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "order",
+        "fulfillment",
+        "automation",
+        "shipping",
+        "logistics"
+      ],
+      "keywords": [
+        "order fulfillment",
+        "order processing",
+        "shipping automation",
+        "inventory check",
+        "payment verification"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/price-optimizer",
+      "name": "Dynamic Pricing Optimizer",
+      "version": "1.0.0",
+      "description": "Dynamic pricing optimization engine that analyzes product costs, competitor pricing, market demand signals, and inventory levels to recommend optimal price points for maximizing profit or volume.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "pricing",
+        "optimization",
+        "competitor-analysis",
+        "profit",
+        "revenue"
+      ],
+      "keywords": [
+        "price optimization",
+        "dynamic pricing",
+        "competitor analysis",
+        "profit maximization",
+        "revenue management"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/product-catalog",
+      "name": "Product Catalog Enrichment",
+      "version": "1.0.0",
+      "description": "Product catalog enrichment and optimization engine that generates AI-powered product descriptions, structured attributes, SEO metadata, and schema.org markup, with content validation and quality scoring.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "catalog",
+        "enrichment",
+        "seo",
+        "content",
+        "product-data"
+      ],
+      "keywords": [
+        "product catalog",
+        "content enrichment",
+        "SEO optimization",
+        "product descriptions",
+        "catalog management"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/product-recommendation",
+      "name": "Product Recommendation Engine",
+      "version": "1.0.0",
+      "description": "AI-powered product recommendation engine that leverages customer behavior data, browsing history, and purchase patterns to generate personalized product suggestions using collaborative filtering, content-based, or hybrid strategies.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "recommendation",
+        "personalization",
+        "customer",
+        "ai",
+        "machine-learning"
+      ],
+      "keywords": [
+        "product recommendation",
+        "personalized shopping",
+        "collaborative filtering",
+        "customer behavior",
+        "product discovery"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/promotion-planner",
+      "name": "Promotional Campaign Planner",
+      "version": "1.0.0",
+      "description": "AI-powered promotional campaign planning engine that designs multi-channel campaigns, allocates budgets, selects products, forecasts impact, and generates creative direction based on historical performance and business goals.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "promotion",
+        "campaign",
+        "marketing",
+        "budget",
+        "forecasting"
+      ],
+      "keywords": [
+        "promotional campaign",
+        "campaign planning",
+        "budget allocation",
+        "marketing strategy",
+        "promotion design"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/return-analyzer",
+      "name": "Return Reason Analyzer",
+      "version": "1.0.0",
+      "description": "Return reason analysis and prevention engine that examines return patterns, identifies root causes of product returns, calculates return costs, flags high-return products, and generates actionable prevention strategies.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "returns",
+        "analysis",
+        "prevention",
+        "quality",
+        "customer-satisfaction"
+      ],
+      "keywords": [
+        "return analysis",
+        "return prevention",
+        "product quality",
+        "root cause analysis",
+        "refund optimization"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/review-analyzer",
+      "name": "Customer Review Analyzer",
+      "version": "1.0.0",
+      "description": "Customer review sentiment analysis and insight extraction engine that processes product reviews, classifies sentiment, identifies key topics, and generates actionable product improvement recommendations.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "reviews",
+        "sentiment",
+        "nlp",
+        "customer-feedback",
+        "insights"
+      ],
+      "keywords": [
+        "review analysis",
+        "sentiment analysis",
+        "customer feedback",
+        "product insights",
+        "voice of customer"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/seasonal-planner",
+      "name": "Seasonal Inventory and Promotion Planner",
+      "version": "1.0.0",
+      "description": "Seasonal inventory and promotion planning engine that analyzes historical seasonal data, current inventory levels, and market trends to forecast demand, recommend reorder quantities, allocate budgets, and generate detailed promotion calendars.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "seasonal",
+        "planning",
+        "inventory",
+        "promotion",
+        "forecasting"
+      ],
+      "keywords": [
+        "seasonal planning",
+        "inventory planning",
+        "promotion calendar",
+        "holiday planning",
+        "demand forecasting"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/shipping-optimizer",
+      "name": "Shipping Cost and Carrier Optimizer",
+      "version": "1.0.0",
+      "description": "Shipping cost and carrier optimization engine that compares real-time rates across multiple carriers, analyzes delivery performance history, scores options by cost/speed/reliability, and recommends the optimal shipping method.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "shipping",
+        "logistics",
+        "carrier",
+        "cost-optimization",
+        "delivery"
+      ],
+      "keywords": [
+        "shipping optimization",
+        "carrier comparison",
+        "shipping rates",
+        "delivery optimization",
+        "logistics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "ecommerce/upsell-recommender",
+      "name": "Post-Purchase Upsell Recommender",
+      "version": "1.0.0",
+      "description": "Post-purchase upsell recommendation engine that analyzes recent orders, customer profiles, and purchase history to generate optimized upsell offers with timing optimization, discount calculation, and personalized messaging.",
+      "author": "aflare community",
+      "category": "ecommerce",
+      "tags": [
+        "upsell",
+        "post-purchase",
+        "recommendation",
+        "revenue",
+        "personalization"
+      ],
+      "keywords": [
+        "upsell",
+        "post-purchase",
+        "upgrade",
+        "subscription",
+        "revenue growth"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/citation-generator",
+      "name": "Citation Generator",
+      "version": "1.0.0",
+      "description": "Bibliography and citation formatter supporting multiple academic styles (APA, MLA, Chicago, Harvard, IEEE, Vancouver) with DOI integration.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "citation",
+        "bibliography",
+        "references",
+        "formatting",
+        "academic"
+      ],
+      "keywords": [
+        "citation",
+        "bibliography",
+        "references",
+        "APA",
+        "MLA",
+        "Chicago",
+        "formatting"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/classroom-management",
+      "name": "Classroom Management Assistant",
+      "version": "1.0.0",
+      "description": "Classroom management and behavior tracking with situation analysis, intervention strategies, positive reinforcement systems, and progress monitoring tools.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "classroom",
+        "management",
+        "behavior",
+        "tracking",
+        "intervention"
+      ],
+      "keywords": [
+        "classroom",
+        "management",
+        "behavior",
+        "tracking",
+        "intervention",
+        "discipline",
+        "engagement"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/course-evaluation",
+      "name": "Course Evaluation Analyzer",
+      "version": "1.0.0",
+      "description": "Course evaluation and feedback analysis with sentiment analysis, category breakdowns, and actionable improvement recommendations.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "evaluation",
+        "feedback",
+        "sentiment",
+        "analysis",
+        "course",
+        "improvement"
+      ],
+      "keywords": [
+        "evaluation",
+        "feedback",
+        "sentiment",
+        "course",
+        "review",
+        "analysis",
+        "improvement"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/curriculum-mapper",
+      "name": "Curriculum Mapper",
+      "version": "1.0.0",
+      "description": "Curriculum mapping and standards alignment tool that maps course units to educational standards frameworks with coverage analysis.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "curriculum",
+        "standards",
+        "mapping",
+        "alignment",
+        "planning"
+      ],
+      "keywords": [
+        "curriculum",
+        "standards",
+        "mapping",
+        "alignment",
+        "common-core",
+        "NGSS",
+        "IB"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/essay-grader",
+      "name": "Essay Grader",
+      "version": "1.0.0",
+      "description": "Essay grading with rubric-based scoring, weighted criteria, detailed feedback, and actionable improvement suggestions for any academic level.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "essay",
+        "grading",
+        "rubric",
+        "writing",
+        "feedback"
+      ],
+      "keywords": [
+        "essay",
+        "grade",
+        "rubric",
+        "writing",
+        "scoring",
+        "feedback",
+        "assessment"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/flashcard-generator",
+      "name": "Flashcard Generator",
+      "version": "1.0.0",
+      "description": "Flashcard deck generator from study materials with multiple formats (front/back, cloze, multiple choice) and difficulty ratings for spaced repetition.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "flashcards",
+        "study",
+        "memory",
+        "spaced-repetition",
+        "learning"
+      ],
+      "keywords": [
+        "flashcard",
+        "study",
+        "memorize",
+        "deck",
+        "spaced",
+        "repetition",
+        "cards"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/grading-assistant",
+      "name": "Grading Assistant",
+      "version": "1.0.0",
+      "description": "Automated essay and assignment grading with rubric-based scoring, detailed feedback, and letter grade calculation. Supports multiple academic levels and customizable feedback styles.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "grading",
+        "assessment",
+        "rubric",
+        "feedback",
+        "scoring"
+      ],
+      "keywords": [
+        "grade",
+        "essay",
+        "assignment",
+        "rubric",
+        "scoring",
+        "feedback",
+        "evaluation"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/language-exercise",
+      "name": "Language Exercise Generator",
+      "version": "1.0.0",
+      "description": "Language learning exercise generator with vocabulary, grammar, translation, and conversation practice across CEFR levels A1-C2.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "language",
+        "learning",
+        "vocabulary",
+        "grammar",
+        "translation",
+        "exercises"
+      ],
+      "keywords": [
+        "language",
+        "learning",
+        "vocabulary",
+        "grammar",
+        "translation",
+        "conversation",
+        "exercises"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/learning-path",
+      "name": "Learning Path Designer",
+      "version": "1.0.0",
+      "description": "Personalized learning path designer with adaptive milestones, resource recommendations, and progress tracking based on learning style preferences.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "learning",
+        "path",
+        "personalized",
+        "milestones",
+        "adaptive"
+      ],
+      "keywords": [
+        "learning",
+        "path",
+        "personalized",
+        "milestones",
+        "study",
+        "plan",
+        "adaptive"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/lesson-plan",
+      "name": "Lesson Plan Generator",
+      "version": "1.0.0",
+      "description": "Detailed lesson plan generator with learning objectives, timed activities, differentiation strategies, and standards alignment.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "lesson",
+        "planning",
+        "teaching",
+        "activities",
+        "curriculum"
+      ],
+      "keywords": [
+        "lesson",
+        "plan",
+        "teaching",
+        "classroom",
+        "activities",
+        "instruction",
+        "pedagogy"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/math-problem-generator",
+      "name": "Math Problem Generator",
+      "version": "1.0.0",
+      "description": "Math problem and solution generator with step-by-step explanations, hints, common mistakes, and solution verification.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "math",
+        "problems",
+        "solutions",
+        "algebra",
+        "calculus",
+        "geometry"
+      ],
+      "keywords": [
+        "math",
+        "problem",
+        "solution",
+        "algebra",
+        "calculus",
+        "geometry",
+        "practice"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/peer-review",
+      "name": "Peer Review Workflow",
+      "version": "1.0.0",
+      "description": "Peer review workflow and rubric for structured student-to-student feedback with anonymous option, criteria-based scoring, and actionable suggestions.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "peer-review",
+        "feedback",
+        "collaboration",
+        "assessment",
+        "rubric"
+      ],
+      "keywords": [
+        "peer",
+        "review",
+        "feedback",
+        "student",
+        "collaboration",
+        "anonymous",
+        "evaluation"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/plagiarism-checker",
+      "name": "Plagiarism Checker",
+      "version": "1.0.0",
+      "description": "Text similarity and plagiarism detection with web search, detailed similarity reports, risk assessment, and proper citation recommendations.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "plagiarism",
+        "similarity",
+        "detection",
+        "academic-integrity",
+        "originality"
+      ],
+      "keywords": [
+        "plagiarism",
+        "similarity",
+        "detection",
+        "originality",
+        "academic",
+        "integrity",
+        "check"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/quiz-generator",
+      "name": "Quiz Generator",
+      "version": "1.0.0",
+      "description": "Auto-generate quizzes with multiple question types including multiple choice, true/false, and short answer from any topic or source material. Supports difficulty levels and automatic scoring metadata.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "quiz",
+        "assessment",
+        "questions",
+        "generator",
+        "testing"
+      ],
+      "keywords": [
+        "quiz",
+        "assessment",
+        "test",
+        "questions",
+        "multiple-choice",
+        "true-false",
+        "exam"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/reading-comprehension",
+      "name": "Reading Comprehension Generator",
+      "version": "1.0.0",
+      "description": "Reading comprehension test generator with leveled passages, diverse question types, readability statistics, and answer keys.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "reading",
+        "comprehension",
+        "test",
+        "literacy",
+        "assessment"
+      ],
+      "keywords": [
+        "reading",
+        "comprehension",
+        "passage",
+        "literacy",
+        "test",
+        "questions",
+        "inference"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/research-proposal",
+      "name": "Research Proposal Generator",
+      "version": "1.0.0",
+      "description": "Academic research proposal generator with automated literature search, methodology design, and refinement for dissertations, theses, and grants.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "research",
+        "proposal",
+        "academic",
+        "literature",
+        "methodology",
+        "dissertation"
+      ],
+      "keywords": [
+        "research",
+        "proposal",
+        "dissertation",
+        "thesis",
+        "grant",
+        "methodology",
+        "literature-review"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/rubric-generator",
+      "name": "Rubric Generator",
+      "version": "1.0.0",
+      "description": "Assessment rubric creator with customizable criteria, multiple performance levels, weighted scoring, and example evidence descriptors.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "rubric",
+        "assessment",
+        "scoring",
+        "criteria",
+        "evaluation"
+      ],
+      "keywords": [
+        "rubric",
+        "assessment",
+        "scoring",
+        "criteria",
+        "evaluation",
+        "grading",
+        "descriptors"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/study-guide",
+      "name": "Study Guide Generator",
+      "version": "1.0.0",
+      "description": "Comprehensive study guide generator with chapter summaries, key concepts, practice questions, glossaries, and study strategies.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "study",
+        "guide",
+        "review",
+        "exam",
+        "preparation"
+      ],
+      "keywords": [
+        "study",
+        "guide",
+        "review",
+        "exam",
+        "prep",
+        "summary",
+        "notes"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/syllabus-builder",
+      "name": "Syllabus Builder",
+      "version": "1.0.0",
+      "description": "Course syllabus and schedule builder with calendar integration. Creates comprehensive syllabi with weekly schedules, readings, assignments, and grading policies.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "syllabus",
+        "course",
+        "schedule",
+        "curriculum",
+        "planning"
+      ],
+      "keywords": [
+        "syllabus",
+        "course",
+        "schedule",
+        "calendar",
+        "curriculum",
+        "semester",
+        "planning"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "education/thesis-outline",
+      "name": "Thesis Outline Builder",
+      "version": "1.0.0",
+      "description": "Thesis and dissertation outline builder with chapter structure, content planning, writing timeline, and citation style integration.",
+      "author": "aflare community",
+      "category": "education",
+      "tags": [
+        "thesis",
+        "dissertation",
+        "outline",
+        "writing",
+        "academic",
+        "planning"
+      ],
+      "keywords": [
+        "thesis",
+        "dissertation",
+        "outline",
+        "chapters",
+        "writing",
+        "timeline",
+        "academic"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "finance/btc-alert",
       "name": "btc-alert",
       "version": "1.0.0",
@@ -1955,6 +3025,1096 @@
       "keywords": [
         "tax-estimator",
         "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/clinical-trial-matcher",
+      "name": "clinical-trial-matcher",
+      "version": "1.0.0",
+      "description": "Match patients to relevant clinical trials using ClinicalTrials.gov data",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "clinical-trials",
+        "research"
+      ],
+      "keywords": [
+        "clinical-trial-matcher",
+        "healthcare",
+        "clinical-trial",
+        "research",
+        "patient-matching"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/discharge-summary",
+      "name": "discharge-summary",
+      "version": "1.0.0",
+      "description": "Generate comprehensive hospital discharge summaries with patient instructions",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "clinical",
+        "documentation"
+      ],
+      "keywords": [
+        "discharge-summary",
+        "healthcare",
+        "hospital",
+        "clinical-documentation",
+        "patient-instructions"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/drug-interaction-checker",
+      "name": "drug-interaction-checker",
+      "version": "1.0.0",
+      "description": "Check drug interactions and contraindications using FDA and RxNav data",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "pharmacy",
+        "drug-safety"
+      ],
+      "keywords": [
+        "drug-interaction-checker",
+        "healthcare",
+        "drug",
+        "interaction",
+        "pharmacy",
+        "contraindication"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/epidemiology-tracker",
+      "name": "epidemiology-tracker",
+      "version": "1.0.0",
+      "description": "Track disease outbreaks and epidemiological trends with risk assessment",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "epidemiology",
+        "public-health"
+      ],
+      "keywords": [
+        "epidemiology-tracker",
+        "healthcare",
+        "epidemiology",
+        "outbreak",
+        "public-health",
+        "surveillance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/hospital-workflow",
+      "name": "hospital-workflow",
+      "version": "1.0.0",
+      "description": "Automate and optimize hospital department workflows with efficiency analysis",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "hospital",
+        "operations"
+      ],
+      "keywords": [
+        "hospital-workflow",
+        "healthcare",
+        "hospital",
+        "workflow",
+        "optimization",
+        "operations",
+        "efficiency"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/lab-report-analyzer",
+      "name": "lab-report-analyzer",
+      "version": "1.0.0",
+      "description": "Analyze and explain lab test results with clinical interpretation",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "lab",
+        "diagnostics"
+      ],
+      "keywords": [
+        "lab-report-analyzer",
+        "healthcare",
+        "lab",
+        "test-results",
+        "diagnostics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/medical-billing",
+      "name": "medical-billing",
+      "version": "1.0.0",
+      "description": "Automated medical billing and coding workflow with validation and error checking",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "billing",
+        "coding",
+        "revenue-cycle"
+      ],
+      "keywords": [
+        "medical-billing",
+        "healthcare",
+        "billing",
+        "coding",
+        "cpt",
+        "icd-10",
+        "revenue-cycle"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/medical-coding",
+      "name": "medical-coding",
+      "version": "1.0.0",
+      "description": "AI-powered ICD-10 medical coding assistant with code validation",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "coding",
+        "icd-10",
+        "billing"
+      ],
+      "keywords": [
+        "medical-coding",
+        "healthcare",
+        "icd-10",
+        "coding",
+        "hcc",
+        "risk-adjustment"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/medical-literature-review",
+      "name": "medical-literature-review",
+      "version": "1.0.0",
+      "description": "Search and review medical literature from PubMed with evidence grading",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "research",
+        "evidence-based"
+      ],
+      "keywords": [
+        "medical-literature-review",
+        "healthcare",
+        "pubmed",
+        "research",
+        "evidence-based",
+        "literature"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/medical-report-summarizer",
+      "name": "medical-report-summarizer",
+      "version": "1.0.0",
+      "description": "Summarize complex medical reports into patient-friendly language",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "summarization"
+      ],
+      "keywords": [
+        "medical-report-summarizer",
+        "healthcare",
+        "report",
+        "patient-education"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/mental-health-screener",
+      "name": "mental-health-screener",
+      "version": "1.0.0",
+      "description": "Administer mental health screening with validated assessment tools (PHQ-9, GAD-7, etc.)",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "mental-health",
+        "screening"
+      ],
+      "keywords": [
+        "mental-health-screener",
+        "healthcare",
+        "mental-health",
+        "phq-9",
+        "gad-7",
+        "depression",
+        "anxiety"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/nutrition-plan",
+      "name": "nutrition-plan",
+      "version": "1.0.0",
+      "description": "Generate personalized nutrition and diet plans with macro calculations",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "nutrition",
+        "diet"
+      ],
+      "keywords": [
+        "nutrition-plan",
+        "healthcare",
+        "nutrition",
+        "diet",
+        "meal-plan",
+        "calories"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/patient-education",
+      "name": "patient-education",
+      "version": "1.0.0",
+      "description": "Generate patient education materials in plain language with readability scoring",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "education",
+        "patient"
+      ],
+      "keywords": [
+        "patient-education",
+        "healthcare",
+        "education",
+        "patient",
+        "plain-language",
+        "health-literacy"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/patient-triage",
+      "name": "patient-triage",
+      "version": "1.0.0",
+      "description": "AI-powered patient triage and urgency assessment with ESI scoring",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "triage"
+      ],
+      "keywords": [
+        "patient-triage",
+        "healthcare",
+        "triage",
+        "emergency",
+        "esi"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/physiotherapy-plan",
+      "name": "physiotherapy-plan",
+      "version": "1.0.0",
+      "description": "Generate personalized physiotherapy exercise plans with progression tracking",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "physiotherapy",
+        "rehabilitation"
+      ],
+      "keywords": [
+        "physiotherapy-plan",
+        "healthcare",
+        "physiotherapy",
+        "exercise",
+        "rehabilitation",
+        "physical-therapy"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/prescription-validator",
+      "name": "prescription-validator",
+      "version": "1.0.0",
+      "description": "Validate prescriptions for safety, dosing, interactions, and contraindications",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "pharmacy",
+        "prescription"
+      ],
+      "keywords": [
+        "prescription-validator",
+        "healthcare",
+        "prescription",
+        "pharmacy",
+        "drug-safety",
+        "dosing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/radiology-report",
+      "name": "radiology-report",
+      "version": "1.0.0",
+      "description": "Generate and analyze radiology reports with structured findings and patient summary",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "radiology",
+        "imaging"
+      ],
+      "keywords": [
+        "radiology-report",
+        "healthcare",
+        "radiology",
+        "imaging",
+        "xray",
+        "mri",
+        "ct"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/symptom-checker",
+      "name": "symptom-checker",
+      "version": "1.0.0",
+      "description": "AI symptom analysis and possible condition suggestions with drug safety cross-reference",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "diagnosis",
+        "symptoms"
+      ],
+      "keywords": [
+        "symptom-checker",
+        "healthcare",
+        "symptoms",
+        "diagnosis",
+        "drug-safety"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/telemedicine-note",
+      "name": "telemedicine-note",
+      "version": "1.0.0",
+      "description": "Generate structured telemedicine visit documentation with quality review",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "telemedicine",
+        "documentation"
+      ],
+      "keywords": [
+        "telemedicine-note",
+        "healthcare",
+        "telemedicine",
+        "soap-note",
+        "virtual-visit"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "healthcare/vaccination-schedule",
+      "name": "vaccination-schedule",
+      "version": "1.0.0",
+      "description": "Plan vaccination schedules with catch-up, travel, and occupational vaccines",
+      "author": "aflare community",
+      "category": "healthcare",
+      "tags": [
+        "healthcare",
+        "workflow",
+        "vaccination",
+        "immunization"
+      ],
+      "keywords": [
+        "vaccination-schedule",
+        "healthcare",
+        "vaccination",
+        "immunization",
+        "cdc",
+        "travel-vaccines"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/360-feedback",
+      "name": "360-Degree Feedback",
+      "version": "1.0.0",
+      "description": "Comprehensive 360-degree feedback collection, multi-source aggregation, self-awareness gap analysis, and professional development report generation.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "feedback",
+        "360-review",
+        "assessment",
+        "development",
+        "performance",
+        "self-awareness"
+      ],
+      "keywords": [
+        "360",
+        "feedback",
+        "review",
+        "assessment",
+        "multi-source",
+        "self-awareness",
+        "development",
+        "performance",
+        "competency"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/benefits-comparison",
+      "name": "Benefits Comparison Analyzer",
+      "version": "1.0.0",
+      "description": "Employee benefits comparison analyzer with total compensation modeling, personalized cost analysis, and negotiation-ready recommendations across health, retirement, PTO, equity, and perks.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "benefits",
+        "comparison",
+        "compensation",
+        "total-rewards",
+        "cost-analysis",
+        "negotiation"
+      ],
+      "keywords": [
+        "benefits",
+        "comparison",
+        "compensation",
+        "total-rewards",
+        "health",
+        "retirement",
+        "401k",
+        "PTO",
+        "equity",
+        "negotiation"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/candidate-matching",
+      "name": "Candidate Matching",
+      "version": "1.0.0",
+      "description": "Multi-dimensional job-candidate matching and scoring workflow that computes fit across skills, experience, education, location, and salary dimensions with weighted scoring.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "recruitment",
+        "matching",
+        "scoring",
+        "talent-acquisition",
+        "candidate-evaluation"
+      ],
+      "keywords": [
+        "candidate",
+        "matching",
+        "scoring",
+        "job-fit",
+        "recruitment",
+        "hiring",
+        "talent",
+        "ATS"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/compensation-benchmark",
+      "name": "Compensation Benchmark",
+      "version": "1.0.0",
+      "description": "Salary benchmarking and market analysis workflow with compa-ratio calculations, range penetration analysis, gap identification, and strategic adjustment recommendations.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "compensation",
+        "benchmark",
+        "salary",
+        "market-analysis",
+        "compa-ratio",
+        "budget"
+      ],
+      "keywords": [
+        "compensation",
+        "salary",
+        "benchmark",
+        "market",
+        "compa-ratio",
+        "pay-equity",
+        "budget",
+        "analysis"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/dei-report",
+      "name": "DEI Report Generator",
+      "version": "1.0.0",
+      "description": "Diversity, equity, and inclusion report generator with workforce demographics, leadership gap analysis, pay equity metrics, and actionable DEI goal setting.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "DEI",
+        "diversity",
+        "equity",
+        "inclusion",
+        "reporting",
+        "pay-equity",
+        "compliance"
+      ],
+      "keywords": [
+        "DEI",
+        "diversity",
+        "equity",
+        "inclusion",
+        "report",
+        "pay-equity",
+        "demographics",
+        "leadership",
+        "compliance",
+        "EEO"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/employee-handbook",
+      "name": "Employee Handbook Generator",
+      "version": "1.0.0",
+      "description": "Comprehensive employee handbook generator with jurisdiction-aware compliance, customizable policy sections, company culture integration, and acknowledgment workflow.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "handbook",
+        "policy",
+        "compliance",
+        "onboarding",
+        "documentation",
+        "legal"
+      ],
+      "keywords": [
+        "handbook",
+        "employee",
+        "policy",
+        "compliance",
+        "onboarding",
+        "HR",
+        "legal",
+        "policies",
+        "procedures"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/employee-survey",
+      "name": "Employee Engagement Survey",
+      "version": "1.0.0",
+      "description": "End-to-end employee engagement survey workflow with AI-generated questions, survey distribution, response analysis, sentiment analysis, and trend comparison with actionable recommendations.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "engagement",
+        "survey",
+        "employee-experience",
+        "analytics",
+        "sentiment"
+      ],
+      "keywords": [
+        "survey",
+        "engagement",
+        "employee",
+        "satisfaction",
+        "pulse",
+        "feedback",
+        "sentiment",
+        "analysis",
+        "culture"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/exit-interview",
+      "name": "Exit Interview Analysis",
+      "version": "1.0.0",
+      "description": "Exit interview analysis workflow that identifies turnover patterns, extracts themes with sentiment analysis, generates retention recommendations, and triggers alerts for concerning trends.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "exit-interview",
+        "turnover",
+        "retention",
+        "sentiment",
+        "analytics",
+        "employee-experience"
+      ],
+      "keywords": [
+        "exit",
+        "interview",
+        "turnover",
+        "retention",
+        "attrition",
+        "sentiment",
+        "analysis",
+        "feedback",
+        "offboarding"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/headcount-planner",
+      "name": "Headcount Planner",
+      "version": "1.0.0",
+      "description": "Workforce headcount planning workflow with attrition modeling, multi-scenario analysis, budget allocation, and department-level hiring prioritization.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "headcount",
+        "planning",
+        "workforce",
+        "budget",
+        "scenario-analysis",
+        "hiring"
+      ],
+      "keywords": [
+        "headcount",
+        "planning",
+        "workforce",
+        "budget",
+        "hiring",
+        "attrition",
+        "scenario",
+        "forecast",
+        "staffing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/interview-scorecard",
+      "name": "Interview Scorecard",
+      "version": "1.0.0",
+      "description": "Structured interview scorecard and evaluation workflow with evidence extraction, weighted scoring, and professional summary generation for all interview types.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "interview",
+        "scorecard",
+        "evaluation",
+        "hiring",
+        "recruitment",
+        "assessment"
+      ],
+      "keywords": [
+        "interview",
+        "scorecard",
+        "evaluation",
+        "scoring",
+        "hiring",
+        "candidate",
+        "assessment",
+        "feedback"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/job-posting",
+      "name": "Job Posting Generator",
+      "version": "1.0.0",
+      "description": "AI-powered job posting and description generator with inclusive language, platform-specific optimization, SEO metadata, and ATS publication integration.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "job-posting",
+        "recruitment",
+        "description",
+        "SEO",
+        "ATS",
+        "hiring"
+      ],
+      "keywords": [
+        "job",
+        "posting",
+        "description",
+        "recruitment",
+        "hiring",
+        "careers",
+        "ATS",
+        "SEO",
+        "job-board"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/offer-letter",
+      "name": "Offer Letter Generator",
+      "version": "1.0.0",
+      "description": "AI-generated offer letter workflow with compensation validation, benefits data integration, and customizable templates for standard, executive, and startup roles.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "offer-letter",
+        "compensation",
+        "onboarding",
+        "hiring",
+        "document-generation"
+      ],
+      "keywords": [
+        "offer",
+        "letter",
+        "compensation",
+        "salary",
+        "hiring",
+        "employment",
+        "contract",
+        "onboarding"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/onboarding-checklist",
+      "name": "Onboarding Checklist Generator",
+      "version": "1.0.0",
+      "description": "Role-based new hire onboarding checklist generator with timeline calculation, task assignment, and support for office, remote, hybrid, and contractor roles across all seniority levels.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "onboarding",
+        "checklist",
+        "new-hire",
+        "employee-experience",
+        "task-management"
+      ],
+      "keywords": [
+        "onboarding",
+        "checklist",
+        "new-hire",
+        "orientation",
+        "employee",
+        "IT-setup",
+        "compliance",
+        "90-day"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/org-chart",
+      "name": "Organizational Chart Generator",
+      "version": "1.0.0",
+      "description": "Organizational chart generator with reporting hierarchy visualization, span of control analysis, vacancy impact assessment, and structural recommendations.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "org-chart",
+        "hierarchy",
+        "visualization",
+        "structure",
+        "workforce",
+        "reporting"
+      ],
+      "keywords": [
+        "org-chart",
+        "organization",
+        "hierarchy",
+        "reporting",
+        "structure",
+        "visualization",
+        "mermaid",
+        "span-of-control"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/performance-review",
+      "name": "Performance Review Generator",
+      "version": "1.0.0",
+      "description": "Comprehensive performance review document generator with goal achievement scoring, multi-source competency assessment, and development planning for annual, semi-annual, quarterly, and probation reviews.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "performance",
+        "review",
+        "goals",
+        "competency",
+        "development",
+        "evaluation"
+      ],
+      "keywords": [
+        "performance",
+        "review",
+        "appraisal",
+        "goals",
+        "competency",
+        "evaluation",
+        "development",
+        "feedback",
+        "OKR"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/resume-screener",
+      "name": "Resume Screener",
+      "version": "1.0.0",
+      "description": "AI-powered resume screening and ranking workflow that parses, filters, scores, and ranks candidates against a job description to identify top talent efficiently.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "recruitment",
+        "screening",
+        "resume",
+        "candidate-ranking",
+        "talent-acquisition"
+      ],
+      "keywords": [
+        "resume",
+        "screening",
+        "ranking",
+        "candidate",
+        "ATS",
+        "recruitment",
+        "hiring",
+        "job-matching",
+        "talent"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/succession-planning",
+      "name": "Succession Planning",
+      "version": "1.0.0",
+      "description": "Succession planning and talent readiness assessment workflow that identifies successors for critical roles, evaluates readiness, builds succession matrices, and generates targeted development plans.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "succession",
+        "talent",
+        "leadership",
+        "readiness",
+        "development",
+        "workforce-planning"
+      ],
+      "keywords": [
+        "succession",
+        "planning",
+        "talent",
+        "readiness",
+        "leadership",
+        "bench",
+        "pipeline",
+        "development",
+        "retention"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/talent-pipeline",
+      "name": "Talent Pipeline Analytics",
+      "version": "1.0.0",
+      "description": "Recruitment funnel analytics workflow with conversion metrics, bottleneck identification, source effectiveness analysis, and hiring forecast based on active pipeline.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "recruitment",
+        "funnel",
+        "pipeline",
+        "analytics",
+        "sourcing",
+        "hiring-forecast"
+      ],
+      "keywords": [
+        "pipeline",
+        "funnel",
+        "recruitment",
+        "analytics",
+        "conversion",
+        "sourcing",
+        "hiring",
+        "forecast",
+        "bottleneck"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/training-needs",
+      "name": "Training Needs Assessment",
+      "version": "1.0.0",
+      "description": "Comprehensive training needs assessment and skills gap analysis workflow with priority scoring, budget-aware planning, quarterly training calendar, and individual development paths.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "training",
+        "skills-gap",
+        "learning",
+        "development",
+        "assessment",
+        "L&D"
+      ],
+      "keywords": [
+        "training",
+        "skills",
+        "gap-analysis",
+        "learning",
+        "development",
+        "L&D",
+        "competency",
+        "assessment",
+        "upskilling"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "hr/workforce-analytics",
+      "name": "Workforce Analytics Dashboard",
+      "version": "1.0.0",
+      "description": "Comprehensive HR workforce analytics dashboard with headcount, turnover, diversity, and compensation KPIs, trend analysis, predictive insights, and executive summaries.",
+      "author": "aflare community",
+      "category": "hr",
+      "tags": [
+        "analytics",
+        "dashboard",
+        "KPIs",
+        "workforce",
+        "trends",
+        "predictive",
+        "reporting"
+      ],
+      "keywords": [
+        "analytics",
+        "dashboard",
+        "workforce",
+        "KPIs",
+        "headcount",
+        "turnover",
+        "compensation",
+        "trends",
+        "predictive",
+        "HR"
       ],
       "inputs": null,
       "outputs": null,
@@ -2413,6 +4573,1022 @@
         "integrations",
         "support",
         "tickets"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/air-quality",
+      "name": "Air Quality",
+      "version": "1.0.0",
+      "description": "Air quality monitoring and reporting with pollutant analysis (PM2.5, PM10, O3, NO2, SO2, CO), AQI calculation, health advisories, and AI-powered trend prediction",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "air-quality",
+        "aqi",
+        "pollution",
+        "monitoring",
+        "health-advisory"
+      ],
+      "keywords": [
+        "iot",
+        "air-quality",
+        "aqi",
+        "pollution",
+        "environmental"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/alert-threshold",
+      "name": "Alert Threshold",
+      "version": "1.0.0",
+      "description": "Sensor threshold alerting and notification pipeline with multi-channel delivery, severity evaluation, and AI-generated alert content",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "alerting",
+        "threshold",
+        "notification",
+        "monitoring",
+        "sensor"
+      ],
+      "keywords": [
+        "iot",
+        "alert",
+        "threshold",
+        "notification",
+        "monitoring"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/device-health-monitor",
+      "name": "Device Health Monitor",
+      "version": "1.0.0",
+      "description": "IoT device health and uptime monitoring with heartbeat tracking, SLA compliance reporting, AI-powered diagnostics, and remediation recommendations",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "health",
+        "uptime",
+        "monitoring",
+        "sla",
+        "diagnostics"
+      ],
+      "keywords": [
+        "iot",
+        "health",
+        "monitoring",
+        "uptime",
+        "diagnostics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/device-registry",
+      "name": "Device Registry",
+      "version": "1.0.0",
+      "description": "IoT device registry and metadata management with validation, CRUD operations, lifecycle tracking, and AI-powered compliance analysis",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "device-registry",
+        "metadata",
+        "lifecycle",
+        "device-management",
+        "crud"
+      ],
+      "keywords": [
+        "iot",
+        "registry",
+        "device",
+        "provisioning",
+        "management"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/edge-computing",
+      "name": "Edge Computing",
+      "version": "1.0.0",
+      "description": "Edge computing workload distribution and task orchestration across IoT edge nodes with intelligent scheduling and AI-powered analysis",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "edge-computing",
+        "workload",
+        "orchestration",
+        "scheduling",
+        "distribution"
+      ],
+      "keywords": [
+        "iot",
+        "edge",
+        "computing",
+        "orchestration",
+        "workload"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/energy-monitor",
+      "name": "Energy Monitor",
+      "version": "1.0.0",
+      "description": "Smart energy consumption monitoring with usage analytics, cost prediction, carbon footprint tracking, and AI-powered optimization recommendations",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "energy",
+        "monitoring",
+        "consumption",
+        "cost",
+        "carbon"
+      ],
+      "keywords": [
+        "iot",
+        "energy",
+        "monitoring",
+        "smart-meter",
+        "optimization"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/environmental-monitor",
+      "name": "Environmental Monitor",
+      "version": "1.0.0",
+      "description": "Environmental sensor monitoring for temperature, humidity, pressure, and air quality with comfort analysis, trend detection, and AI-powered recommendations",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "environmental",
+        "temperature",
+        "humidity",
+        "air-quality",
+        "monitoring"
+      ],
+      "keywords": [
+        "iot",
+        "environmental",
+        "sensor",
+        "climate",
+        "monitoring"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/firmware-update",
+      "name": "Firmware Update",
+      "version": "1.0.0",
+      "description": "OTA firmware update management with firmware validation, canary/phased/all-at-once rollout strategies, AI-powered monitoring, and rollback support",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "firmware",
+        "ota",
+        "update",
+        "rollout",
+        "device-management"
+      ],
+      "keywords": [
+        "iot",
+        "firmware",
+        "ota",
+        "update",
+        "deployment"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/industrial-plc",
+      "name": "Industrial PLC",
+      "version": "1.0.0",
+      "description": "Industrial PLC data collection and monitoring with multi-protocol support, signal processing, alarm management, and AI-powered operational analysis",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "plc",
+        "industrial",
+        "modbus",
+        "opc-ua",
+        "automation"
+      ],
+      "keywords": [
+        "iot",
+        "plc",
+        "industrial",
+        "automation",
+        "scada"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/mqtt-bridge",
+      "name": "MQTT Bridge",
+      "version": "1.0.0",
+      "description": "MQTT protocol bridge and message router with topic mapping, payload transformation, multi-broker support, and AI-powered health monitoring",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "mqtt",
+        "bridge",
+        "protocol",
+        "message-router",
+        "broker"
+      ],
+      "keywords": [
+        "iot",
+        "mqtt",
+        "bridge",
+        "router",
+        "messaging"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/occupancy-sensor",
+      "name": "Occupancy Sensor",
+      "version": "1.0.0",
+      "description": "Occupancy and space utilization tracking with real-time analytics, utilization scoring, overcrowding detection, and AI-powered workspace optimization recommendations",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "occupancy",
+        "space-utilization",
+        "sensor",
+        "workspace",
+        "analytics"
+      ],
+      "keywords": [
+        "iot",
+        "occupancy",
+        "space",
+        "utilization",
+        "workspace"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/predictive-maintenance",
+      "name": "Predictive Maintenance",
+      "version": "1.0.0",
+      "description": "Predictive maintenance for industrial equipment using vibration analysis, temperature trends, failure prediction, risk scoring, and AI-powered maintenance planning",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "predictive-maintenance",
+        "industrial",
+        "failure-prediction",
+        "vibration",
+        "reliability"
+      ],
+      "keywords": [
+        "iot",
+        "predictive",
+        "maintenance",
+        "industrial",
+        "reliability"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/sensor-data-pipeline",
+      "name": "Sensor Data Pipeline",
+      "version": "1.0.0",
+      "description": "End-to-end IoT sensor data ingestion and processing pipeline with validation, anomaly detection, AI enrichment, and storage",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "sensor",
+        "data-pipeline",
+        "ingestion",
+        "anomaly-detection",
+        "mqtt"
+      ],
+      "keywords": [
+        "iot",
+        "sensor",
+        "pipeline",
+        "data-processing",
+        "analytics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/smart-agriculture",
+      "name": "Smart Agriculture",
+      "version": "1.0.0",
+      "description": "Smart agriculture sensor monitoring for soil moisture, temperature, pH, nutrients, and automated irrigation control with AI-powered farming recommendations",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "agriculture",
+        "soil",
+        "irrigation",
+        "farming",
+        "crop-health"
+      ],
+      "keywords": [
+        "iot",
+        "agriculture",
+        "farming",
+        "irrigation",
+        "soil-monitoring"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/smart-building",
+      "name": "Smart Building",
+      "version": "1.0.0",
+      "description": "Smart building automation and monitoring with HVAC, lighting, access control, occupancy tracking, energy optimization, and AI-powered building management",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "building",
+        "automation",
+        "hvac",
+        "lighting",
+        "energy",
+        "occupancy"
+      ],
+      "keywords": [
+        "iot",
+        "building",
+        "smart-building",
+        "automation",
+        "energy-management"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/smart-home-automation",
+      "name": "Smart Home Automation",
+      "version": "1.0.0",
+      "description": "Smart home automation rule engine with conditional logic, device state evaluation, AI-powered action validation, and command dispatch",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "smart-home",
+        "automation",
+        "rules-engine",
+        "device-control",
+        "iot"
+      ],
+      "keywords": [
+        "smart-home",
+        "automation",
+        "home-assistant",
+        "rules",
+        "iot"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/telemetry-dashboard",
+      "name": "Telemetry Dashboard",
+      "version": "1.0.0",
+      "description": "Real-time telemetry dashboard generator for IoT device metrics with aggregation, trend analysis, and AI-powered insights",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "telemetry",
+        "dashboard",
+        "metrics",
+        "visualization",
+        "real-time"
+      ],
+      "keywords": [
+        "iot",
+        "telemetry",
+        "dashboard",
+        "monitoring",
+        "analytics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/vehicle-telematics",
+      "name": "Vehicle Telematics",
+      "version": "1.0.0",
+      "description": "Vehicle telematics data processing with GPS tracking, driver behavior analysis, geofence violation detection, and AI-powered fleet optimization insights",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "telematics",
+        "vehicle",
+        "fleet",
+        "gps",
+        "driver-behavior"
+      ],
+      "keywords": [
+        "iot",
+        "vehicle",
+        "telematics",
+        "fleet",
+        "gps-tracking"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/water-quality",
+      "name": "Water Quality",
+      "version": "1.0.0",
+      "description": "Water quality monitoring and alerting with multi-parameter analysis, contamination detection, regulatory compliance assessment, and AI-powered treatment recommendations",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "water",
+        "quality",
+        "monitoring",
+        "contamination",
+        "compliance"
+      ],
+      "keywords": [
+        "iot",
+        "water",
+        "quality",
+        "monitoring",
+        "environmental"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "iot/wearable-data",
+      "name": "Wearable Data",
+      "version": "1.0.0",
+      "description": "Wearable device data aggregation with health metrics analysis, wellness scoring, activity tracking, health alerts, and AI-powered personalized wellness recommendations",
+      "author": "aflare community",
+      "category": "iot",
+      "tags": [
+        "wearable",
+        "health",
+        "wellness",
+        "fitness",
+        "activity-tracking"
+      ],
+      "keywords": [
+        "iot",
+        "wearable",
+        "health",
+        "fitness",
+        "wellness"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/case-brief",
+      "name": "Legal Case Brief Generator",
+      "version": "1.0.0",
+      "description": "Generates comprehensive legal case briefs from court opinions. Extracts metadata, procedural history, and produces structured briefs with facts, issues, holdings, reasoning, and significance analysis.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "case-brief",
+        "court-opinion",
+        "legal-analysis",
+        "brief",
+        "legal"
+      ],
+      "keywords": [
+        "case brief",
+        "court opinion",
+        "legal brief",
+        "case analysis",
+        "IRAC"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/ccpa-compliance",
+      "name": "CCPA Compliance Workflow",
+      "version": "1.0.0",
+      "description": "California Consumer Privacy Act (CCPA) compliance assessment workflow that determines applicability, maps consumer rights requirements, generates required notices, and calculates compliance scores.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "ccpa",
+        "compliance",
+        "privacy",
+        "california",
+        "consumer-rights",
+        "legal"
+      ],
+      "keywords": [
+        "ccpa",
+        "california privacy",
+        "consumer rights",
+        "privacy compliance",
+        "data privacy"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/compliance-checklist",
+      "name": "Regulatory Compliance Checklist Generator",
+      "version": "1.0.0",
+      "description": "Generates comprehensive regulatory compliance checklists tailored to industry, organization size, and risk profile. Includes regulatory data fetching, prioritized action plans, and coverage metrics.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "compliance",
+        "checklist",
+        "regulatory",
+        "audit",
+        "risk",
+        "legal"
+      ],
+      "keywords": [
+        "compliance checklist",
+        "regulatory compliance",
+        "audit checklist",
+        "compliance management",
+        "risk assessment"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/contract-review",
+      "name": "Contract Review & Risk Analysis",
+      "version": "1.0.0",
+      "description": "AI-powered contract review workflow that classifies contracts, identifies legal risks, checks for missing clauses, and generates executive summaries with actionable recommendations.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "contract",
+        "review",
+        "risk-analysis",
+        "compliance",
+        "legal"
+      ],
+      "keywords": [
+        "contract review",
+        "risk analysis",
+        "legal document",
+        "clause check",
+        "contract audit"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/data-processing-agreement",
+      "name": "DPA (Data Processing Agreement) Generator",
+      "version": "1.0.0",
+      "description": "Generates GDPR-compliant Data Processing Agreements (DPAs) with Standard Contractual Clauses (SCCs), technical and organizational security measures, and compliance validation.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "dpa",
+        "gdpr",
+        "data-processing",
+        "privacy",
+        "agreement",
+        "legal"
+      ],
+      "keywords": [
+        "data processing agreement",
+        "DPA",
+        "GDPR",
+        "SCCs",
+        "data protection",
+        "processor agreement"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/deposition-summary",
+      "name": "Deposition Transcript Summarizer",
+      "version": "1.0.0",
+      "description": "Summarizes deposition transcripts with AI-powered analysis, extracts key testimony by topic, identifies contradictions and impeachment opportunities, and generates comprehensive litigation support summaries.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "deposition",
+        "summary",
+        "transcript",
+        "impeachment",
+        "litigation",
+        "legal"
+      ],
+      "keywords": [
+        "deposition summary",
+        "transcript analysis",
+        "impeachment",
+        "trial preparation",
+        "testimony"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/employment-agreement",
+      "name": "Employment Contract Generator",
+      "version": "1.0.0",
+      "description": "Generates customized employment contracts with role-specific clauses, automated labor law compliance checks, and validation for the relevant jurisdiction.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "employment",
+        "contract",
+        "hr",
+        "labor-law",
+        "agreement",
+        "legal"
+      ],
+      "keywords": [
+        "employment contract",
+        "job offer",
+        "employment agreement",
+        "labor law",
+        "hr contract"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/gdpr-compliance",
+      "name": "GDPR Compliance Checklist & Assessment",
+      "version": "1.0.0",
+      "description": "Comprehensive GDPR compliance workflow that generates tailored checklists, performs DPIA risk assessments, conducts gap analysis, and calculates readiness scores with prioritized remediation plans.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "gdpr",
+        "compliance",
+        "privacy",
+        "data-protection",
+        "eu",
+        "legal"
+      ],
+      "keywords": [
+        "gdpr",
+        "compliance checklist",
+        "data protection",
+        "dpia",
+        "gap analysis",
+        "privacy assessment"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/intellectual-property",
+      "name": "IP Portfolio Management & Analysis",
+      "version": "1.0.0",
+      "description": "Comprehensive IP portfolio management workflow that categorizes assets, performs gap analysis, estimates valuation, and generates strategic recommendations for commercialization and protection.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "ip",
+        "intellectual-property",
+        "portfolio",
+        "patent",
+        "trademark",
+        "legal"
+      ],
+      "keywords": [
+        "intellectual property",
+        "ip portfolio",
+        "patent analysis",
+        "trademark management",
+        "ip valuation"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/legal-opinion",
+      "name": "Legal Opinion Draft Generator",
+      "version": "1.0.0",
+      "description": "Generates formal legal opinion letters with legal research, fact analysis against legal frameworks, confidence scoring, and practical recommendations for various opinion types.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "legal-opinion",
+        "opinion-letter",
+        "legal-analysis",
+        "due-diligence",
+        "legal"
+      ],
+      "keywords": [
+        "legal opinion",
+        "opinion letter",
+        "legal analysis",
+        "due diligence",
+        "legal memorandum"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/legal-research",
+      "name": "Legal Research & Case Law Search",
+      "version": "1.0.0",
+      "description": "Automated legal research workflow that searches case law databases, analyzes results, extracts key legal principles, and generates formal legal research memoranda with proper citations.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "research",
+        "case-law",
+        "memorandum",
+        "precedent",
+        "legal",
+        "analysis"
+      ],
+      "keywords": [
+        "legal research",
+        "case law",
+        "legal memo",
+        "precedent search",
+        "legal analysis"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/litigation-timeline",
+      "name": "Litigation Timeline & Deadline Tracker",
+      "version": "1.0.0",
+      "description": "Generates comprehensive litigation timelines with calculated procedural deadlines, risk assessments, and preparation reminders for civil, criminal, and appellate cases.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "litigation",
+        "timeline",
+        "deadlines",
+        "court",
+        "case-management",
+        "legal"
+      ],
+      "keywords": [
+        "litigation timeline",
+        "deadline tracker",
+        "court deadlines",
+        "case management",
+        "procedural deadlines"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/msa-generator",
+      "name": "Master Service Agreement Generator",
+      "version": "1.0.0",
+      "description": "Generates comprehensive Master Service Agreements (MSAs) with industry-specific standards, complete legal clauses, and a negotiation playbook for commercial contract management.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "msa",
+        "agreement",
+        "commercial",
+        "contract",
+        "generator",
+        "legal"
+      ],
+      "keywords": [
+        "master service agreement",
+        "MSA",
+        "commercial contract",
+        "service agreement",
+        "contract generator"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/nda-generator",
+      "name": "NDA Generator",
+      "version": "1.0.0",
+      "description": "Generates customized Non-Disclosure Agreements (NDAs) with AI-drafted clauses and automated compliance validation. Supports both unilateral and mutual NDAs.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "nda",
+        "generator",
+        "confidentiality",
+        "agreement",
+        "legal"
+      ],
+      "keywords": [
+        "nda",
+        "non-disclosure agreement",
+        "confidentiality agreement",
+        "legal document generator"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/patent-search",
+      "name": "Patent Search & Prior Art Analysis",
+      "version": "1.0.0",
+      "description": "Comprehensive patent search workflow that searches patent databases, analyzes prior art relevance, assesses patentability (novelty, non-obviousness, utility), and evaluates freedom to operate risks.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "patent",
+        "search",
+        "prior-art",
+        "patentability",
+        "fto",
+        "legal"
+      ],
+      "keywords": [
+        "patent search",
+        "prior art",
+        "patentability",
+        "freedom to operate",
+        "IP search"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/privacy-policy-audit",
+      "name": "Privacy Policy Compliance Audit",
+      "version": "1.0.0",
+      "description": "Audits privacy policies against global regulations (GDPR, CCPA, PIPEDA, etc.) by extracting data practices, checking compliance, and generating scored audit reports with remediation recommendations.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "privacy",
+        "audit",
+        "compliance",
+        "gdpr",
+        "ccpa",
+        "legal"
+      ],
+      "keywords": [
+        "privacy policy",
+        "compliance audit",
+        "data protection",
+        "regulatory audit",
+        "privacy compliance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/regulatory-filing",
+      "name": "Regulatory Filing Preparation",
+      "version": "1.0.0",
+      "description": "Prepares regulatory filings by researching requirements, drafting compliant documents, and verifying completeness for SEC, FDA, FCC, EPA, and other regulatory bodies.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "regulatory",
+        "filing",
+        "sec",
+        "fda",
+        "compliance",
+        "legal"
+      ],
+      "keywords": [
+        "regulatory filing",
+        "SEC filing",
+        "FDA submission",
+        "compliance filing",
+        "regulatory document"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/settlement-agreement",
+      "name": "Settlement Agreement Generator",
+      "version": "1.0.0",
+      "description": "Generates comprehensive settlement agreements and releases for dispute resolution. Analyzes dispute context, drafts enforceable agreements, and reviews for legal enforceability.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "settlement",
+        "agreement",
+        "release",
+        "dispute",
+        "resolution",
+        "legal"
+      ],
+      "keywords": [
+        "settlement agreement",
+        "release",
+        "dispute resolution",
+        "settlement",
+        "legal settlement"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/terms-of-use",
+      "name": "Terms of Use Generator",
+      "version": "1.0.0",
+      "description": "Generates comprehensive Terms of Use / Terms of Service documents for websites, mobile apps, SaaS platforms, and marketplaces. Researches legal requirements, drafts clauses, and includes legal review.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "terms-of-use",
+        "tos",
+        "generator",
+        "legal",
+        "agreement"
+      ],
+      "keywords": [
+        "terms of use",
+        "terms of service",
+        "tos generator",
+        "legal document",
+        "website terms"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "legal/trademark-monitor",
+      "name": "Trademark Monitoring & Infringement Detection",
+      "version": "1.0.0",
+      "description": "Automated trademark monitoring workflow that checks registries for similar marks, analyzes potential conflicts, calculates risk scores, and generates enforcement recommendations with alerts.",
+      "author": "aflare community",
+      "category": "legal",
+      "tags": [
+        "trademark",
+        "monitoring",
+        "infringement",
+        "brand-protection",
+        "legal"
+      ],
+      "keywords": [
+        "trademark monitoring",
+        "brand protection",
+        "infringement detection",
+        "trademark search",
+        "IP enforcement"
       ],
       "inputs": null,
       "outputs": null,
@@ -3659,6 +6835,507 @@
       "keywords": [
         "unit-test-generator",
         "software-engineering"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/capacity-planner",
+      "name": "Capacity Planner",
+      "version": "1.0.0",
+      "description": "Production capacity planning with constraint analysis. Compares demand forecasts against line capacities, identifies bottlenecks, computes overtime requirements, and generates investment recommendations.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "capacity",
+        "production",
+        "planning",
+        "bottleneck",
+        "overtime"
+      ],
+      "keywords": [
+        "capacity planning",
+        "production planning",
+        "bottleneck analysis",
+        "overtime planning",
+        "make vs buy"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/cold-chain-monitor",
+      "name": "Cold Chain Monitor",
+      "version": "1.0.0",
+      "description": "Cold chain temperature monitoring and compliance tracking. Analyzes IoT sensor data to detect temperature excursions, assess compliance status, and generate regulatory-ready reports.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "cold-chain",
+        "temperature",
+        "compliance",
+        "iot",
+        "pharma"
+      ],
+      "keywords": [
+        "cold chain",
+        "temperature monitoring",
+        "GDP compliance",
+        "excursion detection",
+        "pharma logistics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/cross-docking-planner",
+      "name": "Cross Docking Planner",
+      "version": "1.0.0",
+      "description": "Cross-docking schedule optimization for inbound/outbound synchronization. Matches inbound shipments to outbound orders, assigns dock doors, and generates handling schedules with labor and equipment estimates.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "cross-docking",
+        "dock-scheduling",
+        "warehouse",
+        "synchronization",
+        "handling"
+      ],
+      "keywords": [
+        "cross docking",
+        "dock scheduling",
+        "inbound outbound sync",
+        "warehouse optimization",
+        "handling plan"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/customs-clearance",
+      "name": "Customs Clearance",
+      "version": "1.0.0",
+      "description": "Customs documentation generation and clearance workflow. Classifies commodities with HS codes, estimates duties and landed costs, checks FTA preferences, generates compliance documents, and submits to customs systems.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "customs",
+        "clearance",
+        "trade",
+        "compliance",
+        "duties"
+      ],
+      "keywords": [
+        "customs clearance",
+        "HS code",
+        "duty calculation",
+        "trade compliance",
+        "landed cost"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/delivery-scheduler",
+      "name": "Delivery Scheduler",
+      "version": "1.0.0",
+      "description": "Last-mile delivery scheduling with time window constraints. Parses orders, assigns to vehicles using round-robin with priority weighting, builds time-slotted schedules, and generates AI optimization recommendations.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "delivery",
+        "scheduling",
+        "last-mile",
+        "fleet",
+        "time-window"
+      ],
+      "keywords": [
+        "delivery scheduling",
+        "last mile",
+        "fleet assignment",
+        "time windows",
+        "route planning"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/demand-forecast",
+      "name": "Demand Forecast",
+      "version": "1.0.0",
+      "description": "AI-powered demand forecasting using time series analysis with exponential smoothing. Ingests historical sales data, fits seasonal trend models, and generates actionable replenishment recommendations.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "forecasting",
+        "demand-planning",
+        "time-series",
+        "inventory",
+        "sales"
+      ],
+      "keywords": [
+        "demand forecast",
+        "sales prediction",
+        "inventory planning",
+        "time series",
+        "seasonal trend"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/freight-cost-optimizer",
+      "name": "Freight Cost Optimizer",
+      "version": "1.0.0",
+      "description": "Multi-carrier freight cost comparison and optimization. Fetches rate quotes, computes composite scores balancing cost, transit time, and reliability, and generates AI-powered carrier selection recommendations with sustainability considerations.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "freight",
+        "cost-optimization",
+        "carrier",
+        "shipping",
+        "rates"
+      ],
+      "keywords": [
+        "freight cost",
+        "carrier comparison",
+        "shipping optimization",
+        "rate quotes",
+        "transportation"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/inventory-replenishment",
+      "name": "Inventory Replenishment",
+      "version": "1.0.0",
+      "description": "Automated inventory replenishment with reorder point and safety stock calculation. Computes EOQ, detects stockout risks, and generates prioritized purchase order recommendations.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "inventory",
+        "replenishment",
+        "safety-stock",
+        "eoq",
+        "reorder"
+      ],
+      "keywords": [
+        "inventory replenishment",
+        "reorder point",
+        "safety stock",
+        "EOQ",
+        "stockout prevention"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/last-mile-optimizer",
+      "name": "Last Mile Optimizer",
+      "version": "1.0.0",
+      "description": "Last-mile delivery cost optimization with multi-mode comparison. Evaluates van, bike, cargo-bike, walking, crowdsourced, and locker delivery modes against cost and time constraints with density-adjusted metrics.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "last-mile",
+        "cost-optimization",
+        "delivery-modes",
+        "sustainability",
+        "urban-logistics"
+      ],
+      "keywords": [
+        "last mile",
+        "delivery optimization",
+        "mode selection",
+        "cost per delivery",
+        "urban logistics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/lead-time-predictor",
+      "name": "Lead Time Predictor",
+      "version": "1.0.0",
+      "description": "Supplier lead time prediction using historical performance and trend analysis. Computes confidence intervals, seasonal adjustments, and reliability scores to generate sourcing and safety stock recommendations.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "lead-time",
+        "prediction",
+        "supplier",
+        "safety-stock",
+        "sourcing"
+      ],
+      "keywords": [
+        "lead time prediction",
+        "supplier performance",
+        "trend analysis",
+        "safety stock",
+        "sourcing strategy"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/logistics-tracker",
+      "name": "Logistics Tracker",
+      "version": "1.0.0",
+      "description": "Real-time shipment and logistics tracking across multiple carriers. Monitors tracking statuses, detects delays and exceptions, and generates AI-powered escalation recommendations with customer communication templates.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "logistics",
+        "tracking",
+        "shipment",
+        "carrier",
+        "alerts"
+      ],
+      "keywords": [
+        "shipment tracking",
+        "logistics monitoring",
+        "delivery alerts",
+        "carrier tracking",
+        "exception management"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/packaging-optimizer",
+      "name": "Packaging Optimizer",
+      "version": "1.0.0",
+      "description": "Packaging size and cost optimization with dimensional weight analysis. Auto-generates optimal box sizes, matches products to boxes for maximum fill rates, and computes shipping cost savings from dimensional weight reduction.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "packaging",
+        "optimization",
+        "dimensional-weight",
+        "shipping",
+        "sustainability"
+      ],
+      "keywords": [
+        "packaging optimization",
+        "dimensional weight",
+        "box size",
+        "void fill",
+        "shipping cost"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/procurement-workflow",
+      "name": "Procurement Workflow",
+      "version": "1.0.0",
+      "description": "End-to-end purchase order creation and procurement automation. Validates requisitions, generates PO details, submits to ERP systems, and sends notifications — all with approval threshold logic.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "procurement",
+        "purchase-order",
+        "erp",
+        "automation",
+        "approval"
+      ],
+      "keywords": [
+        "purchase order",
+        "procurement automation",
+        "PO creation",
+        "ERP integration",
+        "approval workflow"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/quality-inspection",
+      "name": "Quality Inspection",
+      "version": "1.0.0",
+      "description": "Quality control inspection workflow with AQL (Acceptable Quality Level) sampling. Computes sample sizes, acceptance numbers, and generates detailed inspection checklists with pass/fail criteria.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "quality",
+        "inspection",
+        "aql",
+        "sampling",
+        "qc"
+      ],
+      "keywords": [
+        "quality inspection",
+        "AQL sampling",
+        "QC checklist",
+        "acceptance sampling",
+        "inspection plan"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/reverse-logistics",
+      "name": "Reverse Logistics",
+      "version": "1.0.0",
+      "description": "Returns and reverse logistics management with intelligent disposition routing. Classifies returns into restock, refurbish, recycle, liquidate, or return-to-vendor based on configurable rules, and computes processing costs and recovery values.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "returns",
+        "reverse-logistics",
+        "disposition",
+        "refurbish",
+        "recovery"
+      ],
+      "keywords": [
+        "reverse logistics",
+        "returns management",
+        "disposition routing",
+        "recovery value",
+        "refurbishment"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/route-optimizer",
+      "name": "Route Optimizer",
+      "version": "1.0.0",
+      "description": "Multi-stop delivery route optimization using nearest-neighbor heuristic and distance matrix computation. Generates vehicle assignments, turn-by-turn plans, and fuel cost estimates.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "routing",
+        "optimization",
+        "logistics",
+        "delivery",
+        "fleet"
+      ],
+      "keywords": [
+        "route optimization",
+        "delivery routing",
+        "fleet management",
+        "distance matrix",
+        "vehicle routing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/supplier-evaluation",
+      "name": "Supplier Evaluation",
+      "version": "1.0.0",
+      "description": "Weighted supplier scorecard and evaluation system. Computes multi-dimensional KPI scores across quality, delivery, cost, responsiveness, and compliance to assign tier ratings and generate strategic sourcing recommendations.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "supplier",
+        "scorecard",
+        "evaluation",
+        "sourcing",
+        "procurement"
+      ],
+      "keywords": [
+        "supplier evaluation",
+        "vendor scorecard",
+        "KPI scoring",
+        "supplier tiering",
+        "strategic sourcing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/sustainability-tracker",
+      "name": "Sustainability Tracker",
+      "version": "1.0.0",
+      "description": "Supply chain carbon footprint tracking and reporting per GHG Protocol. Computes Scope 1, 2, and 3 emissions from transportation, warehousing, packaging, and energy data, and generates science-based reduction roadmaps.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "sustainability",
+        "carbon",
+        "emissions",
+        "ghg-protocol",
+        "esg"
+      ],
+      "keywords": [
+        "carbon footprint",
+        "GHG protocol",
+        "Scope 3 emissions",
+        "sustainability reporting",
+        "SBTi",
+        "ESG"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/vendor-risk",
+      "name": "Vendor Risk",
+      "version": "1.0.0",
+      "description": "Multi-dimensional vendor risk assessment and continuous monitoring. Evaluates financial, compliance, operational, and geopolitical risks with configurable thresholds, generating AI-powered mitigation strategies for at-risk vendors.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "risk",
+        "vendor",
+        "compliance",
+        "monitoring",
+        "assessment"
+      ],
+      "keywords": [
+        "vendor risk",
+        "supplier risk",
+        "risk assessment",
+        "compliance monitoring",
+        "mitigation strategy"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "supply-chain/warehouse-planner",
+      "name": "Warehouse Planner",
+      "version": "1.0.0",
+      "description": "Warehouse layout and slotting optimization using ABC classification. Computes optimal shelf arrangements, aisle configurations, and zone-based slot assignments to maximize picking efficiency.",
+      "author": "aflare community",
+      "category": "supply-chain",
+      "tags": [
+        "warehouse",
+        "slotting",
+        "layout",
+        "abc-analysis",
+        "storage"
+      ],
+      "keywords": [
+        "warehouse layout",
+        "slotting optimization",
+        "ABC classification",
+        "picking efficiency",
+        "storage planning"
       ],
       "inputs": null,
       "outputs": null,

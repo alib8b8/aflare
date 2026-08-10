@@ -1,0 +1,145 @@
+name: customs-clearance
+description: Customs documentation generation and clearance workflow
+version: "1.0.0"
+params:
+  - name: shipment_data
+    type: string
+    required: true
+    description: JSON with shipment details, commodity codes, values, and countries
+  - name: customs_api_endpoint
+    type: string
+    required: true
+    description: API endpoint for customs documentation submission
+  - name: incoterms
+    type: string
+    required: false
+    default: "FOB"
+    description: Incoterms for the shipment (FOB, CIF, EXW, DDP, etc.)
+  - name: document_types
+    type: string
+    required: false
+    default: '["commercial_invoice","packing_list","certificate_of_origin","bill_of_lading"]'
+    description: JSON array of required document types
+  - name: output_file
+    type: string
+    required: false
+    default: /tmp/customs_documents.json
+    description: Output file for customs documentation
+
+steps:
+  - id: classify_commodities
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+
+        shipment = json.loads('''{{ .params.shipment_data }}''')
+        incoterms = "{{ .params.incoterms }}"
+        doc_types = json.loads('''{{ .params.document_types }}''')
+
+        items = shipment.get("items", [])
+        classified = []
+
+        for item in items:
+            hs_code = item.get("hs_code", "0000.00.0000")
+            value = item.get("value", 0)
+            quantity = item.get("quantity", 1)
+            origin = item.get("country_of_origin", shipment.get("origin_country", "Unknown"))
+
+            # Determine duty rate estimate based on HS code chapter
+            chapter = hs_code[:2] if len(hs_code) >= 2 else "00"
+            duty_rates = {
+                "61": 16.0, "62": 16.0, "84": 2.5, "85": 3.5,
+                "87": 6.0, "90": 4.0, "94": 3.0, "39": 6.5,
+                "73": 5.0, "22": 8.0, "33": 5.5, "42": 10.0
+            }
+            est_duty_rate = duty_rates.get(chapter, 5.0)
+            est_duty = round(value * quantity * est_duty_rate / 100, 2)
+
+            # Check for special trade agreements
+            fta_countries = ["US", "CA", "MX", "JP", "KR", "AU", "SG"]
+            has_fta = origin in fta_countries and shipment.get("destination_country") in fta_countries
+            if has_fta:
+                est_duty_rate = 0.0
+                est_duty = 0.0
+
+            total_value = round(value * quantity, 2)
+
+            classified.append({
+                "line_number": item.get("line_number", len(classified) + 1),
+                "hs_code": hs_code,
+                "description": item.get("description", ""),
+                "quantity": quantity,
+                "unit_value": value,
+                "total_value": total_value,
+                "country_of_origin": origin,
+                "estimated_duty_rate_pct": est_duty_rate,
+                "estimated_duty": est_duty,
+                "has_fta_preference": has_fta,
+                "requires_license": item.get("requires_license", False),
+                "restricted": item.get("restricted", False)
+            })
+
+        total_invoice = sum(c["total_value"] for c in classified)
+        total_duty = sum(c["estimated_duty"] for c in classified)
+        insurance = round(total_invoice * 0.005, 2) if incoterms in ("CIF", "CIP") else 0
+        freight_cost = round(total_invoice * 0.08, 2) if incoterms in ("CIF", "CFR", "CIP", "CPT") else 0
+
+        result = {
+            "shipment_id": shipment.get("shipment_id", "UNKNOWN"),
+            "incoterms": incoterms,
+            "origin_country": shipment.get("origin_country"),
+            "destination_country": shipment.get("destination_country"),
+            "documents_required": doc_types,
+            "total_invoice_value": total_invoice,
+            "freight_cost": freight_cost,
+            "insurance_cost": insurance,
+            "total_duty_estimate": total_duty,
+            "total_landed_cost": round(total_invoice + freight_cost + insurance + total_duty, 2),
+            "line_items": classified,
+            "restricted_items": sum(1 for c in classified if c["restricted"]),
+            "licensed_items": sum(1 for c in classified if c["requires_license"])
+        }
+        print(json.dumps(result))
+    description: Classify commodities and compute duties and landed costs
+
+  - id: generate_documents
+    node: agent
+    config:
+      prompt: |
+        Generate the required customs documentation based on the shipment details:
+        {{ index .steps "classify_commodities" "output" }}
+
+        Generate the following documents:
+        1. Commercial Invoice with all required fields
+        2. Packing List with weights and dimensions
+        3. Certificate of Origin declaration
+        4. Customs declaration summary
+        5. Compliance checklist for restricted/licensed items
+        6. Recommended customs broker instructions
+    description: Generate AI-powered customs documentation
+
+  - id: submit_customs
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.customs_api_endpoint }}"
+      headers:
+        Content-Type: application/json
+      body:
+        shipment_classification: "{{ index .steps 'classify_commodities' 'output' }}"
+        documents: "{{ index .steps 'generate_documents' 'output' }}"
+    description: Submit customs documentation to customs system
+
+  - id: save_customs
+    node: file_write
+    config:
+      path: "{{ .params.output_file }}"
+      content: |
+        {
+          "commodity_classification": {{ index .steps "classify_commodities" "output" }},
+          "generated_documents": {{ index .steps "generate_documents" "output" }},
+          "submission_result": {{ index .steps "submit_customs" "response" "body" }}
+        }
+    description: Save customs documentation to output file

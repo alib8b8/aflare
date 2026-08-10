@@ -1,0 +1,13 @@
+{
+  "id": "iot/smart-home-automation",
+  "name": "Smart Home Automation",
+  "version": "1.0.0",
+  "description": "Smart home automation rule engine with conditional logic, device state evaluation, AI-powered action validation, and command dispatch",
+  "author": "aflare community",
+  "category": "iot",
+  "tags": ["smart-home", "automation", "rules-engine", "device-control", "iot"],
+  "keywords": ["smart-home", "automation", "home-assistant", "rules", "iot"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

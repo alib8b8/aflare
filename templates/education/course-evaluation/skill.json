@@ -1,0 +1,13 @@
+{
+  "id": "education/course-evaluation",
+  "name": "Course Evaluation Analyzer",
+  "version": "1.0.0",
+  "description": "Course evaluation and feedback analysis with sentiment analysis, category breakdowns, and actionable improvement recommendations.",
+  "author": "aflare community",
+  "category": "education",
+  "tags": ["evaluation", "feedback", "sentiment", "analysis", "course", "improvement"],
+  "keywords": ["evaluation", "feedback", "sentiment", "course", "review", "analysis", "improvement"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

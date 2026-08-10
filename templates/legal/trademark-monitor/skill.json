@@ -1,0 +1,13 @@
+{
+  "id": "legal/trademark-monitor",
+  "name": "Trademark Monitoring & Infringement Detection",
+  "version": "1.0.0",
+  "description": "Automated trademark monitoring workflow that checks registries for similar marks, analyzes potential conflicts, calculates risk scores, and generates enforcement recommendations with alerts.",
+  "author": "aflare community",
+  "category": "legal",
+  "tags": ["trademark", "monitoring", "infringement", "brand-protection", "legal"],
+  "keywords": ["trademark monitoring", "brand protection", "infringement detection", "trademark search", "IP enforcement"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

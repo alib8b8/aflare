@@ -1,0 +1,13 @@
+{
+  "id": "iot/smart-agriculture",
+  "name": "Smart Agriculture",
+  "version": "1.0.0",
+  "description": "Smart agriculture sensor monitoring for soil moisture, temperature, pH, nutrients, and automated irrigation control with AI-powered farming recommendations",
+  "author": "aflare community",
+  "category": "iot",
+  "tags": ["agriculture", "soil", "irrigation", "farming", "crop-health"],
+  "keywords": ["iot", "agriculture", "farming", "irrigation", "soil-monitoring"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

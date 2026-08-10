@@ -1,0 +1,123 @@
+name: mqtt-bridge
+description: MQTT protocol bridge and message router with topic mapping, transformation, and multi-broker support
+version: "1.0.0"
+params:
+  - name: source_broker
+    type: string
+    default: "mqtt://broker-source.local:1883"
+    description: Source MQTT broker URL
+  - name: target_broker
+    type: string
+    default: "mqtt://broker-target.local:1883"
+    description: Target MQTT broker URL
+  - name: topic_mappings
+    type: string
+    default: "{}"
+    description: JSON topic mapping rules (source -> target)
+  - name: transform_rules
+    type: string
+    default: "{}"
+    description: JSON message transformation rules
+  - name: qos
+    type: integer
+    default: 1
+    description: MQTT QoS level for publishing
+
+steps:
+  - id: subscribe_source
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.source_broker }}/subscribe"
+      headers:
+        Content-Type: application/json
+      body: |
+        {
+          "topics": {{ .params.topic_mappings | keys | toJson }},
+          "qos": {{ .params.qos }}
+        }
+    description: Subscribe to source MQTT broker topics
+
+  - id: transform_messages
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+
+        messages = {{ .steps.subscribe_source.output.messages | toJson }}
+        mappings = json.loads('''{{ .params.topic_mappings }}''')
+        transforms = json.loads('''{{ .params.transform_rules }}''')
+
+        routed = []
+        for msg in messages:
+            source_topic = msg.get("topic", "")
+            target_topic = mappings.get(source_topic, source_topic)
+            payload = msg.get("payload", {})
+
+            if source_topic in transforms:
+                for rule in transforms[source_topic]:
+                    if rule["type"] == "rename":
+                        payload[rule["new_key"]] = payload.pop(rule["old_key"], None)
+                    elif rule["type"] == "convert":
+                        payload[rule["key"]] = float(payload.get(rule["key"], 0))
+                    elif rule["type"] == "add":
+                        payload[rule["key"]] = rule["value"]
+
+            routed.append({
+                "source_topic": source_topic,
+                "target_topic": target_topic,
+                "payload": payload,
+                "qos": {{ .params.qos }}
+            })
+
+        result = {
+            "messages_processed": len(routed),
+            "routed_messages": routed
+        }
+        print(json.dumps(result))
+    description: Transform and route messages based on topic mappings and rules
+
+  - id: publish_target
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.target_broker }}/publish/batch"
+      headers:
+        Content-Type: application/json
+      body: |
+        {{ .steps.transform_messages.output.routed_messages | toJson }}
+    description: Publish transformed messages to target broker
+
+  - id: monitor_bridge
+    node: agent
+    config:
+      prompt: |
+        Analyze the MQTT bridge message routing results:
+
+        Processed: {{ .steps.transform_messages.output.messages_processed }}
+        Publish Result: {{ .steps.publish_target.output | toJson }}
+
+        Provide:
+        1. Message throughput summary
+        2. Any routing failures or dropped messages
+        3. Latency observations
+        4. Bridge health recommendations
+
+        Return as JSON with "bridge_report" key.
+      output_format: json
+    description: AI-powered bridge health monitoring and reporting
+
+  - id: log_bridge
+    node: file_write
+    config:
+      file_path: "/data/mqtt_bridge/{{ now | date \"2006-01-02\" }}/bridge_{{ now | date \"150405\" }}.json"
+      content: |
+        {
+          "timestamp": "{{ now }}",
+          "source": "{{ .params.source_broker }}",
+          "target": "{{ .params.target_broker }}",
+          "metrics": {{ .steps.transform_messages.output | toJson }},
+          "report": {{ .steps.monitor_bridge.output | toJson }}
+        }
+    description: Log bridge activity to persistent storage

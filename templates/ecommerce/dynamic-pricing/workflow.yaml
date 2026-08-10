@@ -1,0 +1,142 @@
+name: dynamic-pricing
+description: Real-time dynamic pricing engine with demand elasticity, competitor tracking, and margin optimization
+version: "1.0"
+params:
+  - name: product_ids
+    type: array
+    required: true
+    description: Products to price dynamically
+  - name: pricing_rule
+    type: string
+    default: "beat_competition"
+    description: Pricing rule (beat_competition, match_competition, premium, value)
+  - name: price_floor
+    type: number
+    default: 0.70
+    description: Minimum price as percentage of base price
+  - name: price_ceiling
+    type: number
+    default: 1.30
+    description: Maximum price as percentage of base price
+  - name: update_interval
+    type: string
+    default: "1h"
+    description: Repricing frequency
+
+steps:
+  - id: fetch_current_prices
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.api_base }}/pricing/current"
+      body:
+        product_ids: "{{ .params.product_ids }}"
+
+  - id: fetch_competitor_prices
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.api_base }}/market/competitor-prices"
+      body:
+        product_ids: "{{ .params.product_ids }}"
+        realtime: "true"
+
+  - id: fetch_demand_metrics
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.api_base }}/analytics/demand"
+      params:
+        product_ids: "{{ .params.product_ids | join \",\" }}"
+        window: "{{ .params.update_interval }}"
+
+  - id: compute_dynamic_prices
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+
+        current = {{ .steps.fetch_current_prices.response | toJSON }}
+        competitors = {{ .steps.fetch_competitor_prices.response | toJSON }}
+        demand = {{ .steps.fetch_demand_metrics.response | toJSON }}
+        rule = "{{ .params.pricing_rule }}"
+        floor = {{ .params.price_floor }}
+        ceiling = {{ .params.price_ceiling }}
+
+        current_prices = {p["product_id"]: p for p in current.get("products", [])}
+        competitor_prices = {p["product_id"]: p for p in competitors.get("prices", [])}
+        demand_metrics = {p["product_id"]: p for p in demand.get("metrics", [])}
+
+        updates = []
+        for pid in {{ .params.product_ids }}:
+            current_product = current_prices.get(pid, {})
+            base_price = current_product.get("base_price", current_product.get("price", 0))
+            current_price = current_product.get("price", base_price)
+            competitor = competitor_prices.get(pid, {})
+            comp_price = competitor.get("lowest_price", current_price)
+            demand_data = demand_metrics.get(pid, {})
+            demand_score = demand_data.get("demand_score", 0.5)
+
+            if base_price == 0:
+                continue
+
+            new_price = current_price
+
+            if rule == "beat_competition":
+                new_price = comp_price * 0.97  # 3% below competition
+            elif rule == "match_competition":
+                new_price = comp_price
+            elif rule == "premium":
+                new_price = comp_price * 1.05  # 5% above competition
+            elif rule == "value":
+                # Balance demand and competition
+                demand_factor = 1 + (demand_score - 0.5) * 0.1
+                new_price = comp_price * demand_factor
+
+            # Apply floor and ceiling
+            new_price = max(base_price * floor, min(base_price * ceiling, new_price))
+            new_price = round(new_price, 2)
+            change_pct = round((new_price - current_price) / current_price * 100, 2) if current_price else 0
+
+            updates.append({
+                "product_id": pid,
+                "current_price": current_price,
+                "new_price": new_price,
+                "change_pct": change_pct,
+                "base_price": base_price,
+                "competitor_price": comp_price,
+                "demand_score": demand_score,
+                "rule_applied": rule
+            })
+
+        summary = {
+            "rule": rule,
+            "total_products": len(updates),
+            "price_increases": sum(1 for u in updates if u["change_pct"] > 0),
+            "price_decreases": sum(1 for u in updates if u["change_pct"] < 0),
+            "price_unchanged": sum(1 for u in updates if u["change_pct"] == 0),
+            "updates": updates
+        }
+        print(json.dumps(summary))
+
+  - id: apply_price_updates
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.api_base }}/pricing/update"
+      body:
+        updates: "{{ .steps.compute_dynamic_prices.response.updates | toJSON }}"
+
+  - id: save_pricing_log
+    node: file_write
+    config:
+      path: "/output/pricing/dynamic_pricing_{{ .params.timestamp }}.json"
+      content: |
+        {
+          "executed_at": "{{ .params.timestamp }}",
+          "rule": "{{ .params.pricing_rule }}",
+          "interval": "{{ .params.update_interval }}",
+          "results": {{ .steps.compute_dynamic_prices.response | toJSON }},
+          "applied": {{ .steps.apply_price_updates.response | toJSON }}
+        }

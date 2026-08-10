@@ -43,19 +43,25 @@ steps:
       - Footer with unsubscribe link
     id: digest_html
 
-  - node: http_request
+  - node: code_interpreter
     params:
-      url: smtp://{{ .smtp_host }}:{{ .smtp_port }}
-      method: POST
-      content_type: application/json
-      body: |
-        {
-          "from": "{{ .smtp_user }}",
-          "to": "{{ .recipient }}",
-          "subject": "Daily Digest - {{ .date }}",
-          "html": "{{ .digest_html }}"
-        }
-      timeout: 30s
+      language: python
+      code: |
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+
+        msg = MIMEMultipart("alternative")
+        msg["From"] = "{{ .smtp_user }}"
+        msg["To"] = "{{ .recipient }}"
+        msg["Subject"] = "Daily Digest - {{ .date }}"
+        msg.attach(MIMEText("{{ .digest_html }}", "html"))
+
+        with smtplib.SMTP("{{ .smtp_host }}", {{ .smtp_port }}) as server:
+            server.starttls()
+            server.login("{{ .smtp_user }}", "{{ .smtp_pass }}")
+            server.sendmail("{{ .smtp_user }}", "{{ .recipient }}", msg.as_string())
+        print("ok")
     id: send_email
 
   - node: file_write

@@ -1,0 +1,116 @@
+name: promotion-planner
+description: AI-powered promotional campaign planning with budget allocation and impact forecasting
+version: "1.0"
+params:
+  - name: campaign_goal
+    type: string
+    required: true
+    description: Campaign goal (revenue, acquisition, clearance, engagement)
+  - name: budget
+    type: number
+    required: true
+    description: Total campaign budget
+  - name: duration_days
+    type: integer
+    default: 14
+    description: Campaign duration in days
+  - name: target_audience
+    type: string
+    default: "all"
+    description: Target audience segment
+
+steps:
+  - id: fetch_historical_campaigns
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.api_base }}/marketing/campaigns/history"
+      params:
+        goal: "{{ .params.campaign_goal }}"
+        limit: "10"
+
+  - id: fetch_eligible_products
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.api_base }}/products/eligible-for-promotion"
+      params:
+        audience: "{{ .params.target_audience }}"
+        min_margin: "0.10"
+
+  - id: design_campaign
+    node: agent
+    config:
+      model: "{{ .params.model | default \"gpt-4\" }}"
+      temperature: 0.4
+      prompt: |
+        Design a promotional campaign based on:
+        
+        Goal: {{ .params.campaign_goal }}
+        Budget: ${{ .params.budget }}
+        Duration: {{ .params.duration_days }} days
+        Target Audience: {{ .params.target_audience }}
+        
+        Historical Campaigns: {{ .steps.fetch_historical_campaigns.response | toJSON }}
+        Eligible Products: {{ .steps.fetch_eligible_products.response | toJSON }}
+        
+        Design the campaign with:
+        1. Campaign name and theme
+        2. Promotion types and discount structure
+        3. Product selection with quantities
+        4. Channel mix (email, social, site, push, sms)
+        5. Budget allocation by channel
+        6. Creative direction / messaging
+        7. Daily schedule and timing
+        8. A/B testing plan
+        
+        Output as structured JSON.
+
+  - id: forecast_campaign_impact
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+
+        campaign = {{ .steps.design_campaign.response | toJSON }}
+        historical = {{ .steps.fetch_historical_campaigns.response | toJSON }}
+        budget = {{ .params.budget }}
+        duration = {{ .params.duration_days }}
+
+        # Calculate baseline metrics from historical data
+        past_campaigns = historical.get("campaigns", [])
+        avg_roi = sum(c.get("roi", 0) for c in past_campaigns) / max(len(past_campaigns), 1)
+        avg_conversion = sum(c.get("conversion_rate", 0) for c in past_campaigns) / max(len(past_campaigns), 1)
+
+        # Apply uplift factors based on campaign quality
+        channels = campaign.get("channel_mix", {})
+        channel_count = len(channels)
+        uplift = 1.0 + (0.05 * channel_count)
+
+        forecast = {
+            "projected_revenue": round(budget * avg_roi * uplift, 2),
+            "projected_roi": round(avg_roi * uplift, 2),
+            "projected_conversion_rate": round(avg_conversion * uplift, 4),
+            "projected_orders": int(budget * avg_conversion * uplift * 10),
+            "estimated_new_customers": int(budget * avg_conversion * uplift * 3),
+            "daily_budget": round(budget / duration, 2),
+            "confidence_score": round(min(0.9, 0.5 + 0.1 * len(past_campaigns)), 2),
+            "risk_factors": []
+        }
+
+        print(json.dumps(forecast))
+
+  - id: save_campaign_plan
+    node: file_write
+    config:
+      path: "/output/promotions/campaign_{{ .params.timestamp }}.json"
+      content: |
+        {
+          "goal": "{{ .params.campaign_goal }}",
+          "budget": {{ .params.budget }},
+          "duration_days": {{ .params.duration_days }},
+          "generated_at": "{{ .params.timestamp }}",
+          "campaign_design": {{ .steps.design_campaign.response | toJSON }},
+          "impact_forecast": {{ .steps.forecast_campaign_impact.response | toJSON }}
+        }

@@ -1,0 +1,13 @@
+{
+  "id": "ecommerce/cart-abandonment",
+  "name": "Cart Abandonment Recovery",
+  "version": "1.0.0",
+  "description": "Cart abandonment recovery workflow that identifies abandoned carts, prioritizes high-value opportunities, generates personalized multi-channel recovery messages with optimized incentives, and executes recovery campaigns.",
+  "author": "aflare community",
+  "category": "ecommerce",
+  "tags": ["cart", "abandonment", "recovery", "retargeting", "conversion"],
+  "keywords": ["cart abandonment", "cart recovery", "retargeting", "conversion optimization", "incentive optimization"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,146 @@
+name: inventory-replenishment
+description: Automated inventory replenishment with reorder point calculation
+version: "1.0.0"
+params:
+  - name: inventory_api_endpoint
+    type: string
+    required: true
+    description: API endpoint for current inventory levels
+  - name: lead_time_days
+    type: integer
+    required: false
+    default: 7
+    description: Supplier lead time in days
+  - name: service_level
+    type: number
+    required: false
+    default: 0.95
+    description: Target service level (0-1) for safety stock calculation
+  - name: demand_api_endpoint
+    type: string
+    required: true
+    description: API endpoint for demand forecast data
+  - name: output_file
+    type: string
+    required: false
+    default: /tmp/replenishment_plan.json
+    description: Output file for replenishment plan
+
+steps:
+  - id: fetch_inventory
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.inventory_api_endpoint }}"
+      headers:
+        Content-Type: application/json
+    description: Fetch current inventory levels from API
+
+  - id: fetch_demand
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.demand_api_endpoint }}"
+      headers:
+        Content-Type: application/json
+    description: Fetch demand forecast data from API
+
+  - id: compute_replenishment
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json, math
+        from scipy import stats
+
+        inventory = json.loads('''{{ index .steps "fetch_inventory" "response" "body" }}''')
+        demand = json.loads('''{{ index .steps "fetch_demand" "response" "body" }}''')
+        lead_time = {{ .params.lead_time_days }}
+        service_level = {{ .params.service_level }}
+
+        items = inventory.get("items", [])
+        forecasts = {d["sku"]: d for d in demand.get("forecasts", [])}
+
+        # Z-score for service level
+        z_score = stats.norm.ppf(service_level)
+
+        replenishment = []
+        for item in items:
+            sku = item["sku"]
+            fc = forecasts.get(sku, {})
+            daily_demand = fc.get("daily_demand", item.get("avg_daily_demand", 10))
+            demand_std = fc.get("demand_std_dev", daily_demand * 0.3)
+
+            # Safety stock
+            safety_stock = z_score * demand_std * math.sqrt(lead_time)
+            safety_stock = max(0, round(safety_stock))
+
+            # Reorder point
+            reorder_point = round(daily_demand * lead_time + safety_stock)
+
+            # Order quantity (EOQ-like)
+            ordering_cost = item.get("ordering_cost", 50)
+            holding_cost = item.get("holding_cost_per_unit", 5)
+            annual_demand = daily_demand * 365
+            eoq = round(math.sqrt(2 * annual_demand * ordering_cost / holding_cost))
+
+            # Determine if replenishment needed
+            current_qty = item.get("current_quantity", 0)
+            on_order = item.get("on_order", 0)
+            available = current_qty + on_order
+
+            need_replenish = available <= reorder_point
+            order_qty = max(eoq, reorder_point - available) if need_replenish else 0
+
+            replenishment.append({
+                "sku": sku,
+                "name": item.get("name", sku),
+                "current_quantity": current_qty,
+                "on_order": on_order,
+                "available": available,
+                "reorder_point": reorder_point,
+                "safety_stock": safety_stock,
+                "eoq": eoq,
+                "needs_replenishment": need_replenish,
+                "recommended_order_qty": order_qty,
+                "estimated_days_until_stockout": round(available / daily_demand, 1) if daily_demand > 0 else 999,
+                "urgency": "critical" if available <= safety_stock else ("high" if need_replenish else "low")
+            })
+
+        result = {
+            "generated_at": "{{ now }}",
+            "lead_time_days": lead_time,
+            "service_level": service_level,
+            "total_items": len(replenishment),
+            "items_needing_replenishment": sum(1 for r in replenishment if r["needs_replenishment"]),
+            "critical_items": sum(1 for r in replenishment if r["urgency"] == "critical"),
+            "replenishment_plan": sorted(replenishment, key=lambda x: (x["urgency"] == "critical", x["urgency"] == "high"), reverse=True)
+        }
+        print(json.dumps(result))
+    description: Compute reorder points, safety stock, and replenishment quantities
+
+  - id: generate_po_recommendations
+    node: agent
+    config:
+      prompt: |
+        Analyze the replenishment plan and generate purchase order recommendations:
+        {{ index .steps "compute_replenishment" "output" }}
+
+        Provide:
+        1. Prioritized list of items to reorder
+        2. Recommended order quantities with rationale
+        3. Suggested supplier allocation for critical items
+        4. Cost estimate for the replenishment order
+        5. Risks of NOT replenishing critical items immediately
+    description: Generate AI-powered PO recommendations
+
+  - id: save_replenishment
+    node: file_write
+    config:
+      path: "{{ .params.output_file }}"
+      content: |
+        {
+          "replenishment_plan": {{ index .steps "compute_replenishment" "output" }},
+          "po_recommendations": {{ index .steps "generate_po_recommendations" "output" }}
+        }
+    description: Save replenishment plan to output file

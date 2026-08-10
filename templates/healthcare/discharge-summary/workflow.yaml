@@ -1,0 +1,112 @@
+name: Hospital Discharge Summary Generator
+# Generate comprehensive hospital discharge summaries
+# Usage: aflare install healthcare/discharge-summary
+#        aflare run discharge-summary/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: code_interpreter, template_render
+      max_iterations: 4
+    input: |
+      Generate a structured hospital discharge summary from the following clinical data.
+
+      Patient demographics: {{ .params.patient_name }}, {{ .params.age }}yo {{ .params.gender }}, MRN: {{ .params.mrn }}
+      Admission date: {{ .params.admission_date }}
+      Discharge date: {{ .params.discharge_date }}
+      Admitting diagnosis: {{ .params.admitting_diagnosis }}
+      Hospital course: {{ .params.hospital_course }}
+      Procedures performed: {{ .params.procedures }}
+      Significant findings: {{ .params.significant_findings }}
+      Discharge diagnoses: {{ .params.discharge_diagnoses }}
+
+      Structure the summary with:
+      1. Chief complaint and history of present illness
+      2. Admission and discharge diagnoses (primary and secondary)
+      3. Hospital course summary (chronological)
+      4. Significant procedures and results
+      5. Physical exam findings at discharge
+      6. Discharge medications with instructions
+      7. Follow-up appointments
+      8. Activity and diet restrictions
+      9. Patient education provided
+      10. Discharge condition and disposition
+    id: discharge_content
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 2
+    input: |
+      Review the discharge summary for completeness and generate patient discharge instructions in plain language.
+
+      Discharge summary: {{ .discharge_content }}
+
+      Generate:
+      1. Medication reconciliation list (name, dose, frequency, purpose)
+      2. Red flags/warning signs to watch for
+      3. Follow-up appointment schedule
+      4. Diet and activity instructions
+      5. Contact information for questions
+    id: patient_instructions
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 30s
+    input: |
+      import json
+      from datetime import datetime
+
+      admit = "{{ .params.admission_date }}"
+      discharge = "{{ .params.discharge_date }}"
+
+      try:
+          admit_dt = datetime.strptime(admit, "%Y-%m-%d")
+          discharge_dt = datetime.strptime(discharge, "%Y-%m-%d")
+          los = (discharge_dt - admit_dt).days
+      except:
+          los = "unknown"
+
+      print(json.dumps({
+          "length_of_stay": los,
+          "admission_date": admit,
+          "discharge_date": discharge
+      }))
+    id: stay_calculation
+
+  - node: file_write
+    params:
+      path: "{{ .params.output_path | default \"discharge-summary.md\" }}"
+    input: |
+      # DISCHARGE SUMMARY
+      ---
+      **Patient:** {{ .params.patient_name }} | **MRN:** {{ .params.mrn }}
+      **DOB/Age:** {{ .params.age }}yo {{ .params.gender }}
+      **Admission:** {{ .stay_calculation.admission_date }}
+      **Discharge:** {{ .stay_calculation.discharge_date }}
+      **Length of Stay:** {{ .stay_calculation.length_of_stay }} days
+      **Disposition:** {{ .params.disposition }}
+
+      ## Clinical Summary
+      {{ .discharge_content }}
+
+      ## Patient Discharge Instructions
+      {{ .patient_instructions }}
+
+      ---
+      *Attending Physician: {{ .params.attending }}
+      *Dictated by AI, reviewed by clinical staff*
+    id: save_summary
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Discharge summary generated for {{ .params.patient_name }} (MRN: {{ .params.mrn }}).
+      Length of stay: {{ .stay_calculation.length_of_stay }} days.
+    id: notify_complete

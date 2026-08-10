@@ -1,0 +1,191 @@
+name: benefits-comparison
+description: Employee benefits comparison analyzer with cost modeling and recommendations
+params:
+  - name: current_benefits
+    type: object
+    required: true
+    description: Current benefits package details
+  - name: comparison_benefits
+    type: array
+    required: true
+    description: Benefits packages to compare against
+  - name: employee_profile
+    type: object
+    required: true
+    description: Employee profile for personalization
+  - name: comparison_categories
+    type: array
+    required: false
+    default:
+      - health
+      - retirement
+      - time_off
+      - perks
+      - insurance
+      - equity
+    description: Categories to compare
+  - name: include_cost_analysis
+    type: boolean
+    required: false
+    default: true
+    description: Include out-of-pocket cost analysis
+  - name: currency
+    type: string
+    required: false
+    default: "USD"
+    description: Currency for monetary values
+
+steps:
+  - id: normalize_benefits
+    type: agent
+    config:
+      instruction: |
+        Normalize all benefits packages into a consistent structured format for comparison.
+
+        Categories: {{ .params.comparison_categories }}
+
+        For each package, extract and standardize:
+        - **Health Insurance**: Premiums (employee/employer), deductibles, OOP max, coverage type
+        - **Retirement**: 401k/403b match %, vesting schedule, pension
+        - **Time Off**: PTO days, sick days, holidays, parental leave, sabbatical
+        - **Perks**: Wellness, commuter, education, food, childcare, pet insurance
+        - **Insurance**: Life, disability (short/long term), AD&D
+        - **Equity**: Stock options, RSUs, ESPP, equity value estimation
+
+        Return normalized packages as structured JSON.
+      input:
+        current_benefits: "{{ .params.current_benefits }}"
+        comparison_benefits: "{{ .params.comparison_benefits }}"
+        comparison_categories: "{{ .params.comparison_categories }}"
+      output: normalized_packages
+
+  - id: compute_comparison
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        normalized = normalized_packages
+        profile = employee_profile
+        categories = comparison_categories
+        include_cost = include_cost_analysis
+
+        current = normalized.get("current", {})
+        comparisons = normalized.get("comparisons", [])
+
+        def compute_health_cost(benefits, profile):
+            premium = benefits.get("health", {}).get("employee_monthly_premium", 0) * 12
+            deductible = benefits.get("health", {}).get("annual_deductible", 0)
+            oop = benefits.get("health", {}).get("oop_max", 0)
+            family = profile.get("dependents", 0) > 0
+            if family:
+                premium *= (1 + profile.get("dependents", 0) * 0.7)
+            return {"premium_annual": round(premium, 2), "deductible": deductible, "oop_max": oop, "estimated_annual": round(premium + deductible * 0.5, 2)}
+
+        def compute_retirement_value(benefits, profile):
+            salary = profile.get("annual_salary", 0)
+            match_pct = benefits.get("retirement", {}).get("employer_match_pct", 0)
+            match_limit = benefits.get("retirement", {}).get("match_limit_pct", 0)
+            max_match = min(match_pct, match_limit) / 100 * salary if match_limit > 0 else match_pct / 100 * salary
+            return {"max_employer_match": round(max_match, 2), "vesting": benefits.get("retirement", {}).get("vesting_schedule", "Immediate")}
+
+        def compute_pto_value(benefits, profile):
+            salary = profile.get("annual_salary", 0)
+            daily_rate = salary / 260
+            pto_days = benefits.get("time_off", {}).get("pto_days", 0)
+            holidays = benefits.get("time_off", {}).get("holidays", 0)
+            return {"pto_days": pto_days, "holidays": holidays, "total_pto_value": round((pto_days + holidays) * daily_rate, 2)}
+
+        def compute_equity_value(benefits):
+            equity = benefits.get("equity", {})
+            return {
+                "type": equity.get("type", "None"),
+                "annual_value_estimate": equity.get("annual_value", 0),
+                "vesting": equity.get("vesting_schedule", "N/A")
+            }
+
+        def compute_total_package(benefits, profile):
+            salary = profile.get("annual_salary", 0)
+            health = compute_health_cost(benefits, profile)
+            retirement = compute_retirement_value(benefits, profile)
+            equity = compute_equity_value(benefits)
+            total = salary + retirement["max_employer_match"] + equity["annual_value_estimate"]
+            return {"base_salary": salary, "retirement_contribution": retirement["max_employer_match"], "equity_value": equity["annual_value_estimate"], "total_comp": round(total, 2)}
+
+        # Build results
+        current_analysis = {
+            "health_costs": compute_health_cost(current, profile),
+            "retirement": compute_retirement_value(current, profile),
+            "pto": compute_pto_value(current, profile),
+            "equity": compute_equity_value(current),
+            "total_package": compute_total_package(current, profile)
+        }
+
+        comparison_results = []
+        for comp in comparisons:
+            comp_total = compute_total_package(comp, profile)
+            diff = round(comp_total["total_comp"] - current_analysis["total_package"]["total_comp"], 2)
+            diff_pct = round(diff / current_analysis["total_package"]["total_comp"] * 100, 1) if current_analysis["total_package"]["total_comp"] > 0 else 0
+            comparison_results.append({
+                "name": comp.get("package_name", "Unknown"),
+                "health_costs": compute_health_cost(comp, profile),
+                "retirement": compute_retirement_value(comp, profile),
+                "pto": compute_pto_value(comp, profile),
+                "equity": compute_equity_value(comp),
+                "total_package": comp_total,
+                "difference": {"amount": diff, "percentage": diff_pct, "better": diff > 0}
+            })
+
+        # Sort by total package
+        comparison_results.sort(key=lambda x: x["total_package"]["total_comp"], reverse=True)
+
+        output = {
+            "current_package": current_analysis,
+            "comparisons": comparison_results,
+            "best_overall": comparison_results[0]["name"] if comparison_results else "N/A",
+            "summary": {
+                "total_packages_compared": len(comparison_results) + 1,
+                "packages_better_than_current": len([c for c in comparison_results if c["difference"]["better"]])
+            }
+        }
+        print(json.dumps(output, indent=2))
+      inputs:
+        normalized_packages: "{{ .steps.normalize_benefits.output.normalized_packages }}"
+        employee_profile: "{{ .params.employee_profile }}"
+        comparison_categories: "{{ .params.comparison_categories }}"
+        include_cost_analysis: "{{ .params.include_cost_analysis }}"
+      output: comparison_results
+
+  - id: generate_recommendation
+    type: agent
+    config:
+      instruction: |
+        Analyze the benefits comparison and generate personalized recommendations for the employee.
+
+        Employee profile: {{ .params.employee_profile }}
+
+        Provide:
+        1. **Overall Assessment**: Which package offers the best value
+        2. **Category Winners**: Best package for each category (health, retirement, etc.)
+        3. **Personalized Recommendation**: Based on employee profile (age, family, health needs, career stage)
+        4. **Trade-offs**: What you give up vs gain with each option
+        5. **Negotiation Leverage**: Data points for compensation discussions
+        6. **Action Items**: Steps to evaluate or switch benefits
+
+        Return as structured JSON.
+      input:
+        comparison_results: "{{ .steps.compute_comparison.output.comparison_results }}"
+        employee_profile: "{{ .params.employee_profile }}"
+      output: recommendations
+
+  - id: save_report
+    type: file_write
+    config:
+      filename: "{{ .params.output_file | default \"benefits_comparison_report.json\" }}"
+      content: |
+        {
+          "employee_profile": {{ .params.employee_profile | toJson }},
+          "comparison_results": {{ .steps.compute_comparison.output.comparison_results | toJson }},
+          "recommendations": {{ .steps.generate_recommendation.output.recommendations | toJson }}
+        }
+      format: json

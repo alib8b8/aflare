@@ -1,0 +1,96 @@
+name: terms-of-use
+description: "Terms of Use / Terms of Service generator for websites and applications"
+version: "1.0.0"
+params:
+  - name: company_name
+    type: string
+    required: true
+    description: "Name of the company"
+  - name: service_type
+    type: string
+    required: true
+    description: "Type of service (web-app, mobile-app, saas, marketplace, social-media)"
+  - name: features
+    type: array
+    required: true
+    description: "List of service features"
+  - name: has_user_content
+    type: boolean
+    required: false
+    default: false
+    description: "Whether users can upload content"
+  - name: has_payments
+    type: boolean
+    required: false
+    default: false
+    description: "Whether the service processes payments"
+  - name: jurisdiction
+    type: string
+    required: false
+    default: "United States"
+    description: "Governing jurisdiction"
+
+steps:
+  - id: research_requirements
+    node: agent
+    description: "Research legal requirements for the service type"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a technology lawyer specializing in terms of service. Research and identify
+        all required clauses and legal requirements for the given service type. Consider:
+        applicable laws, industry standards, platform policies, and recent regulatory changes.
+      prompt: |
+        Company: {{ .params.company_name }}
+        Service type: {{ .params.service_type }}
+        Features: {{ .params.features }}
+        Has user content: {{ .params.has_user_content }}
+        Has payments: {{ .params.has_payments }}
+        Jurisdiction: {{ .params.jurisdiction }}
+        Identify all required clauses and legal requirements.
+
+  - id: generate_terms
+    node: agent
+    description: "Generate comprehensive terms of use document"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a legal document drafter. Generate a complete Terms of Use document based on
+        the identified requirements. Include all necessary sections: acceptance, account
+        responsibilities, acceptable use, intellectual property, user content, payment terms,
+        termination, disclaimers, limitation of liability, indemnification, dispute resolution,
+        and contact information. Use clear, enforceable language.
+      prompt: |
+        Requirements: {{ index .steps.research_requirements.outputs "requirements" }}
+        Company: {{ .params.company_name }}
+        Service type: {{ .params.service_type }}
+        Features: {{ .params.features }}
+        Generate the complete Terms of Use document.
+
+  - id: review_terms
+    node: agent
+    description: "Review generated terms for legal soundness"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a senior legal reviewer. Review the generated Terms of Use for:
+        legal enforceability, completeness, clarity, consistency, and compliance with
+        applicable laws. Flag any problematic language and suggest improvements.
+      prompt: |
+        Terms text: {{ index .steps.generate_terms.outputs "terms_text" }}
+        Jurisdiction: {{ .params.jurisdiction }}
+        Review and provide feedback on the terms.
+
+  - id: save_terms
+    node: file_write
+    description: "Save the terms of use document"
+    config:
+      path: "{{ .params.output_path | default "output/terms_of_use.md" }}"
+      content: |
+        # Terms of Use - {{ .params.company_name }}
+        
+        {{ index .steps.generate_terms.outputs "terms_text" }}
+        
+        ---
+        ## Legal Review Notes
+        {{ index .steps.review_terms.outputs "review_notes" }}

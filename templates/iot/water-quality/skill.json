@@ -1,0 +1,13 @@
+{
+  "id": "iot/water-quality",
+  "name": "Water Quality",
+  "version": "1.0.0",
+  "description": "Water quality monitoring and alerting with multi-parameter analysis, contamination detection, regulatory compliance assessment, and AI-powered treatment recommendations",
+  "author": "aflare community",
+  "category": "iot",
+  "tags": ["water", "quality", "monitoring", "contamination", "compliance"],
+  "keywords": ["iot", "water", "quality", "monitoring", "environmental"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

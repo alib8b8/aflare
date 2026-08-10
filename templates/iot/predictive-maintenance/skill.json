@@ -1,0 +1,13 @@
+{
+  "id": "iot/predictive-maintenance",
+  "name": "Predictive Maintenance",
+  "version": "1.0.0",
+  "description": "Predictive maintenance for industrial equipment using vibration analysis, temperature trends, failure prediction, risk scoring, and AI-powered maintenance planning",
+  "author": "aflare community",
+  "category": "iot",
+  "tags": ["predictive-maintenance", "industrial", "failure-prediction", "vibration", "reliability"],
+  "keywords": ["iot", "predictive", "maintenance", "industrial", "reliability"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

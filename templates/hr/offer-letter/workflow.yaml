@@ -1,0 +1,133 @@
+name: offer-letter
+description: AI-generated offer letter with compensation details and custom terms
+params:
+  - name: candidate_name
+    type: string
+    required: true
+    description: Full name of the candidate
+  - name: position_title
+    type: string
+    required: true
+    description: Job title being offered
+  - name: department
+    type: string
+    required: true
+    description: Department name
+  - name: start_date
+    type: string
+    required: true
+    description: Proposed start date (YYYY-MM-DD)
+  - name: compensation
+    type: object
+    required: true
+    description: Compensation details including base salary, bonus, equity, benefits
+  - name: company_name
+    type: string
+    required: true
+    description: Company legal name
+  - name: company_address
+    type: string
+    required: false
+    default: ""
+    description: Company address
+  - name: special_terms
+    type: array
+    required: false
+    default: []
+    description: Additional special terms to include
+  - name: template_style
+    type: string
+    required: false
+    default: "standard"
+    description: Template style - standard, executive, or startup
+
+steps:
+  - id: validate_compensation
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        comp = compensation
+        issues = []
+        total_comp = 0
+
+        if not comp.get("base_salary"):
+            issues.append("Missing base salary")
+        else:
+            total_comp += comp["base_salary"]
+
+        if comp.get("target_bonus_pct"):
+            if comp["target_bonus_pct"] < 0 or comp["target_bonus_pct"] > 100:
+                issues.append("Bonus percentage out of range 0-100")
+            total_comp += comp["base_salary"] * comp["target_bonus_pct"] / 100
+
+        if comp.get("equity_grant"):
+            eq = comp["equity_grant"]
+            if not eq.get("shares") or not eq.get("vesting_schedule"):
+                issues.append("Incomplete equity grant details")
+
+        result = {
+            "valid": len(issues) == 0,
+            "issues": issues,
+            "total_annual_comp": round(total_comp, 2),
+            "compensation_breakdown": {
+                "base_salary": comp.get("base_salary", 0),
+                "target_bonus": round(comp.get("base_salary", 0) * comp.get("target_bonus_pct", 0) / 100, 2),
+                "equity": comp.get("equity_grant", {}).get("shares", 0),
+                "signing_bonus": comp.get("signing_bonus", 0)
+            }
+        }
+        print(json.dumps(result, indent=2))
+      inputs:
+        compensation: "{{ .params.compensation }}"
+      output: validation_result
+
+  - id: fetch_benefits_data
+    type: http_request
+    config:
+      method: GET
+      url: "{{ .params.benefits_api_url | default \"https://api.company.internal/benefits/current\" }}"
+      headers:
+        Authorization: "Bearer {{ .params.api_token }}"
+      output: benefits_data
+
+  - id: generate_offer_letter
+    type: agent
+    config:
+      instruction: |
+        You are an HR professional generating a formal offer letter. Create a professional, legally-appropriate offer letter using the provided template style.
+
+        Include these sections:
+        1. Company letterhead and date
+        2. Candidate greeting
+        3. Position and department details
+        4. Start date and reporting structure
+        5. Compensation section (base salary, bonus target, equity, signing bonus)
+        6. Benefits summary (from the benefits data)
+        7. At-will employment statement (if applicable)
+        8. Any special terms (relocation, visa sponsorship, clawback, non-compete)
+        9. Acceptance instructions and deadline
+        10. Closing and signature block
+
+        Format the output as a clean markdown document suitable for conversion to PDF.
+        Style: {{ .params.template_style }}
+      input:
+        candidate_name: "{{ .params.candidate_name }}"
+        position_title: "{{ .params.position_title }}"
+        department: "{{ .params.department }}"
+        start_date: "{{ .params.start_date }}"
+        compensation: "{{ .params.compensation }}"
+        company_name: "{{ .params.company_name }}"
+        company_address: "{{ .params.company_address }}"
+        special_terms: "{{ .params.special_terms }}"
+        benefits_data: "{{ .steps.fetch_benefits_data.output.benefits_data }}"
+        validation: "{{ .steps.validate_compensation.output.validation_result }}"
+      output: offer_letter_content
+
+  - id: save_offer_letter
+    type: file_write
+    config:
+      filename: "{{ .params.output_file | default (printf \"offer_letter_%s.md\" .params.candidate_name | replace \" \" \"_\") }}"
+      content: "{{ .steps.generate_offer_letter.output.offer_letter_content }}"
+      format: markdown

@@ -1,0 +1,13 @@
+{
+  "id": "hr/org-chart",
+  "name": "Organizational Chart Generator",
+  "version": "1.0.0",
+  "description": "Organizational chart generator with reporting hierarchy visualization, span of control analysis, vacancy impact assessment, and structural recommendations.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["org-chart", "hierarchy", "visualization", "structure", "workforce", "reporting"],
+  "keywords": ["org-chart", "organization", "hierarchy", "reporting", "structure", "visualization", "mermaid", "span-of-control"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

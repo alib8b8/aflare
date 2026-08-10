@@ -1,0 +1,13 @@
+{
+  "id": "ecommerce/category-optimizer",
+  "name": "Category Performance Optimizer",
+  "version": "1.0.0",
+  "description": "Product category performance analysis and optimization engine that evaluates category health across multiple KPIs, benchmarks against market trends, and generates prioritized optimization plans with ROI projections.",
+  "author": "aflare community",
+  "category": "ecommerce",
+  "tags": ["category", "optimization", "merchandising", "performance", "analytics"],
+  "keywords": ["category optimization", "product mix", "merchandising", "category management", "performance analysis"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,169 @@
+name: delivery-scheduler
+description: Last-mile delivery scheduling with time window optimization
+version: "1.0.0"
+params:
+  - name: orders_data
+    type: string
+    required: true
+    description: JSON array of orders with delivery addresses and time windows
+  - name: fleet_capacity
+    type: integer
+    required: false
+    default: 5
+    description: Number of available delivery vehicles
+  - name: shift_start
+    type: string
+    required: false
+    default: "08:00"
+    description: Delivery shift start time (HH:MM)
+  - name: shift_end
+    type: string
+    required: false
+    default: "18:00"
+    description: Delivery shift end time (HH:MM)
+  - name: output_file
+    type: string
+    required: false
+    default: /tmp/delivery_schedule.json
+    description: Output file for delivery schedule
+
+steps:
+  - id: parse_orders
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        from datetime import datetime, timedelta
+
+        orders = json.loads('''{{ .params.orders_data }}''')
+        shift_start = "{{ .params.shift_start }}"
+        shift_end = "{{ .params.shift_end }}"
+        fleet = {{ .params.fleet_capacity }}
+
+        start_h, start_m = map(int, shift_start.split(":"))
+        end_h, end_m = map(int, shift_end.split(":"))
+        shift_minutes = (end_h * 60 + end_m) - (start_h * 60 + start_m)
+
+        parsed = []
+        for o in orders:
+            tw = o.get("time_window", "09:00-17:00")
+            tw_start, tw_end = tw.split("-")
+            tw_sh, tw_sm = map(int, tw_start.split(":"))
+            tw_eh, tw_em = map(int, tw_end.split(":"))
+
+            parsed.append({
+                "order_id": o["order_id"],
+                "address": o.get("address", "Unknown"),
+                "priority": o.get("priority", 3),
+                "time_window_start": tw_start,
+                "time_window_end": tw_end,
+                "estimated_service_minutes": o.get("service_minutes", 15),
+                "package_size": o.get("package_size", "M")
+            })
+
+        # Sort by priority (1 highest) and time window start
+        parsed.sort(key=lambda x: (x["priority"], x["time_window_start"]))
+
+        result = {
+            "total_orders": len(parsed),
+            "shift_duration_minutes": shift_minutes,
+            "available_vehicles": fleet,
+            "avg_orders_per_vehicle": round(len(parsed) / fleet, 1) if fleet > 0 else 0,
+            "orders": parsed
+        }
+        print(json.dumps(result))
+    description: Parse and sort orders by priority and time windows
+
+  - id: assign_schedule
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+
+        data = json.loads('''{{ index .steps "parse_orders" "output" }}''')
+        orders = data["orders"]
+        fleet = data["available_vehicles"]
+        shift_min = data["shift_duration_minutes"]
+
+        # Assign orders to vehicles
+        vehicles = []
+        for v in range(fleet):
+            vehicles.append({"vehicle_id": f"V-{v+1:03d}", "orders": [], "total_minutes": 0, "stops": 0})
+
+        # Simple round-robin with priority weighting
+        for order in orders:
+            best_vehicle = min(vehicles, key=lambda v: v["total_minutes"])
+            travel_min = 15 + order["stops"] * 3  # Estimated travel time
+            total = travel_min + order["estimated_service_minutes"]
+
+            if best_vehicle["total_minutes"] + total <= shift_min:
+                best_vehicle["orders"].append(order)
+                best_vehicle["total_minutes"] += total
+                best_vehicle["stops"] += 1
+
+        # Build schedule with time slots
+        schedule = []
+        start_h = 8
+        for v in vehicles:
+            current_time = start_h * 60
+            vehicle_schedule = []
+            for i, o in enumerate(v["orders"]):
+                travel = 15 if i == 0 else 15
+                arrival = current_time + travel
+                departure = arrival + o["estimated_service_minutes"]
+                vehicle_schedule.append({
+                    "order_id": o["order_id"],
+                    "address": o["address"],
+                    "arrival_time": f"{arrival//60:02d}:{arrival%60:02d}",
+                    "departure_time": f"{departure//60:02d}:{departure%60:02d}",
+                    "service_minutes": o["estimated_service_minutes"],
+                    "window": f"{o['time_window_start']}-{o['time_window_end']}"
+                })
+                current_time = departure
+
+            schedule.append({
+                "vehicle_id": v["vehicle_id"],
+                "stops": v["stops"],
+                "total_minutes": v["total_minutes"],
+                "utilization_pct": round(v["total_minutes"] / shift_min * 100, 1),
+                "deliveries": vehicle_schedule
+            })
+
+        result = {
+            "schedule_date": "{{ now }}",
+            "shift": "{{ .params.shift_start }}-{{ .params.shift_end }}",
+            "vehicles_deployed": sum(1 for v in schedule if v["stops"] > 0),
+            "total_deliveries": sum(v["stops"] for v in schedule),
+            "avg_utilization": round(sum(v["utilization_pct"] for v in schedule) / max(1, len(schedule)), 1),
+            "vehicle_schedules": schedule
+        }
+        print(json.dumps(result))
+    description: Assign orders to vehicles and build time-slotted schedules
+
+  - id: optimize_schedule
+    node: agent
+    config:
+      prompt: |
+        Review the delivery schedule and suggest optimizations:
+        {{ index .steps "assign_schedule" "output" }}
+
+        Provide:
+        1. Schedule feasibility assessment
+        2. Vehicle utilization improvement suggestions
+        3. Identified bottlenecks and resolution strategies
+        4. Estimated fuel cost per vehicle
+        5. Customer notification timing recommendations
+    description: Generate AI-powered schedule optimization recommendations
+
+  - id: save_schedule
+    node: file_write
+    config:
+      path: "{{ .params.output_file }}"
+      content: |
+        {
+          "delivery_schedule": {{ index .steps "assign_schedule" "output" }},
+          "optimization_recommendations": {{ index .steps "optimize_schedule" "output" }}
+        }
+    description: Save delivery schedule to output file

@@ -1,0 +1,163 @@
+name: compensation-benchmark
+description: Salary benchmarking and market analysis with compa-ratio calculation
+params:
+  - name: positions
+    type: array
+    required: true
+    description: List of positions to benchmark with title, level, location, current salary
+  - name: market_data_source
+    type: string
+    required: false
+    default: "radford"
+    description: Market data source - radford, mercer, payscale, custom
+  - name: industry
+    type: string
+    required: true
+    description: Industry for benchmarking (e.g., technology, finance, healthcare)
+  - name: company_size
+    type: string
+    required: false
+    default: "mid"
+    description: Company size tier - startup, small, mid, large, enterprise
+  - name: location
+    type: string
+    required: true
+    description: Primary location for cost-of-living adjustment
+  - name: currency
+    type: string
+    required: false
+    default: "USD"
+    description: Currency for salary figures
+  - name: target_percentile
+    type: integer
+    required: false
+    default: 50
+    description: Target market percentile for comparison
+
+steps:
+  - id: fetch_market_data
+    type: http_request
+    config:
+      method: POST
+      url: "{{ .params.market_api_url | default \"https://api.compensation.internal/benchmark\" }}"
+      headers:
+        Authorization: "Bearer {{ .params.api_token }}"
+        Content-Type: "application/json"
+      body: |
+        {
+          "positions": {{ .params.positions | toJson }},
+          "source": "{{ .params.market_data_source }}",
+          "industry": "{{ .params.industry }}",
+          "company_size": "{{ .params.company_size }}",
+          "location": "{{ .params.location }}",
+          "currency": "{{ .params.currency }}"
+        }
+      output: market_data
+
+  - id: compute_benchmarks
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        market = market_data
+        positions = current_positions
+        target_pct = target_percentile
+
+        results = []
+        for i, pos in enumerate(positions):
+            market_entry = market[i] if i < len(market) else {}
+            current_salary = pos.get("current_salary", 0)
+            market_median = market_entry.get("p50", market_entry.get("median", 0))
+            market_p25 = market_entry.get("p25", 0)
+            market_p75 = market_entry.get("p75", 0)
+            market_target = market_entry.get(f"p{target_pct}", market_median)
+
+            compa_ratio = round((current_salary / market_median * 100), 1) if market_median > 0 else 0
+            range_penetration = round(((current_salary - market_p25) / (market_p75 - market_p25) * 100), 1) if (market_p75 - market_p25) > 0 else 0
+
+            gap = round(market_target - current_salary, 0)
+            gap_pct = round((gap / current_salary * 100), 1) if current_salary > 0 else 0
+
+            results.append({
+                "position": pos.get("title", "Unknown"),
+                "level": pos.get("level", "N/A"),
+                "current_salary": current_salary,
+                "market_data": {
+                    "p25": market_p25,
+                    "p50": market_median,
+                    "p75": market_p75,
+                    f"p{target_pct}": market_target
+                },
+                "compa_ratio": compa_ratio,
+                "range_penetration": range_penetration,
+                "salary_gap": gap,
+                "salary_gap_pct": gap_pct,
+                "status": "Above Market" if compa_ratio > 110 else "At Market" if compa_ratio >= 90 else "Below Market"
+            })
+
+        # Summary statistics
+        compa_ratios = [r["compa_ratio"] for r in results if r["compa_ratio"] > 0]
+        avg_compa = round(sum(compa_ratios) / len(compa_ratios), 1) if compa_ratios else 0
+        total_gap = sum(r["salary_gap"] for r in results)
+        above = len([r for r in results if r["status"] == "Above Market"])
+        at = len([r for r in results if r["status"] == "At Market"])
+        below = len([r for r in results if r["status"] == "Below Market"])
+
+        output = {
+            "summary": {
+                "positions_analyzed": len(results),
+                "average_compa_ratio": avg_compa,
+                "total_market_gap": total_gap,
+                "distribution": {"above_market": above, "at_market": at, "below_market": below}
+            },
+            "position_details": results
+        }
+        print(json.dumps(output, indent=2))
+      inputs:
+        market_data: "{{ .steps.fetch_market_data.output.market_data }}"
+        current_positions: "{{ .params.positions }}"
+        target_percentile: "{{ .params.target_percentile }}"
+      output: benchmark_results
+
+  - id: generate_recommendations
+    type: agent
+    config:
+      instruction: |
+        Analyze the compensation benchmarking results and generate strategic recommendations:
+        1. Identify positions with critical gaps (below market by >15%)
+        2. Prioritize adjustment recommendations by risk of attrition
+        3. Estimate budget impact for bringing all positions to target percentile
+        4. Suggest equity adjustments for internal parity issues
+        5. Provide market trend observations for the industry
+        6. Recommend salary band adjustments if needed
+
+        Industry: {{ .params.industry }}
+        Target percentile: {{ .params.target_percentile }}
+
+        Return recommendations as structured JSON.
+      input:
+        benchmark_results: "{{ .steps.compute_benchmarks.output.benchmark_results }}"
+        industry: "{{ .params.industry }}"
+        target_percentile: "{{ .params.target_percentile }}"
+        company_size: "{{ .params.company_size }}"
+      output: recommendations
+
+  - id: save_report
+    type: file_write
+    config:
+      filename: "{{ .params.output_file | default \"compensation_benchmark_report.json\" }}"
+      content: |
+        {
+          "metadata": {
+            "industry": "{{ .params.industry }}",
+            "company_size": "{{ .params.company_size }}",
+            "location": "{{ .params.location }}",
+            "target_percentile": {{ .params.target_percentile }},
+            "data_source": "{{ .params.market_data_source }}",
+            "generated_at": "{{ now | date \"2006-01-02T15:04:05Z\" }}"
+          },
+          "benchmark_results": {{ .steps.compute_benchmarks.output.benchmark_results | toJson }},
+          "recommendations": {{ .steps.generate_recommendations.output.recommendations | toJson }}
+        }
+      format: json

@@ -1,0 +1,92 @@
+name: order-fulfillment
+description: Automated order fulfillment workflow with inventory check, payment verification, and shipping
+version: "1.0"
+params:
+  - name: order_id
+    type: string
+    required: true
+    description: Order to fulfill
+  - name: auto_fulfill
+    type: boolean
+    default: false
+    description: Auto-fulfill if all checks pass
+  - name: shipping_method
+    type: string
+    default: "standard"
+    description: Preferred shipping method
+
+steps:
+  - id: fetch_order_details
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.api_base }}/orders/{{ .params.order_id }}"
+      params:
+        include_items: "true"
+        include_customer: "true"
+
+  - id: verify_payment
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.api_base }}/payments/verify"
+      body:
+        order_id: "{{ .params.order_id }}"
+        transaction_id: "{{ .steps.fetch_order_details.response.payment.transaction_id }}"
+
+  - id: check_inventory
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.api_base }}/inventory/check"
+      body:
+        items: "{{ .steps.fetch_order_details.response.items | toJSON }}"
+
+  - id: evaluate_fulfillment
+    node: agent
+    config:
+      model: "{{ .params.model | default \"gpt-4\" }}"
+      temperature: 0.1
+      prompt: |
+        Evaluate order fulfillment readiness based on:
+        
+        Order Details: {{ .steps.fetch_order_details.response | toJSON }}
+        Payment Status: {{ .steps.verify_payment.response | toJSON }}
+        Inventory Status: {{ .steps.check_inventory.response | toJSON }}
+        
+        Auto-fulfill enabled: {{ .params.auto_fulfill }}
+        Preferred shipping: {{ .params.shipping_method }}
+        
+        Determine:
+        1. Can this order be fulfilled? (yes/no/partial)
+        2. Which items are available vs backordered?
+        3. Recommended shipping method
+        4. Estimated delivery date
+        5. Any issues requiring manual intervention
+        6. Fulfillment priority (standard/express/urgent)
+        
+        Output as JSON.
+
+  - id: execute_fulfillment
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.api_base }}/orders/{{ .params.order_id }}/fulfill"
+      body:
+        auto_fulfill: "{{ .params.auto_fulfill }}"
+        shipping_method: "{{ .params.shipping_method }}"
+        fulfillment_plan: "{{ .steps.evaluate_fulfillment.response | toJSON }}"
+    condition: "{{ .params.auto_fulfill }}"
+
+  - id: save_fulfillment_report
+    node: file_write
+    config:
+      path: "/output/fulfillment/order_{{ .params.order_id }}_{{ .params.timestamp }}.json"
+      content: |
+        {
+          "order_id": "{{ .params.order_id }}",
+          "processed_at": "{{ .params.timestamp }}",
+          "fulfillment_status": "{{ .steps.evaluate_fulfillment.response.can_fulfill }}",
+          "evaluation": {{ .steps.evaluate_fulfillment.response | toJSON }},
+          "execution": {{ .steps.execute_fulfillment.response | toJSON }}
+        }

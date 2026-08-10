@@ -1,0 +1,13 @@
+{
+  "id": "hr/dei-report",
+  "name": "DEI Report Generator",
+  "version": "1.0.0",
+  "description": "Diversity, equity, and inclusion report generator with workforce demographics, leadership gap analysis, pay equity metrics, and actionable DEI goal setting.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["DEI", "diversity", "equity", "inclusion", "reporting", "pay-equity", "compliance"],
+  "keywords": ["DEI", "diversity", "equity", "inclusion", "report", "pay-equity", "demographics", "leadership", "compliance", "EEO"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,13 @@
+{
+  "id": "supply-chain/logistics-tracker",
+  "name": "Logistics Tracker",
+  "version": "1.0.0",
+  "description": "Real-time shipment and logistics tracking across multiple carriers. Monitors tracking statuses, detects delays and exceptions, and generates AI-powered escalation recommendations with customer communication templates.",
+  "author": "aflare community",
+  "category": "supply-chain",
+  "tags": ["logistics", "tracking", "shipment", "carrier", "alerts"],
+  "keywords": ["shipment tracking", "logistics monitoring", "delivery alerts", "carrier tracking", "exception management"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

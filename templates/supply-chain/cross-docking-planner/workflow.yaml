@@ -1,0 +1,199 @@
+name: cross-docking-planner
+description: Cross-docking schedule optimization for inbound/outbound synchronization
+version: "1.0.0"
+params:
+  - name: inbound_shipments
+    type: string
+    required: true
+    description: JSON array of inbound shipments with arrival times and contents
+  - name: outbound_orders
+    type: string
+    required: true
+    description: JSON array of outbound orders with departure windows and requirements
+  - name: dock_count
+    type: integer
+    required: false
+    default: 10
+    description: Number of available dock doors
+  - name: handling_time_minutes
+    type: integer
+    required: false
+    default: 30
+    description: Average handling time per pallet in minutes
+  - name: output_file
+    type: string
+    required: false
+    default: /tmp/cross_docking_plan.json
+    description: Output file for cross-docking schedule
+
+steps:
+  - id: analyze_flows
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        from datetime import datetime, timedelta
+
+        inbound = json.loads('''{{ .params.inbound_shipments }}''')
+        outbound = json.loads('''{{ .params.outbound_orders }}''')
+        docks = {{ .params.dock_count }}
+        handling = {{ .params.handling_time_minutes }}
+
+        # Match inbound SKUs to outbound requirements
+        inbound_index = {}
+        for ib in inbound:
+            for item in ib.get("items", []):
+                sku = item["sku"]
+                if sku not in inbound_index:
+                    inbound_index[sku] = []
+                inbound_index[sku].append({
+                    "shipment_id": ib["shipment_id"],
+                    "arrival_time": ib["arrival_time"],
+                    "quantity": item["quantity"],
+                    "pallets": item.get("pallets", 1)
+                })
+
+        # Analyze cross-dock feasibility
+        flow_analysis = []
+        total_pallets = 0
+        direct_matches = 0
+        storage_needed = []
+
+        for ob in outbound:
+            for item in ob.get("items", []):
+                sku = item["sku"]
+                needed = item["quantity"]
+                available = inbound_index.get(sku, [])
+
+                sku_total = sum(a["quantity"] for a in available)
+                if sku_total >= needed:
+                    direct_matches += 1
+                else:
+                    storage_needed.append({
+                        "sku": sku,
+                        "needed": needed,
+                        "available": sku_total,
+                        "shortfall": needed - sku_total
+                    })
+
+                total_pallets += item.get("pallets", 1)
+
+        # Dock scheduling
+        total_handling_minutes = total_pallets * handling
+        dock_utilization = round((total_handling_minutes / (docks * 480)) * 100, 1) if docks > 0 else 0
+
+        result = {
+            "inbound_shipments": len(inbound),
+            "outbound_orders": len(outbound),
+            "total_pallets": total_pallets,
+            "direct_cross_dock_skus": direct_matches,
+            "storage_required_skus": len(storage_needed),
+            "storage_items": storage_needed,
+            "dock_utilization_pct": dock_utilization,
+            "estimated_total_handling_hours": round(total_handling_minutes / 60, 1),
+            "dock_capacity": docks
+        }
+        print(json.dumps(result))
+    description: Analyze inbound/outbound flows and match SKU requirements
+
+  - id: build_schedule
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+
+        inbound = json.loads('''{{ .params.inbound_shipments }}''')
+        outbound = json.loads('''{{ .params.outbound_orders }}''')
+        docks = {{ .params.dock_count }}
+        handling = {{ .params.handling_time_minutes }}
+
+        # Build dock schedule
+        schedule = []
+        dock_slots = [[] for _ in range(docks)]
+
+        # Assign inbound to dock doors
+        for ib in inbound:
+            pallets = sum(item.get("pallets", 1) for item in ib.get("items", []))
+            duration = pallets * handling
+
+            # Find first available dock
+            assigned = False
+            for d in range(docks):
+                last_end = 0
+                if dock_slots[d]:
+                    last_end = dock_slots[d][-1]["end_minute"]
+                if last_end <= 480:  # 8-hour shift
+                    dock_slots[d].append({
+                        "shipment_id": ib["shipment_id"],
+                        "type": "inbound",
+                        "start_minute": last_end,
+                        "end_minute": last_end + duration,
+                        "pallets": pallets,
+                        "carrier": ib.get("carrier", "Unknown")
+                    })
+                    assigned = True
+                    break
+
+            if not assigned:
+                schedule.append({
+                    "shipment_id": ib["shipment_id"],
+                    "status": "overflow",
+                    "reason": "No dock available"
+                })
+
+        # Build timeline
+        for d, slots in enumerate(dock_slots):
+            for s in slots:
+                start_h = 8 + s["start_minute"] // 60
+                start_m = s["start_minute"] % 60
+                end_h = 8 + s["end_minute"] // 60
+                end_m = s["end_minute"] % 60
+                schedule.append({
+                    "dock": f"D-{d+1:02d}",
+                    "shipment_id": s["shipment_id"],
+                    "type": s["type"],
+                    "start_time": f"{start_h:02d}:{start_m:02d}",
+                    "end_time": f"{end_h:02d}:{end_m:02d}",
+                    "duration_minutes": s["end_minute"] - s["start_minute"],
+                    "pallets": s["pallets"],
+                    "carrier": s["carrier"]
+                })
+
+        result = {
+            "schedule_date": "{{ now }}",
+            "docks_used": sum(1 for d in dock_slots if d),
+            "total_assignments": len(schedule),
+            "schedule": schedule
+        }
+        print(json.dumps(result))
+    description: Build dock door assignment schedule
+
+  - id: optimize_dock_plan
+    node: agent
+    config:
+      prompt: |
+        Review the cross-docking schedule and suggest optimizations:
+        Flow Analysis: {{ index .steps "analyze_flows" "output" }}
+        Dock Schedule: {{ index .steps "build_schedule" "output" }}
+
+        Provide:
+        1. Schedule feasibility assessment
+        2. Dock utilization improvement suggestions
+        3. Inbound/outbound synchronization recommendations
+        4. Overflow handling strategy
+        5. Labor and equipment requirements estimate
+    description: Generate AI-powered dock optimization recommendations
+
+  - id: save_dock_plan
+    node: file_write
+    config:
+      path: "{{ .params.output_file }}"
+      content: |
+        {
+          "flow_analysis": {{ index .steps "analyze_flows" "output" }},
+          "dock_schedule": {{ index .steps "build_schedule" "output" }},
+          "optimization_recommendations": {{ index .steps "optimize_dock_plan" "output" }}
+        }
+    description: Save cross-docking plan to output file

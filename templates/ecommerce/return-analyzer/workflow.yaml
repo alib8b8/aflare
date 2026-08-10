@@ -1,0 +1,113 @@
+name: return-analyzer
+description: Analyze return reasons, identify patterns, and generate prevention strategies
+version: "1.0"
+params:
+  - name: date_range
+    type: string
+    default: "90d"
+    description: Analysis period for returns
+  - name: category_id
+    type: string
+    required: false
+    description: Filter by product category
+  - name: min_return_rate
+    type: number
+    default: 0.05
+    description: Minimum return rate threshold for flagging
+
+steps:
+  - id: fetch_returns_data
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.api_base }}/analytics/returns"
+      params:
+        date_range: "{{ .params.date_range }}"
+        category_id: "{{ .params.category_id }}"
+        include_reasons: "true"
+
+  - id: compute_return_metrics
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        from collections import Counter, defaultdict
+        from datetime import datetime
+
+        returns_data = {{ .steps.fetch_returns_data.response | toJSON }}
+        min_rate = {{ .params.min_return_rate }}
+
+        returns = returns_data.get("returns", [])
+        total_orders = returns_data.get("total_orders", 1)
+        total_returns = len(returns)
+
+        # Aggregate by reason
+        reason_counts = Counter(r.get("reason", "Unknown") for r in returns)
+        reason_costs = defaultdict(float)
+        for r in returns:
+            reason_costs[r.get("reason", "Unknown")] += r.get("refund_amount", 0)
+
+        # Aggregate by product
+        product_returns = defaultdict(lambda: {"count": 0, "reasons": [], "total_refund": 0})
+        for r in returns:
+            pid = r.get("product_id", "unknown")
+            product_returns[pid]["count"] += 1
+            product_returns[pid]["reasons"].append(r.get("reason", "Unknown"))
+            product_returns[pid]["total_refund"] += r.get("refund_amount", 0)
+
+        # Flag high-return products
+        flagged = []
+        for pid, data in product_returns.items():
+            return_rate = data["count"] / max(1, total_orders)
+            if return_rate >= min_rate:
+                top_reason = Counter(data["reasons"]).most_common(1)[0][0]
+                flagged.append({
+                    "product_id": pid,
+                    "return_count": data["count"],
+                    "return_rate": round(return_rate, 4),
+                    "top_reason": top_reason,
+                    "total_refund": round(data["total_refund"], 2)
+                })
+
+        result = {
+            "total_returns": total_returns,
+            "overall_return_rate": round(total_returns / total_orders, 4),
+            "reason_breakdown": [{"reason": k, "count": v, "cost": round(reason_costs[k], 2)} for k, v in reason_counts.most_common()],
+            "total_refund_cost": round(sum(reason_costs.values()), 2),
+            "flagged_products": sorted(flagged, key=lambda x: x["return_rate"], reverse=True),
+            "generated_at": datetime.now().isoformat()
+        }
+        print(json.dumps(result))
+
+  - id: generate_prevention_strategies
+    node: agent
+    config:
+      model: "{{ .params.model | default \"gpt-4\" }}"
+      temperature: 0.3
+      prompt: |
+        Analyze the return data and generate prevention strategies:
+        
+        Return Metrics: {{ .steps.compute_return_metrics.response | toJSON }}
+        
+        For each flagged product and top return reason, provide:
+        1. Root cause analysis
+        2. Prevention strategy (improve_description, quality_check, size_guide, packaging, etc.)
+        3. Estimated impact of implementing the strategy
+        4. Priority level (critical/high/medium/low)
+        5. Implementation difficulty (easy/medium/hard)
+        
+        Also provide overall return reduction recommendations.
+        Output as structured JSON.
+
+  - id: save_return_report
+    node: file_write
+    config:
+      path: "/output/returns/return_analysis_{{ .params.timestamp }}.json"
+      content: |
+        {
+          "analysis_period": "{{ .params.date_range }}",
+          "generated_at": "{{ .params.timestamp }}",
+          "metrics": {{ .steps.compute_return_metrics.response | toJSON }},
+          "prevention_strategies": {{ .steps.generate_prevention_strategies.response | toJSON }}
+        }

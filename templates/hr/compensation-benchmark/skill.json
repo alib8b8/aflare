@@ -1,0 +1,13 @@
+{
+  "id": "hr/compensation-benchmark",
+  "name": "Compensation Benchmark",
+  "version": "1.0.0",
+  "description": "Salary benchmarking and market analysis workflow with compa-ratio calculations, range penetration analysis, gap identification, and strategic adjustment recommendations.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["compensation", "benchmark", "salary", "market-analysis", "compa-ratio", "budget"],
+  "keywords": ["compensation", "salary", "benchmark", "market", "compa-ratio", "pay-equity", "budget", "analysis"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

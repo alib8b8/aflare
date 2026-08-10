@@ -1,0 +1,147 @@
+name: quiz-generator
+description: Auto-generate quizzes with multiple question types from source material
+version: "1.0.0"
+params:
+  - name: topic
+    type: string
+    required: true
+    description: Subject or topic for the quiz
+  - name: question_count
+    type: integer
+    required: false
+    default: 10
+    description: Number of questions to generate
+  - name: question_types
+    type: array
+    required: false
+    default: ["multiple_choice", "true_false", "short_answer"]
+    description: Types of questions to include
+  - name: difficulty
+    type: string
+    required: false
+    default: medium
+    description: Difficulty level (easy, medium, hard)
+  - name: source_text
+    type: string
+    required: false
+    default: ""
+    description: Optional source material text
+  - name: output_format
+    type: string
+    required: false
+    default: json
+    description: Output format (json, markdown, pdf)
+steps:
+  - id: analyze_content
+    node: agent
+    prompt: |
+      Analyze the following source material or topic for quiz generation:
+      Topic: {{ .params.topic }}
+      Source Text: {{ .params.source_text }}
+      
+      Extract key concepts, facts, and learning objectives suitable for assessment.
+      Identify {{ .params.question_count }} potential question points.
+    output: key_concepts
+
+  - id: generate_questions
+    node: agent
+    prompt: |
+      Generate {{ .params.question_count }} quiz questions based on these key concepts:
+      {{ .key_concepts }}
+      
+      Question types to include: {{ .params.question_types }}
+      Difficulty: {{ .params.difficulty }}
+      
+      For each question, provide:
+      - Question text
+      - Question type
+      - Correct answer(s)
+      - Distractors (for multiple choice)
+      - Difficulty rating
+      - Topic category
+      - Explanation of the correct answer
+    output: questions
+
+  - id: calculate_metadata
+    node: code_interpreter
+    language: python
+    code: |
+      import json
+      
+      questions = json.loads('''{{ .questions }}''')
+      
+      total = len(questions)
+      type_counts = {}
+      difficulty_dist = {}
+      topic_dist = {}
+      
+      for q in questions:
+          qtype = q.get('question_type', 'unknown')
+          diff = q.get('difficulty', 'unknown')
+          topic = q.get('topic_category', 'general')
+          
+          type_counts[qtype] = type_counts.get(qtype, 0) + 1
+          difficulty_dist[diff] = difficulty_dist.get(diff, 0) + 1
+          topic_dist[topic] = topic_dist.get(topic, 0) + 1
+      
+      metadata = {
+          "total_questions": total,
+          "type_distribution": type_counts,
+          "difficulty_distribution": difficulty_dist,
+          "topic_distribution": topic_dist,
+          "estimated_time_minutes": total * 2,
+          "max_score": total * 10
+      }
+      
+      print(json.dumps(metadata, indent=2))
+    output: quiz_metadata
+
+  - id: format_output
+    node: transform
+    input: 
+      questions: "{{ .questions }}"
+      metadata: "{{ .quiz_metadata }}"
+    template: |
+      # Quiz: {{ .params.topic }}
+      
+      ## Metadata
+      - Total Questions: {{ .metadata.total_questions }}
+      - Estimated Time: {{ .metadata.estimated_time_minutes }} minutes
+      - Max Score: {{ .metadata.max_score }}
+      
+      ## Difficulty Distribution
+      {{ range $key, $value := .metadata.difficulty_distribution }}
+      - {{ $key }}: {{ $value }}
+      {{ end }}
+      
+      ## Questions
+      {{ range $index, $q := .questions }}
+      ### Question {{ $index | add 1 }}
+      **Type:** {{ $q.question_type }}
+      **Difficulty:** {{ $q.difficulty }}
+      
+      {{ $q.question_text }}
+      
+      {{ if eq $q.question_type "multiple_choice" }}
+      {{ range $q.distractors }}
+      - [ ] {{ . }}
+      {{ end }}
+      {{ end }}
+      
+      **Answer:** {{ $q.correct_answer }}
+      **Explanation:** {{ $q.explanation }}
+      {{ end }}
+    output: formatted_quiz
+
+  - id: save_quiz
+    node: file_write
+    filename: "quiz_{{ .params.topic | sanitize }}_{{ .params.output_format }}.json"
+    content: |
+      {
+        "quiz": {
+          "topic": "{{ .params.topic }}",
+          "metadata": {{ .quiz_metadata }},
+          "questions": {{ .questions }}
+        }
+      }
+    output: file_path

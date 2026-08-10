@@ -1,0 +1,13 @@
+{
+  "id": "legal/case-brief",
+  "name": "Legal Case Brief Generator",
+  "version": "1.0.0",
+  "description": "Generates comprehensive legal case briefs from court opinions. Extracts metadata, procedural history, and produces structured briefs with facts, issues, holdings, reasoning, and significance analysis.",
+  "author": "aflare community",
+  "category": "legal",
+  "tags": ["case-brief", "court-opinion", "legal-analysis", "brief", "legal"],
+  "keywords": ["case brief", "court opinion", "legal brief", "case analysis", "IRAC"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

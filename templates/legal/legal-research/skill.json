@@ -1,0 +1,13 @@
+{
+  "id": "legal/legal-research",
+  "name": "Legal Research & Case Law Search",
+  "version": "1.0.0",
+  "description": "Automated legal research workflow that searches case law databases, analyzes results, extracts key legal principles, and generates formal legal research memoranda with proper citations.",
+  "author": "aflare community",
+  "category": "legal",
+  "tags": ["research", "case-law", "memorandum", "precedent", "legal", "analysis"],
+  "keywords": ["legal research", "case law", "legal memo", "precedent search", "legal analysis"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

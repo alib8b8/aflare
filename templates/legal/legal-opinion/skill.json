@@ -1,0 +1,13 @@
+{
+  "id": "legal/legal-opinion",
+  "name": "Legal Opinion Draft Generator",
+  "version": "1.0.0",
+  "description": "Generates formal legal opinion letters with legal research, fact analysis against legal frameworks, confidence scoring, and practical recommendations for various opinion types.",
+  "author": "aflare community",
+  "category": "legal",
+  "tags": ["legal-opinion", "opinion-letter", "legal-analysis", "due-diligence", "legal"],
+  "keywords": ["legal opinion", "opinion letter", "legal analysis", "due diligence", "legal memorandum"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

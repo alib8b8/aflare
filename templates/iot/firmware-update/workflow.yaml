@@ -1,0 +1,110 @@
+name: firmware-update
+description: OTA firmware update management with rollback, validation, and device targeting
+version: "1.0.0"
+params:
+  - name: firmware_version
+    type: string
+    default: ""
+    description: Firmware version to deploy
+  - name: firmware_url
+    type: string
+    default: ""
+    description: URL to firmware binary
+  - name: target_devices
+    type: string
+    default: ""
+    description: Comma-separated device IDs or device group filter
+  - name: rollout_strategy
+    type: string
+    default: "canary"
+    description: Rollout strategy - canary, phased, or all_at_once
+  - name: canary_percentage
+    type: integer
+    default: 10
+    description: Percentage of devices for canary rollout
+  - name: ota_api
+    type: string
+    default: "https://api.ota.local/v1"
+    description: OTA firmware management API
+
+steps:
+  - id: validate_firmware
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        import re
+
+        version = "{{ .params.firmware_version }}"
+        url = "{{ .params.firmware_url }}"
+
+        errors = []
+        if not re.match(r'^\d+\.\d+\.\d+$', version):
+            errors.append("Invalid version format. Use semver (e.g., 1.2.3)")
+        if not url.startswith("https://"):
+            errors.append("Firmware URL must use HTTPS")
+        if not url.endswith((".bin", ".fw", ".hex", ".ota")):
+            errors.append("Firmware file must have .bin, .fw, .hex, or .ota extension")
+
+        result = {
+            "valid": len(errors) == 0,
+            "errors": errors,
+            "version": version,
+            "url": url,
+            "checksum_required": True
+        }
+        print(json.dumps(result))
+    description: Validate firmware version format and URL accessibility
+
+  - id: create_campaign
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.ota_api }}/campaigns"
+      headers:
+        Authorization: "Bearer {{ .env.OTA_API_TOKEN }}"
+        Content-Type: application/json
+      body: |
+        {
+          "firmware_version": "{{ .params.firmware_version }}",
+          "firmware_url": "{{ .params.firmware_url }}",
+          "target_devices": {{ .params.target_devices | split "," | toJson }},
+          "strategy": "{{ .params.rollout_strategy }}",
+          "canary_percentage": {{ .params.canary_percentage }}
+        }
+    description: Create OTA update campaign
+
+  - id: monitor_rollout
+    node: agent
+    config:
+      prompt: |
+        Analyze the OTA firmware update campaign status and provide rollout guidance:
+
+        Campaign: {{ .steps.create_campaign.output | toJson }}
+        Strategy: {{ .params.rollout_strategy }}
+
+        Provide:
+        1. Current rollout progress assessment
+        2. Success/failure rate analysis
+        3. Rollback decision recommendation
+        4. Next phase actions (if phased rollout)
+
+        Return as JSON with "rollout_status" key.
+      output_format: json
+    description: AI-powered rollout monitoring and decision support
+
+  - id: persist_campaign
+    node: file_write
+    config:
+      file_path: "/data/ota/campaigns/{{ now | date \"2006-01-02\" }}_{{ .params.firmware_version }}.json"
+      content: |
+        {
+          "campaign_id": "{{ .steps.create_campaign.output.id }}",
+          "created_at": "{{ now }}",
+          "firmware": "{{ .params.firmware_version }}",
+          "strategy": "{{ .params.rollout_strategy }}",
+          "validation": {{ .steps.validate_firmware.output | toJson }},
+          "status": {{ .steps.monitor_rollout.output | toJson }}
+        }
+    description: Persist campaign record for audit

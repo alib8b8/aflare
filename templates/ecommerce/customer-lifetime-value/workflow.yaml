@@ -1,0 +1,156 @@
+name: customer-lifetime-value
+description: Customer lifetime value calculation and segmentation for strategic marketing
+version: "1.0"
+params:
+  - name: segment_field
+    type: string
+    default: "clv_tier"
+    description: Field to segment customers by
+  - name: prediction_horizon
+    type: integer
+    default: 12
+    description: Months to forecast CLV
+  - name: discount_rate
+    type: number
+    default: 0.10
+    description: Discount rate for future cash flows
+  - name: min_transactions
+    type: integer
+    default: 1
+    description: Minimum transactions for inclusion
+
+steps:
+  - id: fetch_customer_data
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.api_base }}/customers/analytics"
+      params:
+        include_transactions: "true"
+        include_orders: "true"
+        min_transactions: "{{ .params.min_transactions }}"
+
+  - id: calculate_clv
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        import numpy as np
+        from datetime import datetime
+
+        data = {{ .steps.fetch_customer_data.response | toJSON }}
+        horizon = {{ .params.prediction_horizon }}
+        discount_rate = {{ .params.discount_rate }}
+
+        customers = data.get("customers", [])
+        results = []
+
+        for customer in customers:
+            orders = customer.get("orders", [])
+            total_revenue = sum(o.get("total", 0) for o in orders)
+            order_count = len(orders)
+
+            if order_count == 0:
+                continue
+
+            # Average order value
+            aov = total_revenue / order_count
+
+            # Purchase frequency (orders per month)
+            if len(orders) >= 2:
+                dates = sorted([o.get("created_at", "") for o in orders])
+                first = datetime.fromisoformat(dates[0].replace("Z", "+00:00"))
+                last = datetime.fromisoformat(dates[-1].replace("Z", "+00:00"))
+                months_active = max(1, (last - first).days / 30.44)
+                frequency = order_count / months_active
+            else:
+                frequency = 0.5
+
+            # Historical CLV
+            historical_clv = total_revenue
+
+            # Predictive CLV using DCF
+            monthly_revenue = aov * frequency
+            predicted_clv = 0
+            for month in range(1, horizon + 1):
+                # Apply churn probability
+                retention = 0.95 ** month
+                predicted_clv += (monthly_revenue * retention) / ((1 + discount_rate) ** (month / 12))
+
+            # CLV tier
+            if predicted_clv > 5000:
+                tier = "platinum"
+            elif predicted_clv > 2000:
+                tier = "gold"
+            elif predicted_clv > 500:
+                tier = "silver"
+            else:
+                tier = "bronze"
+
+            results.append({
+                "customer_id": customer["id"],
+                "customer_name": customer.get("name", ""),
+                "total_orders": order_count,
+                "total_revenue": round(total_revenue, 2),
+                "aov": round(aov, 2),
+                "purchase_frequency": round(frequency, 2),
+                "historical_clv": round(historical_clv, 2),
+                "predicted_clv": round(predicted_clv, 2),
+                "clv_tier": tier,
+                "retention_rate": round(0.95 ** horizon, 4)
+            })
+
+        results.sort(key=lambda x: x["predicted_clv"], reverse=True)
+
+        # Summary statistics
+        tiers = {}
+        for r in results:
+            tier = r["clv_tier"]
+            if tier not in tiers:
+                tiers[tier] = {"count": 0, "total_clv": 0, "customers": []}
+            tiers[tier]["count"] += 1
+            tiers[tier]["total_clv"] += r["predicted_clv"]
+
+        summary = {
+            "total_customers": len(results),
+            "total_predicted_clv": round(sum(r["predicted_clv"] for r in results), 2),
+            "avg_clv": round(np.mean([r["predicted_clv"] for r in results]) if results else 0, 2),
+            "tier_breakdown": {k: {"count": v["count"], "total_clv": round(v["total_clv"], 2)} for k, v in tiers.items()},
+            "customers": results
+        }
+        print(json.dumps(summary))
+
+  - id: generate_segment_strategies
+    node: agent
+    config:
+      model: "{{ .params.model | default \"gpt-4\" }}"
+      temperature: 0.3
+      prompt: |
+        Based on the CLV analysis, generate marketing strategies for each segment:
+        
+        CLV Analysis: {{ .steps.calculate_clv.response | toJSON }}
+        
+        For each tier (platinum, gold, silver, bronze):
+        1. Marketing strategy and messaging
+        2. Retention tactics
+        3. Upsell/cross-sell opportunities
+        4. Recommended communication frequency
+        5. Loyalty rewards appropriate for tier
+        6. Churn prevention measures
+        7. Customer acquisition cost (CAC) target vs CLV ratio
+        
+        Output as structured JSON.
+
+  - id: save_clv_report
+    node: file_write
+    config:
+      path: "/output/clv/clv_analysis_{{ .params.timestamp }}.json"
+      content: |
+        {
+          "generated_at": "{{ .params.timestamp }}",
+          "prediction_horizon_months": {{ .params.prediction_horizon }},
+          "discount_rate": {{ .params.discount_rate }},
+          "clv_analysis": {{ .steps.calculate_clv.response | toJSON }},
+          "segment_strategies": {{ .steps.generate_segment_strategies.response | toJSON }}
+        }

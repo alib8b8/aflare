@@ -1,0 +1,13 @@
+{
+  "id": "ecommerce/return-analyzer",
+  "name": "Return Reason Analyzer",
+  "version": "1.0.0",
+  "description": "Return reason analysis and prevention engine that examines return patterns, identifies root causes of product returns, calculates return costs, flags high-return products, and generates actionable prevention strategies.",
+  "author": "aflare community",
+  "category": "ecommerce",
+  "tags": ["returns", "analysis", "prevention", "quality", "customer-satisfaction"],
+  "keywords": ["return analysis", "return prevention", "product quality", "root cause analysis", "refund optimization"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

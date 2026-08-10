@@ -1,0 +1,13 @@
+{
+  "id": "legal/msa-generator",
+  "name": "Master Service Agreement Generator",
+  "version": "1.0.0",
+  "description": "Generates comprehensive Master Service Agreements (MSAs) with industry-specific standards, complete legal clauses, and a negotiation playbook for commercial contract management.",
+  "author": "aflare community",
+  "category": "legal",
+  "tags": ["msa", "agreement", "commercial", "contract", "generator", "legal"],
+  "keywords": ["master service agreement", "MSA", "commercial contract", "service agreement", "contract generator"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

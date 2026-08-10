@@ -1,0 +1,159 @@
+name: lead-time-predictor
+description: Supplier lead time prediction using historical performance data
+version: "1.0.0"
+params:
+  - name: supplier_history_api
+    type: string
+    required: true
+    description: API endpoint for supplier historical lead time data
+  - name: supplier_ids
+    type: string
+    required: true
+    description: JSON array of supplier IDs to predict for
+  - name: confidence_level
+    type: number
+    required: false
+    default: 0.90
+    description: Confidence level for prediction intervals (0.80-0.99)
+  - name: include_factors
+    type: boolean
+    required: false
+    default: true
+    description: Include external factors (seasonality, port congestion, weather)
+  - name: output_file
+    type: string
+    required: false
+    default: /tmp/lead_time_prediction.json
+    description: Output file for prediction results
+
+steps:
+  - id: fetch_history
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.supplier_history_api }}"
+      headers:
+        Content-Type: application/json
+      body:
+        supplier_ids: "{{ .params.supplier_ids }}"
+        lookback_days: 365
+    description: Fetch supplier historical lead time data
+
+  - id: predict_lead_times
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        import numpy as np
+        from datetime import datetime
+
+        history = json.loads('''{{ index .steps "fetch_history" "response" "body" }}''')
+        confidence = {{ .params.confidence_level }}
+        include_factors = {{ .params.include_factors }}
+
+        suppliers = history.get("suppliers", [])
+        predictions = []
+
+        for s in suppliers:
+            lead_times = s.get("historical_lead_times", [])
+            if not lead_times:
+                predictions.append({
+                    "supplier_id": s["supplier_id"],
+                    "supplier_name": s["supplier_name"],
+                    "status": "insufficient_data",
+                    "message": "No historical lead time data available"
+                })
+                continue
+
+            lt_values = [lt["lead_time_days"] for lt in lead_times]
+            avg_lt = np.mean(lt_values)
+            std_lt = np.std(lt_values, ddof=1) if len(lt_values) > 1 else 0
+
+            # Trend analysis
+            if len(lt_values) >= 3:
+                x = np.arange(len(lt_values))
+                z = np.polyfit(x, lt_values, 1)
+                trend = round(z[0], 3)
+                trend_direction = "improving" if trend < 0 else ("degrading" if trend > 0.1 else "stable")
+            else:
+                trend = 0
+                trend_direction = "unknown"
+
+            # Prediction with confidence interval
+            z_score = 1.645 if confidence == 0.90 else (1.96 if confidence == 0.95 else 2.576)
+            margin = z_score * std_lt / np.sqrt(len(lt_values)) if len(lt_values) > 1 else 0
+
+            predicted_lt = round(avg_lt + trend * 2, 1)  # 2-period ahead
+            lower_bound = round(max(1, predicted_lt - margin), 1)
+            upper_bound = round(predicted_lt + margin, 1)
+
+            # Reliability score
+            on_time = sum(1 for lt in lead_times if lt["lead_time_days"] <= lt.get("promised_days", 999))
+            reliability = round(on_time / len(lead_times) * 100, 1)
+
+            # Seasonal factor
+            seasonal_factor = 1.0
+            if include_factors:
+                current_month = datetime.now().month
+                if current_month in (11, 12, 1):  # Peak season
+                    seasonal_factor = 1.15
+                elif current_month in (7, 8):  # Summer slowdown
+                    seasonal_factor = 1.05
+
+            adjusted_lt = round(predicted_lt * seasonal_factor, 1)
+
+            predictions.append({
+                "supplier_id": s["supplier_id"],
+                "supplier_name": s["supplier_name"],
+                "status": "predicted",
+                "sample_size": len(lt_values),
+                "avg_historical_lt": round(avg_lt, 1),
+                "std_deviation": round(std_lt, 1),
+                "trend": trend,
+                "trend_direction": trend_direction,
+                "predicted_lead_time_days": predicted_lt,
+                "confidence_interval": f"{lower_bound}-{upper_bound}",
+                "seasonal_factor": seasonal_factor,
+                "adjusted_lead_time_days": adjusted_lt,
+                "reliability_score": reliability,
+                "risk_level": "high" if reliability < 80 else ("medium" if reliability < 90 else "low")
+            })
+
+        predictions.sort(key=lambda x: x.get("adjusted_lead_time_days", 999))
+
+        result = {
+            "predicted_at": datetime.now().isoformat(),
+            "confidence_level": confidence,
+            "total_suppliers": len(predictions),
+            "avg_predicted_lt": round(np.mean([p.get("adjusted_lead_time_days", 0) for p in predictions if p.get("status") == "predicted"]), 1),
+            "predictions": predictions
+        }
+        print(json.dumps(result))
+    description: Predict lead times with trend analysis and confidence intervals
+
+  - id: generate_sourcing_advice
+    node: agent
+    config:
+      prompt: |
+        Analyze the lead time predictions and generate sourcing recommendations:
+        {{ index .steps "predict_lead_times" "output" }}
+
+        Provide:
+        1. Summary of lead time trends across suppliers
+        2. High-risk supplier identification and mitigation
+        3. Recommended safety stock adjustments
+        4. Dual-sourcing or nearshoring recommendations
+        5. Order timing calendar for the next quarter
+    description: Generate AI-powered sourcing and safety stock recommendations
+
+  - id: save_predictions
+    node: file_write
+    config:
+      path: "{{ .params.output_file }}"
+      content: |
+        {
+          "lead_time_predictions": {{ index .steps "predict_lead_times" "output" }},
+          "sourcing_recommendations": {{ index .steps "generate_sourcing_advice" "output" }}
+        }
+    description: Save lead time predictions to output file

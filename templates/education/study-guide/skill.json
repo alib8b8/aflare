@@ -1,0 +1,13 @@
+{
+  "id": "education/study-guide",
+  "name": "Study Guide Generator",
+  "version": "1.0.0",
+  "description": "Comprehensive study guide generator with chapter summaries, key concepts, practice questions, glossaries, and study strategies.",
+  "author": "aflare community",
+  "category": "education",
+  "tags": ["study", "guide", "review", "exam", "preparation"],
+  "keywords": ["study", "guide", "review", "exam", "prep", "summary", "notes"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

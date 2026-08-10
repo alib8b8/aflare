@@ -1,0 +1,13 @@
+{
+  "id": "education/quiz-generator",
+  "name": "Quiz Generator",
+  "version": "1.0.0",
+  "description": "Auto-generate quizzes with multiple question types including multiple choice, true/false, and short answer from any topic or source material. Supports difficulty levels and automatic scoring metadata.",
+  "author": "aflare community",
+  "category": "education",
+  "tags": ["quiz", "assessment", "questions", "generator", "testing"],
+  "keywords": ["quiz", "assessment", "test", "questions", "multiple-choice", "true-false", "exam"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

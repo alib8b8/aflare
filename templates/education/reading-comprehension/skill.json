@@ -1,0 +1,13 @@
+{
+  "id": "education/reading-comprehension",
+  "name": "Reading Comprehension Generator",
+  "version": "1.0.0",
+  "description": "Reading comprehension test generator with leveled passages, diverse question types, readability statistics, and answer keys.",
+  "author": "aflare community",
+  "category": "education",
+  "tags": ["reading", "comprehension", "test", "literacy", "assessment"],
+  "keywords": ["reading", "comprehension", "passage", "literacy", "test", "questions", "inference"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

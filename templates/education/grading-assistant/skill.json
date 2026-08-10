@@ -1,0 +1,13 @@
+{
+  "id": "education/grading-assistant",
+  "name": "Grading Assistant",
+  "version": "1.0.0",
+  "description": "Automated essay and assignment grading with rubric-based scoring, detailed feedback, and letter grade calculation. Supports multiple academic levels and customizable feedback styles.",
+  "author": "aflare community",
+  "category": "education",
+  "tags": ["grading", "assessment", "rubric", "feedback", "scoring"],
+  "keywords": ["grade", "essay", "assignment", "rubric", "scoring", "feedback", "evaluation"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

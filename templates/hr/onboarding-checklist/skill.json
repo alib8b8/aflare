@@ -1,0 +1,13 @@
+{
+  "id": "hr/onboarding-checklist",
+  "name": "Onboarding Checklist Generator",
+  "version": "1.0.0",
+  "description": "Role-based new hire onboarding checklist generator with timeline calculation, task assignment, and support for office, remote, hybrid, and contractor roles across all seniority levels.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["onboarding", "checklist", "new-hire", "employee-experience", "task-management"],
+  "keywords": ["onboarding", "checklist", "new-hire", "orientation", "employee", "IT-setup", "compliance", "90-day"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

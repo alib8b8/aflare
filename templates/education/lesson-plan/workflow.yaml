@@ -1,0 +1,139 @@
+name: lesson-plan
+description: Detailed lesson plan generator with learning objectives and activities
+version: "1.0.0"
+params:
+  - name: lesson_title
+    type: string
+    required: true
+    description: Title of the lesson
+  - name: subject
+    type: string
+    required: true
+    description: Subject area
+  - name: grade_level
+    type: string
+    required: true
+    description: Grade or academic level
+  - name: duration_minutes
+    type: integer
+    required: false
+    default: 60
+    description: Lesson duration in minutes
+  - name: learning_objectives
+    type: array
+    required: true
+    description: Learning objectives for the lesson
+  - name: materials_needed
+    type: array
+    required: false
+    default: []
+    description: Required materials and resources
+  - name: standards
+    type: array
+    required: false
+    default: []
+    description: Curriculum standards to align with
+  - name: accommodations
+    type: array
+    required: false
+    default: []
+    description: Accessibility and differentiation accommodations
+steps:
+  - id: design_lesson
+    node: agent
+    prompt: |
+      Create a detailed lesson plan for:
+      
+      Title: {{ .params.lesson_title }}
+      Subject: {{ .params.subject }}
+      Grade Level: {{ .params.grade_level }}
+      Duration: {{ .params.duration_minutes }} minutes
+      
+      Learning Objectives: {{ .params.learning_objectives }}
+      Standards: {{ .params.standards }}
+      Materials: {{ .params.materials_needed }}
+      Accommodations: {{ .params.accommodations }}
+      
+      Design a complete lesson plan with:
+      1. Hook/Engagement (5-10 min)
+      2. Direct Instruction (15-20 min)
+      3. Guided Practice (15-20 min)
+      4. Independent Practice (10-15 min)
+      5. Closure/Exit Ticket (5-10 min)
+      
+      For each section, include:
+      - Time allocation
+      - Teacher actions
+      - Student actions
+      - Differentiation strategies
+      - Formative assessment checkpoints
+    output: lesson_content
+
+  - id: structure_activities
+    node: code_interpreter
+    language: python
+    code: |
+      import json
+      
+      content = json.loads('''{{ .lesson_content }}''')
+      duration = {{ .params.duration_minutes }}
+      
+      sections = content.get('sections', [])
+      allocated = sum(s.get('time_minutes', 0) for s in sections)
+      
+      timing = {
+          "total_minutes": duration,
+          "allocated_minutes": allocated,
+          "unallocated_minutes": duration - allocated,
+          "section_count": len(sections),
+          "activities": [
+              {
+                  "name": s.get('name', ''),
+                  "time": s.get('time_minutes', 0),
+                  "percentage": round((s.get('time_minutes', 0) / duration) * 100, 1) if duration > 0 else 0
+              }
+              for s in sections
+          ]
+      }
+      
+      print(json.dumps(timing, indent=2))
+    output: timing_breakdown
+
+  - id: format_lesson_plan
+    node: transform
+    input:
+      content: "{{ .lesson_content }}"
+      timing: "{{ .timing_breakdown }}"
+    template: |
+      # Lesson Plan: {{ .params.lesson_title }}
+      
+      | Detail | Value |
+      |--------|-------|
+      | Subject | {{ .params.subject }} |
+      | Grade | {{ .params.grade_level }} |
+      | Duration | {{ .params.duration_minutes }} min |
+      
+      ## Learning Objectives
+      {{ range .params.learning_objectives }}
+      - {{ . }}
+      {{ end }}
+      
+      ## Materials
+      {{ range .params.materials_needed }}
+      - {{ . }}
+      {{ end }}
+      
+      ## Lesson Procedure
+      {{ .content }}
+      
+      ## Timing Breakdown
+      {{ range .timing.activities }}
+      - **{{ .name }}**: {{ .time }} min ({{ .percentage }}%)
+      {{ end }}
+    output: formatted_plan
+
+  - id: save_lesson_plan
+    node: file_write
+    filename: "lesson_plan_{{ .params.lesson_title | sanitize }}.md"
+    content: "{{ .formatted_plan }}"
+    output: file_path

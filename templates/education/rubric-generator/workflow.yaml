@@ -1,0 +1,121 @@
+name: rubric-generator
+description: Assessment rubric creator with customizable criteria, levels, and scoring
+version: "1.0.0"
+params:
+  - name: assignment_type
+    type: string
+    required: true
+    description: Type of assignment (essay, presentation, project, etc.)
+  - name: criteria
+    type: array
+    required: true
+    description: Assessment criteria to include
+  - name: levels
+    type: integer
+    required: false
+    default: 4
+    description: Number of performance levels
+  - name: level_labels
+    type: array
+    required: false
+    default: ["Excellent", "Proficient", "Developing", "Beginning"]
+    description: Labels for each performance level
+  - name: max_score
+    type: integer
+    required: false
+    default: 100
+    description: Maximum total score
+  - name: subject
+    type: string
+    required: false
+    default: ""
+    description: Subject area
+  - name: include_examples
+    type: boolean
+    required: false
+    default: true
+    description: Include example evidence at each level
+steps:
+  - id: design_rubric
+    node: agent
+    prompt: |
+      Create a detailed assessment rubric for:
+      
+      Assignment Type: {{ .params.assignment_type }}
+      Subject: {{ .params.subject }}
+      Max Score: {{ .params.max_score }}
+      Number of Levels: {{ .params.levels }}
+      Level Labels: {{ .params.level_labels }}
+      Include Examples: {{ .params.include_examples }}
+      
+      For each criterion ({{ .params.criteria }}):
+      1. Define clear descriptors for each performance level
+      2. Assign point ranges for each level
+      3. {{ if .params.include_examples }}Provide example evidence at each level{{ end }}
+      4. Ensure descriptors are observable and measurable
+      5. Avoid subjective language
+    output: rubric_content
+
+  - id: calculate_weights
+    node: code_interpreter
+    language: python
+    code: |
+      import json
+      
+      rubric = json.loads('''{{ .rubric_content }}''')
+      criteria = rubric.get('criteria', [])
+      total = {{ .params.max_score }}
+      num_criteria = len(criteria)
+      levels = {{ .params.levels }}
+      
+      equal_weight = round(total / num_criteria, 1) if num_criteria > 0 else 0
+      per_level = round(equal_weight / levels, 1) if levels > 0 else 0
+      
+      scoring = {
+          "total_max": total,
+          "criteria_count": num_criteria,
+          "levels": levels,
+          "equal_weight_per_criterion": equal_weight,
+          "points_per_level": per_level,
+          "level_labels": {{ .params.level_labels }}
+      }
+      
+      print(json.dumps(scoring, indent=2))
+    output: scoring_scheme
+
+  - id: format_rubric
+    node: transform
+    input:
+      rubric: "{{ .rubric_content }}"
+      scoring: "{{ .scoring_scheme }}"
+    template: |
+      # Assessment Rubric: {{ .params.assignment_type }}
+      **Subject:** {{ .params.subject }} | **Max Score:** {{ .params.max_score }}
+      
+      ## Scoring Summary
+      - Criteria: {{ .scoring.criteria_count }}
+      - Performance Levels: {{ .scoring.levels }}
+      - Points per Criterion: {{ .scoring.equal_weight_per_criterion }}
+      
+      ## Rubric Table
+      {{ range .params.criteria }}
+      ### {{ . }}
+      | Level | Description | Points |
+      |-------|-------------|--------|
+      {{ range $i, $label := .params.level_labels }}
+      | {{ $label }} | {{ index $.rubric.criteria $i }} | {{ }} |
+      {{ end }}
+      {{ end }}
+    output: formatted_rubric
+
+  - id: save_rubric
+    node: file_write
+    filename: "rubric_{{ .params.assignment_type | sanitize }}.json"
+    content: |
+      {
+        "assignment_type": "{{ .params.assignment_type }}",
+        "subject": "{{ .params.subject }}",
+        "scoring_scheme": {{ .scoring_scheme }},
+        "rubric": {{ .rubric_content }}
+      }
+    output: file_path

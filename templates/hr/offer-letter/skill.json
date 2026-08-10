@@ -1,0 +1,13 @@
+{
+  "id": "hr/offer-letter",
+  "name": "Offer Letter Generator",
+  "version": "1.0.0",
+  "description": "AI-generated offer letter workflow with compensation validation, benefits data integration, and customizable templates for standard, executive, and startup roles.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["offer-letter", "compensation", "onboarding", "hiring", "document-generation"],
+  "keywords": ["offer", "letter", "compensation", "salary", "hiring", "employment", "contract", "onboarding"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

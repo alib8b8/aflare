@@ -1,0 +1,13 @@
+{
+  "id": "hr/succession-planning",
+  "name": "Succession Planning",
+  "version": "1.0.0",
+  "description": "Succession planning and talent readiness assessment workflow that identifies successors for critical roles, evaluates readiness, builds succession matrices, and generates targeted development plans.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["succession", "talent", "leadership", "readiness", "development", "workforce-planning"],
+  "keywords": ["succession", "planning", "talent", "readiness", "leadership", "bench", "pipeline", "development", "retention"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,24 @@
+{
+  "id": "healthcare/telemedicine-note",
+  "name": "telemedicine-note",
+  "version": "1.0.0",
+  "description": "Generate structured telemedicine visit documentation with quality review",
+  "author": "aflare community",
+  "category": "healthcare",
+  "tags": [
+    "healthcare",
+    "workflow",
+    "telemedicine",
+    "documentation"
+  ],
+  "keywords": [
+    "telemedicine-note",
+    "healthcare",
+    "telemedicine",
+    "soap-note",
+    "virtual-visit"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

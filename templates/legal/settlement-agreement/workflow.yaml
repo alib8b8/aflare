@@ -1,0 +1,115 @@
+name: settlement-agreement
+description: "Settlement agreement generator for dispute resolution"
+version: "1.0.0"
+params:
+  - name: plaintiff
+    type: string
+    required: true
+    description: "Name of the plaintiff/claimant"
+  - name: defendant
+    type: string
+    required: true
+    description: "Name of the defendant"
+  - name: case_reference
+    type: string
+    required: false
+    description: "Case or claim reference number"
+  - name: dispute_description
+    type: string
+    required: true
+    description: "Brief description of the dispute"
+  - name: settlement_amount
+    type: string
+    required: true
+    description: "Settlement amount and payment terms"
+  - name: settlement_terms
+    type: array
+    required: true
+    description: "Key settlement terms"
+  - name: release_scope
+    type: string
+    required: false
+    default: "all claims"
+    description: "Scope of release (all claims, specific claims, limited)"
+  - name: confidentiality
+    type: boolean
+    required: false
+    default: true
+    description: "Whether settlement terms are confidential"
+  - name: governing_law
+    type: string
+    required: false
+    default: "State of Delaware"
+    description: "Governing law"
+
+steps:
+  - id: analyze_dispute
+    node: agent
+    description: "Analyze the dispute and settlement context"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a dispute resolution attorney. Analyze the dispute and settlement context.
+        Identify: key legal issues, litigation risks, potential damages exposure, and
+        strategic considerations for settlement. Provide an assessment of whether the
+        proposed settlement terms are reasonable and protective.
+      prompt: |
+        Plaintiff: {{ .params.plaintiff }}
+        Defendant: {{ .params.defendant }}
+        Dispute: {{ .params.dispute_description }}
+        Settlement amount: {{ .params.settlement_amount }}
+        Proposed terms: {{ .params.settlement_terms }}
+        Analyze the dispute and settlement context.
+
+  - id: generate_agreement
+    node: agent
+    description: "Generate the settlement agreement"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a settlement agreement drafter. Draft a comprehensive settlement agreement
+        and release. Include: recitals, payment terms, release of claims, covenant not to sue,
+        confidentiality provisions, non-disparagement, no admission of liability, governing law,
+        integration clause, and execution provisions. Ensure the release scope matches the
+        specified parameters. Protect both parties' interests while being enforceable.
+      prompt: |
+        Plaintiff: {{ .params.plaintiff }}
+        Defendant: {{ .params.defendant }}
+        Case reference: {{ .params.case_reference }}
+        Dispute: {{ .params.dispute_description }}
+        Settlement amount: {{ .params.settlement_amount }}
+        Settlement terms: {{ .params.settlement_terms }}
+        Release scope: {{ .params.release_scope }}
+        Confidentiality: {{ .params.confidentiality }}
+        Governing law: {{ .params.governing_law }}
+        Dispute analysis: {{ index .steps.analyze_dispute.outputs "analysis" }}
+        Draft the complete settlement agreement.
+
+  - id: review_enforceability
+    node: agent
+    description: "Review settlement agreement for enforceability"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a litigation partner. Review the settlement agreement for enforceability.
+        Check for: adequate consideration, voluntary execution, clear release language,
+        compliance with applicable law, proper scope of release, and whether the agreement
+        would withstand a challenge. Flag any provisions that may be unenforceable.
+      prompt: |
+        Agreement: {{ index .steps.generate_agreement.outputs "agreement" }}
+        Governing law: {{ .params.governing_law }}
+        Review for enforceability and provide feedback.
+
+  - id: save_agreement
+    node: file_write
+    description: "Save the settlement agreement"
+    config:
+      path: "{{ .params.output_path | default "output/settlement_agreement.md" }}"
+      content: |
+        # Settlement Agreement and Release
+        
+        {{ index .steps.generate_agreement.outputs "agreement" }}
+        
+        ---
+        ## Enforceability Review
+        {{ index .steps.review_enforceability.outputs "review" }}

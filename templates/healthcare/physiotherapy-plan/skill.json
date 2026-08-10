@@ -1,0 +1,25 @@
+{
+  "id": "healthcare/physiotherapy-plan",
+  "name": "physiotherapy-plan",
+  "version": "1.0.0",
+  "description": "Generate personalized physiotherapy exercise plans with progression tracking",
+  "author": "aflare community",
+  "category": "healthcare",
+  "tags": [
+    "healthcare",
+    "workflow",
+    "physiotherapy",
+    "rehabilitation"
+  ],
+  "keywords": [
+    "physiotherapy-plan",
+    "healthcare",
+    "physiotherapy",
+    "exercise",
+    "rehabilitation",
+    "physical-therapy"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

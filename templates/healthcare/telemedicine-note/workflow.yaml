@@ -1,0 +1,140 @@
+name: Telemedicine Visit Note Generator
+# Generate structured telemedicine visit documentation
+# Usage: aflare install healthcare/telemedicine-note
+#        aflare run telemedicine-note/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 3
+    input: |
+      Generate a structured telemedicine visit note from the encounter data.
+
+      Patient: {{ .params.patient_name }}, {{ .params.age }}yo {{ .params.gender }}
+      Visit date: {{ .params.visit_date }}
+      Visit type: {{ .params.visit_type }}
+      Chief complaint: {{ .params.chief_complaint }}
+      Patient-reported symptoms: {{ .params.symptoms }}
+      Telemedicine platform: {{ .params.platform }}
+      Connection quality: {{ .params.connection_quality }}
+      Patient location: {{ .params.patient_location }}
+
+      Generate SOAP note:
+      1. Subjective:
+         - Chief complaint in patient's own words
+         - History of present illness (HPI)
+         - Review of systems (telemedicine-appropriate)
+         - Past medical/surgical/family/social history updates
+      2. Objective:
+         - Virtual physical exam observations
+         - Patient-reported vitals
+         - Any visual findings (rash, swelling, etc.)
+         - Limitations of virtual exam noted
+      3. Assessment:
+         - Differential diagnoses
+         - Most likely diagnosis
+         - Clinical reasoning
+      4. Plan:
+         - Treatment plan
+         - Prescriptions (if any)
+         - Recommended in-person follow-up if needed
+         - Patient education provided
+         - When to seek emergency care
+    id: soap_note
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: code_interpreter
+      max_iterations: 2
+    input: |
+      Review the telemedicine note for quality and completeness.
+
+      SOAP note: {{ .soap_note }}
+
+      Check:
+      1. Are all SOAP elements present?
+      2. Is the virtual exam limitation documented?
+      3. Is the patient's location documented?
+      4. Are telemedicine modifiers appropriate?
+      5. Is informed consent for virtual visit documented?
+      6. Is the plan actionable and clear?
+      7. Are emergency warning signs included?
+    id: quality_review
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 30s
+    input: |
+      import json
+      from datetime import datetime
+
+      review = {{ .quality_review | toJSON }}
+
+      score = 100
+      deductions = []
+
+      if not review.get("subjective_complete"):
+          score -= 15
+          deductions.append("Subjective section incomplete")
+      if not review.get("objective_complete"):
+          score -= 15
+          deductions.append("Objective section incomplete")
+      if not review.get("assessment_complete"):
+          score -= 15
+          deductions.append("Assessment section incomplete")
+      if not review.get("plan_complete"):
+          score -= 15
+          deductions.append("Plan section incomplete")
+      if not review.get("virtual_limitation_documented"):
+          score -= 10
+          deductions.append("Virtual exam limitations not documented")
+      if not review.get("emergency_instructions"):
+          score -= 10
+          deductions.append("Emergency instructions missing")
+      if not review.get("consent_documented"):
+          score -= 5
+          deductions.append("Telemedicine consent not documented")
+
+      billing_level = "99213"
+      if score >= 90:
+          billing_level = "99214"
+      elif score >= 70:
+          billing_level = "99213"
+      else:
+          billing_level = "99212"
+
+      print(json.dumps({
+          "quality_score": max(0, score),
+          "deductions": deductions,
+          "suggested_billing_level": billing_level,
+          "review_complete": True
+      }))
+    id: quality_score
+
+  - node: file_write
+    params:
+      path: "{{ .params.output_path | default \"telemedicine-note.md\" }}"
+    input: |
+      # TELEMEDICINE VISIT NOTE
+      ---
+      **Patient:** {{ .params.patient_name }} | **DOB/Age:** {{ .params.age }}yo {{ .params.gender }}
+      **Visit Date:** {{ .params.visit_date }}
+      **Platform:** {{ .params.platform }}
+      **Quality Score:** {{ .quality_score.quality_score }}/100
+      **Suggested Billing:** {{ .quality_score.suggested_billing_level }}
+
+      {{ .soap_note }}
+
+      ## Quality Review
+      {{ .quality_review }}
+
+      ---
+      *Telemedicine visit conducted via {{ .params.platform }}. Patient located in {{ .params.patient_location }}.*
+      *Provider: {{ .params.provider_name }}*
+    id: save_note

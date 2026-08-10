@@ -1,0 +1,13 @@
+{
+  "id": "supply-chain/capacity-planner",
+  "name": "Capacity Planner",
+  "version": "1.0.0",
+  "description": "Production capacity planning with constraint analysis. Compares demand forecasts against line capacities, identifies bottlenecks, computes overtime requirements, and generates investment recommendations.",
+  "author": "aflare community",
+  "category": "supply-chain",
+  "tags": ["capacity", "production", "planning", "bottleneck", "overtime"],
+  "keywords": ["capacity planning", "production planning", "bottleneck analysis", "overtime planning", "make vs buy"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

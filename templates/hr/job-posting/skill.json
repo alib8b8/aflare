@@ -1,0 +1,13 @@
+{
+  "id": "hr/job-posting",
+  "name": "Job Posting Generator",
+  "version": "1.0.0",
+  "description": "AI-powered job posting and description generator with inclusive language, platform-specific optimization, SEO metadata, and ATS publication integration.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["job-posting", "recruitment", "description", "SEO", "ATS", "hiring"],
+  "keywords": ["job", "posting", "description", "recruitment", "hiring", "careers", "ATS", "SEO", "job-board"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,25 @@
+{
+  "id": "healthcare/patient-education",
+  "name": "patient-education",
+  "version": "1.0.0",
+  "description": "Generate patient education materials in plain language with readability scoring",
+  "author": "aflare community",
+  "category": "healthcare",
+  "tags": [
+    "healthcare",
+    "workflow",
+    "education",
+    "patient"
+  ],
+  "keywords": [
+    "patient-education",
+    "healthcare",
+    "education",
+    "patient",
+    "plain-language",
+    "health-literacy"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

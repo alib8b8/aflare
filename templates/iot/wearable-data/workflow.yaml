@@ -1,0 +1,134 @@
+name: wearable-data
+description: Wearable device data aggregation with health metrics analysis, activity tracking, and wellness insights
+version: "1.0.0"
+params:
+  - name: user_ids
+    type: string
+    default: ""
+    description: Comma-separated user IDs with wearable devices
+  - name: device_types
+    type: string
+    default: "watch,band,ring"
+    description: Comma-separated wearable device types
+  - name: health_metrics
+    type: string
+    default: "heart_rate,steps,calories,sleep,spo2,stress"
+    description: Comma-separated health metrics to track
+  - name: aggregation_period
+    type: string
+    default: "daily"
+    description: Aggregation period - hourly, daily, or weekly
+  - name: wearable_api
+    type: string
+    default: "https://api.wearable.local/v1"
+    description: Wearable device data API
+
+steps:
+  - id: fetch_wearable_data
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.wearable_api }}/users/data"
+      headers:
+        Authorization: "Bearer {{ .env.WEARABLE_API_TOKEN }}"
+        Content-Type: application/json
+      body: |
+        {
+          "user_ids": {{ .params.user_ids | split "," | toJson }},
+          "metrics": {{ .params.health_metrics | split "," | toJson }},
+          "period": "{{ .params.aggregation_period }}"
+        }
+    description: Fetch health data from wearable devices
+
+  - id: compute_wellness_scores
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        import numpy as np
+
+        data = {{ .steps.fetch_wearable_data.output | toJson }}
+
+        users = []
+        for u in data.get("users", []):
+            metrics = u.get("metrics", {})
+            hr = metrics.get("heart_rate", {}).get("avg", 0)
+            steps = metrics.get("steps", {}).get("total", 0)
+            sleep = metrics.get("sleep", {}).get("hours", 0)
+            spo2 = metrics.get("spo2", {}).get("avg", 0)
+            stress = metrics.get("stress", {}).get("avg", 0)
+            calories = metrics.get("calories", {}).get("total", 0)
+
+            hr_score = 100 if 60 <= hr <= 100 else max(0, 100 - abs(hr - 75))
+            steps_score = min(100, steps / 100)
+            sleep_score = min(100, sleep / 8 * 100)
+            spo2_score = 100 if spo2 >= 95 else max(0, spo2)
+            stress_score = max(0, 100 - stress)
+
+            wellness = (hr_score * 0.2 + steps_score * 0.25 + sleep_score * 0.25 + spo2_score * 0.15 + stress_score * 0.15)
+
+            alerts = []
+            if hr > 120:
+                alerts.append({"type": "high_heart_rate", "value": hr, "severity": "warning"})
+            if spo2 < 92:
+                alerts.append({"type": "low_spo2", "value": spo2, "severity": "critical"})
+            if sleep < 4:
+                alerts.append({"type": "low_sleep", "value": sleep, "severity": "warning"})
+
+            users.append({
+                "user_id": u["user_id"],
+                "device_type": u.get("device_type", ""),
+                "metrics": {
+                    "heart_rate": hr,
+                    "steps": steps,
+                    "sleep_hours": sleep,
+                    "spo2": spo2,
+                    "stress_level": stress,
+                    "calories_burned": calories
+                },
+                "wellness_score": round(wellness, 1),
+                "wellness_level": "excellent" if wellness >= 85 else "good" if wellness >= 70 else "fair" if wellness >= 50 else "poor",
+                "alerts": alerts
+            })
+
+        result = {
+            "period": "{{ .params.aggregation_period }}",
+            "users": users,
+            "total_users": len(users)
+        }
+        print(json.dumps(result))
+    description: Compute wellness scores and health alerts from wearable data
+
+  - id: wellness_recommendations
+    node: agent
+    config:
+      prompt: |
+        Analyze wearable health data and provide personalized wellness recommendations:
+
+        {{ .steps.compute_wellness_scores.output | toJson }}
+
+        Provide per-user:
+        1. Activity level assessment
+        2. Sleep quality improvement tips
+        3. Stress management recommendations
+        4. Exercise and movement goals
+        5. Health risk warnings
+
+        Return as JSON with "wellness_recommendations" key.
+      output_format: json
+    description: AI-powered personalized wellness recommendations
+
+  - id: save_health_report
+    node: file_write
+    config:
+      file_path: "/data/wearable/{{ now | date \"2006-01-02\" }}/health_{{ .params.aggregation_period }}.json"
+      content: |
+        {
+          "report_id": "{{ uuid }}",
+          "timestamp": "{{ now }}",
+          "period": "{{ .params.aggregation_period }}",
+          "users": {{ .steps.compute_wellness_scores.output.users | toJson }},
+          "recommendations": {{ .steps.wellness_recommendations.output | toJson }}
+        }
+    description: Save health and wellness report

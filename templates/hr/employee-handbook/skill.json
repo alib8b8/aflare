@@ -1,0 +1,13 @@
+{
+  "id": "hr/employee-handbook",
+  "name": "Employee Handbook Generator",
+  "version": "1.0.0",
+  "description": "Comprehensive employee handbook generator with jurisdiction-aware compliance, customizable policy sections, company culture integration, and acknowledgment workflow.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["handbook", "policy", "compliance", "onboarding", "documentation", "legal"],
+  "keywords": ["handbook", "employee", "policy", "compliance", "onboarding", "HR", "legal", "policies", "procedures"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

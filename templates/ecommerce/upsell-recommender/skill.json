@@ -1,0 +1,13 @@
+{
+  "id": "ecommerce/upsell-recommender",
+  "name": "Post-Purchase Upsell Recommender",
+  "version": "1.0.0",
+  "description": "Post-purchase upsell recommendation engine that analyzes recent orders, customer profiles, and purchase history to generate optimized upsell offers with timing optimization, discount calculation, and personalized messaging.",
+  "author": "aflare community",
+  "category": "ecommerce",
+  "tags": ["upsell", "post-purchase", "recommendation", "revenue", "personalization"],
+  "keywords": ["upsell", "post-purchase", "upgrade", "subscription", "revenue growth"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

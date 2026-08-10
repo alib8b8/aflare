@@ -1,0 +1,13 @@
+{
+  "id": "business/multi-role-agent",
+  "name": "multi-role-agent",
+  "version": "1.0.0",
+  "description": "Three-roles-in-one business agent (Marketing + BD + IR) for content creation, lead hunting, and investor relations",
+  "author": "aflare community",
+  "category": "business",
+  "tags": ["business", "marketing", "bd", "investor-relations", "multi-agent"],
+  "keywords": ["multi-agent", "marketing", "business-development", "investor", "content"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

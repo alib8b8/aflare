@@ -1,0 +1,148 @@
+name: Prescription Validator
+# Validate prescriptions for safety, dosing, and interactions
+# Usage: aflare install healthcare/prescription-validator
+#        aflare run prescription-validator/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: http_request, code_interpreter
+      max_iterations: 4
+    input: |
+      Validate the following prescription for safety and appropriateness.
+
+      Medication: {{ .params.medication }}
+      Dose: {{ .params.dose }}
+      Frequency: {{ .params.frequency }}
+      Route: {{ .params.route }}
+      Duration: {{ .params.duration }}
+      Patient age: {{ .params.age }}
+      Patient weight: {{ .params.weight_kg }}
+      Diagnosis: {{ .params.diagnosis }}
+      Renal function (CrCl): {{ .params.crcl }}
+      Hepatic function: {{ .params.liver_function }}
+      Allergies: {{ .params.allergies }}
+      Current medications: {{ .params.current_medications }}
+      Pregnancy/Lactation: {{ .params.pregnancy_status }}
+
+      Validate:
+      1. Dose appropriateness for age/weight/indication
+      2. Frequency correctness
+      3. Route appropriateness
+      4. Duration appropriateness
+      5. Renal dose adjustment needed
+      6. Hepatic dose adjustment needed
+      7. Allergy cross-reactivity check
+      8. Drug-drug interactions
+      9. Pregnancy/lactation safety
+      10. Therapeutic duplication check
+      11. Off-label use identification
+    id: prescription_validation
+
+  - node: http_request
+    params:
+      url: "https://api.fda.gov/drug/label.json?search=openfda.brand_name:{{ .params.medication | urlquery }}&limit=2"
+      method: GET
+      timeout: 15s
+    id: fda_label
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: code_interpreter
+      max_iterations: 2
+    input: |
+      Cross-reference the prescription validation with FDA labeling data.
+
+      Prescription validation: {{ .prescription_validation }}
+      FDA label data: {{ .fda_label }}
+
+      Check:
+      1. Is the prescribed dose within FDA-approved range?
+      2. Is the indication FDA-approved or off-label?
+      3. Are there any boxed warnings that apply?
+      4. Are there contraindications based on patient profile?
+      5. What monitoring parameters are recommended?
+    id: fda_cross_reference
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 30s
+    input: |
+      import json
+
+      validation = {{ .prescription_validation | toJSON }}
+      fda_check = {{ .fda_cross_reference | toJSON }}
+
+      # Calculate safety score
+      issues = []
+      if validation.get("dose_issue"):
+          issues.append({"type": "dose", "severity": "high"})
+      if validation.get("allergy_alert"):
+          issues.append({"type": "allergy", "severity": "critical"})
+      if validation.get("interaction_found"):
+          issues.append({"type": "interaction", "severity": "high"})
+      if validation.get("contraindication"):
+          issues.append({"type": "contraindication", "severity": "critical"})
+      if validation.get("renal_adjustment_needed"):
+          issues.append({"type": "renal_dose", "severity": "moderate"})
+      if validation.get("off_label"):
+          issues.append({"type": "off_label", "severity": "low"})
+      if fda_check.get("boxed_warning_applies"):
+          issues.append({"type": "boxed_warning", "severity": "critical"})
+
+      critical = sum(1 for i in issues if i["severity"] == "critical")
+      high = sum(1 for i in issues if i["severity"] == "high")
+      moderate = sum(1 for i in issues if i["severity"] == "moderate")
+
+      safety_score = max(0, 100 - (critical * 40) - (high * 20) - (moderate * 10))
+
+      if critical > 0:
+          recommendation = "DO NOT DISPENSE - Critical safety issues detected"
+      elif high > 0:
+          recommendation = "REQUIRES REVIEW - Contact prescriber before dispensing"
+      elif moderate > 0:
+          recommendation = "CAUTION - Review and document before dispensing"
+      else:
+          recommendation = "APPROVED - No significant safety concerns"
+
+      print(json.dumps({
+          "safety_score": safety_score,
+          "total_issues": len(issues),
+          "critical_issues": critical,
+          "high_issues": high,
+          "moderate_issues": moderate,
+          "recommendation": recommendation,
+          "issues": issues
+      }))
+    id: safety_assessment
+
+  - node: file_write
+    params:
+      path: "{{ .params.output_path | default \"prescription-validation-report.md\" }}"
+    input: |
+      # PRESCRIPTION VALIDATION REPORT
+      ---
+      **Medication:** {{ .params.medication }} {{ .params.dose }}
+      **Patient:** {{ .params.patient_name }}
+      **Safety Score:** {{ .safety_assessment.safety_score }}/100
+      **Recommendation:** {{ .safety_assessment.recommendation }}
+
+      ## Validation Results
+      {{ .prescription_validation }}
+
+      ## FDA Label Cross-Reference
+      {{ .fda_cross_reference }}
+
+      ## Issues Found ({{ .safety_assessment.total_issues }})
+      {{ range .safety_assessment.issues }}
+      - [{{ .severity | upper }}] {{ .type }}
+      {{ end }}
+
+      ---
+      *This is a screening tool. Final dispensing decision rests with the pharmacist.*
+    id: save_report

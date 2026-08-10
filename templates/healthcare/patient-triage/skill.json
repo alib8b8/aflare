@@ -1,0 +1,23 @@
+{
+  "id": "healthcare/patient-triage",
+  "name": "patient-triage",
+  "version": "1.0.0",
+  "description": "AI-powered patient triage and urgency assessment with ESI scoring",
+  "author": "aflare community",
+  "category": "healthcare",
+  "tags": [
+    "healthcare",
+    "workflow",
+    "triage"
+  ],
+  "keywords": [
+    "patient-triage",
+    "healthcare",
+    "triage",
+    "emergency",
+    "esi"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

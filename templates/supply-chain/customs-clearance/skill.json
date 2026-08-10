@@ -1,0 +1,13 @@
+{
+  "id": "supply-chain/customs-clearance",
+  "name": "Customs Clearance",
+  "version": "1.0.0",
+  "description": "Customs documentation generation and clearance workflow. Classifies commodities with HS codes, estimates duties and landed costs, checks FTA preferences, generates compliance documents, and submits to customs systems.",
+  "author": "aflare community",
+  "category": "supply-chain",
+  "tags": ["customs", "clearance", "trade", "compliance", "duties"],
+  "keywords": ["customs clearance", "HS code", "duty calculation", "trade compliance", "landed cost"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,13 @@
+{
+  "id": "education/learning-path",
+  "name": "Learning Path Designer",
+  "version": "1.0.0",
+  "description": "Personalized learning path designer with adaptive milestones, resource recommendations, and progress tracking based on learning style preferences.",
+  "author": "aflare community",
+  "category": "education",
+  "tags": ["learning", "path", "personalized", "milestones", "adaptive"],
+  "keywords": ["learning", "path", "personalized", "milestones", "study", "plan", "adaptive"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

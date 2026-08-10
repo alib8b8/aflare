@@ -1,0 +1,109 @@
+name: msa-generator
+description: "Master Service Agreement (MSA) generator"
+version: "1.0.0"
+params:
+  - name: provider_name
+    type: string
+    required: true
+    description: "Name of the service provider"
+  - name: client_name
+    type: string
+    required: true
+    description: "Name of the client"
+  - name: services
+    type: array
+    required: true
+    description: "List of services covered"
+  - name: industry
+    type: string
+    required: false
+    default: "technology"
+    description: "Industry sector"
+  - name: payment_terms
+    type: string
+    required: false
+    default: "Net 30"
+    description: "Payment terms"
+  - name: liability_cap
+    type: string
+    required: false
+    default: "Fees paid in the last 12 months"
+    description: "Liability cap description"
+  - name: term_length
+    type: string
+    required: false
+    default: "12 months with auto-renewal"
+    description: "Agreement term"
+  - name: governing_law
+    type: string
+    required: false
+    default: "State of Delaware"
+    description: "Governing law"
+
+steps:
+  - id: research_industry_standards
+    node: agent
+    description: "Research industry-specific MSA standards"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a commercial contracts specialist. Research and identify industry-specific
+        standards and best practices for MSAs in the given industry. Identify: typical
+        service levels, industry-standard liability provisions, common pricing models,
+        and regulatory requirements specific to the industry.
+      prompt: |
+        Industry: {{ .params.industry }}
+        Services: {{ .params.services }}
+        Provider: {{ .params.provider_name }}
+        Identify industry-specific MSA standards and best practices.
+
+  - id: generate_msa
+    node: agent
+    description: "Generate the Master Service Agreement"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a commercial contract attorney. Draft a comprehensive Master Service Agreement
+        with all standard sections: services, fees and payment, term and termination,
+        representations and warranties, intellectual property, confidentiality, data protection,
+        indemnification, limitations of liability, insurance, dispute resolution, governing law,
+        and general provisions. Use clear, commercially reasonable language.
+      prompt: |
+        Provider: {{ .params.provider_name }}
+        Client: {{ .params.client_name }}
+        Services: {{ .params.services }}
+        Industry standards: {{ index .steps.research_industry_standards.outputs "standards" }}
+        Payment terms: {{ .params.payment_terms }}
+        Liability cap: {{ .params.liability_cap }}
+        Term: {{ .params.term_length }}
+        Governing law: {{ .params.governing_law }}
+        Generate the complete MSA.
+
+  - id: negotiate_playbook
+    node: agent
+    description: "Generate negotiation playbook for the MSA"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a commercial contract negotiator. Create a negotiation playbook for the MSA.
+        For each key clause, provide: fallback position, acceptable compromise, and
+        non-negotiable terms. Include talking points and business justifications for
+        the provider's positions.
+      prompt: |
+        MSA: {{ index .steps.generate_msa.outputs "msa_text" }}
+        Provider: {{ .params.provider_name }}
+        Create a negotiation playbook from the provider's perspective.
+
+  - id: save_msa
+    node: file_write
+    description: "Save the MSA and playbook"
+    config:
+      path: "{{ .params.output_path | default "output/master_service_agreement.md" }}"
+      content: |
+        # Master Service Agreement
+        
+        {{ index .steps.generate_msa.outputs "msa_text" }}
+        
+        ---
+        ## Negotiation Playbook
+        {{ index .steps.negotiate_playbook.outputs "playbook" }}

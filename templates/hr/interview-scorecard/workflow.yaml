@@ -1,0 +1,173 @@
+name: interview-scorecard
+description: Structured interview scorecard and evaluation workflow
+params:
+  - name: candidate_name
+    type: string
+    required: true
+    description: Candidate full name
+  - name: position_title
+    type: string
+    required: true
+    description: Position being interviewed for
+  - name: interview_type
+    type: string
+    required: true
+    description: Type of interview - phone_screen, technical, behavioral, panel, final
+  - name: interviewer_name
+    type: string
+    required: true
+    description: Interviewer name
+  - name: evaluation_criteria
+    type: array
+    required: true
+    description: Criteria with weights and rating scale
+  - name: interview_notes
+    type: string
+    required: false
+    default: ""
+    description: Raw interview notes
+  - name: interview_duration_minutes
+    type: integer
+    required: false
+    default: 60
+    description: Duration of interview
+
+steps:
+  - id: parse_notes
+    type: agent
+    config:
+      instruction: |
+        Analyze the raw interview notes and extract structured evidence for each evaluation criterion.
+
+        Evaluation criteria: {{ .params.evaluation_criteria }}
+
+        For each criterion, extract:
+        - Specific examples and evidence from the conversation
+        - Key quotes that demonstrate (or don't demonstrate) the competency
+        - Follow-up questions asked and candidate responses
+        - Red flags or concerns noted
+        - Strengths demonstrated
+
+        Return structured evidence as JSON.
+      input:
+        interview_notes: "{{ .params.interview_notes }}"
+        evaluation_criteria: "{{ .params.evaluation_criteria }}"
+      output: structured_evidence
+
+  - id: compute_scores
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        criteria = evaluation_criteria
+        evidence = structured_evidence
+
+        scored_criteria = []
+        total_weighted = 0
+        total_weight = 0
+
+        for i, criterion in enumerate(criteria):
+            name = criterion.get("name", f"Criterion {i+1}")
+            weight = criterion.get("weight", 0)
+            max_score = criterion.get("max_score", 5)
+            score = criterion.get("score", 0)
+
+            weighted = (score / max_score * 100) * (weight / 100) if max_score > 0 else 0
+            total_weighted += weighted
+            total_weight += weight
+
+            scored_criteria.append({
+                "name": name,
+                "weight": weight,
+                "score": score,
+                "max_score": max_score,
+                "percentage": round(score / max_score * 100, 1) if max_score > 0 else 0,
+                "weighted_contribution": round(weighted, 2),
+                "evidence": evidence.get(name, {}).get("key_evidence", []) if evidence else []
+            })
+
+        overall_score = round(total_weighted, 1) if total_weight > 0 else 0
+        decision = "Strong Hire" if overall_score >= 85 else "Hire" if overall_score >= 70 else "Lean Hire" if overall_score >= 60 else "No Hire"
+
+        result = {
+            "candidate_name": candidate_name,
+            "position": position_title,
+            "interview_type": interview_type,
+            "interviewer": interviewer_name,
+            "duration_minutes": interview_duration,
+            "overall_score": overall_score,
+            "decision": decision,
+            "criteria_scores": scored_criteria,
+            "score_breakdown": {
+                "strong_hire": overall_score >= 85,
+                "hire": 70 <= overall_score < 85,
+                "lean_hire": 60 <= overall_score < 70,
+                "no_hire": overall_score < 60
+            }
+        }
+        print(json.dumps(result, indent=2))
+      inputs:
+        evaluation_criteria: "{{ .params.evaluation_criteria }}"
+        structured_evidence: "{{ .steps.parse_notes.output.structured_evidence }}"
+        candidate_name: "{{ .params.candidate_name }}"
+        position_title: "{{ .params.position_title }}"
+        interview_type: "{{ .params.interview_type }}"
+        interviewer_name: "{{ .params.interviewer_name }}"
+        interview_duration: "{{ .params.interview_duration_minutes }}"
+      output: scorecard
+
+  - id: generate_summary
+    type: agent
+    config:
+      instruction: |
+        Write a professional interview summary for {{ .params.candidate_name }}.
+
+        Interview type: {{ .params.interview_type }}
+        Position: {{ .params.position_title }}
+
+        Include:
+        1. **Overall Assessment**: 2-3 sentence summary of candidate performance
+        2. **Strengths**: Top 3 strengths demonstrated with specific examples
+        3. **Areas of Concern**: Any gaps or red flags (be specific)
+        4. **Key Questions to Probe in Next Round**: If moving forward
+        5. **Recommendation**: Clear hire/no-hire recommendation with rationale
+        6. **Comparison to Other Candidates**: If applicable, relative ranking notes
+
+        Return the summary as structured markdown.
+      input:
+        scorecard: "{{ .steps.compute_scores.output.scorecard }}"
+        candidate_name: "{{ .params.candidate_name }}"
+        position_title: "{{ .params.position_title }}"
+        interview_type: "{{ .params.interview_type }}"
+      output: summary
+
+  - id: save_scorecard
+    type: file_write
+    config:
+      filename: "{{ .params.output_file | default (printf \"scorecard_%s.md\" .params.candidate_name | replace \" \" \"_\") }}"
+      content: |
+        # Interview Scorecard: {{ .params.candidate_name }}
+        **Position:** {{ .params.position_title }} | **Type:** {{ .params.interview_type }} | **Interviewer:** {{ .params.interviewer_name }}
+        **Date:** {{ now | date "2006-01-02" }} | **Duration:** {{ .params.interview_duration_minutes }} min
+
+        ## Overall Score: {{ .steps.compute_scores.output.scorecard.overall_score }}% - {{ .steps.compute_scores.output.scorecard.decision }}
+
+        ### Criteria Scores
+        | Criterion | Weight | Score | % |
+        |-----------|--------|-------|---|
+        {{ range .steps.compute_scores.output.scorecard.criteria_scores }}
+        | {{ .name }} | {{ .weight }}% | {{ .score }}/{{ .max_score }} | {{ .percentage }}% |
+        {{ end }}
+
+        ## Interview Summary
+        {{ .steps.generate_summary.output.summary }}
+
+        ## Detailed Evidence
+        {{ range .steps.compute_scores.output.scorecard.criteria_scores }}
+        ### {{ .name }}
+        {{ range .evidence }}
+        - {{ . }}
+        {{ end }}
+        {{ end }}
+      format: markdown

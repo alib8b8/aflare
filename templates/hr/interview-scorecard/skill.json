@@ -1,0 +1,13 @@
+{
+  "id": "hr/interview-scorecard",
+  "name": "Interview Scorecard",
+  "version": "1.0.0",
+  "description": "Structured interview scorecard and evaluation workflow with evidence extraction, weighted scoring, and professional summary generation for all interview types.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["interview", "scorecard", "evaluation", "hiring", "recruitment", "assessment"],
+  "keywords": ["interview", "scorecard", "evaluation", "scoring", "hiring", "candidate", "assessment", "feedback"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,13 @@
+{
+  "id": "education/essay-grader",
+  "name": "Essay Grader",
+  "version": "1.0.0",
+  "description": "Essay grading with rubric-based scoring, weighted criteria, detailed feedback, and actionable improvement suggestions for any academic level.",
+  "author": "aflare community",
+  "category": "education",
+  "tags": ["essay", "grading", "rubric", "writing", "feedback"],
+  "keywords": ["essay", "grade", "rubric", "writing", "scoring", "feedback", "assessment"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

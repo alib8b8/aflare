@@ -1,0 +1,136 @@
+name: industrial-plc
+description: Industrial PLC data collection and monitoring with protocol translation, real-time analytics, and alarm management
+version: "1.0.0"
+params:
+  - name: plc_ids
+    type: string
+    default: ""
+    description: Comma-separated PLC device IDs
+  - name: protocol
+    type: string
+    default: "modbus"
+    description: PLC communication protocol - modbus, profinet, ethernet_ip, or opc_ua
+  - name: register_map
+    type: string
+    default: "{}"
+    description: JSON register mapping configuration
+  - name: poll_interval_ms
+    type: integer
+    default: 1000
+    description: Polling interval in milliseconds
+  - name: plc_api
+    type: string
+    default: "https://api.plc.local/v1"
+    description: PLC data collection API
+
+steps:
+  - id: collect_plc_data
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.plc_api }}/collect"
+      headers:
+        Authorization: "Bearer {{ .env.PLC_API_TOKEN }}"
+        Content-Type: application/json
+      body: |
+        {
+          "plc_ids": {{ .params.plc_ids | split "," | toJson }},
+          "protocol": "{{ .params.protocol }}",
+          "register_map": {{ .params.register_map }},
+          "poll_interval_ms": {{ .params.poll_interval_ms }}
+        }
+    description: Collect real-time data from PLC devices
+
+  - id: process_signals
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        import numpy as np
+
+        data = {{ .steps.collect_plc_data.output | toJson }}
+        register_map = json.loads('''{{ .params.register_map }}''')
+
+        processed = []
+        alarms = []
+        for plc in data.get("plc_data", []):
+            signals = {}
+            for reg_name, reg_config in register_map.items():
+                addr = reg_config.get("address")
+                raw = plc.get("registers", {}).get(str(addr))
+                if raw is not None:
+                    scale = reg_config.get("scale", 1)
+                    offset = reg_config.get("offset", 0)
+                    unit = reg_config.get("unit", "")
+                    value = raw * scale + offset
+
+                    signals[reg_name] = {
+                        "raw": raw,
+                        "value": round(value, 3),
+                        "unit": unit
+                    }
+
+                    alarm = reg_config.get("alarm")
+                    if alarm:
+                        if value > alarm.get("high", float("inf")) or value < alarm.get("low", float("-inf")):
+                            alarms.append({
+                                "plc_id": plc["plc_id"],
+                                "register": reg_name,
+                                "value": round(value, 3),
+                                "threshold_high": alarm.get("high"),
+                                "threshold_low": alarm.get("low"),
+                                "severity": alarm.get("severity", "warning")
+                            })
+
+            processed.append({
+                "plc_id": plc["plc_id"],
+                "status": plc.get("status", "unknown"),
+                "timestamp": plc.get("timestamp"),
+                "protocol": "{{ .params.protocol }}",
+                "signals": signals
+            })
+
+        result = {
+            "plc_count": len(processed),
+            "alarms": alarms,
+            "alarm_count": len(alarms),
+            "signals": processed
+        }
+        print(json.dumps(result))
+    description: Process PLC signals with scaling, offset, and alarm detection
+
+  - id: analyze_operations
+    node: agent
+    config:
+      prompt: |
+        Analyze the PLC data and provide operational insights:
+
+        PLC Data: {{ .steps.process_signals.output | toJson }}
+        Protocol: {{ .params.protocol }}
+
+        Provide:
+        1. Overall equipment status assessment
+        2. Alarm severity and priority analysis
+        3. Production efficiency insights
+        4. Predictive maintenance indicators
+        5. Recommended operator actions
+
+        Return as JSON with "operational_analysis" key.
+      output_format: json
+    description: AI-powered operational analysis of PLC data
+
+  - id: log_plc_data
+    node: file_write
+    config:
+      file_path: "/data/plc/{{ .params.protocol }}/{{ now | date \"2006-01-02\" }}/plc_{{ now | date \"150405\" }}.json"
+      content: |
+        {
+          "collection_id": "{{ uuid }}",
+          "timestamp": "{{ now }}",
+          "protocol": "{{ .params.protocol }}",
+          "signals": {{ .steps.process_signals.output.signals | toJson }},
+          "alarms": {{ .steps.process_signals.output.alarms | toJson }},
+          "analysis": {{ .steps.analyze_operations.output | toJson }}
+        }
+    description: Log PLC data collection results

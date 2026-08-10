@@ -1,0 +1,13 @@
+{
+  "id": "supply-chain/packaging-optimizer",
+  "name": "Packaging Optimizer",
+  "version": "1.0.0",
+  "description": "Packaging size and cost optimization with dimensional weight analysis. Auto-generates optimal box sizes, matches products to boxes for maximum fill rates, and computes shipping cost savings from dimensional weight reduction.",
+  "author": "aflare community",
+  "category": "supply-chain",
+  "tags": ["packaging", "optimization", "dimensional-weight", "shipping", "sustainability"],
+  "keywords": ["packaging optimization", "dimensional weight", "box size", "void fill", "shipping cost"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,13 @@
+{
+  "id": "ecommerce/marketplace-listing",
+  "name": "Multi-Marketplace Listing Optimizer",
+  "version": "1.0.0",
+  "description": "Multi-marketplace listing optimization engine that adapts product content for Amazon, eBay, Walmart, and other platforms with platform-specific requirements, search optimization, and content validation.",
+  "author": "aflare community",
+  "category": "ecommerce",
+  "tags": ["marketplace", "listing", "multi-channel", "amazon", "ebay"],
+  "keywords": ["marketplace listing", "amazon optimization", "ebay listing", "multi-channel", "listing optimization"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

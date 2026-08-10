@@ -1,0 +1,139 @@
+name: logistics-tracker
+description: Real-time shipment and logistics tracking across carriers
+version: "1.0.0"
+params:
+  - name: tracking_numbers
+    type: string
+    required: true
+    description: JSON array of tracking numbers with carrier codes
+  - name: carrier_api_endpoint
+    type: string
+    required: true
+    description: Multi-carrier tracking API endpoint
+  - name: api_key
+    type: string
+    required: true
+    description: API key for carrier tracking service
+  - name: alert_threshold_hours
+    type: number
+    required: false
+    default: 24
+    description: Hours of inactivity before triggering an alert
+  - name: output_file
+    type: string
+    required: false
+    default: /tmp/shipment_status.json
+    description: Output file for tracking results
+
+steps:
+  - id: fetch_tracking
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.carrier_api_endpoint }}/track"
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer {{ .params.api_key }}"
+      body:
+        tracking_numbers: "{{ .params.tracking_numbers }}"
+    description: Fetch real-time tracking data for all shipments
+
+  - id: analyze_status
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        from datetime import datetime, timedelta
+
+        tracking_data = json.loads('''{{ index .steps "fetch_tracking" "response" "body" }}''')
+        alert_threshold = {{ .params.alert_threshold_hours }}
+        now = datetime.utcnow()
+
+        shipments = tracking_data.get("shipments", [])
+        analysis = []
+
+        for s in shipments:
+            status = s.get("status", "unknown")
+            last_update = s.get("last_update", "")
+            eta = s.get("estimated_delivery", "")
+
+            # Parse last update time
+            try:
+                last_dt = datetime.fromisoformat(last_update.replace("Z", "+00:00"))
+                hours_since_update = (now - last_dt.replace(tzinfo=None)).total_seconds() / 3600
+            except:
+                hours_since_update = 999
+
+            # Determine alert level
+            alert = None
+            if status == "delivered":
+                alert = "none"
+            elif hours_since_update > alert_threshold:
+                alert = "high"
+            elif hours_since_update > alert_threshold * 0.5:
+                alert = "medium"
+            else:
+                alert = "low"
+
+            # Check if delayed
+            is_delayed = False
+            if eta:
+                try:
+                    eta_dt = datetime.fromisoformat(eta.replace("Z", "+00:00"))
+                    is_delayed = now > eta_dt.replace(tzinfo=None) and status != "delivered"
+                except:
+                    pass
+
+            analysis.append({
+                "tracking_number": s.get("tracking_number"),
+                "carrier": s.get("carrier"),
+                "status": status,
+                "current_location": s.get("current_location", "Unknown"),
+                "hours_since_update": round(hours_since_update, 1),
+                "alert_level": alert,
+                "is_delayed": is_delayed,
+                "estimated_delivery": eta,
+                "checkpoints": s.get("checkpoints", [])
+            })
+
+        result = {
+            "tracked_at": now.isoformat(),
+            "total_shipments": len(analysis),
+            "status_summary": {
+                "in_transit": sum(1 for a in analysis if a["status"] == "in_transit"),
+                "delivered": sum(1 for a in analysis if a["status"] == "delivered"),
+                "delayed": sum(1 for a in analysis if a["is_delayed"]),
+                "out_for_delivery": sum(1 for a in analysis if a["status"] == "out_for_delivery"),
+                "exception": sum(1 for a in analysis if a["alert_level"] == "high")
+            },
+            "shipments": analysis
+        }
+        print(json.dumps(result))
+    description: Analyze tracking statuses and identify delays and exceptions
+
+  - id: generate_alerts
+    node: agent
+    config:
+      prompt: |
+        Review the shipment tracking analysis and generate actionable alerts:
+        {{ index .steps "analyze_status" "output" }}
+
+        For each high-alert shipment, provide:
+        1. Root cause analysis of the delay
+        2. Estimated impact on downstream operations
+        3. Recommended escalation actions
+        4. Customer communication template
+        5. Alternative fulfillment options
+    description: Generate AI-powered alerts and escalation recommendations
+
+  - id: save_tracking
+    node: file_write
+    config:
+      path: "{{ .params.output_file }}"
+      content: |
+        {
+          "tracking_analysis": {{ index .steps "analyze_status" "output" }},
+          "alerts_and_recommendations": {{ index .steps "generate_alerts" "output" }}
+        }
+    description: Save tracking analysis and alerts to output file

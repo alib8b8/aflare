@@ -1,0 +1,158 @@
+name: air-quality
+description: Air quality monitoring and reporting with pollutant analysis, AQI calculation, health advisories, and trend prediction
+version: "1.0.0"
+params:
+  - name: monitor_ids
+    type: string
+    default: ""
+    description: Comma-separated air quality monitor IDs
+  - name: pollutants
+    type: string
+    default: "pm25,pm10,o3,no2,so2,co"
+    description: Comma-separated pollutants to monitor
+  - name: aqi_standard
+    type: string
+    default: "us_epa"
+    description: AQI calculation standard - us_epa or cn_mep
+  - name: reporting_interval
+    type: string
+    default: "hourly"
+    description: Reporting interval
+  - name: aq_api
+    type: string
+    default: "https://api.airquality.local/v1"
+    description: Air quality monitoring API
+
+steps:
+  - id: fetch_air_data
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.aq_api }}/monitors/readings"
+      headers:
+        Authorization: "Bearer {{ .env.AQ_API_TOKEN }}"
+        Content-Type: application/json
+      body: |
+        {
+          "monitor_ids": {{ .params.monitor_ids | split "," | toJson }},
+          "pollutants": {{ .params.pollutants | split "," | toJson }}
+        }
+    description: Fetch air quality readings from monitors
+
+  - id: calculate_aqi
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        import numpy as np
+
+        data = {{ .steps.fetch_air_data.output | toJson }}
+        standard = "{{ .params.aqi_standard }}"
+
+        pm25_breakpoints = [
+            (0, 12.0, 0, 50), (12.1, 35.4, 51, 100),
+            (35.5, 55.4, 101, 150), (55.5, 150.4, 151, 200),
+            (150.5, 250.4, 201, 300), (250.5, 500.4, 301, 500)
+        ]
+        pm10_breakpoints = [
+            (0, 54, 0, 50), (55, 154, 51, 100),
+            (155, 254, 101, 150), (255, 354, 151, 200),
+            (355, 424, 201, 300), (425, 604, 301, 500)
+        ]
+        o3_breakpoints = [
+            (0, 54, 0, 50), (55, 70, 51, 100),
+            (71, 85, 101, 150), (86, 105, 151, 200),
+            (106, 200, 201, 300), (201, 604, 301, 500)
+        ]
+
+        def calc_aqi(value, breakpoints):
+            for lo_conc, hi_conc, lo_aqi, hi_aqi in breakpoints:
+                if lo_conc <= value <= hi_conc:
+                    return round((hi_aqi - lo_aqi) / (hi_conc - lo_conc) * (value - lo_conc) + lo_aqi)
+            return 500
+
+        def aqi_category(aqi):
+            if aqi <= 50: return ("Good", "green")
+            elif aqi <= 100: return ("Moderate", "yellow")
+            elif aqi <= 150: return ("Unhealthy for Sensitive", "orange")
+            elif aqi <= 200: return ("Unhealthy", "red")
+            elif aqi <= 300: return ("Very Unhealthy", "purple")
+            else: return ("Hazardous", "maroon")
+
+        monitors = []
+        for m in data.get("monitors", []):
+            readings = m.get("readings", {})
+            pm25 = readings.get("pm25", {}).get("value", 0)
+            pm10 = readings.get("pm10", {}).get("value", 0)
+            o3 = readings.get("o3", {}).get("value", 0)
+            no2 = readings.get("no2", {}).get("value", 0)
+            so2 = readings.get("so2", {}).get("value", 0)
+            co = readings.get("co", {}).get("value", 0)
+
+            aqi_pm25 = calc_aqi(pm25, pm25_breakpoints)
+            aqi_pm10 = calc_aqi(pm10, pm10_breakpoints)
+            aqi_o3 = calc_aqi(o3, o3_breakpoints)
+            overall_aqi = max(aqi_pm25, aqi_pm10, aqi_o3)
+            category, color = aqi_category(overall_aqi)
+
+            monitors.append({
+                "monitor_id": m["monitor_id"],
+                "location": m.get("location", ""),
+                "pollutants": {
+                    "pm25": pm25, "pm10": pm10, "o3": o3,
+                    "no2": no2, "so2": so2, "co": co
+                },
+                "aqi": overall_aqi,
+                "aqi_category": category,
+                "aqi_color": color,
+                "dominant_pollutant": "pm25" if aqi_pm25 >= max(aqi_pm10, aqi_o3) else "pm10" if aqi_pm10 >= aqi_o3 else "o3"
+            })
+
+        result = {
+            "standard": standard,
+            "monitors": monitors,
+            "avg_aqi": round(np.mean([m["aqi"] for m in monitors]), 1),
+            "hazardous_count": sum(1 for m in monitors if m["aqi_category"] == "Hazardous"),
+            "good_count": sum(1 for m in monitors if m["aqi_category"] == "Good")
+        }
+        print(json.dumps(result))
+    description: Calculate AQI and categorize air quality levels
+
+  - id: health_advisory
+    node: agent
+    config:
+      prompt: |
+        Analyze the air quality data and generate health advisories:
+
+        {{ .steps.calculate_aqi.output | toJson }}
+
+        Provide:
+        1. Overall air quality summary
+        2. Health advisory for sensitive groups
+        3. Outdoor activity recommendations
+        4. Source attribution for pollutants
+        5. Trend prediction for next 24 hours
+
+        Return as JSON with "health_advisory" key.
+      output_format: json
+    description: AI-powered health advisory based on air quality
+
+  - id: publish_report
+    node: file_write
+    config:
+      file_path: "/data/air_quality/{{ now | date \"2006-01-02\" }}/aqi_{{ now | date \"150405\" }}.json"
+      content: |
+        {
+          "report_id": "{{ uuid }}",
+          "timestamp": "{{ now }}",
+          "standard": "{{ .params.aqi_standard }}",
+          "monitors": {{ .steps.calculate_aqi.output.monitors | toJson }},
+          "summary": {
+            "avg_aqi": {{ .steps.calculate_aqi.output.avg_aqi }},
+            "good_locations": {{ .steps.calculate_aqi.output.good_count }},
+            "hazardous_locations": {{ .steps.calculate_aqi.output.hazardous_count }}
+          },
+          "advisory": {{ .steps.health_advisory.output | toJson }}
+        }
+    description: Publish air quality report

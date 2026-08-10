@@ -1,0 +1,110 @@
+name: patent-search
+description: "Patent search and prior art analysis workflow"
+version: "1.0.0"
+params:
+  - name: invention_title
+    type: string
+    required: true
+    description: "Title of the invention"
+  - name: invention_description
+    type: string
+    required: true
+    description: "Detailed description of the invention"
+  - name: keywords
+    type: array
+    required: true
+    description: "Search keywords for patent search"
+  - name: patent_classes
+    type: array
+    required: false
+    default: []
+    description: "CPC/IPC patent classification codes"
+  - name: assignee
+    type: string
+    required: false
+    description: "Assignee or company to filter by"
+  - name: max_results
+    type: integer
+    required: false
+    default: 20
+    description: "Maximum number of patent results"
+
+steps:
+  - id: search_patents
+    node: http_request
+    description: "Search patent databases via USPTO API"
+    config:
+      method: GET
+      url: "https://developer.uspto.gov/ibd-api/v1/application/grants?searchText={{ .params.keywords | join " " }}&rows={{ .params.max_results }}"
+      headers:
+        Accept: "application/json"
+    condition: "{{ .params.keywords | len | gt 0 }}"
+
+  - id: analyze_patents
+    node: agent
+    description: "Analyze patent search results for relevance"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a patent analyst. Review the patent search results and identify the most
+        relevant prior art. For each relevant patent, provide: patent number, title, assignee,
+        filing date, relevance score (1-10), key claims, and how it relates to the invention.
+        Identify any potential novelty or obviousness issues.
+      prompt: |
+        Invention: {{ .params.invention_title }}
+        Description: {{ .params.invention_description }}
+        Patent classes: {{ .params.patent_classes }}
+        {{ if index .steps "search_patents" }}Search results: {{ index .steps.search_patents.outputs "body" }}{{ end }}
+        Analyze the patent search results for prior art relevance.
+
+  - id: novelty_assessment
+    node: agent
+    description: "Assess patentability and novelty"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a patent attorney. Based on the prior art analysis, assess the patentability
+        of the invention. Evaluate: novelty (35 USC 102), non-obviousness (35 USC 103),
+        and utility (35 USC 101). Provide a patentability opinion with confidence level
+        and specific recommendations for claim drafting strategy.
+      prompt: |
+        Invention: {{ .params.invention_title }}
+        Description: {{ .params.invention_description }}
+        Prior art analysis: {{ index .steps.analyze_patents.outputs "prior_art" }}
+        Provide a patentability assessment and claim drafting recommendations.
+
+  - id: freedom_to_operate
+    node: agent
+    description: "Assess freedom to operate risks"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are an IP litigation analyst. Based on the patent search results, assess freedom
+        to operate (FTO) risks. Identify any in-force patents that could be infringed by the
+        invention. For each risk patent, provide: patent details, claims at issue, infringement
+        risk level, and potential design-around strategies.
+      prompt: |
+        Invention: {{ .params.invention_title }}
+        Prior art: {{ index .steps.analyze_patents.outputs "prior_art" }}
+        Provide a freedom to operate analysis.
+
+  - id: save_report
+    node: file_write
+    description: "Save the patent search report"
+    config:
+      path: "{{ .params.output_path | default "output/patent_search_report.md" }}"
+      content: |
+        # Patent Search & Prior Art Analysis Report
+        
+        ## Invention
+        **Title**: {{ .params.invention_title }}
+        **Description**: {{ .params.invention_description }}
+        
+        ## Prior Art Analysis
+        {{ index .steps.analyze_patents.outputs "prior_art" }}
+        
+        ## Patentability Assessment
+        {{ index .steps.novelty_assessment.outputs "patentability" }}
+        
+        ## Freedom to Operate Analysis
+        {{ index .steps.freedom_to_operate.outputs "fto" }}

@@ -1,0 +1,71 @@
+name: case-brief
+description: "Legal case brief generator from court opinions"
+version: "1.0.0"
+params:
+  - name: case_text
+    type: string
+    required: false
+    description: "Full text of the court opinion"
+  - name: case_url
+    type: string
+    required: false
+    description: "URL to the court opinion"
+  - name: case_name
+    type: string
+    required: false
+    description: "Name of the case"
+  - name: brief_format
+    type: string
+    required: false
+    default: "standard"
+    description: "Brief format (standard, detailed, student)"
+
+steps:
+  - id: fetch_opinion
+    node: http_request
+    description: "Fetch court opinion from URL if provided"
+    config:
+      method: GET
+      url: "{{ .params.case_url }}"
+      headers:
+        User-Agent: "LegalBriefBot/1.0"
+    condition: "{{ .params.case_url | ne "" }}"
+
+  - id: extract_metadata
+    node: agent
+    description: "Extract case metadata and procedural history"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a legal case analyst. Extract from the case: case name, citation, court, date,
+        judges, procedural history, nature of the case, and parties. Output in structured JSON.
+      prompt: |
+        {{ if .params.case_url }}Case text: {{ index .steps.fetch_opinion.outputs "body" }}{{ else }}Case text: {{ .params.case_text }}{{ end }}
+        Extract all metadata and procedural history.
+
+  - id: generate_brief
+    node: agent
+    description: "Generate the case brief"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a legal brief writer. Create a comprehensive case brief including:
+        Facts (relevant facts only), Issue (legal question presented), Rule (applicable law),
+        Holding (court's answer), Reasoning (court's analysis), Disposition (outcome),
+        Concurrences/Dissents (if any), and Significance (impact on the law).
+        Format according to {{ .params.brief_format }} format.
+      prompt: |
+        Case name: {{ .params.case_name }}
+        Metadata: {{ index .steps.extract_metadata.outputs "metadata" }}
+        {{ if .params.case_url }}Case text: {{ index .steps.fetch_opinion.outputs "body" }}{{ else }}Case text: {{ .params.case_text }}{{ end }}
+        Generate a complete case brief in {{ .params.brief_format }} format.
+
+  - id: save_brief
+    node: file_write
+    description: "Save the case brief"
+    config:
+      path: "{{ .params.output_path | default "output/case_brief.md" }}"
+      content: |
+        # Case Brief: {{ .params.case_name }}
+        
+        {{ index .steps.generate_brief.outputs "brief" }}

@@ -1,0 +1,116 @@
+name: Lab Report Analyzer
+# Analyze and explain lab test results
+# Usage: aflare install healthcare/lab-report-analyzer
+#        aflare run lab-report-analyzer/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: code_interpreter
+      max_iterations: 3
+    input: |
+      Analyze the following lab test results and interpret each value.
+
+      Lab panel: {{ .params.lab_panel }}
+      Test results: {{ .params.test_results }}
+      Patient age: {{ .params.age }}
+      Patient gender: {{ .params.gender }}
+      Fasting status: {{ .params.fasting }}
+
+      For each test result:
+      1. Identify if value is low, normal, or high
+      2. Provide reference range for patient demographics
+      3. Explain clinical significance of abnormal values
+      4. Identify patterns (e.g., iron deficiency pattern, liver function pattern)
+      5. Suggest confirmatory tests if needed
+      6. Note any critical values requiring immediate attention
+    id: lab_interpretation
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 30s
+    input: |
+      import json
+
+      results = {{ .params.test_results | toJSON }}
+      interpretation = {{ .lab_interpretation | toJSON }}
+
+      # Calculate abnormality statistics
+      total_tests = len(results)
+      abnormal = sum(1 for r in results if r.get("status") != "normal")
+      critical = sum(1 for r in results if r.get("status") == "critical")
+      abnormal_pct = (abnormal / total_tests * 100) if total_tests > 0 else 0
+
+      # Calculate trend indicators if prior results available
+      trends = []
+      for r in results:
+          if r.get("prior_value"):
+              prior = float(r["prior_value"])
+              current = float(r["value"])
+              change_pct = ((current - prior) / prior * 100) if prior != 0 else 0
+              trends.append({
+                  "test": r["name"],
+                  "change_pct": round(change_pct, 1),
+                  "direction": "increasing" if change_pct > 5 else "decreasing" if change_pct < -5 else "stable"
+              })
+
+      print(json.dumps({
+          "total_tests": total_tests,
+          "abnormal_count": abnormal,
+          "critical_count": critical,
+          "abnormal_percentage": round(abnormal_pct, 1),
+          "overall_status": "critical" if critical > 0 else "abnormal" if abnormal > 0 else "normal",
+          "trends": trends
+      }))
+    id: lab_statistics
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 2
+    input: |
+      Create a patient-friendly explanation of the lab results.
+
+      Lab interpretation: {{ .lab_interpretation }}
+      Lab statistics: {{ .lab_statistics }}
+
+      Write in plain language:
+      1. What these tests check for
+      2. What the results mean for the patient
+      3. Which results are normal (reassurance)
+      4. Which results need attention and why
+      5. What lifestyle changes or follow-up tests may help
+      6. Questions the patient should ask their doctor
+    id: patient_explanation
+
+  - node: file_write
+    params:
+      path: "{{ .params.output_path | default \"lab-report-analysis.md\" }}"
+    input: |
+      # LAB REPORT ANALYSIS
+      ---
+      **Panel:** {{ .params.lab_panel }}
+      **Date:** {{ .params.lab_date }}
+      **Overall Status:** {{ .lab_statistics.overall_status | upper }}
+      **Tests Analyzed:** {{ .lab_statistics.total_tests }}
+      **Abnormal:** {{ .lab_statistics.abnormal_count }} | **Critical:** {{ .lab_statistics.critical_count }}
+
+      ## Clinical Interpretation
+      {{ .lab_interpretation }}
+
+      ## Trend Analysis
+      {{ range .lab_statistics.trends }}
+      - **{{ .test }}:** {{ .change_pct }}% ({{ .direction }})
+      {{ end }}
+
+      ## What This Means For You
+      {{ .patient_explanation }}
+
+      ---
+      *Disclaimer: Lab results should be interpreted by your healthcare provider in the context of your complete medical history.*
+    id: save_report

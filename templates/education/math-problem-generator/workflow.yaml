@@ -1,0 +1,132 @@
+name: math-problem-generator
+description: Math problem and solution generator with step-by-step explanations
+version: "1.0.0"
+params:
+  - name: topic
+    type: string
+    required: true
+    description: Math topic (e.g., algebra, calculus, geometry)
+  - name: problem_count
+    type: integer
+    required: false
+    default: 10
+    description: Number of problems to generate
+  - name: difficulty
+    type: string
+    required: false
+    default: medium
+    description: Difficulty level
+  - name: problem_types
+    type: array
+    required: false
+    default: ["computation", "word_problem", "proof"]
+    description: Types of problems
+  - name: include_solutions
+    type: boolean
+    required: false
+    default: true
+    description: Include step-by-step solutions
+  - name: grade_level
+    type: string
+    required: false
+    default: high_school
+    description: Target grade level
+steps:
+  - id: generate_problems
+    node: code_interpreter
+    language: python
+    code: |
+      import random
+      import json
+      
+      topic = "{{ .params.topic }}"
+      difficulty = "{{ .params.difficulty }}"
+      count = {{ .params.problem_count }}
+      types = {{ .params.problem_types }}
+      
+      # Generate problem metadata and structure
+      problems = []
+      for i in range(count):
+          ptype = random.choice(types)
+          problems.append({
+              "id": i + 1,
+              "type": ptype,
+              "difficulty": difficulty,
+              "topic": topic,
+              "points": random.randint(5, 20)
+          })
+      
+      result = {
+          "problems": problems,
+          "total_problems": count,
+          "total_points": sum(p["points"] for p in problems),
+          "estimated_time": count * 5
+      }
+      
+      print(json.dumps(result, indent=2))
+    output: problem_framework
+
+  - id: create_problems
+    node: agent
+    prompt: |
+      Generate {{ .params.problem_count }} math problems with full solutions.
+      
+      Topic: {{ .params.topic }}
+      Difficulty: {{ .params.difficulty }}
+      Grade Level: {{ .params.grade_level }}
+      Problem Types: {{ .params.problem_types }}
+      Framework: {{ .problem_framework }}
+      
+      For each problem:
+      1. Write the problem statement clearly
+      2. Provide the correct answer
+      3. Show step-by-step solution with explanations
+      4. Include any relevant formulas or theorems
+      5. Add a hint for struggling students
+      6. Note common mistakes to avoid
+    output: math_problems
+
+  - id: verify_solutions
+    node: code_interpreter
+    language: python
+    code: |
+      import json
+      import re
+      
+      problems = json.loads('''{{ .math_problems }}''')
+      
+      verified = []
+      for p in problems:
+          solution = p.get('solution', '')
+          steps = len(re.findall(r'Step \d+', solution))
+          verified.append({
+              "id": p.get('id'),
+              "has_solution": bool(solution),
+              "solution_steps": steps,
+              "has_hint": bool(p.get('hint')),
+              "has_common_mistakes": bool(p.get('common_mistakes'))
+          })
+      
+      summary = {
+          "total_problems": len(problems),
+          "problems_with_solutions": sum(1 for v in verified if v['has_solution']),
+          "average_steps": round(sum(v['solution_steps'] for v in verified) / max(1, len(verified)), 1),
+          "problems_with_hints": sum(1 for v in verified if v['has_hint']),
+          "verification": verified
+      }
+      
+      print(json.dumps(summary, indent=2))
+    output: verification_result
+
+  - id: save_problems
+    node: file_write
+    filename: "math_problems_{{ .params.topic | sanitize }}.json"
+    content: |
+      {
+        "topic": "{{ .params.topic }}",
+        "difficulty": "{{ .params.difficulty }}",
+        "grade_level": "{{ .params.grade_level }}",
+        "verification": {{ .verification_result }},
+        "problems": {{ .math_problems }}
+      }
+    output: file_path

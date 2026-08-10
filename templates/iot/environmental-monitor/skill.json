@@ -1,0 +1,13 @@
+{
+  "id": "iot/environmental-monitor",
+  "name": "Environmental Monitor",
+  "version": "1.0.0",
+  "description": "Environmental sensor monitoring for temperature, humidity, pressure, and air quality with comfort analysis, trend detection, and AI-powered recommendations",
+  "author": "aflare community",
+  "category": "iot",
+  "tags": ["environmental", "temperature", "humidity", "air-quality", "monitoring"],
+  "keywords": ["iot", "environmental", "sensor", "climate", "monitoring"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

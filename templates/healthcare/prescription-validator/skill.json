@@ -1,0 +1,25 @@
+{
+  "id": "healthcare/prescription-validator",
+  "name": "prescription-validator",
+  "version": "1.0.0",
+  "description": "Validate prescriptions for safety, dosing, interactions, and contraindications",
+  "author": "aflare community",
+  "category": "healthcare",
+  "tags": [
+    "healthcare",
+    "workflow",
+    "pharmacy",
+    "prescription"
+  ],
+  "keywords": [
+    "prescription-validator",
+    "healthcare",
+    "prescription",
+    "pharmacy",
+    "drug-safety",
+    "dosing"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,186 @@
+name: dei-report
+description: Diversity, equity, and inclusion report generator with metrics analysis
+params:
+  - name: workforce_demographics
+    type: object
+    required: true
+    description: Workforce demographic data by category
+  - name: reporting_period
+    type: object
+    required: true
+    description: Reporting period dates
+  - name: comparison_year
+    type: integer
+    required: false
+    default: 0
+    description: Previous year data for comparison
+  - name: include_pay_equity
+    type: boolean
+    required: false
+    default: true
+    description: Include pay equity analysis
+  - name: include_hiring_funnel
+    type: boolean
+    required: false
+    default: true
+    description: Include hiring funnel diversity data
+  - name: include_promotion_data
+    type: boolean
+    required: false
+    default: true
+    description: Include promotion and advancement data
+  - name: company_name
+    type: string
+    required: true
+    description: Company name for report
+  - name: dei_initiatives
+    type: array
+    required: false
+    default: []
+    description: Current DEI initiatives to highlight
+
+steps:
+  - id: compute_metrics
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        demos = workforce_demographics
+        total = demos.get("total_employees", 0)
+
+        if total == 0:
+            print(json.dumps({"error": "No workforce data"}, indent=2))
+        else:
+            # Overall representation
+            gender = demos.get("gender", {})
+            ethnicity = demos.get("ethnicity", {})
+            age = demos.get("age_distribution", {})
+            disability = demos.get("disability", {})
+            veteran = demos.get("veteran_status", {})
+
+            # Leadership representation
+            leadership = demos.get("leadership", {})
+            leadership_gender = leadership.get("gender", {})
+            leadership_ethnicity = leadership.get("ethnicity", {})
+
+            # Calculate leadership gap
+            leadership_gaps = {}
+            for cat, pct in gender.items():
+                lead_pct = leadership_gender.get(cat, 0)
+                leadership_gaps[f"gender_{cat}"] = {
+                    "overall_pct": round(pct / total * 100, 1) if pct else 0,
+                    "leadership_pct": round(lead_pct / demos.get("total_leadership", 1) * 100, 1) if lead_pct else 0,
+                    "gap": round((lead_pct / demos.get("total_leadership", 1) - (pct / total)) * 100, 1) if pct and lead_pct and demos.get("total_leadership", 0) > 0 else 0
+                }
+
+            for cat, pct in ethnicity.items():
+                lead_pct = leadership_ethnicity.get(cat, 0)
+                leadership_gaps[f"ethnicity_{cat}"] = {
+                    "overall_pct": round(pct / total * 100, 1) if pct else 0,
+                    "leadership_pct": round(lead_pct / demos.get("total_leadership", 1) * 100, 1) if lead_pct else 0,
+                    "gap": round((lead_pct / demos.get("total_leadership", 1) - (pct / total)) * 100, 1) if pct and lead_pct and demos.get("total_leadership", 0) > 0 else 0
+                }
+
+            result = {
+                "total_employees": total,
+                "representation": {
+                    "gender": {k: {"count": v, "pct": round(v/total*100, 1)} for k, v in gender.items()},
+                    "ethnicity": {k: {"count": v, "pct": round(v/total*100, 1)} for k, v in ethnicity.items()},
+                    "age": age,
+                    "disability_pct": round(disability.get("identified", 0) / total * 100, 1),
+                    "veteran_pct": round(veteran.get("identified", 0) / total * 100, 1)
+                },
+                "leadership_gaps": leadership_gaps,
+                "total_leadership": demos.get("total_leadership", 0)
+            }
+            print(json.dumps(result, indent=2))
+      inputs:
+        workforce_demographics: "{{ .params.workforce_demographics }}"
+      output: metrics
+
+  - id: analyze_pay_equity
+    type: code_interpreter
+    config:
+      code: |
+        import json
+
+        if not include_pay:
+            print(json.dumps({"skipped": "Pay equity analysis not requested"}, indent=2))
+        else:
+            pay_data = workforce_demographics.get("pay_data", {})
+            if not pay_data:
+                print(json.dumps({"warning": "No pay data available"}, indent=2))
+            else:
+                # Calculate pay gaps by gender and ethnicity
+                results = {"by_gender": {}, "by_ethnicity": {}, "summary": {}}
+
+                for group, data in pay_data.get("by_gender", {}).items():
+                    results["by_gender"][group] = {
+                        "avg_salary": data.get("avg_salary", 0),
+                        "median_salary": data.get("median_salary", 0),
+                        "count": data.get("count", 0)
+                    }
+
+                for group, data in pay_data.get("by_ethnicity", {}).items():
+                    results["by_ethnicity"][group] = {
+                        "avg_salary": data.get("avg_salary", 0),
+                        "median_salary": data.get("median_salary", 0),
+                        "count": data.get("count", 0)
+                    }
+
+                # Calculate unadjusted gap
+                ref_gender = pay_data.get("by_gender", {}).get("Men", {})
+                ref_avg = ref_gender.get("avg_salary", 0)
+                if ref_avg > 0:
+                    for group, data in results["by_gender"].items():
+                        if group != "Men":
+                            gap = round((1 - data["avg_salary"] / ref_avg) * 100, 1)
+                            results["by_gender"][group]["pay_gap_pct"] = gap
+
+                results["summary"]["note"] = "Unadjusted pay gap. Adjusted analysis requires controlled regression."
+                print(json.dumps(results, indent=2))
+      inputs:
+        workforce_demographics: "{{ .params.workforce_demographics }}"
+        include_pay: "{{ .params.include_pay_equity }}"
+      output: pay_equity
+
+  - id: generate_report
+    type: agent
+    config:
+      instruction: |
+        Generate a comprehensive DEI report for {{ .params.company_name }}.
+
+        Reporting period: {{ .params.reporting_period }}
+        Comparison year: {{ .params.comparison_year }}
+
+        Include these sections:
+        1. **Executive Summary**: Key findings and year-over-year trends
+        2. **Workforce Demographics**: Gender, ethnicity, age, disability, veteran representation
+        3. **Leadership Representation**: Diversity at leadership levels with gap analysis
+        4. **Pay Equity Analysis**: {{ if .params.include_pay_equity }}Unadjusted pay gaps by gender and ethnicity{{ else }}Not included{{ end }}
+        5. **Hiring Funnel Diversity**: {{ if .params.include_hiring_funnel }}Pipeline, interview, offer, and acceptance rates by demographic{{ else }}Not included{{ end }}
+        6. **Promotion & Advancement**: {{ if .params.include_promotion_data }}Promotion rates by demographic, time-to-promotion{{ else }}Not included{{ end }}
+        7. **DEI Initiatives Progress**: {{ .params.dei_initiatives }}
+        8. **Goals & Commitments**: Specific, measurable goals for next period
+        9. **Action Plan**: Concrete steps to address gaps
+
+        Use data-driven narrative with charts described in text. Be transparent about both progress and gaps.
+        Return as a professional markdown document.
+      input:
+        metrics: "{{ .steps.compute_metrics.output.metrics }}"
+        pay_equity: "{{ .steps.analyze_pay_equity.output.pay_equity }}"
+        company_name: "{{ .params.company_name }}"
+        reporting_period: "{{ .params.reporting_period }}"
+        comparison_year: "{{ .params.comparison_year }}"
+        dei_initiatives: "{{ .params.dei_initiatives }}"
+        include_hiring_funnel: "{{ .params.include_hiring_funnel }}"
+        include_promotion_data: "{{ .params.include_promotion_data }}"
+      output: report_content
+
+  - id: save_report
+    type: file_write
+    config:
+      filename: "{{ .params.output_file | default \"dei_report.md\" }}"
+      content: "{{ .steps.generate_report.output.report_content }}"
+      format: markdown

@@ -1,0 +1,160 @@
+name: packaging-optimizer
+description: Packaging size and cost optimization with dimensional weight analysis
+version: "1.0.0"
+params:
+  - name: product_catalog
+    type: string
+    required: true
+    description: JSON array of products with dimensions, weight, and sales volume
+  - name: available_boxes
+    type: string
+    required: false
+    default: '[]'
+    description: JSON array of available box sizes (empty = auto-generate)
+  - name: dim_weight_factor
+    type: integer
+    required: false
+    default: 5000
+    description: Dimensional weight divisor (5000 for imperial, 6000 for metric)
+  - name: target_fill_rate
+    type: number
+    required: false
+    default: 0.85
+    description: Target box fill rate (0-1)
+  - name: output_file
+    type: string
+    required: false
+    default: /tmp/packaging_optimization.json
+    description: Output file for optimization results
+
+steps:
+  - id: analyze_products
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json, math
+
+        products = json.loads('''{{ .params.product_catalog }}''')
+        existing_boxes = json.loads('''{{ .params.available_boxes }}''')
+        dim_factor = {{ .params.dim_weight_factor }}
+        target_fill = {{ .params.target_fill_rate }}
+
+        # Analyze product dimensions
+        analysis = []
+        for p in products:
+            dims = p.get("dimensions_cm", {})
+            length = dims.get("length", 10)
+            width = dims.get("width", 10)
+            height = dims.get("height", 10)
+            weight_kg = p.get("weight_kg", 1)
+            volume = length * width * height
+
+            # Dimensional weight
+            dim_weight = (length * width * height) / dim_factor
+
+            # Chargeable weight
+            chargeable = max(weight_kg, dim_weight)
+
+            analysis.append({
+                "product_id": p["product_id"],
+                "name": p.get("name", ""),
+                "dimensions_cm": {"l": length, "w": width, "h": height},
+                "volume_cm3": volume,
+                "actual_weight_kg": weight_kg,
+                "dim_weight_kg": round(dim_weight, 3),
+                "chargeable_weight_kg": round(chargeable, 3),
+                "monthly_volume": p.get("monthly_volume", 100),
+                "fragility": p.get("fragility", "standard")
+            })
+
+        # Generate optimal box sizes if none provided
+        if not existing_boxes:
+            volumes = [a["volume_cm3"] for a in analysis]
+            volumes.sort()
+            n = len(volumes)
+            box_sizes = []
+            for i in range(min(5, n)):
+                idx = int(i * n / min(5, n))
+                v = volumes[min(idx, n - 1)]
+                side = round(v ** (1/3), 1)
+                box_sizes.append({
+                    "box_id": f"BOX-{chr(65+i)}",
+                    "length_cm": round(side * 1.1, 1),
+                    "width_cm": round(side * 0.9, 1),
+                    "height_cm": round(side * 1.0, 1),
+                    "volume_cm3": round(side * 1.1 * side * 0.9 * side * 1.0),
+                    "cost_per_box": round(0.50 + i * 0.30, 2),
+                    "max_weight_kg": 5 + i * 5
+                })
+        else:
+            box_sizes = existing_boxes
+
+        # Match products to optimal boxes
+        packaging_plan = []
+        total_savings = 0
+        for a in analysis:
+            best_box = None
+            best_fill = 0
+            for box in box_sizes:
+                box_vol = box.get("volume_cm3", box.get("length_cm", 10) * box.get("width_cm", 10) * box.get("height_cm", 10))
+                if a["volume_cm3"] <= box_vol and a["actual_weight_kg"] <= box.get("max_weight_kg", 999):
+                    fill_rate = a["volume_cm3"] / box_vol
+                    if fill_rate <= 1.0 and fill_rate > best_fill:
+                        best_fill = fill_rate
+                        best_box = box
+
+            if best_box:
+                void_volume = best_box.get("volume_cm3", 0) - a["volume_cm3"]
+                void_pct = round(void_volume / best_box.get("volume_cm3", 1) * 100, 1)
+                packaging_plan.append({
+                    "product_id": a["product_id"],
+                    "product_name": a["name"],
+                    "assigned_box": best_box["box_id"],
+                    "box_cost": best_box["cost_per_box"],
+                    "fill_rate_pct": round(best_fill * 100, 1),
+                    "void_volume_pct": void_pct,
+                    "monthly_boxes": a["monthly_volume"],
+                    "monthly_packaging_cost": round(best_box["cost_per_box"] * a["monthly_volume"], 2)
+                })
+
+        monthly_total = sum(p["monthly_packaging_cost"] for p in packaging_plan)
+        avg_fill = round(sum(p["fill_rate_pct"] for p in packaging_plan) / max(1, len(packaging_plan)), 1)
+
+        result = {
+            "products_analyzed": len(analysis),
+            "box_sizes_available": len(box_sizes),
+            "box_sizes": box_sizes,
+            "target_fill_rate": target_fill,
+            "average_fill_rate_pct": avg_fill,
+            "total_monthly_packaging_cost": monthly_total,
+            "packaging_plan": packaging_plan
+        }
+        print(json.dumps(result))
+    description: Analyze products and match to optimal box sizes
+
+  - id: optimize_packaging
+    node: agent
+    config:
+      prompt: |
+        Analyze the packaging plan and suggest further optimizations:
+        {{ index .steps "analyze_products" "output" }}
+
+        Provide:
+        1. Packaging cost reduction opportunities
+        2. Void fill reduction strategies
+        3. Recommended box size consolidation
+        4. Sustainability improvements (material reduction, recyclability)
+        5. Shipper cost impact analysis (dimensional weight savings)
+    description: Generate AI-powered packaging optimization recommendations
+
+  - id: save_packaging
+    node: file_write
+    config:
+      path: "{{ .params.output_file }}"
+      content: |
+        {
+          "packaging_analysis": {{ index .steps "analyze_products" "output" }},
+          "optimization_recommendations": {{ index .steps "optimize_packaging" "output" }}
+        }
+    description: Save packaging optimization to output file

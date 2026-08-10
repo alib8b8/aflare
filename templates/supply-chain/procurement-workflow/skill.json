@@ -1,0 +1,13 @@
+{
+  "id": "supply-chain/procurement-workflow",
+  "name": "Procurement Workflow",
+  "version": "1.0.0",
+  "description": "End-to-end purchase order creation and procurement automation. Validates requisitions, generates PO details, submits to ERP systems, and sends notifications — all with approval threshold logic.",
+  "author": "aflare community",
+  "category": "supply-chain",
+  "tags": ["procurement", "purchase-order", "erp", "automation", "approval"],
+  "keywords": ["purchase order", "procurement automation", "PO creation", "ERP integration", "approval workflow"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

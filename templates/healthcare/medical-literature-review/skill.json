@@ -1,0 +1,25 @@
+{
+  "id": "healthcare/medical-literature-review",
+  "name": "medical-literature-review",
+  "version": "1.0.0",
+  "description": "Search and review medical literature from PubMed with evidence grading",
+  "author": "aflare community",
+  "category": "healthcare",
+  "tags": [
+    "healthcare",
+    "workflow",
+    "research",
+    "evidence-based"
+  ],
+  "keywords": [
+    "medical-literature-review",
+    "healthcare",
+    "pubmed",
+    "research",
+    "evidence-based",
+    "literature"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

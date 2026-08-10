@@ -1,0 +1,13 @@
+{
+  "id": "education/rubric-generator",
+  "name": "Rubric Generator",
+  "version": "1.0.0",
+  "description": "Assessment rubric creator with customizable criteria, multiple performance levels, weighted scoring, and example evidence descriptors.",
+  "author": "aflare community",
+  "category": "education",
+  "tags": ["rubric", "assessment", "scoring", "criteria", "evaluation"],
+  "keywords": ["rubric", "assessment", "scoring", "criteria", "evaluation", "grading", "descriptors"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

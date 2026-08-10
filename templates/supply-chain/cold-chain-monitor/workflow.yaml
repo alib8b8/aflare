@@ -1,0 +1,162 @@
+name: cold-chain-monitor
+description: Cold chain temperature monitoring and compliance tracking
+version: "1.0.0"
+params:
+  - name: sensor_data_endpoint
+    type: string
+    required: true
+    description: API endpoint for IoT temperature sensor data
+  - name: shipment_ids
+    type: string
+    required: true
+    description: JSON array of shipment IDs to monitor
+  - name: temperature_range
+    type: string
+    required: false
+    default: '{"min": 2.0, "max": 8.0}'
+    description: JSON with acceptable temperature range in Celsius
+  - name: alert_threshold_minutes
+    type: integer
+    required: false
+    default: 15
+    description: Minutes of out-of-range temperature before alerting
+  - name: output_file
+    type: string
+    required: false
+    default: /tmp/cold_chain_monitor.json
+    description: Output file for monitoring results
+
+steps:
+  - id: fetch_sensor_data
+    node: http_request
+    config:
+      method: POST
+      url: "{{ .params.sensor_data_endpoint }}"
+      headers:
+        Content-Type: application/json
+      body:
+        shipment_ids: "{{ .params.shipment_ids }}"
+        window_minutes: 60
+    description: Fetch temperature sensor data from IoT devices
+
+  - id: analyze_temperature
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        from datetime import datetime
+
+        sensor_data = json.loads('''{{ index .steps "fetch_sensor_data" "response" "body" }}''')
+        temp_range = json.loads('''{{ .params.temperature_range }}''')
+        alert_threshold = {{ .params.alert_threshold_minutes }}
+
+        min_temp = temp_range["min"]
+        max_temp = temp_range["max"]
+
+        shipments = sensor_data.get("shipments", [])
+        analysis = []
+
+        for s in shipments:
+            readings = s.get("readings", [])
+            if not readings:
+                analysis.append({
+                    "shipment_id": s["shipment_id"],
+                    "status": "no_data",
+                    "alerts": [{"severity": "high", "message": "No sensor data received"}]
+                })
+                continue
+
+            # Calculate statistics
+            temps = [r["temperature_c"] for r in readings]
+            avg_temp = round(sum(temps) / len(temps), 2)
+            min_recorded = min(temps)
+            max_recorded = max(temps)
+
+            # Detect excursions
+            excursions = []
+            excursion_start = None
+            for r in readings:
+                t = r["temperature_c"]
+                ts = r["timestamp"]
+                if t < min_temp or t > max_temp:
+                    if excursion_start is None:
+                        excursion_start = {"start": ts, "temp": t}
+                else:
+                    if excursion_start is not None:
+                        start_dt = datetime.fromisoformat(excursion_start["start"].replace("Z", "+00:00"))
+                        end_dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                        duration_min = (end_dt - start_dt.replace(tzinfo=None)).total_seconds() / 60
+                        if duration_min >= alert_threshold:
+                            excursions.append({
+                                "start": excursion_start["start"],
+                                "end": ts,
+                                "duration_minutes": round(duration_min, 1),
+                                "max_deviation": round(excursion_start["temp"], 2),
+                                "triggered_alert": True
+                            })
+                        excursion_start = None
+
+            # Compliance status
+            has_excursions = len(excursions) > 0
+            if not has_excursions:
+                compliance = "compliant"
+            elif len(excursions) <= 2:
+                compliance = "at_risk"
+            else:
+                compliance = "non_compliant"
+
+            analysis.append({
+                "shipment_id": s["shipment_id"],
+                "status": "active",
+                "readings_count": len(readings),
+                "avg_temperature": avg_temp,
+                "min_temperature": min_recorded,
+                "max_temperature": max_recorded,
+                "temperature_range": f"{min_temp}-{max_temp}°C",
+                "excursions": excursions,
+                "excursion_count": len(excursions),
+                "compliance": compliance
+            })
+
+        result = {
+            "monitored_at": "{{ now }}",
+            "temperature_range": temp_range,
+            "alert_threshold_minutes": alert_threshold,
+            "total_shipments": len(analysis),
+            "compliance_summary": {
+                "compliant": sum(1 for a in analysis if a.get("compliance") == "compliant"),
+                "at_risk": sum(1 for a in analysis if a.get("compliance") == "at_risk"),
+                "non_compliant": sum(1 for a in analysis if a.get("compliance") == "non_compliant"),
+                "no_data": sum(1 for a in analysis if a.get("status") == "no_data")
+            },
+            "shipments": analysis
+        }
+        print(json.dumps(result))
+    description: Analyze temperature readings and detect excursions
+
+  - id: generate_compliance_report
+    node: agent
+    config:
+      prompt: |
+        Analyze the cold chain monitoring results and generate a compliance report:
+        {{ index .steps "analyze_temperature" "output" }}
+
+        Provide:
+        1. Overall compliance summary and trends
+        2. Root cause analysis of temperature excursions
+        3. Product quality impact assessment for non-compliant shipments
+        4. Corrective action recommendations
+        5. Regulatory reporting guidance (FDA/CFR, EU GDP)
+    description: Generate AI-powered compliance report
+
+  - id: save_monitoring
+    node: file_write
+    config:
+      path: "{{ .params.output_file }}"
+      content: |
+        {
+          "temperature_analysis": {{ index .steps "analyze_temperature" "output" }},
+          "compliance_report": {{ index .steps "generate_compliance_report" "output" }}
+        }
+    description: Save monitoring results and compliance report to output file

@@ -1,0 +1,26 @@
+{
+  "id": "healthcare/mental-health-screener",
+  "name": "mental-health-screener",
+  "version": "1.0.0",
+  "description": "Administer mental health screening with validated assessment tools (PHQ-9, GAD-7, etc.)",
+  "author": "aflare community",
+  "category": "healthcare",
+  "tags": [
+    "healthcare",
+    "workflow",
+    "mental-health",
+    "screening"
+  ],
+  "keywords": [
+    "mental-health-screener",
+    "healthcare",
+    "mental-health",
+    "phq-9",
+    "gad-7",
+    "depression",
+    "anxiety"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

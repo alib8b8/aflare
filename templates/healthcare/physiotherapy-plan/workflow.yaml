@@ -1,0 +1,156 @@
+name: Physiotherapy Exercise Plan Generator
+# Generate personalized physiotherapy exercise plans
+# Usage: aflare install healthcare/physiotherapy-plan
+#        aflare run physiotherapy-plan/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: code_interpreter
+      max_iterations: 3
+    input: |
+      Assess the patient's condition and create a physiotherapy treatment plan.
+
+      Diagnosis: {{ .params.diagnosis }}
+      Affected body area: {{ .params.body_area }}
+      Injury/Surgery date: {{ .params.injury_date }}
+      Pain level (0-10): {{ .params.pain_level }}
+      Range of motion: {{ .params.range_of_motion }}
+      Strength assessment: {{ .params.strength_assessment }}
+      Functional limitations: {{ .params.functional_limitations }}
+      Patient goals: {{ .params.patient_goals }}
+      Age: {{ .params.age }}
+      Activity level: {{ .params.activity_level }}
+      Prior physiotherapy: {{ .params.prior_therapy }}
+      Contraindications: {{ .params.contraindications }}
+
+      Create a treatment plan with:
+      1. Phase assessment (acute, subacute, chronic, maintenance)
+      2. Treatment goals for each phase
+      3. Exercise selection rationale
+      4. Precautions and contraindications
+      5. Pain management strategies
+      6. Progress milestones
+      7. Expected recovery timeline
+    id: treatment_plan
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 30s
+    input: |
+      import json
+      from datetime import datetime
+
+      plan = {{ .treatment_plan | toJSON }}
+      injury_date = "{{ .params.injury_date }}"
+      pain_level = int({{ .params.pain_level }})
+
+      # Calculate weeks since injury
+      try:
+          injury_dt = datetime.strptime(injury_date, "%Y-%m-%d")
+          weeks_since = (datetime.now() - injury_dt).days / 7
+      except:
+          weeks_since = 0
+
+      # Determine exercise phase
+      if weeks_since < 2 or pain_level >= 7:
+          phase = "acute"
+          reps = "8-10"
+          sets = "1-2"
+          frequency = "daily (2-3x/day)"
+          intensity = "low"
+      elif weeks_since < 6 or pain_level >= 4:
+          phase = "subacute"
+          reps = "10-12"
+          sets = "2-3"
+          frequency = "daily"
+          intensity = "moderate"
+      else:
+          phase = "chronic"
+          reps = "12-15"
+          sets = "3"
+          frequency = "every other day"
+          intensity = "moderate-high"
+
+      # Calculate exercise progression
+      exercises = plan.get("exercises", [])
+      for i, ex in enumerate(exercises):
+          ex["week"] = i + 1
+          ex["sets"] = sets
+          ex["reps"] = reps
+          ex["frequency"] = frequency
+          ex["intensity"] = intensity
+
+      print(json.dumps({
+          "phase": phase,
+          "weeks_since_injury": round(weeks_since, 1),
+          "pain_level": pain_level,
+          "recommended_sets": sets,
+          "recommended_reps": reps,
+          "recommended_frequency": frequency,
+          "recommended_intensity": intensity,
+          "exercises": exercises
+      }))
+    id: exercise_program
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 2
+    input: |
+      Generate detailed exercise instructions and home program materials.
+
+      Treatment plan: {{ .treatment_plan }}
+      Exercise program: {{ .exercise_program }}
+
+      For each exercise, provide:
+      1. Step-by-step instructions (clear, actionable)
+      2. Common mistakes to avoid
+      3. Visual description of proper form
+      4. How to know if you're doing it right
+      5. When to progress to next level
+      6. Pain guidelines (what's normal vs. stop)
+      7. Modifications for difficulty level
+    id: exercise_instructions
+
+  - node: file_write
+    params:
+      path: "{{ .params.output_path | default \"physiotherapy-plan.md\" }}"
+    input: |
+      # PHYSIOTHERAPY EXERCISE PLAN
+      ---
+      **Diagnosis:** {{ .params.diagnosis }}
+      **Phase:** {{ .exercise_program.phase | upper }}
+      **Weeks Since Injury:** {{ .exercise_program.weeks_since_injury }}
+      **Pain Level:** {{ .exercise_program.pain_level }}/10
+
+      ## Treatment Goals
+      {{ .treatment_plan.goals }}
+
+      ## Exercise Program
+      **Sets:** {{ .exercise_program.recommended_sets }} | **Reps:** {{ .exercise_program.recommended_reps }}
+      **Frequency:** {{ .exercise_program.recommended_frequency }} | **Intensity:** {{ .exercise_program.recommended_intensity }}
+
+      {{ range .exercise_program.exercises }}
+      ### Week {{ .week }}: {{ .name }}
+      - **Target:** {{ .target_area }}
+      - **Sets/Reps:** {{ .sets }} x {{ .reps }}
+      - **Instructions:** {{ .instructions }}
+      - **Precautions:** {{ .precautions }}
+      {{ end }}
+
+      ## Detailed Instructions
+      {{ .exercise_instructions }}
+
+      ## Progress Tracking
+      {{ .treatment_plan.milestones }}
+
+      ---
+      *Stop any exercise that causes sharp pain. Follow up with your physiotherapist regularly.*
+      *Therapist: {{ .params.therapist_name }}*
+    id: save_plan

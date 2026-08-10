@@ -1,0 +1,24 @@
+{
+  "id": "healthcare/clinical-trial-matcher",
+  "name": "clinical-trial-matcher",
+  "version": "1.0.0",
+  "description": "Match patients to relevant clinical trials using ClinicalTrials.gov data",
+  "author": "aflare community",
+  "category": "healthcare",
+  "tags": [
+    "healthcare",
+    "workflow",
+    "clinical-trials",
+    "research"
+  ],
+  "keywords": [
+    "clinical-trial-matcher",
+    "healthcare",
+    "clinical-trial",
+    "research",
+    "patient-matching"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

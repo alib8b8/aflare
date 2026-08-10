@@ -1,0 +1,136 @@
+name: data-processing-agreement
+description: "Data Processing Agreement (DPA) generator for GDPR compliance"
+version: "1.0.0"
+params:
+  - name: controller_name
+    type: string
+    required: true
+    description: "Name of the data controller"
+  - name: processor_name
+    type: string
+    required: true
+    description: "Name of the data processor"
+  - name: processing_purposes
+    type: array
+    required: true
+    description: "Purposes of data processing"
+  - name: data_categories
+    type: array
+    required: true
+    description: "Categories of personal data"
+  - name: data_subjects
+    type: array
+    required: true
+    description: "Categories of data subjects"
+  - name: duration
+    type: string
+    required: false
+    default: "Duration of the service agreement"
+    description: "Duration of processing"
+  - name: subprocessors
+    type: array
+    required: false
+    default: []
+    description: "List of authorized sub-processors"
+  - name: cross_border
+    type: boolean
+    required: false
+    default: false
+    description: "Whether international transfers are involved"
+  - name: governing_law
+    type: string
+    required: false
+    default: "GDPR / EU Member State Law"
+    description: "Governing law"
+
+steps:
+  - id: generate_dpa
+    node: agent
+    description: "Generate the Data Processing Agreement"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a GDPR compliance attorney. Draft a complete Data Processing Agreement (DPA)
+        compliant with GDPR Article 28. Include all required clauses: subject matter and duration,
+        nature and purpose, types of personal data, categories of data subjects, controller
+        obligations, processor obligations, sub-processing, data subject rights, security
+        measures, breach notification, deletion/return of data, audits, international transfers,
+        and liability. Use clear, legally precise language.
+      prompt: |
+        Controller: {{ .params.controller_name }}
+        Processor: {{ .params.processor_name }}
+        Purposes: {{ .params.processing_purposes }}
+        Data categories: {{ .params.data_categories }}
+        Data subjects: {{ .params.data_subjects }}
+        Duration: {{ .params.duration }}
+        Sub-processors: {{ .params.subprocessors }}
+        Cross-border transfers: {{ .params.cross_border }}
+        Governing law: {{ .params.governing_law }}
+        Generate the complete DPA.
+
+  - id: generate_sccs
+    node: agent
+    description: "Generate Standard Contractual Clauses if cross-border"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a data transfer compliance specialist. Generate the appropriate Standard
+        Contractual Clauses (SCCs) for international data transfers based on the EU 2021
+        standard. Include all required modules and annexes. Ensure proper safeguards.
+      prompt: |
+        Controller: {{ .params.controller_name }}
+        Processor: {{ .params.processor_name }}
+        Cross-border: {{ .params.cross_border }}
+        {{ if .params.cross_border }}Generate the required SCCs for this transfer.{{ else }}No SCCs needed - no cross-border transfers.{{ end }}
+
+  - id: generate_security_measures
+    node: agent
+    description: "Generate technical and organizational security measures"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are an information security compliance specialist. Generate a comprehensive
+        annex of technical and organizational security measures (TOMs) appropriate for the
+        data processing activities. Include: access controls, encryption, pseudonymization,
+        backup, disaster recovery, incident response, staff training, and audit procedures.
+      prompt: |
+        Data categories: {{ .params.data_categories }}
+        Processing purposes: {{ .params.processing_purposes }}
+        Generate appropriate technical and organizational security measures.
+
+  - id: validate_dpa
+    node: agent
+    description: "Validate DPA for GDPR compliance"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a GDPR compliance auditor. Validate the DPA for completeness and compliance
+        with GDPR Article 28 requirements. Check for: mandatory clauses, prohibited terms,
+        adequate safeguards, and enforceability. Flag any issues and provide corrections.
+      prompt: |
+        DPA: {{ index .steps.generate_dpa.outputs "dpa_text" }}
+        SCCs: {{ index .steps.generate_sccs.outputs "sccs" }}
+        Security measures: {{ index .steps.generate_security_measures.outputs "toms" }}
+        Validate for GDPR compliance.
+
+  - id: save_dpa
+    node: file_write
+    description: "Save the DPA document"
+    config:
+      path: "{{ .params.output_path | default "output/data_processing_agreement.md" }}"
+      content: |
+        # Data Processing Agreement
+        
+        {{ index .steps.generate_dpa.outputs "dpa_text" }}
+        
+        {{ if .params.cross_border }}
+        ## Standard Contractual Clauses
+        {{ index .steps.generate_sccs.outputs "sccs" }}
+        {{ end }}
+        
+        ## Technical & Organizational Security Measures
+        {{ index .steps.generate_security_measures.outputs "toms" }}
+        
+        ---
+        ## Compliance Validation
+        {{ index .steps.validate_dpa.outputs "validation" }}

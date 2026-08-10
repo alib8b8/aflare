@@ -1,0 +1,13 @@
+{
+  "id": "hr/performance-review",
+  "name": "Performance Review Generator",
+  "version": "1.0.0",
+  "description": "Comprehensive performance review document generator with goal achievement scoring, multi-source competency assessment, and development planning for annual, semi-annual, quarterly, and probation reviews.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["performance", "review", "goals", "competency", "development", "evaluation"],
+  "keywords": ["performance", "review", "appraisal", "goals", "competency", "evaluation", "development", "feedback", "OKR"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

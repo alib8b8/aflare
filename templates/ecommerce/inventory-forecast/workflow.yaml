@@ -1,0 +1,126 @@
+name: inventory-forecast
+description: AI-driven inventory demand forecasting to optimize stock levels and prevent stockouts
+version: "1.0"
+params:
+  - name: product_ids
+    type: array
+    required: false
+    description: Specific products to forecast (empty for all)
+  - name: category_id
+    type: string
+    required: false
+    description: Category to forecast
+  - name: forecast_horizon
+    type: integer
+    default: 30
+    description: Number of days to forecast
+  - name: seasonality
+    type: string
+    default: "auto"
+    description: Seasonality mode (auto, additive, multiplicative)
+
+steps:
+  - id: fetch_sales_history
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.api_base }}/analytics/sales-history"
+      params:
+        product_ids: "{{ .params.product_ids | join \",\" }}"
+        category_id: "{{ .params.category_id }}"
+        days: "{{ mul .params.forecast_horizon 3 }}"
+
+  - id: fetch_inventory_levels
+    node: http_request
+    config:
+      method: GET
+      url: "{{ .params.api_base }}/inventory/levels"
+      params:
+        product_ids: "{{ .params.product_ids | join \",\" }}"
+        category_id: "{{ .params.category_id }}"
+
+  - id: compute_forecast
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        import json
+        import numpy as np
+        from datetime import datetime, timedelta
+
+        sales_data = {{ .steps.fetch_sales_history.response | toJSON }}
+        inventory = {{ .steps.fetch_inventory_levels.response | toJSON }}
+        horizon = {{ .params.forecast_horizon }}
+        seasonality = "{{ .params.seasonality }}"
+
+        # Simple exponential smoothing with trend
+        results = []
+        for product in sales_data.get("products", []):
+            daily_sales = product.get("daily_sales", [])
+            current_stock = next((i["quantity"] for i in inventory["items"] if i["product_id"] == product["id"]), 0)
+            
+            if len(daily_sales) > 0:
+                alpha = 0.3
+                forecast = np.mean(daily_sales[-7:]) if len(daily_sales) >= 7 else np.mean(daily_sales)
+                
+                forecast_days = []
+                running_stock = current_stock
+                stockout_day = None
+                
+                for day in range(horizon):
+                    running_stock -= forecast
+                    forecast_days.append({
+                        "day": day + 1,
+                        "date": (datetime.now() + timedelta(days=day+1)).strftime("%Y-%m-%d"),
+                        "forecast_demand": round(forecast, 2),
+                        "projected_stock": round(max(0, running_stock), 2)
+                    })
+                    if stockout_day is None and running_stock <= 0:
+                        stockout_day = day + 1
+                
+                results.append({
+                    "product_id": product["id"],
+                    "product_name": product.get("name", ""),
+                    "current_stock": current_stock,
+                    "avg_daily_demand": round(forecast, 2),
+                    "forecast_horizon_days": horizon,
+                    "total_forecast_demand": round(forecast * horizon, 2),
+                    "stockout_risk": "high" if stockout_day else "low" if running_stock > forecast * 7 else "medium",
+                    "estimated_stockout_day": stockout_day,
+                    "recommended_reorder": max(0, round(forecast * horizon - running_stock, 2)),
+                    "daily_forecast": forecast_days
+                })
+
+        print(json.dumps({"forecasts": results, "generated_at": datetime.now().isoformat()}))
+
+  - id: generate_recommendations
+    node: agent
+    config:
+      model: "{{ .params.model | default \"gpt-4\" }}"
+      temperature: 0.2
+      prompt: |
+        Based on the inventory forecast results, generate actionable recommendations:
+        
+        Forecast Results: {{ .steps.compute_forecast.response | toJSON }}
+        
+        For each product:
+        1. Reorder recommendation (priority: high/medium/low)
+        2. Suggested order quantity
+        3. Lead time recommendation
+        4. Risk mitigation strategies
+        5. Seasonal adjustment notes
+        
+        Also provide overall inventory health summary.
+        Output as structured JSON.
+
+  - id: save_forecast_report
+    node: file_write
+    config:
+      path: "/output/inventory/forecast_{{ .params.timestamp }}.json"
+      content: |
+        {
+          "forecast_date": "{{ .params.timestamp }}",
+          "horizon_days": {{ .params.forecast_horizon }},
+          "forecasts": {{ .steps.compute_forecast.response | toJSON }},
+          "recommendations": {{ .steps.generate_recommendations.response | toJSON }}
+        }

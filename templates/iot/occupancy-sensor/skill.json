@@ -1,0 +1,13 @@
+{
+  "id": "iot/occupancy-sensor",
+  "name": "Occupancy Sensor",
+  "version": "1.0.0",
+  "description": "Occupancy and space utilization tracking with real-time analytics, utilization scoring, overcrowding detection, and AI-powered workspace optimization recommendations",
+  "author": "aflare community",
+  "category": "iot",
+  "tags": ["occupancy", "space-utilization", "sensor", "workspace", "analytics"],
+  "keywords": ["iot", "occupancy", "space", "utilization", "workspace"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

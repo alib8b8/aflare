@@ -1,0 +1,111 @@
+name: course-evaluation
+description: Course evaluation and feedback analysis with sentiment analysis and actionable insights
+version: "1.0.0"
+params:
+  - name: course_name
+    type: string
+    required: true
+    description: Name of the course being evaluated
+  - name: feedback_data
+    type: string
+    required: true
+    description: Raw student feedback and evaluation data
+  - name: evaluation_categories
+    type: array
+    required: false
+    default: ["teaching_quality", "course_content", "materials", "assessments", "engagement"]
+    description: Categories to evaluate
+  - name: rating_scale
+    type: integer
+    required: false
+    default: 5
+    description: Rating scale (1-5 or 1-10)
+  - name: include_recommendations
+    type: boolean
+    required: false
+    default: true
+    description: Generate improvement recommendations
+  - name: semester
+    type: string
+    required: false
+    default: ""
+    description: Academic term
+steps:
+  - id: analyze_feedback
+    node: agent
+    prompt: |
+      Analyze student feedback for course evaluation:
+      
+      Course: {{ .params.course_name }}
+      Semester: {{ .params.semester }}
+      Rating Scale: 1-{{ .params.rating_scale }}
+      Feedback Data: {{ .params.feedback_data }}
+      
+      For each category ({{ .params.evaluation_categories }}):
+      1. Summarize overall sentiment
+      2. Identify common themes and patterns
+      3. Quote representative feedback
+      4. Rate the category (1-{{ .params.rating_scale }})
+      5. Note strengths and weaknesses
+    output: category_analysis
+
+  - id: compute_statistics
+    node: code_interpreter
+    language: python
+    code: |
+      import json
+      import re
+      
+      analysis = json.loads('''{{ .category_analysis }}''')
+      feedback = '''{{ .params.feedback_data }}'''
+      
+      # Count sentiment indicators
+      positive_words = ['good', 'great', 'excellent', 'helpful', 'clear', 'engaging', 'useful']
+      negative_words = ['poor', 'confusing', 'boring', 'unclear', 'difficult', 'waste', 'bad']
+      
+      feedback_lower = feedback.lower()
+      positive_count = sum(1 for w in positive_words if w in feedback_lower)
+      negative_count = sum(1 for w in negative_words if w in feedback_lower)
+      
+      total_sentiment = positive_count + negative_count
+      positive_ratio = round(positive_count / max(1, total_sentiment) * 100, 1)
+      
+      stats = {
+          "positive_indicators": positive_count,
+          "negative_indicators": negative_count,
+          "positive_sentiment_pct": positive_ratio,
+          "categories_analyzed": len(analysis),
+          "rating_scale": {{ .params.rating_scale }}
+      }
+      
+      print(json.dumps(stats, indent=2))
+    output: sentiment_stats
+
+  - id: generate_recommendations
+    node: agent
+    prompt: |
+      {{ if .params.include_recommendations }}
+      Generate actionable improvement recommendations based on:
+      
+      Category Analysis: {{ .category_analysis }}
+      Sentiment Stats: {{ .sentiment_stats }}
+      
+      Provide:
+      1. Top 3 strengths to maintain
+      2. Top 3 areas for improvement
+      3. Specific action items for each area
+      4. Timeline for implementation
+      5. Success metrics for each recommendation
+      {{ else }}
+      Skip recommendations.
+      {{ end }}
+    output: recommendations
+
+  - id: notify_results
+    node: notify
+    channel: education_evaluations
+    message: |
+      Course evaluation complete for {{ .params.course_name }}
+      Positive sentiment: {{ .sentiment_stats.positive_sentiment_pct }}%
+      Categories analyzed: {{ .sentiment_stats.categories_analyzed }}
+    output: notification_sent

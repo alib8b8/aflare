@@ -1,0 +1,139 @@
+name: Vaccination Schedule Planner
+# Plan vaccination schedules and generate reminders
+# Usage: aflare install healthcare/vaccination-schedule
+#        aflare run vaccination-schedule/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: http_request
+      max_iterations: 3
+    input: |
+      Determine the recommended vaccination schedule based on patient profile.
+
+      Patient age: {{ .params.age }}
+      Age unit: {{ .params.age_unit }}
+      Previous vaccinations: {{ .params.previous_vaccinations }}
+      Medical conditions: {{ .params.medical_conditions }}
+      Travel plans: {{ .params.travel_plans }}
+      Occupation: {{ .params.occupation }}
+      Pregnancy status: {{ .params.pregnancy_status }}
+      Immunocompromised: {{ .params.immunocompromised }}
+      Country: {{ .params.country }}
+
+      Based on CDC/WHO guidelines, determine:
+      1. Due now vaccinations
+      2. Overdue vaccinations
+      3. Upcoming vaccinations (next 12 months)
+      4. Catch-up schedule if behind
+      5. Travel-specific vaccines needed
+      6. Occupational health vaccines
+      7. Contraindications based on medical history
+      8. Special population considerations
+    id: vaccine_recommendations
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 30s
+    input: |
+      import json
+      from datetime import datetime, timedelta
+
+      recommendations = {{ .vaccine_recommendations | toJSON }}
+      today = datetime.now()
+
+      schedule = []
+      for vaccine in recommendations.get("vaccines", []):
+          if vaccine.get("due_date"):
+              due_date = datetime.strptime(vaccine["due_date"], "%Y-%m-%d")
+              days_until = (due_date - today).days
+              schedule.append({
+                  "vaccine": vaccine["name"],
+                  "due_date": vaccine["due_date"],
+                  "days_until": days_until,
+                  "status": "overdue" if days_until < 0 else "due_now" if days_until <= 7 else "upcoming",
+                  "priority": vaccine.get("priority", "routine")
+              })
+
+      # Sort by days_until
+      schedule.sort(key=lambda x: x["days_until"])
+
+      due_now = [v for v in schedule if v["status"] == "due_now"]
+      overdue = [v for v in schedule if v["status"] == "overdue"]
+      upcoming = [v for v in schedule if v["status"] == "upcoming"]
+
+      print(json.dumps({
+          "total_vaccines": len(schedule),
+          "due_now_count": len(due_now),
+          "overdue_count": len(overdue),
+          "upcoming_count": len(upcoming),
+          "schedule": schedule,
+          "next_vaccine": schedule[0] if schedule else None,
+          "generated_date": today.strftime("%Y-%m-%d")
+      }))
+    id: schedule_calculation
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 2
+    input: |
+      Generate patient-friendly vaccination guidance and educational content.
+
+      Vaccine recommendations: {{ .vaccine_recommendations }}
+      Schedule calculation: {{ .schedule_calculation }}
+
+      Create:
+      1. Simple explanation of why each vaccine is important
+      2. What to expect at the vaccination visit
+      3. Common side effects and how to manage them
+      4. Warning signs that require medical attention
+      5. Vaccination records tracking template
+    id: patient_education
+
+  - node: file_write
+    params:
+      path: "{{ .params.output_path | default \"vaccination-schedule.md\" }}"
+    input: |
+      # VACCINATION SCHEDULE
+      ---
+      **Patient Age:** {{ .params.age }} {{ .params.age_unit }}
+      **Generated:** {{ .schedule_calculation.generated_date }}
+      **Vaccines Due/Overdue:** {{ .schedule_calculation.due_now_count }} due / {{ .schedule_calculation.overdue_count }} overdue
+
+      ## Vaccines Due Now
+      {{ range .schedule_calculation.schedule }}
+      {{ if or (eq .status "due_now") (eq .status "overdue") }}
+      - **{{ .vaccine }}** - {{ .due_date }} ({{ .days_until }} days) [{{ .status | upper }}]
+      {{ end }}
+      {{ end }}
+
+      ## Upcoming Vaccines
+      {{ range .schedule_calculation.schedule }}
+      {{ if eq .status "upcoming" }}
+      - **{{ .vaccine }}** - {{ .due_date }} (in {{ .days_until }} days)
+      {{ end }}
+      {{ end }}
+
+      ## Clinical Recommendations
+      {{ .vaccine_recommendations }}
+
+      ## Patient Education
+      {{ .patient_education }}
+
+      ---
+      *Based on CDC/WHO immunization guidelines for {{ .params.country }}. Consult your healthcare provider.*
+    id: save_schedule
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Vaccination schedule generated. {{ .schedule_calculation.due_now_count }} vaccines due now, {{ .schedule_calculation.overdue_count }} overdue.
+      Next: {{ .schedule_calculation.next_vaccine.vaccine }} on {{ .schedule_calculation.next_vaccine.due_date }}
+    id: notify_summary

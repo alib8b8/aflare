@@ -1,0 +1,13 @@
+{
+  "id": "ecommerce/promotion-planner",
+  "name": "Promotional Campaign Planner",
+  "version": "1.0.0",
+  "description": "AI-powered promotional campaign planning engine that designs multi-channel campaigns, allocates budgets, selects products, forecasts impact, and generates creative direction based on historical performance and business goals.",
+  "author": "aflare community",
+  "category": "ecommerce",
+  "tags": ["promotion", "campaign", "marketing", "budget", "forecasting"],
+  "keywords": ["promotional campaign", "campaign planning", "budget allocation", "marketing strategy", "promotion design"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

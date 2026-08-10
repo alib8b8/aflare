@@ -1,0 +1,13 @@
+{
+  "id": "legal/nda-generator",
+  "name": "NDA Generator",
+  "version": "1.0.0",
+  "description": "Generates customized Non-Disclosure Agreements (NDAs) with AI-drafted clauses and automated compliance validation. Supports both unilateral and mutual NDAs.",
+  "author": "aflare community",
+  "category": "legal",
+  "tags": ["nda", "generator", "confidentiality", "agreement", "legal"],
+  "keywords": ["nda", "non-disclosure agreement", "confidentiality agreement", "legal document generator"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

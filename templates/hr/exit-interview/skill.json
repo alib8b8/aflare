@@ -1,0 +1,13 @@
+{
+  "id": "hr/exit-interview",
+  "name": "Exit Interview Analysis",
+  "version": "1.0.0",
+  "description": "Exit interview analysis workflow that identifies turnover patterns, extracts themes with sentiment analysis, generates retention recommendations, and triggers alerts for concerning trends.",
+  "author": "aflare community",
+  "category": "hr",
+  "tags": ["exit-interview", "turnover", "retention", "sentiment", "analytics", "employee-experience"],
+  "keywords": ["exit", "interview", "turnover", "retention", "attrition", "sentiment", "analysis", "feedback", "offboarding"],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

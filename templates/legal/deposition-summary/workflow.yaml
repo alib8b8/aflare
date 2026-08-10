@@ -1,0 +1,113 @@
+name: deposition-summary
+description: "Deposition transcript summarizer and analysis"
+version: "1.0.0"
+params:
+  - name: case_name
+    type: string
+    required: true
+    description: "Name of the case"
+  - name: deponent_name
+    type: string
+    required: true
+    description: "Name of the deponent"
+  - name: deposition_date
+    type: string
+    required: true
+    description: "Date of the deposition (YYYY-MM-DD)"
+  - name: transcript_text
+    type: string
+    required: false
+    description: "Full deposition transcript text"
+  - name: transcript_url
+    type: string
+    required: false
+    description: "URL to the deposition transcript"
+  - name: summary_type
+    type: string
+    required: false
+    default: "comprehensive"
+    description: "Summary type (comprehensive, executive, topic, chronological)"
+  - name: key_topics
+    type: array
+    required: false
+    default: []
+    description: "Key topics to focus on"
+
+steps:
+  - id: fetch_transcript
+    node: http_request
+    description: "Fetch deposition transcript from URL"
+    config:
+      method: GET
+      url: "{{ .params.transcript_url }}"
+      headers:
+        User-Agent: "LegalDepositionBot/1.0"
+    condition: "{{ .params.transcript_url | ne "" }}"
+
+  - id: summarize_deposition
+    node: agent
+    description: "Summarize the deposition transcript"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a litigation paralegal. Summarize the deposition transcript in a {{ .params.summary_type }}
+        format. Include: deponent background, key admissions, critical testimony, contradictions,
+        objections raised, exhibits discussed, and impeachment potential. Organize by topic
+        and highlight the most impactful testimony.
+      prompt: |
+        Case: {{ .params.case_name }}
+        Deponent: {{ .params.deponent_name }}
+        Date: {{ .params.deposition_date }}
+        Key topics: {{ .params.key_topics }}
+        {{ if .params.transcript_url }}Transcript: {{ index .steps.fetch_transcript.outputs "body" }}{{ else }}Transcript: {{ .params.transcript_text }}{{ end }}
+        Generate a {{ .params.summary_type }} summary.
+
+  - id: extract_testimony
+    node: agent
+    description: "Extract and index key testimony by topic"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a litigation support specialist. Extract and index the most important testimony
+        by topic. For each key excerpt, provide: page/line reference, topic, witness statement,
+        context, and relevance to case issues. Flag any testimony that is inconsistent with
+        documents or other witnesses.
+      prompt: |
+        Summary: {{ index .steps.summarize_deposition.outputs "summary" }}
+        {{ if .params.transcript_url }}Transcript: {{ index .steps.fetch_transcript.outputs "body" }}{{ else }}Transcript: {{ .params.transcript_text }}{{ end }}
+        Extract and index key testimony by topic.
+
+  - id: impeachment_analysis
+    node: agent
+    description: "Identify impeachment material and contradictions"
+    config:
+      model: "{{ .params.model | default "gpt-4" }}"
+      system_prompt: |
+        You are a trial attorney. Analyze the deposition for impeachment opportunities.
+        Identify: internal contradictions, inconsistencies with prior statements, admissions
+        against interest, evasive answers, and areas where the deponent's credibility can
+        be challenged. For each finding, suggest cross-examination strategies.
+      prompt: |
+        Testimony: {{ index .steps.extract_testimony.outputs "testimony" }}
+        Deponent: {{ .params.deponent_name }}
+        Identify impeachment material and cross-examination opportunities.
+
+  - id: save_summary
+    node: file_write
+    description: "Save the deposition summary"
+    config:
+      path: "{{ .params.output_path | default "output/deposition_summary.md" }}"
+      content: |
+        # Deposition Summary
+        ## Case: {{ .params.case_name }}
+        ## Deponent: {{ .params.deponent_name }}
+        ## Date: {{ .params.deposition_date }}
+        
+        ### Summary
+        {{ index .steps.summarize_deposition.outputs "summary" }}
+        
+        ### Key Testimony by Topic
+        {{ index .steps.extract_testimony.outputs "testimony" }}
+        
+        ### Impeachment Analysis
+        {{ index .steps.impeachment_analysis.outputs "impeachment" }}

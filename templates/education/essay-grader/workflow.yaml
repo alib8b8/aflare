@@ -1,0 +1,125 @@
+name: essay-grader
+description: Essay grading with rubric-based scoring, detailed feedback, and improvement suggestions
+version: "1.0.0"
+params:
+  - name: essay_text
+    type: string
+    required: true
+    description: The essay to grade
+  - name: essay_prompt
+    type: string
+    required: true
+    description: The original essay prompt/question
+  - name: rubric_criteria
+    type: array
+    required: true
+    description: Grading rubric dimensions with weights
+  - name: grade_level
+    type: string
+    required: false
+    default: high_school
+    description: Academic level
+  - name: word_limit
+    type: integer
+    required: false
+    default: 0
+    description: Expected word count (0 for no limit)
+  - name: focus_areas
+    type: array
+    required: false
+    default: ["argument", "evidence", "structure", "grammar"]
+    description: Specific areas to focus grading on
+steps:
+  - id: analyze_essay
+    node: agent
+    prompt: |
+      Analyze this essay in detail:
+      
+      Prompt: {{ .params.essay_prompt }}
+      Essay: {{ .params.essay_text }}
+      Grade Level: {{ .params.grade_level }}
+      
+      Evaluate each dimension:
+      {{ range .params.rubric_criteria }}
+      - {{ .name }} (weight: {{ .weight }}%): {{ .description }}
+      {{ end }}
+      
+      For each criterion provide:
+      1. Score (0-100)
+      2. Weighted score
+      3. Specific evidence from the essay
+      4. Strengths demonstrated
+      5. Areas for improvement
+    output: rubric_scores
+
+  - id: calculate_final_grade
+    node: code_interpreter
+    language: python
+    code: |
+      import json
+      
+      scores = json.loads('''{{ .rubric_scores }}''')
+      criteria = {{ .params.rubric_criteria }}
+      
+      total_weighted = 0
+      total_weight = 0
+      breakdown = []
+      
+      for c in criteria:
+          name = c['name']
+          weight = c['weight']
+          score_item = next((s for s in scores if s.get('criterion', '') == name), None)
+          score = score_item.get('score', 0) if score_item else 0
+          weighted = (score / 100) * weight
+          total_weighted += weighted
+          total_weight += weight
+          breakdown.append({
+              "criterion": name,
+              "score": score,
+              "weight": weight,
+              "weighted_score": round(weighted, 2)
+          })
+      
+      final = round((total_weighted / total_weight) * 100, 1) if total_weight > 0 else 0
+      
+      grade = 'A' if final >= 90 else 'B' if final >= 80 else 'C' if final >= 70 else 'D' if final >= 60 else 'F'
+      
+      result = {
+          "final_score": final,
+          "letter_grade": grade,
+          "criteria_breakdown": breakdown,
+          "word_count": len('''{{ .params.essay_text }}'''.split()),
+          "word_limit": {{ .params.word_limit }}
+      }
+      
+      print(json.dumps(result, indent=2))
+    output: grading_result
+
+  - id: generate_feedback
+    node: agent
+    prompt: |
+      Generate comprehensive feedback for this essay:
+      
+      Grading Results: {{ .grading_result }}
+      Focus Areas: {{ .params.focus_areas }}
+      
+      Provide:
+      1. Overall assessment (2-3 sentences)
+      2. Strengths summary by focus area
+      3. Weaknesses by focus area with specific examples
+      4. Actionable revision suggestions
+      5. Writing tips for future essays
+    output: detailed_feedback
+
+  - id: save_grade
+    node: file_write
+    filename: "essay_grade_result.json"
+    content: |
+      {
+        "essay_prompt": "{{ .params.essay_prompt }}",
+        "grade_level": "{{ .params.grade_level }}",
+        "grading": {{ .grading_result }},
+        "feedback": "{{ .detailed_feedback }}",
+        "rubric_scores": {{ .rubric_scores }}
+      }
+    output: file_path
