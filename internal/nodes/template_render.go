@@ -20,9 +20,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"text/template"
 	"time"
+
+	"github.com/Masterminds/sprig/v3"
 )
 
 type TemplateRenderNode struct{}
@@ -82,14 +83,8 @@ func (n *TemplateRenderNode) Execute(ctx context.Context, input string, params m
 		}
 	}
 
-	funcMap := template.FuncMap{
-		"upper": strings.ToUpper,
-		"lower": strings.ToLower,
-		"title": strings.ToTitle,
-		"trim":  strings.TrimSpace,
-		"len":   func(s string) int { return len(s) },
-		"now":   func() string { return time.Now().Format(time.RFC3339) },
-	}
+	funcMap := sprig.FuncMap()
+	funcMap["now"] = func() string { return time.Now().Format(time.RFC3339) }
 
 	tmpl, err := template.New("template").Funcs(funcMap).Parse(templateStr)
 	if err != nil {
