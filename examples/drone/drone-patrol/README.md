@@ -55,9 +55,28 @@ aflare run examples/drone/drone-patrol/workflow.yaml
 | 起飞前检查 | GPS/电池/状态 | 并行检查，确保飞行安全 |
 | 解锁 & 起飞 | arm → takeoff | 按序执行，解锁后起飞到 20m |
 | 巡检航线 | 上传航点 → 开始任务 | 上传 5 个航点组成的巡检航线 |
-| 监控 | 轮询遥测 | 每 3 秒检查一次，电池 < 25% 自动中断 |
+| 监控 | 轮询遥测（5 次 × 3s） | 模拟巡检进度监控，每 3 秒查询一次遥测 |
 | 降落 | land → disarm | 降落并锁定电机 |
 | 报告 | 生成摘要 | 汇总任务执行结果 |
+
+### 上下文变量引用
+
+aflare 使用 `{{step.name}}` 引用前置步骤的输出（JSON 字符串），例如：
+
+```yaml
+# 引用步骤 check_battery 的完整输出
+{{step.check_battery}}
+
+# 使用 JSONPath 提取字段
+{{step.takeoff.jsonpath:$.success}}
+{{step.land.jsonpath:$.telemetry.battery_pct}}
+```
+
+**注意**：`loop`/`map`/`reduce` 等复合步骤使用独立的表达式引擎，`{{step.X}}` 引用无法访问父 workflow 的步骤输出。如需在循环内判断条件，应将数据通过 `loop.items` 传入，或在被调用的节点内部处理。
+
+### 循环限制
+
+aflare 的 `loop` 是 **for-each 循环**（遍历 `items` 列表），不是 while 循环。不支持 `condition` 表达式控制循环终止。示例中通过固定 5 次迭代模拟监控轮询；真实场景建议在 drone 节点内部处理电池等判断逻辑。
 
 ## 支持的 drone 节点动作
 

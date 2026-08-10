@@ -10,6 +10,16 @@
 #
 # 模拟模式（无需真实无人机）：
 #   所有 drone 节点默认 mode=simulate，可直接运行测试
+#
+# ── 上下文变量引用说明 ──
+# aflare 使用 {{step.name}} 引用前置步骤的输出（JSON 字符串），例如：
+#   {{step.check_battery}}            → 步骤 check_battery 的完整输出
+#   {{step.takeoff.jsonpath:$.success}} → JSONPath 提取 success 字段
+#
+# 注意：loop/map/reduce 等复合步骤使用独立的表达式引擎，
+# {{step.X}} 引用无法访问父 workflow 的步骤输出。
+# 如需在循环内判断条件，应将数据通过 loop items 传入，
+# 或在被调用的节点内部处理。
 
 name: "无人机巡检"
 version: "1.0"
@@ -88,13 +98,18 @@ steps:
         depends_on: [upload_waypoints]
 
   # === 阶段 4: 监控巡检进度 ===
+  # 注意：aflare 的 loop 是 for-each 循环（遍历 items 列表），不是 while 循环。
+  # loop 内部使用独立的表达式引擎，无法通过 {{step.X}} 访问父 workflow 步骤输出。
+  # 这里用 5 次迭代（每 3 秒一次）模拟监控；真实场景建议在 drone 节点内部
+  # 处理电池判断逻辑，或将电池数据通过 loop items 传入。
   - name: monitor_patrol
-    description: "监控巡检进度和电池状态"
+    description: "监控巡检进度和电池状态（模拟 5 次轮询）"
     node: loop
     depends_on: [patrol_mission]
-    params:
-      condition: "{{monitor_patrol.step.battery_pct > 25}}"
-      max_iterations: 60
+    loop:
+      # 每行一个 item，共 5 次迭代，每次间隔 3 秒（由 sleep 步骤控制）
+      items: "1\n2\n3\n4\n5"
+      max_iterations: 10
     steps:
       - name: poll_telemetry
         node: drone
