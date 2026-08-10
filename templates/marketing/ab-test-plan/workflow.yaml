@@ -1,0 +1,105 @@
+name: A/B Test Plan Generator
+# Design and analyze A/B tests for marketing campaigns
+# Usage: aflare install marketing/ab-test-plan
+#        aflare run ab-test-plan/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render, json_parse
+      max_iterations: 3
+    input: |
+      Design an A/B testing plan for the following marketing initiative:
+      
+      Goal: {{ .params.goal }}
+      Channel: {{ .params.channel }}
+      Target Metric: {{ .params.metric }}
+      Budget: {{ .params.budget }}
+      Duration: {{ .params.duration }}
+      
+      Provide a structured plan with:
+      1. Hypothesis Statement
+         - Null hypothesis (H0)
+         - Alternative hypothesis (H1)
+      2. Test Design
+         - Control group setup
+         - Variant(s) definition
+         - Sample size calculation (use {{ .params.baseline_rate }} baseline, {{ .params.mde }} minimum detectable effect)
+      3. Test Variables
+         - Independent variable(s)
+         - Dependent variable(s)
+         - Confounding variables to control
+      4. Execution Plan
+         - Timeline with milestones
+         - Traffic split strategy
+         - Technical implementation notes
+      5. Statistical Analysis Plan
+         - Significance level (alpha)
+         - Statistical power (beta)
+         - Test duration calculation
+         - Decision criteria
+      6. Risk Assessment
+         - Potential biases
+         - Validity threats
+         - Mitigation strategies
+    id: test_plan
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 60s
+    input: |
+      import json
+      import math
+      from scipy import stats
+
+      # Sample size calculation for A/B test
+      baseline_rate = {{ .params.baseline_rate }}
+      mde = {{ .params.mde }}
+      alpha = {{ .params.alpha | default 0.05 }}
+      power = {{ .params.power | default 0.80 }}
+
+      # Z-scores for alpha and power
+      z_alpha = stats.norm.ppf(1 - alpha / 2)
+      z_beta = stats.norm.ppf(power)
+
+      # Pooled proportion
+      p1 = baseline_rate
+      p2 = baseline_rate + mde
+      p_pooled = (p1 + p2) / 2
+
+      # Sample size per variant
+      n = (2 * p_pooled * (1 - p_pooled) * (z_alpha + z_beta) ** 2) / (mde ** 2)
+      n = math.ceil(n)
+
+      # Duration estimate
+      daily_visitors = {{ .params.daily_visitors | default 5000 }}
+      variants = {{ .params.variants | default 2 }}
+      days_needed = math.ceil((n * variants) / daily_visitors)
+
+      result = {
+          "sample_size_per_variant": n,
+          "total_sample_needed": n * variants,
+          "estimated_days": days_needed,
+          "baseline_rate": baseline_rate,
+          "minimum_detectable_effect": mde,
+          "significance_level": alpha,
+          "statistical_power": power
+      }
+
+      print(json.dumps(result, indent=2))
+    id: sample_calc
+
+  - node: file_write
+    params:
+      path: ab-test-plan.md
+    input: |
+      {{ .test_plan }}
+      
+      ## Sample Size Calculation Results
+      ```json
+      {{ .sample_calc }}
+      ```
+    id: save

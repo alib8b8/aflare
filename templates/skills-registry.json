@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "count": 121,
+  "count": 182,
   "skills": [
     {
       "id": "business/business-plan",
@@ -129,25 +129,6 @@
       ],
       "keywords": [
         "job-description",
-        "business"
-      ],
-      "inputs": null,
-      "outputs": null,
-      "dependencies": null
-    },
-    {
-      "id": "business/multi-role-agent",
-      "name": "multi-role-agent",
-      "version": "1.0.0",
-      "description": "三角色一体商业智能体（营销 + BD + IR），参考 xiaobei 的产品设计思路。一个入口，覆盖从内容产出、找客户、到融资材料的全流程。",
-      "author": "aflare community",
-      "category": "business",
-      "tags": [
-        "business",
-        "workflow"
-      ],
-      "keywords": [
-        "multi-role-agent",
         "business"
       ],
       "inputs": null,
@@ -364,6 +345,49 @@
       "dependencies": null
     },
     {
+      "id": "business/vendor-assessment",
+      "name": "vendor-assessment",
+      "version": "1.0.0",
+      "description": "Evaluate and score potential vendors/suppliers",
+      "author": "aflare community",
+      "category": "business",
+      "tags": [
+        "business",
+        "procurement",
+        "assessment"
+      ],
+      "keywords": [
+        "vendor-assessment",
+        "business"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-creative/ad-copy",
+      "name": "ad-copy",
+      "version": "1.0.0",
+      "description": "Advertising copy generator for multiple platforms",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "ad-copy",
+        "content-creative",
+        "advertising",
+        "google-ads",
+        "facebook-ads",
+        "copywriting"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "content-creative/brand-identity",
       "name": "brand-identity",
       "version": "1.0.0",
@@ -377,6 +401,29 @@
       "keywords": [
         "brand-identity",
         "content-creative"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-creative/brand-story",
+      "name": "brand-story",
+      "version": "1.0.0",
+      "description": "Brand narrative and origin story writer",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "brand-story",
+        "content-creative",
+        "branding",
+        "storytelling",
+        "origin-story",
+        "narrative"
       ],
       "inputs": null,
       "outputs": null,
@@ -402,6 +449,29 @@
       "dependencies": null
     },
     {
+      "id": "content-creative/creative-brief",
+      "name": "creative-brief",
+      "version": "1.0.0",
+      "description": "Creative project brief template generator",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "creative-brief",
+        "content-creative",
+        "creative-direction",
+        "project-brief",
+        "marketing",
+        "design-brief"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "content-creative/ebook-outline",
       "name": "ebook-outline",
       "version": "1.0.0",
@@ -421,6 +491,97 @@
       "dependencies": null
     },
     {
+      "id": "content-creative/infographic-brief",
+      "name": "infographic-brief",
+      "version": "1.0.0",
+      "description": "Infographic content brief and data outline",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "infographic-brief",
+        "content-creative",
+        "infographic",
+        "data-visualization",
+        "design-brief",
+        "visual-content"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-creative/newsletter-content",
+      "name": "newsletter-content",
+      "version": "1.0.0",
+      "description": "Email newsletter content curator and writer",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "newsletter-content",
+        "content-creative",
+        "email",
+        "newsletter",
+        "curation",
+        "email-marketing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-creative/podcast-outline",
+      "name": "podcast-outline",
+      "version": "1.0.0",
+      "description": "Podcast episode outline and show notes generator",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "podcast-outline",
+        "content-creative",
+        "podcast",
+        "show-notes",
+        "episode-planning"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-creative/presentation-outline",
+      "name": "presentation-outline",
+      "version": "1.0.0",
+      "description": "Presentation slide deck outline generator",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "presentation-outline",
+        "content-creative",
+        "presentation",
+        "slide-deck",
+        "pitch-deck",
+        "speaker-notes"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "content-creative/press-release",
       "name": "press-release",
       "version": "1.0.0",
@@ -434,6 +595,97 @@
       "keywords": [
         "press-release",
         "content-creative"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-creative/product-manual",
+      "name": "product-manual",
+      "version": "1.0.0",
+      "description": "Product user manual and documentation writer",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "product-manual",
+        "content-creative",
+        "documentation",
+        "user-manual",
+        "technical-writing",
+        "user-guide"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-creative/product-naming",
+      "name": "product-naming",
+      "version": "1.0.0",
+      "description": "Product and brand name brainstorming",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "product-naming",
+        "content-creative",
+        "naming",
+        "branding",
+        "brainstorming"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-creative/slogan-generator",
+      "name": "slogan-generator",
+      "version": "1.0.0",
+      "description": "Brand slogan and tagline generator",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "slogan-generator",
+        "content-creative",
+        "slogan",
+        "tagline",
+        "branding",
+        "copywriting"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-creative/social-caption",
+      "name": "social-caption",
+      "version": "1.0.0",
+      "description": "Social media caption generator for Instagram/LinkedIn/Twitter",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "social-caption",
+        "content-creative",
+        "instagram",
+        "linkedin",
+        "twitter",
+        "social-media"
       ],
       "inputs": null,
       "outputs": null,
@@ -478,6 +730,52 @@
       "dependencies": null
     },
     {
+      "id": "content-creative/video-script",
+      "name": "video-script",
+      "version": "1.0.0",
+      "description": "AI video script generator for YouTube/TikTok",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "video-script",
+        "content-creative",
+        "youtube",
+        "tiktok",
+        "script-writing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "content-creative/viral-content",
+      "name": "viral-content",
+      "version": "1.0.0",
+      "description": "Viral content idea generator and hook writer",
+      "author": "aflare community",
+      "category": "content-creative",
+      "tags": [
+        "content-creative",
+        "workflow"
+      ],
+      "keywords": [
+        "viral-content",
+        "content-creative",
+        "viral",
+        "social-media",
+        "hooks",
+        "content-ideas",
+        "engagement"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "content-creative/whitepaper",
       "name": "whitepaper",
       "version": "1.0.0",
@@ -509,6 +807,27 @@
       ],
       "keywords": [
         "ab-test-analyzer",
+        "data-ai"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "data-ai/anomaly-detector",
+      "name": "anomaly-detector",
+      "version": "1.0.0",
+      "description": "Detect anomalies in datasets using statistical and ML methods",
+      "author": "aflare community",
+      "category": "data-ai",
+      "tags": [
+        "data",
+        "ai",
+        "anomaly",
+        "ml"
+      ],
+      "keywords": [
+        "anomaly-detector",
         "data-ai"
       ],
       "inputs": null,
@@ -934,6 +1253,27 @@
       "dependencies": null
     },
     {
+      "id": "devops-infra/config-auditor",
+      "name": "config-auditor",
+      "version": "1.0.0",
+      "description": "Audit configuration files for security and best practices",
+      "author": "aflare community",
+      "category": "devops-infra",
+      "tags": [
+        "devops",
+        "config",
+        "audit",
+        "security"
+      ],
+      "keywords": [
+        "config-auditor",
+        "devops-infra"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "devops-infra/dns-checker",
       "name": "dns-checker",
       "version": "1.0.0",
@@ -1041,6 +1381,26 @@
       ],
       "keywords": [
         "incident-response",
+        "devops-infra"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "devops-infra/k8s-troubleshooter",
+      "name": "k8s-troubleshooter",
+      "version": "1.0.0",
+      "description": "Diagnose and fix Kubernetes issues from error logs",
+      "author": "aflare community",
+      "category": "devops-infra",
+      "tags": [
+        "devops",
+        "kubernetes",
+        "troubleshooting"
+      ],
+      "keywords": [
+        "k8s-troubleshooter",
         "devops-infra"
       ],
       "inputs": null,
@@ -1181,6 +1541,27 @@
       "dependencies": null
     },
     {
+      "id": "devops-infra/service-mesh-check",
+      "name": "service-mesh-check",
+      "version": "1.0.0",
+      "description": "Check Istio/Service Mesh configuration and health",
+      "author": "aflare community",
+      "category": "devops-infra",
+      "tags": [
+        "devops",
+        "service-mesh",
+        "istio",
+        "kubernetes"
+      ],
+      "keywords": [
+        "service-mesh-check",
+        "devops-infra"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "devops-infra/ssl-cert-checker",
       "name": "ssl-cert-checker",
       "version": "1.0.0",
@@ -1238,6 +1619,101 @@
       "dependencies": null
     },
     {
+      "id": "finance/cap-table",
+      "name": "cap-table",
+      "version": "1.0.0",
+      "description": "Startup cap table and equity management with dilution analysis and exit scenario modeling.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "cap-table",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/cash-flow-forecast",
+      "name": "cash-flow-forecast",
+      "version": "1.0.0",
+      "description": "Cash flow projection and analysis with scenario modeling and runway calculation.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "cash-flow-forecast",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/credit-score-analyzer",
+      "name": "credit-score-analyzer",
+      "version": "1.0.0",
+      "description": "Credit score analysis and improvement suggestions with score projection modeling.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "credit-score-analyzer",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/crypto-tracker",
+      "name": "crypto-tracker",
+      "version": "1.0.0",
+      "description": "Cryptocurrency portfolio tracker with real-time price alerts and performance analysis.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "crypto-tracker",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/expense-tracker",
+      "name": "expense-tracker",
+      "version": "1.0.0",
+      "description": "Personal and business expense tracking with intelligent categorization and spending analysis.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "expense-tracker",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "finance/financial-analysis-sop",
       "name": "financial-analysis-sop",
       "version": "1.0.0",
@@ -1250,6 +1726,63 @@
       ],
       "keywords": [
         "financial-analysis-sop",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/financial-report",
+      "name": "financial-report",
+      "version": "1.0.0",
+      "description": "Automated financial report generation with ratio analysis, benchmarking, and executive summary.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "financial-report",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/forex-analyzer",
+      "name": "forex-analyzer",
+      "version": "1.0.0",
+      "description": "Foreign exchange rate analysis with trend detection, technical indicators, and volatility modeling.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "forex-analyzer",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/insurance-comparison",
+      "name": "insurance-comparison",
+      "version": "1.0.0",
+      "description": "Insurance policy comparison analyzer with cost-effectiveness scoring and coverage gap detection.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "insurance-comparison",
         "finance"
       ],
       "inputs": null,
@@ -1276,6 +1809,44 @@
       "dependencies": null
     },
     {
+      "id": "finance/invoice-generator",
+      "name": "invoice-generator",
+      "version": "1.0.0",
+      "description": "Automated invoice creation from transaction data with validation and professional formatting.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "invoice-generator",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/loan-calculator",
+      "name": "loan-calculator",
+      "version": "1.0.0",
+      "description": "Loan comparison and amortization schedule calculator with prepayment analysis.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "loan-calculator",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "finance/market-scan",
       "name": "market-scan",
       "version": "1.0.0",
@@ -1288,6 +1859,25 @@
       ],
       "keywords": [
         "market-scan",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/merger-model",
+      "name": "merger-model",
+      "version": "1.0.0",
+      "description": "M&A financial model with accretion/dilution analysis, synergy modeling, and sensitivity tables.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "merger-model",
         "finance"
       ],
       "inputs": null,
@@ -1314,6 +1904,63 @@
       "dependencies": null
     },
     {
+      "id": "finance/retirement-planner",
+      "name": "retirement-planner",
+      "version": "1.0.0",
+      "description": "Retirement savings and withdrawal planning with gap analysis and tax optimization.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "retirement-planner",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/stock-screener",
+      "name": "stock-screener",
+      "version": "1.0.0",
+      "description": "Stock screening and filtering tool with multi-factor scoring and ranking.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "stock-screener",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/tax-estimator",
+      "name": "tax-estimator",
+      "version": "1.0.0",
+      "description": "Tax liability estimation and planning with deduction optimization and credit analysis.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow"
+      ],
+      "keywords": [
+        "tax-estimator",
+        "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "integrations/ai-news",
       "name": "ai-news",
       "version": "1.0.0",
@@ -1327,6 +1974,124 @@
       "keywords": [
         "ai-news",
         "integrations"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/calendar-bridge",
+      "name": "calendar-bridge",
+      "version": "1.0.0",
+      "description": "Bridge calendar events between Google Calendar and Microsoft Outlook.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "calendar",
+        "bridge"
+      ],
+      "keywords": [
+        "calendar-bridge",
+        "calendar",
+        "google",
+        "outlook",
+        "integrations"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/crm-sync",
+      "name": "crm-sync",
+      "version": "1.0.0",
+      "description": "Synchronize CRM contacts and deals across platforms like HubSpot.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "crm",
+        "sync"
+      ],
+      "keywords": [
+        "crm-sync",
+        "crm",
+        "hubspot",
+        "integrations",
+        "contacts"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/discord-notifier",
+      "name": "discord-notifier",
+      "version": "1.0.0",
+      "description": "Send webhook notifications to Discord channels.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "discord",
+        "notifications"
+      ],
+      "keywords": [
+        "discord-notifier",
+        "discord",
+        "integrations",
+        "webhook"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/email-digest",
+      "name": "email-digest",
+      "version": "1.0.0",
+      "description": "Generate and send daily/weekly email digests with news and trending content.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "email",
+        "digest"
+      ],
+      "keywords": [
+        "email-digest",
+        "email",
+        "integrations",
+        "newsletter"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/github-issue-bot",
+      "name": "github-issue-bot",
+      "version": "1.0.0",
+      "description": "Auto-create, label, and triage GitHub issues.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "github",
+        "issues"
+      ],
+      "keywords": [
+        "github-issue-bot",
+        "github",
+        "integrations",
+        "issues",
+        "labeling"
       ],
       "inputs": null,
       "outputs": null,
@@ -1352,6 +2117,195 @@
       "dependencies": null
     },
     {
+      "id": "integrations/google-sheets-report",
+      "name": "google-sheets-report",
+      "version": "1.0.0",
+      "description": "Generate and update reports in Google Sheets from various data sources.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "google",
+        "sheets"
+      ],
+      "keywords": [
+        "google-sheets-report",
+        "google",
+        "sheets",
+        "integrations",
+        "reporting"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/jira-ticket",
+      "name": "jira-ticket",
+      "version": "1.0.0",
+      "description": "Create and track Jira issues with AI-powered ticket generation.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "jira",
+        "ticketing"
+      ],
+      "keywords": [
+        "jira-ticket",
+        "jira",
+        "integrations",
+        "issues"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/notion-sync",
+      "name": "notion-sync",
+      "version": "1.0.0",
+      "description": "Create Notion pages and synchronize databases automatically.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "notion",
+        "sync"
+      ],
+      "keywords": [
+        "notion-sync",
+        "notion",
+        "integrations",
+        "database"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/rss-to-social",
+      "name": "rss-to-social",
+      "version": "1.0.0",
+      "description": "Cross-post RSS feed items to Twitter/X and Mastodon automatically.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "rss",
+        "social-media"
+      ],
+      "keywords": [
+        "rss-to-social",
+        "rss",
+        "social",
+        "integrations",
+        "cross-posting"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/s3-uploader",
+      "name": "s3-uploader",
+      "version": "1.0.0",
+      "description": "Upload and manage files in AWS S3 buckets with automated manifest generation.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "aws",
+        "s3"
+      ],
+      "keywords": [
+        "s3-uploader",
+        "s3",
+        "aws",
+        "integrations",
+        "upload"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/slack-bot",
+      "name": "slack-bot",
+      "version": "1.0.0",
+      "description": "Send messages and manage Slack channels from your workflows.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "slack",
+        "messaging"
+      ],
+      "keywords": [
+        "slack-bot",
+        "slack",
+        "integrations",
+        "messaging"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/sms-alert",
+      "name": "sms-alert",
+      "version": "1.0.0",
+      "description": "Send SMS alerts and notifications via Twilio with intelligent message formatting.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "sms",
+        "twilio"
+      ],
+      "keywords": [
+        "sms-alert",
+        "sms",
+        "twilio",
+        "integrations",
+        "alerts"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/stripe-report",
+      "name": "stripe-report",
+      "version": "1.0.0",
+      "description": "Generate Stripe payment, revenue, and customer analytics reports.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "stripe",
+        "reporting"
+      ],
+      "keywords": [
+        "stripe-report",
+        "stripe",
+        "integrations",
+        "revenue",
+        "analytics"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "integrations/telegram-bot",
       "name": "telegram-bot",
       "version": "1.0.0",
@@ -1365,6 +2319,100 @@
       "keywords": [
         "telegram-bot",
         "integrations"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/trello-sync",
+      "name": "trello-sync",
+      "version": "1.0.0",
+      "description": "Manage Trello boards and cards with automated sync reports.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "trello",
+        "boards"
+      ],
+      "keywords": [
+        "trello-sync",
+        "trello",
+        "integrations",
+        "cards"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/webhook-relay",
+      "name": "webhook-relay",
+      "version": "1.0.0",
+      "description": "Receive, transform, and forward webhooks between services.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "webhook",
+        "relay"
+      ],
+      "keywords": [
+        "webhook-relay",
+        "webhook",
+        "integrations",
+        "forwarder"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/whatsapp-notify",
+      "name": "whatsapp-notify",
+      "version": "1.0.0",
+      "description": "Send WhatsApp message notifications with delivery status tracking.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "whatsapp",
+        "twilio"
+      ],
+      "keywords": [
+        "whatsapp-notify",
+        "whatsapp",
+        "integrations",
+        "notifications",
+        "messaging"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/zendesk-ticket",
+      "name": "zendesk-ticket",
+      "version": "1.0.0",
+      "description": "Manage Zendesk support tickets with AI-powered analysis and reporting.",
+      "author": "aflare community",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow",
+        "zendesk",
+        "support"
+      ],
+      "keywords": [
+        "zendesk-ticket",
+        "zendesk",
+        "integrations",
+        "support",
+        "tickets"
       ],
       "inputs": null,
       "outputs": null,
@@ -1504,6 +2552,26 @@
       "dependencies": null
     },
     {
+      "id": "lifestyle/garden-planner",
+      "name": "garden-planner",
+      "version": "1.0.0",
+      "description": "Generate a personalized garden planting plan",
+      "author": "aflare community",
+      "category": "lifestyle",
+      "tags": [
+        "lifestyle",
+        "garden",
+        "planning"
+      ],
+      "keywords": [
+        "garden-planner",
+        "lifestyle"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "lifestyle/goal-setting",
       "name": "goal-setting",
       "version": "1.0.0",
@@ -1592,6 +2660,26 @@
       ],
       "keywords": [
         "medical-consultation-sop",
+        "lifestyle"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "lifestyle/recipe-generator",
+      "name": "recipe-generator",
+      "version": "1.0.0",
+      "description": "Generate personalized recipes from available ingredients",
+      "author": "aflare community",
+      "category": "lifestyle",
+      "tags": [
+        "lifestyle",
+        "cooking",
+        "food"
+      ],
+      "keywords": [
+        "recipe-generator",
         "lifestyle"
       ],
       "inputs": null,
@@ -1713,6 +2801,31 @@
       "dependencies": null
     },
     {
+      "id": "marketing/ab-test-plan",
+      "name": "ab-test-plan",
+      "version": "1.0.0",
+      "description": "A/B test design and analysis plan generator for marketing campaigns",
+      "author": "aflare community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow",
+        "ab-testing",
+        "experimentation",
+        "analytics"
+      ],
+      "keywords": [
+        "ab-test-plan",
+        "marketing",
+        "ab-testing",
+        "experiment-design",
+        "statistical-analysis"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "marketing/blog-outline-generator",
       "name": "blog-outline-generator",
       "version": "1.0.0",
@@ -1726,6 +2839,81 @@
       "keywords": [
         "blog-outline-generator",
         "marketing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "marketing/brand-audit",
+      "name": "brand-audit",
+      "version": "1.0.0",
+      "description": "Brand health audit and competitive positioning analysis",
+      "author": "aflare community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow",
+        "brand",
+        "audit",
+        "competitive-analysis"
+      ],
+      "keywords": [
+        "brand-audit",
+        "marketing",
+        "brand-health",
+        "competitive-positioning",
+        "brand-strategy"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "marketing/campaign-tracker",
+      "name": "campaign-tracker",
+      "version": "1.0.0",
+      "description": "Multi-channel marketing campaign performance tracker with ROI analysis",
+      "author": "aflare community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow",
+        "campaign",
+        "analytics",
+        "performance"
+      ],
+      "keywords": [
+        "campaign-tracker",
+        "marketing",
+        "campaign-performance",
+        "roi-analysis",
+        "multi-channel"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "marketing/churn-prediction",
+      "name": "churn-prediction",
+      "version": "1.0.0",
+      "description": "Customer churn prediction and retention strategy generator",
+      "author": "aflare community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow",
+        "churn",
+        "retention",
+        "analytics"
+      ],
+      "keywords": [
+        "churn-prediction",
+        "marketing",
+        "customer-retention",
+        "churn-analysis",
+        "retention-strategy"
       ],
       "inputs": null,
       "outputs": null,
@@ -1751,6 +2939,31 @@
       "dependencies": null
     },
     {
+      "id": "marketing/competitor-price-tracker",
+      "name": "competitor-price-tracker",
+      "version": "1.0.0",
+      "description": "Competitor pricing monitoring and analysis with gap detection",
+      "author": "aflare community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow",
+        "pricing",
+        "competitive-intelligence",
+        "analytics"
+      ],
+      "keywords": [
+        "competitor-price-tracker",
+        "marketing",
+        "pricing-analysis",
+        "competitive-pricing",
+        "price-monitoring"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "marketing/content-calendar",
       "name": "content-calendar",
       "version": "1.0.0",
@@ -1764,6 +2977,31 @@
       "keywords": [
         "content-calendar",
         "marketing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "marketing/customer-journey-map",
+      "name": "customer-journey-map",
+      "version": "1.0.0",
+      "description": "Customer journey mapping and touchpoint analysis across all stages",
+      "author": "aflare community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow",
+        "customer-journey",
+        "ux",
+        "cx"
+      ],
+      "keywords": [
+        "customer-journey-map",
+        "marketing",
+        "journey-mapping",
+        "touchpoint-analysis",
+        "customer-experience"
       ],
       "inputs": null,
       "outputs": null,
@@ -1789,6 +3027,31 @@
       "dependencies": null
     },
     {
+      "id": "marketing/influencer-brief",
+      "name": "influencer-brief",
+      "version": "1.0.0",
+      "description": "Influencer marketing campaign brief generator with profile matching and deliverables",
+      "author": "aflare community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow",
+        "influencer",
+        "campaign",
+        "social-media"
+      ],
+      "keywords": [
+        "influencer-brief",
+        "marketing",
+        "influencer-marketing",
+        "campaign-brief",
+        "creator-partnership"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "marketing/landing-page-copy",
       "name": "landing-page-copy",
       "version": "1.0.0",
@@ -1808,6 +3071,81 @@
       "dependencies": null
     },
     {
+      "id": "marketing/lead-scoring",
+      "name": "lead-scoring",
+      "version": "1.0.0",
+      "description": "Lead scoring and qualification workflow for sales prioritization",
+      "author": "aflare community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow",
+        "lead-scoring",
+        "sales",
+        "qualification"
+      ],
+      "keywords": [
+        "lead-scoring",
+        "marketing",
+        "lead-qualification",
+        "sales-prioritization",
+        "lead-management"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "marketing/media-plan",
+      "name": "media-plan",
+      "version": "1.0.0",
+      "description": "Media buying plan and budget allocator with channel optimization",
+      "author": "aflare community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow",
+        "media-buying",
+        "budgeting",
+        "advertising"
+      ],
+      "keywords": [
+        "media-plan",
+        "marketing",
+        "media-buying",
+        "budget-allocation",
+        "advertising-plan"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "marketing/persona-builder",
+      "name": "persona-builder",
+      "version": "1.0.0",
+      "description": "Buyer persona research and profile generator for targeted marketing",
+      "author": "aflare community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow",
+        "persona",
+        "audience-research",
+        "targeting"
+      ],
+      "keywords": [
+        "persona-builder",
+        "marketing",
+        "buyer-persona",
+        "audience-research",
+        "customer-profile"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "marketing/product-description",
       "name": "product-description",
       "version": "1.0.0",
@@ -1821,6 +3159,31 @@
       "keywords": [
         "product-description",
         "marketing"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "marketing/sentiment-analysis",
+      "name": "sentiment-analysis",
+      "version": "1.0.0",
+      "description": "Brand sentiment analysis from social media and review platforms",
+      "author": "aflare community",
+      "category": "marketing",
+      "tags": [
+        "marketing",
+        "workflow",
+        "sentiment",
+        "social-media",
+        "brand-monitoring"
+      ],
+      "keywords": [
+        "sentiment-analysis",
+        "marketing",
+        "brand-sentiment",
+        "social-listening",
+        "review-analysis"
       ],
       "inputs": null,
       "outputs": null,

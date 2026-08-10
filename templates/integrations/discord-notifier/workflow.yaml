@@ -1,0 +1,53 @@
+name: Discord Notifier
+# Send webhook notifications to Discord channels
+# Usage: aflare install discord-notifier
+#        aflare run discord-notifier/workflow.yaml
+# Config: Set DISCORD_WEBHOOK_URL
+
+steps:
+  - node: file_read
+    params:
+      path: discord-message.txt
+    id: message_content
+    on_error: skip
+
+  - node: template_render
+    params:
+      template: |
+        {{ if .message }}{{ .message }}{{ else }}Notification from aflare workflow{{ end }}
+      message: "{{ .message_content }}"
+    id: rendered_message
+
+  - node: http_request
+    params:
+      url: "{{ .webhook_url }}"
+      method: POST
+      content_type: application/json
+      body: |
+        {
+          "content": "{{ .rendered_message }}",
+          "username": "aflare",
+          "embeds": [
+            {
+              "title": "Workflow Notification",
+              "description": "{{ .rendered_message }}",
+              "color": 5814783,
+              "timestamp": "{{ .timestamp }}"
+            }
+          ]
+        }
+      timeout: 30s
+    id: send
+
+  - node: json_parse
+    params:
+      path: ""
+    input: send
+    id: response
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Discord notification sent. Response: {{ .response }}
+    id: confirm

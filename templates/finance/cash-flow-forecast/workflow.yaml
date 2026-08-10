@@ -1,0 +1,130 @@
+name: Cash Flow Forecast
+# Cash flow projection and analysis
+# Usage: aflare install finance/cash-flow-forecast
+#        aflare run cash-flow-forecast/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.financial_data }}"
+    id: raw_financials
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render,json_parse
+      max_iterations: 3
+    input: |
+      Build a cash flow forecast based on the following financial data:
+
+      Historical Financials:
+      {{ .raw_financials }}
+
+      Forecast Parameters:
+      - Forecast Period: {{ .params.forecast_months }} months
+      - Starting Cash Balance: {{ .params.starting_cash }}
+      - Revenue Growth Rate: {{ .params.revenue_growth }}%
+      - Expense Growth Rate: {{ .params.expense_growth }}%
+      - Seasonality: {{ .params.seasonality }}
+
+      Project the following for each month:
+      1. CASH INFLOWS
+         - Operating revenue
+         - Accounts receivable collections
+         - Investment income
+         - Loan proceeds
+         - Other inflows
+
+      2. CASH OUTFLOWS
+         - Operating expenses (payroll, rent, utilities)
+         - COGS / direct costs
+         - Capital expenditures
+         - Debt service (principal + interest)
+         - Tax payments
+         - Dividends/distributions
+
+      3. NET CASH FLOW per month
+
+      4. ENDING CASH BALANCE
+
+      5. Key Metrics:
+         - Cash runway (months until cash runs out)
+         - Cash burn rate
+         - Operating cash flow margin
+         - Free cash flow
+         - Cash conversion cycle
+
+      6. Scenario Analysis:
+         - Best case (revenue +20%, expenses -10%)
+         - Base case (as projected)
+         - Worst case (revenue -20%, expenses +10%)
+
+      7. Warning flags:
+         - Months where cash drops below minimum threshold
+         - Negative cash flow trends
+         - Liquidity concerns
+    id: forecast
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 60s
+    input: |
+      import json
+
+      forecast = {{ .forecast }}
+      months = int({{ .params.forecast_months }})
+      starting_cash = float({{ .params.starting_cash }})
+
+      # Calculate cash runway
+      burn_rate = 0
+      balances = []
+      cash = starting_cash
+
+      for m in range(months):
+          monthly_inflow = forecast.get('inflows', {}).get(f'month_{m+1}', 0) or 0
+          monthly_outflow = forecast.get('outflows', {}).get(f'month_{m+1}', 0) or 0
+          net = monthly_inflow - monthly_outflow
+          cash += net
+          balances.append(cash)
+          if net < 0:
+              burn_rate = abs(net)
+
+      runway = cash / burn_rate if burn_rate > 0 else float('inf')
+      min_balance = min(balances) if balances else 0
+
+      print("## Cash Flow Metrics")
+      print(f"Starting Cash: ${starting_cash:,.2f}")
+      print(f"Ending Cash: ${cash:,.2f}")
+      print(f"Minimum Balance: ${min_balance:,.2f}")
+      print(f"Monthly Burn Rate: ${burn_rate:,.2f}")
+      print(f"Cash Runway: {runway:.1f} months")
+      print()
+      print("### Monthly Balances")
+      for i, b in enumerate(balances):
+          print(f"Month {i+1}: ${b:,.2f}")
+    id: calculations
+
+  - node: file_write
+    params:
+      path: cash-flow-forecast-report.md
+    input: |
+      # Cash Flow Forecast Report
+
+      Forecast Period: {{ .params.forecast_months }} months
+      Generated: {{ .metadata.timestamp }}
+
+      ## Analysis
+      {{ .forecast }}
+
+      ## Calculations
+      {{ .calculations }}
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Cash flow forecast complete. Report saved to cash-flow-forecast-report.md
+    id: notify

@@ -1,0 +1,23 @@
+{
+  "id": "integrations/email-digest",
+  "name": "email-digest",
+  "version": "1.0.0",
+  "description": "Generate and send daily/weekly email digests with news and trending content.",
+  "author": "aflare community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow",
+    "email",
+    "digest"
+  ],
+  "keywords": [
+    "email-digest",
+    "email",
+    "integrations",
+    "newsletter"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,78 @@
+name: Trello Sync
+# Manage Trello boards and cards
+# Usage: aflare install trello-sync
+#        aflare run trello-sync/workflow.yaml
+# Config: Set TRELLO_API_KEY, TRELLO_TOKEN, TRELLO_BOARD_ID
+
+steps:
+  - node: http_request
+    params:
+      url: https://api.trello.com/1/boards/{{ .board_id }}/lists?key={{ .api_key }}&token={{ .token }}
+      method: GET
+      timeout: 30s
+    id: fetch_lists
+
+  - node: json_parse
+    params:
+      path: ""
+    input: fetch_lists
+    id: lists
+
+  - node: http_request
+    params:
+      url: https://api.trello.com/1/boards/{{ .board_id }}/cards?key={{ .api_key }}&token={{ .token }}
+      method: GET
+      timeout: 30s
+    id: fetch_cards
+
+  - node: json_parse
+    params:
+      path: ""
+    input: fetch_cards
+    id: cards
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse,template_render
+      max_iterations: 3
+    input: |
+      Analyze the Trello board and generate a sync report:
+      - Lists: {{ .lists }}
+      - Cards: {{ .cards }}
+      
+      Provide:
+      - Cards per list count
+      - Overdue cards
+      - Suggested card movements
+      - New cards to create
+    id: sync_report
+
+  - node: http_request
+    params:
+      url: https://api.trello.com/1/cards?key={{ .api_key }}&token={{ .token }}
+      method: POST
+      content_type: application/json
+      body: |
+        {
+          "name": "Sync Report - {{ .date }}",
+          "desc": "{{ .sync_report }}",
+          "idList": "{{ .lists[0].id }}",
+          "idBoard": "{{ .board_id }}"
+        }
+      timeout: 30s
+    id: create_card
+
+  - node: file_write
+    params:
+      path: trello-sync-report.md
+    input: sync_report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Trello sync complete. Report card created: {{ .create_card.id }}
+    id: confirm

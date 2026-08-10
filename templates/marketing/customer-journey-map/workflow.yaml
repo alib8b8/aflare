@@ -1,0 +1,90 @@
+name: Customer Journey Map
+# Map customer journey and analyze touchpoints
+# Usage: aflare install marketing/customer-journey-map
+#        aflare run customer-journey-map/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render, json_parse
+      max_iterations: 4
+    input: |
+      Create a customer journey map for the following persona and product:
+      
+      Persona: {{ .params.persona }}
+      Product: {{ .params.product }}
+      Industry: {{ .params.industry }}
+      Goal: {{ .params.goal }}
+      
+      Map the complete journey through these stages:
+      1. AWARENESS
+         - How do they discover the problem?
+         - Channels: {{ .params.discovery_channels }}
+         - Customer thoughts, feelings, and actions
+         - Pain points at this stage
+      2. CONSIDERATION
+         - Research and evaluation process
+         - Information sources consulted
+         - Comparison criteria
+         - Emotional state
+      3. DECISION
+         - Purchase triggers and barriers
+         - Decision-making factors
+         - Influencers in the decision
+      4. PURCHASE
+         - Onboarding experience
+         - First impressions
+         - Setup and activation steps
+      5. RETENTION
+         - Usage patterns and habits
+         - Value realization moments
+         - Support interactions
+         - Renewal/repeat purchase triggers
+      6. ADVOCACY
+         - Referral motivations
+         - Review and testimonial triggers
+         - Community engagement
+      
+      For each stage, provide:
+      - Touchpoint description
+      - Channel/medium
+      - Customer emotion (emoji + description)
+      - Pain point severity (1-5)
+      - Opportunity for improvement
+      - Internal owner recommendation
+    id: journey_map
+
+  - node: transform
+    params:
+      format: json
+    input: |
+      {
+        "journey_stages": {{ .journey_map | toJson }},
+        "metadata": {
+          "persona": "{{ .params.persona }}",
+          "product": "{{ .params.product }}",
+          "created_at": "{{ .date }}"
+        }
+      }
+    id: structured_output
+
+  - node: file_write
+    params:
+      path: customer-journey-map.md
+    input: |
+      # Customer Journey Map
+      
+      **Persona:** {{ .params.persona }}
+      **Product:** {{ .params.product }}
+      **Industry:** {{ .params.industry }}
+      
+      {{ .journey_map }}
+      
+      ---
+      ## Structured Data (JSON)
+      ```json
+      {{ .structured_output }}
+      ```
+    id: save

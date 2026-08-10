@@ -1,0 +1,109 @@
+name: Viral Content Generator
+# Generate viral content ideas and hooks for social media
+# Usage: aflare install creative/viral-content
+#        aflare run viral-content/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Generate viral content ideas and hooks for {{ .params.brand }}.
+
+      Brand/creator: {{ .params.brand }}
+      Platform: {{ .params.platform }}
+      Content niche: {{ .params.niche }}
+      Target audience: {{ .params.audience }}
+      Brand voice: {{ .params.brand_voice }}
+      Previous top content: {{ .params.top_content }}
+      Trend awareness: {{ .params.trends }}
+      Content format: {{ .params.content_format }}
+
+      Generate the following viral content components:
+      1. Viral Strategy
+         - Viral coefficient analysis
+         - Shareability factors for this niche
+         - Emotional triggers map (awe, surprise, humor, etc.)
+         - Platform algorithm insights
+         - Optimal posting time recommendations
+         - Content series and franchise ideas
+      2. Hook Library (30 hooks)
+         - Curiosity gap hooks (10 hooks)
+         - Controversial/opinion hooks (5 hooks)
+         - Story-based hooks (5 hooks)
+         - Statistic/shock hooks (5 hooks)
+         - Question-based hooks (5 hooks)
+         For each hook provide: full text, emotional trigger, why it works
+      3. Viral Content Ideas (20 ideas)
+         - Idea title
+         - Hook to use
+         - Content outline (3-5 key points)
+         - Visual/camera direction
+         - Trend connection
+         - Viral potential score (1-10)
+         - Target share/engagement metrics
+      4. Template Library
+         - Before/after transformation format
+         - Unpopular opinion format
+         - "Things I wish I knew" format
+         - Reaction/response format
+         - Story time format
+         - Tutorial/hack format
+         - Comparison format
+         - Challenge format
+         For each template: structure, best platform, example
+      5. Engagement Optimization
+         - Comment bait strategies
+         - Share triggers
+         - Save-worthy content elements
+         - Duet/stitch/collab opportunities
+         - Remix potential
+         - Cross-platform adaptation notes
+      6. Content Calendar Integration
+         - Weekly posting schedule
+         - Content mix (educational, entertaining, promotional)
+         - Trend-jacking opportunities
+         - Seasonal/holiday content hooks
+         - User-generated content prompts
+      7. Analytics and Iteration
+         - Key metrics to track per platform
+         - A/B testing plan for hooks
+         - Content performance benchmarks
+         - Iteration and optimization strategy
+         - Repurposing strategy for top performers
+    id: viral_content
+
+  - node: transform
+    params:
+      operation: extract_sections
+      sections:
+        - strategy
+        - hooks
+        - ideas
+        - templates
+        - engagement
+        - calendar
+        - analytics
+    input: viral_content
+    id: structured_output
+
+  - node: file_write
+    params:
+      path: viral-content.md
+    input: viral_content
+    id: save_full
+
+  - node: file_write
+    params:
+      path: viral-content-hooks.json
+    input: structured_output
+    id: save_hooks
+
+  - node: notify
+    params:
+      channel: stdout
+    input: viral_content
+    id: notify

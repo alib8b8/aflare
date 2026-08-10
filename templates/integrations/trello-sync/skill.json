@@ -1,0 +1,23 @@
+{
+  "id": "integrations/trello-sync",
+  "name": "trello-sync",
+  "version": "1.0.0",
+  "description": "Manage Trello boards and cards with automated sync reports.",
+  "author": "aflare community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow",
+    "trello",
+    "boards"
+  ],
+  "keywords": [
+    "trello-sync",
+    "trello",
+    "integrations",
+    "cards"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

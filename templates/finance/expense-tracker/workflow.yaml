@@ -1,0 +1,98 @@
+name: Expense Tracker
+# Personal/business expense tracking and categorization
+# Usage: aflare install finance/expense-tracker
+#        aflare run expense-tracker/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.transactions_file }}"
+    id: raw_data
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render,json_parse
+      max_iterations: 3
+    input: |
+      Analyze and categorize the following expense transactions:
+
+      {{ .raw_data }}
+
+      Categorization rules:
+      - Category mapping: {{ .params.categories }}
+      - Tax deductible flag: {{ .params.tax_deductible }}
+
+      For each transaction, determine:
+      1. Category (Food, Transport, Housing, Utilities, Entertainment, Healthcare, Shopping, Subscriptions, Travel, Other)
+      2. Sub-category
+      3. Is it tax deductible?
+      4. Is it recurring or one-time?
+      5. Flag anomalies (unusually high amounts)
+
+      Then produce a summary:
+      1. Total spending by category
+      2. Category percentage breakdown
+      3. Month-over-month comparison (if historical data available)
+      4. Top 10 largest expenses
+      5. Recurring vs one-time split
+      6. Budget vs actual comparison
+      7. Spending trends and patterns
+      8. Savings opportunities identified
+    id: analysis
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 60s
+    input: |
+      import json
+
+      data = {{ .analysis }}
+
+      # Calculate spending statistics
+      total = sum(item.get('amount', 0) for item in data if isinstance(item, dict))
+
+      # Generate category breakdown
+      categories = {}
+      for item in data:
+          if isinstance(item, dict):
+              cat = item.get('category', 'Uncategorized')
+              amount = item.get('amount', 0)
+              categories[cat] = categories.get(cat, 0) + amount
+
+      # Sort categories by spend
+      ranked = sorted(categories.items(), key=lambda x: x[1], reverse=True)
+
+      print("## Expense Summary")
+      print(f"**Total Spending:** ${total:,.2f}")
+      print()
+      print("### Category Breakdown")
+      for cat, amt in ranked:
+          pct = (amt / total * 100) if total > 0 else 0
+          print(f"- **{cat}:** ${amt:,.2f} ({pct:.1f}%)")
+    id: calculations
+
+  - node: file_write
+    params:
+      path: expense-report.md
+    input: |
+      # Expense Tracking Report
+      
+      Generated: {{ .metadata.timestamp }}
+      
+      ## Raw Analysis
+      {{ .analysis }}
+      
+      ## Calculations
+      {{ .calculations }}
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Expense tracking complete. Report saved to expense-report.md
+      Total spending: see report for details.
+    id: notify

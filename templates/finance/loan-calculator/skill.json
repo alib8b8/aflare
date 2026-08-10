@@ -1,0 +1,19 @@
+{
+  "id": "finance/loan-calculator",
+  "name": "loan-calculator",
+  "version": "1.0.0",
+  "description": "Loan comparison and amortization schedule calculator with prepayment analysis.",
+  "author": "aflare community",
+  "category": "finance",
+  "tags": [
+    "finance",
+    "workflow"
+  ],
+  "keywords": [
+    "loan-calculator",
+    "finance"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

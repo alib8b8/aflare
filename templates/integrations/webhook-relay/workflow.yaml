@@ -1,0 +1,74 @@
+name: Webhook Relay
+# Receive and forward webhooks with transformation
+# Usage: aflare install webhook-relay
+#        aflare run webhook-relay/workflow.yaml
+# Config: Set RELAY_TARGET_URL, AUTH_HEADER
+
+steps:
+  - node: http_request
+    params:
+      url: http://localhost:8080/webhook
+      method: GET
+      timeout: 10s
+    id: receive_webhook
+    on_error: skip
+
+  - node: json_parse
+    params:
+      path: payload
+    input: receive_webhook
+    id: payload
+    on_error: skip
+
+  - node: transform
+    params:
+      mapping:
+        event_type: "{{ .payload.type }}"
+        data: "{{ .payload.data }}"
+        source: "webhook-relay"
+        received_at: "{{ .timestamp }}"
+        relay_id: "{{ .relay_id }}"
+    id: transformed
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse
+      max_iterations: 2
+    input: |
+      Process the webhook payload and determine if it needs enrichment:
+      Payload: {{ .transformed }}
+      
+      If enrichment is needed, add relevant metadata.
+    id: enriched
+
+  - node: http_request
+    params:
+      url: "{{ .relay_target_url }}"
+      method: POST
+      content_type: application/json
+      headers:
+        Authorization: "{{ .auth_header }}"
+        X-Relay-Source: "aflare-webhook-relay"
+      body: "{{ .enriched }}"
+      timeout: 30s
+    id: forward
+
+  - node: file_write
+    params:
+      path: webhook-relay-log.json
+    input: |
+      {
+        "received": {{ .receive_webhook }},
+        "transformed": {{ .transformed }},
+        "forwarded": {{ .forward }}
+      }
+    id: save_log
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Webhook relayed successfully. Status: {{ .forward.status }}
+    id: confirm

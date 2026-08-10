@@ -1,0 +1,24 @@
+{
+  "id": "integrations/whatsapp-notify",
+  "name": "whatsapp-notify",
+  "version": "1.0.0",
+  "description": "Send WhatsApp message notifications with delivery status tracking.",
+  "author": "aflare community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow",
+    "whatsapp",
+    "twilio"
+  ],
+  "keywords": [
+    "whatsapp-notify",
+    "whatsapp",
+    "integrations",
+    "notifications",
+    "messaging"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

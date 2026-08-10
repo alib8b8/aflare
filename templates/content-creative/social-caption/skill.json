@@ -1,0 +1,23 @@
+{
+  "id": "content-creative/social-caption",
+  "name": "social-caption",
+  "version": "1.0.0",
+  "description": "Social media caption generator for Instagram/LinkedIn/Twitter",
+  "author": "aflare community",
+  "category": "content-creative",
+  "tags": [
+    "content-creative",
+    "workflow"
+  ],
+  "keywords": [
+    "social-caption",
+    "content-creative",
+    "instagram",
+    "linkedin",
+    "twitter",
+    "social-media"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

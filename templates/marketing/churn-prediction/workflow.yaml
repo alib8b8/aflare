@@ -1,0 +1,191 @@
+name: Churn Prediction & Retention
+# Predict customer churn and generate retention strategies
+# Usage: aflare install marketing/churn-prediction
+#        aflare run churn-prediction/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: "https://api.crm.example.com/v1/customers?status=active&limit=1000"
+      method: GET
+      timeout: 30s
+    id: customer_data
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 60s
+    input: |
+      import json
+      import math
+      from datetime import datetime, timedelta
+
+      # Parse customer data
+      raw_data = json.loads('''{{ .customer_data }}''')
+      customers = raw_data.get("customers", [])
+
+      # Risk scoring model
+      now = datetime.now()
+      risk_scores = []
+
+      for c in customers:
+          score = 0
+          factors = []
+
+          # Factor 1: Days since last login (weight: 25)
+          last_login = c.get("last_login")
+          if last_login:
+              days_since = (now - datetime.fromisoformat(last_login)).days
+              if days_since > 30:
+                  score += 25
+                  factors.append(f"Inactive {days_since} days")
+              elif days_since > 14:
+                  score += 15
+                  factors.append(f"Inactive {days_since} days")
+              elif days_since > 7:
+                  score += 8
+                  factors.append(f"Inactive {days_since} days")
+
+          # Factor 2: Support tickets (weight: 20)
+          tickets = c.get("open_tickets", 0)
+          if tickets > 3:
+              score += 20
+              factors.append(f"{tickets} open tickets")
+          elif tickets > 1:
+              score += 10
+              factors.append(f"{tickets} open tickets")
+
+          # Factor 3: Usage decline (weight: 25)
+          usage_current = c.get("usage_current", 0)
+          usage_previous = c.get("usage_previous", 0)
+          if usage_previous > 0:
+              decline = (usage_previous - usage_current) / usage_previous
+              if decline > 0.5:
+                  score += 25
+                  factors.append(f"Usage declined {decline:.0%}")
+              elif decline > 0.3:
+                  score += 15
+                  factors.append(f"Usage declined {decline:.0%}")
+              elif decline > 0.1:
+                  score += 8
+                  factors.append(f"Usage declined {decline:.0%}")
+
+          # Factor 4: NPS score (weight: 15)
+          nps = c.get("nps_score")
+          if nps is not None and nps <= 6:
+              score += 15
+              factors.append(f"Low NPS: {nps}")
+          elif nps is not None and nps <= 8:
+              score += 5
+              factors.append(f"Neutral NPS: {nps}")
+
+          # Factor 5: Payment issues (weight: 15)
+          if c.get("failed_payments", 0) > 0:
+              score += 15
+              factors.append(f"{c['failed_payments']} failed payments")
+
+          risk_level = "high" if score >= 70 else "medium" if score >= 40 else "low"
+
+          risk_scores.append({
+              "customer_id": c.get("id"),
+              "customer_name": c.get("name"),
+              "risk_score": score,
+              "risk_level": risk_level,
+              "risk_factors": factors,
+              "account_value": c.get("mrr", 0),
+              "tenure_months": c.get("tenure_months", 0)
+          })
+
+      # Sort by risk score descending
+      risk_scores.sort(key=lambda x: x["risk_score"], reverse=True)
+
+      # Summary statistics
+      high_risk = [r for r in risk_scores if r["risk_level"] == "high"]
+      medium_risk = [r for r in risk_scores if r["risk_level"] == "medium"]
+      low_risk = [r for r in risk_scores if r["risk_level"] == "low"]
+
+      total_at_risk_mrr = sum(r["account_value"] for r in high_risk + medium_risk)
+
+      output = {
+          "summary": {
+              "total_customers": len(customers),
+              "high_risk_count": len(high_risk),
+              "medium_risk_count": len(medium_risk),
+              "low_risk_count": len(low_risk),
+              "at_risk_mrr": round(total_at_risk_mrr, 2),
+              "churn_rate_estimate": f"{round(len(high_risk) / len(customers) * 100, 1)}%"
+          },
+          "high_risk_customers": high_risk[:10],
+          "top_risk_factors": list(set(
+              f for r in high_risk for f in r["risk_factors"]
+          ))[:10]
+      }
+
+      print(json.dumps(output, indent=2))
+    id: churn_analysis
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse, template_render
+      max_iterations: 4
+    input: |
+      Generate a churn prevention and retention strategy based on:
+      
+      Product: {{ .params.product }}
+      Industry: {{ .params.industry }}
+      Churn Analysis: {{ .churn_analysis }}
+      
+      Provide:
+      1. Executive Summary
+         - Overall churn risk assessment
+         - Revenue at risk summary
+         - Top churn drivers identified
+      2. High-Risk Customer Profiles
+         - Common characteristics of at-risk customers
+         - Early warning signals
+         - Segment-specific risk patterns
+      3. Retention Strategy by Risk Level
+         - High Risk: Immediate intervention playbook
+           - Personalized outreach templates
+           - Escalation workflow
+           - Special offer frameworks
+         - Medium Risk: Proactive engagement plan
+           - Health check cadence
+           - Feature adoption campaigns
+           - Success milestone tracking
+         - Low Risk: Loyalty amplification
+           - Advocacy program enrollment
+           - Expansion and upsell opportunities
+           - Referral incentive programs
+      4. Prevention Framework
+         - Automated churn detection triggers
+         - Customer health score dashboard
+         - Early warning system design
+         - Quarterly business review template
+      5. Action Plan
+         - Week 1: Immediate high-risk interventions
+         - Month 1: Process improvements
+         - Quarter 1: Systemic prevention
+         - KPIs and success metrics
+    id: retention_strategy
+
+  - node: file_write
+    params:
+      path: churn-prediction-report.md
+    input: |
+      # Churn Prediction & Retention Strategy
+      
+      **Product:** {{ .params.product }}
+      **Industry:** {{ .params.industry }}
+      **Date:** {{ .date }}
+      
+      {{ .retention_strategy }}
+      
+      ---
+      ## Risk Analysis Data
+      ```json
+      {{ .churn_analysis }}
+      ```
+    id: save

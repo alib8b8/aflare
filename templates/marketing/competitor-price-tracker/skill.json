@@ -1,0 +1,25 @@
+{
+  "id": "marketing/competitor-price-tracker",
+  "name": "competitor-price-tracker",
+  "version": "1.0.0",
+  "description": "Competitor pricing monitoring and analysis with gap detection",
+  "author": "aflare community",
+  "category": "marketing",
+  "tags": [
+    "marketing",
+    "workflow",
+    "pricing",
+    "competitive-intelligence",
+    "analytics"
+  ],
+  "keywords": [
+    "competitor-price-tracker",
+    "marketing",
+    "pricing-analysis",
+    "competitive-pricing",
+    "price-monitoring"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,118 @@
+name: K8s Troubleshooter
+# Diagnose and fix Kubernetes issues from error logs
+# Usage: aflare install devops-infra/k8s-troubleshooter
+#        aflare run k8s-troubleshooter/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: |
+        echo "=== Cluster Info ==="
+        kubectl cluster-info 2>/dev/null || echo "Cannot connect to cluster"
+        echo "=== Node Status ==="
+        kubectl get nodes -o wide 2>/dev/null || echo "Cannot get nodes"
+        echo "=== Node Conditions ==="
+        kubectl get nodes -o json 2>/dev/null | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    for item in data.get('items', []):
+        name = item['metadata']['name']
+        for cond in item['status'].get('conditions', []):
+            if cond['status'] != 'False' or cond['type'] == 'Ready':
+                print(f'{name}: {cond[\"type\"]}={cond[\"status\"]} ({cond.get(\"reason\", \"\")})')
+except: pass
+" 2>/dev/null || echo "Cannot parse node conditions"
+    id: cluster_info
+
+  - node: execute
+    params:
+      command: |
+        echo "=== Problem Pods ==="
+        kubectl get pods --all-namespaces --field-selector=status.phase!=Running 2>/dev/null | head -30 || echo "Cannot get pods"
+        echo "=== Recent Events ==="
+        kubectl get events --all-namespaces --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || echo "Cannot get events"
+        echo "=== Resource Pressure ==="
+        kubectl top nodes 2>/dev/null || echo "Metrics server not available"
+        kubectl top pods --all-namespaces 2>/dev/null | head -20 || echo "Pod metrics not available"
+    id: pod_events
+
+  - node: execute
+    params:
+      command: |
+        echo "=== Error Logs ==="
+        if [ -n "{{ .params.error_logs }}" ]; then
+          echo "{{ .params.error_logs }}"
+        else
+          echo "No specific error logs provided. Checking common sources..."
+          kubectl logs -n kube-system -l component=kube-apiserver --tail=20 2>/dev/null || echo "Cannot access API server logs"
+          echo "---"
+          kubectl logs -n kube-system -l component=kube-controller-manager --tail=20 2>/dev/null || echo "Cannot access controller manager logs"
+        fi
+        echo "=== Target Namespace ==="
+        kubectl get all -n {{ .params.namespace }} 2>/dev/null || echo "Cannot access namespace {{ .params.namespace }}"
+        echo "=== Target Resource ==="
+        kubectl describe {{ .params.resource_type }} {{ .params.resource_name }} -n {{ .params.namespace }} 2>/dev/null || echo "Cannot describe resource"
+    id: error_context
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 5
+    input: |
+      Troubleshoot the Kubernetes issue based on the following diagnostics:
+
+      Cluster Info: {{ .cluster_info }}
+      Pod Events: {{ .pod_events }}
+      Error Context: {{ .error_context }}
+
+      Target namespace: {{ .params.namespace }}
+      Target resource: {{ .params.resource_type }}/{{ .params.resource_name }}
+      Symptom description: {{ .params.symptom }}
+
+      Generate a comprehensive troubleshooting guide:
+
+      1. Issue Summary
+         - What is the observed symptom
+         - Which resources are affected
+         - Impact severity (Critical / High / Medium / Low)
+         - Timeline of the issue (if determinable)
+
+      2. Root Cause Analysis
+         - Most likely root cause (with confidence level)
+         - Alternative possible causes
+         - Evidence supporting each hypothesis
+         - Event chain leading to the failure
+
+      3. Diagnostic Steps Performed
+         - What was checked and findings
+         - Cluster health indicators
+         - Resource utilization patterns
+         - Configuration inconsistencies found
+
+      4. Step-by-Step Fix Guide
+         - Immediate mitigation steps (stop the bleeding)
+         - Permanent fix steps with exact commands
+         - Validation steps after each fix
+         - Rollback instructions if fix doesn't work
+
+      5. Prevention Measures
+         - Monitoring alerts to add
+         - Resource limits to adjust
+         - Health checks to implement
+         - Configuration changes to prevent recurrence
+         - Runbook/documentation updates needed
+
+      6. Related Resources
+         - Relevant Kubernetes documentation links
+         - Community issues or known bugs
+         - Similar incident patterns
+    id: fix_guide
+
+  - node: file_write
+    params:
+      path: k8s-troubleshoot-guide.md
+    input: fix_guide
+    id: save

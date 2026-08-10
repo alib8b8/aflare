@@ -1,0 +1,19 @@
+{
+  "id": "finance/crypto-tracker",
+  "name": "crypto-tracker",
+  "version": "1.0.0",
+  "description": "Cryptocurrency portfolio tracker with real-time price alerts and performance analysis.",
+  "author": "aflare community",
+  "category": "finance",
+  "tags": [
+    "finance",
+    "workflow"
+  ],
+  "keywords": [
+    "crypto-tracker",
+    "finance"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

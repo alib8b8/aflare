@@ -1,0 +1,24 @@
+{
+  "id": "integrations/rss-to-social",
+  "name": "rss-to-social",
+  "version": "1.0.0",
+  "description": "Cross-post RSS feed items to Twitter/X and Mastodon automatically.",
+  "author": "aflare community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow",
+    "rss",
+    "social-media"
+  ],
+  "keywords": [
+    "rss-to-social",
+    "rss",
+    "social",
+    "integrations",
+    "cross-posting"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,72 @@
+name: Email Digest
+# Generate and send daily/weekly email digests
+# Usage: aflare install email-digest
+#        aflare run email-digest/workflow.yaml
+# Config: Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, RECIPIENT
+
+steps:
+  - node: http_request
+    params:
+      url: https://newsapi.org/v2/top-headlines?country=us&apiKey={{ .news_api_key }}
+      method: GET
+      timeout: 30s
+    id: fetch_news
+
+  - node: json_parse
+    params:
+      path: articles
+    input: fetch_news
+    id: articles
+
+  - node: http_request
+    params:
+      url: https://api.github.com/trending
+      method: GET
+      timeout: 30s
+    id: fetch_trending
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse,template_render
+      max_iterations: 3
+    input: |
+      Generate a daily email digest from the following data:
+      - Top news headlines: {{ .articles }}
+      - Trending repos: {{ .fetch_trending }}
+      
+      Format as a clean HTML email with:
+      - Header with date
+      - Top 5 news stories with links
+      - Trending repositories
+      - Footer with unsubscribe link
+    id: digest_html
+
+  - node: http_request
+    params:
+      url: smtp://{{ .smtp_host }}:{{ .smtp_port }}
+      method: POST
+      content_type: application/json
+      body: |
+        {
+          "from": "{{ .smtp_user }}",
+          "to": "{{ .recipient }}",
+          "subject": "Daily Digest - {{ .date }}",
+          "html": "{{ .digest_html }}"
+        }
+      timeout: 30s
+    id: send_email
+
+  - node: file_write
+    params:
+      path: email-digest-{{ .date }}.html
+    input: digest_html
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Email digest sent to {{ .recipient }}
+    id: confirm

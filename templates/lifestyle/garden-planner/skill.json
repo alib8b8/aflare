@@ -1,0 +1,20 @@
+{
+  "id": "lifestyle/garden-planner",
+  "name": "garden-planner",
+  "version": "1.0.0",
+  "description": "Generate a personalized garden planting plan",
+  "author": "aflare community",
+  "category": "lifestyle",
+  "tags": [
+    "lifestyle",
+    "garden",
+    "planning"
+  ],
+  "keywords": [
+    "garden-planner",
+    "lifestyle"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

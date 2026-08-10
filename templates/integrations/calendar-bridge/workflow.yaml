@@ -1,0 +1,84 @@
+name: Calendar Bridge
+# Bridge calendar events between platforms
+# Usage: aflare install calendar-bridge
+#        aflare run calendar-bridge/workflow.yaml
+# Config: Set GOOGLE_CALENDAR_ID, OUTLOOK_CLIENT_ID, OUTLOOK_CLIENT_SECRET
+
+steps:
+  - node: http_request
+    params:
+      url: https://www.googleapis.com/calendar/v3/calendars/{{ .google_calendar_id }}/events?timeMin={{ .today }}T00:00:00Z&maxResults=20
+      method: GET
+      headers:
+        Authorization: "Bearer {{ .google_token }}"
+      timeout: 30s
+    id: fetch_google_events
+
+  - node: json_parse
+    params:
+      path: items
+    input: fetch_google_events
+    id: google_events
+
+  - node: http_request
+    params:
+      url: https://graph.microsoft.com/v1.0/me/calendar/events?$top=20
+      method: GET
+      headers:
+        Authorization: "Bearer {{ .outlook_token }}"
+      timeout: 30s
+    id: fetch_outlook_events
+
+  - node: json_parse
+    params:
+      path: value
+    input: fetch_outlook_events
+    id: outlook_events
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse,template_render
+      max_iterations: 3
+    input: |
+      Compare calendar events and find sync opportunities:
+      - Google Calendar events: {{ .google_events }}
+      - Outlook events: {{ .outlook_events }}
+      
+      Identify:
+      - Events in Google but not in Outlook
+      - Events in Outlook but not in Google
+      - Conflicting events
+      - Events to sync
+    id: sync_plan
+
+  - node: http_request
+    params:
+      url: https://graph.microsoft.com/v1.0/me/calendar/events
+      method: POST
+      content_type: application/json
+      headers:
+        Authorization: "Bearer {{ .outlook_token }}"
+      body: |
+        {
+          "subject": "{{ .sync_plan.new_event.subject }}",
+          "start": { "dateTime": "{{ .sync_plan.new_event.start }}", "timeZone": "UTC" },
+          "end": { "dateTime": "{{ .sync_plan.new_event.end }}", "timeZone": "UTC" }
+        }
+      timeout: 30s
+    id: sync_to_outlook
+    on_error: skip
+
+  - node: file_write
+    params:
+      path: calendar-bridge-report.md
+    input: sync_plan
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Calendar bridge sync complete. Google: {{ .google_events.length }} events, Outlook: {{ .outlook_events.length }} events
+    id: confirm

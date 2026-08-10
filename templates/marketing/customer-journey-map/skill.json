@@ -1,0 +1,25 @@
+{
+  "id": "marketing/customer-journey-map",
+  "name": "customer-journey-map",
+  "version": "1.0.0",
+  "description": "Customer journey mapping and touchpoint analysis across all stages",
+  "author": "aflare community",
+  "category": "marketing",
+  "tags": [
+    "marketing",
+    "workflow",
+    "customer-journey",
+    "ux",
+    "cx"
+  ],
+  "keywords": [
+    "customer-journey-map",
+    "marketing",
+    "journey-mapping",
+    "touchpoint-analysis",
+    "customer-experience"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

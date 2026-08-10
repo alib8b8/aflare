@@ -1,0 +1,25 @@
+{
+  "id": "marketing/lead-scoring",
+  "name": "lead-scoring",
+  "version": "1.0.0",
+  "description": "Lead scoring and qualification workflow for sales prioritization",
+  "author": "aflare community",
+  "category": "marketing",
+  "tags": [
+    "marketing",
+    "workflow",
+    "lead-scoring",
+    "sales",
+    "qualification"
+  ],
+  "keywords": [
+    "lead-scoring",
+    "marketing",
+    "lead-qualification",
+    "sales-prioritization",
+    "lead-management"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

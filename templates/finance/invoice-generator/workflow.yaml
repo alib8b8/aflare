@@ -1,0 +1,116 @@
+name: Invoice Generator
+# Automated invoice creation from transaction data
+# Usage: aflare install finance/invoice-generator
+#        aflare run invoice-generator/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.transactions_file }}"
+    id: tx_data
+
+  - node: http_request
+    params:
+      url: "{{ .params.customer_api_url }}"
+      method: GET
+      timeout: 30s
+    id: customer_data
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render,json_parse
+      max_iterations: 3
+    input: |
+      Generate professional invoices from the following data:
+
+      Transactions:
+      {{ .tx_data }}
+
+      Customer Information:
+      {{ .customer_data }}
+
+      Invoice Configuration:
+      - Company: {{ .params.company_name }}
+      - Company Address: {{ .params.company_address }}
+      - Tax ID: {{ .params.tax_id }}
+      - Payment Terms: {{ .params.payment_terms }}
+      - Due Date: {{ .params.due_date }}
+      - Currency: {{ .params.currency }}
+      - Invoice Number Prefix: {{ .params.invoice_prefix }}
+
+      For each invoice, include:
+      1. Invoice header with company logo placeholder
+      2. Bill-to and ship-to addresses
+      3. Invoice number, date, and due date
+      4. Line items with description, quantity, unit price, and total
+      5. Subtotal, tax amount, and grand total
+      6. Payment instructions and terms
+      7. Notes and thank-you message
+
+      Calculate totals and validate that all amounts are correct.
+    id: invoices
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 60s
+    input: |
+      import json
+
+      invoices = {{ .invoices }}
+
+      # Validate invoice calculations
+      results = []
+      for inv in invoices:
+          subtotal = sum(item.get('total', 0) for item in inv.get('items', []))
+          tax_rate = inv.get('tax_rate', 0)
+          tax = subtotal * tax_rate
+          grand_total = subtotal + tax
+          results.append({
+              'invoice_number': inv.get('number'),
+              'subtotal': subtotal,
+              'tax': tax,
+              'grand_total': grand_total,
+              'item_count': len(inv.get('items', []))
+          })
+
+      print("## Invoice Validation")
+      for r in results:
+          print(f"- Invoice #{r['invoice_number']}: {r['item_count']} items, Subtotal ${r['subtotal']:.2f}, Tax ${r['tax']:.2f}, Total ${r['grand_total']:.2f}")
+    id: validation
+
+  - node: template_render
+    params:
+      template: |
+        # INVOICE
+
+        **{{ .params.company_name }}**
+        {{ .params.company_address }}
+        Tax ID: {{ .params.tax_id }}
+
+        ---
+
+        {{ .invoices }}
+
+        ---
+
+        ## Validation
+        {{ .validation }}
+      invoices: "{{ .steps.invoices.output }}"
+      validation: "{{ .steps.validation.output }}"
+    id: rendered
+
+  - node: file_write
+    params:
+      path: generated-invoices.md
+    input: rendered
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Invoice generation complete. Invoices saved to generated-invoices.md
+    id: notify

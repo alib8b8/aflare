@@ -1,0 +1,98 @@
+name: Newsletter Content Generator
+# Generate email newsletter content curated and written for your audience
+# Usage: aflare install creative/newsletter-content
+#        aflare run newsletter-content/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Create a complete email newsletter for {{ .params.newsletter_name }}.
+
+      Newsletter name: {{ .params.newsletter_name }}
+      Edition: {{ .params.edition }}
+      Theme/focus: {{ .params.theme }}
+      Industry: {{ .params.industry }}
+      Target audience: {{ .params.audience }}
+      Brand voice: {{ .params.brand_voice }}
+      Content sources: {{ .params.sources }}
+
+      Generate the following newsletter sections:
+      1. Newsletter Strategy
+         - Edition overview and theme
+         - Content curation criteria
+         - Key message for this edition
+         - Reader persona alignment
+      2. Email Header
+         - Subject line (5 options, A/B test ready)
+         - Preheader text (3 options)
+         - Sender name and from address recommendation
+      3. Hero Section
+         - Hero headline
+         - Hero subheadline
+         - Hero image description
+         - Primary CTA
+      4. Main Content Blocks
+         - Featured article (300-400 words)
+         - Industry news roundup (3-5 items with commentary)
+         - Tip of the week (actionable advice)
+         - Tool/resource spotlight
+         - Case study or success story highlight
+      5. Curated Content Section
+         - 5 external links with editorial commentary
+         - Quote of the week with context
+         - Data point or statistic with analysis
+         - Upcoming event or webinar mention
+      6. Community/Engagement Section
+         - Reader question/answer
+         - Poll or survey prompt
+         - User-generated content feature
+         - Social proof element (testimonial, metric)
+      7. Footer and CTA
+         - Secondary CTA
+         - Social media links
+         - Referral prompt
+         - Unsubscribe and preference center
+         - Copyright and legal
+      8. Editorial Calendar Hint
+         - Next edition teaser
+         - Content series preview
+         - Upcoming theme announcement
+    id: newsletter_content
+
+  - node: transform
+    params:
+      operation: extract_sections
+      sections:
+        - strategy
+        - header
+        - hero
+        - main_content
+        - curated_content
+        - community
+        - footer
+        - calendar
+    input: newsletter_content
+    id: structured_output
+
+  - node: file_write
+    params:
+      path: newsletter-content.md
+    input: newsletter_content
+    id: save_full
+
+  - node: file_write
+    params:
+      path: newsletter-content-structured.json
+    input: structured_output
+    id: save_structured
+
+  - node: notify
+    params:
+      channel: stdout
+    input: newsletter_content
+    id: notify

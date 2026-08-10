@@ -1,0 +1,119 @@
+name: Anomaly Detector
+# Detect anomalies in datasets using statistical and ML methods
+# Usage: aflare install data-ai/anomaly-detector
+#        aflare run anomaly-detector/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: |
+        python3 -c "
+import pandas as pd
+import numpy as np
+from scipy import stats
+import json
+
+# Load dataset
+df = pd.read_csv('{{ .params.dataset_path }}')
+
+# Basic stats
+result = {}
+result['shape'] = list(df.shape)
+result['columns'] = df.columns.tolist()
+result['dtypes'] = {col: str(dt) for col, dt in df.dtypes.items()}
+result['missing'] = df.isnull().sum().to_dict()
+result['missing_pct'] = (df.isnull().sum() / len(df) * 100).round(2).to_dict()
+
+# Statistical summary for numeric columns
+numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+result['numeric_columns'] = numeric_cols
+result['describe'] = df[numeric_cols].describe().to_dict()
+
+# Z-score based anomaly detection
+anomalies = {}
+for col in numeric_cols:
+    z_scores = np.abs(stats.zscore(df[col].dropna()))
+    anomaly_indices = np.where(z_scores > 3)[0].tolist()
+    if anomaly_indices:
+        anomalies[col] = {
+            'count': len(anomaly_indices),
+            'pct': round(len(anomaly_indices) / len(df) * 100, 2),
+            'indices': anomaly_indices[:20],
+            'threshold': '3 std deviations'
+        }
+result['zscore_anomalies'] = anomalies
+
+# IQR-based outlier detection
+iqr_anomalies = {}
+for col in numeric_cols:
+    Q1 = df[col].quantile(0.25)
+    Q3 = df[col].quantile(0.75)
+    IQR = Q3 - Q1
+    lower = Q1 - 1.5 * IQR
+    upper = Q3 + 1.5 * IQR
+    outlier_indices = df[(df[col] < lower) | (df[col] > upper)].index.tolist()
+    if outlier_indices:
+        iqr_anomalies[col] = {
+            'count': len(outlier_indices),
+            'pct': round(len(outlier_indices) / len(df) * 100, 2),
+            'lower_bound': round(lower, 4),
+            'upper_bound': round(upper, 4)
+        }
+result['iqr_anomalies'] = iqr_anomalies
+
+print(json.dumps(result, indent=2))
+" 2>&1
+    id: anomaly_stats
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Analyze the following anomaly detection results from dataset "{{ .params.dataset_name }}":
+
+      Dataset shape: {{ .anomaly_stats.shape }}
+      Numeric columns: {{ .anomaly_stats.numeric_columns }}
+      Missing data: {{ .anomaly_stats.missing_pct }}
+      
+      Z-Score anomalies (|z| > 3): {{ .anomaly_stats.zscore_anomalies }}
+      IQR-based outliers: {{ .anomaly_stats.iqr_anomalies }}
+
+      Statistical summary: {{ .anomaly_stats.describe }}
+
+      Provide a comprehensive anomaly detection report:
+
+      1. Executive Summary
+         - Total anomalies detected across all methods
+         - Overall data quality score (1-10)
+         - Key columns with highest anomaly rates
+
+      2. Detailed Anomaly Analysis
+         - For each column with anomalies: describe the pattern, severity, and potential causes
+         - Compare Z-score vs IQR findings — where do they agree/disagree?
+         - Highlight any systematic anomalies (e.g., entire rows flagged across multiple columns)
+
+      3. Root Cause Hypothesis
+         - Data entry errors
+         - Sensor/metering failures
+         - Seasonal or cyclical patterns mistaken for anomalies
+         - Genuine rare events worth investigating
+
+      4. Visual Summary (describe in text)
+         - Which columns show the widest distributions
+         - Any bimodal or skewed distributions detected
+
+      5. Recommendations
+         - Columns requiring data cleaning
+         - Suggested threshold adjustments for specific domains
+         - Whether to use statistical vs ML-based approaches going forward
+         - Next steps for investigation
+    id: anomaly_report
+
+  - node: file_write
+    params:
+      path: anomaly-detection-report.md
+    input: anomaly_report
+    id: save

@@ -1,0 +1,86 @@
+name: Podcast Outline Generator
+# Generate podcast episode outlines and show notes
+# Usage: aflare install creative/podcast-outline
+#        aflare run podcast-outline/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Create a detailed podcast episode outline for "{{ .params.show_name }}".
+
+      Podcast name: {{ .params.show_name }}
+      Episode topic: {{ .params.topic }}
+      Episode number: {{ .params.episode_number }}
+      Guest(s): {{ .params.guests }}
+      Format: {{ .params.format }}
+      Duration target: {{ .params.duration }}
+      Target audience: {{ .params.audience }}
+
+      Generate the following:
+      1. Episode Metadata
+         - Episode title (3 catchy options)
+         - Episode subtitle
+         - SEO keywords
+         - Category tags
+      2. Episode Overview
+         - One-paragraph summary
+         - Key takeaways for listeners
+         - Target listener persona
+      3. Segment Breakdown with Timestamps
+         - Intro (0:00-2:00): Cold open, theme music, host introduction
+         - Segment 1 (2:00-10:00): Topic introduction and context
+         - Segment 2 (10:00-20:00): Deep dive discussion points
+         - Segment 3 (20:00-30:00): Guest interview questions (if applicable)
+         - Segment 4 (30:00-40:00): Practical tips and actionable advice
+         - Outro (40:00-45:00): Summary, CTA, next episode teaser
+      4. Discussion Questions
+         - 8-10 thought-provoking questions to explore
+         - Follow-up questions for deeper discussion
+         - Debate angles and contrarian viewpoints
+      5. Show Notes
+         - Resources and links mentioned
+         - Books, articles, tools referenced
+         - Guest bio and social links
+         - Key quotes to highlight
+      6. Promotion Plan
+         - Social media teaser copy (3 variations)
+         - Audiogram clip suggestions (3 moments)
+         - Newsletter blurb
+         - Cross-promotion ideas
+    id: podcast_outline
+
+  - node: transform
+    params:
+      operation: extract_sections
+      sections:
+        - metadata
+        - overview
+        - segments
+        - questions
+        - show_notes
+        - promotion
+    input: podcast_outline
+    id: structured_output
+
+  - node: file_write
+    params:
+      path: podcast-outline.md
+    input: podcast_outline
+    id: save_outline
+
+  - node: file_write
+    params:
+      path: podcast-show-notes.md
+    input: structured_output
+    id: save_notes
+
+  - node: notify
+    params:
+      channel: stdout
+    input: podcast_outline
+    id: notify

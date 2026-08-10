@@ -1,0 +1,68 @@
+name: CRM Sync
+# Synchronize CRM contacts and deals across platforms
+# Usage: aflare install crm-sync
+#        aflare run crm-sync/workflow.yaml
+# Config: Set HUBSPOT_API_KEY, SALESFORCE_TOKEN
+
+steps:
+  - node: http_request
+    params:
+      url: https://api.hubapi.com/crm/v3/objects/contacts?limit=50
+      method: GET
+      headers:
+        Authorization: "Bearer {{ .hubspot_api_key }}"
+      timeout: 30s
+    id: fetch_hubspot_contacts
+
+  - node: json_parse
+    params:
+      path: results
+    input: fetch_hubspot_contacts
+    id: hubspot_contacts
+
+  - node: http_request
+    params:
+      url: https://api.hubapi.com/crm/v3/objects/deals?limit=50
+      method: GET
+      headers:
+        Authorization: "Bearer {{ .hubspot_api_key }}"
+      timeout: 30s
+    id: fetch_hubspot_deals
+
+  - node: json_parse
+    params:
+      path: results
+    input: fetch_hubspot_deals
+    id: hubspot_deals
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse,template_render
+      max_iterations: 3
+    input: |
+      Analyze CRM data and generate a sync report:
+      - HubSpot contacts: {{ .hubspot_contacts }}
+      - HubSpot deals: {{ .hubspot_deals }}
+      
+      Provide:
+      - Contact count and segmentation
+      - Deal pipeline analysis
+      - Stale contacts (no activity in 30 days)
+      - Duplicate contacts to merge
+      - Sync recommendations
+    id: sync_report
+
+  - node: file_write
+    params:
+      path: crm-sync-report.md
+    input: sync_report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      CRM sync report generated. Contacts: {{ .hubspot_contacts.length }}, Deals: {{ .hubspot_deals.length }}
+    id: confirm

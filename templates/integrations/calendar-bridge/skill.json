@@ -1,0 +1,24 @@
+{
+  "id": "integrations/calendar-bridge",
+  "name": "calendar-bridge",
+  "version": "1.0.0",
+  "description": "Bridge calendar events between Google Calendar and Microsoft Outlook.",
+  "author": "aflare community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow",
+    "calendar",
+    "bridge"
+  ],
+  "keywords": [
+    "calendar-bridge",
+    "calendar",
+    "google",
+    "outlook",
+    "integrations"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

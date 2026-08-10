@@ -1,0 +1,23 @@
+{
+  "id": "integrations/slack-bot",
+  "name": "slack-bot",
+  "version": "1.0.0",
+  "description": "Send messages and manage Slack channels from your workflows.",
+  "author": "aflare community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow",
+    "slack",
+    "messaging"
+  ],
+  "keywords": [
+    "slack-bot",
+    "slack",
+    "integrations",
+    "messaging"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

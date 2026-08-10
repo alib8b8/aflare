@@ -1,0 +1,23 @@
+{
+  "id": "content-creative/slogan-generator",
+  "name": "slogan-generator",
+  "version": "1.0.0",
+  "description": "Brand slogan and tagline generator",
+  "author": "aflare community",
+  "category": "content-creative",
+  "tags": [
+    "content-creative",
+    "workflow"
+  ],
+  "keywords": [
+    "slogan-generator",
+    "content-creative",
+    "slogan",
+    "tagline",
+    "branding",
+    "copywriting"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "finance/tax-estimator",
+  "name": "tax-estimator",
+  "version": "1.0.0",
+  "description": "Tax liability estimation and planning with deduction optimization and credit analysis.",
+  "author": "aflare community",
+  "category": "finance",
+  "tags": [
+    "finance",
+    "workflow"
+  ],
+  "keywords": [
+    "tax-estimator",
+    "finance"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,143 @@
+name: Competitor Price Tracker
+# Monitor and analyze competitor pricing strategies
+# Usage: aflare install marketing/competitor-price-tracker
+#        aflare run competitor-price-tracker/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: "{{ .params.competitor_pricing_page }}"
+      method: GET
+      timeout: 30s
+    id: competitor_page
+
+  - node: http_request
+    params:
+      url: "https://api.priceapi.com/v2/prices?product={{ .params.product_category }}&market={{ .params.market }}"
+      method: GET
+      timeout: 30s
+    id: market_prices
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 60s
+    input: |
+      import json
+      import statistics
+
+      # Parse competitor and market data
+      market_data = json.loads('''{{ .market_prices }}''')
+      our_prices = {{ .params.our_prices | toJson }}
+
+      # Extract competitor pricing tiers
+      competitor_prices = {}
+      for product in market_data.get("products", []):
+          name = product.get("name", "unknown")
+          tiers = product.get("tiers", [])
+          competitor_prices[name] = {
+              "tiers": tiers,
+              "lowest": min(t.get("price", 0) for t in tiers) if tiers else 0,
+              "highest": max(t.get("price", 0) for t in tiers) if tiers else 0,
+              "avg": statistics.mean([t.get("price", 0) for t in tiers]) if tiers else 0
+          }
+
+      # Calculate market averages
+      all_prices = [p for c in competitor_prices.values() for p in [c["lowest"], c["highest"]] if p > 0]
+      market_avg = statistics.mean(all_prices) if all_prices else 0
+      market_median = statistics.median(all_prices) if all_prices else 0
+      market_min = min(all_prices) if all_prices else 0
+      market_max = max(all_prices) if all_prices else 0
+
+      # Price positioning analysis
+      our_lowest = min(t.get("price", 0) for t in our_prices.get("tiers", [{"price": 0}]))
+      our_highest = max(t.get("price", 0) for t in our_prices.get("tiers", [{"price": 0}]))
+
+      position = "premium" if our_lowest > market_median else "mid-market" if our_lowest >= market_avg * 0.8 else "budget"
+
+      # Gap analysis
+      opportunities = []
+      for comp_name, comp_data in competitor_prices.items():
+          if comp_data["lowest"] > our_highest * 1.3:
+              opportunities.append(f"Gap above {comp_name}: Our highest tier is ${our_highest}, theirs starts at ${comp_data['lowest']}")
+
+      output = {
+          "competitor_breakdown": competitor_prices,
+          "market_stats": {
+              "average_price": round(market_avg, 2),
+              "median_price": round(market_median, 2),
+              "price_range": [round(market_min, 2), round(market_max, 2)],
+              "our_positioning": position
+          },
+          "our_pricing": {
+              "lowest_tier": our_lowest,
+              "highest_tier": our_highest,
+              "tier_count": len(our_prices.get("tiers", [])),
+              "price_spread": our_highest - our_lowest
+          },
+          "opportunities": opportunities,
+          "recommended_actions": {
+              "if_premium": "Justify with enhanced features and positioning",
+              "if_mid_market": "Compete on value, not price",
+              "if_budget": "Ensure sustainable margins and upsell path"
+          }
+      }
+
+      print(json.dumps(output, indent=2))
+    id: price_analysis
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse, template_render
+      max_iterations: 3
+    input: |
+      Analyze competitor pricing and generate strategic recommendations:
+      
+      Product: {{ .params.product_category }}
+      Market: {{ .params.market }}
+      Price Analysis: {{ .price_analysis }}
+      Competitor Page Data: {{ .competitor_page }}
+      
+      Provide:
+      1. Competitive Landscape Overview
+         - Number of competitors analyzed
+         - Market price range summary
+         - Our positioning assessment
+      2. Tier-by-Tier Comparison
+         - Feature comparison at each price point
+         - Value proposition gaps
+         - Bundle and packaging insights
+      3. Pricing Strategy Recommendations
+         - Optimal price point adjustments
+         - New tier opportunities
+         - Promotional pricing windows
+         - Volume/license discount structures
+      4. Competitive Response Plan
+         - Anticipated competitor moves
+         - Defensive strategies
+         - Offensive opportunities
+      5. Executive Summary
+         - Key findings in 3 bullet points
+         - Revenue impact estimation
+         - Implementation timeline
+    id: strategy_report
+
+  - node: file_write
+    params:
+      path: competitor-price-analysis.md
+    input: |
+      # Competitor Price Analysis: {{ .params.product_category }}
+      
+      **Market:** {{ .params.market }}
+      **Date:** {{ .date }}
+      
+      {{ .strategy_report }}
+      
+      ---
+      ## Quantitative Analysis
+      ```json
+      {{ .price_analysis }}
+      ```
+    id: save

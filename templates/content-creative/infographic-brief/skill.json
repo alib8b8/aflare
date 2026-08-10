@@ -1,0 +1,23 @@
+{
+  "id": "content-creative/infographic-brief",
+  "name": "infographic-brief",
+  "version": "1.0.0",
+  "description": "Infographic content brief and data outline",
+  "author": "aflare community",
+  "category": "content-creative",
+  "tags": [
+    "content-creative",
+    "workflow"
+  ],
+  "keywords": [
+    "infographic-brief",
+    "content-creative",
+    "infographic",
+    "data-visualization",
+    "design-brief",
+    "visual-content"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

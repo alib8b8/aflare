@@ -1,0 +1,146 @@
+name: Retirement Planner
+# Retirement savings and withdrawal planning
+# Usage: aflare install finance/retirement-planner
+#        aflare run retirement-planner/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render,json_parse
+      max_iterations: 3
+    input: |
+      Create a comprehensive retirement plan:
+
+      Profile:
+      - Current Age: {{ .params.current_age }}
+      - Retirement Age: {{ .params.retirement_age }}
+      - Life Expectancy: {{ .params.life_expectancy }}
+      - Current Savings: {{ .params.current_savings }}
+      - Annual Income: {{ .params.annual_income }}
+      - Monthly Contribution: {{ .params.monthly_contribution }}
+      - Expected Return: {{ .params.expected_return }}%
+      - Inflation Rate: {{ .params.inflation_rate }}%
+      - Desired Retirement Income: {{ .params.desired_income }}
+
+      Analyze:
+      1. RETIREMENT SAVINGS PROJECTION
+         - Future value of current savings
+         - Future value of ongoing contributions
+         - Total nest egg at retirement age
+         - Inflation-adjusted value
+
+      2. RETIREMENT INCOME PLAN
+         - Social Security estimate (if applicable)
+         - Pension income (if any)
+         - Withdrawal strategy (4% rule, dynamic, bucket)
+         - Sustainable withdrawal rate
+         - Years of income from savings
+
+      3. GAP ANALYSIS
+         - Shortfall or surplus projection
+         - Required additional monthly savings
+         - Required rate of return to meet goals
+         - Impact of delaying retirement
+
+      4. ASSET ALLOCATION
+         - Age-based allocation recommendation
+         - Glide path strategy
+         - Risk capacity assessment
+         - Tax-efficient placement
+
+      5. TAX STRATEGY
+         - Roth vs Traditional comparison
+         - Required Minimum Distribution planning
+         - Tax bracket optimization
+         - Roth conversion ladder strategy
+
+      6. RISK MANAGEMENT
+         - Sequence of returns risk
+         - Longevity risk
+         - Healthcare cost estimates
+         - Long-term care insurance evaluation
+         - Inflation protection
+    id: plan
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 60s
+    input: |
+      import json
+
+      plan = {{ .plan }}
+      current_age = int({{ .params.current_age }})
+      retirement_age = int({{ .params.retirement_age }})
+      current_savings = float({{ .params.current_savings }})
+      monthly_contribution = float({{ .params.monthly_contribution }})
+      expected_return = float({{ .params.expected_return }}) / 100
+      inflation_rate = float({{ .params.inflation_rate }}) / 100
+      desired_income = float({{ .params.desired_income }})
+
+      years_to_retirement = retirement_age - current_age
+      annual_contribution = monthly_contribution * 12
+
+      # Future value of current savings
+      fv_current = current_savings * (1 + expected_return) ** years_to_retirement
+
+      # Future value of annuity (ongoing contributions)
+      if expected_return > 0:
+          fv_contributions = annual_contribution * ((1 + expected_return) ** years_to_retirement - 1) / expected_return
+      else:
+          fv_contributions = annual_contribution * years_to_retirement
+
+      total_nest_egg = fv_current + fv_contributions
+
+      # Inflation-adjusted
+      real_nest_egg = total_nest_egg / (1 + inflation_rate) ** years_to_retirement
+
+      # Sustainable withdrawal (4% rule)
+      sustainable_withdrawal = total_nest_egg * 0.04
+      withdrawal_rate = (desired_income / total_nest_egg * 100) if total_nest_egg > 0 else float('inf')
+
+      print("## Retirement Savings Projection")
+      print(f"Years to Retirement: {years_to_retirement}")
+      print(f"Future Value of Current Savings: ${fv_current:,.2f}")
+      print(f"Future Value of Contributions: ${fv_contributions:,.2f}")
+      print(f"Projected Nest Egg: ${total_nest_egg:,.2f}")
+      print(f"Inflation-Adjusted (Real): ${real_nest_egg:,.2f}")
+      print()
+      print(f"Desired Annual Income: ${desired_income:,.2f}")
+      print(f"Sustainable Withdrawal (4%): ${sustainable_withdrawal:,.2f}")
+      print(f"Required Withdrawal Rate: {withdrawal_rate:.1f}%")
+
+      shortfall = max(0, desired_income - sustainable_withdrawal)
+      if shortfall > 0:
+          required_savings = desired_income / 0.04
+          required_monthly = (required_savings - fv_current) * expected_return / (12 * ((1 + expected_return) ** years_to_retirement - 1)) if expected_return > 0 else (required_savings - fv_current) / (12 * years_to_retirement)
+          print(f"\nShortfall: ${shortfall:,.2f}/year")
+          print(f"Additional Monthly Savings Needed: ${required_monthly:,.2f}")
+    id: calculations
+
+  - node: file_write
+    params:
+      path: retirement-plan.md
+    input: |
+      # Retirement Plan
+
+      Generated: {{ .metadata.timestamp }}
+
+      ## Plan Analysis
+      {{ .plan }}
+
+      ## Financial Projections
+      {{ .calculations }}
+
+      ---
+      > **Disclaimer:** This is a planning tool only. Consult a financial advisor for personalized advice.
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Retirement plan complete. Report saved to retirement-plan.md
+    id: notify

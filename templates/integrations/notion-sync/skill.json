@@ -1,0 +1,23 @@
+{
+  "id": "integrations/notion-sync",
+  "name": "notion-sync",
+  "version": "1.0.0",
+  "description": "Create Notion pages and synchronize databases automatically.",
+  "author": "aflare community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow",
+    "notion",
+    "sync"
+  ],
+  "keywords": [
+    "notion-sync",
+    "notion",
+    "integrations",
+    "database"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

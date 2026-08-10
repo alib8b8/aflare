@@ -1,0 +1,117 @@
+name: Creative Brief Generator
+# Generate creative project briefs for marketing and design projects
+# Usage: aflare install creative/creative-brief
+#        aflare run creative-brief/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Create a comprehensive creative brief for {{ .params.project_name }}.
+
+      Project name: {{ .params.project_name }}
+      Project type: {{ .params.project_type }}
+      Client/Brand: {{ .params.client }}
+      Campaign/initiative: {{ .params.campaign }}
+      Objective: {{ .params.objective }}
+      Target audience: {{ .params.audience }}
+      Budget: {{ .params.budget }}
+      Timeline: {{ .params.timeline }}
+      Deliverables: {{ .params.deliverables }}
+
+      Generate the following creative brief sections:
+      1. Project Overview
+         - Project name and code
+         - Client/brand background
+         - Project type and scope
+         - Key stakeholders
+         - Project summary (2-3 sentences)
+      2. Business Context
+         - Market situation analysis
+         - Competitive landscape
+         - Brand positioning
+         - Previous campaign performance
+         - Business challenge being addressed
+      3. Objectives and KPIs
+         - Primary objective (SMART format)
+         - Secondary objectives
+         - Success metrics and KPIs
+         - Measurement methodology
+         - Target benchmarks
+      4. Target Audience
+         - Primary audience persona (detailed)
+         - Secondary audience persona
+         - Audience insights and behaviors
+         - Pain points and motivations
+         - Current brand perception
+      5. Key Message and Proposition
+         - Single-minded proposition
+         - Key message hierarchy
+         - Supporting messages (3-5)
+         - Tone of voice direction
+         - Messages to avoid
+      6. Creative Direction
+         - Creative territory and inspiration
+         - Look and feel direction
+         - Mood board description
+         - Reference campaigns (3-5 examples)
+         - Mandatory elements
+         - Creative constraints
+      7. Deliverables and Specifications
+         - Deliverable list with specifications
+         - Format requirements
+         - Size/dimension specifications
+         - File format requirements
+         - Versioning requirements
+      8. Timeline and Milestones
+         - Project kickoff date
+         - Concept presentation date
+         - First review milestone
+         - Final review milestone
+         - Production/delivery deadline
+         - Launch/go-live date
+      9. Budget and Resources
+         - Total budget allocation
+         - Budget breakdown by deliverable
+         - Resource requirements
+         - Agency/team responsibilities
+         - Approval process
+    id: creative_brief
+
+  - node: transform
+    params:
+      operation: extract_sections
+      sections:
+        - overview
+        - business_context
+        - objectives
+        - audience
+        - key_message
+        - creative_direction
+        - deliverables
+        - timeline
+        - budget
+    input: creative_brief
+    id: structured_output
+
+  - node: file_write
+    params:
+      path: creative-brief.md
+    input: creative_brief
+    id: save_brief
+
+  - node: file_write
+    params:
+      path: creative-brief-structured.json
+    input: structured_output
+    id: save_structured
+
+  - node: notify
+    params:
+      channel: stdout
+    input: creative_brief
+    id: notify

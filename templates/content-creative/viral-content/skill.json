@@ -1,0 +1,24 @@
+{
+  "id": "content-creative/viral-content",
+  "name": "viral-content",
+  "version": "1.0.0",
+  "description": "Viral content idea generator and hook writer",
+  "author": "aflare community",
+  "category": "content-creative",
+  "tags": [
+    "content-creative",
+    "workflow"
+  ],
+  "keywords": [
+    "viral-content",
+    "content-creative",
+    "viral",
+    "social-media",
+    "hooks",
+    "content-ideas",
+    "engagement"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

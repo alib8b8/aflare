@@ -1,0 +1,129 @@
+name: Config Auditor
+# Audit configuration files for security and best practices
+# Usage: aflare install devops-infra/config-auditor
+#        aflare run config-auditor/workflow.yaml
+
+steps:
+  - node: execute
+    params:
+      command: |
+        echo "=== Environment Files ==="
+        find {{ .params.config_path }} -name ".env*" -o -name "*.env" 2>/dev/null | head -10
+        echo "=== YAML Config Files ==="
+        find {{ .params.config_path }} -name "*.yaml" -o -name "*.yml" 2>/dev/null | head -20
+        echo "=== JSON Config Files ==="
+        find {{ .params.config_path }} -name "*.json" 2>/dev/null | head -20
+        echo "=== TOML Config Files ==="
+        find {{ .params.config_path }} -name "*.toml" 2>/dev/null | head -10
+        echo "=== INI Config Files ==="
+        find {{ .params.config_path }} -name "*.ini" -o -name "*.conf" 2>/dev/null | head -10
+        echo "=== Docker/K8s Configs ==="
+        find {{ .params.config_path }} -name "Dockerfile*" -o -name "docker-compose*" -o -name "*.k8s.yaml" 2>/dev/null | head -10
+    id: config_files
+
+  - node: execute
+    params:
+      command: |
+        echo "=== Hardcoded Secrets ==="
+        grep -rn "password\|secret\|api_key\|token\|private_key\|access_key" \
+          --include="*.yaml" --include="*.yml" --include="*.json" --include="*.env" --include="*.toml" \
+          {{ .params.config_path }} 2>/dev/null | grep -v ".git" | head -30
+        echo "=== Default Credentials ==="
+        grep -rn "admin\|root\|default\|guest\|test" \
+          --include="*.yaml" --include="*.yml" --include="*.json" --include="*.env" \
+          {{ .params.config_path }} 2>/dev/null | grep -v ".git" | head -20
+        echo "=== Insecure Protocols ==="
+        grep -rn "http://\|ftp://\|telnet" \
+          --include="*.yaml" --include="*.yml" --include="*.json" \
+          {{ .params.config_path }} 2>/dev/null | grep -v ".git" | head -15
+        echo "=== Debug Mode Enabled ==="
+        grep -rn "debug.*true\|DEBUG.*true\|debug.*1\|DEBUG=1" \
+          --include="*.yaml" --include="*.yml" --include="*.env" \
+          {{ .params.config_path }} 2>/dev/null | grep -v ".git" | head -15
+    id: security_scan
+
+  - node: execute
+    params:
+      command: |
+        echo "=== Duplicate Config Keys ==="
+        for f in $(find {{ .params.config_path }} -name "*.yaml" -o -name "*.yml" 2>/dev/null | head -20); do
+          echo "--- $f ---"
+          python3 -c "
+import yaml, sys
+try:
+    with open('$f') as fh:
+        data = yaml.safe_load(fh)
+    if isinstance(data, dict):
+        keys = list(data.keys())
+        if len(keys) != len(set(keys)):
+            print('WARNING: Duplicate keys detected')
+        print(f'  Top-level keys: {len(keys)}')
+except Exception as e:
+    print(f'  Parse error: {e}')
+" 2>/dev/null
+        done
+        echo "=== Large Config Files (>1000 lines) ==="
+        find {{ .params.config_path }} -name "*.yaml" -o -name "*.yml" -o -name "*.json" 2>/dev/null | xargs wc -l 2>/dev/null | awk '$1 > 1000 {print}' | head -10
+    id: config_quality
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Audit the configuration files based on the following scan results:
+
+      Config files found: {{ .config_files }}
+      Security scan results: {{ .security_scan }}
+      Config quality checks: {{ .config_quality }}
+
+      Generate a comprehensive Config Audit Report:
+
+      1. Executive Summary
+         - Total config files scanned
+         - Critical issues found (immediate action required)
+         - High/Medium/Low issue counts
+         - Overall security posture score (1-10)
+
+      2. Security Findings
+         - Hardcoded secrets and credentials (CRITICAL)
+         - Default credentials in use (HIGH)
+         - Insecure protocols and endpoints (HIGH)
+         - Debug mode enabled in production configs (MEDIUM)
+         - Missing encryption for sensitive values (HIGH)
+
+      3. Configuration Quality
+         - Files with duplicate keys
+         - Overly large configuration files (monolith risk)
+         - Missing environment-specific configs (dev/staging/prod)
+         - Inconsistent naming conventions
+         - Unused or deprecated configuration keys
+
+      4. Best Practices Compliance
+         - Secrets management (use of vault/external secret stores)
+         - Configuration as Code practices
+         - Environment-specific overrides
+         - Documentation and comments
+         - Version control considerations
+
+      5. Remediation Plan
+         - Priority-ordered action items with effort estimates
+         - Quick wins (under 1 hour)
+         - Medium-term improvements (1 day - 1 week)
+         - Long-term architectural changes
+         - Recommended tools and automation
+
+      6. Compliance Checklist
+         - SOC2 / ISO 27001 relevant items
+         - PCI-DSS considerations (if applicable)
+         - GDPR data handling configs
+         - Internal security policy alignment
+    id: audit_report
+
+  - node: file_write
+    params:
+      path: config-audit-report.md
+    input: audit_report
+    id: save

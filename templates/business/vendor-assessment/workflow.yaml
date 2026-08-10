@@ -1,0 +1,70 @@
+name: Vendor Assessment
+# Evaluate and score potential vendors/suppliers
+# Usage: aflare install business/vendor-assessment
+#        aflare run vendor-assessment/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: researcher, template_render
+      max_iterations: 5
+    input: |
+      Conduct a comprehensive vendor assessment for the following supplier:
+
+      Vendor name: {{ .params.vendor_name }}
+      Industry: {{ .params.industry }}
+      Product/Service: {{ .params.product_service }}
+      Annual spend estimate: {{ .params.annual_spend }}
+      Region: {{ .params.region }}
+
+      Evaluate the vendor across these dimensions:
+
+      1. Company Profile & Background
+         - Years in business, legal structure, ownership
+         - Reputation and market standing
+         - Key clients and case studies
+
+      2. Financial Health Assessment
+         - Revenue stability and growth trends
+         - Credit rating and financial ratios
+         - Dependence on key customers
+
+      3. Product/Service Quality
+         - Quality certifications (ISO, industry-specific)
+         - Defect rates and quality control processes
+         - Innovation and R&D capabilities
+
+      4. Pricing & Commercial Terms
+         - Price competitiveness vs market average
+         - Payment terms and volume discounts
+         - Total cost of ownership analysis
+
+      5. Operational Capability
+         - Production capacity and scalability
+         - Supply chain resilience
+         - Lead times and delivery reliability
+
+      6. Risk Assessment
+         - Geopolitical and regulatory risks
+         - Single-source dependency risks
+         - Data security and compliance (GDPR, SOC2, etc.)
+
+      7. ESG & Sustainability
+         - Environmental practices
+         - Social responsibility
+         - Governance standards
+
+      8. Final Scorecard
+         - Weighted scoring across all dimensions (1-10 scale)
+         - Overall recommendation: Approve / Approve with conditions / Reject
+         - Key strengths and critical concerns
+         - Suggested negotiation points
+    id: vendor_assessment
+
+  - node: file_write
+    params:
+      path: vendor-assessment-report.md
+    input: vendor_assessment
+    id: save

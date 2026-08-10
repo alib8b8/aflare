@@ -1,0 +1,24 @@
+{
+  "id": "integrations/crm-sync",
+  "name": "crm-sync",
+  "version": "1.0.0",
+  "description": "Synchronize CRM contacts and deals across platforms like HubSpot.",
+  "author": "aflare community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow",
+    "crm",
+    "sync"
+  ],
+  "keywords": [
+    "crm-sync",
+    "crm",
+    "hubspot",
+    "integrations",
+    "contacts"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

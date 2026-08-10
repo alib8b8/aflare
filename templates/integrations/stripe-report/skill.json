@@ -1,0 +1,24 @@
+{
+  "id": "integrations/stripe-report",
+  "name": "stripe-report",
+  "version": "1.0.0",
+  "description": "Generate Stripe payment, revenue, and customer analytics reports.",
+  "author": "aflare community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow",
+    "stripe",
+    "reporting"
+  ],
+  "keywords": [
+    "stripe-report",
+    "stripe",
+    "integrations",
+    "revenue",
+    "analytics"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

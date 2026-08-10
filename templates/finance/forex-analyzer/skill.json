@@ -1,0 +1,19 @@
+{
+  "id": "finance/forex-analyzer",
+  "name": "forex-analyzer",
+  "version": "1.0.0",
+  "description": "Foreign exchange rate analysis with trend detection, technical indicators, and volatility modeling.",
+  "author": "aflare community",
+  "category": "finance",
+  "tags": [
+    "finance",
+    "workflow"
+  ],
+  "keywords": [
+    "forex-analyzer",
+    "finance"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

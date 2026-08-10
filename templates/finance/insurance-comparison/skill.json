@@ -1,0 +1,19 @@
+{
+  "id": "finance/insurance-comparison",
+  "name": "insurance-comparison",
+  "version": "1.0.0",
+  "description": "Insurance policy comparison analyzer with cost-effectiveness scoring and coverage gap detection.",
+  "author": "aflare community",
+  "category": "finance",
+  "tags": [
+    "finance",
+    "workflow"
+  ],
+  "keywords": [
+    "insurance-comparison",
+    "finance"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

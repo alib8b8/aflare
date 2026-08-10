@@ -1,0 +1,23 @@
+{
+  "id": "content-creative/ad-copy",
+  "name": "ad-copy",
+  "version": "1.0.0",
+  "description": "Advertising copy generator for multiple platforms",
+  "author": "aflare community",
+  "category": "content-creative",
+  "tags": [
+    "content-creative",
+    "workflow"
+  ],
+  "keywords": [
+    "ad-copy",
+    "content-creative",
+    "advertising",
+    "google-ads",
+    "facebook-ads",
+    "copywriting"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

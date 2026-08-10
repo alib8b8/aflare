@@ -1,0 +1,85 @@
+name: Stripe Report
+# Generate Stripe payment and revenue reports
+# Usage: aflare install stripe-report
+#        aflare run stripe-report/workflow.yaml
+# Config: Set STRIPE_SECRET_KEY
+
+steps:
+  - node: http_request
+    params:
+      url: https://api.stripe.com/v1/charges?limit=50
+      method: GET
+      headers:
+        Authorization: "Bearer {{ .stripe_secret_key }}"
+      timeout: 30s
+    id: fetch_charges
+
+  - node: json_parse
+    params:
+      path: data
+    input: fetch_charges
+    id: charges
+
+  - node: http_request
+    params:
+      url: https://api.stripe.com/v1/balance
+      method: GET
+      headers:
+        Authorization: "Bearer {{ .stripe_secret_key }}"
+      timeout: 30s
+    id: fetch_balance
+
+  - node: json_parse
+    params:
+      path: ""
+    input: fetch_balance
+    id: balance
+
+  - node: http_request
+    params:
+      url: https://api.stripe.com/v1/customers?limit=30
+      method: GET
+      headers:
+        Authorization: "Bearer {{ .stripe_secret_key }}"
+      timeout: 30s
+    id: fetch_customers
+
+  - node: json_parse
+    params:
+      path: data
+    input: fetch_customers
+    id: customers
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse,template_render
+      max_iterations: 3
+    input: |
+      Generate a comprehensive Stripe revenue report:
+      - Charges (last 50): {{ .charges }}
+      - Balance: {{ .balance }}
+      - Customers: {{ .customers }}
+      
+      Provide:
+      - Total revenue and fees
+      - Charge success rate
+      - Top customers by spend
+      - Refund analysis
+      - Revenue trends
+      - Monthly recurring revenue estimate
+    id: revenue_report
+
+  - node: file_write
+    params:
+      path: stripe-revenue-report.md
+    input: revenue_report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Stripe revenue report generated. Charges analyzed: {{ .charges.length }}, Customers: {{ .customers.length }}
+    id: confirm

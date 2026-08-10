@@ -1,0 +1,102 @@
+name: Product Manual Generator
+# Generate product user manuals and documentation
+# Usage: aflare install creative/product-manual
+#        aflare run product-manual/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Create a comprehensive user manual for {{ .params.product_name }}.
+
+      Product name: {{ .params.product_name }}
+      Product type: {{ .params.product_type }}
+      User skill level: {{ .params.user_level }}
+      Key features: {{ .params.features }}
+      Platform/OS: {{ .params.platform }}
+      Documentation format: {{ .params.doc_format }}
+      Brand voice: {{ .params.brand_voice }}
+      Compliance requirements: {{ .params.compliance }}
+
+      Generate the following manual sections:
+      1. Front Matter
+         - Product name and version
+         - Document version and date
+         - Copyright and legal notices
+         - Table of contents
+         - Safety warnings and disclaimers
+         - FCC/regulatory compliance (if applicable)
+      2. Getting Started
+         - What's in the box / system requirements
+         - Product overview and key features
+         - Quick start guide (5-minute setup)
+         - Hardware/components diagram descriptions
+         - Installation/setup instructions
+         - Account creation and activation
+      3. Core Features Guide
+         - Feature 1: Overview, step-by-step usage, tips, troubleshooting
+         - Feature 2: Overview, step-by-step usage, tips, troubleshooting
+         - (continue for all key features)
+         - Screenshot/illustration descriptions for each feature
+      4. Advanced Usage
+         - Power user tips and shortcuts
+         - Customization and settings
+         - Integrations with other tools
+         - Automation and workflows
+         - Best practices for optimal use
+      5. Troubleshooting
+         - Common issues table (problem, cause, solution)
+         - Error codes and meanings
+         - Diagnostic procedures
+         - Factory reset instructions
+         - When to contact support
+      6. Maintenance and Care
+         - Cleaning and maintenance schedule
+         - Battery/charging guidelines (if applicable)
+         - Software/firmware update instructions
+         - Storage recommendations
+         - Warranty information
+      7. Appendices
+         - Technical specifications
+         - Glossary of terms
+         - Keyboard shortcuts / command reference
+         - FAQ (top 10 questions)
+         - Support contact information
+         - Regulatory compliance details
+    id: product_manual
+
+  - node: transform
+    params:
+      operation: extract_sections
+      sections:
+        - front_matter
+        - getting_started
+        - core_features
+        - advanced_usage
+        - troubleshooting
+        - maintenance
+        - appendices
+    input: product_manual
+    id: structured_output
+
+  - node: file_write
+    params:
+      path: product-manual.md
+    input: product_manual
+    id: save_manual
+
+  - node: file_write
+    params:
+      path: product-manual-structured.json
+    input: structured_output
+    id: save_structured
+
+  - node: notify
+    params:
+      channel: stdout
+    input: product_manual
+    id: notify

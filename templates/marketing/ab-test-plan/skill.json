@@ -1,0 +1,25 @@
+{
+  "id": "marketing/ab-test-plan",
+  "name": "ab-test-plan",
+  "version": "1.0.0",
+  "description": "A/B test design and analysis plan generator for marketing campaigns",
+  "author": "aflare community",
+  "category": "marketing",
+  "tags": [
+    "marketing",
+    "workflow",
+    "ab-testing",
+    "experimentation",
+    "analytics"
+  ],
+  "keywords": [
+    "ab-test-plan",
+    "marketing",
+    "ab-testing",
+    "experiment-design",
+    "statistical-analysis"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

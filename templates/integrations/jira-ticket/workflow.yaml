@@ -1,0 +1,78 @@
+name: Jira Ticket Manager
+# Create and track Jira issues
+# Usage: aflare install jira-ticket
+#        aflare run jira-ticket/workflow.yaml
+# Config: Set JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN, JIRA_PROJECT
+
+steps:
+  - node: file_read
+    params:
+      path: jira-issue.json
+    id: issue_data
+    on_error: skip
+
+  - node: http_request
+    params:
+      url: https://{{ .jira_base_url }}/rest/api/3/search?jql=project={{ .project }}&maxResults=10
+      method: GET
+      headers:
+        Authorization: "Basic {{ .auth_token }}"
+      timeout: 30s
+    id: fetch_issues
+
+  - node: json_parse
+    params:
+      path: issues
+    input: fetch_issues
+    id: existing_issues
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse
+      max_iterations: 2
+    input: |
+      Review existing Jira issues and the new issue request:
+      - Existing issues: {{ .existing_issues }}
+      - New issue request: {{ .issue_data }}
+      
+      Generate a properly formatted Jira issue with:
+      - Summary
+      - Description
+      - Priority suggestion
+      - Recommended assignee (if not specified)
+    id: generated_issue
+
+  - node: http_request
+    params:
+      url: https://{{ .jira_base_url }}/rest/api/3/issue
+      method: POST
+      content_type: application/json
+      headers:
+        Authorization: "Basic {{ .auth_token }}"
+      body: |
+        {
+          "fields": {
+            "project": { "key": "{{ .project }}" },
+            "summary": "{{ .generated_issue.summary }}",
+            "description": "{{ .generated_issue.description }}",
+            "issuetype": { "name": "Task" },
+            "priority": { "name": "{{ .generated_issue.priority }}" }
+          }
+        }
+      timeout: 30s
+    id: create_issue
+
+  - node: file_write
+    params:
+      path: jira-issue-created.json
+    input: create_issue
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Jira issue created: {{ .create_issue.key }}
+    id: confirm

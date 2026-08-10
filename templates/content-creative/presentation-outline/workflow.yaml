@@ -1,0 +1,104 @@
+name: Presentation Outline Generator
+# Generate presentation slide deck outlines
+# Usage: aflare install creative/presentation-outline
+#        aflare run presentation-outline/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Create a comprehensive presentation slide deck outline for {{ .params.presentation_title }}.
+
+      Title: {{ .params.presentation_title }}
+      Type: {{ .params.presentation_type }}
+      Audience: {{ .params.audience }}
+      Duration: {{ .params.duration }}
+      Objective: {{ .params.objective }}
+      Key message: {{ .params.key_message }}
+      Presenter style: {{ .params.presenter_style }}
+      Visual style: {{ .params.visual_style }}
+
+      Generate the following presentation components:
+      1. Presentation Strategy
+         - Core message pyramid
+         - Audience analysis and expectations
+         - Persuasion framework (ethos, pathos, logos)
+         - Story arc mapped to slide flow
+         - Call to action definition
+      2. Slide-by-Slide Outline
+         - Slide 1: Title slide (title, subtitle, presenter, date)
+         - Slide 2: Agenda/overview
+         - Slide 3: Hook/opening (statistic, question, or story)
+         - Slide 4-6: Problem/context setup
+         - Slide 7-10: Solution/key content
+         - Slide 11-13: Evidence/supporting data
+         - Slide 14-15: Case studies/examples
+         - Slide 16-17: Implementation/action plan
+         - Slide 18: Summary and key takeaways
+         - Slide 19: CTA and next steps
+         - Slide 20: Q&A / contact
+         For each slide provide:
+         - Slide headline
+         - Key bullet points (3-5)
+         - Visual suggestion (chart, image, diagram type)
+         - Speaker notes (2-3 sentences)
+         - Transition to next slide
+      3. Data Visualization Plan
+         - Charts and graphs needed
+         - Data points to highlight
+         - Comparison frameworks
+         - Timeline visualizations
+         - Process flow diagrams
+      4. Storytelling Elements
+         - Opening hook (3 options)
+         - Key stories or anecdotes to include
+         - Metaphors and analogies
+         - Audience interaction moments
+         - Memorable closing statement
+      5. Delivery Notes
+         - Timing per section
+         - Pacing recommendations
+         - Pause and emphasis points
+         - Handling Q&A strategy
+         - Backup slides content
+      6. Handout/Leave-Behind
+         - Executive summary (1 page)
+         - Key data summary
+         - Resource links
+         - Contact information
+    id: presentation_outline
+
+  - node: transform
+    params:
+      operation: extract_sections
+      sections:
+        - strategy
+        - slide_outline
+        - data_visualization
+        - storytelling
+        - delivery_notes
+        - handout
+    input: presentation_outline
+    id: structured_output
+
+  - node: file_write
+    params:
+      path: presentation-outline.md
+    input: presentation_outline
+    id: save_outline
+
+  - node: file_write
+    params:
+      path: presentation-outline-structured.json
+    input: structured_output
+    id: save_structured
+
+  - node: notify
+    params:
+      channel: stdout
+    input: presentation_outline
+    id: notify

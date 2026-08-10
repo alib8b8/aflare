@@ -1,0 +1,23 @@
+{
+  "id": "integrations/webhook-relay",
+  "name": "webhook-relay",
+  "version": "1.0.0",
+  "description": "Receive, transform, and forward webhooks between services.",
+  "author": "aflare community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow",
+    "webhook",
+    "relay"
+  ],
+  "keywords": [
+    "webhook-relay",
+    "webhook",
+    "integrations",
+    "forwarder"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

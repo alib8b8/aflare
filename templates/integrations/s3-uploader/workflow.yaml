@@ -1,0 +1,59 @@
+name: S3 Uploader
+# Upload and manage files in AWS S3
+# Usage: aflare install s3-uploader
+#        aflare run s3-uploader/workflow.yaml
+# Config: Set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET, AWS_REGION
+
+steps:
+  - node: execute
+    params:
+      command: ls -la uploads/ 2>/dev/null || echo "No files to upload"
+    id: list_files
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse
+      max_iterations: 2
+    input: |
+      Review the files available for upload and determine the upload strategy:
+      Files: {{ .list_files }}
+      
+      Determine:
+      - Which files to upload
+      - Content types for each file
+      - Appropriate S3 key paths
+      - Whether to set public-read ACL
+    id: upload_plan
+
+  - node: http_request
+    params:
+      url: https://{{ .s3_bucket }}.s3.{{ .aws_region }}.amazonaws.com/
+      method: GET
+      headers:
+        Authorization: "AWS {{ .aws_access_key }}:{{ .signature }}"
+        x-amz-date: "{{ .amz_date }}"
+      timeout: 30s
+    id: list_bucket
+
+  - node: file_write
+    params:
+      path: s3-upload-manifest.json
+    input: |
+      {
+        "timestamp": "{{ .timestamp }}",
+        "bucket": "{{ .s3_bucket }}",
+        "region": "{{ .aws_region }}",
+        "upload_plan": {{ .upload_plan }},
+        "bucket_contents": {{ .list_bucket }}
+      }
+    id: save_manifest
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      S3 uploader ready. Bucket: {{ .s3_bucket }}, Region: {{ .aws_region }}
+      Upload manifest saved to s3-upload-manifest.json
+    id: confirm

@@ -1,0 +1,24 @@
+{
+  "id": "integrations/github-issue-bot",
+  "name": "github-issue-bot",
+  "version": "1.0.0",
+  "description": "Auto-create, label, and triage GitHub issues.",
+  "author": "aflare community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow",
+    "github",
+    "issues"
+  ],
+  "keywords": [
+    "github-issue-bot",
+    "github",
+    "integrations",
+    "issues",
+    "labeling"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

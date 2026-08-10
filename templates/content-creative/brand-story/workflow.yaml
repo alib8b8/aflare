@@ -1,0 +1,94 @@
+name: Brand Story Generator
+# Generate compelling brand narrative and origin story
+# Usage: aflare install creative/brand-story
+#        aflare run brand-story/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Write a compelling brand story for {{ .params.brand }}.
+
+      Brand name: {{ .params.brand }}
+      Founder/background: {{ .params.founder }}
+      Industry: {{ .params.industry }}
+      Brand mission: {{ .params.mission }}
+      Brand values: {{ .params.values }}
+      Origin details: {{ .params.origin }}
+      Key milestones: {{ .params.milestones }}
+      Target audience: {{ .params.audience }}
+      Tone: {{ .params.tone }}
+
+      Generate the following brand narrative components:
+      1. Brand Story Strategy
+         - Narrative archetype identification (Hero, Sage, Explorer, etc.)
+         - Story framework (Hero's Journey, Three-Act, etc.)
+         - Emotional core of the brand
+         - Brand mythology foundations
+      2. Origin Story (500-800 words)
+         - The "why" behind the brand
+         - Founder's journey and motivation
+         - The problem that sparked the solution
+         - Early struggles and breakthrough moment
+         - The "aha" moment
+      3. Brand Narrative Versions
+         - Full story (for About page, 800-1000 words)
+         - Medium story (for pitch deck, 300-400 words)
+         - Short story (for social bio, 100-150 words)
+         - One-liner (for elevator pitch, 15-20 words)
+         - Founder's letter (personal, first-person)
+      4. Storytelling Elements
+         - Core metaphor or analogy
+         - Recurring themes and motifs
+         - Key characters (founder, team, customers)
+         - Conflict and resolution arc
+         - Transformation narrative
+      5. Story Applications
+         - Website About page copy
+         - Investor pitch narrative
+         - Media/PR boilerplate
+         - Social media bio
+         - Video script treatment
+         - Podcast interview talking points
+      6. Brand Voice Guide
+         - Voice characteristics
+         - Vocabulary and lexicon
+         - Sentence style and rhythm
+         - Storytelling do's and don'ts
+         - Example passages in brand voice
+    id: brand_story
+
+  - node: transform
+    params:
+      operation: extract_sections
+      sections:
+        - strategy
+        - origin_story
+        - narrative_versions
+        - storytelling_elements
+        - applications
+        - voice_guide
+    input: brand_story
+    id: structured_output
+
+  - node: file_write
+    params:
+      path: brand-story.md
+    input: brand_story
+    id: save_story
+
+  - node: file_write
+    params:
+      path: brand-story-assets.json
+    input: structured_output
+    id: save_assets
+
+  - node: notify
+    params:
+      channel: stdout
+    input: brand_story
+    id: notify

@@ -1,0 +1,24 @@
+{
+  "id": "integrations/zendesk-ticket",
+  "name": "zendesk-ticket",
+  "version": "1.0.0",
+  "description": "Manage Zendesk support tickets with AI-powered analysis and reporting.",
+  "author": "aflare community",
+  "category": "integrations",
+  "tags": [
+    "integrations",
+    "workflow",
+    "zendesk",
+    "support"
+  ],
+  "keywords": [
+    "zendesk-ticket",
+    "zendesk",
+    "integrations",
+    "support",
+    "tickets"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

@@ -1,0 +1,110 @@
+name: Buyer Persona Builder
+# Research and generate buyer personas
+# Usage: aflare install marketing/persona-builder
+#        aflare run persona-builder/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: "https://api.linkedin.com/v2/audienceInsights?industry={{ .params.industry }}&jobTitle={{ .params.job_title }}"
+      method: GET
+      timeout: 30s
+    id: audience_data
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: researcher, template_render, json_parse
+      max_iterations: 4
+    input: |
+      Create a detailed buyer persona based on the following inputs:
+      
+      Industry: {{ .params.industry }}
+      Target Job Title: {{ .params.job_title }}
+      Company Size: {{ .params.company_size }}
+      Product/Service: {{ .params.product }}
+      Audience Data: {{ .audience_data }}
+      
+      Generate a comprehensive buyer persona profile:
+      1. Demographic Profile
+         - Age range, gender distribution
+         - Education level
+         - Income bracket
+         - Geographic location
+      2. Professional Background
+         - Job title(s) and seniority level
+         - Years of experience
+         - Career path and aspirations
+         - Key responsibilities
+         - Reporting structure
+         - Decision-making authority
+      3. Goals & Motivations
+         - Primary business goals
+         - Personal career objectives
+         - Success metrics they care about
+         - What keeps them up at night
+      4. Pain Points & Challenges
+         - Daily frustrations
+         - Process inefficiencies
+         - Budget constraints
+         - Organizational barriers
+         - Competitor pressures
+      5. Information Sources
+         - Preferred content formats
+         - Trusted publications and influencers
+         - Social media platforms used
+         - Events and conferences attended
+         - Communities and forums
+      6. Buying Behavior
+         - Purchase decision process
+         - Evaluation criteria
+         - Budget authority
+         - Typical sales cycle length
+         - Objections and concerns
+      7. Communication Preferences
+         - Preferred channels (email, phone, social)
+         - Best times to reach out
+         - Tone and messaging style
+         - Value propositions that resonate
+      8. Persona Narrative
+         - "Day in the life" story
+         - Quote that captures their mindset
+         - Photo/avatar description
+    id: persona_profile
+
+  - node: transform
+    params:
+      format: json
+    input: |
+      {
+        "persona": {
+          "name": "{{ .params.persona_name }}",
+          "profile": {{ .persona_profile | toJson }}
+        },
+        "research_inputs": {
+          "industry": "{{ .params.industry }}",
+          "job_title": "{{ .params.job_title }}",
+          "company_size": "{{ .params.company_size }}"
+        }
+      }
+    id: structured_persona
+
+  - node: file_write
+    params:
+      path: buyer-persona-{{ .params.persona_name | lowercase | replace " " "-" }}.md
+    input: |
+      # Buyer Persona: {{ .params.persona_name }}
+      
+      **Industry:** {{ .params.industry }}
+      **Job Title:** {{ .params.job_title }}
+      **Product:** {{ .params.product }}
+      
+      {{ .persona_profile }}
+      
+      ---
+      ## Structured Persona Data (JSON)
+      ```json
+      {{ .structured_persona }}
+      ```
+    id: save

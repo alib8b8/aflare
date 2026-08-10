@@ -1,0 +1,183 @@
+name: Brand Sentiment Analysis
+# Analyze brand sentiment from social media and reviews
+# Usage: aflare install marketing/sentiment-analysis
+#        aflare run sentiment-analysis/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: "https://api.twitter.com/2/tweets/search/recent?query={{ .params.brand_name }}&max_results=100"
+      method: GET
+      timeout: 30s
+    id: social_mentions
+
+  - node: http_request
+    params:
+      url: "https://api.trustpilot.com/v1/business-units/{{ .params.brand_name }}/reviews"
+      method: GET
+      timeout: 30s
+    id: reviews_data
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 60s
+    input: |
+      import json
+      import re
+      from collections import Counter
+      from datetime import datetime
+
+      social_data = json.loads('''{{ .social_mentions }}''')
+      reviews_data = json.loads('''{{ .reviews_data }}''')
+
+      # Simple sentiment scoring
+      positive_words = ["love", "great", "amazing", "excellent", "perfect", "best", "awesome", "fantastic", "recommend", "impressed"]
+      negative_words = ["hate", "terrible", "awful", "worst", "bad", "poor", "frustrating", "disappointed", "broken", "useless"]
+
+      def score_sentiment(text):
+          if not text:
+              return {"score": 0, "label": "neutral"}
+          text_lower = text.lower()
+          pos_count = sum(1 for w in positive_words if w in text_lower)
+          neg_count = sum(1 for w in negative_words if w in text_lower)
+          score = pos_count - neg_count
+          if score > 0:
+              return {"score": score, "label": "positive"}
+          elif score < 0:
+              return {"score": score, "label": "negative"}
+          return {"score": 0, "label": "neutral"}
+
+      # Analyze social mentions
+      social_results = []
+      for tweet in social_data.get("data", []):
+          sentiment = score_sentiment(tweet.get("text", ""))
+          social_results.append({
+              "id": tweet.get("id"),
+              "text": tweet.get("text", "")[:100],
+              "sentiment": sentiment["label"],
+              "score": sentiment["score"],
+              "date": tweet.get("created_at", "")
+          })
+
+      # Analyze reviews
+      review_results = []
+      for review in reviews_data.get("reviews", []):
+          sentiment = score_sentiment(review.get("text", ""))
+          review_results.append({
+              "id": review.get("id"),
+              "rating": review.get("stars", 0),
+              "text": review.get("text", "")[:100],
+              "sentiment": sentiment["label"],
+              "score": sentiment["score"],
+              "date": review.get("created_at", "")
+          })
+
+      # Aggregate sentiment
+      all_social = [s["sentiment"] for s in social_results]
+      all_reviews = [r["sentiment"] for r in review_results]
+
+      social_counts = Counter(all_social)
+      review_counts = Counter(all_reviews)
+
+      total_social = len(all_social) or 1
+      total_reviews = len(all_reviews) or 1
+
+      # Extract common themes
+      all_text = " ".join([s["text"] for s in social_results] + [r["text"] for r in review_results])
+      words = re.findall(r'\b[a-zA-Z]{4,}\b', all_text.lower())
+      common_words = [w for w, c in Counter(words).most_common(20) if w not in positive_words + negative_words]
+
+      output = {
+          "social_media": {
+              "total_mentions": len(social_results),
+              "sentiment_distribution": {
+                  "positive_pct": round(social_counts.get("positive", 0) / total_social * 100, 1),
+                  "neutral_pct": round(social_counts.get("neutral", 0) / total_social * 100, 1),
+                  "negative_pct": round(social_counts.get("negative", 0) / total_social * 100, 1)
+              },
+              "sample_mentions": social_results[:5]
+          },
+          "reviews": {
+              "total_reviews": len(review_results),
+              "sentiment_distribution": {
+                  "positive_pct": round(review_counts.get("positive", 0) / total_reviews * 100, 1),
+                  "neutral_pct": round(review_counts.get("neutral", 0) / total_reviews * 100, 1),
+                  "negative_pct": round(review_counts.get("negative", 0) / total_reviews * 100, 1)
+              },
+              "average_rating": round(sum(r["rating"] for r in review_results) / total_reviews, 1) if review_results else 0,
+              "sample_reviews": review_results[:5]
+          },
+          "common_themes": common_words,
+          "overall_sentiment": "positive" if (social_counts.get("positive", 0) + review_counts.get("positive", 0)) > 
+                                             (social_counts.get("negative", 0) + review_counts.get("negative", 0)) 
+                               else "negative" if (social_counts.get("negative", 0) + review_counts.get("negative", 0)) >
+                                                  (social_counts.get("positive", 0) + review_counts.get("positive", 0))
+                               else "neutral"
+      }
+
+      print(json.dumps(output, indent=2))
+    id: sentiment_results
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: json_parse, template_render
+      max_iterations: 4
+    input: |
+      Generate a brand sentiment analysis report:
+      
+      Brand: {{ .params.brand_name }}
+      Industry: {{ .params.industry }}
+      Sentiment Data: {{ .sentiment_results }}
+      
+      Provide:
+      1. Executive Summary
+         - Overall sentiment score and trend
+         - Key finding highlights
+         - Comparison to industry benchmarks
+      2. Social Media Sentiment Deep Dive
+         - Platform-by-platform breakdown
+         - Viral/spike events analysis
+         - Influencer mentions impact
+         - Hashtag sentiment tracking
+      3. Review Analysis
+         - Rating distribution analysis
+         - Common praise themes
+         - Recurring complaint categories
+         - Review velocity trends
+      4. Topic & Theme Analysis
+         - What customers love most
+         - Top pain points and frustrations
+         - Feature requests and suggestions
+         - Competitive mentions
+      5. Crisis & Risk Detection
+         - Potential PR issues brewing
+         - Response urgency assessment
+         - Recommended crisis communication
+      6. Actionable Recommendations
+         - Immediate response actions
+         - Product/service improvements
+         - Messaging and positioning adjustments
+         - Engagement strategy for each platform
+    id: report
+
+  - node: file_write
+    params:
+      path: brand-sentiment-report.md
+    input: |
+      # Brand Sentiment Analysis: {{ .params.brand_name }}
+      
+      **Industry:** {{ .params.industry }}
+      **Date:** {{ .date }}
+      **Overall Sentiment:** {{ .sentiment_results.overall_sentiment }}
+      
+      {{ .report }}
+      
+      ---
+      ## Raw Sentiment Data
+      ```json
+      {{ .sentiment_results }}
+      ```
+    id: save

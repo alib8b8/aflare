@@ -1,0 +1,94 @@
+name: Ad Copy Generator
+# Generate advertising copy for multiple platforms and formats
+# Usage: aflare install creative/ad-copy
+#        aflare run ad-copy/workflow.yaml
+
+steps:
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render
+      max_iterations: 4
+    input: |
+      Create high-converting advertising copy for {{ .params.product }}.
+
+      Product/Service: {{ .params.product }}
+      Platform: {{ .params.platform }}
+      Target audience: {{ .params.audience }}
+      Campaign goal: {{ .params.goal }}
+      Budget tier: {{ .params.budget_tier }}
+      Unique selling proposition: {{ .params.usp }}
+      Competitors: {{ .params.competitors }}
+      Brand voice: {{ .params.brand_voice }}
+
+      Generate the following ad formats:
+      1. Ad Strategy Overview
+         - Campaign messaging framework
+         - Key value propositions (3-5)
+         - Pain points addressed
+         - Emotional hooks
+         - Differentiation from competitors
+      2. Search Ads (Google/Bing)
+         - Headline variants (15 headlines, max 30 chars each)
+         - Description variants (4 descriptions, max 90 chars each)
+         - Ad extensions suggestions
+         - Keyword theme clusters
+         - Negative keyword suggestions
+      3. Social Media Ads
+         - Facebook/Instagram ad copy (3 variants)
+           - Primary text
+           - Headline
+           - Description
+           - CTA button
+         - LinkedIn ad copy (2 variants)
+         - Twitter/X promoted post copy (3 variants)
+         - TikTok Spark Ads copy (2 variants)
+      4. Display/Banner Ads
+         - Banner headline (3 sizes: 300x250, 728x90, 160x600)
+         - Body copy for each size
+         - CTA for each size
+         - Visual direction notes
+      5. Video Ad Scripts
+         - 15-second skippable ad script
+         - 30-second non-skippable ad script
+         - 6-second bumper ad script
+         - Voiceover direction
+         - Visual storyboard notes
+      6. A/B Testing Plan
+         - 3 headline variations to test
+         - 3 CTA variations to test
+         - 2 visual concept directions
+         - Success metrics to track
+    id: ad_copy
+
+  - node: transform
+    params:
+      operation: extract_sections
+      sections:
+        - strategy
+        - search_ads
+        - social_ads
+        - display_ads
+        - video_ads
+        - ab_testing
+    input: ad_copy
+    id: structured_output
+
+  - node: file_write
+    params:
+      path: ad-copy.md
+    input: ad_copy
+    id: save_full
+
+  - node: file_write
+    params:
+      path: ad-copy-campaign.json
+    input: structured_output
+    id: save_campaign
+
+  - node: notify
+    params:
+      channel: stdout
+    input: ad_copy
+    id: notify

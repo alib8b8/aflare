@@ -1,0 +1,145 @@
+name: Financial Report Generator
+# Automated financial report generation
+# Usage: aflare install finance/financial-report
+#        aflare run financial-report/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.data_file }}"
+    id: raw_data
+
+  - node: http_request
+    params:
+      url: "{{ .params.benchmark_api_url }}"
+      method: GET
+      timeout: 30s
+    id: benchmark_data
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render,json_parse
+      max_iterations: 3
+    input: |
+      Generate a comprehensive financial report based on:
+
+      Company Data:
+      {{ .raw_data }}
+
+      Benchmark Data:
+      {{ .benchmark_data }}
+
+      Report Configuration:
+      - Company Name: {{ .params.company_name }}
+      - Report Type: {{ .params.report_type }}
+      - Period: {{ .params.period }}
+      - Comparison Period: {{ .params.comparison_period }}
+
+      Generate the following sections:
+      1. Executive Summary
+         - Key highlights
+         - Performance at a glance
+         - Management commentary
+
+      2. Income Statement Analysis
+         - Revenue trends and drivers
+         - Gross margin analysis
+         - Operating expense breakdown
+         - EBITDA and net income
+
+      3. Balance Sheet Analysis
+         - Asset composition
+         - Liability structure
+         - Working capital position
+         - Debt-to-equity analysis
+
+      4. Cash Flow Analysis
+         - Operating cash flow
+         - Investing activities
+         - Financing activities
+         - Free cash flow
+
+      5. Key Financial Ratios
+         - Profitability (ROE, ROA, gross margin, net margin)
+         - Liquidity (current ratio, quick ratio)
+         - Efficiency (asset turnover, inventory turnover)
+         - Leverage (debt/equity, interest coverage)
+
+      6. Benchmark Comparison
+         - Industry average comparison
+         - Peer group analysis
+         - Percentile ranking
+
+      7. Risk Factors and Disclosures
+
+      8. Outlook and Guidance
+    id: report_content
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 60s
+    input: |
+      import json
+
+      data = {{ .raw_data }}
+      content = {{ .report_content }}
+
+      # Calculate key financial ratios
+      ratios = {}
+      if isinstance(data, dict):
+          revenue = data.get('revenue', 0) or 0
+          net_income = data.get('net_income', 0) or 0
+          total_assets = data.get('total_assets', 0) or 0
+          total_equity = data.get('total_equity', 0) or 0
+          current_assets = data.get('current_assets', 0) or 0
+          current_liabilities = data.get('current_liabilities', 0) or 0
+
+          if total_equity > 0:
+              ratios['ROE'] = (net_income / total_equity) * 100
+          if total_assets > 0:
+              ratios['ROA'] = (net_income / total_assets) * 100
+          if current_liabilities > 0:
+              ratios['Current Ratio'] = current_assets / current_liabilities
+
+      print("## Financial Ratios Summary")
+      for name, value in ratios.items():
+          print(f"- **{name}:** {value:.2f}")
+    id: ratio_calculations
+
+  - node: template_render
+    params:
+      template: |
+        # {{ .params.company_name }} - Financial Report
+        **Period:** {{ .params.period }}
+        **Generated:** {{ .metadata.timestamp }}
+
+        ---
+
+        {{ .report_content }}
+
+        ---
+
+        ## Financial Ratios
+        {{ .ratio_calculations }}
+
+        ---
+        > **Disclaimer:** This report is for informational purposes only.
+      report_content: "{{ .steps.report_content.output }}"
+      ratio_calculations: "{{ .steps.ratio_calculations.output }}"
+    id: final_report
+
+  - node: file_write
+    params:
+      path: financial-report.md
+    input: final_report
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Financial report generated. Saved to financial-report.md
+    id: notify

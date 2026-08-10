@@ -1,0 +1,191 @@
+name: Merger Model
+# M&A financial model and accretion/dilution analysis
+# Usage: aflare install finance/merger-model
+#        aflare run merger-model/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.acquirer_financials }}"
+    id: acquirer_data
+
+  - node: file_read
+    params:
+      path: "{{ .params.target_financials }}"
+    id: target_data
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render,json_parse
+      max_iterations: 3
+    input: |
+      Build an M&A merger model and accretion/dilution analysis:
+
+      Acquirer Financials:
+      {{ .acquirer_data }}
+
+      Target Financials:
+      {{ .target_data }}
+
+      Deal Parameters:
+      - Transaction Type: {{ .params.transaction_type }}
+      - Offer Price: {{ .params.offer_price }}
+      - Premium: {{ .params.premium }}%
+      - Financing Mix: {{ .params.financing_mix }}
+      - Synergies: {{ .params.synergies }}
+      - Integration Costs: {{ .params.integration_costs }}
+
+      Model the following:
+      1. TRANSACTION SUMMARY
+         - Deal value and structure
+         - Purchase price allocation
+         - Goodwill calculation
+         - Financing sources and uses
+
+      2. PRO FORMA FINANCIALS
+         - Combined income statement
+         - Combined balance sheet
+         - Combined cash flow statement
+         - Pro forma adjustments
+
+      3. ACCRETION/DILUTION ANALYSIS
+         - EPS impact (Year 1, 2, 3)
+         - Breakeven analysis
+         - Sensitivity tables
+         - Synergy realization timeline
+
+      4. FINANCING ANALYSIS
+         - Debt capacity analysis
+         - Interest coverage ratios
+         - Leverage ratios (Debt/EBITDA)
+         - Credit rating impact
+
+      5. VALUATION ANALYSIS
+         - Implied transaction multiples
+         - Comparable transactions
+         - Premium analysis
+         - DCF valuation of combined entity
+
+      6. SYNERGY ANALYSIS
+         - Revenue synergies
+         - Cost synergies
+         - Realization probability
+         - NPV of synergies
+
+      7. RISK ASSESSMENT
+         - Integration risks
+         - Regulatory/antitrust risks
+         - Financing risks
+         - Key man risks
+         - Cultural fit assessment
+
+      8. RECOMMENDATION
+         - Deal rationale
+         - Price negotiation range
+         - Walk-away price
+         - Alternative structures
+    id: merger_model
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 60s
+    input: |
+      import json
+
+      model = {{ .merger_model }}
+      acquirer = {{ .acquirer_data }}
+      target = {{ .target_data }}
+
+      # Extract key financials
+      if isinstance(acquirer, dict):
+          a_eps = acquirer.get('eps', 0) or 0
+          a_shares = acquirer.get('shares_outstanding', 0) or 0
+          a_net_income = acquirer.get('net_income', 0) or 0
+
+      if isinstance(target, dict):
+          t_eps = target.get('eps', 0) or 0
+          t_shares = target.get('shares_outstanding', 0) or 0
+          t_net_income = target.get('net_income', 0) or 0
+
+      offer_price = float({{ .params.offer_price }})
+      premium = float({{ .params.premium }}) / 100
+      synergies = float({{ .params.synergies }})
+
+      # Calculate deal metrics
+      target_equity_value = offer_price * t_shares
+      implied_enterprise_value = target_equity_value  # simplified
+
+      # Pro forma EPS
+      combined_net_income = a_net_income + t_net_income + synergies
+      # Assume 100% stock deal for simplicity
+      exchange_ratio = offer_price / (a_eps * 20) if a_eps > 0 else 0  # simplified P/E
+      new_shares = t_shares * exchange_ratio
+      pro_forma_shares = a_shares + new_shares
+      pro_forma_eps = combined_net_income / pro_forma_shares if pro_forma_shares > 0 else 0
+
+      accretion = ((pro_forma_eps - a_eps) / a_eps * 100) if a_eps > 0 else 0
+
+      print("## Merger Model Summary")
+      print(f"### Deal Metrics")
+      print(f"Target Equity Value: ${target_equity_value:,.2f}")
+      print(f"Offer Price per Share: ${offer_price:,.2f}")
+      print(f"Premium: {premium*100:.1f}%")
+      print(f"Exchange Ratio: {exchange_ratio:.4f}")
+      print()
+      print(f"### Accretion/Dilution")
+      print(f"Acquirer Standalone EPS: ${a_eps:.2f}")
+      print(f"Pro Forma EPS: ${pro_forma_eps:.2f}")
+      print(f"Accretion/Dilution: {accretion:+.1f}%")
+      print(f"New Shares Issued: {new_shares:,.0f}")
+      print(f"Pro Forma Shares: {pro_forma_shares:,.0f}")
+      print(f"Combined Net Income: ${combined_net_income:,.2f}")
+
+      # Sensitivity
+      print()
+      print("### EPS Accretion Sensitivity (% varying synergies and premium)")
+      print(f"{'Syn/Prem':>10}", end="")
+      for p in [0.15, 0.20, 0.25, 0.30]:
+          print(f" {p*100:>8.0f}%", end="")
+      print()
+      for s in [synergies*0.5, synergies, synergies*1.5, synergies*2.0]:
+          print(f"${s:>9,.0f}", end="")
+          for p in [0.15, 0.20, 0.25, 0.30]:
+              ep = offer_price * (1 + p) / (a_eps * 20) if a_eps > 0 else 0
+              ns = t_shares * ep
+              ni = a_net_income + t_net_income + s
+              pf = a_shares + ns
+              pe = ni / pf if pf > 0 else 0
+              acc = (pe - a_eps) / a_eps * 100 if a_eps > 0 else 0
+              print(f" {acc:>8.1f}%", end="")
+          print()
+    id: calculations
+
+  - node: file_write
+    params:
+      path: merger-model-report.md
+    input: |
+      # M&A Merger Model Report
+
+      Acquirer: {{ .params.acquirer_name }}
+      Target: {{ .params.target_name }}
+      Generated: {{ .metadata.timestamp }}
+
+      ## Merger Model Analysis
+      {{ .merger_model }}
+
+      ## Quantitative Analysis
+      {{ .calculations }}
+
+      ---
+      > **Disclaimer:** This model is for illustrative purposes only. Not financial advice.
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      Merger model complete. Report saved to merger-model-report.md
+    id: notify

@@ -1,0 +1,25 @@
+{
+  "id": "marketing/sentiment-analysis",
+  "name": "sentiment-analysis",
+  "version": "1.0.0",
+  "description": "Brand sentiment analysis from social media and review platforms",
+  "author": "aflare community",
+  "category": "marketing",
+  "tags": [
+    "marketing",
+    "workflow",
+    "sentiment",
+    "social-media",
+    "brand-monitoring"
+  ],
+  "keywords": [
+    "sentiment-analysis",
+    "marketing",
+    "brand-sentiment",
+    "social-listening",
+    "review-analysis"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

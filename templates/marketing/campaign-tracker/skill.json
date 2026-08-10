@@ -1,0 +1,25 @@
+{
+  "id": "marketing/campaign-tracker",
+  "name": "campaign-tracker",
+  "version": "1.0.0",
+  "description": "Multi-channel marketing campaign performance tracker with ROI analysis",
+  "author": "aflare community",
+  "category": "marketing",
+  "tags": [
+    "marketing",
+    "workflow",
+    "campaign",
+    "analytics",
+    "performance"
+  ],
+  "keywords": [
+    "campaign-tracker",
+    "marketing",
+    "campaign-performance",
+    "roi-analysis",
+    "multi-channel"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}
