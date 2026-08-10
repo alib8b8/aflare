@@ -27,7 +27,7 @@ params:
 
 steps:
   - id: assess_readiness
-    type: agent
+    node: agent
     config:
       instruction: |
         For each critical role, assess the readiness of potential successors from the talent pool.
@@ -55,7 +55,7 @@ steps:
       output: readiness_assessment
 
   - id: build_succession_matrix
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -112,7 +112,7 @@ steps:
       output: succession_matrix
 
   - id: generate_development_plan
-    type: agent
+    node: agent
     config:
       instruction: |
         Generate individual development plans for high-potential successors identified in the succession matrix.
@@ -135,7 +135,7 @@ steps:
       output: development_plans
 
   - id: save_plan
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"succession_plan.json\" }}"
       content: |

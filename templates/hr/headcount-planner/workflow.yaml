@@ -36,7 +36,7 @@ params:
 
 steps:
   - id: calculate_baseline
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -82,7 +82,7 @@ steps:
       output: baseline
 
   - id: model_scenarios
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -146,7 +146,7 @@ steps:
       output: scenario_models
 
   - id: generate_recommendation
-    type: agent
+    node: agent
     config:
       instruction: |
         Analyze the headcount scenarios and provide strategic recommendations.
@@ -176,7 +176,7 @@ steps:
       output: recommendations
 
   - id: save_plan
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"headcount_plan.json\" }}"
       content: |

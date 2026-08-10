@@ -42,7 +42,7 @@ params:
 
 steps:
   - id: generate_survey_questions
-    type: agent
+    node: agent
     config:
       instruction: |
         Generate a comprehensive employee engagement survey with questions organized by focus areas.
@@ -64,7 +64,7 @@ steps:
       output: survey_questions
 
   - id: distribute_survey
-    type: http_request
+    node: http_request
     config:
       method: POST
       url: "{{ .params.survey_api_url | default \"https://api.surveys.internal/engage/create\" }}"
@@ -82,7 +82,7 @@ steps:
       output: distribution_result
 
   - id: analyze_responses
-    type: agent
+    node: agent
     config:
       instruction: |
         Analyze the survey responses and generate insights:
@@ -103,7 +103,7 @@ steps:
       output: analysis_results
 
   - id: generate_report
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -141,7 +141,7 @@ steps:
       output: final_report
 
   - id: save_report
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"employee_survey_report.json\" }}"
       content: "{{ .steps.generate_report.output.final_report }}"

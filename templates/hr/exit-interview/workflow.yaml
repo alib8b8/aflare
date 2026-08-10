@@ -32,7 +32,7 @@ params:
 
 steps:
   - id: preprocess_data
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -87,7 +87,7 @@ steps:
       output: preprocessed_data
 
   - id: analyze_themes
-    type: agent
+    node: agent
     config:
       instruction: |
         Analyze the exit interview data to identify patterns and themes.
@@ -114,7 +114,7 @@ steps:
       output: theme_analysis
 
   - id: generate_insights
-    type: agent
+    node: agent
     config:
       instruction: |
         Generate actionable insights and recommendations from the exit interview analysis.
@@ -144,7 +144,7 @@ steps:
       output: insights
 
   - id: notify_stakeholders
-    type: notify
+    node: notify
     config:
       channel: "{{ .params.notification_channel | default \"email\" }}"
       recipients: "{{ .params.notification_recipients | default \"hr-leadership@company.com\" }}"
@@ -167,7 +167,7 @@ steps:
         Full report: {{ .params.output_file | default \"exit_interview_report.json\" }}
 
   - id: compute_timestamp
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         from datetime import datetime, timezone
@@ -175,7 +175,7 @@ steps:
       output: compute_timestamp
 
   - id: save_report
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"exit_interview_report.json\" }}"
       content: |

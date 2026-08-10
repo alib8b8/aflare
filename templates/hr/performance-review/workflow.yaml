@@ -43,7 +43,7 @@ params:
 
 steps:
   - id: calculate_goal_scores
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -84,7 +84,7 @@ steps:
       output: goal_results
 
   - id: calculate_competency_scores
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -120,7 +120,7 @@ steps:
       output: competency_results
 
   - id: generate_review_document
-    type: agent
+    node: agent
     config:
       instruction: |
         Generate a comprehensive performance review document for {{ .params.employee_name }} ({{ .params.employee_title }}, {{ .params.department }}).
@@ -154,7 +154,7 @@ steps:
       output: review_document
 
   - id: generate_filename
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         name = "{{ .params.employee_name }}"
@@ -163,7 +163,7 @@ steps:
       output: filename
 
   - id: save_review
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .steps.generate_filename.output.filename }}"
       content: "{{ .steps.generate_review_document.output.review_document }}"

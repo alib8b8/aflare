@@ -36,7 +36,7 @@ params:
 
 steps:
   - id: fetch_market_data
-    type: http_request
+    node: http_request
     config:
       method: POST
       url: "{{ .params.market_api_url | default \"https://api.compensation.internal/benchmark\" }}"
@@ -55,7 +55,7 @@ steps:
       output: market_data
 
   - id: compute_benchmarks
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -121,7 +121,7 @@ steps:
       output: benchmark_results
 
   - id: generate_recommendations
-    type: agent
+    node: agent
     config:
       instruction: |
         Analyze the compensation benchmarking results and generate strategic recommendations:
@@ -144,7 +144,7 @@ steps:
       output: recommendations
 
   - id: compute_timestamp
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         from datetime import datetime, timezone
@@ -152,7 +152,7 @@ steps:
       output: compute_timestamp
 
   - id: save_report
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"compensation_benchmark_report.json\" }}"
       content: |

@@ -31,7 +31,7 @@ params:
 
 steps:
   - id: identify_gaps
-    type: agent
+    node: agent
     config:
       instruction: |
         Analyze the current employee skills against required competencies and identify gaps.
@@ -58,7 +58,7 @@ steps:
       output: gap_analysis
 
   - id: prioritize_training
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -131,7 +131,7 @@ steps:
       output: prioritized_training
 
   - id: generate_training_plan
-    type: agent
+    node: agent
     config:
       instruction: |
         Create a comprehensive training plan based on the prioritized training needs.
@@ -161,7 +161,7 @@ steps:
       output: training_plan
 
   - id: save_plan
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"training_needs_plan.json\" }}"
       content: |

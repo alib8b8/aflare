@@ -41,7 +41,7 @@ params:
 
 steps:
   - id: compute_metrics
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -100,7 +100,7 @@ steps:
       output: metrics
 
   - id: analyze_pay_equity
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -146,7 +146,7 @@ steps:
       output: pay_equity
 
   - id: generate_report
-    type: agent
+    node: agent
     config:
       instruction: |
         Generate a comprehensive DEI report for {{ .params.company_name }}.
@@ -179,7 +179,7 @@ steps:
       output: report_content
 
   - id: save_report
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"dei_report.md\" }}"
       content: "{{ .steps.generate_report.output.report_content }}"

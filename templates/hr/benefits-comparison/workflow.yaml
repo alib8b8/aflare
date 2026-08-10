@@ -37,7 +37,7 @@ params:
 
 steps:
   - id: normalize_benefits
-    type: agent
+    node: agent
     config:
       instruction: |
         Normalize all benefits packages into a consistent structured format for comparison.
@@ -60,7 +60,7 @@ steps:
       output: normalized_packages
 
   - id: compute_comparison
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -157,7 +157,7 @@ steps:
       output: comparison_results
 
   - id: generate_recommendation
-    type: agent
+    node: agent
     config:
       instruction: |
         Analyze the benefits comparison and generate personalized recommendations for the employee.
@@ -179,7 +179,7 @@ steps:
       output: recommendations
 
   - id: save_report
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"benefits_comparison_report.json\" }}"
       content: |

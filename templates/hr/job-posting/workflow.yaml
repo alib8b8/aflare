@@ -51,7 +51,7 @@ params:
 
 steps:
   - id: generate_description
-    type: agent
+    node: agent
     config:
       instruction: |
         Create a compelling and inclusive job posting for {{ .params.job_title }}.
@@ -93,7 +93,7 @@ steps:
       output: job_posting_content
 
   - id: optimize_for_platforms
-    type: agent
+    node: agent
     config:
       instruction: |
         Adapt the job posting for each target platform: {{ .params.target_platforms }}
@@ -113,7 +113,7 @@ steps:
       output: platform_variants
 
   - id: generate_meta
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -146,7 +146,7 @@ steps:
       output: meta_data
 
   - id: publish_to_ats
-    type: http_request
+    node: http_request
     config:
       method: POST
       url: "{{ .params.ats_api_url | default \"https://api.ats.internal/jobs\" }}"
@@ -166,7 +166,7 @@ steps:
       output: publication_result
 
   - id: generate_filename
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         title = "{{ .params.job_title }}"
@@ -175,7 +175,7 @@ steps:
       output: filename
 
   - id: format_platform_keys
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -187,7 +187,7 @@ steps:
       output: formatted_variants
 
   - id: save_posting
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .steps.generate_filename.output.filename }}"
       content: |

@@ -37,7 +37,7 @@ params:
 
 steps:
   - id: build_hierarchy
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -106,7 +106,7 @@ steps:
       output: hierarchy_data
 
   - id: generate_chart
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -170,7 +170,7 @@ steps:
       output: chart_output
 
   - id: analyze_structure
-    type: agent
+    node: agent
     config:
       instruction: |
         Analyze the organizational structure and provide insights:
@@ -189,7 +189,7 @@ steps:
       output: structural_analysis
 
   - id: compute_date
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         from datetime import date
@@ -197,7 +197,7 @@ steps:
       output: compute_date
 
   - id: save_chart
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"org_chart.mmd\" }}"
       content: |

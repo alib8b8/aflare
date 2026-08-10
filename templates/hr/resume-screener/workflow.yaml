@@ -27,7 +27,7 @@ params:
 
 steps:
   - id: parse_resumes
-    type: agent
+    node: agent
     config:
       instruction: |
         Parse and extract structured information from each resume:
@@ -43,7 +43,7 @@ steps:
       output: parsed_resumes
 
   - id: filter_by_requirements
-    type: transform
+    node: transform
     config:
       code: |
         function filterCandidates(parsed, requiredSkills, minYears) {
@@ -67,7 +67,7 @@ steps:
       output: filtered_resumes
 
   - id: score_and_rank
-    type: agent
+    node: agent
     config:
       instruction: |
         You are an expert recruiter. Score each candidate against the job description on a scale of 0-100.
@@ -87,7 +87,7 @@ steps:
       output: ranked_results
 
   - id: generate_report
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -124,7 +124,7 @@ steps:
       output: final_report
 
   - id: save_results
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"resume_screening_report.json\" }}"
       content: "{{ .steps.generate_report.output.final_report }}"

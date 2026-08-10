@@ -31,7 +31,7 @@ params:
 
 steps:
   - id: compute_funnel_metrics
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -89,7 +89,7 @@ steps:
       output: funnel_metrics
 
   - id: identify_bottlenecks
-    type: agent
+    node: agent
     config:
       instruction: |
         Analyze the recruitment funnel and identify bottlenecks and optimization opportunities.
@@ -117,7 +117,7 @@ steps:
       output: bottleneck_analysis
 
   - id: generate_forecast
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -174,7 +174,7 @@ steps:
       output: forecast
 
   - id: save_report
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"talent_pipeline_report.json\" }}"
       content: |

@@ -37,7 +37,7 @@ params:
 
 steps:
   - id: compute_headcount_kpis
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -71,7 +71,7 @@ steps:
       output: headcount_kpis
 
   - id: compute_turnover_kpis
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -111,7 +111,7 @@ steps:
       output: turnover_kpis
 
   - id: compute_compensation_kpis
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -142,7 +142,7 @@ steps:
       output: compensation_kpis
 
   - id: generate_insights
-    type: agent
+    node: agent
     config:
       instruction: |
         Analyze the workforce KPIs and generate strategic insights for the HR dashboard.
@@ -171,7 +171,7 @@ steps:
       output: dashboard_insights
 
   - id: compute_timestamp
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         from datetime import datetime, timezone
@@ -179,7 +179,7 @@ steps:
       output: compute_timestamp
 
   - id: save_dashboard
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"workforce_analytics_dashboard.json\" }}"
       content: |

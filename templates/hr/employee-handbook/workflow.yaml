@@ -40,7 +40,7 @@ params:
 
 steps:
   - id: fetch_compliance_requirements
-    type: http_request
+    node: http_request
     config:
       method: POST
       url: "{{ .params.compliance_api_url | default \"https://api.compliance.internal/requirements\" }}"
@@ -56,7 +56,7 @@ steps:
       output: compliance_requirements
 
   - id: generate_handbook
-    type: agent
+    node: agent
     config:
       instruction: |
         Generate a comprehensive, legally-informed employee handbook for {{ .params.company_name }}.
@@ -109,7 +109,7 @@ steps:
       output: handbook_content
 
   - id: generate_table_of_contents
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -137,7 +137,7 @@ steps:
       output: toc_data
 
   - id: compute_date
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         from datetime import date
@@ -145,7 +145,7 @@ steps:
       output: compute_date
 
   - id: save_handbook
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"employee_handbook.md\" }}"
       content: |

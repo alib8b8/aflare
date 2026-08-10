@@ -34,7 +34,7 @@ params:
 
 steps:
   - id: parse_notes
-    type: agent
+    node: agent
     config:
       instruction: |
         Analyze the raw interview notes and extract structured evidence for each evaluation criterion.
@@ -55,7 +55,7 @@ steps:
       output: structured_evidence
 
   - id: compute_scores
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -118,7 +118,7 @@ steps:
       output: scorecard
 
   - id: generate_summary
-    type: agent
+    node: agent
     config:
       instruction: |
         Write a professional interview summary for {{ .params.candidate_name }}.
@@ -143,7 +143,7 @@ steps:
       output: summary
 
   - id: generate_filename
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         name = "{{ .params.candidate_name }}"
@@ -152,7 +152,7 @@ steps:
       output: filename
 
   - id: compute_date
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         from datetime import date
@@ -160,7 +160,7 @@ steps:
       output: current_date
 
   - id: save_scorecard
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .steps.generate_filename.output.filename }}"
       content: |

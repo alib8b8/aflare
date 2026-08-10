@@ -27,7 +27,7 @@ params:
 
 steps:
   - id: normalize_profiles
-    type: agent
+    node: agent
     config:
       instruction: |
         Normalize all candidate profiles into a consistent structured format:
@@ -42,7 +42,7 @@ steps:
       output: normalized_candidates
 
   - id: compute_match_scores
-    type: code_interpreter
+    node: code_interpreter
     config:
       code: |
         import json
@@ -112,7 +112,7 @@ steps:
       output: match_results
 
   - id: generate_insights
-    type: agent
+    node: agent
     config:
       instruction: |
         Analyze the match results and generate actionable insights:
@@ -127,7 +127,7 @@ steps:
       output: insights
 
   - id: save_results
-    type: file_write
+    node: file_write
     config:
       filename: "{{ .params.output_file | default \"candidate_matching_report.json\" }}"
       content: |
