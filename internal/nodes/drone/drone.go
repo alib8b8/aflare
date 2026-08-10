@@ -84,6 +84,7 @@ func (n *DroneNode) Schema() core.NodeSchema {
 			{Name: "drone_id", Type: "string", Description: "Unique drone identifier (default: auto-generated)", Required: false},
 			{Name: "bridge_host", Type: "string", Description: "MAVSDK bridge host IP (default: 127.0.0.1)", Required: false, Default: "127.0.0.1"},
 			{Name: "bridge_port", Type: "string", Description: "MAVSDK bridge port (default: 50051 for gRPC, 8080 for HTTP)", Required: false, Default: "8080"},
+			{Name: "bridge_token", Type: "string", Description: "Bearer token for bridge authentication (default: none)", Required: false},
 			{Name: "action", Type: "string", Description: "Action: arm, disarm, takeoff, land, rtl, hold, goto, mission_start, mission_pause, mission_resume, mission_upload, mission_clear, set_mode, get_telemetry, get_status, get_gps, get_battery, camera, deliver, patrol, survey, orbit, follow", Required: false},
 			{Name: "mode", Type: "string", Description: "Backend mode: simulate (default) | mavsdk | http", Required: false, Default: "simulate"},
 			{Name: "target_altitude_m", Type: "float", Description: "Target altitude in meters (default: 10)", Required: false, Default: "10"},
@@ -179,6 +180,7 @@ func (n *DroneNode) Execute(ctx context.Context, input string, params map[string
 
 	bridgeHost := getDroneParam(params, "bridge_host", "127.0.0.1")
 	bridgePort := getDroneParam(params, "bridge_port", "8080")
+	bridgeToken := getDroneParam(params, "bridge_token", "")
 
 	targetAlt := parseFloatSafe(getDroneParam(params, "target_altitude_m", "10"), 10)
 	if targetAlt < 0 || targetAlt > 500 {
@@ -243,7 +245,7 @@ func (n *DroneNode) Execute(ctx context.Context, input string, params map[string
 	// Connected mode: send HTTP request to MAVSDK bridge
 	if mode == "mavsdk" || mode == "http" {
 		timeoutSec := core.ParamInt(params, "timeout", 15, 1, 120)
-		telemetry, mission, err := n.callBridge(ctx, bridgeHost, bridgePort, action, actionParams, waypointsJSON, timeoutSec, mode)
+		telemetry, mission, err := n.callBridge(ctx, bridgeHost, bridgePort, bridgeToken, action, actionParams, waypointsJSON, timeoutSec, mode)
 		if err != nil {
 			result.Success = false
 			result.Error = err.Error()
@@ -267,7 +269,7 @@ func (n *DroneNode) Execute(ctx context.Context, input string, params map[string
 }
 
 // callBridge sends a command to the MAVSDK HTTP bridge.
-func (n *DroneNode) callBridge(ctx context.Context, host, port, action string, params map[string]interface{}, waypointsJSON string, timeoutSec int, mode string) (*DroneTelemetry, *DroneMissionStatus, error) {
+func (n *DroneNode) callBridge(ctx context.Context, host, port, token, action string, params map[string]interface{}, waypointsJSON string, timeoutSec int, mode string) (*DroneTelemetry, *DroneMissionStatus, error) {
 	rawURL := fmt.Sprintf("http://%s:%s/api/v1/drone/%s", host, port, action)
 
 	// SSRF protection: validate the bridge URL before dialing.
@@ -302,6 +304,9 @@ func (n *DroneNode) callBridge(ctx context.Context, host, port, action string, p
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := droneBridgeClient.Do(req)
 	if err != nil {

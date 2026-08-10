@@ -355,8 +355,23 @@ class DroneBridge:
 class DroneHTTPHandler(BaseHTTPRequestHandler):
     """HTTP request handler for the drone bridge."""
     bridge = None  # Set by the server
+    token = None   # Set by the server (None = no auth required)
+
+    def _authenticate(self):
+        """Check the request token. Returns True if authentication passes."""
+        if self.token is None:
+            return True
+        auth = self.headers.get("Authorization", "")
+        expected = f"Bearer {self.token}"
+        if auth != expected:
+            self._send_error(401, "Unauthorized: invalid or missing token")
+            return False
+        return True
 
     def do_POST(self):
+        if not self._authenticate():
+            return
+
         path = urlparse(self.path).path
         # Parse action from URL: /api/v1/drone/<action>
         parts = path.strip("/").split("/")
@@ -384,6 +399,7 @@ class DroneHTTPHandler(BaseHTTPRequestHandler):
         self._send_json(result)
 
     def do_GET(self):
+        # Health check is public (no auth required).
         path = urlparse(self.path).path
         if path == "/health":
             self._send_json({"status": "ok", "connected": self.bridge.connected})
@@ -412,7 +428,11 @@ class DroneHTTPHandler(BaseHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser(description="HTTP-to-MAVLink drone bridge")
+    parser.add_argument("--bind", type=str, default="127.0.0.1",
+                        help="Bind address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8080, help="HTTP server port")
+    parser.add_argument("--token", type=str, default=None,
+                        help="Bearer token for authentication (default: none)")
     parser.add_argument("--connection", type=str, default="udp:127.0.0.1:14550",
                         help="MAVLink connection string (serial:/dev/ttyACM0:115200, udp:127.0.0.1:14550, tcp:192.168.1.100:5760)")
     parser.add_argument("--simulate", action="store_true", help="Force simulation mode")
@@ -426,9 +446,14 @@ def main():
         bridge.connected = True
 
     DroneHTTPHandler.bridge = bridge
-    server = HTTPServer(("0.0.0.0", args.port), DroneHTTPHandler)
+    DroneHTTPHandler.token = args.token
+    server = HTTPServer((args.bind, args.port), DroneHTTPHandler)
 
-    print(f"Drone bridge listening on http://0.0.0.0:{args.port}")
+    print(f"Drone bridge listening on http://{args.bind}:{args.port}")
+    if args.token:
+        print(f"Authentication:  Bearer token enabled")
+    else:
+        print("WARNING: No authentication token set — anyone can control the drone")
     print(f"Health check:  http://localhost:{args.port}/health")
     print(f"API endpoint:  http://localhost:{args.port}/api/v1/drone/<action>")
     print("Press Ctrl+C to stop")
