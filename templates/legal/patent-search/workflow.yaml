@@ -30,22 +30,12 @@ params:
     description: "Maximum number of patent results"
 
 steps:
-  - id: join_keywords
-    node: code_interpreter
-    config:
-      language: python
-      code: |
-        import json
-        arr = json.loads('{{ .params.keywords | toJson }}')
-        print(' '.join(arr))
-      output: keywords_query
-
   - id: search_patents
     node: http_request
     description: "Search patent databases via USPTO API"
     config:
       method: GET
-      url: "https://developer.uspto.gov/ibd-api/v1/application/grants?searchText={{ .keywords_query }}&rows={{ .params.max_results }}"
+      url: "https://developer.uspto.gov/ibd-api/v1/application/grants?searchText={{ range $i, $k := .params.keywords }}{{ if $i }}+{{ end }}{{ $k }}{{ end }}&rows={{ .params.max_results }}"
       headers:
         Accept: "application/json"
 
@@ -53,7 +43,7 @@ steps:
     node: agent
     description: "Analyze patent search results for relevance"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a patent analyst. Review the patent search results and identify the most
         relevant prior art. For each relevant patent, provide: patent number, title, assignee,
@@ -70,7 +60,7 @@ steps:
     node: agent
     description: "Assess patentability and novelty"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a patent attorney. Based on the prior art analysis, assess the patentability
         of the invention. Evaluate: novelty (35 USC 102), non-obviousness (35 USC 103),
@@ -86,7 +76,7 @@ steps:
     node: agent
     description: "Assess freedom to operate risks"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are an IP litigation analyst. Based on the patent search results, assess freedom
         to operate (FTO) risks. Identify any in-force patents that could be infringed by the
@@ -101,7 +91,7 @@ steps:
     node: file_write
     description: "Save the patent search report"
     config:
-      path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }output/patent_search_report.md{{ end }}'
+      path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }}output/patent_search_report.md{{ end }}'
       content: |
         # Patent Search & Prior Art Analysis Report
         

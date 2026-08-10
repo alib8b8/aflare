@@ -32,7 +32,7 @@ steps:
     node: agent
     description: "Research filing requirements and latest forms"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a regulatory filing specialist. Provide the complete filing requirements
         for the specified filing type and jurisdiction. Include: required forms, sections,
@@ -48,7 +48,7 @@ steps:
     node: agent
     description: "Draft the regulatory filing content"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a regulatory filing drafter. Draft the complete filing document following
         the identified requirements. Include all required sections, disclosures, and
@@ -66,7 +66,7 @@ steps:
     node: agent
     description: "Verify filing compliance and completeness"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a regulatory compliance reviewer. Verify the draft filing against all
         requirements. Check for: completeness, accuracy, compliance with disclosure
@@ -82,7 +82,7 @@ steps:
     node: file_write
     description: "Save the regulatory filing document"
     config:
-      path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }output/regulatory_filing.md{{ end }}'
+      path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }}output/regulatory_filing.md{{ end }}'
       content: |
         # {{ .params.filing_type }} Filing
         ## Organization: {{ .params.organization_name }}

@@ -47,7 +47,7 @@ steps:
     node: agent
     description: "Summarize the deposition transcript"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a litigation paralegal. Summarize the deposition transcript in a {{ .params.summary_type }}
         format. Include: deponent background, key admissions, critical testimony, contradictions,
@@ -58,14 +58,14 @@ steps:
         Deponent: {{ .params.deponent_name }}
         Date: {{ .params.deposition_date }}
         Key topics: {{ .params.key_topics }}
-        {{ if .params.transcript_url }}Transcript: {{ index .steps.fetch_transcript.outputs "body" }}{{ else }}Transcript: {{ .params.transcript_text }}{{ end }}
+        {{ if .params.transcript_url }}Transcript: {{ index .steps.fetch_transcript.outputs "body" }}{{ else }}}Transcript: {{ .params.transcript_text }}{{ end }}
         Generate a {{ .params.summary_type }} summary.
 
   - id: extract_testimony
     node: agent
     description: "Extract and index key testimony by topic"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a litigation support specialist. Extract and index the most important testimony
         by topic. For each key excerpt, provide: page/line reference, topic, witness statement,
@@ -73,14 +73,14 @@ steps:
         documents or other witnesses.
       prompt: |
         Summary: {{ index .steps.summarize_deposition.outputs "summary" }}
-        {{ if .params.transcript_url }}Transcript: {{ index .steps.fetch_transcript.outputs "body" }}{{ else }}Transcript: {{ .params.transcript_text }}{{ end }}
+        {{ if .params.transcript_url }}Transcript: {{ index .steps.fetch_transcript.outputs "body" }}{{ else }}}Transcript: {{ .params.transcript_text }}{{ end }}
         Extract and index key testimony by topic.
 
   - id: impeachment_analysis
     node: agent
     description: "Identify impeachment material and contradictions"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a trial attorney. Analyze the deposition for impeachment opportunities.
         Identify: internal contradictions, inconsistencies with prior statements, admissions
@@ -95,7 +95,7 @@ steps:
     node: file_write
     description: "Save the deposition summary"
     config:
-      path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }output/deposition_summary.md{{ end }}'
+      path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }}output/deposition_summary.md{{ end }}'
       content: |
         # Deposition Summary
         ## Case: {{ .params.case_name }}

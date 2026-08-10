@@ -48,7 +48,7 @@ steps:
     node: agent
     description: "Generate the Data Processing Agreement"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a GDPR compliance attorney. Draft a complete Data Processing Agreement (DPA)
         compliant with GDPR Article 28. Include all required clauses: subject matter and duration,
@@ -72,7 +72,7 @@ steps:
     node: agent
     description: "Generate Standard Contractual Clauses if cross-border"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a data transfer compliance specialist. Generate the appropriate Standard
         Contractual Clauses (SCCs) for international data transfers based on the EU 2021
@@ -81,13 +81,13 @@ steps:
         Controller: {{ .params.controller_name }}
         Processor: {{ .params.processor_name }}
         Cross-border: {{ .params.cross_border }}
-        {{ if .params.cross_border }}Generate the required SCCs for this transfer.{{ else }}No SCCs needed - no cross-border transfers.{{ end }}
+        {{ if .params.cross_border }}Generate the required SCCs for this transfer.{{ else }}}No SCCs needed - no cross-border transfers.{{ end }}
 
   - id: generate_security_measures
     node: agent
     description: "Generate technical and organizational security measures"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are an information security compliance specialist. Generate a comprehensive
         annex of technical and organizational security measures (TOMs) appropriate for the
@@ -102,7 +102,7 @@ steps:
     node: agent
     description: "Validate DPA for GDPR compliance"
     config:
-      model: '{{ if .params.model }}{{ .params.model }}{{ else }gpt-4{{ end }}'
+      model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a GDPR compliance auditor. Validate the DPA for completeness and compliance
         with GDPR Article 28 requirements. Check for: mandatory clauses, prohibited terms,
@@ -117,7 +117,7 @@ steps:
     node: file_write
     description: "Save the DPA document"
     config:
-      path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }output/data_processing_agreement.md{{ end }}'
+      path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }}output/data_processing_agreement.md{{ end }}'
       content: |
         # Data Processing Agreement
         
