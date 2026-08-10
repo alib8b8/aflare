@@ -22,7 +22,7 @@ params:
 steps:
   - id: fetch_historical_campaigns
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/marketing/campaigns/history"
       params:
@@ -31,7 +31,7 @@ steps:
 
   - id: fetch_eligible_products
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/products/eligible-for-promotion"
       params:
@@ -40,7 +40,7 @@ steps:
 
   - id: design_campaign
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.4
       prompt: |
@@ -68,7 +68,7 @@ steps:
 
   - id: forecast_campaign_impact
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -103,7 +103,7 @@ steps:
 
   - id: save_campaign_plan
     node: file_write
-    config:
+    params:
       path: "/output/promotions/campaign_{{ .params.timestamp }}.json"
       content: |
         {

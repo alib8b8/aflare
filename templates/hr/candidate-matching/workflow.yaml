@@ -28,7 +28,7 @@ params:
 steps:
   - id: normalize_profiles
     node: agent
-    config:
+    params:
       instruction: |
         Normalize all candidate profiles into a consistent structured format:
         - Extract and standardize skill names using a common taxonomy
@@ -43,7 +43,7 @@ steps:
 
   - id: compute_match_scores
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
 
@@ -113,7 +113,7 @@ steps:
 
   - id: generate_insights
     node: agent
-    config:
+    params:
       instruction: |
         Analyze the match results and generate actionable insights:
         - Identify the strongest candidates and why they stand out
@@ -128,7 +128,7 @@ steps:
 
   - id: save_results
     node: file_write
-    config:
+    params:
       filename: "{{ .params.output_file | default \"candidate_matching_report.json\" }}"
       content: |
         {

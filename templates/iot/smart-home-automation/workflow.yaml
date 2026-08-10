@@ -22,7 +22,7 @@ params:
 steps:
   - id: fetch_state
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.device_api_endpoint }}/homes/{{ .params.home_id }}/state"
       headers:
@@ -31,7 +31,7 @@ steps:
 
   - id: evaluate_rules
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -75,7 +75,7 @@ steps:
 
   - id: execute_actions
     node: agent
-    config:
+    params:
       prompt: |
         You are a smart home automation controller. Review the following triggered actions and decide if they should be executed:
 
@@ -94,7 +94,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -102,7 +102,7 @@ steps:
 
   - id: dispatch_commands
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.device_api_endpoint }}/homes/{{ .params.home_id }}/commands"
       headers:
@@ -114,7 +114,7 @@ steps:
 
   - id: log_automation
     node: file_write
-    config:
+    params:
       file_path: "/data/automation_logs/{{ .params.home_id }}/{{ .compute_date }}.json"
       content: |
         {

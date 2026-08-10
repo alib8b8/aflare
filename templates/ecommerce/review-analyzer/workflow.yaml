@@ -22,7 +22,7 @@ params:
 steps:
   - id: fetch_reviews
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/products/{{ .params.product_id }}/reviews"
       params:
@@ -32,7 +32,7 @@ steps:
 
   - id: analyze_sentiment
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.1
       prompt: |
@@ -48,7 +48,7 @@ steps:
 
   - id: extract_insights
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.3
       prompt: |
@@ -69,7 +69,7 @@ steps:
 
   - id: save_review_report
     node: file_write
-    config:
+    params:
       path: "/output/reviews/{{ .params.product_id }}_review_report_{{ .params.timestamp }}.json"
       content: |
         {

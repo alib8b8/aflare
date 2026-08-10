@@ -26,7 +26,7 @@ params:
 steps:
   - id: ingest
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.storage_endpoint }}/ingest"
       headers:
@@ -41,7 +41,7 @@ steps:
 
   - id: validate
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -73,7 +73,7 @@ steps:
 
   - id: detect_anomalies
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -104,7 +104,7 @@ steps:
 
   - id: enrich
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the following IoT sensor data with anomaly detection results and provide enrichment insights:
 
@@ -124,7 +124,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -132,7 +132,7 @@ steps:
 
   - id: store
     node: file_write
-    config:
+    params:
       file_path: "/data/processed/{{ .compute_date }}/sensor_batch.json"
       content: |
         {{ .steps.enrich.output | toJson }}

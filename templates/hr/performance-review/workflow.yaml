@@ -44,7 +44,7 @@ params:
 steps:
   - id: calculate_goal_scores
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
 
@@ -85,7 +85,7 @@ steps:
 
   - id: calculate_competency_scores
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
 
@@ -121,7 +121,7 @@ steps:
 
   - id: generate_review_document
     node: agent
-    config:
+    params:
       instruction: |
         Generate a comprehensive performance review document for {{ .params.employee_name }} ({{ .params.employee_title }}, {{ .params.department }}).
 
@@ -155,7 +155,7 @@ steps:
 
   - id: generate_filename
     node: code_interpreter
-    config:
+    params:
       code: |
         name = "{{ .params.employee_name }}"
         output = "{{ .params.output_file }}" or f"performance_review_{name.replace(' ', '_')}.md"
@@ -164,7 +164,7 @@ steps:
 
   - id: save_review
     node: file_write
-    config:
+    params:
       filename: "{{ .steps.generate_filename.output.filename }}"
       content: "{{ .steps.generate_review_document.output.review_document }}"
       format: markdown

@@ -29,7 +29,7 @@ params:
 steps:
   - id: fetch_history
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.supplier_history_api }}"
       headers:
@@ -41,7 +41,7 @@ steps:
 
   - id: predict_lead_times
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -134,7 +134,7 @@ steps:
 
   - id: generate_sourcing_advice
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the lead time predictions and generate sourcing recommendations:
         {{ index .steps "predict_lead_times" "output" }}
@@ -149,7 +149,7 @@ steps:
 
   - id: save_predictions
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

@@ -30,7 +30,7 @@ params:
 steps:
   - id: validate_firmware
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -59,7 +59,7 @@ steps:
 
   - id: create_campaign
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.ota_api }}/campaigns"
       headers:
@@ -77,7 +77,7 @@ steps:
 
   - id: monitor_rollout
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the OTA firmware update campaign status and provide rollout guidance:
 
@@ -96,7 +96,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -104,7 +104,7 @@ steps:
 
   - id: persist_campaign
     node: file_write
-    config:
+    params:
       file_path: "/data/ota/campaigns/{{ .compute_date }}_{{ .params.firmware_version }}.json"
       content: |
         {

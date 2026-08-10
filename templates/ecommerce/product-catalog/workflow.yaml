@@ -22,7 +22,7 @@ params:
 steps:
   - id: fetch_products
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.api_base }}/products/catalog"
       body:
@@ -32,7 +32,7 @@ steps:
 
   - id: enrich_product_content
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.5
       prompt: |
@@ -71,7 +71,7 @@ steps:
 
   - id: validate_content
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -124,7 +124,7 @@ steps:
 
   - id: save_enriched_catalog
     node: file_write
-    config:
+    params:
       path: "/output/catalog/enriched_catalog_{{ .params.timestamp }}.json"
       content: |
         {

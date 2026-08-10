@@ -10,7 +10,7 @@ params:
 steps:
   - id: route_task
     node: agent
-    config:
+    params:
       provider: auto
       model: auto
       instruction: |
@@ -29,7 +29,7 @@ steps:
 
   - id: marketing_agent
     node: agent
-    config:
+    params:
       provider: auto
       model: auto
       instruction: |
@@ -53,7 +53,7 @@ steps:
 
   - id: bd_agent
     node: agent
-    config:
+    params:
       provider: auto
       model: auto
       instruction: |
@@ -78,7 +78,7 @@ steps:
 
   - id: ir_agent
     node: agent
-    config:
+    params:
       provider: auto
       model: auto
       instruction: |
@@ -104,7 +104,7 @@ steps:
 
   - id: research_agent
     node: agent
-    config:
+    params:
       provider: auto
       model: auto
       tools: researcher
@@ -130,7 +130,7 @@ steps:
 
   - id: merge
     node: agent
-    config:
+    params:
       provider: auto
       model: auto
       instruction: |
@@ -161,7 +161,7 @@ steps:
 
   - id: save
     node: file_write
-    config:
+    params:
       filename: multi_role_agent_output.md
       content: |
         # Multi-Role Agent Output: {{ .params.task }}

@@ -28,7 +28,7 @@ params:
 steps:
   - id: parse_resumes
     node: agent
-    config:
+    params:
       instruction: |
         Parse and extract structured information from each resume:
         - Full name, email, phone, location
@@ -44,7 +44,7 @@ steps:
 
   - id: filter_by_requirements
     node: transform
-    config:
+    params:
       code: |
         function filterCandidates(parsed, requiredSkills, minYears) {
           let filtered = parsed;
@@ -68,7 +68,7 @@ steps:
 
   - id: score_and_rank
     node: agent
-    config:
+    params:
       instruction: |
         You are an expert recruiter. Score each candidate against the job description on a scale of 0-100.
         Consider: skill match, experience relevance, education fit, industry background, career progression.
@@ -88,7 +88,7 @@ steps:
 
   - id: generate_report
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
 
@@ -125,7 +125,7 @@ steps:
 
   - id: save_results
     node: file_write
-    config:
+    params:
       filename: "{{ .params.output_file | default \"resume_screening_report.json\" }}"
       content: "{{ .steps.generate_report.output.final_report }}"
       format: json

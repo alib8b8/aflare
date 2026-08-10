@@ -29,7 +29,7 @@ params:
 steps:
   - id: fetch_historical
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.historical_data_endpoint }}"
       params:
@@ -41,7 +41,7 @@ steps:
 
   - id: analyze_demand
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -104,7 +104,7 @@ steps:
 
   - id: generate_insights
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the following demand forecast results and provide actionable insights:
         {{ index .steps "analyze_demand" "output" }}
@@ -119,7 +119,7 @@ steps:
 
   - id: save_forecast
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

@@ -26,7 +26,7 @@ params:
 steps:
   - id: fetch_building_state
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.building_api }}/buildings/{{ .params.building_id }}/state"
       headers:
@@ -41,7 +41,7 @@ steps:
 
   - id: analyze_efficiency
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -108,7 +108,7 @@ steps:
 
   - id: optimize_building
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the smart building data and provide optimization recommendations:
 
@@ -127,7 +127,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -135,7 +135,7 @@ steps:
 
   - id: compute_timestamp
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import datetime
@@ -143,7 +143,7 @@ steps:
 
   - id: apply_automation
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.building_api }}/buildings/{{ .params.building_id }}/automation"
       headers:
@@ -155,7 +155,7 @@ steps:
 
   - id: save_building_report
     node: file_write
-    config:
+    params:
       file_path: "/data/building/{{ .params.building_id }}/{{ .compute_date }}/building_{{ .compute_timestamp }}.json"
       content: |
         {

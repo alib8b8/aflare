@@ -22,7 +22,7 @@ params:
 steps:
   - id: fetch_product_data
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/products/{{ .params.product_id }}"
       params:
@@ -31,7 +31,7 @@ steps:
 
   - id: fetch_competitor_prices
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/market/competitor-prices"
       params:
@@ -40,7 +40,7 @@ steps:
 
   - id: fetch_demand_signals
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/market/demand-signals"
       params:
@@ -49,7 +49,7 @@ steps:
 
   - id: compute_optimal_price
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.2
       prompt: |
@@ -76,7 +76,7 @@ steps:
 
   - id: save_price_recommendation
     node: file_write
-    config:
+    params:
       path: "/output/pricing/{{ .params.product_id }}_{{ .params.strategy }}_{{ .params.timestamp }}.json"
       content: |
         {

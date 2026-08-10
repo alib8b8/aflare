@@ -22,7 +22,7 @@ params:
 steps:
   - id: fetch_customer_transactions
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/customers/transactions"
       params:
@@ -31,7 +31,7 @@ steps:
 
   - id: compute_rfm_segments
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -156,7 +156,7 @@ steps:
 
   - id: generate_segment_strategies
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.3
       prompt: |
@@ -178,7 +178,7 @@ steps:
 
   - id: save_segmentation_report
     node: file_write
-    config:
+    params:
       path: "/output/segmentation/rfm_segmentation_{{ .params.timestamp }}.json"
       content: |
         {

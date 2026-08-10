@@ -29,7 +29,7 @@ params:
 steps:
   - id: fetch_rates
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.carrier_rates_api }}"
       headers:
@@ -41,7 +41,7 @@ steps:
 
   - id: compare_rates
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -111,7 +111,7 @@ steps:
 
   - id: recommend_carrier
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the freight rate comparison and recommend the optimal carrier selection:
         {{ index .steps "compare_rates" "output" }}
@@ -126,7 +126,7 @@ steps:
 
   - id: save_optimization
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

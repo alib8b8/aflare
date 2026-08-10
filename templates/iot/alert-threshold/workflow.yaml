@@ -30,7 +30,7 @@ params:
 steps:
   - id: read_sensor
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.sensor_api }}/sensors/{{ .params.sensor_id }}/metrics/{{ .params.metric }}"
       headers:
@@ -39,7 +39,7 @@ steps:
 
   - id: evaluate_threshold
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -72,7 +72,7 @@ steps:
 
   - id: generate_alert
     node: agent
-    config:
+    params:
       prompt: |
         Generate a detailed alert notification based on the threshold evaluation:
 
@@ -91,7 +91,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -99,7 +99,7 @@ steps:
 
   - id: compute_timestamp
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import datetime
@@ -107,7 +107,7 @@ steps:
 
   - id: notify_channels
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.sensor_api }}/notifications"
       headers:
@@ -123,7 +123,7 @@ steps:
 
   - id: log_alert
     node: file_write
-    config:
+    params:
       file_path: "/data/alerts/{{ .params.sensor_id }}/{{ .compute_date }}_{{ .compute_timestamp }}.json"
       content: |
         {

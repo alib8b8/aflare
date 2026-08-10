@@ -29,7 +29,7 @@ params:
 steps:
   - id: fetch_emission_factors
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.emission_factors_api }}"
       headers:
@@ -41,7 +41,7 @@ steps:
 
   - id: compute_footprint
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -179,7 +179,7 @@ steps:
 
   - id: generate_reduction_plan
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the carbon footprint and generate a reduction roadmap:
         {{ index .steps "compute_footprint" "output" }}
@@ -195,7 +195,7 @@ steps:
 
   - id: save_footprint
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

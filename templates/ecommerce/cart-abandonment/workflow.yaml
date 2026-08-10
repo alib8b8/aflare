@@ -22,7 +22,7 @@ params:
 steps:
   - id: fetch_abandoned_carts
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/carts/abandoned"
       params:
@@ -32,7 +32,7 @@ steps:
 
   - id: prioritize_carts
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -79,7 +79,7 @@ steps:
 
   - id: generate_recovery_messages
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.5
       prompt: |
@@ -102,7 +102,7 @@ steps:
 
   - id: execute_recovery
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.api_base }}/carts/recovery/execute"
       body:
@@ -111,7 +111,7 @@ steps:
 
   - id: save_recovery_report
     node: file_write
-    config:
+    params:
       path: "/output/cart-recovery/recovery_{{ .params.timestamp }}.json"
       content: |
         {

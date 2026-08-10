@@ -26,7 +26,7 @@ params:
 steps:
   - id: check_heartbeats
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.monitor_api }}/devices/heartbeat"
       headers:
@@ -41,7 +41,7 @@ steps:
 
   - id: compute_health
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -102,7 +102,7 @@ steps:
 
   - id: diagnose_issues
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the device health report and diagnose any issues:
 
@@ -120,7 +120,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -128,7 +128,7 @@ steps:
 
   - id: compute_timestamp
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import datetime
@@ -136,7 +136,7 @@ steps:
 
   - id: generate_report
     node: file_write
-    config:
+    params:
       file_path: "/data/health_reports/{{ .compute_date }}/health_{{ .compute_timestamp }}.json"
       content: |
         {

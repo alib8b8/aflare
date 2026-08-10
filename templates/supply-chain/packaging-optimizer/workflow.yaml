@@ -30,7 +30,7 @@ params:
 steps:
   - id: analyze_products
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json, math
@@ -135,7 +135,7 @@ steps:
 
   - id: optimize_packaging
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the packaging plan and suggest further optimizations:
         {{ index .steps "analyze_products" "output" }}
@@ -150,7 +150,7 @@ steps:
 
   - id: save_packaging
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

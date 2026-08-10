@@ -26,7 +26,7 @@ params:
 steps:
   - id: fetch_occupancy
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.occupancy_api }}/spaces/occupancy"
       headers:
@@ -41,7 +41,7 @@ steps:
 
   - id: analyze_utilization
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -106,7 +106,7 @@ steps:
 
   - id: space_optimization
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the occupancy data and provide space optimization recommendations:
 
@@ -125,7 +125,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -133,7 +133,7 @@ steps:
 
   - id: save_occupancy_report
     node: file_write
-    config:
+    params:
       file_path: "/data/occupancy/{{ .compute_date }}/occupancy_{{ .params.reporting_window }}.json"
       content: |
         {

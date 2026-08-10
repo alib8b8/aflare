@@ -26,7 +26,7 @@ params:
 steps:
   - id: query_node_status
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.edge_api }}/nodes/status"
       headers:
@@ -40,7 +40,7 @@ steps:
 
   - id: optimize_schedule
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -86,7 +86,7 @@ steps:
 
   - id: dispatch_tasks
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.edge_api }}/tasks/dispatch"
       headers:
@@ -98,7 +98,7 @@ steps:
 
   - id: analyze_distribution
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the edge computing workload distribution results:
 
@@ -117,7 +117,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -125,7 +125,7 @@ steps:
 
   - id: compute_timestamp
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import datetime
@@ -133,7 +133,7 @@ steps:
 
   - id: persist_results
     node: file_write
-    config:
+    params:
       file_path: "/data/edge/{{ .compute_date }}/workload_{{ .compute_timestamp }}.json"
       content: |
         {

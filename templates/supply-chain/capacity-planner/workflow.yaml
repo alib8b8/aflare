@@ -29,7 +29,7 @@ params:
 steps:
   - id: analyze_capacity
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -113,7 +113,7 @@ steps:
 
   - id: generate_capacity_recommendations
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the production capacity plan and generate recommendations:
         {{ index .steps "analyze_capacity" "output" }}
@@ -128,7 +128,7 @@ steps:
 
   - id: save_capacity_plan
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

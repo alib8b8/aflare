@@ -50,7 +50,7 @@ params:
 steps:
   - id: generate_checklist
     node: agent
-    config:
+    params:
       instruction: |
         Generate a comprehensive new hire onboarding checklist organized by:
         - Pre-boarding (before start date)
@@ -89,7 +89,7 @@ steps:
 
   - id: format_checklist_keys
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
         data = json.loads("{{ .steps.generate_checklist.output.checklist_data | toJson }}")
@@ -102,7 +102,7 @@ steps:
 
   - id: calculate_timeline
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
         from datetime import datetime, timedelta
@@ -149,7 +149,7 @@ steps:
 
   - id: assign_initial_tasks
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.task_api_url | default \"https://api.tasks.internal/onboarding/create\" }}"
       headers:
@@ -166,7 +166,7 @@ steps:
 
   - id: generate_filename
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
         name = "{{ .params.employee_name }}".replace(" ", "_")
@@ -176,7 +176,7 @@ steps:
 
   - id: save_checklist
     node: file_write
-    config:
+    params:
       filename: "{{ .steps.generate_filename.output.filename }}"
       content: |
         # Onboarding Checklist: {{ .params.employee_name }}

@@ -41,7 +41,7 @@ params:
 steps:
   - id: fetch_compliance_requirements
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.compliance_api_url | default \"https://api.compliance.internal/requirements\" }}"
       headers:
@@ -57,7 +57,7 @@ steps:
 
   - id: generate_handbook
     node: agent
-    config:
+    params:
       instruction: |
         Generate a comprehensive, legally-informed employee handbook for {{ .params.company_name }}.
 
@@ -110,7 +110,7 @@ steps:
 
   - id: generate_table_of_contents
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
         import re
@@ -138,7 +138,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       code: |
         from datetime import date
         print(date.today().strftime('%B %d, %Y'))
@@ -146,7 +146,7 @@ steps:
 
   - id: save_handbook
     node: file_write
-    config:
+    params:
       filename: "{{ .params.output_file | default \"employee_handbook.md\" }}"
       content: |
         # {{ .params.company_name }} Employee Handbook

@@ -52,7 +52,7 @@ params:
 steps:
   - id: generate_description
     node: agent
-    config:
+    params:
       instruction: |
         Create a compelling and inclusive job posting for {{ .params.job_title }}.
 
@@ -94,7 +94,7 @@ steps:
 
   - id: optimize_for_platforms
     node: agent
-    config:
+    params:
       instruction: |
         Adapt the job posting for each target platform: {{ .params.target_platforms }}
 
@@ -114,7 +114,7 @@ steps:
 
   - id: generate_meta
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
         from datetime import date
@@ -147,7 +147,7 @@ steps:
 
   - id: publish_to_ats
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.ats_api_url | default \"https://api.ats.internal/jobs\" }}"
       headers:
@@ -167,7 +167,7 @@ steps:
 
   - id: generate_filename
     node: code_interpreter
-    config:
+    params:
       code: |
         title = "{{ .params.job_title }}"
         output = "{{ .params.output_file }}" or f"job_posting_{title.replace(' ', '_').lower()}.md"
@@ -176,7 +176,7 @@ steps:
 
   - id: format_platform_keys
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
         data = json.loads("{{ .steps.optimize_for_platforms.output.platform_variants | toJson }}")
@@ -188,7 +188,7 @@ steps:
 
   - id: save_posting
     node: file_write
-    config:
+    params:
       filename: "{{ .steps.generate_filename.output.filename }}"
       content: |
         # {{ .params.job_title }} - {{ .params.department }}

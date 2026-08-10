@@ -26,7 +26,7 @@ params:
 steps:
   - id: fetch_field_data
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.agri_api }}/fields/readings"
       headers:
@@ -41,7 +41,7 @@ steps:
 
   - id: analyze_soil_health
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -104,7 +104,7 @@ steps:
 
   - id: generate_recommendations
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the smart agriculture sensor data and provide farming recommendations:
 
@@ -123,7 +123,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -131,7 +131,7 @@ steps:
 
   - id: trigger_irrigation
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.agri_api }}/irrigation/trigger"
       headers:
@@ -145,7 +145,7 @@ steps:
 
   - id: save_agri_report
     node: file_write
-    config:
+    params:
       file_path: "/data/agriculture/{{ .compute_date }}/field_{{ .params.crop_type }}.json"
       content: |
         {

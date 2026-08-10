@@ -18,7 +18,7 @@ params:
 steps:
   - id: fetch_customer_profile
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.api_base }}/customers/profile"
       body:
@@ -28,7 +28,7 @@ steps:
 
   - id: fetch_browsing_history
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/customers/{{ .params.customer_id }}/browsing-history"
       params:
@@ -36,7 +36,7 @@ steps:
 
   - id: compute_recommendations
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.3
       prompt: |
@@ -56,7 +56,7 @@ steps:
 
   - id: enrich_recommendations
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.api_base }}/products/enrich"
       body:
@@ -64,7 +64,7 @@ steps:
 
   - id: save_results
     node: file_write
-    config:
+    params:
       path: "/output/recommendations/{{ .params.customer_id }}_{{ .params.timestamp }}.json"
       content: |
         {

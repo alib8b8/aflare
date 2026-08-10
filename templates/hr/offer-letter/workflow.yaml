@@ -44,7 +44,7 @@ params:
 steps:
   - id: validate_compensation
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
 
@@ -85,7 +85,7 @@ steps:
 
   - id: fetch_benefits_data
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.benefits_api_url | default \"https://api.company.internal/benefits/current\" }}"
       headers:
@@ -94,7 +94,7 @@ steps:
 
   - id: generate_offer_letter
     node: agent
-    config:
+    params:
       instruction: |
         You are an HR professional generating a formal offer letter. Create a professional, legally-appropriate offer letter using the provided template style.
 
@@ -127,7 +127,7 @@ steps:
 
   - id: generate_filename
     node: code_interpreter
-    config:
+    params:
       code: |
         name = "{{ .params.candidate_name }}"
         output = "{{ .params.output_file }}" or f"offer_letter_{name.replace(' ', '_')}.md"
@@ -136,7 +136,7 @@ steps:
 
   - id: save_offer_letter
     node: file_write
-    config:
+    params:
       filename: "{{ .steps.generate_filename.output.filename }}"
       content: "{{ .steps.generate_offer_letter.output.offer_letter_content }}"
       format: markdown

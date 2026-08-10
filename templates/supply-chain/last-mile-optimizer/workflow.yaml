@@ -29,7 +29,7 @@ params:
 steps:
   - id: compute_mode_costs
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -146,7 +146,7 @@ steps:
 
   - id: recommend_mode_mix
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the last-mile delivery mode comparison and recommend an optimal mode mix:
         {{ index .steps "compute_mode_costs" "output" }}
@@ -161,7 +161,7 @@ steps:
 
   - id: save_optimization
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

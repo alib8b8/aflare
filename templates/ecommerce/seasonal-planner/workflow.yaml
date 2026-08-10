@@ -22,7 +22,7 @@ params:
 steps:
   - id: fetch_seasonal_history
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/analytics/seasonal"
       params:
@@ -31,7 +31,7 @@ steps:
 
   - id: fetch_inventory_status
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/inventory/status"
       params:
@@ -39,7 +39,7 @@ steps:
 
   - id: fetch_market_trends
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/market/seasonal-trends"
       params:
@@ -48,7 +48,7 @@ steps:
 
   - id: compute_seasonal_plan
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -129,7 +129,7 @@ steps:
 
   - id: generate_promotion_calendar
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.4
       prompt: |
@@ -152,7 +152,7 @@ steps:
 
   - id: save_seasonal_plan
     node: file_write
-    config:
+    params:
       path: "/output/seasonal/{{ .params.season }}_plan_{{ .params.timestamp }}.json"
       content: |
         {

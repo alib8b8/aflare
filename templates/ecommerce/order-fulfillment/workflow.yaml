@@ -18,7 +18,7 @@ params:
 steps:
   - id: fetch_order_details
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/orders/{{ .params.order_id }}"
       params:
@@ -27,7 +27,7 @@ steps:
 
   - id: verify_payment
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.api_base }}/payments/verify"
       body:
@@ -36,7 +36,7 @@ steps:
 
   - id: check_inventory
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.api_base }}/inventory/check"
       body:
@@ -44,7 +44,7 @@ steps:
 
   - id: evaluate_fulfillment
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.1
       prompt: |
@@ -69,7 +69,7 @@ steps:
 
   - id: execute_fulfillment
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.api_base }}/orders/{{ .params.order_id }}/fulfill"
       body:
@@ -80,7 +80,7 @@ steps:
 
   - id: save_fulfillment_report
     node: file_write
-    config:
+    params:
       path: "/output/fulfillment/order_{{ .params.order_id }}_{{ .params.timestamp }}.json"
       content: |
         {

@@ -26,7 +26,7 @@ params:
 steps:
   - id: fetch_equipment_data
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.maintenance_api }}/equipment/readings"
       headers:
@@ -42,7 +42,7 @@ steps:
 
   - id: predict_failures
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -124,7 +124,7 @@ steps:
 
   - id: maintenance_plan
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the predictive maintenance assessment and generate a maintenance plan:
 
@@ -143,7 +143,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -151,7 +151,7 @@ steps:
 
   - id: create_work_orders
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.maintenance_api }}/work-orders/batch"
       headers:
@@ -163,7 +163,7 @@ steps:
 
   - id: save_prediction_report
     node: file_write
-    config:
+    params:
       file_path: "/data/maintenance/{{ .compute_date }}/prediction_{{ .params.equipment_type }}.json"
       content: |
         {

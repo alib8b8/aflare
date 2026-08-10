@@ -29,7 +29,7 @@ params:
 steps:
   - id: classify_commodities
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -106,7 +106,7 @@ steps:
 
   - id: generate_documents
     node: agent
-    config:
+    params:
       prompt: |
         Generate the required customs documentation based on the shipment details:
         {{ index .steps "classify_commodities" "output" }}
@@ -122,7 +122,7 @@ steps:
 
   - id: submit_customs
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.customs_api_endpoint }}"
       headers:
@@ -134,7 +134,7 @@ steps:
 
   - id: save_customs
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

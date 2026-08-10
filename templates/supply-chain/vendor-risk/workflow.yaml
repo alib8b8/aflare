@@ -29,7 +29,7 @@ params:
 steps:
   - id: fetch_risk_data
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.risk_data_api }}"
       headers:
@@ -40,7 +40,7 @@ steps:
 
   - id: compute_risk_scores
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -131,7 +131,7 @@ steps:
 
   - id: generate_mitigation_plan
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the vendor risk assessment and generate mitigation strategies:
         {{ index .steps "compute_risk_scores" "output" }}
@@ -146,7 +146,7 @@ steps:
 
   - id: save_risk_assessment
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

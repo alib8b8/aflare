@@ -18,7 +18,7 @@ params:
 steps:
   - id: fetch_product_master
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/products/{{ .params.product_id }}/master"
       params:
@@ -27,7 +27,7 @@ steps:
 
   - id: fetch_marketplace_requirements
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.api_base }}/marketplace/requirements"
       body:
@@ -36,7 +36,7 @@ steps:
 
   - id: generate_listings
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.4
       prompt: |
@@ -61,7 +61,7 @@ steps:
 
   - id: validate_listings
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -101,7 +101,7 @@ steps:
 
   - id: save_marketplace_listings
     node: file_write
-    config:
+    params:
       path: "/output/marketplace/{{ .params.product_id }}_listings_{{ .params.timestamp }}.json"
       content: |
         {

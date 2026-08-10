@@ -29,7 +29,7 @@ params:
 steps:
   - id: fetch_inventory
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.inventory_api_endpoint }}"
       headers:
@@ -38,7 +38,7 @@ steps:
 
   - id: fetch_demand
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.demand_api_endpoint }}"
       headers:
@@ -47,7 +47,7 @@ steps:
 
   - id: compute_replenishment
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json, math
@@ -121,7 +121,7 @@ steps:
 
   - id: generate_po_recommendations
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the replenishment plan and generate purchase order recommendations:
         {{ index .steps "compute_replenishment" "output" }}
@@ -136,7 +136,7 @@ steps:
 
   - id: save_replenishment
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

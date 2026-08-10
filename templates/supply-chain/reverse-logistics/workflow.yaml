@@ -24,7 +24,7 @@ params:
 steps:
   - id: classify_returns
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -142,7 +142,7 @@ steps:
 
   - id: generate_routing_plan
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the classified returns and generate a routing and processing plan:
         {{ index .steps "classify_returns" "output" }}
@@ -157,7 +157,7 @@ steps:
 
   - id: submit_dispositions
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.warehouse_api }}/returns/disposition"
       headers:
@@ -169,7 +169,7 @@ steps:
 
   - id: save_returns_plan
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

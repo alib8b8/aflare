@@ -26,7 +26,7 @@ params:
 steps:
   - id: subscribe_source
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.source_broker }}/subscribe"
       headers:
@@ -40,7 +40,7 @@ steps:
 
   - id: transform_messages
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -80,7 +80,7 @@ steps:
 
   - id: publish_target
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.target_broker }}/publish/batch"
       headers:
@@ -91,7 +91,7 @@ steps:
 
   - id: monitor_bridge
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the MQTT bridge message routing results:
 
@@ -110,7 +110,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -118,7 +118,7 @@ steps:
 
   - id: compute_timestamp
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import datetime
@@ -126,7 +126,7 @@ steps:
 
   - id: log_bridge
     node: file_write
-    config:
+    params:
       file_path: "/data/mqtt_bridge/{{ .compute_date }}/bridge_{{ .compute_timestamp }}.json"
       content: |
         {

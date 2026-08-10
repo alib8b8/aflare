@@ -32,7 +32,7 @@ steps:
   - id: calculate_deadlines
     node: code_interpreter
     description: "Calculate all procedural deadlines"
-    config:
+    params:
       language: python
       code: |
         import json
@@ -87,7 +87,7 @@ steps:
   - id: generate_timeline
     node: agent
     description: "Generate comprehensive litigation timeline"
-    config:
+    params:
       model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a litigation paralegal. Create a comprehensive litigation timeline combining
@@ -104,7 +104,7 @@ steps:
   - id: risk_assessment
     node: agent
     description: "Assess timeline risks and bottlenecks"
-    config:
+    params:
       model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a litigation strategist. Analyze the timeline for risks, bottlenecks, and
@@ -119,7 +119,7 @@ steps:
   - id: save_timeline
     node: file_write
     description: "Save the litigation timeline"
-    config:
+    params:
       path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }}output/litigation_timeline.md{{ end }}'
       content: |
         # Litigation Timeline: {{ .params.case_name }}

@@ -26,7 +26,7 @@ params:
 steps:
   - id: fetch_air_data
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.aq_api }}/monitors/readings"
       headers:
@@ -41,7 +41,7 @@ steps:
 
   - id: calculate_aqi
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -121,7 +121,7 @@ steps:
 
   - id: health_advisory
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the air quality data and generate health advisories:
 
@@ -140,7 +140,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -148,7 +148,7 @@ steps:
 
   - id: compute_timestamp
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import datetime
@@ -156,7 +156,7 @@ steps:
 
   - id: publish_report
     node: file_write
-    config:
+    params:
       file_path: "/data/air_quality/{{ .compute_date }}/aqi_{{ .compute_timestamp }}.json"
       content: |
         {

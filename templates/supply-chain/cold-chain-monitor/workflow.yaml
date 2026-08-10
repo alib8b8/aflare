@@ -29,7 +29,7 @@ params:
 steps:
   - id: fetch_sensor_data
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.sensor_data_endpoint }}"
       headers:
@@ -41,7 +41,7 @@ steps:
 
   - id: analyze_temperature
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -137,7 +137,7 @@ steps:
 
   - id: generate_compliance_report
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the cold chain monitoring results and generate a compliance report:
         {{ index .steps "analyze_temperature" "output" }}
@@ -152,7 +152,7 @@ steps:
 
   - id: save_monitoring
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

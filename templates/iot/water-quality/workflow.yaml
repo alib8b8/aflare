@@ -26,7 +26,7 @@ params:
 steps:
   - id: fetch_water_readings
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.water_api }}/stations/readings"
       headers:
@@ -42,7 +42,7 @@ steps:
 
   - id: assess_quality
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -111,7 +111,7 @@ steps:
 
   - id: contamination_analysis
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the water quality assessment results and provide contamination analysis:
 
@@ -130,7 +130,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -138,7 +138,7 @@ steps:
 
   - id: generate_compliance_report
     node: file_write
-    config:
+    params:
       file_path: "/data/water_quality/{{ .compute_date }}/water_{{ .params.standards_profile }}.json"
       content: |
         {

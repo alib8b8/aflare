@@ -29,7 +29,7 @@ params:
 steps:
   - id: classify_inventory
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -69,7 +69,7 @@ steps:
 
   - id: compute_slotting
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -139,7 +139,7 @@ steps:
 
   - id: generate_layout_plan
     node: agent
-    config:
+    params:
       prompt: |
         Based on the warehouse slotting optimization results, generate a comprehensive layout plan:
         {{ index .steps "compute_slotting" "output" }}
@@ -154,7 +154,7 @@ steps:
 
   - id: save_warehouse_plan
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

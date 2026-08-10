@@ -29,7 +29,7 @@ params:
 steps:
   - id: validate_requisition
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -77,7 +77,7 @@ steps:
 
   - id: generate_po
     node: agent
-    config:
+    params:
       prompt: |
         Based on the validated requisition, generate a purchase order:
         Requisition: {{ .params.requisition_data }}
@@ -93,7 +93,7 @@ steps:
 
   - id: submit_po
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.erp_endpoint }}/purchase-orders"
       headers:
@@ -106,7 +106,7 @@ steps:
 
   - id: send_notification
     node: notify
-    config:
+    params:
       channel: email
       recipient: "{{ .params.notify_email }}"
       subject: "Purchase Order Created - {{ index .steps 'validate_requisition' 'output' }}"
@@ -121,7 +121,7 @@ steps:
 
   - id: save_po
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

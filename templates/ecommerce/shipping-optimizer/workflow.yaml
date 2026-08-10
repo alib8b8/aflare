@@ -30,7 +30,7 @@ params:
 steps:
   - id: fetch_carrier_rates
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.api_base }}/shipping/rates"
       body:
@@ -42,7 +42,7 @@ steps:
 
   - id: fetch_delivery_performance
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/shipping/performance"
       params:
@@ -52,7 +52,7 @@ steps:
 
   - id: compute_optimal_shipping
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -124,7 +124,7 @@ steps:
 
   - id: generate_shipping_label
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.api_base }}/shipping/label"
       body:
@@ -135,7 +135,7 @@ steps:
 
   - id: save_shipping_report
     node: file_write
-    config:
+    params:
       path: "/output/shipping/shipping_optimization_{{ .params.timestamp }}.json"
       content: |
         {

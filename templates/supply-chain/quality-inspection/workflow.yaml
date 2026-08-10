@@ -29,7 +29,7 @@ params:
 steps:
   - id: compute_sample_size
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -85,7 +85,7 @@ steps:
 
   - id: generate_checklist
     node: agent
-    config:
+    params:
       prompt: |
         Based on the inspection plan, generate a detailed quality inspection checklist:
         {{ index .steps "compute_sample_size" "output" }}
@@ -101,7 +101,7 @@ steps:
 
   - id: submit_plan
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.inspection_api_endpoint }}"
       headers:
@@ -113,7 +113,7 @@ steps:
 
   - id: save_inspection_plan
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

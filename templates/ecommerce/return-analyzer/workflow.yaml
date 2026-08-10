@@ -18,7 +18,7 @@ params:
 steps:
   - id: fetch_returns_data
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/analytics/returns"
       params:
@@ -28,7 +28,7 @@ steps:
 
   - id: compute_return_metrics
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -82,7 +82,7 @@ steps:
 
   - id: generate_prevention_strategies
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.3
       prompt: |
@@ -102,7 +102,7 @@ steps:
 
   - id: save_return_report
     node: file_write
-    config:
+    params:
       path: "/output/returns/return_analysis_{{ .params.timestamp }}.json"
       content: |
         {

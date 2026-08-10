@@ -30,7 +30,7 @@ steps:
   - id: fetch_regulatory_data
     node: http_request
     description: "Fetch latest regulatory updates for specified regulations"
-    config:
+    params:
       method: GET
       url: "https://api.regulations.gov/v4/documents?filter[searchTerm]={{ range $i, $r := .params.regulations }}{{ if $i }},{{ end }}{{ $r }}{{ end }}&sort=-lastModifiedDate&page[size]=10"
       headers:
@@ -39,7 +39,7 @@ steps:
   - id: generate_checklist
     node: agent
     description: "Generate comprehensive compliance checklist"
-    config:
+    params:
       model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a regulatory compliance expert. Generate a comprehensive compliance checklist
@@ -59,7 +59,7 @@ steps:
   - id: prioritize_actions
     node: agent
     description: "Prioritize compliance actions based on risk"
-    config:
+    params:
       model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a compliance program manager. Review the checklist and create a prioritized
@@ -75,7 +75,7 @@ steps:
   - id: calculate_coverage
     node: code_interpreter
     description: "Calculate compliance coverage metrics"
-    config:
+    params:
       language: python
       code: |
         import json
@@ -101,7 +101,7 @@ steps:
   - id: save_checklist
     node: file_write
     description: "Save the compliance checklist report"
-    config:
+    params:
       path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }}output/compliance_checklist.md{{ end }}'
       content: |
         # Compliance Checklist: {{ .params.industry }} - {{ range $i, $r := .params.regulations }}{{ if $i }}, {{ end }}{{ $r }}{{ end }}

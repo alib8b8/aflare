@@ -22,7 +22,7 @@ params:
 steps:
   - id: fetch_sales_history
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/analytics/sales-history"
       params:
@@ -32,7 +32,7 @@ steps:
 
   - id: fetch_inventory_levels
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/inventory/levels"
       params:
@@ -41,7 +41,7 @@ steps:
 
   - id: compute_forecast
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -95,7 +95,7 @@ steps:
 
   - id: generate_recommendations
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.2
       prompt: |
@@ -115,7 +115,7 @@ steps:
 
   - id: save_forecast_report
     node: file_write
-    config:
+    params:
       path: "/output/inventory/forecast_{{ .params.timestamp }}.json"
       content: |
         {

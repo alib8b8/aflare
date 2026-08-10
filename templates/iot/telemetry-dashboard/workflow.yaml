@@ -26,7 +26,7 @@ params:
 steps:
   - id: query_telemetry
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.telemetry_api }}/query"
       headers:
@@ -42,7 +42,7 @@ steps:
 
   - id: aggregate_metrics
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -84,7 +84,7 @@ steps:
 
   - id: generate_insights
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the following telemetry dashboard data and generate actionable insights:
 
@@ -103,7 +103,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -111,7 +111,7 @@ steps:
 
   - id: compute_timestamp
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import datetime
@@ -119,7 +119,7 @@ steps:
 
   - id: render_dashboard
     node: file_write
-    config:
+    params:
       file_path: "/data/dashboards/{{ .compute_date }}/telemetry_{{ .compute_timestamp }}.json"
       content: |
         {

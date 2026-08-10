@@ -25,7 +25,7 @@ params:
 steps:
   - id: fetch_supplier_data
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.supplier_data_endpoint }}"
       params:
@@ -36,7 +36,7 @@ steps:
 
   - id: compute_scorecard
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -112,7 +112,7 @@ steps:
 
   - id: generate_evaluation_report
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the following supplier evaluation results and generate a detailed report:
         {{ index .steps "compute_scorecard" "output" }}
@@ -127,7 +127,7 @@ steps:
 
   - id: save_evaluation
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

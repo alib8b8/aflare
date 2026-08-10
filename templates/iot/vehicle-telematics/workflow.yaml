@@ -26,7 +26,7 @@ params:
 steps:
   - id: fetch_telematics
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.telematics_api }}/vehicles/telemetry"
       headers:
@@ -41,7 +41,7 @@ steps:
 
   - id: analyze_driving
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -113,7 +113,7 @@ steps:
 
   - id: fleet_insights
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the fleet telematics data and provide actionable insights:
 
@@ -132,7 +132,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -140,7 +140,7 @@ steps:
 
   - id: compute_timestamp
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import datetime
@@ -148,7 +148,7 @@ steps:
 
   - id: log_telematics
     node: file_write
-    config:
+    params:
       file_path: "/data/telematics/{{ .params.fleet_id }}/{{ .compute_date }}/fleet_{{ .compute_timestamp }}.json"
       content: |
         {

@@ -26,7 +26,7 @@ params:
 steps:
   - id: fetch_environmental_data
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.env_api }}/sensors/readings"
       headers:
@@ -42,7 +42,7 @@ steps:
 
   - id: compute_statistics
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -99,7 +99,7 @@ steps:
 
   - id: analyze_environment
     node: agent
-    config:
+    params:
       prompt: |
         Analyze the environmental sensor data and provide insights:
 
@@ -118,7 +118,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -126,7 +126,7 @@ steps:
 
   - id: compute_timestamp
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import datetime
@@ -134,7 +134,7 @@ steps:
 
   - id: save_report
     node: file_write
-    config:
+    params:
       file_path: "/data/environmental/{{ .compute_date }}/env_{{ .compute_timestamp }}.json"
       content: |
         {

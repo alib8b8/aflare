@@ -29,7 +29,7 @@ params:
 steps:
   - id: analyze_flows
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -99,7 +99,7 @@ steps:
 
   - id: build_schedule
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -172,7 +172,7 @@ steps:
 
   - id: optimize_dock_plan
     node: agent
-    config:
+    params:
       prompt: |
         Review the cross-docking schedule and suggest optimizations:
         Flow Analysis: {{ index .steps "analyze_flows" "output" }}
@@ -188,7 +188,7 @@ steps:
 
   - id: save_dock_plan
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

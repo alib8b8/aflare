@@ -22,7 +22,7 @@ params:
 steps:
   - id: validate_device
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -54,7 +54,7 @@ steps:
 
   - id: manage_device
     node: http_request
-    config:
+    params:
       method: "{{ if eq .params.operation \"query\" }}GET{{ else }}POST{{ end }}"
       url: "{{ .params.registry_api }}/devices{{ if eq .params.operation \"query\" }}?filter={{ .params.device_filter }}{{ end }}"
       headers:
@@ -66,7 +66,7 @@ steps:
 
   - id: analyze_lifecycle
     node: agent
-    config:
+    params:
       prompt: |
         Review the device registry operation result and provide lifecycle management recommendations:
 
@@ -86,7 +86,7 @@ steps:
 
   - id: compute_date
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         from datetime import date
@@ -94,7 +94,7 @@ steps:
 
   - id: persist_record
     node: file_write
-    config:
+    params:
       file_path: "/data/registry/{{ .params.operation }}/{{ .compute_date }}_{{ .steps.validate_device.output.payload.device_id }}.json"
       content: |
         {

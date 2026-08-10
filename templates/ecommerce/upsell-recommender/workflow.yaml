@@ -22,7 +22,7 @@ params:
 steps:
   - id: fetch_recent_order
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/orders/{{ .params.order_id }}"
       params:
@@ -31,7 +31,7 @@ steps:
 
   - id: fetch_customer_profile
     node: http_request
-    config:
+    params:
       method: GET
       url: "{{ .params.api_base }}/customers/{{ .params.customer_id }}/profile"
       params:
@@ -40,7 +40,7 @@ steps:
 
   - id: find_upsell_opportunities
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.api_base }}/recommendations/upsell"
       body:
@@ -51,7 +51,7 @@ steps:
 
   - id: optimize_upsell_offers
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -112,7 +112,7 @@ steps:
 
   - id: generate_upsell_messages
     node: agent
-    config:
+    params:
       model: "{{ .params.model | default \"gpt-4\" }}"
       temperature: 0.5
       prompt: |
@@ -134,7 +134,7 @@ steps:
 
   - id: schedule_upsell_campaign
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.api_base }}/marketing/upsell/schedule"
       body:
@@ -145,7 +145,7 @@ steps:
 
   - id: save_upsell_report
     node: file_write
-    config:
+    params:
       path: "/output/upsell/upsell_{{ .params.customer_id }}_{{ .params.timestamp }}.json"
       content: |
         {

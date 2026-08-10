@@ -28,7 +28,7 @@ params:
 steps:
   - id: fetch_tracking
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.carrier_api_endpoint }}/track"
       headers:
@@ -40,7 +40,7 @@ steps:
 
   - id: analyze_status
     node: code_interpreter
-    config:
+    params:
       language: python
       code: |
         import json
@@ -114,7 +114,7 @@ steps:
 
   - id: generate_alerts
     node: agent
-    config:
+    params:
       prompt: |
         Review the shipment tracking analysis and generate actionable alerts:
         {{ index .steps "analyze_status" "output" }}
@@ -129,7 +129,7 @@ steps:
 
   - id: save_tracking
     node: file_write
-    config:
+    params:
       path: "{{ .params.output_file }}"
       content: |
         {

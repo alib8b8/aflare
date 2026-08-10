@@ -34,7 +34,7 @@ steps:
   - id: research_requirements
     node: agent
     description: "Research legal requirements for the service type"
-    config:
+    params:
       model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a technology lawyer specializing in terms of service. Research and identify
@@ -52,7 +52,7 @@ steps:
   - id: generate_terms
     node: agent
     description: "Generate comprehensive terms of use document"
-    config:
+    params:
       model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a legal document drafter. Generate a complete Terms of Use document based on
@@ -70,7 +70,7 @@ steps:
   - id: review_terms
     node: agent
     description: "Review generated terms for legal soundness"
-    config:
+    params:
       model: '{{ if .params.model }}{{ .params.model }}{{ else }}gpt-4{{ end }}'
       system_prompt: |
         You are a senior legal reviewer. Review the generated Terms of Use for:
@@ -84,7 +84,7 @@ steps:
   - id: save_terms
     node: file_write
     description: "Save the terms of use document"
-    config:
+    params:
       path: '{{ if .params.output_path }}{{ .params.output_path }}{{ else }}output/terms_of_use.md{{ end }}'
       content: |
         # Terms of Use - {{ .params.company_name }}

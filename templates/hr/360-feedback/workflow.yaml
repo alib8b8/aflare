@@ -40,7 +40,7 @@ params:
 steps:
   - id: collect_feedback
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.feedback_api_url | default \"https://api.feedback.internal/360/collect\" }}"
       headers:
@@ -59,7 +59,7 @@ steps:
 
   - id: aggregate_feedback
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
 
@@ -157,7 +157,7 @@ steps:
 
   - id: generate_report
     node: agent
-    config:
+    params:
       instruction: |
         Generate a comprehensive 360-degree feedback report for {{ .params.subject_name }} ({{ .params.subject_title }}).
 
@@ -184,7 +184,7 @@ steps:
 
   - id: generate_filename
     node: code_interpreter
-    config:
+    params:
       code: |
         name = "{{ .params.subject_name }}"
         output = "{{ .params.output_file }}" or f"360_feedback_{name.replace(' ', '_')}.md"
@@ -193,7 +193,7 @@ steps:
 
   - id: save_report
     node: file_write
-    config:
+    params:
       filename: "{{ .steps.generate_filename.output.filename }}"
       content: "{{ .steps.generate_report.output.report_content }}"
       format: markdown

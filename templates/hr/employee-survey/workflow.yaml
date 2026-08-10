@@ -43,7 +43,7 @@ params:
 steps:
   - id: generate_survey_questions
     node: agent
-    config:
+    params:
       instruction: |
         Generate a comprehensive employee engagement survey with questions organized by focus areas.
         Focus areas: {{ .params.survey_focus }}
@@ -65,7 +65,7 @@ steps:
 
   - id: distribute_survey
     node: http_request
-    config:
+    params:
       method: POST
       url: "{{ .params.survey_api_url | default \"https://api.surveys.internal/engage/create\" }}"
       headers:
@@ -83,7 +83,7 @@ steps:
 
   - id: analyze_responses
     node: agent
-    config:
+    params:
       instruction: |
         Analyze the survey responses and generate insights:
         1. Calculate engagement score (weighted average across all Likert questions)
@@ -104,7 +104,7 @@ steps:
 
   - id: generate_report
     node: code_interpreter
-    config:
+    params:
       code: |
         import json
 
@@ -142,7 +142,7 @@ steps:
 
   - id: save_report
     node: file_write
-    config:
+    params:
       filename: "{{ .params.output_file | default \"employee_survey_report.json\" }}"
       content: "{{ .steps.generate_report.output.final_report }}"
       format: json
