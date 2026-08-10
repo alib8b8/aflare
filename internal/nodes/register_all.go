@@ -20,6 +20,9 @@
 package nodes
 
 import (
+	// Register drone nodes (MAVLink-compatible drone control via PX4/ArduPilot).
+	_ "github.com/alib8b8/aflare/internal/nodes/drone"
+
 	// Register mobile/hardware nodes (OnDeviceLLM, PowerManager, Robot,
 	// Voice I/O, Screen, Video, AgentBrowser, BlockchainAudit, etc.).
 	_ "github.com/alib8b8/aflare/internal/nodes/mobile"

@@ -1,0 +1,140 @@
+# 无人机巡检工作流
+# 使用 aflare drone 节点控制 PX4/ArduPilot 无人机执行自动巡检任务
+#
+# 前置条件：
+#   1. 运行 drone_bridge.py 连接无人机
+#   2. 确保无人机已上电、GPS 锁定、电池充足
+#
+# 运行：
+#   aflare run drone-patrol.yaml
+#
+# 模拟模式（无需真实无人机）：
+#   所有 drone 节点默认 mode=simulate，可直接运行测试
+
+name: "无人机巡检"
+version: "1.0"
+
+steps:
+  # === 阶段 1: 起飞前检查 ===
+  - name: pre_flight_checks
+    description: "起飞前安全检查"
+    parallel:
+      - name: check_gps
+        node: drone
+        params:
+          action: get_gps
+          mode: simulate
+          drone_model: PX4
+      - name: check_battery
+        node: drone
+        params:
+          action: get_battery
+          mode: simulate
+          drone_model: PX4
+      - name: check_status
+        node: drone
+        params:
+          action: get_status
+          mode: simulate
+          drone_model: PX4
+
+  # === 阶段 2: 解锁 & 起飞 ===
+  - name: arm_and_takeoff
+    description: "解锁电机并起飞"
+    depends_on: [pre_flight_checks]
+    steps:
+      - name: arm
+        node: drone
+        params:
+          action: arm
+          mode: simulate
+          drone_model: PX4
+      - name: takeoff
+        node: drone
+        params:
+          action: takeoff
+          mode: simulate
+          drone_model: PX4
+          target_altitude_m: "20"
+          flight_speed_ms: "5"
+        depends_on: [arm]
+
+  # === 阶段 3: 巡检航线 ===
+  - name: patrol_mission
+    description: "执行巡检航线"
+    depends_on: [arm_and_takeoff]
+    steps:
+      - name: upload_waypoints
+        node: drone
+        params:
+          action: mission_upload
+          mode: simulate
+          drone_model: PX4
+          mission_type: patrol
+          waypoints: |
+            [
+              {"lat": 30.2750, "lon": 120.1560, "alt": 20},
+              {"lat": 30.2760, "lon": 120.1570, "alt": 20},
+              {"lat": 30.2770, "lon": 120.1560, "alt": 20},
+              {"lat": 30.2760, "lon": 120.1550, "alt": 20},
+              {"lat": 30.2750, "lon": 120.1560, "alt": 20}
+            ]
+      - name: start_patrol
+        node: drone
+        params:
+          action: mission_start
+          mode: simulate
+          drone_model: PX4
+        depends_on: [upload_waypoints]
+
+  # === 阶段 4: 监控巡检进度 ===
+  - name: monitor_patrol
+    description: "监控巡检进度和电池状态"
+    node: loop
+    depends_on: [patrol_mission]
+    params:
+      condition: "{{monitor_patrol.step.battery_pct > 25}}"
+      max_iterations: 60
+    steps:
+      - name: poll_telemetry
+        node: drone
+        params:
+          action: get_telemetry
+          mode: simulate
+          drone_model: PX4
+      - name: sleep
+        node: execute
+        params:
+          command: sleep 3
+
+  # === 阶段 5: 降落 & 锁定 ===
+  - name: land_and_disarm
+    description: "降落并锁定电机"
+    depends_on: [monitor_patrol]
+    steps:
+      - name: land
+        node: drone
+        params:
+          action: land
+          mode: simulate
+          drone_model: PX4
+      - name: disarm
+        node: drone
+        params:
+          action: disarm
+          mode: simulate
+          drone_model: PX4
+        depends_on: [land]
+
+  # === 阶段 6: 完成报告 ===
+  - name: mission_report
+    description: "生成巡检报告"
+    depends_on: [land_and_disarm]
+    node: transform
+    params:
+      template: |
+        无人机巡检任务完成
+        - 起飞: {{arm_and_takeoff.takeoff.success}}
+        - 巡检状态: {{patrol_mission.start_patrol.mission.state}}
+        - 电池: {{land_and_disarm.land.telemetry.battery_pct}}%
+        - 时间: {{land_and_disarm.land.timestamp}}
