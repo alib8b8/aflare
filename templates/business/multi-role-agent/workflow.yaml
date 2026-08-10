@@ -1,23 +1,19 @@
 name: Multi-Role Business Agent
-description: Three-roles-in-one business agent (Marketing + BD + IR) inspired by xiaobei. Handles content creation, lead hunting, investor relations, and business material generation through a single unified interface.
-author: aflare community
-version: 1.0.0
-tags: [business, marketing, bd, investor-relations, multi-agent, opc]
+description: Three-roles-in-one business agent (Marketing + BD + IR) for content creation, lead hunting, investor relations, and market research through a single unified interface.
+version: "1.0.0"
+params:
+  - name: task
+    type: string
+    required: true
+    description: Describe your business task (content creation, lead hunting, investor deck, market research, etc.)
 
-nodes:
-  - id: input
-    type: input
-    label: Task Input
-    config:
-      description: "Describe your business task (content creation, lead hunting, investor deck, market research, etc.)"
-
-  - id: router
-    type: llm
-    label: Task Router
+steps:
+  - id: route_task
+    type: agent
     config:
       provider: auto
       model: auto
-      prompt: |
+      instruction: |
         Analyze the user's request and classify it into ONE of these categories. Reply with ONLY the category code:
 
         Categories:
@@ -26,20 +22,21 @@ nodes:
         - IR: investor deck, pitch deck, business model, financial planning, investor pipeline, project applications, soft copyright, ICP filing, fundraising materials
         - RESEARCH: market research, industry analysis, trend reports, information gathering, news monitoring
 
-        User request: {{ input }}
-
-        Category code (MARKETING/BD/IR/RESEARCH only):
+        User request: {{ .params.task }}
+      input:
+        task: "{{ .params.task }}"
+      output: task_category
 
   - id: marketing_agent
-    type: llm
-    label: Marketing Agent
+    type: agent
     config:
       provider: auto
       model: auto
-      prompt: |
+      instruction: |
         You are a marketing specialist for solo entrepreneurs and small businesses.
 
-        Task: {{ input }}
+        Task: {{ .params.task }}
+        Task Category: {{ .steps.route_task.output.task_category }}
 
         Create actionable, platform-specific content plans. Consider:
         1. Which platforms are best suited (WeChat, Xiaohongshu, Douyin, Twitter/X, LinkedIn, Bilibili, Zhihu)
@@ -49,17 +46,21 @@ nodes:
         5. SEO keywords and trending topics to leverage
 
         Provide concrete, ready-to-use output rather than just advice.
+      input:
+        task: "{{ .params.task }}"
+        category: "{{ .steps.route_task.output.task_category }}"
+      output: marketing_output
 
   - id: bd_agent
-    type: llm
-    label: Business Development Agent
+    type: agent
     config:
       provider: auto
       model: auto
-      prompt: |
+      instruction: |
         You are a business development specialist for solo entrepreneurs.
 
-        Task: {{ input }}
+        Task: {{ .params.task }}
+        Task Category: {{ .steps.route_task.output.task_category }}
 
         Your responsibilities:
         1. Identify potential customers or partners on social media and professional platforms
@@ -70,72 +71,102 @@ nodes:
         6. Competitive analysis: who are the competitors and what are their weaknesses
 
         Always provide actionable next steps and templates.
+      input:
+        task: "{{ .params.task }}"
+        category: "{{ .steps.route_task.output.task_category }}"
+      output: bd_output
 
   - id: ir_agent
-    type: llm
-    label: Investor Relations Agent
+    type: agent
     config:
       provider: auto
       model: auto
-      prompt: |
+      instruction: |
         You are an investor relations and fundraising specialist for early-stage startups and solo entrepreneurs.
 
-        Task: {{ input }}
+        Task: {{ .params.task }}
+        Task Category: {{ .steps.route_task.output.task_category }}
 
         Your responsibilities:
         1. Business model refinement and polishing
         2. Pitch deck / investor deck structure and content
         3. Financial projections and key metrics
         4. Investor pipeline: identify suitable investors (VCs, angels, accelerators)
-        5. Application materials: software copyright (软著), ICP filing, project declarations
+        5. Application materials: software copyright, ICP filing, project declarations
         6. Go-to-market strategy validation
         7. Term sheet basics and negotiation tips
 
         Provide professional, structured output suitable for investor review.
+      input:
+        task: "{{ .params.task }}"
+        category: "{{ .steps.route_task.output.task_category }}"
+      output: ir_output
 
   - id: research_agent
-    type: search_aggregate
-    label: Market Research Agent
-    config:
-      sources: "hn,reddit,github,twitter,news,zhihu,weibo,finance,academic"
-      limit: "15"
-      time_range: "week"
-      sort_by: "signal"
-
-  - id: merge
-    type: llm
-    label: Final Output Synthesizer
+    type: agent
     config:
       provider: auto
       model: auto
-      prompt: |
+      tools: researcher
+      max_iterations: 3
+      instruction: |
+        You are a market research specialist. Conduct comprehensive research on the given task.
+
+        Task: {{ .params.task }}
+        Task Category: {{ .steps.route_task.output.task_category }}
+
+        Search across multiple sources to gather:
+        1. Recent news and developments
+        2. Industry trends and analysis
+        3. Competitor landscape
+        4. Market data and statistics
+        5. Expert opinions and commentary
+
+        Provide a structured research report with citations.
+      input:
+        task: "{{ .params.task }}"
+        category: "{{ .steps.route_task.output.task_category }}"
+      output: research_output
+
+  - id: merge
+    type: agent
+    config:
+      provider: auto
+      model: auto
+      instruction: |
         Synthesize the following multi-agent outputs into a coherent, actionable response.
 
-        Original task: {{ input }}
+        Original task: {{ .params.task }}
+        Task Category: {{ .steps.route_task.output.task_category }}
 
         Agent outputs:
-        - Marketing: {{ marketing_agent }}
-        - Business Dev: {{ bd_agent }}
-        - Investor Relations: {{ ir_agent }}
-        - Market Research: {{ research_agent }}
+        - Marketing: {{ .steps.marketing_agent.output.marketing_output }}
+        - Business Dev: {{ .steps.bd_agent.output.bd_output }}
+        - Investor Relations: {{ .steps.ir_agent.output.ir_output }}
+        - Market Research: {{ .steps.research_agent.output.research_output }}
 
         Provide:
         1. Executive summary (3 bullets)
         2. Detailed action items with priorities (P0/P1/P2)
         3. Any generated content/templates ready for use
         4. Recommended next steps with timeline
+      input:
+        task: "{{ .params.task }}"
+        category: "{{ .steps.route_task.output.task_category }}"
+        marketing: "{{ .steps.marketing_agent.output.marketing_output }}"
+        bd: "{{ .steps.bd_agent.output.bd_output }}"
+        ir: "{{ .steps.ir_agent.output.ir_output }}"
+        research: "{{ .steps.research_agent.output.research_output }}"
+      output: final_output
 
-edges:
-  - from: input
-    to: [router]
-  - from: router
-    to: [marketing_agent, bd_agent, ir_agent, research_agent]
-    condition: "routed"
-  - from: marketing_agent
-    to: [merge]
-  - from: bd_agent
-    to: [merge]
-  - from: ir_agent
-    to: [merge]
-  - from: research_agent
-    to: [merge]
+  - id: save
+    type: file_write
+    config:
+      filename: multi_role_agent_output.md
+      content: |
+        # Multi-Role Agent Output: {{ .params.task }}
+
+        **Category:** {{ .steps.route_task.output.task_category }}
+
+        {{ .steps.merge.output.final_output }}
+      format: markdown
