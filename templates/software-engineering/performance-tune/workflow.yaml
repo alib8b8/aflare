@@ -50,7 +50,6 @@ steps:
             'message': 'Ascend NPU model adaptation is not available in aflare.',
             'recommended_action': 'Use torch_npu or MindSpore for Ascend NPU adaptation. See: https://www.hiascend.com/'
         }, ensure_ascii=False))
-    id: ascend_model_adapt_unavailable
     depends_on: [adapt_plan]
 
   # ============================================================
@@ -88,7 +87,6 @@ steps:
             'message': 'Ascend NPU model quantization is not available in aflare.',
             'recommended_action': 'Use Ascend ModelZoo or AMCT toolkit for quantization.'
         }, ensure_ascii=False))
-    id: ascend_model_quantize_unavailable
     depends_on: [quantize_plan]
 
   # ============================================================
@@ -129,7 +127,6 @@ steps:
             'message': 'Ascend NPU performance optimization is not available in aflare.',
             'recommended_action': 'Use Ascend Graph Engine (GE) and AOE for performance tuning.'
         }, ensure_ascii=False))
-    id: ascend_model_optimize_unavailable
     depends_on: [optimize_plan]
 
   # ============================================================
@@ -164,7 +161,6 @@ steps:
             'message': 'Ascend NPU model deployment is not available in aflare.',
             'recommended_action': 'Use MindIE or vLLM-Ascend for inference deployment.'
         }, ensure_ascii=False))
-    id: ascend_model_deploy_unavailable
     depends_on: [deploy_plan]
 
   # ============================================================
@@ -208,7 +204,6 @@ steps:
             'message': 'Ascend NPU documentation generation is not available in aflare.',
             'recommended_action': 'Generate documentation manually using the collected outputs.'
         }, ensure_ascii=False))
-    id: ascend_model_doc_unavailable
     depends_on: [doc_plan]
 
 # 最终输出：性能调优报告 + 完整 Benchmark（性能调优交付物）
