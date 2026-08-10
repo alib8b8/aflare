@@ -907,7 +907,7 @@ func (mgr *SessionMemoryManager) saveSessionLocked(session *SessionMemory) {
 
 	// Atomic write: write to tmp then rename
 	tmpPath := path + ".tmp"
-	if err := os.WriteFile(tmpPath, jsonData, 0644); err != nil {
+	if err := os.WriteFile(tmpPath, jsonData, 0600); err != nil {
 		return
 	}
 	_ = os.Rename(tmpPath, path)

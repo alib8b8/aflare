@@ -17,9 +17,9 @@ package nodes
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -35,7 +35,6 @@ var (
 	cliSessionMu         sync.RWMutex
 	cliSessionLastUsed   = make(map[string]time.Time)
 	cliSessionLastUsedMu sync.RWMutex
-	cliSessionRandMu     sync.Mutex
 )
 
 type CLISessionNode struct{}
@@ -130,10 +129,12 @@ func (n *CLISessionNode) Execute(ctx context.Context, input string, params map[s
 }
 
 func generateSessionID() string {
-	cliSessionRandMu.Lock()
-	defer cliSessionRandMu.Unlock()
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return fmt.Sprintf("cli-session-%d-%d", time.Now().Unix(), r.Intn(10000))
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// Fallback: use time-based if crypto/rand fails (should never happen)
+		return fmt.Sprintf("cli-session-%d", time.Now().UnixNano())
+	}
+	return fmt.Sprintf("cli-session-%x", b)
 }
 
 func simulateCLISessionResponse(input, model string, historyCount int) string {

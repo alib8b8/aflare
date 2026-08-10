@@ -579,7 +579,7 @@ func (fs *FSStore) saveKGLocked() error {
 	if err := os.MkdirAll(filepath.Dir(fs.kgPath), 0755); err != nil {
 		return fmt.Errorf("failed to create kg dir: %w", err)
 	}
-	return os.WriteFile(fs.kgPath, data, 0644)
+	return os.WriteFile(fs.kgPath, data, 0600)
 }
 
 // readKG handles /kg/entities/[<name>] and /kg/relations reads.
