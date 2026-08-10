@@ -34,32 +34,33 @@ steps:
         kubectl get serviceentries --all-namespaces 2>/dev/null | head -10 || echo "No ServiceEntries found"
     id: mesh_resources
 
-  - node: execute
+  - node: code_interpreter
     params:
-      command: |
-        echo "=== Pods with Sidecar Issues ==="
-        kubectl get pods --all-namespaces -o json 2>/dev/null | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    issues = []
-    for item in data.get('items', []):
-        ns = item['metadata']['namespace']
-        name = item['metadata']['name']
-        containers = item['spec'].get('containers', [])
-        container_names = [c['name'] for c in containers]
-        istio_containers = [c for c in container_names if 'istio' in c.lower()]
-        statuses = item['status'].get('containerStatuses', [])
-        for cs in statuses:
-            if cs.get('name') in istio_containers and not cs.get('ready', False):
-                issues.append(f'{ns}/{name}: {cs[\"name\"]} not ready')
-    for i in issues[:20]:
-        print(i)
-    if not issues:
-        print('No sidecar issues detected')
-except Exception as e:
-    print(f'Error: {e}')
-" 2>/dev/null || echo "Cannot query pod sidecar status"
+      language: python
+      code: |
+        import subprocess, json
+
+        print("=== Pods with Sidecar Issues ===")
+        r = subprocess.run(["kubectl", "get", "pods", "--all-namespaces", "-o", "json"], capture_output=True, text=True)
+        try:
+            data = json.loads(r.stdout)
+            issues = []
+            for item in data.get("items", []):
+                ns = item["metadata"]["namespace"]
+                name = item["metadata"]["name"]
+                containers = item["spec"].get("containers", [])
+                container_names = [c["name"] for c in containers]
+                istio_containers = [c for c in container_names if "istio" in c.lower()]
+                statuses = item["status"].get("containerStatuses", [])
+                for cs in statuses:
+                    if cs.get("name") in istio_containers and not cs.get("ready", False):
+                        issues.append(f'{ns}/{name}: {cs["name"]} not ready')
+            for i in issues[:20]:
+                print(i)
+            if not issues:
+                print("No sidecar issues detected")
+        except Exception as e:
+            print(f"Error: {e}")
     id: sidecar_health
 
   - node: agent

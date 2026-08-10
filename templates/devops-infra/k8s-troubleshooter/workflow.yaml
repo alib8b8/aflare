@@ -4,25 +4,35 @@ name: K8s Troubleshooter
 #        aflare run k8s-troubleshooter/workflow.yaml
 
 steps:
-  - node: execute
+  - node: code_interpreter
     params:
-      command: |
-        echo "=== Cluster Info ==="
-        kubectl cluster-info 2>/dev/null || echo "Cannot connect to cluster"
-        echo "=== Node Status ==="
-        kubectl get nodes -o wide 2>/dev/null || echo "Cannot get nodes"
-        echo "=== Node Conditions ==="
-        kubectl get nodes -o json 2>/dev/null | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    for item in data.get('items', []):
-        name = item['metadata']['name']
-        for cond in item['status'].get('conditions', []):
-            if cond['status'] != 'False' or cond['type'] == 'Ready':
-                print(f'{name}: {cond[\"type\"]}={cond[\"status\"]} ({cond.get(\"reason\", \"\")})')
-except: pass
-" 2>/dev/null || echo "Cannot parse node conditions"
+      language: python
+      code: |
+        import subprocess, json
+
+        def run_kubectl(args):
+            r = subprocess.run(["kubectl"] + args, capture_output=True, text=True)
+            return r.stdout or r.stderr or ""
+
+        print("=== Cluster Info ===")
+        out = run_kubectl(["cluster-info"])
+        print(out or "Cannot connect to cluster")
+
+        print("=== Node Status ===")
+        out = run_kubectl(["get", "nodes", "-o", "wide"])
+        print(out or "Cannot get nodes")
+
+        print("=== Node Conditions ===")
+        r = subprocess.run(["kubectl", "get", "nodes", "-o", "json"], capture_output=True, text=True)
+        try:
+            data = json.loads(r.stdout)
+            for item in data.get("items", []):
+                name = item["metadata"]["name"]
+                for cond in item["status"].get("conditions", []):
+                    if cond["status"] != "False" or cond["type"] == "Ready":
+                        print(f'{name}: {cond["type"]}={cond["status"]} ({cond.get("reason", "")})')
+        except Exception:
+            print("Cannot parse node conditions")
     id: cluster_info
 
   - node: execute
