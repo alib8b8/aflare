@@ -24,11 +24,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/alib8b8/aflare/internal/httpclient"
 	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
@@ -265,7 +268,12 @@ func (n *DroneNode) Execute(ctx context.Context, input string, params map[string
 
 // callBridge sends a command to the MAVSDK HTTP bridge.
 func (n *DroneNode) callBridge(ctx context.Context, host, port, action string, params map[string]interface{}, waypointsJSON string, timeoutSec int, mode string) (*DroneTelemetry, *DroneMissionStatus, error) {
-	url := fmt.Sprintf("http://%s:%s/api/v1/drone/%s", host, port, action)
+	rawURL := fmt.Sprintf("http://%s:%s/api/v1/drone/%s", host, port, action)
+
+	// SSRF protection: validate the bridge URL before dialing.
+	if err := validateDroneBridgeURL(rawURL); err != nil {
+		return nil, nil, err
+	}
 
 	reqBody := map[string]interface{}{
 		"action":     action,
@@ -288,15 +296,14 @@ func (n *DroneNode) callBridge(ctx context.Context, host, port, action string, p
 	reqCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, rawURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Timeout: time.Duration(timeoutSec) * time.Second}
-	resp, err := client.Do(req)
+	resp, err := droneBridgeClient.Do(req)
 	if err != nil {
 		return nil, nil, fmt.Errorf("drone bridge call failed: %w", err)
 	}
@@ -324,6 +331,68 @@ func (n *DroneNode) callBridge(ctx context.Context, host, port, action string, p
 }
 
 const droneMaxResponseSize = 1 * 1024 * 1024 // 1MB
+
+// droneBridgeClient is the shared HTTP client for drone bridge communication.
+// It allows loopback and private addresses (drone bridges are typically on
+// localhost or LAN) but blocks link-local (cloud metadata), multicast,
+// unspecified, and reserved IP ranges.
+var droneBridgeClient = httpclient.NewClient(httpclient.Options{
+	Timeout:   120 * time.Second,
+	Validator: validateDroneBridgeIP,
+})
+
+// validateDroneBridgeIP allows loopback and private IPs (drone bridges are
+// typically on the companion computer or local network) but blocks link-local
+// (169.254.x.x cloud metadata), multicast, unspecified, and reserved ranges.
+func validateDroneBridgeIP(ip net.IP, displayHost string) error {
+	if ip.IsLoopback() || ip.IsPrivate() {
+		return nil
+	}
+	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return fmt.Errorf("drone bridge: link-local address %s is not allowed", displayHost)
+	}
+	if ip.IsUnspecified() {
+		return fmt.Errorf("drone bridge: unspecified address %s is not allowed", displayHost)
+	}
+	if ip.IsMulticast() {
+		return fmt.Errorf("drone bridge: multicast address %s is not allowed", displayHost)
+	}
+	if httpclient.IsReservedIP(ip) {
+		return fmt.Errorf("drone bridge: reserved address %s is not allowed", displayHost)
+	}
+	return nil
+}
+
+// validateDroneBridgeURL validates the bridge URL before making a request.
+// It blocks non-http schemes, URLs with userinfo, and validates the host's
+// resolved IPs through validateDroneBridgeIP.
+func validateDroneBridgeURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid drone bridge URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("drone bridge: only http and https are allowed, got %s", u.Scheme)
+	}
+	if u.User != nil {
+		return fmt.Errorf("drone bridge: URLs with credentials are not allowed")
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("drone bridge: URL has no host")
+	}
+	// Resolve and validate every IP.
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return fmt.Errorf("drone bridge: failed to resolve %s: %w", host, err)
+	}
+	for _, ip := range ips {
+		if err := validateDroneBridgeIP(ip, host); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 type droneBridgeResponse struct {
 	Success   bool                `json:"success"`
