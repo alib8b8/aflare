@@ -31,11 +31,19 @@
 # 安装
 brew install alib8b8/tap/aflare
 # 或: curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash
+
+# 可选：安装 bubblewrap 以获得完整沙箱隔离（code_interpreter 节点需要）
+# Ubuntu/Debian: sudo apt install bubblewrap
+# macOS:        brew install bubblewrap
+# Fedora:       sudo dnf install bubblewrap
 ```
 
 ```bash
-# 关键词生成工作流并运行
+# 关键词生成工作流
 aflare create "每 10 分钟检查 BTC 价格，超过 70000 发 Telegram 通知"
+# 输出: 工作流已生成 → btc-monitor.yaml
+
+# 运行工作流
 aflare run btc-monitor.yaml
 ```
 
@@ -105,9 +113,11 @@ L3: Runtime      —  确定性执行层
 | Secret 脱敏 | ✅ | 有测试 |
 | 表达式引擎（字节码 IR + 向量化） | ✅ | 有测试 |
 | 关键词匹配生成工作流 | ✅ | 有测试 |
+| MCP 协议支持（Server/Client） | ✅ | 有测试 |
 | LLM 节点（22+ 模型） | ✅ | 有测试 |
-| 信创芯片适配（昇腾/寒武纪/海光） | 实验性 | 无测试，未验证可用 |
-| 宇树机器人集成 | 实验性 | 无测试，概念阶段 |
+| 安全等级（L0-L3） | ✅ | 有测试 |
+
+> 实验性功能见下方 [实验性支持](#实验性支持) 章节。
 
 ### Runtime 保障（确定性执行）
 - **DAG 并行调度** — 拓扑排序依赖调度，无依赖步骤并发执行
@@ -132,6 +142,11 @@ L3: Runtime      —  确定性执行层
 - 完全离线运行（Ollama 本地 LLM）
 - LLM 智能路由（EWMA 延迟预测 + 帕累托成本排序）
 
+### MCP 协议支持
+- 内置 MCP Server，可被任何 MCP 客户端（Claude、VS Code、Cursor 等）连接
+- 提供工作流运行、验证、节点查询、代码图谱等工具
+- 内置 MCP Client，工作流中可直接调用外部 MCP 服务
+
 ### 工程能力
 - 表达式引擎：字节码 IR + 向量化批量求值
 - DAG 调度器经 TLA+ 形式化验证（spec 见 [`docs/tla/dag_scheduler.tla`](docs/tla/dag_scheduler.tla)，Go 测试 `dag_formal_test.go` 可执行有界模型检查）
@@ -139,7 +154,7 @@ L3: Runtime      —  确定性执行层
 - 单二进制部署，零运行时依赖
 - CI 双架构验证（x86-64 + ARM64）
 
-#### 实验性支持
+### 实验性支持
 - 昇腾 / 寒武纪 / 海光国产芯片适配（基础功能可用，持续完善中）
 - 宇树机器人集成（simulate 模式可用，实机模式需硬件）
 
@@ -181,13 +196,22 @@ L3: Runtime      —  确定性执行层
 | **v0.7** | **当前** | 金融场景增强（Saga / 幂等 / 审计链）、信创芯片实验性适配、宇树机器人实验性支持 |
 | v1.0 | 计划中 | 稳定 API、LTS |
 
-[完整路线图 →](ROADMAP.md)
+详情见 [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
 ## 安全
 
-aflare 内置多层安全防护：SSRF 防护、Path Traversal 防御、Command Injection 白名单、AES-GCM 加密、Secret 脱敏、HMAC 审计链、熔断器、出站监控。CI 自动运行 `gofmt` / `go vet` / `gosec` / `govulncheck`。
+aflare 内置多层安全防护，支持四级安全等级（`--security-level`）：
+
+| 等级 | 说明 |
+|------|------|
+| **L0** | 宽松：允许所有节点，沙箱降级时仅警告 |
+| **L1** | 标准：沙箱降级时警告，启发式拦截 |
+| **L2** | 严格：无 bwrap 沙箱时拒绝执行 code_interpreter，命令白名单校验 |
+| **L3** | 极严：禁用 code_interpreter 节点，最大安全策略 |
+
+其他防护：SSRF 防护、Path Traversal 防御、Command Injection 白名单、AES-GCM 加密、Secret 脱敏、HMAC 审计链、熔断器、出站监控。CI 自动运行 `gofmt` / `go vet` / `gosec` / `govulncheck`。
 
 [安全指南 →](SECURITY.md)
 
@@ -195,9 +219,12 @@ aflare 内置多层安全防护：SSRF 防护、Path Traversal 防御、Command 
 
 ## 文档
 
-- [入门指南](docs/getting-started.md) · [YAML 语法](docs/getting-started.md#workflow-configuration)
+- [入门指南](docs/getting-started.md) · [教程](docs/tutorial.md) · [YAML 语法](docs/getting-started.md#workflow-configuration)
 - [数据流](docs/dataflow.md) · [调度](docs/scheduling.md) · [MCP](docs/mcp.md) · [插件](docs/plugins.md)
 - [Web UI](docs/webui.md) · [可视化](docs/visualizer.md) · [自定义节点](docs/custom-nodes.md)
+- [API 文档](docs/api.md) · [节点参考](docs/nodes-reference.md)
+- [部署指南](docs/deployment.md) · [Docker](docs/docker.md) · [分布式](docs/distributed.md) · [多租户](docs/tenants.md)
+- [故障排除](docs/troubleshooting.md)
 
 ---
 

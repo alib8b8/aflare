@@ -31,11 +31,19 @@
 # Install
 brew install alib8b8/tap/aflare
 # or: curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash
+
+# Optional: install bubblewrap for full sandbox isolation (required by code_interpreter node)
+# Ubuntu/Debian: sudo apt install bubblewrap
+# macOS:        brew install bubblewrap
+# Fedora:       sudo dnf install bubblewrap
 ```
 
 ```bash
-# Generate workflow from keywords and run
+# Generate workflow from keywords
 aflare create "monitor BTC price every 10 minutes, alert via Telegram when > 70000"
+# Output: workflow generated → btc-monitor.yaml
+
+# Run the workflow
 aflare run btc-monitor.yaml
 ```
 
@@ -105,9 +113,11 @@ L3: Runtime      —  Execution layer
 | Secret Redaction | ✅ | Tested |
 | Expression Engine (bytecode IR + vectorized) | ✅ | Tested |
 | Keyword-based Workflow Generation | ✅ | Tested |
+| MCP Protocol Support (Server/Client) | ✅ | Tested |
 | LLM Nodes (22+ models) | ✅ | Tested |
-| Domestic Chip Support (Ascend/Cambricon/Hygon) | Experimental | No tests, unverified |
-| Unitree Robot Integration | Experimental | No tests, proof-of-concept |
+| Security Levels (L0-L3) | ✅ | Tested |
+
+> See [Experimental](#experimental) below for experimental features.
 
 ### Runtime Guarantees (Deterministic Execution)
 - **DAG Parallel Scheduling** — topological sort dependency scheduling, independent steps run concurrently
@@ -132,6 +142,11 @@ L3: Runtime      —  Execution layer
 - Fully offline capable (Ollama local LLM)
 - LLM smart routing (EWMA latency prediction + Pareto cost sorting)
 
+### MCP Protocol Support
+- Built-in MCP Server, connectable by any MCP client (Claude, VS Code, Cursor, etc.)
+- Provides workflow execution, validation, node query, code graph, and other tools
+- Built-in MCP Client, workflows can call external MCP services directly
+
 ### Engineering
 - Expression engine: bytecode IR + vectorized batch evaluation
 - DAG scheduler formally verified with TLA+ (spec at [`docs/tla/dag_scheduler.tla`](docs/tla/dag_scheduler.tla), bounded model-checking via `dag_formal_test.go`)
@@ -139,7 +154,7 @@ L3: Runtime      —  Execution layer
 - Single binary, zero runtime dependencies
 - CI validates both architectures (x86-64 + ARM64)
 
-#### Experimental
+### Experimental
 - Ascend / Cambricon / Hygon domestic chip support (basic functionality available, under active development)
 - Unitree robot integration (simulate mode available, physical mode requires hardware)
 
@@ -181,13 +196,22 @@ L3: Runtime      —  Execution layer
 | **v0.7** | **Current** | Financial scenario (Saga / Idempotency / Audit chain), experimental domestic chip support, experimental Unitree robot |
 | v1.0 | Planned | Stable API, LTS |
 
-[Full Roadmap →](ROADMAP.md)
+See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ---
 
 ## Security
 
-aflare has built-in multi-layer security: SSRF protection, Path Traversal defense, Command Injection whitelist, AES-GCM encryption, Secret redaction, HMAC audit chain, circuit breakers, outbound monitoring. CI auto-runs `gofmt` / `go vet` / `gosec` / `govulncheck`.
+aflare has built-in multi-layer security with four security levels (`--security-level`):
+
+| Level | Description |
+|-------|-------------|
+| **L0** | Relaxed: all nodes allowed, sandbox degradation only warns |
+| **L1** | Standard: warn on sandbox degradation, heuristic blocking |
+| **L2** | Strict: refuse code_interpreter execution without bwrap sandbox, command whitelist validation |
+| **L3** | Maximum: disable code_interpreter nodes, strictest security policy |
+
+Additional protections: SSRF protection, Path Traversal defense, Command Injection whitelist, AES-GCM encryption, Secret redaction, HMAC audit chain, circuit breakers, outbound monitoring. CI auto-runs `gofmt` / `go vet` / `gosec` / `govulncheck`.
 
 [Security Guide →](SECURITY.md)
 
@@ -195,9 +219,12 @@ aflare has built-in multi-layer security: SSRF protection, Path Traversal defens
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md) · [YAML Syntax](docs/getting-started.md#workflow-configuration)
+- [Getting Started](docs/getting-started.md) · [Tutorial](docs/tutorial.md) · [YAML Syntax](docs/getting-started.md#workflow-configuration)
 - [Dataflow](docs/dataflow.md) · [Scheduling](docs/scheduling.md) · [MCP](docs/mcp.md) · [Plugins](docs/plugins.md)
 - [Web UI](docs/webui.md) · [Visualizer](docs/visualizer.md) · [Custom Nodes](docs/custom-nodes.md)
+- [API Reference](docs/api.md) · [Nodes Reference](docs/nodes-reference.md)
+- [Deployment](docs/deployment.md) · [Docker](docs/docker.md) · [Distributed](docs/distributed.md) · [Multi-Tenancy](docs/tenants.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
 ---
 
