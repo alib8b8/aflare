@@ -31,11 +31,11 @@ const (
 
 // Span names for the three levels of tracing.
 const (
-	SpanWorkflow      = "workflow.run"
-	SpanStep          = "step.execute"
-	SpanCompoundStep  = "step.compound"
-	SpanSubStep       = "step.sub"
-	SpanLLMCall       = "llm.call"
+	SpanWorkflow     = "workflow.run"
+	SpanStep         = "step.execute"
+	SpanCompoundStep = "step.compound"
+	SpanSubStep      = "step.sub"
+	SpanLLMCall      = "llm.call"
 )
 
 // StartWorkflowSpan creates the root span for a workflow execution. It is the

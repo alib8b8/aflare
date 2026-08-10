@@ -71,9 +71,9 @@ func FuzzExecuteCommand(f *testing.F) {
 		// Skip commands that are too long — the node enforces a 4096 byte limit
 		// and we want to fuzz the behavior inside that limit.
 		params := map[string]string{
-			"command":  command,
-			"dry_run":  "true",
-			"timeout":  timeout,
+			"command": command,
+			"dry_run": "true",
+			"timeout": timeout,
 		}
 
 		done := make(chan struct{})
@@ -129,10 +129,10 @@ func FuzzExecuteCommandParams(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, key string, value string) {
 		params := map[string]string{
-			"command":  "echo test",
-			"dry_run":  "true",
-			"timeout":  "5s",
-			key: value,
+			"command": "echo test",
+			"dry_run": "true",
+			"timeout": "5s",
+			key:       value,
 		}
 
 		done := make(chan struct{})

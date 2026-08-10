@@ -32,9 +32,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	aferrors "github.com/alib8b8/aflare/internal/errors"
 	"github.com/alib8b8/aflare/internal/cache"
 	"github.com/alib8b8/aflare/internal/config"
+	aferrors "github.com/alib8b8/aflare/internal/errors"
 	"github.com/alib8b8/aflare/internal/logger"
 )
 

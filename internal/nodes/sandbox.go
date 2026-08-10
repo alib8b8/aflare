@@ -570,13 +570,13 @@ func init() {
 	// (e.g. "rm  -rf  /" bypasses a simple strings.Contains check).
 	rawPatterns := []string{
 		`rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/\S*`, // rm -rf /, rm -rf /etc, etc.
-		`mkfs\.\S+`,                            // mkfs.ext4, mkfs.xfs, etc.
-		`dd\s+if=`,                             // dd if=/dev/zero
-		`>\s*/dev/sd[a-z]`,                     // > /dev/sda
-		`:\(\)\s*\{`,                           // fork bomb: :(){ :|:& };:
-		`chmod\s+777\s+/`,                      // chmod 777 /
-		`wget\s+.*-O\s+/etc/`,                  // wget -O /etc/...
-		`curl\s+.*-o\s+/etc/`,                  // curl -o /etc/...
+		`mkfs\.\S+`,                         // mkfs.ext4, mkfs.xfs, etc.
+		`dd\s+if=`,                          // dd if=/dev/zero
+		`>\s*/dev/sd[a-z]`,                  // > /dev/sda
+		`:\(\)\s*\{`,                        // fork bomb: :(){ :|:& };:
+		`chmod\s+777\s+/`,                   // chmod 777 /
+		`wget\s+.*-O\s+/etc/`,               // wget -O /etc/...
+		`curl\s+.*-o\s+/etc/`,               // curl -o /etc/...
 	}
 	for _, p := range rawPatterns {
 		sandboxBlockedPatterns = append(sandboxBlockedPatterns, regexp.MustCompile(`(?i)`+p))
