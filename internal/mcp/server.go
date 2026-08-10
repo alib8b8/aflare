@@ -18,6 +18,7 @@ package mcp
 import (
 	"bufio"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -168,8 +169,10 @@ func (s *Server) validateToken(req *rpcRequest) bool {
 	var params map[string]interface{}
 	if req.Params != nil {
 		if err := json.Unmarshal(req.Params, &params); err == nil {
-			if auth, ok := params["_auth"].(string); ok && auth == s.authToken {
-				return true
+			if auth, ok := params["_auth"].(string); ok {
+				if subtle.ConstantTimeCompare([]byte(auth), []byte(s.authToken)) == 1 {
+					return true
+				}
 			}
 		}
 	}
