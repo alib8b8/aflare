@@ -25,6 +25,7 @@ import (
 	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/secrets"
+	"github.com/alib8b8/aflare/internal/telemetry"
 	"github.com/alib8b8/aflare/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -75,6 +76,15 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	// OpenTelemetry: create the root workflow span. Every step span will be a
+	// child of this span. The span is ended in the deferred function below.
+	otelCtx, wfSpan := telemetry.StartWorkflowSpan(timeoutCtx, wf.Name)
+	defer func() {
+		if wfSpan != nil {
+			wfSpan.End()
+		}
+	}()
+
 	var allResults []StepResult
 	engine := NewExpressionEngine()
 	resolver := newStepInputResolver()
@@ -112,6 +122,15 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 	lastOutput := ""
 
 	for batchIdx, batch := range batches {
+		// Graceful shutdown: if a shutdown has been requested, stop starting
+		// new batches. Steps in the current batch will complete or be
+		// cancelled by their context. Deferred cleanup (trace finalization,
+		// audit finalization) runs when the function returns.
+		if IsShuttingDown() {
+			logger.Info("shutdown requested, stopping DAG workflow execution", "name", wf.Name, "completed_batches", batchIdx, "total_batches", len(batches))
+			break
+		}
+
 		batchStart := time.Now()
 		logger.Info("DAG batch started", "batch", batchIdx, "steps", len(batch))
 
@@ -226,7 +245,7 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 					program.Send(tui.StepStartMsg{Index: ps.idx, Name: ps.wStep.Node})
 				}
 
-				output, attempts, llmCalls, routerDecisions, err := executeDAGStep(timeoutCtx, ps.wStep, ps.input, ps.evaluatedParams, reg)
+				output, attempts, llmCalls, routerDecisions, err := executeDAGStep(otelCtx, ps.wStep, ps.input, ps.evaluatedParams, reg)
 				resultChan <- execResult{
 					idx:             ps.idx,
 					nodeName:        ps.wStep.Node,
@@ -441,6 +460,8 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 // collected LLM telemetry and router decisions so the caller can attach
 // them to StepTrace. The slices are nil when the node published nothing.
 func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, params map[string]string, reg *nodes.Registry) (output string, attemptsMade int, llmCalls []nodes.LLMCallTelemetry, routerDecisions []nodes.RouterDecision, execErr error) {
+	stepStart := time.Now()
+
 	// B-2/B-3: per-step collector (LLM calls + router decisions), scoped
 	// to this step's calls. Drained via the deferred return so every exit
 	// path carries the telemetry gathered so far.
@@ -450,6 +471,15 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 		llmCalls = llmCollector.drainCalls()
 		routerDecisions = llmCollector.drainDecisions()
 	}()
+
+	// OpenTelemetry: create a step span as a child of the workflow span.
+	// The span is ended via the deferred function at the end of this block.
+	stepCtx, stepSpan := telemetry.StartStepSpan(ctx, wStep.Name, wStep.Node, 0)
+	defer func() {
+		stepDur := time.Since(stepStart)
+		telemetry.StepSpanEnd(stepSpan, execErr, stepDur.Milliseconds(), len(output), false)
+	}()
+	_ = stepCtx // used below for compound step sub-contexts
 
 	// 复合步骤：委托给现有执行器（它们内部会自建 engine，与主 engine 隔离）
 	if wStep.IsIf() {

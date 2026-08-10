@@ -135,6 +135,18 @@ type MapConfig struct {
 	// MaxIterations is a safety cap on the number of items (default:
 	// 100, capped at 10000) to prevent runaway expansion.
 	MaxIterations int `yaml:"max_iterations,omitempty"`
+	// Backpressure controls how the map step handles a full work queue
+	// when running concurrently. Two modes:
+	//   "block" (default) — producer blocks until a consumer drains a slot,
+	//     providing backpressure to the upstream step.
+	//   "drop"  — producer skips the item when the queue is full, suitable
+	//     for best-effort monitoring data where losing a sample is acceptable.
+	// Backpressure is only meaningful when Concurrency > 1.
+	Backpressure string `yaml:"backpressure,omitempty"`
+	// QueueSize is the capacity of the bounded work queue (default:
+	// Concurrency * 2, capped at 1000). A larger queue buffers more items
+	// in memory before backpressure or drop logic kicks in.
+	QueueSize int `yaml:"queue_size,omitempty"`
 }
 
 // ReduceConfig configures a left fold over a list. Each item is processed by
@@ -375,6 +387,35 @@ func (m *MapConfig) GetMaxIterations() int {
 		return 10000
 	}
 	return m.MaxIterations
+}
+
+// GetBackpressure returns the backpressure mode: "block" or "drop" (default: "block").
+func (m *MapConfig) GetBackpressure() string {
+	switch m.Backpressure {
+	case "drop":
+		return "drop"
+	default:
+		return "block"
+	}
+}
+
+// GetQueueSize returns the bounded work queue capacity (default: Concurrency * 2, capped at 1000).
+func (m *MapConfig) GetQueueSize() int {
+	concurrency := m.GetConcurrency()
+	if concurrency <= 1 {
+		return 1
+	}
+	if m.QueueSize <= 0 {
+		n := concurrency * 2
+		if n > 1000 {
+			return 1000
+		}
+		return n
+	}
+	if m.QueueSize > 1000 {
+		return 1000
+	}
+	return m.QueueSize
 }
 
 // GetSplitBy returns the delimiter for splitting reduce items (default: newline).

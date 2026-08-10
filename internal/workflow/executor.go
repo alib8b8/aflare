@@ -20,12 +20,16 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/metrics"
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/secrets"
+	"github.com/alib8b8/aflare/internal/telemetry"
 	"github.com/alib8b8/aflare/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 	"gopkg.in/yaml.v3"
@@ -177,6 +181,14 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	// OpenTelemetry: root workflow span. Step spans are children of this span.
+	otelCtx, wfSpan := telemetry.StartWorkflowSpan(timeoutCtx, wf.Name)
+	defer func() {
+		if wfSpan != nil {
+			wfSpan.End()
+		}
+	}()
+
 	var results []StepResult
 	data := ""
 	// A branch sub-workflow (then/else of an if-step) inherits the if-step's
@@ -296,11 +308,24 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		if i < resumeFromStep {
 			continue
 		}
+
+		// Graceful shutdown: if a shutdown has been requested, stop starting
+		// new steps. The current step (if any) has already completed by the
+		// time we reach this check on the next iteration. Deferred cleanup
+		// (WAL close → flush, audit finalization) runs when the function
+		// returns.
+		if IsShuttingDown() {
+			logger.Info("shutdown requested, stopping workflow execution", "name", wf.Name, "completed_steps", i)
+			break
+		}
 		stepStart := time.Now()
 
 		// ── Handle if/else branch ──
 		if wStep.IsIf() {
+			_, compSpan := telemetry.StartCompoundStepSpan(otelCtx, wStep.Name, "if", i)
 			branchResults, output, err := executeIfBranch(timeoutCtx, i, wStep.If, data, engine, reg, program, globalLimiter)
+			compDur := time.Since(stepStart)
+			telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
 			if err != nil {
 				results = append(results, branchResults...)
 				if program != nil {
@@ -319,7 +344,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				BatchIndex:      -1,
 				ConditionPassed: true,
 				Attempts:        1,
-				TotalDuration:   time.Since(stepStart),
+				TotalDuration:   compDur,
 				InputLen:        len(data),
 				OutputLen:       len(output),
 			})
@@ -410,7 +435,10 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		}
 
 		if wStep.IsLoop() {
+			_, compSpan := telemetry.StartCompoundStepSpan(otelCtx, wStep.Name, "loop", i)
 			loopResults, output, err := executeLoopStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
+			compDur := time.Since(stepStart)
+			telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
 			if err != nil {
 				results = append(results, loopResults...)
 				if program != nil {
@@ -428,7 +456,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				BatchIndex:      -1,
 				ConditionPassed: true,
 				Attempts:        1,
-				TotalDuration:   time.Since(stepStart),
+				TotalDuration:   compDur,
 				InputLen:        len(data),
 				OutputLen:       len(output),
 			})
@@ -437,7 +465,10 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		}
 
 		if wStep.IsMap() {
+			_, compSpan := telemetry.StartCompoundStepSpan(otelCtx, wStep.Name, "map", i)
 			mapResults, output, err := executeMapStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
+			compDur := time.Since(stepStart)
+			telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
 			if err != nil {
 				results = append(results, mapResults...)
 				if program != nil {
@@ -455,7 +486,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				BatchIndex:      -1,
 				ConditionPassed: true,
 				Attempts:        1,
-				TotalDuration:   time.Since(stepStart),
+				TotalDuration:   compDur,
 				InputLen:        len(data),
 				OutputLen:       len(output),
 			})
@@ -464,7 +495,10 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		}
 
 		if wStep.IsReduce() {
+			_, compSpan := telemetry.StartCompoundStepSpan(otelCtx, wStep.Name, "reduce", i)
 			reduceResults, output, err := executeReduceStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
+			compDur := time.Since(stepStart)
+			telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
 			if err != nil {
 				results = append(results, reduceResults...)
 				if program != nil {
@@ -482,7 +516,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				BatchIndex:      -1,
 				ConditionPassed: true,
 				Attempts:        1,
-				TotalDuration:   time.Since(stepStart),
+				TotalDuration:   compDur,
 				InputLen:        len(data),
 				OutputLen:       len(output),
 			})
@@ -491,7 +525,10 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		}
 
 		if wStep.IsParallel() {
+			_, compSpan := telemetry.StartCompoundStepSpan(otelCtx, wStep.Name, "parallel", i)
 			parallelResults, output, err := executeParallelStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
+			compDur := time.Since(stepStart)
+			telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
 			if err != nil {
 				results = append(results, parallelResults...)
 				if program != nil {
@@ -509,7 +546,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				BatchIndex:      -1,
 				ConditionPassed: true,
 				Attempts:        1,
-				TotalDuration:   time.Since(stepStart),
+				TotalDuration:   compDur,
 				InputLen:        len(data),
 				OutputLen:       len(output),
 			})
@@ -518,7 +555,10 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		}
 
 		if wStep.IsSaga() {
+			_, compSpan := telemetry.StartCompoundStepSpan(otelCtx, wStep.Name, "saga", i)
 			sagaResults, output, err := executeSagaStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
+			compDur := time.Since(stepStart)
+			telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
 			if err != nil {
 				results = append(results, sagaResults...)
 				if program != nil {
@@ -536,7 +576,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				BatchIndex:      -1,
 				ConditionPassed: true,
 				Attempts:        1,
-				TotalDuration:   time.Since(stepStart),
+				TotalDuration:   compDur,
 				InputLen:        len(data),
 				OutputLen:       len(output),
 			})
@@ -654,6 +694,9 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		maxAttempts := retryCount + 1
 		attemptsMade := 0
 
+		// OpenTelemetry: step span wrapping the node execution (including retries).
+		_, stepSpan := telemetry.StartStepSpan(otelCtx, wStep.Name, wStep.Node, i)
+
 		for attempt := 1; attempt <= maxAttempts; attempt++ {
 			attemptsMade = attempt
 			attemptStart := time.Now()
@@ -706,6 +749,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 				select {
 				case <-time.After(retryDelayActual):
 				case <-timeoutCtx.Done():
+					telemetry.StepSpanEnd(stepSpan, context.DeadlineExceeded, duration.Milliseconds(), len(output), false)
 					return "", results, trace, fmt.Errorf("workflow timed out during retry delay")
 				}
 			}
@@ -762,6 +806,9 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 			Router:          projectRouterDecisions(llmCollector.drainDecisions()),
 		})
 		results = append(results, result)
+
+		// End the OTel step span with the final outcome.
+		telemetry.StepSpanEnd(stepSpan, resultErr, duration.Milliseconds(), len(output), false)
 
 		if resultErr != nil {
 			logger.Error("step failed", "index", i, "node", wStep.Node, "duration", duration, "error", nodes.RedactSensitive(resultErr.Error()))
@@ -879,6 +926,9 @@ type Executor struct {
 	// wfPath is the original workflow file path, used for pause-resume
 	// metadata when a resumable step is paused.
 	wfPath string
+	// wg tracks in-flight executions so Shutdown can wait for all running
+	// steps to complete before returning.
+	wg sync.WaitGroup
 }
 
 // NewExecutor returns an Executor with no checkpoint configured and the
@@ -1002,6 +1052,38 @@ func (e *Executor) WithWorkflowPath(path string) *Executor {
 	return e
 }
 
+// SetupShutdown registers OS signal handlers (SIGINT, SIGTERM) for standalone
+// CLI use. When a signal is received, SignalShutdown is called to mark the
+// global shutdown flag, which causes all running workflow executions to stop
+// starting new steps after the current one completes. Deferred cleanup (WAL
+// flush, audit finalization) runs when each execution's function returns.
+//
+// This is intended for standalone CLI use (aflare run). When the Executor is
+// used through the HTTP server, the server's own signal handler calls
+// SignalShutdown and srv.Shutdown, so this method is not needed.
+//
+// It is safe to call SetupShutdown multiple times on the same Executor.
+func (e *Executor) SetupShutdown() {
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		<-sigCh
+		logger.Info("executor received shutdown signal, stopping gracefully...")
+		SignalShutdown()
+		e.Shutdown()
+	}()
+}
+
+// Shutdown waits for all in-flight executions tracked by this Executor to
+// complete (current step finishes, WAL flushed, audit finalized), then
+// returns. It is called automatically by SetupShutdown's signal handler or
+// can be called directly by the caller.
+func (e *Executor) Shutdown() {
+	logger.Info("executor shutting down, waiting for current steps to complete...")
+	e.wg.Wait()
+	logger.Info("executor shutdown complete")
+}
+
 // Execute runs the workflow without a TUI program. It is the checkpoint-aware
 // equivalent of ExecuteWorkflow.
 func (e *Executor) Execute(ctx context.Context, wf *Workflow, reg *nodes.Registry) (string, []StepResult, error) {
@@ -1012,6 +1094,10 @@ func (e *Executor) Execute(ctx context.Context, wf *Workflow, reg *nodes.Registr
 // ExecuteWithTrace runs the workflow and returns a detailed per-step trace.
 // It is the checkpoint-aware equivalent of ExecuteWorkflowWithTrace.
 func (e *Executor) ExecuteWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, *WorkflowTrace, error) {
+	// Track this execution in the WaitGroup so Shutdown can wait for it.
+	e.wg.Add(1)
+	defer e.wg.Done()
+
 	// Idempotency: guard against duplicate side effects when the same
 	// Idempotency-Key is re-triggered, including concurrently. The previous
 	// implementation did a non-atomic Check → execute → Record: two concurrent

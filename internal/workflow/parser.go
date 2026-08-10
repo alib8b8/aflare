@@ -16,11 +16,11 @@
 package workflow
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	aferrors "github.com/alib8b8/aflare/internal/errors"
 	"gopkg.in/yaml.v3"
 )
 
@@ -35,31 +35,31 @@ import (
 // information from arbitrary files.
 func safeWorkflowPath(path string) (string, error) {
 	if path == "" {
-		return "", fmt.Errorf("path is empty")
+		return "", aferrors.New(aferrors.CodeWorkflowParseError, "path is empty")
 	}
 
 	cleanPath := filepath.Clean(path)
 	absPath, err := filepath.Abs(cleanPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve path: %w", err)
+		return "", aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to resolve path")
 	}
 
 	info, err := os.Lstat(absPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to stat file: %w", err)
+		return "", aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to stat file")
 	}
 
 	if info.Mode()&os.ModeSymlink != 0 {
 		resolved, err := filepath.EvalSymlinks(absPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to resolve symlink: %w", err)
+			return "", aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to resolve symlink")
 		}
 		absPath = resolved
 	}
 
 	ext := strings.ToLower(filepath.Ext(absPath))
 	if ext != ".yaml" && ext != ".yml" {
-		return "", fmt.Errorf("only .yaml and .yml workflow files are allowed")
+		return "", aferrors.New(aferrors.CodeWorkflowParseError, "only .yaml and .yml workflow files are allowed")
 	}
 
 	return absPath, nil
@@ -69,35 +69,35 @@ func safeWorkflowPath(path string) (string, error) {
 func ParseWorkflow(path string) (*Workflow, error) {
 	safePath, err := safeWorkflowPath(path)
 	if err != nil {
-		return nil, fmt.Errorf("invalid workflow file path: %w", err)
+		return nil, aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "invalid workflow file path")
 	}
 
 	file, err := os.Open(safePath) // #nosec G304 -- path validated
 	if err != nil {
-		return nil, fmt.Errorf("failed to open workflow file: %w", err)
+		return nil, aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to open workflow file")
 	}
 	defer file.Close()
 
 	info, err := file.Stat()
 	if err != nil {
-		return nil, fmt.Errorf("failed to stat workflow file: %w", err)
+		return nil, aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to stat workflow file")
 	}
 	if info.IsDir() {
-		return nil, fmt.Errorf("workflow path is a directory, not a file")
+		return nil, aferrors.New(aferrors.CodeWorkflowParseError, "workflow path is a directory, not a file")
 	}
 	if info.Size() > MaxFileSize {
-		return nil, fmt.Errorf("workflow file too large (%d bytes, max %d bytes)", info.Size(), MaxFileSize)
+		return nil, aferrors.Newf(aferrors.CodeWorkflowParseError, "workflow file too large (%d bytes, max %d bytes)", info.Size(), MaxFileSize)
 	}
 
 	data := make([]byte, info.Size())
 	_, err = file.Read(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read workflow file: %w", err)
+		return nil, aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to read workflow file")
 	}
 
 	var wf Workflow
 	if err := yaml.Unmarshal(data, &wf); err != nil {
-		return nil, fmt.Errorf("failed to parse workflow YAML: %w", err)
+		return nil, aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to parse workflow YAML")
 	}
 
 	return &wf, nil
@@ -106,12 +106,12 @@ func ParseWorkflow(path string) (*Workflow, error) {
 // ParseWorkflowFromContent parses YAML content into a Workflow structure
 func ParseWorkflowFromContent(content string) (*Workflow, error) {
 	if len(content) > MaxFileSize {
-		return nil, fmt.Errorf("workflow content too large (%d bytes, max %d bytes)", len(content), MaxFileSize)
+		return nil, aferrors.Newf(aferrors.CodeWorkflowParseError, "workflow content too large (%d bytes, max %d bytes)", len(content), MaxFileSize)
 	}
 
 	var wf Workflow
 	if err := yaml.Unmarshal([]byte(content), &wf); err != nil {
-		return nil, fmt.Errorf("failed to parse workflow YAML: %w", err)
+		return nil, aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to parse workflow YAML")
 	}
 
 	return &wf, nil

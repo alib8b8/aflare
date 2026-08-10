@@ -24,6 +24,7 @@ import (
 
 	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/telemetry"
 	"github.com/alib8b8/aflare/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -115,7 +116,9 @@ func executeLoopStep(ctx context.Context, stepIndex int, wStep WorkflowStep, inp
 			if ie.err != nil {
 				execErr = ie.err
 			} else {
+				_, subSpan := telemetry.StartSubStepSpan(ctx, wStep.Name, wStep.Node, stepIndex*MaxParallel+idx)
 				output, execErr = executeWithRetry(ctx, node, ie.item, ie.params, retryCount, retryDelay, stepTimeout)
+				telemetry.SubStepSpanEnd(subSpan, execErr, time.Since(start).Milliseconds(), len(output))
 			}
 			duration := time.Since(start)
 
@@ -199,8 +202,11 @@ func executeLoopStep(ctx context.Context, stepIndex int, wStep WorkflowStep, inp
 					resultsChan <- loopResult{idx: idx, err: perr, dur: time.Since(start)}
 					return
 				}
+				_, subSpan := telemetry.StartSubStepSpan(ctx, wStep.Name, wStep.Node, stepIndex*MaxParallel+idx)
 				output, execErr := executeWithRetry(ctx, node, item, params, retryCount, retryDelay, stepTimeout)
-				resultsChan <- loopResult{idx: idx, output: output, err: execErr, dur: time.Since(start)}
+				dur := time.Since(start)
+				telemetry.SubStepSpanEnd(subSpan, execErr, dur.Milliseconds(), len(output))
+				resultsChan <- loopResult{idx: idx, output: output, err: execErr, dur: dur}
 			}(idx, ie.item, ie.params, ie.err)
 		}
 

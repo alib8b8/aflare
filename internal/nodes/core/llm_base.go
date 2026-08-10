@@ -32,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	aferrors "github.com/alib8b8/aflare/internal/errors"
 	"github.com/alib8b8/aflare/internal/cache"
 	"github.com/alib8b8/aflare/internal/config"
 	"github.com/alib8b8/aflare/internal/logger"
@@ -497,7 +498,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		apiKey = config.GetAPIKey(n.config.Name, n.config.EnvAPIKey)
 	}
 	if apiKey == "" {
-		return "", fmt.Errorf("%s API key required. Set %s env var, add to config file, or pass api_key param",
+		return "", aferrors.Newf(aferrors.CodeLLMAPIAuthError, "%s API key required. Set %s env var, add to config file, or pass api_key param",
 			n.config.ProviderName, n.config.EnvAPIKey)
 	}
 
@@ -630,7 +631,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 	resp, err := client.Do(req)
 	if err != nil {
 		tel.ErrText = err.Error()
-		return "", fmt.Errorf("failed to call %s API: %w", n.config.ProviderName, err)
+		return "", aferrors.Wrapf(err, aferrors.CodeLLMProviderFailed, "failed to call %s API", n.config.ProviderName)
 	}
 	defer resp.Body.Close()
 	tel.StatusCode = resp.StatusCode
@@ -640,10 +641,10 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		_ = json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&errResp)
 		if errResp.Error != nil && errResp.Error.Message != "" {
 			tel.ErrText = errResp.Error.Message
-			return "", fmt.Errorf("%s API error (%d): %s", n.config.ProviderName, resp.StatusCode, errResp.Error.Message)
+			return "", aferrors.Newf(aferrors.CodeLLMProviderFailed, "%s API error (%d): %s", n.config.ProviderName, resp.StatusCode, errResp.Error.Message)
 		}
 		tel.ErrText = fmt.Sprintf("status %d", resp.StatusCode)
-		return "", fmt.Errorf("%s API returned status %d", n.config.ProviderName, resp.StatusCode)
+		return "", aferrors.Newf(aferrors.CodeLLMProviderFailed, "%s API returned status %d", n.config.ProviderName, resp.StatusCode)
 	}
 
 	if stream {
@@ -665,13 +666,13 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 	var llmResp LLMResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&llmResp); err != nil {
 		tel.ErrText = err.Error()
-		return "", fmt.Errorf("failed to parse %s response: %w", n.config.ProviderName, err)
+		return "", aferrors.Wrapf(err, aferrors.CodeLLMProviderFailed, "failed to parse %s response", n.config.ProviderName)
 	}
 	tel.Usage = llmResp.Usage
 
 	if len(llmResp.Choices) == 0 {
 		tel.ErrText = "no choices in response"
-		return "", fmt.Errorf("no choices in %s response", n.config.ProviderName)
+		return "", aferrors.Newf(aferrors.CodeLLMProviderFailed, "no choices in %s response", n.config.ProviderName)
 	}
 
 	content := llmResp.Choices[0].Message.Content
@@ -980,7 +981,7 @@ func (n *OpenAICompatibleNode) CallWithTools(ctx context.Context, messages []LLM
 		apiKey = config.GetAPIKey(n.config.Name, n.config.EnvAPIKey)
 	}
 	if apiKey == "" {
-		return nil, fmt.Errorf("%s API key required. Set %s env var, add to config file, or pass api_key param",
+		return nil, aferrors.Newf(aferrors.CodeLLMAPIAuthError, "%s API key required. Set %s env var, add to config file, or pass api_key param",
 			n.config.ProviderName, n.config.EnvAPIKey)
 	}
 	if endpoint == "" {
@@ -990,7 +991,7 @@ func (n *OpenAICompatibleNode) CallWithTools(ctx context.Context, messages []LLM
 		model = n.config.DefaultModel
 	}
 	if err := ValidateLMLEndpoint(endpoint); err != nil {
-		return nil, fmt.Errorf("endpoint URL validation failed: %w", err)
+		return nil, aferrors.Wrap(err, aferrors.CodeLLMProviderFailed, "endpoint URL validation failed")
 	}
 
 	generateURL := fmt.Sprintf("%s/chat/completions", endpoint)
@@ -1012,12 +1013,12 @@ func (n *OpenAICompatibleNode) CallWithTools(ctx context.Context, messages []LLM
 
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, aferrors.Wrap(err, aferrors.CodeLLMProviderFailed, "failed to marshal request")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, generateURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, aferrors.Wrap(err, aferrors.CodeLLMProviderFailed, "failed to create request")
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
@@ -1030,7 +1031,7 @@ func (n *OpenAICompatibleNode) CallWithTools(ctx context.Context, messages []LLM
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call %s API: %w", n.config.ProviderName, err)
+		return nil, aferrors.Wrapf(err, aferrors.CodeLLMProviderFailed, "failed to call %s API", n.config.ProviderName)
 	}
 	defer resp.Body.Close()
 
@@ -1038,18 +1039,17 @@ func (n *OpenAICompatibleNode) CallWithTools(ctx context.Context, messages []LLM
 		var errResp LLMResponse
 		_ = json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&errResp)
 		if errResp.Error != nil && errResp.Error.Message != "" {
-			return nil, fmt.Errorf("%s API error (%d): %s", n.config.ProviderName, resp.StatusCode, errResp.Error.Message)
+			return nil, aferrors.Newf(aferrors.CodeLLMProviderFailed, "%s API error (%d): %s", n.config.ProviderName, resp.StatusCode, errResp.Error.Message)
 		}
-		return nil, fmt.Errorf("%s API returned status %d", n.config.ProviderName, resp.StatusCode)
+		return nil, aferrors.Newf(aferrors.CodeLLMProviderFailed, "%s API returned status %d", n.config.ProviderName, resp.StatusCode)
 	}
 
 	var llmResp LLMResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&llmResp); err != nil {
-		return nil, fmt.Errorf("failed to parse %s response: %w", n.config.ProviderName, err)
+		return nil, aferrors.Wrapf(err, aferrors.CodeLLMProviderFailed, "failed to parse %s response", n.config.ProviderName)
 	}
-
 	if len(llmResp.Choices) == 0 {
-		return nil, fmt.Errorf("no choices in %s response", n.config.ProviderName)
+		return nil, aferrors.Newf(aferrors.CodeLLMProviderFailed, "no choices in %s response", n.config.ProviderName)
 	}
 
 	return &llmResp, nil

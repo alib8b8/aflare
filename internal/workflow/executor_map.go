@@ -26,6 +26,7 @@ import (
 
 	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/telemetry"
 	"github.com/alib8b8/aflare/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -149,31 +150,57 @@ func executeMapStep(ctx context.Context, stepIndex int, wStep WorkflowStep, inpu
 			}
 		}
 	} else {
-		// ── Concurrent ──
-		sem := make(chan struct{}, concurrency)
-		var wg sync.WaitGroup
+		// ── Concurrent with bounded backpressure pool ──
+		// Instead of spawning one goroutine per item (which can create
+		// 10,000 goroutines for a 10,000-item map, all blocked on the
+		// semaphore), we use a fixed-size worker pool fed by a bounded
+		// channel. This limits live goroutines to concurrency and provides
+		// backpressure to the producer when the queue is full.
+		pool := newBackpressurePool(cfg.GetQueueSize(), cfg.GetBackpressure())
 		iterResults := make([]iterResult, len(items))
 
-		for idx, item := range items {
-			wg.Add(1)
-			sem <- struct{}{}
-			go func(idx int, item string) {
-				defer wg.Done()
-				defer func() { <-sem }()
-				if globalLimiter != nil {
-					if err := globalLimiter.Acquire(ctx); err != nil {
-						iterResults[idx] = iterResult{err: err}
-						return
+		// Start fixed-size worker pool. Workers exit when the queue is
+		// closed (after all items are submitted or skipped).
+		var workerWg sync.WaitGroup
+		for range concurrency {
+			workerWg.Add(1)
+			go func() {
+				defer workerWg.Done()
+				for mi := range pool.queue {
+					idx, item := mi.idx, mi.item
+					if globalLimiter != nil {
+						if err := globalLimiter.Acquire(ctx); err != nil {
+							iterResults[idx] = iterResult{err: err}
+							continue
+						}
 					}
-					defer globalLimiter.Release()
+					if program != nil {
+						program.Send(tui.StepStartMsg{Index: stepIndex*MaxParallel + idx, Name: "map[" + fmt.Sprintf("%d", idx) + "]"})
+					}
+					iterResults[idx] = runOne(idx, item)
+					if globalLimiter != nil {
+						globalLimiter.Release()
+					}
 				}
-				if program != nil {
-					program.Send(tui.StepStartMsg{Index: stepIndex*MaxParallel + idx, Name: "map[" + fmt.Sprintf("%d", idx) + "]"})
-				}
-				iterResults[idx] = runOne(idx, item)
-			}(idx, item)
+			}()
 		}
-		wg.Wait()
+
+		// Submit items. In "block" mode the producer blocks when the
+		// queue is full (backpressure); in "drop" mode the item is
+		// skipped with an empty result.
+		var drops int64
+		for idx, item := range items {
+			if !pool.submit(mapItem{idx, item}) {
+				drops++
+				iterResults[idx] = iterResult{} // skipped
+			}
+		}
+		pool.close()
+		workerWg.Wait()
+
+		if drops > 0 {
+			logger.Warn("map dropped items due to backpressure", "dropped", drops, "total", len(items))
+		}
 
 		// Process in order.
 		for idx, r := range iterResults {
@@ -258,22 +285,40 @@ func resolveMapItems(over, splitBy string) ([]string, error) {
 func executeSubStep(ctx context.Context, baseIdx int, subStep WorkflowStep, input string, engine *ExpressionEngine, reg *nodes.Registry, program *tea.Program, globalLimiter *ConcurrencyLimiter) ([]StepResult, string, error) {
 	// Compound steps delegate to the existing executors.
 	if subStep.IsIf() {
-		return executeIfBranch(ctx, baseIdx, subStep.If, input, engine, reg, program, globalLimiter)
+		_, subSpan := telemetry.StartSubStepSpan(ctx, subStep.Name, "if", baseIdx)
+		results, out, err := executeIfBranch(ctx, baseIdx, subStep.If, input, engine, reg, program, globalLimiter)
+		telemetry.SubStepSpanEnd(subSpan, err, 0, len(out))
+		return results, out, err
 	}
 	if subStep.IsLoop() {
-		return executeLoopStep(ctx, baseIdx, subStep, input, engine, reg, program, globalLimiter)
+		_, subSpan := telemetry.StartSubStepSpan(ctx, subStep.Name, subStep.Node, baseIdx)
+		results, out, err := executeLoopStep(ctx, baseIdx, subStep, input, engine, reg, program, globalLimiter)
+		telemetry.SubStepSpanEnd(subSpan, err, 0, len(out))
+		return results, out, err
 	}
 	if subStep.IsParallel() {
-		return executeParallelStep(ctx, baseIdx, subStep, input, engine, reg, program, globalLimiter)
+		_, subSpan := telemetry.StartSubStepSpan(ctx, subStep.Name, subStep.Node, baseIdx)
+		results, out, err := executeParallelStep(ctx, baseIdx, subStep, input, engine, reg, program, globalLimiter)
+		telemetry.SubStepSpanEnd(subSpan, err, 0, len(out))
+		return results, out, err
 	}
 	if subStep.IsMap() {
-		return executeMapStep(ctx, baseIdx, subStep, input, engine, reg, program, globalLimiter)
+		_, subSpan := telemetry.StartSubStepSpan(ctx, subStep.Name, "map", baseIdx)
+		results, out, err := executeMapStep(ctx, baseIdx, subStep, input, engine, reg, program, globalLimiter)
+		telemetry.SubStepSpanEnd(subSpan, err, 0, len(out))
+		return results, out, err
 	}
 	if subStep.IsReduce() {
-		return executeReduceStep(ctx, baseIdx, subStep, input, engine, reg, program, globalLimiter)
+		_, subSpan := telemetry.StartSubStepSpan(ctx, subStep.Name, "reduce", baseIdx)
+		results, out, err := executeReduceStep(ctx, baseIdx, subStep, input, engine, reg, program, globalLimiter)
+		telemetry.SubStepSpanEnd(subSpan, err, 0, len(out))
+		return results, out, err
 	}
 	if subStep.IsSaga() {
-		return executeSagaStep(ctx, baseIdx, subStep, input, engine, reg, program, globalLimiter)
+		_, subSpan := telemetry.StartSubStepSpan(ctx, subStep.Name, "saga", baseIdx)
+		results, out, err := executeSagaStep(ctx, baseIdx, subStep, input, engine, reg, program, globalLimiter)
+		telemetry.SubStepSpanEnd(subSpan, err, 0, len(out))
+		return results, out, err
 	}
 
 	// Condition check.
@@ -308,14 +353,17 @@ func executeSubStep(ctx context.Context, baseIdx int, subStep WorkflowStep, inpu
 	retryDelay := subStep.GetRetryDelay()
 
 	start := time.Now()
+	_, subSpan := telemetry.StartSubStepSpan(ctx, subStep.Name, subStep.Node, baseIdx)
 	output, execErr := executeWithRetry(ctx, node, input, evaluatedParams, retryCount, retryDelay, stepTimeout)
+	subDur := time.Since(start)
+	telemetry.SubStepSpanEnd(subSpan, execErr, subDur.Milliseconds(), len(output))
 	sr := StepResult{
 		StepIndex: baseIdx,
 		NodeName:  subStep.Node,
 		Input:     input,
 		Output:    output,
 		Error:     execErr,
-		Duration:  time.Since(start),
+		Duration:  subDur,
 	}
 	if execErr != nil {
 		// Error recovery is delegated to applyErrorRecovery (shared with the

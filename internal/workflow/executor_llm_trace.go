@@ -23,6 +23,7 @@ import (
 
 	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/telemetry"
 )
 
 // traceRedactExtras holds secret patterns that core.RedactSensitive does not
@@ -188,7 +189,11 @@ func (c *llmCallCollector) drainDecisions() []nodes.RouterDecision {
 // context will publish to the collector.
 func withLLMCollector(ctx context.Context) (context.Context, *llmCallCollector) {
 	c := newLLMCallCollector()
-	ctx = nodes.WithLLMCallSink(ctx, c)
+	// Wrap the collector with an OTel sink so every LLM call produces a span
+	// with model, provider, token count, latency, and cost. When the global
+	// tracer provider is not set, the wrapper is a no-op (single bool check).
+	sink := nodes.LLMCallSink(&telemetry.OtelLLMCallSink{Inner: c})
+	ctx = nodes.WithLLMCallSink(ctx, sink)
 	ctx = nodes.WithRouterDecisionSink(ctx, c)
 	return ctx, c
 }

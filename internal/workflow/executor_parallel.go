@@ -23,6 +23,7 @@ import (
 
 	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/telemetry"
 	"github.com/alib8b8/aflare/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -181,6 +182,7 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 				retryDelay = MaxRetryDelay
 			}
 
+			_, subSpan := telemetry.StartSubStepSpan(ctx, "", nodeName, stepIndex*MaxParallel+j)
 			var output string
 			var execErr error
 			maxAttempts := retryCount + 1
@@ -215,13 +217,15 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 					}
 				}
 			}
+			dur := time.Since(start)
+			telemetry.SubStepSpanEnd(subSpan, execErr, dur.Milliseconds(), len(output))
 
 			resultsChan <- parallelResult{
 				stepIndex: stepIndex*MaxParallel + j,
 				nodeName:  nodeName,
 				output:    output,
 				err:       execErr,
-				duration:  time.Since(start),
+				duration:  dur,
 			}
 		}(j, step, pe)
 	}

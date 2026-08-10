@@ -1,0 +1,463 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aflare.dev/schemas/workflow.schema.json",
+  "title": "aflare Workflow",
+  "description": "JSON Schema for aflare workflow YAML files. Supports autocomplete and validation in VS Code / IntelliJ with YAML plugin.",
+  "type": "object",
+  "required": ["steps"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Workflow name (used for logging and resume checkpoints)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of what this workflow does"
+    },
+    "vars": {
+      "type": "object",
+      "description": "Workflow-level variables accessible via {{var.NAME}}",
+      "additionalProperties": { "type": "string" }
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered list of workflow steps to execute",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/WorkflowStep" }
+    },
+    "output": {
+      "type": "string",
+      "description": "Expression for final output (default: last step output). Supports {{step.NAME}} references."
+    },
+    "input_schema": {
+      "type": "array",
+      "description": "Optional input validation schema",
+      "items": { "$ref": "#/$defs/InputField" }
+    },
+    "max_concurrency": {
+      "type": "integer",
+      "description": "Global concurrency limit (default: 0 = unlimited)",
+      "minimum": 0
+    }
+  },
+  "$defs": {
+    "InputField": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "description": "Parameter name" },
+        "type": {
+          "type": "string",
+          "enum": ["string", "int", "bool", "json"],
+          "description": "Expected parameter type"
+        },
+        "required": { "type": "boolean", "description": "Whether this parameter is required" },
+        "default": { "type": "string", "description": "Default value if not provided" }
+      }
+    },
+    "WorkflowStep": {
+      "type": "object",
+      "description": "A workflow step. Either use 'node' for a simple node, or one of the compound step types (saga/map/if/parallel/loop/reduce).",
+      "anyOf": [
+        { "required": ["node"] },
+        { "required": ["saga"] },
+        { "required": ["map"] },
+        { "required": ["if"] },
+        { "required": ["parallel"] },
+        { "required": ["loop"] },
+        { "required": ["reduce"] }
+      ],
+      "properties": {
+        "node": {
+          "type": "string",
+          "description": "Node type to execute. Use one of the registered node names.",
+          "enum": [
+            "agent",
+            "agent_browser",
+            "agent_inbox",
+            "agent_message",
+            "agent_orchestrator",
+            "andesgpt",
+            "antling",
+            "app_launch",
+            "blockchain_audit",
+            "call",
+            "clarify",
+            "cli_session",
+            "code_interpreter",
+            "code_knowledge_graph",
+            "code_review",
+            "combine",
+            "compress",
+            "condition",
+            "context_fs",
+            "critic",
+            "cross_app_action",
+            "device_state",
+            "doc_gen",
+            "doc_parse",
+            "engineer_skills",
+            "evaluator",
+            "execute",
+            "fastgpt",
+            "fetch_url",
+            "file_read",
+            "file_watch",
+            "file_write",
+            "harmony_ability",
+            "harmony_atomic_service",
+            "harmony_device_adapt",
+            "harmony_widget",
+            "http_request",
+            "human_in_loop",
+            "intent_router",
+            "json_parse",
+            "knowledge_graph",
+            "llm_router",
+            "marketplace",
+            "memory",
+            "moe_streaming",
+            "multimodal",
+            "node_marketplace",
+            "notify",
+            "office",
+            "ollama",
+            "ondevice_llm",
+            "pipeline",
+            "planner",
+            "plugin_system",
+            "power_manager",
+            "preference",
+            "rag",
+            "reflector",
+            "researcher",
+            "robot_action",
+            "robot_control",
+            "sandbox",
+            "screen_understanding",
+            "search_aggregate",
+            "send_notification",
+            "sensenova",
+            "session_manager",
+            "skill_distill",
+            "skill_explorer",
+            "sql_query",
+            "structured_output",
+            "supervisor",
+            "system_event",
+            "template_render",
+            "test_node",
+            "transform",
+            "ui_automate",
+            "unitree_robot",
+            "verify",
+            "video_edit",
+            "voice_input",
+            "voice_output"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "description": "Optional step name for {{step.NAME}} references in expressions"
+        },
+        "params": {
+          "type": "object",
+          "description": "Key-value parameters passed to the node. Common params: command, url, path, model, prompt, timeout, etc.",
+          "additionalProperties": { "type": "string" }
+        },
+        "condition": {
+          "type": "string",
+          "description": "Expression that must evaluate to a truthy value for the step to run"
+        },
+        "retry": {
+          "type": "integer",
+          "description": "Number of retry attempts on failure (default: 0)",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "delay": {
+          "type": "string",
+          "description": "Delay between retries (e.g. '1s', '5m'). Default: 1s"
+        },
+        "backoff": { "$ref": "#/$defs/BackoffConfig" },
+        "parallel": {
+          "type": "array",
+          "description": "Sub-steps to execute in parallel",
+          "items": { "$ref": "#/$defs/Step" }
+        },
+        "continue_on_error": {
+          "type": "boolean",
+          "description": "If true, step failure does not abort the workflow"
+        },
+        "fallback": {
+          "type": "string",
+          "description": "Fallback value to use if the step fails"
+        },
+        "on_error": {
+          "$ref": "#/$defs/Step",
+          "description": "Single handler step to run on failure"
+        },
+        "loop": { "$ref": "#/$defs/LoopConfig" },
+        "max_failures": {
+          "type": "integer",
+          "description": "Maximum number of failures before aborting the workflow",
+          "minimum": 0
+        },
+        "if": { "$ref": "#/$defs/IfConfig" },
+        "map": { "$ref": "#/$defs/MapConfig" },
+        "reduce": { "$ref": "#/$defs/ReduceConfig" },
+        "saga": { "$ref": "#/$defs/SagaConfig" },
+        "capture_error": {
+          "type": "array",
+          "description": "Sub-workflow executed when the step fails. Error flows as input to first sub-step.",
+          "items": { "$ref": "#/$defs/WorkflowStep" }
+        },
+        "output_strategy": {
+          "type": "string",
+          "description": "How to combine outputs from parallel/loop/map steps",
+          "enum": ["join", "first", "last", "json_array", "longest", "shortest"]
+        },
+        "depends_on": {
+          "type": "array",
+          "description": "Explicit DAG dependencies by step name or 1-based index (as string). Switches executor to DAG scheduling.",
+          "items": { "type": "string" }
+        },
+        "resumable": {
+          "type": "boolean",
+          "description": "If true, workflow pauses instead of failing on error. Resume via CLI or webhook."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Step-level timeout for resumable steps (e.g. '72h'). Separate from params._timeout."
+        },
+        "resume_on": {
+          "type": "string",
+          "description": "How a paused workflow can be resumed",
+          "enum": ["webhook", "manual"]
+        },
+        "webhook_token": {
+          "type": "string",
+          "description": "Secret token required to resume via webhook. Auto-generated if empty."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Step": {
+      "type": "object",
+      "description": "Simple step used in parallel blocks and on_error handlers",
+      "required": ["node"],
+      "properties": {
+        "node": {
+          "type": "string",
+          "description": "Node type to execute",
+          "enum": [
+            "agent", "agent_browser", "agent_inbox", "agent_message", "agent_orchestrator",
+            "andesgpt", "antling", "app_launch", "blockchain_audit", "call", "clarify",
+            "cli_session", "code_interpreter", "code_knowledge_graph", "code_review",
+            "combine", "compress", "condition", "context_fs", "critic", "cross_app_action",
+            "device_state", "doc_gen", "doc_parse", "engineer_skills", "evaluator",
+            "execute", "fastgpt", "fetch_url", "file_read", "file_watch", "file_write",
+            "harmony_ability", "harmony_atomic_service", "harmony_device_adapt",
+            "harmony_widget", "http_request", "human_in_loop", "intent_router",
+            "json_parse", "knowledge_graph", "llm_router", "marketplace", "memory",
+            "moe_streaming", "multimodal", "node_marketplace", "notify", "office",
+            "ollama", "ondevice_llm", "pipeline", "planner", "plugin_system",
+            "power_manager", "preference", "rag", "reflector", "researcher",
+            "robot_action", "robot_control", "sandbox", "screen_understanding",
+            "search_aggregate", "send_notification", "sensenova", "session_manager",
+            "skill_distill", "skill_explorer", "sql_query", "structured_output",
+            "supervisor", "system_event", "template_render", "test_node", "transform",
+            "ui_automate", "unitree_robot", "verify", "video_edit", "voice_input",
+            "voice_output"
+          ]
+        },
+        "params": {
+          "type": "object",
+          "description": "Key-value parameters for the node",
+          "additionalProperties": { "type": "string" }
+        },
+        "condition": {
+          "type": "string",
+          "description": "Expression that must evaluate to a truthy value"
+        },
+        "retry": {
+          "type": "integer",
+          "description": "Number of retry attempts",
+          "minimum": 0
+        },
+        "delay": {
+          "type": "string",
+          "description": "Delay between retries"
+        }
+      }
+    },
+    "BackoffConfig": {
+      "type": "object",
+      "description": "Exponential backoff configuration for retries",
+      "properties": {
+        "exponential": {
+          "type": "boolean",
+          "description": "Enable exponential backoff"
+        },
+        "base": {
+          "type": "string",
+          "description": "Base delay for exponential backoff (e.g. '1s')"
+        },
+        "max_delay": {
+          "type": "string",
+          "description": "Maximum delay cap (e.g. '5m')"
+        },
+        "jitter": {
+          "type": "boolean",
+          "description": "Add random jitter to delay"
+        }
+      }
+    },
+    "LoopConfig": {
+      "type": "object",
+      "description": "Batch iteration over a list of items. The parent step's node is executed once per item.",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "string",
+          "description": "Expression evaluating to the list of items to iterate"
+        },
+        "split_by": {
+          "type": "string",
+          "description": "Delimiter for splitting string items (default: '\\n')"
+        },
+        "var": {
+          "type": "string",
+          "description": "Loop variable name (default: 'item')"
+        },
+        "concurrency": {
+          "type": "integer",
+          "description": "Max concurrent iterations (default: 1)",
+          "minimum": 1
+        },
+        "stop_on_error": {
+          "type": "boolean",
+          "description": "Stop on first error (default: true)"
+        },
+        "max_iterations": {
+          "type": "integer",
+          "description": "Safety limit on iterations (default: 100, max: 10000)",
+          "minimum": 1,
+          "maximum": 10000
+        }
+      }
+    },
+    "MapConfig": {
+      "type": "object",
+      "description": "Sub-workflow per item. Each item is processed by a sub-workflow of steps.",
+      "required": ["over", "steps"],
+      "properties": {
+        "over": {
+          "type": "string",
+          "description": "Expression evaluating to the items to iterate (JSON array or delimited string)"
+        },
+        "steps": {
+          "type": "array",
+          "description": "Sub-workflow executed once per item",
+          "items": { "$ref": "#/$defs/WorkflowStep" }
+        },
+        "split_by": {
+          "type": "string",
+          "description": "Delimiter for splitting string values (default: '\\n')"
+        },
+        "concurrency": {
+          "type": "integer",
+          "description": "Max concurrent iterations (default: 1)",
+          "minimum": 1
+        },
+        "stop_on_error": {
+          "type": "boolean",
+          "description": "Stop on first error (default: true)"
+        },
+        "max_iterations": {
+          "type": "integer",
+          "description": "Safety limit on iterations (default: 100, max: 10000)",
+          "minimum": 1,
+          "maximum": 10000
+        }
+      }
+    },
+    "ReduceConfig": {
+      "type": "object",
+      "description": "Left fold over a list. Each item updates a running accumulator via a sub-workflow.",
+      "required": ["over", "steps"],
+      "properties": {
+        "over": {
+          "type": "string",
+          "description": "Expression evaluating to the items to fold (JSON array or delimited string)"
+        },
+        "initial": {
+          "type": "string",
+          "description": "Starting accumulator value. Defaults to empty string."
+        },
+        "steps": {
+          "type": "array",
+          "description": "Sub-workflow executed once per item. {{loop.acc}} and {{loop.item}} are available.",
+          "items": { "$ref": "#/$defs/WorkflowStep" }
+        },
+        "split_by": {
+          "type": "string",
+          "description": "Delimiter for splitting string values (default: '\\n')"
+        },
+        "max_iterations": {
+          "type": "integer",
+          "description": "Safety limit on iterations (default: 100, max: 10000)",
+          "minimum": 1,
+          "maximum": 10000
+        }
+      }
+    },
+    "SagaConfig": {
+      "type": "object",
+      "description": "Cross-step saga transaction with compensation. Forward steps execute in order; on failure, completed steps are compensated in reverse.",
+      "required": ["steps"],
+      "properties": {
+        "steps": {
+          "type": "array",
+          "description": "Ordered forward transactional steps, each with optional compensation",
+          "items": { "$ref": "#/$defs/SagaStep" }
+        }
+      }
+    },
+    "SagaStep": {
+      "type": "object",
+      "required": ["forward"],
+      "properties": {
+        "forward": {
+          "$ref": "#/$defs/WorkflowStep",
+          "description": "The transactional step to execute"
+        },
+        "compensate": {
+          "$ref": "#/$defs/WorkflowStep",
+          "description": "Step run on rollback to undo Forward's side effects. Receives Forward's output as input."
+        }
+      }
+    },
+    "IfConfig": {
+      "type": "object",
+      "description": "If/else conditional branching",
+      "required": ["condition", "then"],
+      "properties": {
+        "condition": {
+          "type": "string",
+          "description": "Expression evaluated for truthiness"
+        },
+        "then": {
+          "type": "array",
+          "description": "Steps to execute when condition is truthy",
+          "items": { "$ref": "#/$defs/WorkflowStep" }
+        },
+        "else": {
+          "type": "array",
+          "description": "Steps to execute when condition is falsy",
+          "items": { "$ref": "#/$defs/WorkflowStep" }
+        }
+      }
+    }
+  }
+}

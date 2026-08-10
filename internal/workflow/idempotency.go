@@ -54,6 +54,7 @@ import (
 	"sync"
 	"time"
 
+	aferrors "github.com/alib8b8/aflare/internal/errors"
 	"github.com/alib8b8/aflare/internal/logger"
 )
 
@@ -63,19 +64,19 @@ import (
 // returned as the first result value, so callers that only need the output
 // can ignore this error. Callers that need to distinguish a real execution
 // from a dedup hit should check errors.Is(err, ErrIdempotencyHit).
-var ErrIdempotencyHit = errors.New("workflow skipped: idempotency key already completed")
+var ErrIdempotencyHit = aferrors.New(aferrors.CodeIdempotencyConflict, "workflow skipped: idempotency key already completed")
 
 // ErrIdempotencyInProgress is returned when an idempotency key already has an
 // in_progress run (another goroutine/process is mid-execution for the same
 // key). The caller must NOT re-execute: doing so would duplicate side effects
 // such as a duplicate money transfer. The run should be rejected and the
 // caller is expected to retry later or surface the conflict to the user.
-var ErrIdempotencyInProgress = errors.New("workflow skipped: idempotency key has an in-progress run")
+var ErrIdempotencyInProgress = aferrors.New(aferrors.CodeIdempotencyConflict, "workflow skipped: idempotency key has an in-progress run")
 
 // ErrIdempotencyLockTimeout is returned by Reserve when the cross-process lock
 // for a key could not be acquired within crossProcessLockTimeout. This usually
 // means another process is stuck mid-Reserve; the caller should retry.
-var ErrIdempotencyLockTimeout = errors.New("idempotency: timed out acquiring cross-process lock")
+var ErrIdempotencyLockTimeout = aferrors.New(aferrors.CodeIdempotencyInternal, "idempotency: timed out acquiring cross-process lock")
 
 // Idempotency status values stored in IdempotencyRecord.Status.
 const (
@@ -312,12 +313,12 @@ func (s *FileIdempotencyStore) Check(key string) (IdempotencyRecord, bool, error
 // itself is mode 0600.
 func (s *FileIdempotencyStore) Record(rec IdempotencyRecord) error {
 	if rec.Key == "" {
-		return fmt.Errorf("idempotency: empty key")
+		return aferrors.New(aferrors.CodeIdempotencyInternal, "idempotency: empty key")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := os.MkdirAll(s.dir, 0700); err != nil {
-		return fmt.Errorf("idempotency: mkdir: %w", err)
+		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: mkdir")
 	}
 	return s.writeLocked(rec.Key, rec)
 }
@@ -340,7 +341,7 @@ func (s *FileIdempotencyStore) writeLocked(key string, rec IdempotencyRecord) er
 	rec.HMAC = signRecord(&rec)
 	data, err := json.MarshalIndent(rec, "", "  ")
 	if err != nil {
-		return fmt.Errorf("idempotency: marshal: %w", err)
+		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: marshal")
 	}
 	finalPath := s.pathFor(key)
 	tmpPath := finalPath + ".tmp." + randomSuffix()
@@ -349,25 +350,25 @@ func (s *FileIdempotencyStore) writeLocked(key string, rec IdempotencyRecord) er
 	// durability pattern in internal/nodes/router_quota.go.
 	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
-		return fmt.Errorf("idempotency: write tmp: %w", err)
+		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: write tmp")
 	}
 	if _, err := f.Write(data); err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("idempotency: write tmp: %w", err)
+		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: write tmp")
 	}
 	if err := f.Sync(); err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("idempotency: fsync tmp: %w", err)
+		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: fsync tmp")
 	}
 	if err := f.Close(); err != nil {
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("idempotency: close tmp: %w", err)
+		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: close tmp")
 	}
 	if err := os.Rename(tmpPath, finalPath); err != nil {
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("idempotency: rename: %w", err)
+		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: rename")
 	}
 	// Best-effort fsync of the parent directory so the rename itself is
 	// durable. A failure here is non-fatal: at worst a crash could lose the
@@ -392,17 +393,17 @@ func (s *FileIdempotencyStore) writeLocked(key string, rec IdempotencyRecord) er
 // orphaned-sentinel reclamation policy.
 func (s *FileIdempotencyStore) Reserve(key string, runID string) (IdempotencyRecord, bool, error) {
 	if key == "" {
-		return IdempotencyRecord{}, false, fmt.Errorf("idempotency: empty key")
+		return IdempotencyRecord{}, false, aferrors.New(aferrors.CodeIdempotencyInternal, "idempotency: empty key")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := os.MkdirAll(s.dir, 0700); err != nil {
-		return IdempotencyRecord{}, false, fmt.Errorf("idempotency: mkdir: %w", err)
+		return IdempotencyRecord{}, false, aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: mkdir")
 	}
 
 	release, err := s.acquireCrossProcessLock(key)
 	if err != nil {
-		return IdempotencyRecord{}, false, fmt.Errorf("idempotency: lock: %w", err)
+		return IdempotencyRecord{}, false, aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: lock")
 	}
 	defer release()
 
@@ -410,7 +411,7 @@ func (s *FileIdempotencyStore) Reserve(key string, runID string) (IdempotencyRec
 	// whether to claim or yield.
 	rec, ok, err := s.readLocked(key)
 	if err != nil {
-		return IdempotencyRecord{}, false, fmt.Errorf("idempotency: read: %w", err)
+		return IdempotencyRecord{}, false, aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: read")
 	}
 	if ok {
 		// Reap expired records (including a stale in_progress left behind by a
@@ -485,7 +486,7 @@ func (s *FileIdempotencyStore) Clear(key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := os.Remove(s.pathFor(key)); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("idempotency: clear: %w", err)
+		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: clear")
 	}
 	return nil
 }
@@ -504,7 +505,7 @@ func (s *FileIdempotencyStore) readLocked(key string) (IdempotencyRecord, bool, 
 		if errors.Is(err, os.ErrNotExist) {
 			return IdempotencyRecord{}, false, nil
 		}
-		return IdempotencyRecord{}, false, fmt.Errorf("idempotency: read: %w", err)
+		return IdempotencyRecord{}, false, aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: read")
 	}
 	// An empty file is the post-crash residue of an interrupted write that
 	// the fsync+rename pattern is designed to prevent; treat it as not-found
@@ -516,7 +517,7 @@ func (s *FileIdempotencyStore) readLocked(key string) (IdempotencyRecord, bool, 
 	}
 	var rec IdempotencyRecord
 	if err := json.Unmarshal(data, &rec); err != nil {
-		return IdempotencyRecord{}, false, fmt.Errorf("idempotency: parse: %w", err)
+		return IdempotencyRecord{}, false, aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: parse")
 	}
 	// Reject tampered records: a bad/missing HMAC means FinalOutput (or any
 	// other field) may have been forged, so we must not serve it as a cache
@@ -613,7 +614,7 @@ func (s *MemoryIdempotencyStore) Check(key string) (IdempotencyRecord, bool, err
 // Record implements IdempotencyStore.
 func (s *MemoryIdempotencyStore) Record(rec IdempotencyRecord) error {
 	if rec.Key == "" {
-		return fmt.Errorf("idempotency: empty key")
+		return aferrors.New(aferrors.CodeIdempotencyInternal, "idempotency: empty key")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -634,7 +635,7 @@ func (s *MemoryIdempotencyStore) Record(rec IdempotencyRecord) error {
 // obtains reserved=true.
 func (s *MemoryIdempotencyStore) Reserve(key string, runID string) (IdempotencyRecord, bool, error) {
 	if key == "" {
-		return IdempotencyRecord{}, false, fmt.Errorf("idempotency: empty key")
+		return IdempotencyRecord{}, false, aferrors.New(aferrors.CodeIdempotencyInternal, "idempotency: empty key")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

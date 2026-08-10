@@ -16,6 +16,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/alib8b8/aflare/internal/i18n"
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/output"
+	"github.com/alib8b8/aflare/internal/telemetry"
 )
 
 func main() {
@@ -31,11 +33,28 @@ func main() {
 		fmt.Println(cli.PrintUsage())
 		os.Exit(1)
 	}
-	command, args, safeMode, dryRun, mcpServer, lang, concise, initMCP, initAgent, updateChannel, serveMode, aiMode := cli.ParseArgs(os.Args[1:])
+	command, args, safeMode, dryRun, mcpServer, lang, concise, initMCP, initAgent, updateChannel, serveMode, aiMode, otelEndpoint, otelServiceName := cli.ParseArgs(os.Args[1:])
 	if concise {
 		output.SetMode(output.ModeConcise)
 	}
 	i18n.Init(lang)
+
+	// OpenTelemetry: initialise the global tracer provider if an OTLP endpoint
+	// is configured (via --otel-endpoint or OTEL_EXPORTER_OTLP_ENDPOINT env).
+	// Tracing is a no-op when no endpoint is set.
+	ctx := context.Background()
+	otelShutdown, err := telemetry.InitTracer(ctx, telemetry.Config{
+		Endpoint:    otelEndpoint,
+		ServiceName: otelServiceName,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: OpenTelemetry initialisation failed: %v\n", err)
+	}
+	defer func() {
+		if err := otelShutdown(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: OpenTelemetry shutdown failed: %v\n", err)
+		}
+	}()
 	if mcpServer {
 		cli.HandleMCP()
 		return

@@ -32,7 +32,7 @@ import (
 
 // ParseArgs parses the command-line arguments and returns the command and its arguments.
 // It also detects the --safe-mode, --dry-run, --mcp-server, --lang, --concise, and --ai flags.
-func ParseArgs(args []string) (command string, commandArgs []string, safeMode bool, dryRun bool, mcpServer bool, lang string, concise bool, initMCP string, initAgent string, updateChannel string, serveMode bool, aiMode bool) {
+func ParseArgs(args []string) (command string, commandArgs []string, safeMode bool, dryRun bool, mcpServer bool, lang string, concise bool, initMCP string, initAgent string, updateChannel string, serveMode bool, aiMode bool, otelEndpoint string, otelServiceName string) {
 	safeMode = false
 	dryRun = false
 	mcpServer = false
@@ -43,6 +43,8 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 	updateChannel = ""
 	serveMode = false
 	aiMode = false
+	otelEndpoint = ""
+	otelServiceName = ""
 	var filtered []string
 	skipNext := false
 	for i, arg := range args {
@@ -94,6 +96,20 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 			serveMode = true
 		} else if arg == "--ai" {
 			aiMode = true
+		} else if arg == "--otel-endpoint" {
+			if i+1 < len(args) {
+				otelEndpoint = args[i+1]
+				skipNext = true
+			}
+		} else if strings.HasPrefix(arg, "--otel-endpoint=") {
+			otelEndpoint = strings.TrimPrefix(arg, "--otel-endpoint=")
+		} else if arg == "--otel-service-name" {
+			if i+1 < len(args) {
+				otelServiceName = args[i+1]
+				skipNext = true
+			}
+		} else if strings.HasPrefix(arg, "--otel-service-name=") {
+			otelServiceName = strings.TrimPrefix(arg, "--otel-service-name=")
 		} else {
 			filtered = append(filtered, arg)
 		}
@@ -115,7 +131,7 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 	}
 
 	if len(filtered) == 0 {
-		return "", nil, safeMode, dryRun, mcpServer, lang, concise, initMCP, initAgent, updateChannel, serveMode, aiMode
+		return "", nil, safeMode, dryRun, mcpServer, lang, concise, initMCP, initAgent, updateChannel, serveMode, aiMode, otelEndpoint, otelServiceName
 	}
 
 	command = filtered[0]

@@ -24,9 +24,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/alib8b8/aflare/internal/nodes"
@@ -94,7 +96,27 @@ func (s *Server) Start() error {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	return srv.ListenAndServe()
+	// Graceful shutdown: listen for SIGINT/SIGTERM and drain connections.
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		sig := <-sigCh
+		log.Printf("[api] received signal %v, shutting down gracefully...", sig)
+		workflow.SignalShutdown()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("[api] server shutdown error: %v", err)
+		}
+		log.Printf("[api] server stopped")
+	}()
+
+	log.Printf("[api] starting server on %s", addr)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("server error: %w", err)
+	}
+	return nil
 }
 
 // middlewareStack wraps the handler with all middleware layers.

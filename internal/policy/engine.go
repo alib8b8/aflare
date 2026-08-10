@@ -50,11 +50,11 @@ package policy
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	aferrors "github.com/alib8b8/aflare/internal/errors"
 	"gopkg.in/yaml.v3"
 )
 
@@ -194,11 +194,11 @@ func LoadPolicy(path string) (*Policy, error) {
 	}
 	data, err := os.ReadFile(safePath) // #nosec G304 -- path validated by validatePolicyPath
 	if err != nil {
-		return nil, fmt.Errorf("failed to read policy file: %w", err)
+		return nil, aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to read policy file")
 	}
 	var p Policy
 	if err := yaml.Unmarshal(data, &p); err != nil {
-		return nil, fmt.Errorf("failed to parse policy YAML: %w", err)
+		return nil, aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to parse policy YAML")
 	}
 	return &p, nil
 }
@@ -207,16 +207,16 @@ func LoadPolicy(path string) (*Policy, error) {
 // path traversal attacks. It returns the resolved absolute path on success.
 func validatePolicyPath(path string) (string, error) {
 	if path == "" {
-		return "", fmt.Errorf("empty policy path")
+		return "", aferrors.New(aferrors.CodeWorkflowParseError, "empty policy path")
 	}
 	// Reject paths containing null bytes
 	if strings.ContainsRune(path, '\x00') {
-		return "", fmt.Errorf("policy path contains null byte")
+		return "", aferrors.New(aferrors.CodeWorkflowParseError, "policy path contains null byte")
 	}
 	// Resolve to absolute path and evaluate symlinks
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve policy path: %w", err)
+		return "", aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to resolve policy path")
 	}
 	resolved, err := filepath.EvalSymlinks(absPath)
 	if err != nil {
@@ -224,11 +224,11 @@ func validatePolicyPath(path string) (string, error) {
 		if os.IsNotExist(err) {
 			cleaned := filepath.Clean(absPath)
 			if !filepath.IsAbs(cleaned) {
-				return "", fmt.Errorf("policy path must be absolute after resolution: %s", path)
+				return "", aferrors.Newf(aferrors.CodeWorkflowParseError, "policy path must be absolute after resolution: %s", path)
 			}
 			return cleaned, nil
 		}
-		return "", fmt.Errorf("failed to resolve policy path: %w", err)
+		return "", aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to resolve policy path")
 	}
 	return resolved, nil
 }
@@ -240,18 +240,18 @@ func (e *Engine) Check(ctx context.Context, action Action, details string) (Deci
 		return DecisionDenied, err
 	}
 	if !allowed {
-		return DecisionDenied, fmt.Errorf("policy denies %s: %s", action, details)
+		return DecisionDenied, aferrors.Newf(aferrors.CodePolicyDenied, "policy denies %s: %s", action, details)
 	}
 	if needsApproval {
 		if e.approval == nil {
-			return DecisionDenied, fmt.Errorf("policy requires approval for %s but no approval function configured", action)
+			return DecisionDenied, aferrors.Newf(aferrors.CodePolicyApprovalRequired, "policy requires approval for %s but no approval function configured", action)
 		}
 		approved, err := e.approval(ctx, action, details)
 		if err != nil {
-			return DecisionDenied, fmt.Errorf("approval check failed: %w", err)
+			return DecisionDenied, aferrors.Wrap(err, aferrors.CodePolicyDenied, "approval check failed")
 		}
 		if !approved {
-			return DecisionDenied, fmt.Errorf("human approval denied for %s: %s", action, details)
+			return DecisionDenied, aferrors.Newf(aferrors.CodePolicyApprovalDenied, "human approval denied for %s: %s", action, details)
 		}
 		return DecisionApproval, nil
 	}
@@ -270,7 +270,7 @@ func (e *Engine) evaluate(action Action, details string) (bool, bool, error) {
 	case strings.HasPrefix(string(action), "financial:"):
 		return e.evaluateFinancial(action, details)
 	default:
-		return false, false, fmt.Errorf("unknown action: %s", action)
+		return false, false, aferrors.Newf(aferrors.CodePolicyDenied, "unknown action: %s", action)
 	}
 }
 
@@ -284,7 +284,7 @@ func (e *Engine) evaluateFilesystem(action Action, _ string) (bool, bool, error)
 	case ActionFileDelete:
 		rule = e.policy.Filesystem.Delete
 	default:
-		return false, false, fmt.Errorf("unknown filesystem action: %s", action)
+		return false, false, aferrors.Newf(aferrors.CodePolicyDenied, "unknown filesystem action: %s", action)
 	}
 	return e.parseRule(rule)
 }
@@ -298,7 +298,7 @@ func (e *Engine) evaluateNetwork(_ Action, details string) (bool, bool, error) {
 		// Check denylist
 		for _, blocked := range e.policy.Network.Denylist {
 			if matchDomain(details, blocked) {
-				return false, false, fmt.Errorf("network access to %s is blocked by denylist", details)
+				return false, false, aferrors.Newf(aferrors.CodePolicyDenied, "network access to %s is blocked by denylist", details)
 			}
 		}
 		return true, false, nil
@@ -308,15 +308,15 @@ func (e *Engine) evaluateNetwork(_ Action, details string) (bool, bool, error) {
 				return true, false, nil
 			}
 		}
-		return false, false, fmt.Errorf("network access to %s is not in allowlist", details)
+		return false, false, aferrors.Newf(aferrors.CodePolicyDenied, "network access to %s is not in allowlist", details)
 	default:
-		return false, false, fmt.Errorf("unknown network policy: %s", rule)
+		return false, false, aferrors.Newf(aferrors.CodePolicyDenied, "unknown network policy: %s", rule)
 	}
 }
 
 func (e *Engine) evaluateShell(_ Action, details string) (bool, bool, error) {
 	if !e.policy.Shell.Enabled {
-		return false, false, fmt.Errorf("shell execution is disabled by policy")
+		return false, false, aferrors.New(aferrors.CodePolicyDenied, "shell execution is disabled by policy")
 	}
 
 	cmd := strings.Fields(details)
@@ -328,7 +328,7 @@ func (e *Engine) evaluateShell(_ Action, details string) (bool, bool, error) {
 	// Check denylist first
 	for _, blocked := range e.policy.Shell.Denylist {
 		if cmdName == blocked || strings.HasPrefix(details, blocked) {
-			return false, false, fmt.Errorf("shell command %q is blocked by denylist", cmdName)
+			return false, false, aferrors.Newf(aferrors.CodePolicyDenied, "shell command %q is blocked by denylist", cmdName)
 		}
 	}
 
@@ -342,7 +342,7 @@ func (e *Engine) evaluateShell(_ Action, details string) (bool, bool, error) {
 			}
 		}
 		if !allowed {
-			return false, false, fmt.Errorf("shell command %q is not in allowlist", cmdName)
+			return false, false, aferrors.Newf(aferrors.CodePolicyDenied, "shell command %q is not in allowlist", cmdName)
 		}
 	}
 
@@ -367,7 +367,7 @@ func (e *Engine) parseRule(rule string) (bool, bool, error) {
 	case "approval", "approval_required":
 		return true, true, nil
 	default:
-		return false, false, fmt.Errorf("unknown policy rule: %s", rule)
+		return false, false, aferrors.Newf(aferrors.CodePolicyDenied, "unknown policy rule: %s", rule)
 	}
 }
 
