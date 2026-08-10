@@ -44,6 +44,14 @@ var safeHTTPClient = httpclient.NewClient(httpclient.Options{
 	Validator: httpclient.ValidateAllowLoopback,
 })
 
+// maxMCPResponseSize bounds how much of an MCP server's HTTP response body
+// the client is willing to read. Without this limit, a malicious or
+// compromised MCP server could return a multi-GB response body and OOM
+// the aflare process. All other outbound reads in the project (http_request,
+// webhook, fetch_url, doc_parse) already enforce a LimitReader; this
+// constant closes the coverage gap in the MCP client.
+const maxMCPResponseSize = 10 * 1024 * 1024 // 10MB
+
 // validateMCPIP validates an IP address for MCP connections. It delegates
 // to the shared httpclient validator so the IP-range policy lives in one
 // place. validateMCPURL still does the URL-scheme/host checks that
@@ -321,7 +329,7 @@ func (c *Client) postStreamable(req *rpcRequest) error {
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusAccepted && httpResp.StatusCode != http.StatusNoContent {
-		body, _ := io.ReadAll(httpResp.Body)
+		body, _ := io.ReadAll(io.LimitReader(httpResp.Body, maxMCPResponseSize))
 		return fmt.Errorf("HTTP %d: %s", httpResp.StatusCode, string(body))
 	}
 
@@ -333,7 +341,7 @@ func (c *Client) postStreamable(req *rpcRequest) error {
 	}
 
 	// Read and dispatch response
-	body, err := io.ReadAll(httpResp.Body)
+	body, err := io.ReadAll(io.LimitReader(httpResp.Body, maxMCPResponseSize))
 	if err != nil || len(body) == 0 {
 		return nil
 	}
@@ -374,7 +382,7 @@ func (c *Client) postSSE(req *rpcRequest) error {
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(httpResp.Body)
+		body, _ := io.ReadAll(io.LimitReader(httpResp.Body, maxMCPResponseSize))
 		return fmt.Errorf("HTTP %d: %s", httpResp.StatusCode, string(body))
 	}
 	return nil
