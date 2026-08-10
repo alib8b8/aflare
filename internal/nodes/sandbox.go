@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -53,12 +54,12 @@ var (
 	// Retained for backward compatibility in tests that reference this symbol.
 	sandboxCommandWhitelist = SafeCommandWhitelist
 
-	// sandboxBlockedPatterns are patterns that are never allowed.
-	sandboxBlockedPatterns = []string{
-		"rm -rf /", "mkfs.", "dd if=", "> /dev/sda",
-		"fork bomb", ":(){ :|:& };:", "chmod 777 /",
-		"wget -O /etc/", "curl -o /etc/",
-	}
+	// sandboxBlockedPatterns are regex patterns that are never allowed.
+	// They use \s+ for whitespace-tolerant matching to prevent bypass via
+	// extra spaces (e.g. "rm  -rf  /" vs "rm -rf /").
+	// These are defense-in-depth: the whitelist and shell metacharacter
+	// checks are the primary defenses.
+	sandboxBlockedPatterns []*regexp.Regexp
 
 	sandboxInstances   = make(map[string]*sandboxState)
 	sandboxInstancesMu sync.RWMutex
@@ -353,10 +354,10 @@ func (n *SandboxNode) executeDesktop(input string, state *sandboxState) map[stri
 func validateShellCommand(cmd string) error {
 	trimmed := strings.TrimSpace(cmd)
 
-	// Check blocked patterns
+	// Check blocked patterns (regex-based, whitespace-tolerant)
 	for _, pattern := range sandboxBlockedPatterns {
-		if strings.Contains(strings.ToLower(trimmed), strings.ToLower(pattern)) {
-			return fmt.Errorf("blocked dangerous pattern: %s", pattern)
+		if pattern.MatchString(trimmed) {
+			return fmt.Errorf("blocked dangerous pattern: %s", pattern.String())
 		}
 	}
 
@@ -564,5 +565,22 @@ func ListSandboxSessions() ([]string, error) {
 }
 
 func init() {
+	// Compile blocked patterns with case-insensitive, whitespace-tolerant matching.
+	// These patterns catch dangerous commands even when extra spaces are inserted
+	// (e.g. "rm  -rf  /" bypasses a simple strings.Contains check).
+	rawPatterns := []string{
+		`rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/\S*`, // rm -rf /, rm -rf /etc, etc.
+		`mkfs\.\S+`,                            // mkfs.ext4, mkfs.xfs, etc.
+		`dd\s+if=`,                             // dd if=/dev/zero
+		`>\s*/dev/sd[a-z]`,                     // > /dev/sda
+		`:\(\)\s*\{`,                           // fork bomb: :(){ :|:& };:
+		`chmod\s+777\s+/`,                      // chmod 777 /
+		`wget\s+.*-O\s+/etc/`,                  // wget -O /etc/...
+		`curl\s+.*-o\s+/etc/`,                  // curl -o /etc/...
+	}
+	for _, p := range rawPatterns {
+		sandboxBlockedPatterns = append(sandboxBlockedPatterns, regexp.MustCompile(`(?i)`+p))
+	}
+
 	Register(&SandboxNode{})
 }

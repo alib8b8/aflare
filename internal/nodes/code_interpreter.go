@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/alib8b8/aflare/internal/config"
+	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
@@ -39,7 +40,7 @@ func (n *CodeInterpreterNode) Name() string {
 }
 
 func (n *CodeInterpreterNode) Description() string {
-	return "Execute Python/Node.js/Rust code in a sandboxed environment with file I/O"
+	return "Execute Python/Node.js/Rust code in a sandboxed environment with file I/O (requires bubblewrap for full sandbox)"
 }
 
 func (n *CodeInterpreterNode) Schema() NodeSchema {
@@ -66,6 +67,12 @@ func (n *CodeInterpreterNode) Execute(ctx context.Context, input string, params 
 	if secLevel == config.SecurityLevelL3 {
 		core.GetSecurityStats().RecordBlock(core.BlockSafeMode, "code_interpreter blocked at L3", "code_interpreter")
 		return "", fmt.Errorf("code_interpreter node is disabled at L3 security level (max security)")
+	}
+
+	// Reject execution at L2+ if bubblewrap sandbox is not available
+	if err := checkSandbox(); err != nil {
+		core.GetSecurityStats().RecordBlock(core.BlockSafeMode, "code_interpreter requires sandbox", "code_interpreter")
+		return "", err
 	}
 
 	code := params["code"]
@@ -159,6 +166,20 @@ func (n *CodeInterpreterNode) Execute(ctx context.Context, input string, params 
 	return result, nil
 }
 
+// checkSandbox verifies that bubblewrap is available for sandboxed execution.
+// It logs a warning when bwrap is missing, and returns an error at L2+ security
+// levels where running without sandbox isolation is not acceptable.
+func checkSandbox() error {
+	if _, err := exec.LookPath("bwrap"); err != nil {
+		logger.Warn("bwrap not found, code will execute without sandbox isolation",
+			"hint", "install bubblewrap for full sandbox protection")
+		if config.SecurityLevelAtLeast(config.SecurityLevelL2) {
+			return fmt.Errorf("code_interpreter requires bubblewrap sandbox at L2+ security level; install bubblewrap or lower security level")
+		}
+	}
+	return nil
+}
+
 func runPython(ctx context.Context, code, workDir string, timeout time.Duration, stdin string, allowNetwork bool) (string, error) {
 	scriptPath := filepath.Join(workDir, "script.py")
 	if err := os.WriteFile(scriptPath, []byte(code), 0644); err != nil {
@@ -213,6 +234,7 @@ urllib.request.urlopen = _block_urlopen
 		args = append(args, "--", "python3", scriptPath)
 		cmd = exec.CommandContext(ctx, bwrap, args...) // #nosec G204 -- sandboxed/audited execution with internally generated paths
 	} else {
+		logger.Warn("bwrap not found, running python without sandbox isolation")
 		cmd = exec.CommandContext(ctx, "python3", scriptPath) // #nosec G204 -- sandboxed/audited execution with internally generated paths
 	}
 	cmd.Dir = workDir
@@ -298,6 +320,7 @@ require('https').get = _blockNet;
 		args = append(args, "--", "node", scriptPath)
 		cmd = exec.CommandContext(ctx, bwrap, args...) // #nosec G204 -- sandboxed/audited execution with internally generated paths
 	} else {
+		logger.Warn("bwrap not found, running node without sandbox isolation")
 		cmd = exec.CommandContext(ctx, "node", scriptPath) // #nosec G204 -- sandboxed/audited execution with internally generated paths
 	}
 	cmd.Dir = workDir
@@ -384,6 +407,7 @@ mod net_block {
 		args = append(args, "--", "rustc", "-o", binPath, srcPath)
 		compileCmd = exec.CommandContext(compileCtx, bwrap, args...) // #nosec G204 -- sandboxed/audited execution with internally generated paths
 	} else {
+		logger.Warn("bwrap not found, compiling rust without sandbox isolation")
 		compileCmd = exec.CommandContext(compileCtx, "rustc", "-o", binPath, srcPath) // #nosec G204 -- sandboxed/audited execution with internally generated paths
 	}
 	compileCmd.Dir = workDir
@@ -426,6 +450,7 @@ mod net_block {
 		args = append(args, "--", binPath)
 		runCmd = exec.CommandContext(runCtx, bwrap, args...) // #nosec G204 -- sandboxed/audited execution with internally generated paths
 	} else {
+		logger.Warn("bwrap not found, running rust binary without sandbox isolation")
 		runCmd = exec.CommandContext(runCtx, binPath) // #nosec G204 -- sandboxed/audited execution with internally generated paths
 	}
 	runCmd.Dir = workDir
