@@ -66,8 +66,8 @@ steps:
     input: |
       import json
 
-      symptoms = {{ .params.symptoms | toJSON }}
-      analysis = {{ .symptom_analysis | toJSON }}
+      symptoms = {{ .params.symptoms | toJson }}
+      analysis = {{ .symptom_analysis | toJson }}
 
       # Calculate a concern index based on symptom count and severity
       severity_map = {"mild": 1, "moderate": 2, "severe": 3, "critical": 5}

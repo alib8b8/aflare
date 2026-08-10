@@ -42,8 +42,8 @@ steps:
       prompt: |
         Generate optimized marketplace listings for each platform:
         
-        Product Master Data: {{ .steps.fetch_product_master.response | toJSON }}
-        Marketplace Requirements: {{ .steps.fetch_marketplace_requirements.response | toJSON }}
+        Product Master Data: {{ .steps.fetch_product_master.response | toJson }}
+        Marketplace Requirements: {{ .steps.fetch_marketplace_requirements.response | toJson }}
         Optimization Goal: {{ .params.optimize_for }}
         
         For each marketplace ({{ .params.marketplaces }}), generate:
@@ -66,7 +66,7 @@ steps:
       code: |
         import json
 
-        listings = {{ .steps.generate_listings.response | toJSON }}
+        listings = {{ .steps.generate_listings.response | toJson }}
         validations = {}
 
         for platform, listing in listings.items():
@@ -106,9 +106,9 @@ steps:
       content: |
         {
           "product_id": "{{ .params.product_id }}",
-          "marketplaces": {{ .params.marketplaces | toJSON }},
+          "marketplaces": {{ .params.marketplaces | toJson }},
           "optimization_goal": "{{ .params.optimize_for }}",
           "generated_at": "{{ .params.timestamp }}",
-          "listings": {{ .steps.generate_listings.response | toJSON }},
-          "validations": {{ .steps.validate_listings.response | toJSON }}
+          "listings": {{ .steps.generate_listings.response | toJson }},
+          "validations": {{ .steps.validate_listings.response | toJson }}
         }

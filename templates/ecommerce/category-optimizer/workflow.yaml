@@ -42,8 +42,8 @@ steps:
       prompt: |
         Analyze the performance of each product category:
         
-        Performance Data: {{ .steps.fetch_category_performance.response | toJSON }}
-        Market Trends: {{ .steps.fetch_market_trends.response | toJSON }}
+        Performance Data: {{ .steps.fetch_category_performance.response | toJson }}
+        Market Trends: {{ .steps.fetch_market_trends.response | toJson }}
         Target Metrics: {{ .params.metrics }}
         
         For each category, provide:
@@ -66,7 +66,7 @@ steps:
       prompt: |
         Based on the category health analysis, create an optimization plan:
         
-        Category Analysis: {{ .steps.analyze_category_health.response | toJSON }}
+        Category Analysis: {{ .steps.analyze_category_health.response | toJson }}
         
         Generate a prioritized action plan with:
         1. Top 10 optimization actions ranked by impact
@@ -86,6 +86,6 @@ steps:
         {
           "analyzed_at": "{{ .params.timestamp }}",
           "comparison_period": "{{ .params.comparison_period }}",
-          "category_health": {{ .steps.analyze_category_health.response | toJSON }},
-          "optimization_plan": {{ .steps.generate_optimization_plan.response | toJSON }}
+          "category_health": {{ .steps.analyze_category_health.response | toJson }},
+          "optimization_plan": {{ .steps.generate_optimization_plan.response | toJson }}
         }

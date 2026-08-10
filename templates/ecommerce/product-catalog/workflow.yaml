@@ -38,7 +38,7 @@ steps:
       prompt: |
         Enrich the following product catalog entries:
         
-        Products: {{ .steps.fetch_products.response | toJSON }}
+        Products: {{ .steps.fetch_products.response | toJson }}
         Enrichment Type: {{ .params.enrichment_type }}
         Language: {{ .params.language }}
         {{ if .params.seo_keywords }}Target SEO Keywords: {{ .params.seo_keywords }}{{ end }}
@@ -76,7 +76,7 @@ steps:
       code: |
         import json
 
-        enriched = {{ .steps.enrich_product_content.response | toJSON }}
+        enriched = {{ .steps.enrich_product_content.response | toJson }}
         products = enriched if isinstance(enriched, list) else enriched.get("products", [])
 
         validations = []
@@ -131,6 +131,6 @@ steps:
           "enrichment_type": "{{ .params.enrichment_type }}",
           "language": "{{ .params.language }}",
           "generated_at": "{{ .params.timestamp }}",
-          "products": {{ .steps.enrich_product_content.response | toJSON }},
-          "validation": {{ .steps.validate_content.response | toJSON }}
+          "products": {{ .steps.enrich_product_content.response | toJson }},
+          "validation": {{ .steps.validate_content.response | toJson }}
         }

@@ -57,8 +57,8 @@ steps:
       code: |
         import json
 
-        rates = {{ .steps.fetch_carrier_rates.response | toJSON }}
-        performance = {{ .steps.fetch_delivery_performance.response | toJSON }}
+        rates = {{ .steps.fetch_carrier_rates.response | toJson }}
+        performance = {{ .steps.fetch_delivery_performance.response | toJson }}
         preference = "{{ .params.delivery_preference }}"
         weight = {{ .params.package_weight }}
 
@@ -144,6 +144,6 @@ steps:
           "destination": "{{ .params.destination_zip }}",
           "weight_lbs": {{ .params.package_weight }},
           "preference": "{{ .params.delivery_preference }}",
-          "optimization": {{ .steps.compute_optimal_shipping.response | toJSON }},
-          "label": {{ .steps.generate_shipping_label.response | toJSON }}
+          "optimization": {{ .steps.compute_optimal_shipping.response | toJson }},
+          "label": {{ .steps.generate_shipping_label.response | toJson }}
         }

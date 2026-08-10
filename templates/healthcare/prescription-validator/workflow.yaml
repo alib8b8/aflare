@@ -75,8 +75,8 @@ steps:
     input: |
       import json
 
-      validation = {{ .prescription_validation | toJSON }}
-      fda_check = {{ .fda_cross_reference | toJSON }}
+      validation = {{ .prescription_validation | toJson }}
+      fda_check = {{ .fda_cross_reference | toJson }}
 
       # Calculate safety score
       issues = []

@@ -39,7 +39,7 @@ steps:
     input: |
       import json
 
-      analysis = {{ .workflow_analysis | toJSON }}
+      analysis = {{ .workflow_analysis | toJson }}
 
       # Calculate efficiency metrics
       steps = analysis.get("workflow_steps", [])

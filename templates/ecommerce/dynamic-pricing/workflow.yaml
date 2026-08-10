@@ -57,9 +57,9 @@ steps:
       code: |
         import json
 
-        current = {{ .steps.fetch_current_prices.response | toJSON }}
-        competitors = {{ .steps.fetch_competitor_prices.response | toJSON }}
-        demand = {{ .steps.fetch_demand_metrics.response | toJSON }}
+        current = {{ .steps.fetch_current_prices.response | toJson }}
+        competitors = {{ .steps.fetch_competitor_prices.response | toJson }}
+        demand = {{ .steps.fetch_demand_metrics.response | toJson }}
         rule = "{{ .params.pricing_rule }}"
         floor = {{ .params.price_floor }}
         ceiling = {{ .params.price_ceiling }}
@@ -126,7 +126,7 @@ steps:
       method: POST
       url: "{{ .params.api_base }}/pricing/update"
       body:
-        updates: "{{ .steps.compute_dynamic_prices.response.updates | toJSON }}"
+        updates: "{{ .steps.compute_dynamic_prices.response.updates | toJson }}"
 
   - id: save_pricing_log
     node: file_write
@@ -137,6 +137,6 @@ steps:
           "executed_at": "{{ .params.timestamp }}",
           "rule": "{{ .params.pricing_rule }}",
           "interval": "{{ .params.update_interval }}",
-          "results": {{ .steps.compute_dynamic_prices.response | toJSON }},
-          "applied": {{ .steps.apply_price_updates.response | toJSON }}
+          "results": {{ .steps.compute_dynamic_prices.response | toJson }},
+          "applied": {{ .steps.apply_price_updates.response | toJson }}
         }

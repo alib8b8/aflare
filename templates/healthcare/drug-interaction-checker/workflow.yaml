@@ -76,7 +76,7 @@ steps:
     input: |
       import json
 
-      analysis = {{ .final_analysis | toJSON }}
+      analysis = {{ .final_analysis | toJson }}
 
       # Count interactions by severity
       severity_counts = {"contraindicated": 0, "severe": 0, "moderate": 0, "mild": 0}

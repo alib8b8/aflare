@@ -65,7 +65,7 @@ steps:
     input: |
       import json
 
-      matches = {{ .trial_matches | toJSON }}
+      matches = {{ .trial_matches | toJson }}
 
       ranked = sorted(matches.get("trials", []), key=lambda x: x.get("match_score", 0), reverse=True)[:10]
 

@@ -36,7 +36,7 @@ steps:
     input: |
       import json
 
-      results = {{ .screening_results | toJSON }}
+      results = {{ .screening_results | toJson }}
       tool = "{{ .params.screening_tool }}"
 
       # Define thresholds for common screening tools

@@ -37,7 +37,7 @@ steps:
       code: |
         import json
 
-        carts = {{ .steps.fetch_abandoned_carts.response | toJSON }}
+        carts = {{ .steps.fetch_abandoned_carts.response | toJson }}
         max_incentive = {{ .params.incentive_budget }}
 
         abandoned = carts.get("carts", [])
@@ -85,7 +85,7 @@ steps:
       prompt: |
         Generate personalized recovery messages for each abandoned cart:
         
-        Prioritized Carts: {{ .steps.prioritize_carts.response | toJSON }}
+        Prioritized Carts: {{ .steps.prioritize_carts.response | toJson }}
         Available Channels: {{ .params.channels }}
         Max Incentive: ${{ .params.incentive_budget }}
         
@@ -106,7 +106,7 @@ steps:
       method: POST
       url: "{{ .params.api_base }}/carts/recovery/execute"
       body:
-        recoveries: "{{ .steps.generate_recovery_messages.response | toJSON }}"
+        recoveries: "{{ .steps.generate_recovery_messages.response | toJson }}"
         channels: "{{ .params.channels }}"
 
   - id: save_recovery_report
@@ -118,6 +118,6 @@ steps:
           "executed_at": "{{ .params.timestamp }}",
           "threshold_minutes": {{ .params.abandonment_threshold_minutes }},
           "total_carts": {{ .steps.prioritize_carts.response.total_found }},
-          "prioritized_carts": {{ .steps.prioritize_carts.response | toJSON }},
-          "recovery_execution": {{ .steps.execute_recovery.response | toJSON }}
+          "prioritized_carts": {{ .steps.prioritize_carts.response | toJson }},
+          "recovery_execution": {{ .steps.execute_recovery.response | toJson }}
         }

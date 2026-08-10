@@ -64,7 +64,7 @@ steps:
       import json
       import re
 
-      content = {{ .patient_content | toJSON }}
+      content = {{ .patient_content | toJson }}
       text = content.get("full_text", "")
 
       # Calculate readability metrics

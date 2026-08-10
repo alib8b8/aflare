@@ -45,8 +45,8 @@ steps:
         import json
         from datetime import datetime, timezone
 
-        order = {{ .steps.fetch_order_details.response | toJSON }}
-        signals = {{ .steps.fetch_fraud_signals.response | toJSON }}
+        order = {{ .steps.fetch_order_details.response | toJson }}
+        signals = {{ .steps.fetch_fraud_signals.response | toJson }}
         threshold = {{ .params.risk_threshold }}
 
         risk_factors = []
@@ -137,9 +137,9 @@ steps:
       prompt: |
         Generate a fraud analysis report based on:
         
-        Risk Assessment: {{ .steps.compute_risk_score.response | toJSON }}
-        Order Details: {{ .steps.fetch_order_details.response | toJSON }}
-        Fraud Signals: {{ .steps.fetch_fraud_signals.response | toJSON }}
+        Risk Assessment: {{ .steps.compute_risk_score.response | toJson }}
+        Order Details: {{ .steps.fetch_order_details.response | toJson }}
+        Fraud Signals: {{ .steps.fetch_fraud_signals.response | toJson }}
         
         Provide:
         1. Summary of risk assessment
@@ -159,7 +159,7 @@ steps:
         order_id: "{{ .params.order_id }}"
         decision: "{{ .steps.compute_risk_score.response.decision }}"
         risk_score: "{{ .steps.compute_risk_score.response.risk_score }}"
-        report: "{{ .steps.generate_fraud_report.response | toJSON }}"
+        report: "{{ .steps.generate_fraud_report.response | toJson }}"
     condition: "{{ and .params.auto_reject (eq .steps.compute_risk_score.response.decision \"reject\") }}"
 
   - id: save_fraud_report
@@ -170,7 +170,7 @@ steps:
         {
           "order_id": "{{ .params.order_id }}",
           "checked_at": "{{ .params.timestamp }}",
-          "risk_assessment": {{ .steps.compute_risk_score.response | toJSON }},
-          "analysis_report": {{ .steps.generate_fraud_report.response | toJSON }},
-          "action_taken": {{ .steps.execute_fraud_action.response | toJSON }}
+          "risk_assessment": {{ .steps.compute_risk_score.response | toJson }},
+          "analysis_report": {{ .steps.generate_fraud_report.response | toJson }},
+          "action_taken": {{ .steps.execute_fraud_action.response | toJson }}
         }

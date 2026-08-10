@@ -35,7 +35,7 @@ steps:
         from collections import Counter, defaultdict
         from datetime import datetime
 
-        returns_data = {{ .steps.fetch_returns_data.response | toJSON }}
+        returns_data = {{ .steps.fetch_returns_data.response | toJson }}
         min_rate = {{ .params.min_return_rate }}
 
         returns = returns_data.get("returns", [])
@@ -88,7 +88,7 @@ steps:
       prompt: |
         Analyze the return data and generate prevention strategies:
         
-        Return Metrics: {{ .steps.compute_return_metrics.response | toJSON }}
+        Return Metrics: {{ .steps.compute_return_metrics.response | toJson }}
         
         For each flagged product and top return reason, provide:
         1. Root cause analysis
@@ -108,6 +108,6 @@ steps:
         {
           "analysis_period": "{{ .params.date_range }}",
           "generated_at": "{{ .params.timestamp }}",
-          "metrics": {{ .steps.compute_return_metrics.response | toJSON }},
-          "prevention_strategies": {{ .steps.generate_prevention_strategies.response | toJSON }}
+          "metrics": {{ .steps.compute_return_metrics.response | toJson }},
+          "prevention_strategies": {{ .steps.generate_prevention_strategies.response | toJson }}
         }

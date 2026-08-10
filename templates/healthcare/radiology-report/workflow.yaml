@@ -40,7 +40,7 @@ steps:
     input: |
       import json
 
-      findings = {{ .radiology_findings | toJSON }}
+      findings = {{ .radiology_findings | toJson }}
 
       # Categorize findings by severity
       categories = {

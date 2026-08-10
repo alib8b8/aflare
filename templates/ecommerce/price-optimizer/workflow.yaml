@@ -55,9 +55,9 @@ steps:
       prompt: |
         You are a pricing optimization expert. Analyze the following data and recommend the optimal price:
         
-        Product Data: {{ .steps.fetch_product_data.response | toJSON }}
-        Competitor Prices: {{ .steps.fetch_competitor_prices.response | toJSON }}
-        Demand Signals: {{ .steps.fetch_demand_signals.response | toJSON }}
+        Product Data: {{ .steps.fetch_product_data.response | toJson }}
+        Competitor Prices: {{ .steps.fetch_competitor_prices.response | toJson }}
+        Demand Signals: {{ .steps.fetch_demand_signals.response | toJson }}
         
         Constraints:
         - Minimum margin: {{ .params.margin_min }} ({{ mul .params.margin_min 100 }}%)
@@ -84,5 +84,5 @@ steps:
           "strategy": "{{ .params.strategy }}",
           "generated_at": "{{ .params.timestamp }}",
           "current_price": {{ .steps.fetch_product_data.response.price }},
-          "recommendation": {{ .steps.compute_optimal_price.response | toJSON }}
+          "recommendation": {{ .steps.compute_optimal_price.response | toJson }}
         }

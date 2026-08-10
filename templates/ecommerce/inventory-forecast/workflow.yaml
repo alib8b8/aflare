@@ -48,8 +48,8 @@ steps:
         import numpy as np
         from datetime import datetime, timedelta
 
-        sales_data = {{ .steps.fetch_sales_history.response | toJSON }}
-        inventory = {{ .steps.fetch_inventory_levels.response | toJSON }}
+        sales_data = {{ .steps.fetch_sales_history.response | toJson }}
+        inventory = {{ .steps.fetch_inventory_levels.response | toJson }}
         horizon = {{ .params.forecast_horizon }}
         seasonality = "{{ .params.seasonality }}"
 
@@ -101,7 +101,7 @@ steps:
       prompt: |
         Based on the inventory forecast results, generate actionable recommendations:
         
-        Forecast Results: {{ .steps.compute_forecast.response | toJSON }}
+        Forecast Results: {{ .steps.compute_forecast.response | toJson }}
         
         For each product:
         1. Reorder recommendation (priority: high/medium/low)
@@ -121,6 +121,6 @@ steps:
         {
           "forecast_date": "{{ .params.timestamp }}",
           "horizon_days": {{ .params.forecast_horizon }},
-          "forecasts": {{ .steps.compute_forecast.response | toJSON }},
-          "recommendations": {{ .steps.generate_recommendations.response | toJSON }}
+          "forecasts": {{ .steps.compute_forecast.response | toJson }},
+          "recommendations": {{ .steps.generate_recommendations.response | toJson }}
         }

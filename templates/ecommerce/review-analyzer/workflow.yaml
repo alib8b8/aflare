@@ -42,7 +42,7 @@ steps:
         - Key topics mentioned
         - Specific product features praised or criticized
         
-        Reviews: {{ .steps.fetch_reviews.response | toJSON }}
+        Reviews: {{ .steps.fetch_reviews.response | toJson }}
         
         Output as JSON array of analyzed reviews.
 
@@ -54,7 +54,7 @@ steps:
       prompt: |
         Based on the analyzed reviews below, extract actionable insights:
         
-        Analyzed Reviews: {{ .steps.analyze_sentiment.response | toJSON }}
+        Analyzed Reviews: {{ .steps.analyze_sentiment.response | toJson }}
         
         Provide:
         1. Overall sentiment summary (distribution %)
@@ -77,6 +77,6 @@ steps:
           "analysis_period": "{{ .params.date_range }}",
           "total_reviews": {{ .steps.fetch_reviews.response.count }},
           "generated_at": "{{ .params.timestamp }}",
-          "sentiment_analysis": {{ .steps.analyze_sentiment.response | toJSON }},
-          "insights": {{ .steps.extract_insights.response | toJSON }}
+          "sentiment_analysis": {{ .steps.analyze_sentiment.response | toJson }},
+          "insights": {{ .steps.extract_insights.response | toJson }}
         }

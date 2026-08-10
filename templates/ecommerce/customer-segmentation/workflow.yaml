@@ -38,7 +38,7 @@ steps:
         import numpy as np
         from datetime import datetime, timezone
 
-        data = {{ .steps.fetch_customer_transactions.response | toJSON }}
+        data = {{ .steps.fetch_customer_transactions.response | toJson }}
         r_weight = {{ .params.recency_weight }}
         f_weight = {{ .params.frequency_weight }}
         m_weight = {{ .params.monetary_weight }}
@@ -162,7 +162,7 @@ steps:
       prompt: |
         Generate targeted marketing strategies for each RFM segment:
         
-        Segmentation Results: {{ .steps.compute_rfm_segments.response | toJSON }}
+        Segmentation Results: {{ .steps.compute_rfm_segments.response | toJson }}
         
         For each segment, provide:
         1. Segment description and characteristics
@@ -189,6 +189,6 @@ steps:
             "frequency": {{ .params.frequency_weight }},
             "monetary": {{ .params.monetary_weight }}
           },
-          "segmentation": {{ .steps.compute_rfm_segments.response | toJSON }},
-          "strategies": {{ .steps.generate_segment_strategies.response | toJSON }}
+          "segmentation": {{ .steps.compute_rfm_segments.response | toJson }},
+          "strategies": {{ .steps.generate_segment_strategies.response | toJson }}
         }

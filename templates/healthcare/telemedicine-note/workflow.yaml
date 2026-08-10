@@ -74,7 +74,7 @@ steps:
       import json
       from datetime import datetime
 
-      review = {{ .quality_review | toJSON }}
+      review = {{ .quality_review | toJson }}
 
       score = 100
       deductions = []

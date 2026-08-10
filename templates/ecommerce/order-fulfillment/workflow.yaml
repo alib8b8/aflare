@@ -40,7 +40,7 @@ steps:
       method: POST
       url: "{{ .params.api_base }}/inventory/check"
       body:
-        items: "{{ .steps.fetch_order_details.response.items | toJSON }}"
+        items: "{{ .steps.fetch_order_details.response.items | toJson }}"
 
   - id: evaluate_fulfillment
     node: agent
@@ -50,9 +50,9 @@ steps:
       prompt: |
         Evaluate order fulfillment readiness based on:
         
-        Order Details: {{ .steps.fetch_order_details.response | toJSON }}
-        Payment Status: {{ .steps.verify_payment.response | toJSON }}
-        Inventory Status: {{ .steps.check_inventory.response | toJSON }}
+        Order Details: {{ .steps.fetch_order_details.response | toJson }}
+        Payment Status: {{ .steps.verify_payment.response | toJson }}
+        Inventory Status: {{ .steps.check_inventory.response | toJson }}
         
         Auto-fulfill enabled: {{ .params.auto_fulfill }}
         Preferred shipping: {{ .params.shipping_method }}
@@ -75,7 +75,7 @@ steps:
       body:
         auto_fulfill: "{{ .params.auto_fulfill }}"
         shipping_method: "{{ .params.shipping_method }}"
-        fulfillment_plan: "{{ .steps.evaluate_fulfillment.response | toJSON }}"
+        fulfillment_plan: "{{ .steps.evaluate_fulfillment.response | toJson }}"
     condition: "{{ .params.auto_fulfill }}"
 
   - id: save_fulfillment_report
@@ -87,6 +87,6 @@ steps:
           "order_id": "{{ .params.order_id }}",
           "processed_at": "{{ .params.timestamp }}",
           "fulfillment_status": "{{ .steps.evaluate_fulfillment.response.can_fulfill }}",
-          "evaluation": {{ .steps.evaluate_fulfillment.response | toJSON }},
-          "execution": {{ .steps.execute_fulfillment.response | toJSON }}
+          "evaluation": {{ .steps.evaluate_fulfillment.response | toJson }},
+          "execution": {{ .steps.execute_fulfillment.response | toJson }}
         }

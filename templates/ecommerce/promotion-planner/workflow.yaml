@@ -51,8 +51,8 @@ steps:
         Duration: {{ .params.duration_days }} days
         Target Audience: {{ .params.target_audience }}
         
-        Historical Campaigns: {{ .steps.fetch_historical_campaigns.response | toJSON }}
-        Eligible Products: {{ .steps.fetch_eligible_products.response | toJSON }}
+        Historical Campaigns: {{ .steps.fetch_historical_campaigns.response | toJson }}
+        Eligible Products: {{ .steps.fetch_eligible_products.response | toJson }}
         
         Design the campaign with:
         1. Campaign name and theme
@@ -73,8 +73,8 @@ steps:
       code: |
         import json
 
-        campaign = {{ .steps.design_campaign.response | toJSON }}
-        historical = {{ .steps.fetch_historical_campaigns.response | toJSON }}
+        campaign = {{ .steps.design_campaign.response | toJson }}
+        historical = {{ .steps.fetch_historical_campaigns.response | toJson }}
         budget = {{ .params.budget }}
         duration = {{ .params.duration_days }}
 
@@ -111,6 +111,6 @@ steps:
           "budget": {{ .params.budget }},
           "duration_days": {{ .params.duration_days }},
           "generated_at": "{{ .params.timestamp }}",
-          "campaign_design": {{ .steps.design_campaign.response | toJSON }},
-          "impact_forecast": {{ .steps.forecast_campaign_impact.response | toJSON }}
+          "campaign_design": {{ .steps.design_campaign.response | toJson }},
+          "impact_forecast": {{ .steps.forecast_campaign_impact.response | toJson }}
         }

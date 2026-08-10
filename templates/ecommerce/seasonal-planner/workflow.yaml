@@ -54,9 +54,9 @@ steps:
         import json
         from datetime import datetime, timedelta
 
-        history = {{ .steps.fetch_seasonal_history.response | toJSON }}
-        inventory = {{ .steps.fetch_inventory_status.response | toJSON }}
-        trends = {{ .steps.fetch_market_trends.response | toJSON }}
+        history = {{ .steps.fetch_seasonal_history.response | toJson }}
+        inventory = {{ .steps.fetch_inventory_status.response | toJson }}
+        trends = {{ .steps.fetch_market_trends.response | toJson }}
         season = "{{ .params.season }}"
         horizon = {{ .params.planning_horizon_days }}
         budget = {{ .params.budget | default 0 }}
@@ -136,7 +136,7 @@ steps:
         Generate a detailed seasonal promotion calendar:
         
         Season: {{ .params.season }}
-        Seasonal Plan: {{ .steps.compute_seasonal_plan.response | toJSON }}
+        Seasonal Plan: {{ .steps.compute_seasonal_plan.response | toJson }}
         {{ if .params.budget }}Budget: ${{ .params.budget }}{{ end }}
         
         Create a {{ .params.planning_horizon_days }}-day promotion calendar with:
@@ -159,6 +159,6 @@ steps:
           "season": "{{ .params.season }}",
           "horizon_days": {{ .params.planning_horizon_days }},
           "generated_at": "{{ .params.timestamp }}",
-          "inventory_plan": {{ .steps.compute_seasonal_plan.response | toJSON }},
-          "promotion_calendar": {{ .steps.generate_promotion_calendar.response | toJSON }}
+          "inventory_plan": {{ .steps.compute_seasonal_plan.response | toJson }},
+          "promotion_calendar": {{ .steps.generate_promotion_calendar.response | toJson }}
         }

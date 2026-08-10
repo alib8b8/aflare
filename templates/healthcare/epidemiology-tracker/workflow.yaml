@@ -43,8 +43,8 @@ steps:
       import json
       from datetime import datetime, timedelta
 
-      data = {{ .disease_data | toJSON }}
-      plan = {{ .surveillance_plan | toJSON }}
+      data = {{ .disease_data | toJson }}
+      plan = {{ .surveillance_plan | toJson }}
 
       # Calculate epidemiological metrics
       timeline = data.get("timeline", {})

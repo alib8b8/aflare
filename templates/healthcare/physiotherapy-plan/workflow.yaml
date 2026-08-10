@@ -44,7 +44,7 @@ steps:
       import json
       from datetime import datetime
 
-      plan = {{ .treatment_plan | toJSON }}
+      plan = {{ .treatment_plan | toJson }}
       injury_date = "{{ .params.injury_date }}"
       pain_level = int({{ .params.pain_level }})
 

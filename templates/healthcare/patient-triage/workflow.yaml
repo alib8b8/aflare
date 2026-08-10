@@ -38,7 +38,7 @@ steps:
       # Calculate urgency score based on triage assessment factors
       import json
 
-      assessment = {{ .triage_assessment | toJSON }}
+      assessment = {{ .triage_assessment | toJson }}
 
       # Scoring factors
       red_flags = assessment.get("red_flag_count", 0)

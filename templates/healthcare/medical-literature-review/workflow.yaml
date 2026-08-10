@@ -77,7 +77,7 @@ steps:
     input: |
       import json
 
-      synthesis = {{ .literature_synthesis | toJSON }}
+      synthesis = {{ .literature_synthesis | toJson }}
 
       evidence_levels = {"meta-analysis": 1, "systematic-review": 1, "rct": 2, "cohort": 3, "case-control": 4, "case-series": 5}
       studies = synthesis.get("studies", [])

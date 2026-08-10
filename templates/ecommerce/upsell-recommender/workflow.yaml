@@ -45,7 +45,7 @@ steps:
       url: "{{ .params.api_base }}/recommendations/upsell"
       body:
         customer_id: "{{ .params.customer_id }}"
-        purchased_items: "{{ .steps.fetch_recent_order.response.items | toJSON }}"
+        purchased_items: "{{ .steps.fetch_recent_order.response.items | toJson }}"
         upsell_type: "{{ .params.upsell_type }}"
         max_value: "{{ .params.max_upsell_value }}"
 
@@ -57,9 +57,9 @@ steps:
         import json
         from datetime import datetime, timedelta
 
-        order = {{ .steps.fetch_recent_order.response | toJSON }}
-        customer = {{ .steps.fetch_customer_profile.response | toJSON }}
-        opportunities = {{ .steps.find_upsell_opportunities.response | toJSON }}
+        order = {{ .steps.fetch_recent_order.response | toJson }}
+        customer = {{ .steps.fetch_customer_profile.response | toJson }}
+        opportunities = {{ .steps.find_upsell_opportunities.response | toJson }}
         upsell_type = "{{ .params.upsell_type }}"
         max_multiple = {{ .params.max_upsell_value }}
 
@@ -118,8 +118,8 @@ steps:
       prompt: |
         Generate compelling upsell messages for each offer:
         
-        Upsell Offers: {{ .steps.optimize_upsell_offers.response | toJSON }}
-        Customer Profile: {{ .steps.fetch_customer_profile.response | toJSON }}
+        Upsell Offers: {{ .steps.optimize_upsell_offers.response | toJson }}
+        Customer Profile: {{ .steps.fetch_customer_profile.response | toJson }}
         
         For each offer, create:
         1. Email subject line
@@ -139,9 +139,9 @@ steps:
       url: "{{ .params.api_base }}/marketing/upsell/schedule"
       body:
         customer_id: "{{ .params.customer_id }}"
-        offers: "{{ .steps.optimize_upsell_offers.response.offers | toJSON }}"
-        messages: "{{ .steps.generate_upsell_messages.response | toJSON }}"
-        timing: "{{ .steps.optimize_upsell_offers.response.timing | toJSON }}"
+        offers: "{{ .steps.optimize_upsell_offers.response.offers | toJson }}"
+        messages: "{{ .steps.generate_upsell_messages.response | toJson }}"
+        timing: "{{ .steps.optimize_upsell_offers.response.timing | toJson }}"
 
   - id: save_upsell_report
     node: file_write
@@ -153,7 +153,7 @@ steps:
           "order_id": "{{ .params.order_id }}",
           "upsell_type": "{{ .params.upsell_type }}",
           "generated_at": "{{ .params.timestamp }}",
-          "offers": {{ .steps.optimize_upsell_offers.response | toJSON }},
-          "messages": {{ .steps.generate_upsell_messages.response | toJSON }},
-          "campaign": {{ .steps.schedule_upsell_campaign.response | toJSON }}
+          "offers": {{ .steps.optimize_upsell_offers.response | toJson }},
+          "messages": {{ .steps.generate_upsell_messages.response | toJson }},
+          "campaign": {{ .steps.schedule_upsell_campaign.response | toJson }}
         }

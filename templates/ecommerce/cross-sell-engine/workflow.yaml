@@ -47,8 +47,8 @@ steps:
         import json
         from itertools import combinations
 
-        source = {{ .steps.fetch_product_info.response | toJSON }}
-        candidates = {{ .steps.find_cross_sell_candidates.response | toJSON }}
+        source = {{ .steps.fetch_product_info.response | toJson }}
+        candidates = {{ .steps.find_cross_sell_candidates.response | toJson }}
         bundle_size = {{ .params.bundle_size }}
         max_discount = {{ .params.discount_threshold }}
 
@@ -86,7 +86,7 @@ steps:
       prompt: |
         Generate compelling marketing descriptions for each bundle:
         
-        Bundle Options: {{ .steps.compute_bundle_options.response | toJSON }}
+        Bundle Options: {{ .steps.compute_bundle_options.response | toJson }}
         
         For each bundle, create:
         1. Bundle name/title
@@ -106,6 +106,6 @@ steps:
           "source_product_id": "{{ .params.product_id }}",
           "strategy": "{{ .params.strategy }}",
           "generated_at": "{{ .params.timestamp }}",
-          "bundles": {{ .steps.compute_bundle_options.response | toJSON }},
-          "marketing": {{ .steps.generate_bundle_descriptions.response | toJSON }}
+          "bundles": {{ .steps.compute_bundle_options.response | toJson }},
+          "marketing": {{ .steps.generate_bundle_descriptions.response | toJson }}
         }

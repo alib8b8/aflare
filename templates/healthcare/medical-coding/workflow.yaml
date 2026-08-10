@@ -65,7 +65,7 @@ steps:
     input: |
       import json
 
-      codes = {{ .code_mapping | toJSON }}
+      codes = {{ .code_mapping | toJson }}
 
       # Validate code format and calculate metrics
       valid_codes = []

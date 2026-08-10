@@ -60,8 +60,8 @@ steps:
     input: |
       import json
 
-      extraction = {{ .code_extraction | toJSON }}
-      validation = {{ .code_validation | toJSON }}
+      extraction = {{ .code_extraction | toJson }}
+      validation = {{ .code_validation | toJson }}
 
       # Calculate billing metrics
       codes = extraction.get("codes", [])

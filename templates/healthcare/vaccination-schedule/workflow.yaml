@@ -42,7 +42,7 @@ steps:
       import json
       from datetime import datetime, timedelta
 
-      recommendations = {{ .vaccine_recommendations | toJSON }}
+      recommendations = {{ .vaccine_recommendations | toJson }}
       today = datetime.now()
 
       schedule = []

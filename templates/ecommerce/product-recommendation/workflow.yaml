@@ -71,6 +71,6 @@ steps:
           "customer_id": "{{ .params.customer_id }}",
           "strategy": "{{ .params.strategy }}",
           "generated_at": "{{ .params.timestamp }}",
-          "recommendations": {{ .steps.compute_recommendations.response | toJSON }},
-          "enriched": {{ .steps.enrich_recommendations.response | toJSON }}
+          "recommendations": {{ .steps.compute_recommendations.response | toJson }},
+          "enriched": {{ .steps.enrich_recommendations.response | toJson }}
         }

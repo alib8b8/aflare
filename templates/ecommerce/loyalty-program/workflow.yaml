@@ -42,7 +42,7 @@ steps:
         import json
         import numpy as np
 
-        data = {{ .steps.fetch_customer_engagement.response | toJSON }}
+        data = {{ .steps.fetch_customer_engagement.response | toJson }}
         program_type = "{{ .params.program_type }}"
         tier_count = {{ .params.tier_count }}
         points_per_dollar = {{ .params.points_per_dollar }}
@@ -132,7 +132,7 @@ steps:
       prompt: |
         Design a complete loyalty program based on the analysis:
         
-        Program Structure: {{ .steps.analyze_engagement_patterns.response | toJSON }}
+        Program Structure: {{ .steps.analyze_engagement_patterns.response | toJson }}
         Program Type: {{ .params.program_type }}
         Target Retention: {{ .params.target_retention_rate }}
         
@@ -158,6 +158,6 @@ steps:
         {
           "generated_at": "{{ .params.timestamp }}",
           "program_type": "{{ .params.program_type }}",
-          "structure": {{ .steps.analyze_engagement_patterns.response | toJSON }},
-          "program_design": {{ .steps.generate_program_details.response | toJSON }}
+          "structure": {{ .steps.analyze_engagement_patterns.response | toJson }},
+          "program_design": {{ .steps.generate_program_details.response | toJson }}
         }

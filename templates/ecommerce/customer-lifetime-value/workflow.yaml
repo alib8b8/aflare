@@ -39,7 +39,7 @@ steps:
         import numpy as np
         from datetime import datetime
 
-        data = {{ .steps.fetch_customer_data.response | toJSON }}
+        data = {{ .steps.fetch_customer_data.response | toJson }}
         horizon = {{ .params.prediction_horizon }}
         discount_rate = {{ .params.discount_rate }}
 
@@ -129,7 +129,7 @@ steps:
       prompt: |
         Based on the CLV analysis, generate marketing strategies for each segment:
         
-        CLV Analysis: {{ .steps.calculate_clv.response | toJSON }}
+        CLV Analysis: {{ .steps.calculate_clv.response | toJson }}
         
         For each tier (platinum, gold, silver, bronze):
         1. Marketing strategy and messaging
@@ -151,6 +151,6 @@ steps:
           "generated_at": "{{ .params.timestamp }}",
           "prediction_horizon_months": {{ .params.prediction_horizon }},
           "discount_rate": {{ .params.discount_rate }},
-          "clv_analysis": {{ .steps.calculate_clv.response | toJSON }},
-          "segment_strategies": {{ .steps.generate_segment_strategies.response | toJSON }}
+          "clv_analysis": {{ .steps.calculate_clv.response | toJson }},
+          "segment_strategies": {{ .steps.generate_segment_strategies.response | toJson }}
         }

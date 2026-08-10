@@ -35,8 +35,8 @@ steps:
     input: |
       import json
 
-      results = {{ .params.test_results | toJSON }}
-      interpretation = {{ .lab_interpretation | toJSON }}
+      results = {{ .params.test_results | toJson }}
+      interpretation = {{ .lab_interpretation | toJson }}
 
       # Calculate abnormality statistics
       total_tests = len(results)
