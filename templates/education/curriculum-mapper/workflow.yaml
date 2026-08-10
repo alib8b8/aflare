@@ -33,10 +33,23 @@ params:
     default: true
     description: Include 21st century skills mapping
 steps:
+  - id: compute_search_query
+    node: code_interpreter
+    language: python
+    code: |
+      from urllib.parse import quote
+
+      standards_framework = "{{ .params.standards_framework }}"
+      subject = "{{ .params.subject }}"
+
+      search_query = quote(standards_framework) + "+" + quote(subject)
+      print(search_query)
+    output: compute_search_query
+
   - id: fetch_standards
     node: http_request
     method: GET
-    url: "https://api.openalex.org/works?search={{ .params.standards_framework | urlquery }}+{{ .params.subject | urlquery }}&filter=type:article&per_page=10"
+    url: "https://api.openalex.org/works?search={{ .compute_search_query }}&filter=type:article&per_page=10"
     headers:
       Accept: application/json
     output: standards_reference
@@ -122,9 +135,20 @@ steps:
       {{ end }}
     output: formatted_map
 
+  - id: generate_filename
+    node: code_interpreter
+    language: python
+    code: |
+      import re
+
+      course_name = "{{ .params.course_name }}"
+      filename = "curriculum_map_" + re.sub(r'[^\w\-]', '_', course_name).strip('_') + ".json"
+      print(filename)
+    output: generate_filename
+
   - id: save_map
     node: file_write
-    filename: "curriculum_map_{{ .params.course_name | sanitize }}.json"
+    filename: "{{ .generate_filename }}"
     content: |
       {
         "course": "{{ .params.course_name }}",

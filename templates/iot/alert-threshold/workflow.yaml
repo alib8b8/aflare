@@ -89,6 +89,22 @@ steps:
       output_format: json
     description: AI-generated alert notification content
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
+  - id: compute_timestamp
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import datetime
+        print(datetime.now().strftime('%H%M%S'))
+
   - id: notify_channels
     node: http_request
     config:
@@ -108,7 +124,7 @@ steps:
   - id: log_alert
     node: file_write
     config:
-      file_path: "/data/alerts/{{ .params.sensor_id }}/{{ now | date \"2006-01-02\" }}_{{ now | date \"150405\" }}.json"
+      file_path: "/data/alerts/{{ .params.sensor_id }}/{{ .compute_date }}_{{ .compute_timestamp }}.json"
       content: |
         {
           "alert_id": "{{ uuid }}",

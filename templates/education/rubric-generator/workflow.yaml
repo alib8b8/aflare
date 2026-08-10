@@ -108,9 +108,19 @@ steps:
       {{ end }}
     output: formatted_rubric
 
+  - id: sanitize_rubric_filename
+    node: code_interpreter
+    language: python
+    code: |
+      import re
+      text = '''{{ .params.assignment_type }}'''
+      sanitized = re.sub(r'[^\w\-]', '_', text).strip('_')
+      print(sanitized)
+    output: sanitized_assignment_type
+
   - id: save_rubric
     node: file_write
-    filename: "rubric_{{ .params.assignment_type | sanitize }}.json"
+    filename: "rubric_{{ .sanitized_assignment_type }}.json"
     content: |
       {
         "assignment_type": "{{ .params.assignment_type }}",

@@ -108,10 +108,26 @@ steps:
       output_format: json
     description: AI-powered bridge health monitoring and reporting
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
+  - id: compute_timestamp
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import datetime
+        print(datetime.now().strftime('%H%M%S'))
+
   - id: log_bridge
     node: file_write
     config:
-      file_path: "/data/mqtt_bridge/{{ now | date \"2006-01-02\" }}/bridge_{{ now | date \"150405\" }}.json"
+      file_path: "/data/mqtt_bridge/{{ .compute_date }}/bridge_{{ .compute_timestamp }}.json"
       content: |
         {
           "timestamp": "{{ now }}",

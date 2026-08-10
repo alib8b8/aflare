@@ -138,10 +138,26 @@ steps:
       output_format: json
     description: AI-powered health advisory based on air quality
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
+  - id: compute_timestamp
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import datetime
+        print(datetime.now().strftime('%H%M%S'))
+
   - id: publish_report
     node: file_write
     config:
-      file_path: "/data/air_quality/{{ now | date \"2006-01-02\" }}/aqi_{{ now | date \"150405\" }}.json"
+      file_path: "/data/air_quality/{{ .compute_date }}/aqi_{{ .compute_timestamp }}.json"
       content: |
         {
           "report_id": "{{ uuid }}",

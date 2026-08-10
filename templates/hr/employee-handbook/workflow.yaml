@@ -136,6 +136,14 @@ steps:
         handbook_content: "{{ .steps.generate_handbook.output.handbook_content }}"
       output: toc_data
 
+  - id: compute_date
+    type: code_interpreter
+    config:
+      code: |
+        from datetime import date
+        print(date.today().strftime('%B %d, %Y'))
+      output: compute_date
+
   - id: save_handbook
     type: file_write
     config:
@@ -143,7 +151,7 @@ steps:
       content: |
         # {{ .params.company_name }} Employee Handbook
 
-        **Last Updated:** {{ now | date "January 2, 2006" }}
+        **Last Updated:** {{ .compute_date }}
         **Version:** {{ .params.version | default "1.0" }}
 
         ---

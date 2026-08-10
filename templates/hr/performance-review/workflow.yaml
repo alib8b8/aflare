@@ -153,9 +153,18 @@ steps:
         self_assessment: "{{ .params.self_assessment }}"
       output: review_document
 
+  - id: generate_filename
+    type: code_interpreter
+    config:
+      code: |
+        name = "{{ .params.employee_name }}"
+        output = "{{ .params.output_file }}" or f"performance_review_{name.replace(' ', '_')}.md"
+        print(output)
+      output: filename
+
   - id: save_review
     type: file_write
     config:
-      filename: "{{ .params.output_file | default (printf \"performance_review_%s.md\" .params.employee_name | replace \" \" \"_\") }}"
+      filename: "{{ .steps.generate_filename.output.filename }}"
       content: "{{ .steps.generate_review_document.output.review_document }}"
       format: markdown

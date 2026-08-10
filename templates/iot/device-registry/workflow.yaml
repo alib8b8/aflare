@@ -84,10 +84,18 @@ steps:
       output_format: json
     description: AI-powered device lifecycle analysis
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
   - id: persist_record
     node: file_write
     config:
-      file_path: "/data/registry/{{ .params.operation }}/{{ now | date \"2006-01-02\" }}_{{ .steps.validate_device.output.payload.device_id }}.json"
+      file_path: "/data/registry/{{ .params.operation }}/{{ .compute_date }}_{{ .steps.validate_device.output.payload.device_id }}.json"
       content: |
         {
           "operation": "{{ .params.operation }}",

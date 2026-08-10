@@ -119,10 +119,18 @@ steps:
       output_format: json
     description: AI-powered personalized wellness recommendations
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
   - id: save_health_report
     node: file_write
     config:
-      file_path: "/data/wearable/{{ now | date \"2006-01-02\" }}/health_{{ .params.aggregation_period }}.json"
+      file_path: "/data/wearable/{{ .compute_date }}/health_{{ .params.aggregation_period }}.json"
       content: |
         {
           "report_id": "{{ uuid }}",

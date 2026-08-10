@@ -87,6 +87,19 @@ steps:
         compliance_required: "{{ .params.compliance_required }}"
       output: checklist_data
 
+  - id: format_checklist_keys
+    type: code_interpreter
+    config:
+      code: |
+        import json
+        data = json.loads("{{ .steps.generate_checklist.output.checklist_data | toJson }}")
+        formatted = {}
+        for key, value in data.items():
+            new_key = key.replace("_", " ").title()
+            formatted[new_key] = value
+        print(json.dumps(formatted))
+      output: formatted_checklist
+
   - id: calculate_timeline
     type: code_interpreter
     config:
@@ -151,10 +164,20 @@ steps:
         }
       output: task_creation_result
 
+  - id: generate_filename
+    type: code_interpreter
+    config:
+      code: |
+        import json
+        name = "{{ .params.employee_name }}".replace(" ", "_")
+        output = "{{ .params.output_file }}" or f"onboarding_{name}.md"
+        print(output)
+      output: filename
+
   - id: save_checklist
     type: file_write
     config:
-      filename: "{{ .params.output_file | default (printf \"onboarding_%s.md\" .params.employee_name | replace \" \" \"_\") }}"
+      filename: "{{ .steps.generate_filename.output.filename }}"
       content: |
         # Onboarding Checklist: {{ .params.employee_name }}
         **Role:** {{ .params.job_title }} | **Department:** {{ .params.department }} | **Start:** {{ .params.start_date }}
@@ -175,8 +198,8 @@ steps:
         - **By Category:** {{ .steps.calculate_timeline.output.complete_checklist.summary.by_category | toJson }}
         - **By Owner:** {{ .steps.calculate_timeline.output.complete_checklist.summary.by_owner | toJson }}
 
-        {{ range $phase, $items := .steps.generate_checklist.output.checklist_data }}
-        ## {{ $phase | replace "_" " " | title }}
+        {{ range $phase, $items := .steps.format_checklist_keys.output.formatted_checklist }}
+        ## {{ $phase }}
         {{ range $items }}
         - [ ] **{{ .task }}** | Owner: {{ .owner }} | Priority: {{ .priority }} | Category: {{ .category }} | Est: {{ .estimated_duration }}
         {{ end }}

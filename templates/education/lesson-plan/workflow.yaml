@@ -132,8 +132,18 @@ steps:
       {{ end }}
     output: formatted_plan
 
+  - id: sanitize_lesson_filename
+    node: code_interpreter
+    language: python
+    code: |
+      import re
+      text = '''{{ .params.lesson_title }}'''
+      sanitized = re.sub(r'[^\w\-]', '_', text).strip('_')
+      print(sanitized)
+    output: sanitized_lesson_title
+
   - id: save_lesson_plan
     node: file_write
-    filename: "lesson_plan_{{ .params.lesson_title | sanitize }}.md"
+    filename: "lesson_plan_{{ .sanitized_lesson_title }}.md"
     content: "{{ .formatted_plan }}"
     output: file_path

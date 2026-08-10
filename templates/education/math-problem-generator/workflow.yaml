@@ -118,9 +118,19 @@ steps:
       print(json.dumps(summary, indent=2))
     output: verification_result
 
+  - id: sanitize_topic_filename
+    node: code_interpreter
+    language: python
+    code: |
+      import re
+      text = '''{{ .params.topic }}'''
+      sanitized = re.sub(r'[^\w\-]', '_', text).strip('_')
+      print(sanitized)
+    output: sanitized_topic
+
   - id: save_problems
     node: file_write
-    filename: "math_problems_{{ .params.topic | sanitize }}.json"
+    filename: "math_problems_{{ .sanitized_topic }}.json"
     content: |
       {
         "topic": "{{ .params.topic }}",

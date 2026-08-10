@@ -141,6 +141,14 @@ steps:
       output_format: json
     description: AI-powered maintenance planning and scheduling
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
   - id: create_work_orders
     node: http_request
     config:
@@ -156,7 +164,7 @@ steps:
   - id: save_prediction_report
     node: file_write
     config:
-      file_path: "/data/maintenance/{{ now | date \"2006-01-02\" }}/prediction_{{ .params.equipment_type }}.json"
+      file_path: "/data/maintenance/{{ .compute_date }}/prediction_{{ .params.equipment_type }}.json"
       content: |
         {
           "report_id": "{{ uuid }}",

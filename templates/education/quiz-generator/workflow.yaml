@@ -96,6 +96,20 @@ steps:
       print(json.dumps(metadata, indent=2))
     output: quiz_metadata
 
+  - id: enrich_questions
+    node: code_interpreter
+    language: python
+    code: |
+      import json
+      
+      questions = json.loads('''{{ .questions }}''')
+      
+      for i, q in enumerate(questions):
+          q['question_number'] = i + 1
+      
+      print(json.dumps(questions, indent=2))
+    output: questions
+
   - id: format_output
     node: transform
     input: 
@@ -116,7 +130,7 @@ steps:
       
       ## Questions
       {{ range $index, $q := .questions }}
-      ### Question {{ $index | add 1 }}
+      ### Question {{ $q.question_number }}
       **Type:** {{ $q.question_type }}
       **Difficulty:** {{ $q.difficulty }}
       
@@ -133,9 +147,24 @@ steps:
       {{ end }}
     output: formatted_quiz
 
+  - id: generate_filename
+    node: code_interpreter
+    language: python
+    code: |
+      import re
+      
+      topic = '''{{ .params.topic }}'''
+      output_format = '''{{ .params.output_format }}'''
+      
+      sanitized = re.sub(r'[^\w\-]', '_', topic).strip('_')
+      filename = f"quiz_{sanitized}_{output_format}.json"
+      
+      print(filename)
+    output: filename
+
   - id: save_quiz
     node: file_write
-    filename: "quiz_{{ .params.topic | sanitize }}_{{ .params.output_format }}.json"
+    filename: "{{ .filename }}"
     content: |
       {
         "quiz": {

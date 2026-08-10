@@ -101,10 +101,26 @@ steps:
       output_format: json
     description: AI-powered dashboard insights and recommendations
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
+  - id: compute_timestamp
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import datetime
+        print(datetime.now().strftime('%H%M%S'))
+
   - id: render_dashboard
     node: file_write
     config:
-      file_path: "/data/dashboards/{{ now | date \"2006-01-02\" }}/telemetry_{{ now | date \"150405\" }}.json"
+      file_path: "/data/dashboards/{{ .compute_date }}/telemetry_{{ .compute_timestamp }}.json"
       content: |
         {
           "generated_at": "{{ now }}",

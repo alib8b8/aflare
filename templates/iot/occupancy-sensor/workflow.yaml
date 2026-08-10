@@ -123,10 +123,18 @@ steps:
       output_format: json
     description: AI-powered space utilization optimization
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
   - id: save_occupancy_report
     node: file_write
     config:
-      file_path: "/data/occupancy/{{ now | date \"2006-01-02\" }}/occupancy_{{ .params.reporting_window }}.json"
+      file_path: "/data/occupancy/{{ .compute_date }}/occupancy_{{ .params.reporting_window }}.json"
       content: |
         {
           "report_id": "{{ uuid }}",

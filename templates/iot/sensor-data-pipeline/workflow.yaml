@@ -122,10 +122,18 @@ steps:
       output_format: json
     description: AI-powered enrichment and root cause analysis
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
   - id: store
     node: file_write
     config:
-      file_path: "/data/processed/{{ now | date \"2006-01-02\" }}/sensor_batch.json"
+      file_path: "/data/processed/{{ .compute_date }}/sensor_batch.json"
       content: |
         {{ .steps.enrich.output | toJson }}
     description: Persist processed and enriched data to storage

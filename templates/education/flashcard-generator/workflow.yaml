@@ -89,10 +89,21 @@ steps:
       print(json.dumps(stats, indent=2))
     output: deck_stats
 
+  - id: enrich_flashcards
+    node: code_interpreter
+    language: python
+    code: |
+      import json
+      cards = json.loads('''{{ .flashcards }}''')
+      for i, card in enumerate(cards):
+          card['number'] = i + 1
+      print(json.dumps(cards, indent=2))
+    output: enriched_cards
+
   - id: format_deck
     node: transform
     input:
-      cards: "{{ .flashcards }}"
+      cards: "{{ .enriched_cards }}"
       stats: "{{ .deck_stats }}"
     template: |
       # Flashcard Deck
@@ -100,7 +111,7 @@ steps:
       
       {{ range $index, $card := .cards }}
       ---
-      ## Card {{ $index | add 1 }}
+      ## Card {{ $card.number }}
       **Front:** {{ $card.front }}
       **Back:** {{ $card.back }}
       **Hint:** {{ $card.hint }}

@@ -94,10 +94,18 @@ steps:
       output_format: json
     description: AI-powered rollout monitoring and decision support
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
   - id: persist_campaign
     node: file_write
     config:
-      file_path: "/data/ota/campaigns/{{ now | date \"2006-01-02\" }}_{{ .params.firmware_version }}.json"
+      file_path: "/data/ota/campaigns/{{ .compute_date }}_{{ .params.firmware_version }}.json"
       content: |
         {
           "campaign_id": "{{ .steps.create_campaign.output.id }}",

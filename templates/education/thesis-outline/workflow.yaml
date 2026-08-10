@@ -123,8 +123,18 @@ steps:
       {{ .outline }}
     output: formatted_outline
 
+  - id: generate_filename
+    node: code_interpreter
+    language: python
+    code: |
+      import re
+      text = "{{ .params.thesis_title }}"
+      sanitized = re.sub(r'[^\w\-]', '_', text).strip('_')[:50]
+      print("thesis_outline_" + sanitized + ".md")
+    output: filename
+
   - id: save_outline
     node: file_write
-    filename: "thesis_outline_{{ .params.thesis_title | sanitize | trunc 50 }}.md"
+    filename: "{{ .filename }}"
     content: "{{ .formatted_outline }}"
     output: file_path

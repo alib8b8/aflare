@@ -101,9 +101,19 @@ steps:
       5. Encouraging closing remarks
     output: feedback_report
 
+  - id: sanitize_grading_filename
+    node: code_interpreter
+    language: python
+    code: |
+      import re
+      text = '''{{ .params.subject }}'''
+      sanitized = re.sub(r'[^\w\-]', '_', text).strip('_')
+      print(sanitized)
+    output: sanitized_subject
+
   - id: save_grading
     node: file_write
-    filename: "grading_{{ .params.subject | sanitize }}.json"
+    filename: "grading_{{ .sanitized_subject }}.json"
     content: |
       {
         "grading": {

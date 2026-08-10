@@ -107,10 +107,18 @@ steps:
       output_format: json
     description: AI-powered energy optimization recommendations
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
   - id: generate_report
     node: file_write
     config:
-      file_path: "/data/energy_reports/{{ now | date \"2006-01-02\" }}/energy_{{ .params.billing_period }}.json"
+      file_path: "/data/energy_reports/{{ .compute_date }}/energy_{{ .params.billing_period }}.json"
       content: |
         {
           "report_id": "{{ uuid }}",

@@ -125,6 +125,22 @@ steps:
       output_format: json
     description: AI-powered building optimization recommendations
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
+  - id: compute_timestamp
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import datetime
+        print(datetime.now().strftime('%H%M%S'))
+
   - id: apply_automation
     node: http_request
     config:
@@ -140,7 +156,7 @@ steps:
   - id: save_building_report
     node: file_write
     config:
-      file_path: "/data/building/{{ .params.building_id }}/{{ now | date \"2006-01-02\" }}/building_{{ now | date \"150405\" }}.json"
+      file_path: "/data/building/{{ .params.building_id }}/{{ .compute_date }}/building_{{ .compute_timestamp }}.json"
       content: |
         {
           "report_id": "{{ uuid }}",

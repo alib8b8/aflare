@@ -93,9 +93,19 @@ steps:
       print(json.dumps(scores, indent=2))
     output: review_scores
 
+  - id: sanitize_review_filename
+    node: code_interpreter
+    language: python
+    code: |
+      import re
+      text = '''{{ .params.assignment_type }}'''
+      sanitized = re.sub(r'[^\w\-]', '_', text).strip('_')
+      print(sanitized)
+    output: sanitized_review_assignment
+
   - id: save_review
     node: file_write
-    filename: "peer_review_{{ .params.assignment_type | sanitize }}.json"
+    filename: "peer_review_{{ .sanitized_review_assignment }}.json"
     content: |
       {
         "assignment_type": "{{ .params.assignment_type }}",

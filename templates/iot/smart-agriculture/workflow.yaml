@@ -121,6 +121,14 @@ steps:
       output_format: json
     description: AI-powered farming recommendations
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
   - id: trigger_irrigation
     node: http_request
     config:
@@ -138,7 +146,7 @@ steps:
   - id: save_agri_report
     node: file_write
     config:
-      file_path: "/data/agriculture/{{ now | date \"2006-01-02\" }}/field_{{ .params.crop_type }}.json"
+      file_path: "/data/agriculture/{{ .compute_date }}/field_{{ .params.crop_type }}.json"
       content: |
         {
           "report_id": "{{ uuid }}",

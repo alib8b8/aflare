@@ -128,10 +128,18 @@ steps:
       output_format: json
     description: AI-powered water contamination analysis
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
   - id: generate_compliance_report
     node: file_write
     config:
-      file_path: "/data/water_quality/{{ now | date \"2006-01-02\" }}/water_{{ .params.standards_profile }}.json"
+      file_path: "/data/water_quality/{{ .compute_date }}/water_{{ .params.standards_profile }}.json"
       content: |
         {
           "report_id": "{{ uuid }}",

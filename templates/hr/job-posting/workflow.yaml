@@ -117,6 +117,7 @@ steps:
     config:
       code: |
         import json
+        from datetime import date
 
         title = job_title
         department = dept
@@ -132,7 +133,7 @@ steps:
                 "title": title,
                 "industry": department,
                 "jobLocation": {"@type": "Place", "address": location},
-                "datePosted": "{{ now | date \"2006-01-02\" }}"
+                "datePosted": date.today().isoformat()
             },
             "keywords": [title.lower(), department.lower(), location.lower(), "jobs", "careers", "hiring"],
             "social_share_text": f"We're hiring! Join us as a {title} in {department}. {location}. #hiring #jobs #careers"
@@ -164,10 +165,31 @@ steps:
         }
       output: publication_result
 
+  - id: generate_filename
+    type: code_interpreter
+    config:
+      code: |
+        title = "{{ .params.job_title }}"
+        output = "{{ .params.output_file }}" or f"job_posting_{title.replace(' ', '_').lower()}.md"
+        print(output)
+      output: filename
+
+  - id: format_platform_keys
+    type: code_interpreter
+    config:
+      code: |
+        import json
+        data = json.loads("{{ .steps.optimize_for_platforms.output.platform_variants | toJson }}")
+        formatted = {}
+        for key, value in data.items():
+            formatted[key.title()] = value
+        print(json.dumps(formatted))
+      output: formatted_variants
+
   - id: save_posting
     type: file_write
     config:
-      filename: "{{ .params.output_file | default (printf \"job_posting_%s.md\" .params.job_title | replace \" \" \"_\" | lower) }}"
+      filename: "{{ .steps.generate_filename.output.filename }}"
       content: |
         # {{ .params.job_title }} - {{ .params.department }}
 
@@ -175,8 +197,8 @@ steps:
 
         ---
         ## Platform Variants
-        {{ range $platform, $content := .steps.optimize_for_platforms.output.platform_variants }}
-        ### {{ $platform | title }}
+        {{ range $platform, $content := .steps.format_platform_keys.output.formatted_variants }}
+        ### {{ $platform }}
         {{ $content }}
         {{ end }}
       format: markdown

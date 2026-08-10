@@ -125,9 +125,18 @@ steps:
         validation: "{{ .steps.validate_compensation.output.validation_result }}"
       output: offer_letter_content
 
+  - id: generate_filename
+    type: code_interpreter
+    config:
+      code: |
+        name = "{{ .params.candidate_name }}"
+        output = "{{ .params.output_file }}" or f"offer_letter_{name.replace(' ', '_')}.md"
+        print(output)
+      output: filename
+
   - id: save_offer_letter
     type: file_write
     config:
-      filename: "{{ .params.output_file | default (printf \"offer_letter_%s.md\" .params.candidate_name | replace \" \" \"_\") }}"
+      filename: "{{ .steps.generate_filename.output.filename }}"
       content: "{{ .steps.generate_offer_letter.output.offer_letter_content }}"
       format: markdown

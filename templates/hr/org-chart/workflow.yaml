@@ -188,13 +188,21 @@ steps:
         organization_name: "{{ .params.organization_name }}"
       output: structural_analysis
 
+  - id: compute_date
+    type: code_interpreter
+    config:
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+      output: compute_date
+
   - id: save_chart
     type: file_write
     config:
       filename: "{{ .params.output_file | default \"org_chart.mmd\" }}"
       content: |
         %% {{ .params.organization_name }} - Organizational Chart
-        %% Generated: {{ now | date "2006-01-02" }}
+        %% Generated: {{ .compute_date }}
         %% Format: {{ .params.chart_format }}
 
         {{ .steps.generate_chart.output.chart_output.chart }}

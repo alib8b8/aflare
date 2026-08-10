@@ -90,9 +90,16 @@ steps:
       }
     id: structured_persona
 
+  - node: code_interpreter
+    params:
+      language: python
+      code: |
+        print("buyer-persona-" + "{{ .params.persona_name }}".lower().replace(" ", "-") + ".md")
+    id: filename
+
   - node: file_write
     params:
-      path: buyer-persona-{{ .params.persona_name | lowercase | replace " " "-" }}.md
+      path: "{{ .filename }}"
     input: |
       # Buyer Persona: {{ .params.persona_name }}
       

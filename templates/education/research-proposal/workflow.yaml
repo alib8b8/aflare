@@ -31,10 +31,19 @@ params:
     default: ""
     description: Preferred methodology (qualitative, quantitative, mixed)
 steps:
+  - id: compute_search_query
+    node: code_interpreter
+    language: python
+    code: |
+      import urllib.parse
+      text = "{{ .params.research_topic }}"
+      result = urllib.parse.quote(text)
+    output: compute_search_query
+
   - id: search_literature
     node: http_request
     method: GET
-    url: "https://api.openalex.org/works?search={{ .params.research_topic | urlquery }}&per_page=15&filter=type:article"
+    url: "https://api.openalex.org/works?search={{ .compute_search_query }}&per_page=15&filter=type:article"
     headers:
       Accept: application/json
     output: literature_results
@@ -79,9 +88,18 @@ steps:
       Provide the refined version with tracked improvements.
     output: final_proposal
 
+  - id: generate_filename
+    node: code_interpreter
+    language: python
+    code: |
+      import re
+      text = "{{ .params.research_topic }}"
+      result = re.sub(r'[^\w\-]', '_', text).strip('_')[:50]
+    output: generate_filename
+
   - id: save_proposal
     node: file_write
-    filename: "research_proposal_{{ .params.research_topic | sanitize | trunc 50 }}.md"
+    filename: "research_proposal_{{ .generate_filename }}.md"
     content: |
       # Research Proposal: {{ .params.research_topic }}
       

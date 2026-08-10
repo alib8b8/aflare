@@ -32,10 +32,21 @@ params:
     default: detailed
     description: Report detail level (summary, detailed, comprehensive)
 steps:
+  - id: encode_search_text
+    node: code_interpreter
+    language: python
+    code: |
+      import urllib.parse
+      text = '''{{ .params.text }}'''
+      truncated = text[:200]
+      encoded = urllib.parse.quote(truncated)
+      print(encoded)
+    output: encoded_search_text
+
   - id: search_web
     node: http_request
     method: GET
-    url: "https://api.openalex.org/works?search={{ .params.text | trunc 200 | urlquery }}&per_page=10"
+    url: "https://api.openalex.org/works?search={{ .encoded_search_text }}&per_page=10"
     headers:
       Accept: application/json
     output: web_results

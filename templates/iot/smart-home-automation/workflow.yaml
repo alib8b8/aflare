@@ -92,6 +92,14 @@ steps:
       output_format: json
     description: AI validation and prioritization of automation actions
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
   - id: dispatch_commands
     node: http_request
     config:
@@ -107,7 +115,7 @@ steps:
   - id: log_automation
     node: file_write
     config:
-      file_path: "/data/automation_logs/{{ .params.home_id }}/{{ now | date \"2006-01-02\" }}.json"
+      file_path: "/data/automation_logs/{{ .params.home_id }}/{{ .compute_date }}.json"
       content: |
         {
           "timestamp": "{{ now }}",

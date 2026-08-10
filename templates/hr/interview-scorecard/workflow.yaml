@@ -142,14 +142,31 @@ steps:
         interview_type: "{{ .params.interview_type }}"
       output: summary
 
+  - id: generate_filename
+    type: code_interpreter
+    config:
+      code: |
+        name = "{{ .params.candidate_name }}"
+        output = "{{ .params.output_file }}" or f"scorecard_{name.replace(' ', '_')}.md"
+        print(output)
+      output: filename
+
+  - id: compute_date
+    type: code_interpreter
+    config:
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+      output: current_date
+
   - id: save_scorecard
     type: file_write
     config:
-      filename: "{{ .params.output_file | default (printf \"scorecard_%s.md\" .params.candidate_name | replace \" \" \"_\") }}"
+      filename: "{{ .steps.generate_filename.output.filename }}"
       content: |
         # Interview Scorecard: {{ .params.candidate_name }}
         **Position:** {{ .params.position_title }} | **Type:** {{ .params.interview_type }} | **Interviewer:** {{ .params.interviewer_name }}
-        **Date:** {{ now | date "2006-01-02" }} | **Duration:** {{ .params.interview_duration_minutes }} min
+        **Date:** {{ .current_date }} | **Duration:** {{ .params.interview_duration_minutes }} min
 
         ## Overall Score: {{ .steps.compute_scores.output.scorecard.overall_score }}% - {{ .steps.compute_scores.output.scorecard.decision }}
 

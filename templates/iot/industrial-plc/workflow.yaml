@@ -120,10 +120,26 @@ steps:
       output_format: json
     description: AI-powered operational analysis of PLC data
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
+  - id: compute_timestamp
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import datetime
+        print(datetime.now().strftime('%H%M%S'))
+
   - id: log_plc_data
     node: file_write
     config:
-      file_path: "/data/plc/{{ .params.protocol }}/{{ now | date \"2006-01-02\" }}/plc_{{ now | date \"150405\" }}.json"
+      file_path: "/data/plc/{{ .params.protocol }}/{{ .compute_date }}/plc_{{ .compute_timestamp }}.json"
       content: |
         {
           "collection_id": "{{ uuid }}",

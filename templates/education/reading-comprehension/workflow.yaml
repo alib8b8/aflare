@@ -96,11 +96,22 @@ steps:
       print(json.dumps(stats, indent=2))
     output: readability_stats
 
+  - id: enrich_questions
+    node: code_interpreter
+    language: python
+    code: |
+      import json
+      questions = json.loads('''{{ .questions }}''')
+      for i, q in enumerate(questions):
+          q['number'] = i + 1
+      print(json.dumps(questions, indent=2))
+    output: enriched_questions
+
   - id: format_test
     node: transform
     input:
       passage: "{{ .passage }}"
-      questions: "{{ .questions }}"
+      questions: "{{ .enriched_questions }}"
       stats: "{{ .readability_stats }}"
     template: |
       # Reading Comprehension Test
@@ -111,7 +122,7 @@ steps:
       
       ## Questions
       {{ range $index, $q := .questions }}
-      ### {{ $index | add 1 }}. {{ $q.question }}
+      ### {{ $q.number }}. {{ $q.question }}
       **Type:** {{ $q.type }}
       
       A) {{ $q.choices[0] }}
@@ -123,13 +134,23 @@ steps:
       {{ if .params.include_answers }}
       ## Answer Key
       {{ range $index, $q := .questions }}
-      **{{ $index | add 1 }}.** {{ $q.correct }} - {{ $q.explanation }}
+      **{{ $q.number }}.** {{ $q.correct }} - {{ $q.explanation }}
       {{ end }}
       {{ end }}
     output: formatted_test
 
+  - id: sanitize_test_filename
+    node: code_interpreter
+    language: python
+    code: |
+      import re
+      text = '''{{ .params.passage_topic }}'''
+      sanitized = re.sub(r'[^\w\-]', '_', text).strip('_')
+      print(sanitized)
+    output: sanitized_passage_topic
+
   - id: save_test
     node: file_write
-    filename: "reading_test_{{ .params.passage_topic | sanitize }}.md"
+    filename: "reading_test_{{ .sanitized_passage_topic }}.md"
     content: "{{ .formatted_test }}"
     output: file_path

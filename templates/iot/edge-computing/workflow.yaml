@@ -115,10 +115,26 @@ steps:
       output_format: json
     description: AI-powered analysis of workload distribution effectiveness
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
+  - id: compute_timestamp
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import datetime
+        print(datetime.now().strftime('%H%M%S'))
+
   - id: persist_results
     node: file_write
     config:
-      file_path: "/data/edge/{{ now | date \"2006-01-02\" }}/workload_{{ now | date \"150405\" }}.json"
+      file_path: "/data/edge/{{ .compute_date }}/workload_{{ .compute_timestamp }}.json"
       content: |
         {
           "timestamp": "{{ now }}",

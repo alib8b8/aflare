@@ -118,10 +118,26 @@ steps:
       output_format: json
     description: AI-powered device diagnostics and remediation recommendations
 
+  - id: compute_date
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import date
+        print(date.today().isoformat())
+
+  - id: compute_timestamp
+    node: code_interpreter
+    config:
+      language: python
+      code: |
+        from datetime import datetime
+        print(datetime.now().strftime('%H%M%S'))
+
   - id: generate_report
     node: file_write
     config:
-      file_path: "/data/health_reports/{{ now | date \"2006-01-02\" }}/health_{{ now | date \"150405\" }}.json"
+      file_path: "/data/health_reports/{{ .compute_date }}/health_{{ .compute_timestamp }}.json"
       content: |
         {
           "report_id": "{{ uuid }}",

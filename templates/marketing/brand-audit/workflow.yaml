@@ -11,9 +11,16 @@ steps:
       timeout: 30s
     id: brand_site
 
+  - node: code_interpreter
+    params:
+      language: python
+      code: |
+        print("{{ .params.brand_name }}".lower().replace(" ", "-"))
+    id: brand_slug
+
   - node: http_request
     params:
-      url: "https://api.g2.com/v1/products/{{ .params.brand_name | lowercase | replace " " "-" }}"
+      url: "https://api.g2.com/v1/products/{{ .brand_slug }}"
       method: GET
       timeout: 30s
     id: g2_reviews

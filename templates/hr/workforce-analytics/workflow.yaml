@@ -170,6 +170,14 @@ steps:
         comparison_period: "{{ .params.comparison_period }}"
       output: dashboard_insights
 
+  - id: compute_timestamp
+    type: code_interpreter
+    config:
+      code: |
+        from datetime import datetime, timezone
+        print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+      output: compute_timestamp
+
   - id: save_dashboard
     type: file_write
     config:
@@ -179,7 +187,7 @@ steps:
           "metadata": {
             "reporting_period": {{ .params.reporting_period | toJson }},
             "comparison_period": "{{ .params.comparison_period }}",
-            "generated_at": "{{ now | date \"2006-01-02T15:04:05Z\" }}"
+            "generated_at": "{{ .compute_timestamp }}"
           },
           "kpis": {
             "headcount": {{ .steps.compute_headcount_kpis.output.headcount_kpis | toJson }},

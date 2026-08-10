@@ -182,9 +182,18 @@ steps:
         anonymize_peers: "{{ .params.anonymize_peers }}"
       output: report_content
 
+  - id: generate_filename
+    type: code_interpreter
+    config:
+      code: |
+        name = "{{ .params.subject_name }}"
+        output = "{{ .params.output_file }}" or f"360_feedback_{name.replace(' ', '_')}.md"
+        print(output)
+      output: filename
+
   - id: save_report
     type: file_write
     config:
-      filename: "{{ .params.output_file | default (printf \"360_feedback_%s.md\" .params.subject_name | replace \" \" \"_\") }}"
+      filename: "{{ .steps.generate_filename.output.filename }}"
       content: "{{ .steps.generate_report.output.report_content }}"
       format: markdown

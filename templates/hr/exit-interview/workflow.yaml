@@ -166,6 +166,14 @@ steps:
 
         Full report: {{ .params.output_file | default \"exit_interview_report.json\" }}
 
+  - id: compute_timestamp
+    type: code_interpreter
+    config:
+      code: |
+        from datetime import datetime, timezone
+        print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+      output: compute_timestamp
+
   - id: save_report
     type: file_write
     config:
@@ -175,7 +183,7 @@ steps:
           "metadata": {
             "period": {{ .params.analysis_period | toJson }},
             "department_filter": "{{ .params.department_filter }}",
-            "generated_at": "{{ now | date \"2006-01-02T15:04:05Z\" }}"
+            "generated_at": "{{ .compute_timestamp }}"
           },
           "summary": {{ .steps.preprocess_data.output.preprocessed_data.summary | toJson }},
           "theme_analysis": {{ .steps.analyze_themes.output.theme_analysis | toJson }},

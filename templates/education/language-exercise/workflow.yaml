@@ -32,10 +32,18 @@ params:
     default: 15
     description: Number of exercises
 steps:
+  - id: compute_language_slug
+    node: code_interpreter
+    language: python
+    code: |
+      import urllib.parse
+      print(urllib.parse.quote("{{ .params.target_language }}".lower()))
+    output: language_slug
+
   - id: fetch_language_data
     node: http_request
     method: GET
-    url: "https://restcountries.com/v3.1/lang/{{ .params.target_language | lower | urlquery }}"
+    url: "https://restcountries.com/v3.1/lang/{{ .language_slug }}"
     headers:
       Accept: application/json
     output: language_context
@@ -84,9 +92,19 @@ steps:
       print(json.dumps(structure, indent=2))
     output: exercise_structure
 
+  - id: generate_filename
+    node: code_interpreter
+    language: python
+    code: |
+      import re
+      name = "{{ .params.target_language }}"
+      name = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
+      print(f"language_exercises_{name}.json")
+    output: filename
+
   - id: save_exercises
     node: file_write
-    filename: "language_exercises_{{ .params.target_language | sanitize }}.json"
+    filename: "{{ .filename }}"
     content: |
       {
         "language": "{{ .params.target_language }}",

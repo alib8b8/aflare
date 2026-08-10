@@ -99,9 +99,19 @@ steps:
       print(json.dumps(progress, indent=2))
     output: progress_plan
 
+  - id: sanitize_path_filename
+    node: code_interpreter
+    language: python
+    code: |
+      import re
+      text = '''{{ .params.subject }}'''
+      sanitized = re.sub(r'[^\w\-]', '_', text).strip('_')
+      print(sanitized)
+    output: sanitized_path_subject
+
   - id: save_path
     node: file_write
-    filename: "learning_path_{{ .params.subject | sanitize }}.json"
+    filename: "learning_path_{{ .sanitized_path_subject }}.json"
     content: |
       {
         "subject": "{{ .params.subject }}",
