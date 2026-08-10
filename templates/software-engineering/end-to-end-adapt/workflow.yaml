@@ -36,11 +36,17 @@ steps:
     depends_on: []
 
   - id: search
-    node: ascend_model_search
+    node: code_interpreter
     params:
-      query: "{{input}}"
-      source: "atomgit/huggingface"
-      limit: 10
+      language: python
+      code: |
+        import json
+        print(json.dumps({
+            'status': 'ascend_model_search_not_available',
+            'message': 'Ascend NPU model search is not available in aflare. Please use AtomGit or HuggingFace directly.',
+            'recommended_action': 'Search for the model on https://huggingface.co/ or https://atomgit.com/'
+        }, ensure_ascii=False))
+    id: ascend_model_search_unavailable
     depends_on: [search_plan]
 
   # ============================================================
@@ -62,10 +68,17 @@ steps:
     depends_on: [search]
 
   - id: verify
-    node: ascend_model_verify
+    node: code_interpreter
     params:
-      model_name: "{{input}}"
-      source: "atomgit/huggingface"
+      language: python
+      code: |
+        import json
+        print(json.dumps({
+            'status': 'ascend_model_verify_not_available',
+            'message': 'Ascend NPU model verification is not available in aflare.',
+            'recommended_action': 'Manually verify model files, config.json, tokenizer, and license compatibility.'
+        }, ensure_ascii=False))
+    id: ascend_model_verify_unavailable
     depends_on: [verify_plan]
 
   # ============================================================
@@ -90,12 +103,17 @@ steps:
     depends_on: [verify]
 
   - id: adapt
-    node: ascend_model_adapt
+    node: code_interpreter
     params:
-      model_name: "{{input}}"
-      framework: "{{framework}}"
-      strategy: "auto"
-      target_npu: "{{target_npu}}"
+      language: python
+      code: |
+        import json
+        print(json.dumps({
+            'status': 'ascend_model_adapt_not_available',
+            'message': 'Ascend NPU model adaptation is not available in aflare.',
+            'recommended_action': 'Use torch_npu or MindSpore for Ascend NPU adaptation. See: https://www.hiascend.com/'
+        }, ensure_ascii=False))
+    id: ascend_model_adapt_unavailable
     depends_on: [adapt_plan]
 
   # ============================================================
@@ -121,11 +139,17 @@ steps:
     depends_on: [adapt]
 
   - id: quantize
-    node: ascend_model_quantize
+    node: code_interpreter
     params:
-      model_name: "{{input}}"
-      method: "{{quantize_method}}"
-      calibration_dataset: "c4-en-512"
+      language: python
+      code: |
+        import json
+        print(json.dumps({
+            'status': 'ascend_model_quantize_not_available',
+            'message': 'Ascend NPU model quantization is not available in aflare.',
+            'recommended_action': 'Use Ascend ModelZoo or AMCT toolkit for quantization.'
+        }, ensure_ascii=False))
+    id: ascend_model_quantize_unavailable
     depends_on: [quantize_plan]
 
   # ============================================================
@@ -149,12 +173,17 @@ steps:
     depends_on: [quantize]
 
   - id: optimize
-    node: ascend_model_optimize
+    node: code_interpreter
     params:
-      model_name: "{{input}}"
-      hardware: "{{target_npu}}"
-      target_latency: 100
-      target_throughput: 50
+      language: python
+      code: |
+        import json
+        print(json.dumps({
+            'status': 'ascend_model_optimize_not_available',
+            'message': 'Ascend NPU performance optimization is not available in aflare.',
+            'recommended_action': 'Use Ascend Graph Engine (GE) and AOE for performance tuning.'
+        }, ensure_ascii=False))
+    id: ascend_model_optimize_unavailable
     depends_on: [optimize_plan]
 
   # ============================================================
@@ -179,12 +208,17 @@ steps:
     depends_on: [optimize]
 
   - id: deploy
-    node: ascend_model_deploy
+    node: code_interpreter
     params:
-      model_name: "{{input}}"
-      hardware: "{{target_npu}}"
-      port: "{{deploy_port}}"
-      backend: "mindie"
+      language: python
+      code: |
+        import json
+        print(json.dumps({
+            'status': 'ascend_model_deploy_not_available',
+            'message': 'Ascend NPU model deployment is not available in aflare.',
+            'recommended_action': 'Use MindIE or vLLM-Ascend for inference deployment.'
+        }, ensure_ascii=False))
+    id: ascend_model_deploy_unavailable
     depends_on: [deploy_plan]
 
   # ============================================================
@@ -215,11 +249,17 @@ steps:
     depends_on: [deploy]
 
   - id: doc
-    node: ascend_model_doc
+    node: code_interpreter
     params:
-      model_name: "{{input}}"
-      format: "markdown"
-      include_benchmark: true
+      language: python
+      code: |
+        import json
+        print(json.dumps({
+            'status': 'ascend_model_doc_not_available',
+            'message': 'Ascend NPU documentation generation is not available in aflare.',
+            'recommended_action': 'Generate documentation manually using the collected outputs.'
+        }, ensure_ascii=False))
+    id: ascend_model_doc_unavailable
     depends_on: [doc_plan]
 
 # 最终输出：测评报告（含 Benchmark）

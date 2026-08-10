@@ -40,7 +40,7 @@ steps:
       请将分析任务分成并行执行的几组。
     id: analysis_plan
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |
@@ -68,7 +68,7 @@ steps:
       请进行全面的财务分析。
     id: financial_analysis
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |
@@ -88,7 +88,7 @@ steps:
       请进行行业和竞争分析。
     id: industry_analysis
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |
@@ -116,7 +116,7 @@ steps:
       请进行全面的风险评估。
     id: risk_analysis
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |

@@ -92,7 +92,7 @@ steps:
       - Final integration review
     id: legion_output
 
-  - node: verify
+  - node: critic
     params:
       verify_type: code_correctness
       output_format: detailed

@@ -46,7 +46,7 @@ steps:
       注意：此咨询仅供参考，不能替代专业医疗建议。如症状严重，请立即就医。
     id: consultation_plan
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |
@@ -69,7 +69,7 @@ steps:
       请进行详细的医学分析。
     id: medical_analysis
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |
@@ -88,7 +88,7 @@ steps:
       请提供相关的医学科普和健康指导。
     id: health_education
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |

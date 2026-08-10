@@ -12,10 +12,25 @@ steps:
       timeout: 30s
     id: fetch_rss
 
-  - node: xml_parse
+  - node: code_interpreter
     params:
-      path: rss.channel.item
-    input: fetch_rss
+      language: python
+      code: |
+        import xml.etree.ElementTree as ET
+        import json
+
+        rss_xml = '''{{ .steps.fetch_rss.output }}'''
+        root = ET.fromstring(rss_xml)
+
+        items = []
+        for item in root.findall('.//item'):
+            entry = {}
+            for field in ['title', 'link', 'description', 'pubDate']:
+                el = item.find(field)
+                entry[field] = el.text if el is not None else ''
+            items.append(entry)
+
+        print(json.dumps(items, ensure_ascii=False))
     id: items
 
   - node: agent

@@ -37,7 +37,7 @@ steps:
       7. MINDMAP — visual structure of the field (Mermaid)
     id: review
 
-  - node: verify
+  - node: critic
     params:
       verify_type: factual
       output_format: detailed

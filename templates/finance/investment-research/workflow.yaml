@@ -72,7 +72,7 @@ steps:
          - Industry events
     id: research_report
 
-  - node: verify
+  - node: critic
     params:
       verify_type: security
       output_format: detailed

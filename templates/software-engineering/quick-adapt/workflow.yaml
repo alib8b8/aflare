@@ -34,11 +34,17 @@ steps:
     depends_on: []
 
   - id: search
-    node: ascend_model_search
+    node: code_interpreter
     params:
-      query: "{{input}}"
-      source: "atomgit/huggingface"
-      limit: 5
+      language: python
+      code: |
+        import json
+        print(json.dumps({
+            'status': 'ascend_model_search_not_available',
+            'message': 'Ascend NPU model search is not available in aflare. Please use AtomGit or HuggingFace directly.',
+            'recommended_action': 'Search for the model on https://huggingface.co/ or https://atomgit.com/'
+        }, ensure_ascii=False))
+    id: ascend_model_search_unavailable
     depends_on: [search_plan]
 
   # ============================================================
@@ -61,10 +67,17 @@ steps:
     depends_on: [search]
 
   - id: verify
-    node: ascend_model_verify
+    node: code_interpreter
     params:
-      model_name: "{{input}}"
-      source: "atomgit/huggingface"
+      language: python
+      code: |
+        import json
+        print(json.dumps({
+            'status': 'ascend_model_verify_not_available',
+            'message': 'Ascend NPU model verification is not available in aflare.',
+            'recommended_action': 'Manually verify model files, config.json, tokenizer, and license compatibility.'
+        }, ensure_ascii=False))
+    id: ascend_model_verify_unavailable
     depends_on: [verify_plan]
 
   # ============================================================
@@ -89,12 +102,17 @@ steps:
     depends_on: [verify]
 
   - id: adapt
-    node: ascend_model_adapt
+    node: code_interpreter
     params:
-      model_name: "{{input}}"
-      framework: "{{framework}}"
-      strategy: "auto"
-      target_npu: "{{target_npu}}"
+      language: python
+      code: |
+        import json
+        print(json.dumps({
+            'status': 'ascend_model_adapt_not_available',
+            'message': 'Ascend NPU model adaptation is not available in aflare.',
+            'recommended_action': 'Use torch_npu or MindSpore for Ascend NPU adaptation. See: https://www.hiascend.com/'
+        }, ensure_ascii=False))
+    id: ascend_model_adapt_unavailable
     depends_on: [adapt_plan]
 
   # ============================================================
@@ -121,11 +139,17 @@ steps:
     depends_on: [adapt]
 
   - id: doc
-    node: ascend_model_doc
+    node: code_interpreter
     params:
-      model_name: "{{input}}"
-      format: "markdown"
-      include_benchmark: false
+      language: python
+      code: |
+        import json
+        print(json.dumps({
+            'status': 'ascend_model_doc_not_available',
+            'message': 'Ascend NPU documentation generation is not available in aflare.',
+            'recommended_action': 'Generate documentation manually using the collected outputs.'
+        }, ensure_ascii=False))
+    id: ascend_model_doc_unavailable
     depends_on: [doc_plan]
 
 # 最终输出：快速适配报告（最小可行，不含 Benchmark）

@@ -43,7 +43,7 @@ steps:
       目标：全面、深入、多角度地研究该主题。
     id: research_plan
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |
@@ -64,7 +64,7 @@ steps:
       请进行第一轮探索性研究。
     id: exploration_phase1
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |
@@ -88,7 +88,7 @@ steps:
       请进行第二轮深入研究。
     id: exploration_phase2
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |
@@ -116,7 +116,7 @@ steps:
       请进行批判性审查和质量评估。
     id: critical_review
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |

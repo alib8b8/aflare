@@ -944,7 +944,7 @@ func TestTemplateRenderNode_TitleFunction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render should succeed: %v", err)
 	}
-	if !strings.Contains(out, "HELLO WORLD") {
+	if !strings.Contains(out, "Hello World") {
 		t.Errorf("expected title case, got: %q", out)
 	}
 }

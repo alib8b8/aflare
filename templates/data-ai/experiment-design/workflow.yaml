@@ -82,7 +82,7 @@ steps:
          - How to iterate
     id: design
 
-  - node: verify
+  - node: critic
     params:
       verify_type: factual
       output_format: detailed

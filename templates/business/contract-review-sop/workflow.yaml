@@ -43,18 +43,32 @@ steps:
       输出审查计划：每个专家负责的部分、权重和输出格式。
     id: contract_review_plan
 
-  - node: rag
+  - node: code_interpreter
     params:
-      source: "{{ .params.contract_file }}"
-      source_type: file
-      chunk_size: "1500"
-      top_k: "8"
-      search_method: hybrid
-    input: "合同中的关键法律条款和风险点"
+      language: python
+      code: |
+        import re
+        contract_path = '{{ .params.contract_file }}'
+        with open(contract_path, 'r') as f:
+            content = f.read()
+
+        key_terms = ['违约责任', '保密', '知识产权', '赔偿', '终止', '管辖', '不可抗力', '争议解决', '付款', '交付']
+        clauses = []
+        for line in content.split('\n'):
+            for term in key_terms:
+                if term in line:
+                    clauses.append(line.strip())
+                    break
+
+        if clauses:
+            print('\n'.join(clauses))
+        else:
+            print(content[:2000])
     id: key_clauses
 
-  - node: ollama
+  - node: llm
     params:
+      provider: ollama
       model: "llama3"
       system: |
         你是一名资深律师和合同审查专家。请对合同进行法律审查，重点关注：
@@ -75,8 +89,9 @@ steps:
       请进行全面的法律审查。
     id: legal_review
 
-  - node: ollama
+  - node: llm
     params:
+      provider: ollama
       model: "llama3"
       system: |
         你是一名财务和商业分析专家。请从商业和财务角度审查合同：
@@ -94,8 +109,9 @@ steps:
       请从财务和商业角度进行审查。
     id: financial_review
 
-  - node: ollama
+  - node: llm
     params:
+      provider: ollama
       model: "llama3"
       system: |
         你是一名合同质量评估专家。请综合各方审查意见：

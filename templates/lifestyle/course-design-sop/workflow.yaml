@@ -46,7 +46,7 @@ steps:
       - 底层：具体课时和知识点
     id: course_plan
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |
@@ -71,7 +71,7 @@ steps:
       请进行详细的教学设计分析。
     id: instructional_design
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |
@@ -97,7 +97,7 @@ steps:
       请设计详细的课程内容大纲。
     id: content_outline
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |
@@ -119,7 +119,7 @@ steps:
       请设计完整的课程评估体系。
     id: assessment_design
 
-  - node: ollama
+  - node: llm
     params:
       model: "llama3"
       system: |
