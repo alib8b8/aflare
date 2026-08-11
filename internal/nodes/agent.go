@@ -534,11 +534,7 @@ func (a *ReActAgent) callOllama(ctx context.Context, messages []LLMMessage) (str
 		// so users don't see {"thought":"...","action":"..."} noise.
 		// Tool calls are already visible via onToolCall/onToolResult callbacks;
 		// the final answer is rendered from the return value.
-		var buf strings.Builder
-		wrappedChunk := func(chunk string) {
-			buf.WriteString(chunk)
-		}
-		return node.ExecuteStream(ctx, fullPrompt, params, wrappedChunk)
+		return node.ExecuteStream(ctx, fullPrompt, params, func(string) {})
 	}
 	return node.Execute(ctx, fullPrompt, params)
 }
