@@ -194,7 +194,9 @@ func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 	}()
 
 	// Streaming output: print tokens as they arrive
+	streamed := false
 	onChunk := func(chunk string) {
+		streamed = true
 		fmt.Print(chunk)
 	}
 
@@ -206,7 +208,7 @@ func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 		fmt.Printf("%s\n", truncateStr(result, 100))
 	}
 
-	_, err := s.loop.ProcessInputStream(ctx, input, onChunk, onToolCall, onToolResult)
+	response, err := s.loop.ProcessInputStream(ctx, input, onChunk, onToolCall, onToolResult)
 	close(done)
 
 	if err != nil {
@@ -215,8 +217,15 @@ func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 		} else {
 			fmt.Printf("\nError: %v\n", err)
 		}
+		return
 	}
-	fmt.Println()
+	// If nothing was streamed (e.g. ollama suppressed JSON), print the response.
+	// If content was streamed, just add a trailing newline.
+	if streamed {
+		fmt.Println()
+	} else if response != "" {
+		fmt.Println(response)
+	}
 }
 
 // processInput handles a single user message and returns the agent's response.

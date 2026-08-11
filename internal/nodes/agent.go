@@ -530,7 +530,15 @@ func (a *ReActAgent) callOllama(ctx context.Context, messages []LLMMessage) (str
 	}
 	fullPrompt := buildConversationPrompt(messages)
 	if a.onChunk != nil {
-		return node.ExecuteStream(ctx, fullPrompt, params, a.onChunk)
+		// Ollama returns JSON ReAct format — suppress raw JSON from streaming
+		// so users don't see {"thought":"...","action":"..."} noise.
+		// Tool calls are already visible via onToolCall/onToolResult callbacks;
+		// the final answer is rendered from the return value.
+		var buf strings.Builder
+		wrappedChunk := func(chunk string) {
+			buf.WriteString(chunk)
+		}
+		return node.ExecuteStream(ctx, fullPrompt, params, wrappedChunk)
 	}
 	return node.Execute(ctx, fullPrompt, params)
 }
