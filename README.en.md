@@ -293,7 +293,14 @@ Additional protections: SSRF protection, Path Traversal defense, Command Injecti
 
 ## Contributing
 
-We welcome contributions! Fork → branch → change → `go test ./...` → PR.
+We welcome contributions! Beyond code, you can also **submit Skill templates**:
+
+1. **Fork** this repo
+2. Create a YAML template under the corresponding domain directory in `templates/` (see [YAML Syntax](docs/getting-started.md#workflow-configuration))
+3. Run `go test ./...` to verify
+4. Submit a PR with a description of what the template does
+
+300+ Skills already cover 16 domains — your template can fill the missing piece.
 
 [Contributing →](CONTRIBUTING.md)
 

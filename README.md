@@ -292,7 +292,14 @@ aflare 内置多层安全防护，支持四级安全等级（`--security-level`�
 
 ## 贡献
 
-欢迎社区贡献！Fork → 创建分支 → 修改 → `go test ./...` → PR。
+欢迎社区贡献！除了代码，你还可以**提交 Skill 模板**：
+
+1. **Fork** 本仓库
+2. 在 `templates/` 对应领域目录下创建 YAML 模板（参考 [YAML 语法](docs/getting-started.md#workflow-configuration)）
+3. 运行 `go test ./...` 验证
+4. 提交 PR，附上模板用途说明
+
+已有 300+ Skill 覆盖 16 个领域，你的模板可以补上缺失的一环。
 
 [贡献指南 →](CONTRIBUTING.md)
 
