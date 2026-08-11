@@ -143,7 +143,10 @@ type LLMChoiceMessage struct {
 }
 
 // LLMToolCall is a single tool/function invocation returned by the model.
+// In streaming mode the Index field is populated to identify the tool call
+// across incremental delta chunks.
 type LLMToolCall struct {
+	Index    int             `json:"index,omitempty"`
 	ID       string          `json:"id"`
 	Type     string          `json:"type"`
 	Function LLMToolCallFunc `json:"function"`
@@ -1053,4 +1056,156 @@ func (n *OpenAICompatibleNode) CallWithTools(ctx context.Context, messages []LLM
 	}
 
 	return &llmResp, nil
+}
+
+// CallWithToolsStream sends a streaming chat completion request with tool
+// definitions. It accumulates content and tool_calls from the SSE stream,
+// calling onChunk for each content delta. Returns the final LLMResponse
+// with the accumulated content and tool_calls.
+func (n *OpenAICompatibleNode) CallWithToolsStream(ctx context.Context, messages []LLMMessage, model, apiKey, endpoint string, tools []ToolDefinition, params map[string]string, onChunk func(chunk string)) (*LLMResponse, error) {
+	if apiKey == "" {
+		apiKey = config.GetAPIKey(n.config.Name, n.config.EnvAPIKey)
+	}
+	if apiKey == "" {
+		return nil, aferrors.Newf(aferrors.CodeLLMAPIAuthError, "%s API key required. Set %s env var, add to config file, or pass api_key param",
+			n.config.ProviderName, n.config.EnvAPIKey)
+	}
+	if endpoint == "" {
+		endpoint = config.GetEndpoint(n.config.Name, n.config.EnvAPIKey+"_ENDPOINT", n.config.DefaultEndpoint)
+	}
+	if model == "" {
+		model = n.config.DefaultModel
+	}
+	if err := ValidateLMLEndpoint(endpoint); err != nil {
+		return nil, aferrors.Wrap(err, aferrors.CodeLLMProviderFailed, "endpoint URL validation failed")
+	}
+
+	generateURL := fmt.Sprintf("%s/chat/completions", endpoint)
+
+	reqBody := LLMRequest{
+		Model:    model,
+		Messages: messages,
+		Stream:   true,
+	}
+	if len(tools) > 0 {
+		reqBody.Tools = tools
+		reqBody.ToolChoice = json.RawMessage(`"auto"`)
+	}
+	if params != nil {
+		if err := applyLLMRequestParams(&reqBody, params); err != nil {
+			return nil, err
+		}
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, aferrors.Wrap(err, aferrors.CodeLLMProviderFailed, "failed to marshal request")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, generateURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return nil, aferrors.Wrap(err, aferrors.CodeLLMProviderFailed, "failed to create request")
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{
+		Timeout:       DefaultLLMTimeout,
+		Transport:     SafeLLMHTTPClient.Transport,
+		CheckRedirect: HTTPRedirectValidator(ValidateLMLEndpoint),
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, aferrors.Wrapf(err, aferrors.CodeLLMProviderFailed, "failed to call %s API", n.config.ProviderName)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp LLMResponse
+		_ = json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&errResp)
+		if errResp.Error != nil && errResp.Error.Message != "" {
+			return nil, aferrors.Newf(aferrors.CodeLLMProviderFailed, "%s API error (%d): %s", n.config.ProviderName, resp.StatusCode, errResp.Error.Message)
+		}
+		return nil, aferrors.Newf(aferrors.CodeLLMProviderFailed, "%s API returned status %d", n.config.ProviderName, resp.StatusCode)
+	}
+
+	// Parse SSE stream: accumulate content and tool_calls
+	var fullContent strings.Builder
+	var toolCalls []LLMToolCall
+	// toolCallAccum tracks in-progress tool_calls by index (streaming tool_calls arrive incrementally)
+	toolCallAccum := make(map[int]*LLMToolCall)
+
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		data := strings.TrimPrefix(line, "data: ")
+		if data == "[DONE]" {
+			break
+		}
+
+		var streamResp LLMResponse
+		if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
+			continue
+		}
+
+		if len(streamResp.Choices) == 0 {
+			continue
+		}
+
+		delta := streamResp.Choices[0].Delta
+
+		// Content streaming
+		if delta.Content != "" && onChunk != nil {
+			onChunk(delta.Content)
+			fullContent.WriteString(delta.Content)
+		}
+
+		// Tool call accumulation (streaming tool_calls arrive as incremental chunks)
+		for _, tc := range delta.ToolCalls {
+			idx := tc.Index
+			if existing, ok := toolCallAccum[idx]; ok {
+				// Append arguments fragment
+				existing.Function.Arguments += tc.Function.Arguments
+			} else {
+				cp := tc
+				toolCallAccum[idx] = &cp
+			}
+		}
+	}
+
+	// Convert accumulated tool_calls to slice
+	if len(toolCallAccum) > 0 {
+		indices := make([]int, 0, len(toolCallAccum))
+		for i := range toolCallAccum {
+			indices = append(indices, i)
+		}
+		// Sort by index (simple insertion)
+		for i := 0; i < len(indices); i++ {
+			for j := i + 1; j < len(indices); j++ {
+				if indices[j] < indices[i] {
+					indices[i], indices[j] = indices[j], indices[i]
+				}
+			}
+		}
+		for _, i := range indices {
+			toolCalls = append(toolCalls, *toolCallAccum[i])
+		}
+	}
+
+	return &LLMResponse{
+		Choices: []LLMChoice{
+			{
+				Message: LLMChoiceMessage{
+					Content:   fullContent.String(),
+					ToolCalls: toolCalls,
+				},
+			},
+		},
+	}, nil
 }

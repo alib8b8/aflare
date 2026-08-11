@@ -80,6 +80,7 @@ func NewChatSession(cfg Config) *ChatSession {
 
 // Run starts the interactive REPL loop.
 // Stdin input is fed into the AgentLoop, responses are printed to stdout.
+// Supports multi-line input: lines ending with \ are continued on the next line.
 func (s *ChatSession) Run() {
 	s.running = true
 	scanner := bufio.NewScanner(os.Stdin)
@@ -92,58 +93,86 @@ func (s *ChatSession) Run() {
 	signal.Notify(s.interrupt, syscall.SIGINT)
 	defer signal.Stop(s.interrupt)
 
-	// Create an input channel and feed stdin into it
-	inputs := make(chan AgentInput, 1)
-	outputs := make(chan AgentOutput, 1)
-
-	// Background goroutine: handle stdin → feed into AgentLoop
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start the AgentLoop in background
-	go s.loop.Run(ctx, inputs, outputs)
+	var multiLineBuf strings.Builder
+	inMultiLine := false
+	const maxMultiLineBytes = 1 * 1024 * 1024 // 1MB limit for multi-line input
 
 	for s.running {
-		// Show output from the agent loop first
-		select {
-		case out := <-outputs:
-			if out.Error != nil {
-				fmt.Printf("Error: %v\n", out.Error)
-			} else {
-				fmt.Println(out.Response)
-				fmt.Println()
-			}
-			continue
-		default:
+		if inMultiLine {
+			fmt.Print("... ")
+		} else {
+			fmt.Print("> ")
 		}
 
-		fmt.Print("> ")
 		if !scanner.Scan() {
 			// Ctrl-D (EOF)
 			fmt.Println()
 			break
 		}
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
+
+		line := scanner.Text()
+		trimmedLine := strings.TrimSpace(line)
+
+		// Multi-line continuation: lines ending with \ or empty lines in continuation mode
+		if strings.HasSuffix(line, "\\") {
+			inMultiLine = true
+			// Append the line without the trailing backslash
+			multiLineBuf.WriteString(strings.TrimSuffix(line, "\\"))
+			multiLineBuf.WriteString("\n")
+			// Force submit if buffer exceeds 1MB
+			if multiLineBuf.Len() > maxMultiLineBytes {
+				input := strings.TrimSpace(multiLineBuf.String())
+				multiLineBuf.Reset()
+				inMultiLine = false
+				if input != "" {
+					s.handleTurn(ctx, input)
+				}
+			}
 			continue
 		}
 
-		if strings.HasPrefix(line, "/") {
-			s.handleCommand(line)
+		if inMultiLine {
+			if trimmedLine == "" {
+				// Empty line in continuation mode: submit the accumulated input
+				input := strings.TrimSpace(multiLineBuf.String())
+				multiLineBuf.Reset()
+				inMultiLine = false
+				if input == "" {
+					continue
+				}
+				s.handleTurn(ctx, input)
+				continue
+			}
+			// Non-empty line in continuation mode: append and continue
+			multiLineBuf.WriteString(line)
+			multiLineBuf.WriteString("\n")
 			continue
 		}
 
-		s.handleTurn(ctx, inputs, outputs, line)
+		// Single-line mode
+		if trimmedLine == "" {
+			continue
+		}
+
+		if strings.HasPrefix(trimmedLine, "/") {
+			s.handleCommand(trimmedLine)
+			continue
+		}
+
+		s.handleTurn(ctx, trimmedLine)
 	}
 
-	close(inputs)
 	cancel()
 	fmt.Println("Goodbye!")
 }
 
 // handleTurn processes a single user message and prints the response.
 // Ctrl-C during execution interrupts the current turn but does not exit.
-func (s *ChatSession) handleTurn(parentCtx context.Context, inputs chan<- AgentInput, outputs <-chan AgentOutput, input string) {
+// Streaming output is printed token-by-token in real time.
+func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 	// Drain any stale interrupt signals
 	select {
 	case <-s.interrupt:
@@ -164,32 +193,30 @@ func (s *ChatSession) handleTurn(parentCtx context.Context, inputs chan<- AgentI
 		}
 	}()
 
-	replyCh := make(chan AgentOutput, 1)
-	select {
-	case inputs <- AgentInput{Source: SourceStdin, Message: input, ReplyTo: replyCh}:
-	case <-ctx.Done():
-		close(done)
-		return
+	// Streaming output: print tokens as they arrive
+	onChunk := func(chunk string) {
+		fmt.Print(chunk)
 	}
 
-	// Wait for response
-	select {
-	case out := <-replyCh:
-		close(done)
-		if out.Error != nil {
-			if ctx.Err() != nil {
-				fmt.Println("(cancelled)")
-			} else {
-				fmt.Printf("Error: %v\n", out.Error)
-			}
-		} else {
-			fmt.Println(out.Response)
-			fmt.Println()
-		}
-	case <-ctx.Done():
-		close(done)
-		fmt.Println("(cancelled)")
+	// Tool visibility: show tool calls and results
+	onToolCall := func(toolName, input string) {
+		fmt.Printf("  %s(\"%s\") → ", toolName, truncateStr(input, 50))
 	}
+	onToolResult := func(toolName, result string) {
+		fmt.Printf("%s\n", truncateStr(result, 100))
+	}
+
+	_, err := s.loop.ProcessInputStream(ctx, input, onChunk, onToolCall, onToolResult)
+	close(done)
+
+	if err != nil {
+		if ctx.Err() != nil {
+			fmt.Println("\n(cancelled)")
+		} else {
+			fmt.Printf("\nError: %v\n", err)
+		}
+	}
+	fmt.Println()
 }
 
 // processInput handles a single user message and returns the agent's response.

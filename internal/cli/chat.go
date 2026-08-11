@@ -17,9 +17,11 @@ package cli
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alib8b8/aflare/internal/agent"
 	"github.com/alib8b8/aflare/internal/i18n"
@@ -80,6 +82,13 @@ func HandleChat(args []string) {
 		}
 	}
 
+	// Check LLM readiness before creating the session
+	if err := checkLLMReady(cfg.Provider, cfg.Endpoint, cfg.APIKey); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		printLLMStartupGuide(cfg.Provider)
+		os.Exit(1)
+	}
+
 	session := agent.NewChatSession(cfg)
 	session.Run()
 }
@@ -136,4 +145,61 @@ func PrintChatUsage() {
 	fmt.Println("  /history       Show conversation state")
 	fmt.Println("  /clear         Clear conversation history")
 	fmt.Println("  /exit          Exit chat")
+}
+
+// checkLLMReady verifies the LLM provider is reachable before starting chat.
+// For ollama, it checks the /api/tags endpoint. For other providers, it checks
+// that an API key is configured.
+func checkLLMReady(provider, endpoint, apiKey string) error {
+	if provider == "ollama" {
+		ep := strings.TrimRight(endpoint, "/")
+		if ep == "" {
+			ep = "http://localhost:11434"
+		}
+		client := &http.Client{Timeout: 3 * time.Second}
+		resp, err := client.Get(ep + "/api/tags")
+		if err != nil {
+			return fmt.Errorf("ollama is not reachable at %s: %w", ep, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("ollama returned status %d at %s", resp.StatusCode, ep)
+		}
+		return nil
+	}
+
+	// For cloud providers, check that an API key is configured
+	if apiKey == "" {
+		envKey := strings.ToUpper(provider) + "_API_KEY"
+		if os.Getenv(envKey) == "" {
+			return fmt.Errorf("%s API key not configured", provider)
+		}
+	}
+	return nil
+}
+
+// printLLMStartupGuide prints a helpful guide for first-time users.
+func printLLMStartupGuide(provider string) {
+	if provider == "ollama" {
+		fmt.Println()
+		fmt.Println("ollama startup guide:")
+		fmt.Println("  1. Install ollama:")
+		fmt.Println("     curl -fsSL https://ollama.com/install.sh | sh")
+		fmt.Println("  2. Start ollama:")
+		fmt.Println("     ollama serve")
+		fmt.Println("  3. Pull a model:")
+		fmt.Println("     ollama pull llama3")
+		fmt.Println()
+		fmt.Println("  Or use a cloud provider:")
+		fmt.Println("     aflare chat -p deepseek -m deepseek-chat -k $DEEPSEEK_API_KEY")
+		fmt.Println("     aflare chat -p openai -m gpt-4o -k $OPENAI_API_KEY")
+	} else {
+		fmt.Println()
+		fmt.Printf("%s configuration guide:\n", provider)
+		fmt.Printf("  1. Get an API key from the %s console\n", provider)
+		fmt.Printf("  2. Set the environment variable:\n")
+		fmt.Printf("     export %s_API_KEY=your-api-key\n", strings.ToUpper(provider))
+		fmt.Printf("  3. Or pass it directly:\n")
+		fmt.Printf("     aflare chat -p %s -k your-api-key\n", provider)
+	}
 }

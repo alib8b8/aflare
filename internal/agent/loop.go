@@ -144,6 +144,14 @@ func (a *AgentLoop) Capabilities() *CapabilityRegistry {
 // Capabilities hook into the execution via PreProcess (before agent) and
 // PostProcess (after agent).
 func (a *AgentLoop) ProcessInput(ctx context.Context, input string) (string, error) {
+	return a.ProcessInputStream(ctx, input, nil, nil, nil)
+}
+
+// ProcessInputStream processes a single input with optional streaming and
+// tool-visibility callbacks. onChunk is called for each token as the LLM
+// generates it. onToolCall is called before each tool execution. onToolResult
+// is called after each tool execution.
+func (a *AgentLoop) ProcessInputStream(ctx context.Context, input string, onChunk func(chunk string), onToolCall func(toolName, input string), onToolResult func(toolName, result string)) (string, error) {
 	// Run capability PreProcess hooks
 	processedInput, err := a.caps.PreProcessAll(ctx, input)
 	if err != nil {
@@ -175,7 +183,15 @@ func (a *AgentLoop) ProcessInput(ctx context.Context, input string) (string, err
 		false, // showThinking
 	)
 
-	response, err := agent.Run(ctx, a.ctx.BuildPrefix())
+	// Set streaming and tool-visibility callbacks
+	agent.SetCallbacks(onChunk, onToolCall, onToolResult)
+
+	var response string
+	if onChunk != nil {
+		response, err = agent.RunStream(ctx, a.ctx.BuildPrefix(), onChunk)
+	} else {
+		response, err = agent.Run(ctx, a.ctx.BuildPrefix())
+	}
 	if err != nil {
 		return "", fmt.Errorf("agent execution failed: %w", err)
 	}
