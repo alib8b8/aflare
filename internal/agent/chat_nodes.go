@@ -36,9 +36,10 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/alib8b8/aflare/internal/meta"
+	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/nodes/core"
 	"github.com/alib8b8/aflare/internal/templates"
-	"github.com/alib8b8/aflare/internal/workflow"
+	workflow "github.com/alib8b8/aflare/internal/workflow"
 )
 
 // TemplateCategories lists all available template categories (skills domains).
@@ -595,6 +596,12 @@ func (n *selfUpdateNode) Execute(ctx context.Context, input string, params map[s
 			return fmt.Sprintf("Update available: %s (current: %s)\nRelease notes: %s", release.TagName, meta.Version, release.Body), nil
 		}
 		return fmt.Sprintf("Already up to date (current: %s, latest: %s)", meta.Version, release.TagName), nil
+	}
+
+	// In safe mode, refuse to install updates — the LLM should not be able
+	// to unilaterally replace the binary. Use check_only=true instead.
+	if nodes.IsSafeMode() {
+		return "", fmt.Errorf("self-update installation is disabled in safe mode; use check_only=true to check for updates")
 	}
 
 	result, err := meta.SelfUpdate("alib8b8/aflare")
