@@ -44,6 +44,7 @@ type Server struct {
 	readTimeout  time.Duration
 	writeTimeout time.Duration
 	workflowsDir string
+	chat         chatHandler
 
 	// Metrics
 	requestsTotal   uint64
@@ -80,6 +81,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/v1/workflows/resume", s.handleResumeWorkflow)
 	mux.HandleFunc("/api/v1/workflows", s.handleListWorkflows)
 	mux.HandleFunc("/api/v1/workflows/", s.handleGetWorkflow)
+	mux.HandleFunc("/api/v1/chat", s.handleChat)
 
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
 	if s.host == "" {

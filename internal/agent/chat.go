@@ -246,6 +246,17 @@ func (s *ChatSession) handleCommand(cmd string) {
 	}
 }
 
+// SendMessage processes a single user message and returns the agent's response.
+// This is the public API for programmatic chat integration (e.g., HTTP endpoints).
+func (s *ChatSession) SendMessage(input string) (string, error) {
+	return s.processInput(input)
+}
+
+// ResetSession clears the conversation history while keeping the system prompt.
+func (s *ChatSession) ResetSession() {
+	s.ctx.Reset()
+}
+
 // processInput handles a single user message and returns the agent's response.
 func (s *ChatSession) processInput(input string) (string, error) {
 	// Add user message to context

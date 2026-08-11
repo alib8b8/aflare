@@ -53,6 +53,7 @@ type WebUIServer struct {
 	port         string
 	workflowsDir string
 	authToken    string
+	chat         chatHandler
 
 	mu     sync.RWMutex
 	server *http.Server
@@ -124,6 +125,7 @@ func (s *WebUIServer) buildHandler() http.Handler {
 	mux.HandleFunc("/api/workflows", s.authMiddleware(s.handleListWorkflows))
 	mux.HandleFunc("/api/workflow", s.authMiddleware(s.handleWorkflow))
 	mux.HandleFunc("/api/validate", s.authMiddleware(s.handleValidate))
+	mux.HandleFunc("/api/chat", s.authMiddleware(s.handleChat))
 
 	// pprof 调试端点:默认关闭,仅当环境变量 AFLARE_PPROF=1 时启用。
 	// 生产环境保持关闭以避免安全暴露;需要在线性能剖析时显式开启。
@@ -563,6 +565,17 @@ var indexHTML = `<!DOCTYPE html>
         .modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
         .error-message { color: #ff4757; font-size: 12px; margin-top: 8px; }
         .warnings { background: #2a2a0a; border: 1px solid #4a4a1a; border-radius: 6px; padding: 10px; margin-top: 10px; font-size: 12px; color: #ffff80; }
+        .chat-container { flex: 1; display: flex; flex-direction: column; height: 100%; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .chat-message { max-width: 85%; padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.5; }
+        .chat-message.user { align-self: flex-end; background: #00d4ff; color: #0f0f23; }
+        .chat-message.assistant { align-self: flex-start; background: #2a2a4a; color: #e0e0e0; }
+        .chat-message.error { align-self: flex-start; background: #4a1a1a; color: #ff4757; }
+        .chat-input-area { padding: 12px 16px; border-top: 1px solid #2a2a4a; display: flex; gap: 10px; }
+        .chat-input-area input { flex: 1; padding: 10px 14px; background: #2a2a4a; border: 1px solid #3a3a5a; border-radius: 8px; color: #e0e0e0; font-size: 14px; }
+        .chat-input-area input:focus { outline: none; border-color: #00d4ff; }
+        .chat-input-area button { padding: 10px 20px; }
+        .chat-loading { align-self: flex-start; color: #8080a0; font-size: 13px; padding: 8px 16px; }
     </style>
 </head>
 <body>
@@ -596,6 +609,7 @@ var indexHTML = `<!DOCTYPE html>
             <div class="tabs">
                 <div class="tab active" onclick="switchTab('editor')">Editor</div>
                 <div class="tab" onclick="switchTab('preview')">Preview</div>
+                <div class="tab" onclick="switchTab('chat')">Chat</div>
             </div>
 
             <div class="tab-content" id="editorTab">
@@ -604,6 +618,19 @@ var indexHTML = `<!DOCTYPE html>
 
             <div class="tab-content" id="previewTab" style="display:none">
                 <div id="previewContent"></div>
+            </div>
+
+            <div class="tab-content" id="chatTab" style="display:none">
+                <div class="chat-container">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="chat-message assistant">Hello! I'm aflare, your local-first automation agent. Ask me anything — I can run workflows, search templates, compose new automations, and more.</div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" id="chatInput" placeholder="Type your message..." onkeydown="if(event.key==='Enter')sendChat()" />
+                        <button class="btn btn-primary" onclick="sendChat()">Send</button>
+                        <button class="btn btn-secondary" onclick="clearChat()" title="Clear conversation">Clear</button>
+                    </div>
+                </div>
             </div>
 
             <div class="status-bar">
@@ -836,6 +863,52 @@ var indexHTML = `<!DOCTYPE html>
             document.getElementById('validationStatus').textContent = 'Not validated';
             document.getElementById('validationStatus').className = '';
         });
+
+        // Chat functions
+        async function sendChat() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const messages = document.getElementById('chatMessages');
+            messages.innerHTML += '<div class="chat-message user">' + escapeHtml(message) + '</div>';
+            input.value = '';
+            messages.innerHTML += '<div class="chat-loading">Thinking...</div>';
+            messages.scrollTop = messages.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                const data = await response.json();
+
+                // Remove loading indicator
+                messages.removeChild(messages.lastChild);
+
+                if (data.error) {
+                    messages.innerHTML += '<div class="chat-message error">Error: ' + escapeHtml(data.error) + '</div>';
+                } else {
+                    messages.innerHTML += '<div class="chat-message assistant">' + escapeHtml(data.response) + '</div>';
+                }
+            } catch (e) {
+                messages.removeChild(messages.lastChild);
+                messages.innerHTML += '<div class="chat-message error">Network error: ' + escapeHtml(e.message) + '</div>';
+            }
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        async function clearChat() {
+            try {
+                await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: '/clear', reset: true })
+                });
+            } catch (e) {}
+            document.getElementById('chatMessages').innerHTML = '<div class="chat-message assistant">Conversation cleared. How can I help you?</div>';
+        }
 
         loadWorkflows();
     </script>

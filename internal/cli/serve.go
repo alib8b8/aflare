@@ -83,6 +83,7 @@ func HandleServe(args []string) {
 	fmt.Println("  POST /api/v1/workflows/run  - Run a workflow")
 	fmt.Println("  GET  /api/v1/workflows      - List available workflows")
 	fmt.Println("  GET  /api/v1/workflows/{name} - Get workflow details")
+	fmt.Println("  POST /api/v1/chat           - Chat with the aflare agent")
 	fmt.Println("Press Ctrl+C to stop")
 
 	if err := server.Start(); err != nil {

@@ -19,23 +19,37 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/alib8b8/aflare/internal/agent"
 	"github.com/alib8b8/aflare/internal/i18n"
 	"github.com/alib8b8/aflare/internal/workflow"
 )
 
 // HandleCreate handles the "create" command.
 func HandleCreate(args []string, aiMode bool) {
-	if len(args) < 1 {
+	interactive := false
+
+	// Filter out --interactive flag from args
+	filteredArgs := make([]string, 0, len(args))
+	for _, a := range args {
+		if a == "--interactive" || a == "-i" {
+			interactive = true
+		} else {
+			filteredArgs = append(filteredArgs, a)
+		}
+	}
+
+	if len(filteredArgs) < 1 {
 		fmt.Println(i18n.T("create.usage"))
 		fmt.Println("\nExamples:")
 		fmt.Println("  aflare create \"fetch example.com and save to file\"")
 		fmt.Println("  aflare create \"fetch Hacker News and save to hn.txt\"")
 		fmt.Println("  aflare create \"summarize article and write to summary.md\"")
 		fmt.Println("  aflare --ai create \"generate a weekly report from github commits\"")
+		fmt.Println("  aflare create --interactive \"fetch example.com\"")
 		os.Exit(1)
 	}
 
-	description := SummarizeCommand("", args)
+	description := SummarizeCommand("", filteredArgs)
 	fmt.Printf("%s\n", i18n.T("create.start", description))
 
 	var filename string
@@ -53,4 +67,18 @@ func HandleCreate(args []string, aiMode bool) {
 	fmt.Printf("\n✅ %s\n", i18n.T("create.success", filename))
 	fmt.Printf("\n%s\n", i18n.T("create.run_hint"))
 	fmt.Printf("  aflare run %s\n", filename)
+
+	if interactive {
+		fmt.Println("\nEntering interactive chat mode to validate your workflow...")
+		fmt.Println("Type /quit to exit.")
+		EnterChatMode()
+	}
+}
+
+// EnterChatMode starts an interactive chat session for workflow validation.
+// This is called from create --interactive.
+func EnterChatMode() {
+	cfg := agent.DefaultConfig()
+	session := agent.NewChatSession(cfg)
+	session.Run()
 }
