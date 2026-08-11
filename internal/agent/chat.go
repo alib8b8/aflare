@@ -159,6 +159,8 @@ func buildToolList(toolNames []string, safeMode bool) []core.AgentTool {
 func (s *ChatSession) Run() {
 	s.running = true
 	scanner := bufio.NewScanner(os.Stdin)
+	// Increase buffer from default 64KB to 1MB for pasting long text
+	scanner.Buffer(make([]byte, 0, 64*1024), 1*1024*1024)
 
 	fmt.Println(WelcomeMessage(meta.GetVersion()))
 	fmt.Println()

@@ -69,32 +69,68 @@ func NewReActAgent(provider, model, apiKey, endpoint, systemPrompt string, maxIt
 }
 
 // buildToolDefinitions converts agent tools to OpenAI-compatible ToolDefinition
-// schemas for native function calling.
+// schemas for native function calling. Node parameters are exposed from the
+// registry schema so the LLM knows what params to pass (e.g. operation, key, value).
 func (a *ReActAgent) buildToolDefinitions() []core.ToolDefinition {
 	if len(a.tools) == 0 {
 		return nil
 	}
 	defs := make([]core.ToolDefinition, 0, len(a.tools))
 	for _, t := range a.tools {
+		properties := map[string]interface{}{
+			"input": map[string]interface{}{
+				"type":        "string",
+				"description": "The input to pass to the tool",
+			},
+		}
+		required := []string{"input"}
+
+		// Look up the node's schema from the registry and expose its params
+		if a.registry != nil {
+			if node, ok := a.registry.Get(t.NodeName); ok {
+				schema := node.Schema()
+				for _, p := range schema.Params {
+					prop := map[string]interface{}{
+						"type":        mapParamType(p.Type),
+						"description": p.Description,
+					}
+					if p.Default != "" {
+						prop["default"] = p.Default
+					}
+					properties[p.Name] = prop
+					if p.Required {
+						required = append(required, p.Name)
+					}
+				}
+			}
+		}
+
 		defs = append(defs, core.ToolDefinition{
 			Type: "function",
 			Function: core.ToolFunction{
 				Name:        t.Name,
 				Description: t.Description,
 				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"input": map[string]interface{}{
-							"type":        "string",
-							"description": "The input to pass to the tool",
-						},
-					},
-					"required": []string{"input"},
+					"type":       "object",
+					"properties": properties,
+					"required":   required,
 				},
 			},
 		})
 	}
 	return defs
+}
+
+// mapParamType maps a node parameter type string to a JSON Schema type.
+func mapParamType(t string) string {
+	switch strings.ToLower(t) {
+	case "number", "int", "integer", "float":
+		return "number"
+	case "bool", "boolean":
+		return "boolean"
+	default:
+		return "string"
+	}
 }
 
 func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
@@ -343,11 +379,11 @@ func (a *ReActAgent) executeTool(ctx context.Context, toolName, toolInput string
 		return "", fmt.Errorf("tool node %q not found in registry", targetTool.NodeName)
 	}
 
-	// For native function calling, the arguments come as a JSON string like {"input":"..."}
-	// Try to extract the "input" field from the JSON.
-	toolInput = extractToolInput(toolInput)
+	// Parse tool arguments: extract "input" as the main input string,
+	// and all other string fields as named params (e.g. operation, key, value).
+	toolInput, params := parseToolArgs(toolInput)
 
-	result, err := node.Execute(ctx, toolInput, map[string]string{})
+	result, err := node.Execute(ctx, toolInput, params)
 	if err != nil {
 		return "", fmt.Errorf("tool %s execution failed: %w", toolName, err)
 	}
@@ -359,23 +395,40 @@ func (a *ReActAgent) executeTool(ctx context.Context, toolName, toolInput string
 	return result, nil
 }
 
-// extractToolInput extracts the "input" field from a JSON tool call argument string.
-// If the argument is not valid JSON or doesn't have an "input" field, returns the original string.
-func extractToolInput(rawArgs string) string {
+// parseToolArgs extracts the "input" field and all other string parameters from
+// a JSON tool call argument string. Non-JSON input is returned as-is with nil params
+// for backward compatibility.
+//
+// Example: {"input":"user data","operation":"retrieve","key":"session1"}
+// → input="user data", params={"operation":"retrieve","key":"session1"}
+func parseToolArgs(rawArgs string) (input string, params map[string]string) {
 	rawArgs = strings.TrimSpace(rawArgs)
 	if rawArgs == "" || !strings.HasPrefix(rawArgs, "{") {
-		return rawArgs
+		return rawArgs, nil
 	}
 	var args map[string]interface{}
 	if err := json.Unmarshal([]byte(rawArgs), &args); err != nil {
-		return rawArgs
+		return rawArgs, nil
 	}
-	if input, ok := args["input"]; ok {
-		if s, ok := input.(string); ok {
-			return s
+
+	params = make(map[string]string)
+	for k, v := range args {
+		if k == "input" {
+			if s, ok := v.(string); ok {
+				input = s
+			}
+		} else {
+			if s, ok := v.(string); ok {
+				params[k] = s
+			}
 		}
 	}
-	return rawArgs
+
+	// If no "input" field was found and no params extracted, return raw as-is
+	if input == "" && len(params) == 0 {
+		return rawArgs, nil
+	}
+	return input, params
 }
 
 func (a *ReActAgent) toolNames() string {
