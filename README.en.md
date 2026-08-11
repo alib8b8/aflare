@@ -4,8 +4,8 @@
     <a href="README.md">中文</a> ·
     <strong>English</strong>
   </p>
-  <p><strong>ReAct Agent · 300+ Skills · Workflow Runtime · 10 Pluggable Capabilities</strong></p>
-  <p><em>Local-first Automation Agent + Deterministic Workflow Execution Engine</em></p>
+  <p><strong>AI Beyond Chat — Get Things Done</strong></p>
+  <p><em>ReAct Reasoning Loop · 300+ Skill Templates · Deterministic Workflow Execution · 10 Pluggable Capabilities</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">

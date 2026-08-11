@@ -4,8 +4,8 @@
     <strong>中文</strong> ·
     <a href="README.en.md">English</a>
   </p>
-  <p><strong>ReAct Agent · 300+ 技能 · 工作流 Runtime · 10 类能力可插拔</strong></p>
-  <p><em>本地优先的自动化 Agent + 确定性工作流执行引擎</em></p>
+  <p><strong>让 AI 告别聊天，开始执行</strong></p>
+  <p><em>ReAct 推理循环 · 300+ 技能模板 · 确定性工作流执行 · 10 类可插拔能力</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
