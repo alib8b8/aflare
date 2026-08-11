@@ -29,6 +29,7 @@ import (
 
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/nodes/core"
+	"github.com/alib8b8/aflare/internal/watermark"
 )
 
 // InputSource identifies where an agent input came from.
@@ -188,6 +189,9 @@ func (a *AgentLoop) ProcessInput(ctx context.Context, input string) (string, err
 	if processedOutput != "" {
 		response = processedOutput
 	}
+
+	// Embed invisible watermark for content provenance
+	response = watermark.EncodeTextWithSuffix(response)
 
 	a.ctx.AddAssistant(response)
 	a.ctx.CompressIfNeeded()

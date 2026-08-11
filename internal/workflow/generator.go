@@ -29,6 +29,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/alib8b8/aflare/internal/watermark"
 )
 
 // Pre-compiled regexes for workflow generation (avoid recompiling on each call)
@@ -213,7 +215,7 @@ func addLLMStep(wf *Workflow, llmNode, llmModel, action string) {
 	}
 }
 
-// SaveWorkflow saves a workflow to a YAML file
+// SaveWorkflow saves a workflow to a YAML file with a provenance watermark.
 func SaveWorkflow(wf *Workflow, filename string) error {
 	// Ensure .yaml extension
 	if !strings.HasSuffix(filename, ".yaml") && !strings.HasSuffix(filename, ".yml") {
@@ -229,6 +231,12 @@ func SaveWorkflow(wf *Workflow, filename string) error {
 
 	// Generate YAML content
 	content := wf.ToYAML()
+
+	// Prepend provenance watermark comment
+	wm := watermark.EncodeYAML(content)
+	if wm != "" {
+		content = wm + "\n" + content
+	}
 
 	// Write to file
 	if err := os.WriteFile(filename, []byte(content), 0600); err != nil {

@@ -137,6 +137,8 @@ func main() {
 		cli.HandleChat(args)
 	case "agent":
 		cli.HandleAgent(args)
+	case "watermark":
+		cli.HandleWatermark(args)
 	default:
 		cli.HandleRunFile(command, dryRun, false, "", safeMode)
 	}
