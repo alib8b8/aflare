@@ -4,8 +4,8 @@
     <a href="README.md">中文</a> ·
     <strong>English</strong>
   </p>
-  <p><strong>Keywords describe intent → YAML workflow → Deterministic execution</strong></p>
-  <p><em>Deterministic Workflow Execution Runtime</em></p>
+  <p><strong>ReAct Agent · 300+ Skills · Workflow Runtime · 10 Pluggable Capabilities</strong></p>
+  <p><em>Local-first Automation Agent + Deterministic Workflow Execution Engine</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
@@ -45,37 +45,57 @@ aflare create "monitor BTC price every 10 minutes, alert via Telegram when > 700
 
 # Run the workflow
 aflare run btc-monitor.yaml
+
+# Interactive AI Agent chat (ReAct Agent + 300+ skills)
+aflare chat
+# Or: aflare chat -p deepseek -m deepseek-chat
+
+# Daemon-mode Agent (stdin + scheduler fusion) + pluggable capabilities
+aflare agent -c reflection,bdi,utility
 ```
 
 ---
 
 ## Project Status
 
-aflare is currently in **early-stage v0.7**. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. Some advanced features (domestic chip support, Unitree robot) are experimental. Feedback and contributions welcome.
+aflare is currently at **v0.7 early stage**. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. Agent features (ReAct Agent chat, 300+ skill templates, 10 pluggable capabilities, unified event loop) are complete. Some advanced features (domestic chip support, Unitree robot) are experimental. Feedback and contributions welcome.
 
 ---
 
 ## What is this?
 
-aflare separates the "description" of a workflow from its "execution":
+aflare is both a **local-first automation Agent** and a **deterministic workflow execution engine**. Two modes, one core:
 
 ```
-Your words  →  Keyword matching  →  YAML Workflow  →  Runtime executes
-(description)  (regex + keywords)    (deterministic)    (DAG / WAL / Saga / Retry / Audit)
+Conversational Agent             Declarative Workflow
+─────────────────              ─────────────────
+aflare chat                    aflare create
+  ↓                              ↓
+ReAct Agent reasoning          Keyword matching generation
+  ↓                              ↓
+Invoke 300+ skill templates      YAML workflow
+  ↓                              ↓
+Tool execution → Reflect →      DAG scheduled execution
+  Optimize
 ```
 
-`aflare create` converts descriptions into YAML workflows via regex and keyword matching (**not LLM-generated**, see [`generator.go`](internal/workflow/generator.go)). The YAML workflow defines exactly what each step does, what it depends on, and what happens on failure. The Runtime handles DAG scheduling, checkpoint recovery, Saga transaction compensation, circuit breaking, and auditing — every operation is traceable, replayable, and verifiable.
+**Agent Mode**: Launch via `aflare chat` or `aflare agent`. Built-in ReAct reasoning loop, 300+ pre-built skill templates (16 domains), 10 pluggable capability types (reflection, human-in-the-loop, BDI goal management, utility-driven optimization, etc.).
+
+**Workflow Mode**: `aflare create` converts descriptions into YAML workflows via keyword matching. The YAML defines exactly what each step does, its dependencies, and failure handling. The Runtime handles DAG scheduling, WAL crash recovery, Saga transaction compensation, circuit breaking, and auditing — every operation is traceable, replayable, and verifiable.
 
 ---
 
 ## Three-Layer Model
 
 ```
-L1: Intent       —  "Monitor BTC, notify me if it drops 5%"
-                        ↓
-L2: Workflow     —  YAML deterministic workflow (schedule → get_price → condition → telegram)
-                        ↓
-L3: Runtime      —  Execution layer
+L0: Agent        —  "Monitor BTC, notify me if it drops 5%"
+                    ├── ReAct reasoning loop (think → call tool → observe → answer)
+                    ├── 300+ skill templates (16 domains)
+                    └── 10 pluggable capabilities (reflection/HITL/BDI/utility etc.)
+                       ↓
+L1: Workflow     —  YAML deterministic workflow (schedule → get_price → condition → telegram)
+                       ↓
+L2: Runtime      —  Execution layer
                     ├── DAG parallel scheduling
                     ├── Checkpoint / Resume (WAL crash recovery)
                     ├── Session persistence (cross-turn context)
@@ -92,9 +112,11 @@ L3: Runtime      —  Execution layer
 
 | Tool | Problem | aflare |
 |------|---------|--------|
-| **AI Agent** | LLM decides execution — unpredictable, hard to audit | Deterministic YAML workflows, execution is traceable and replayable |
+| **AI Agent (general)** | LLM decides execution — unpredictable, hard to audit | Deterministic YAML workflows as execution backend, traceable and replayable |
 | **n8n** | Visual workflow, but heavier (Docker), no built-in generation | Single binary, terminal-native, keyword-based workflow generation |
 | **Bash** | Hard to write and maintain, no error recovery | Description-based generation, built-in retry/circuit-breaking/checkpoint |
+| **LangChain/AutoGPT** | Pure Agent without deterministic execution guarantees | Agent + Runtime dual mode, Agent can degrade to deterministic workflow |
+| **Claude Code/Cursor** | Cloud-dependent, code-editing focused | Local-first, general automation, 300+ skills, auditable execution |
 
 ---
 
@@ -104,6 +126,11 @@ L3: Runtime      —  Execution layer
 
 | Feature | Status | Verification |
 |---------|--------|-------------|
+| **ReAct Agent Chat** (`aflare chat`) | ✅ | Tested |
+| **Daemon-mode Agent** (`aflare agent`) | ✅ | Tested |
+| **300+ Skill Templates** (16 domains) | ✅ | Tested |
+| **10 Pluggable Capabilities** (reflection/HITL/BDI/utility etc.) | ✅ | Tested |
+| **Multi-source Input Fusion** (stdin + scheduler + filewatch) | ✅ | Tested |
 | DAG Parallel Scheduling | ✅ | Tested + TLA+ formal verification |
 | WAL Crash Recovery + Session Persistence | ✅ | Tested |
 | Saga Transaction Compensation | ✅ | Tested |
@@ -118,6 +145,26 @@ L3: Runtime      —  Execution layer
 | Security Levels (L0-L3) | ✅ | Tested |
 
 > See [Experimental](#experimental) below for experimental features.
+
+### Agent Capabilities (Conversational + Daemon)
+
+- **ReAct Reasoning Loop** — Think → Call Tool → Observe → Answer, with native function calling and JSON fallback
+- **300+ Pre-built Skill Templates** — Covering 16 domains (Finance, Healthcare, Supply Chain, DevOps, etc.), auto-matched and executed by Agent
+- **Unified Event Loop** — Conversational (`aflare chat`) and daemon (`aflare agent`) share the same `AgentLoop` core, supporting stdin / scheduler / filewatch multi-source input fusion
+- **10 Pluggable Capabilities** — Enable on demand, mapping the complete Agent type taxonomy:
+
+| Capability | Type | Description |
+|------------|------|-------------|
+| `reflection` | Self-Critique | Auto-evaluate output quality after each turn, trigger self-correction |
+| `human-in-loop` | Human-in-the-Loop | Pause at critical decisions, request human confirmation |
+| `bdi` | Belief-Desire-Intention | Maintain goal tracking, belief extraction, periodic goal context injection |
+| `utility` | Utility-Driven | 6-dimension scoring (correctness/completeness/efficiency/safety/clarity/actionability), optimize decisions |
+| `adaptive` | Learning/Adaptive | Learn from feedback, improve across turns |
+| `memory` | Stateful | Cross-session long-term memory, remember user preferences |
+| `planning` | Planning | Generate plans before acting, execute step by step |
+| `multi-agent` | Multi-Agent Collaboration | Decompose complex tasks, multi-role coordination |
+| `workflow` | Workflow/Pipeline | Prioritize existing templates, stable and predictable |
+| `simulation` | Simulation/Generative | Human-like behavior modeling, scenario generation |
 
 ### Runtime Guarantees (Deterministic Execution)
 - **DAG Parallel Scheduling** — topological sort dependency scheduling, independent steps run concurrently
@@ -164,8 +211,23 @@ L3: Runtime      —  Execution layer
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│                    aflare Runtime                     │
+│                    aflare                             │
 │                                                       │
+│  ┌──────────────────────────────────────────────────┐ │
+│  │ Agent Layer (L0)                                  │ │
+│  │                                                    │ │
+│  │  aflare chat / aflare agent                       │ │
+│  │  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │ │
+│  │  │ ReAct    │  │ 300+     │  │ 10 Pluggable   │  │ │
+│  │  │ Reasoning│  │ Skills   │  │ Capabilities   │  │ │
+│  │  └──────────┘  └──────────┘  └────────────────┘  │ │
+│  │                                                    │ │
+│  │  ┌──────────────────────────────────────────────┐ │ │
+│  │  │ AgentLoop Unified Event Loop                   │ │ │
+│  │  │ stdin · scheduler · filewatch · MCP · HTTP   │ │ │
+│  │  └──────────────────────────────────────────────┘ │ │
+│  └──────────────────────────────────────────────────┘ │
+│                        ↓                               │
 │  ┌──────────┐   ┌──────────┐   ┌──────────────────┐  │
 │  │ Intent   │──▶│ Workflow │──▶│ Deterministic     │  │
 │  │ (desc.)  │   │ (YAML)   │   │ Executor          │  │
@@ -193,7 +255,8 @@ L3: Runtime      —  Execution layer
 | Version | Status | Focus |
 |---------|--------|-------|
 | v0.6 | Done | Agent memory infrastructure, voice AI toolchain, WAL persistence, TLA+ verification |
-| **v0.7** | **Current** | Financial scenario (Saga / Idempotency / Audit chain), experimental domestic chip support, experimental Unitree robot |
+| v0.7 | Done | Financial scenario enhancement (Saga / Idempotency / Audit chain), ReAct Agent chat, 300+ skill templates, 10 pluggable capabilities, Agent unified event loop |
+| **v0.8** | **Current** | Domestic chip support refinement, Unitree robot physical support, Agent capability deepening |
 | v1.0 | Planned | Stable API, LTS |
 
 See [CHANGELOG.md](CHANGELOG.md) for details.
