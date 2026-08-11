@@ -84,6 +84,9 @@ func (r *ReflectionCapability) PostProcess(ctx context.Context, input, output st
 		return "", nil // output is good, no modification needed
 	}
 
+	// Persist to cross-session learning log
+	appendReflection(input, issues)
+
 	// Build reflection prompt
 	reflection := r.buildReflectionPrompt(input, output, issues)
 	r.reflectionLog = append(r.reflectionLog, reflection)

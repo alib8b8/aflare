@@ -60,10 +60,13 @@ func (a *AdaptiveCapability) PreProcess(ctx context.Context, input string) (stri
 func (a *AdaptiveCapability) PostProcess(ctx context.Context, input, output string) (string, error) {
 	lower := strings.ToLower(output)
 	if strings.Contains(lower, "error") || strings.Contains(lower, "failed") {
-		a.feedback = append(a.feedback, fmt.Sprintf("Avoid errors like in response to: %s", truncateStr(input, 60)))
+		feedback := fmt.Sprintf("Avoid errors like in response to: %s", truncateStr(input, 60))
+		a.feedback = append(a.feedback, feedback)
 		if len(a.feedback) > 20 {
 			a.feedback = a.feedback[len(a.feedback)-20:]
 		}
+		// Persist to cross-session learning log
+		appendAdaptiveFeedback(feedback)
 	}
 	return "", nil
 }

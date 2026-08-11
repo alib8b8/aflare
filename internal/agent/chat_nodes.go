@@ -35,6 +35,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/alib8b8/aflare/internal/meta"
 	"github.com/alib8b8/aflare/internal/nodes/core"
 	"github.com/alib8b8/aflare/internal/templates"
 	"github.com/alib8b8/aflare/internal/workflow"
@@ -501,11 +502,12 @@ func (n *createWorkflowNode) Description() string { return "Generate a new workf
 func (n *createWorkflowNode) Schema() core.NodeSchema {
 	return core.NodeSchema{
 		Name:        "create_workflow",
-		Description: "Generate a new workflow YAML from a natural language description. Use this when no existing template matches the user's request.",
+		Description: "Generate a new workflow YAML from a natural language description. Use this when no existing template matches the user's request. Set save=true to persist as a reusable skill under templates/custom/.",
 		Input:       "string - natural language description of the desired workflow",
 		Output:      "string - generated workflow YAML content",
 		Params: []core.ParamSchema{
 			{Name: "name", Type: "string", Description: "Optional name for the workflow", Required: false},
+			{Name: "save", Type: "string", Description: "Set to 'true' to save the workflow as a reusable skill under templates/custom/", Required: false},
 		},
 	}
 }
@@ -530,7 +532,69 @@ func (n *createWorkflowNode) Execute(ctx context.Context, input string, params m
 		return "", fmt.Errorf("failed to marshal workflow: %w", err)
 	}
 
+	save := core.GetParam(params, "save", "")
+	if strings.ToLower(save) == "true" {
+		saveDir := filepath.Join("templates", "custom")
+		if err := os.MkdirAll(saveDir, 0o755); err != nil {
+			return "", fmt.Errorf("failed to create custom templates directory: %w", err)
+		}
+
+		skillName := strings.ToLower(wf.Name)
+		skillName = strings.ReplaceAll(skillName, " ", "_")
+		skillName = strings.ReplaceAll(skillName, "-", "_")
+		skillDir := filepath.Join(saveDir, skillName)
+		if err := os.MkdirAll(skillDir, 0o755); err != nil {
+			return "", fmt.Errorf("failed to create skill directory: %w", err)
+		}
+
+		skillPath := filepath.Join(skillDir, "workflow.yaml")
+		if err := os.WriteFile(skillPath, yamlBytes, 0o644); err != nil {
+			return "", fmt.Errorf("failed to save skill: %w", err)
+		}
+
+		return fmt.Sprintf("Workflow saved as reusable skill: templates/custom/%s/workflow.yaml\n\n%s", skillName, string(yamlBytes)), nil
+	}
+
 	return string(yamlBytes), nil
+}
+
+// ── SelfUpdateNode ──────────────────────────────────────────────────────
+
+type selfUpdateNode struct{}
+
+func (n *selfUpdateNode) Name() string       { return "self_update" }
+func (n *selfUpdateNode) Description() string { return "Check for aflare updates and install the latest version. Use when the user asks to upgrade or if you detect the version is outdated." }
+
+func (n *selfUpdateNode) Schema() core.NodeSchema {
+	return core.NodeSchema{
+		Name:        "self_update",
+		Description: "Check for aflare updates and install the latest version from GitHub releases. Downloads and verifies the binary with checksum validation.",
+		Input:       "string - optional, ignored",
+		Output:      "string - update result (already up to date, or updated to version X)",
+		Params: []core.ParamSchema{
+			{Name: "check_only", Type: "string", Description: "Set to 'true' to only check for updates without installing", Required: false},
+		},
+	}
+}
+
+func (n *selfUpdateNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	checkOnly := core.GetParam(params, "check_only", "")
+	if strings.ToLower(checkOnly) == "true" {
+		release, err := meta.CheckLatestRelease("alib8b8/aflare")
+		if err != nil {
+			return "", fmt.Errorf("failed to check for updates: %w", err)
+		}
+		if meta.HasUpdate(meta.Version, release) {
+			return fmt.Sprintf("Update available: %s (current: %s)\nRelease notes: %s", release.TagName, meta.Version, release.Body), nil
+		}
+		return fmt.Sprintf("Already up to date (current: %s, latest: %s)", meta.Version, release.TagName), nil
+	}
+
+	result, err := meta.SelfUpdate("alib8b8/aflare")
+	if err != nil {
+		return "", fmt.Errorf("self-update failed: %w", err)
+	}
+	return result, nil
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -548,6 +612,7 @@ func registerChatNodes(reg *core.Registry) {
 	reg.Register(&templateInfoNode{})
 	reg.Register(&runWorkflowNode{})
 	reg.Register(&createWorkflowNode{})
+	reg.Register(&selfUpdateNode{})
 }
 
 // ListCategories returns a summary of all template categories with counts.
