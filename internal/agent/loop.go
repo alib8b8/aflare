@@ -60,13 +60,18 @@ type AgentOutput struct {
 // processes them through the ReActAgent, and routes responses back.
 // Multiple input sources (stdin, scheduler, filewatch, MCP, HTTP) feed into
 // the same loop — the agent doesn't care where the input came from.
+//
+// The loop supports pluggable capabilities (reflection, BDI, human-in-the-loop,
+// utility optimization, etc.) that hook into the execution cycle via
+// PreProcess and PostProcess.
 type AgentLoop struct {
 	config     Config
 	reg        *core.Registry
 	tools      []core.AgentTool
 	systemMsg  string
 	ctx        *ContextManager
-	interrupt  chan struct{} // internal interrupt for Ctrl-C
+	interrupt  chan struct{}        // internal interrupt for Ctrl-C
+	caps       *CapabilityRegistry  // pluggable capabilities
 }
 
 // NewAgentLoop creates a new AgentLoop with the given configuration.
@@ -92,14 +97,30 @@ func NewAgentLoop(cfg Config) *AgentLoop {
 	systemMsg := BuildSystemPrompt(tools, "0.0.0")
 	cm.SetSystemPrompt(systemMsg)
 
-	return &AgentLoop{
+	loop := &AgentLoop{
 		config:    cfg,
 		reg:       reg,
 		tools:     tools,
 		systemMsg: systemMsg,
 		ctx:       cm,
 		interrupt: make(chan struct{}, 1),
+		caps:      NewCapabilityRegistry(),
 	}
+
+	// Initialize capabilities from config
+	if len(cfg.Capabilities) > 0 {
+		for _, name := range cfg.Capabilities {
+			cap := CreateCapability(name)
+			if cap != nil {
+				loop.caps.Register(cap)
+			}
+		}
+		if err := loop.caps.InitAll(loop); err != nil {
+			log.Printf("[agent] capability init warning: %v", err)
+		}
+	}
+
+	return loop
 }
 
 // Context returns the context manager for external access (e.g. /history, /clear).
@@ -112,10 +133,27 @@ func (a *AgentLoop) Tools() []core.AgentTool {
 	return a.tools
 }
 
+// Capabilities returns the capability registry for external access (e.g. /capabilities).
+func (a *AgentLoop) Capabilities() *CapabilityRegistry {
+	return a.caps
+}
+
 // ProcessInput processes a single input and returns the response.
 // This is the same core logic used by chat, scheduler, filewatch, and MCP.
+// Capabilities hook into the execution via PreProcess (before agent) and
+// PostProcess (after agent).
 func (a *AgentLoop) ProcessInput(ctx context.Context, input string) (string, error) {
-	a.ctx.AddUser(input)
+	// Run capability PreProcess hooks
+	processedInput, err := a.caps.PreProcessAll(ctx, input)
+	if err != nil {
+		log.Printf("[agent] pre-process warning: %v", err)
+		processedInput = input // fall back to original
+	}
+	if processedInput == "" {
+		processedInput = input
+	}
+
+	a.ctx.AddUser(processedInput)
 
 	agent := nodes.NewReActAgent(
 		a.config.Provider,
@@ -133,6 +171,16 @@ func (a *AgentLoop) ProcessInput(ctx context.Context, input string) (string, err
 	response, err := agent.Run(ctx, a.ctx.BuildPrefix())
 	if err != nil {
 		return "", fmt.Errorf("agent execution failed: %w", err)
+	}
+
+	// Run capability PostProcess hooks
+	processedOutput, capErr := a.caps.PostProcessAll(ctx, processedInput, response)
+	if capErr != nil {
+		log.Printf("[agent] post-process warning: %v", capErr)
+		processedOutput = response // fall back to original
+	}
+	if processedOutput != "" {
+		response = processedOutput
 	}
 
 	a.ctx.AddAssistant(response)

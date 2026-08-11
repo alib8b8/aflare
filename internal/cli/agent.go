@@ -68,6 +68,11 @@ func HandleAgent(args []string) {
 				cfg.Tools = parseToolsArg(args[i+1])
 				i++
 			}
+		case "--capabilities", "-c":
+			if i+1 < len(args) {
+				cfg.Capabilities = agent.ParseCapabilities(args[i+1])
+				i++
+			}
 		case "--max-iterations", "-n":
 			if i+1 < len(args) {
 				if n, err := strconv.Atoi(args[i+1]); err == nil && n > 0 {
@@ -189,6 +194,7 @@ func handleAgentCommand(cmd string, loop *agent.AgentLoop, running *bool) {
 		fmt.Println("  /help, /h      Show this help")
 		fmt.Println("  /skills        List skill categories (300+ templates)")
 		fmt.Println("  /tools         List available tools")
+		fmt.Println("  /capabilities  List active capabilities")
 		fmt.Println("  /history       Show conversation state")
 		fmt.Println("  /clear         Clear conversation history")
 		fmt.Println("  /exit, /quit   Exit agent")
@@ -200,6 +206,20 @@ func handleAgentCommand(cmd string, loop *agent.AgentLoop, running *bool) {
 		fmt.Println("Available tools:")
 		for _, t := range loop.Tools() {
 			fmt.Printf("  %-20s %s\n", t.Name, t.Description)
+		}
+
+	case "/capabilities":
+		caps := loop.Capabilities()
+		if caps.Count() == 0 {
+			fmt.Println("No capabilities active. Use --capabilities to enable (e.g. -c reflection,bdi,utility).")
+		} else {
+			fmt.Printf("Active capabilities (%d):\n", caps.Count())
+			for _, name := range caps.Names() {
+				cap := caps.Get(name)
+				if cap != nil {
+					fmt.Printf("  %-16s %s\n", name, cap.Description())
+				}
+			}
 		}
 
 	case "/history":
@@ -232,19 +252,35 @@ func PrintAgentUsage() {
 	fmt.Println("  --api-key, -k <key>       API key for cloud providers")
 	fmt.Println("  --endpoint, -e <url>      Custom API endpoint")
 	fmt.Println("  --tools, -t <list>        Comma-separated tool names, or 'all'")
+	fmt.Println("  --capabilities, -c <list> Comma-separated capability names, or 'all'")
 	fmt.Println("  --max-iterations, -n <n>  Max agent iterations per turn (default: 10)")
 	fmt.Println("  --safe-mode, -s            Block execute and destructive tools")
 	fmt.Println("  --help, -h                 Show this help")
+	fmt.Println()
+	fmt.Println("Capabilities (--capabilities):")
+	fmt.Println("  reflection     Self-reflection and self-correction (反思/自我批评)")
+	fmt.Println("  human-in-loop  Pause at critical decisions for human approval (人机协同)")
+	fmt.Println("  bdi            Belief-Desire-Intention goal management (BDI)")
+	fmt.Println("  utility        Utility-driven optimization of decisions (效用驱动)")
+	fmt.Println("  adaptive       Learning and adaptation from feedback (学习型/自适应)")
+	fmt.Println("  memory         Cross-session long-term memory (有状态)")
+	fmt.Println("  planning       Goal-driven planning and action sequencing (规划式)")
+	fmt.Println("  multi-agent    Multi-agent collaboration (多Agent协作式)")
+	fmt.Println("  workflow       Predefined workflow/pipeline execution (工作流/管道式)")
+	fmt.Println("  simulation     Simulation and generative behavior modeling (模拟/生成式)")
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  aflare agent                                    # local ollama (default)")
 	fmt.Println("  aflare agent -p deepseek -m deepseek-chat       # DeepSeek")
 	fmt.Println("  aflare agent -s                                 # safe mode")
+	fmt.Println("  aflare agent -c reflection,bdi                  # with reflection + BDI")
+	fmt.Println("  aflare agent -c all                             # all capabilities")
 	fmt.Println()
 	fmt.Println("Agent commands:")
-	fmt.Println("  /help     Show commands")
-	fmt.Println("  /tools    List available tools")
-	fmt.Println("  /history  Show conversation state")
-	fmt.Println("  /clear    Clear conversation history")
-	fmt.Println("  /exit     Exit agent")
+	fmt.Println("  /help       Show commands")
+	fmt.Println("  /tools      List available tools")
+	fmt.Println("  /capabilities  List active capabilities")
+	fmt.Println("  /history    Show conversation state")
+	fmt.Println("  /clear      Clear conversation history")
+	fmt.Println("  /exit       Exit agent")
 }

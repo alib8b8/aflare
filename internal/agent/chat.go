@@ -49,6 +49,7 @@ type Config struct {
 	Tools         []string // Tool names to enable (default: DefaultTools)
 	MaxIterations int      // Max agent iterations per turn (default: 10)
 	SafeMode      bool     // Block execute and destructive tools
+	Capabilities  []string // Capability names to enable (e.g. "reflection", "bdi")
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -219,6 +220,7 @@ func (s *ChatSession) handleCommand(cmd string) {
 		fmt.Println("  /help, /h      Show this help")
 		fmt.Println("  /skills        List skill categories (300+ templates)")
 		fmt.Println("  /tools         List available tools")
+		fmt.Println("  /capabilities  List active capabilities")
 		fmt.Println("  /history       Show conversation state")
 		fmt.Println("  /clear         Clear conversation history")
 		fmt.Println("  /exit, /quit   Exit chat")
@@ -230,6 +232,20 @@ func (s *ChatSession) handleCommand(cmd string) {
 		fmt.Println("Available tools:")
 		for _, t := range s.loop.Tools() {
 			fmt.Printf("  %-20s %s\n", t.Name, t.Description)
+		}
+
+	case "/capabilities":
+		caps := s.loop.Capabilities()
+		if caps.Count() == 0 {
+			fmt.Println("No capabilities active. Use --capabilities to enable (e.g. -c reflection,bdi,utility).")
+		} else {
+			fmt.Printf("Active capabilities (%d):\n", caps.Count())
+			for _, name := range caps.Names() {
+				cap := caps.Get(name)
+				if cap != nil {
+					fmt.Printf("  %-16s %s\n", name, cap.Description())
+				}
+			}
 		}
 
 	case "/history":
