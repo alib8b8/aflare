@@ -19,209 +19,144 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"unicode/utf8"
 
-	"github.com/alib8b8/aflare/internal/compress"
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
 const (
-	// DefaultMaxContextTokens is the default token budget for conversation history.
-	// Rough estimate: 1 token ≈ 4 characters for English text.
-	DefaultMaxContextTokens = 8000
+	// MaxContextChars is the character budget for the full conversation context.
+	// When exceeded, older messages are compressed into a summary.
+	MaxContextChars = 8000
 
-	// DefaultMaxContextChars is the character-level fallback when token counting
-	// is unavailable (roughly 4 chars per token for English).
-	DefaultMaxContextChars = DefaultMaxContextTokens * 4
+	// KeepRecentN is the number of most recent messages preserved during compression.
+	KeepRecentN = 4
 
-	// KeepLastN is the number of recent messages to always preserve during compression.
-	KeepLastN = 6
-
-	// MaxMemoryKeyLength is the maximum length for memory keys.
-	MaxMemoryKeyLength = 128
+	// MaxSummaryChars caps the compressed summary to prevent unbounded growth.
+	MaxSummaryChars = 2000
 )
 
-// ContextManager manages conversation history with automatic compression
-// and key fact persistence via the memory system.
+// ContextManager manages multi-turn conversation history with automatic
+// compression when the context exceeds the character budget.
 type ContextManager struct {
-	messages       []core.LLMMessage
-	sessionID      string
-	compressNode   *nodes.CompressNode
-	memoryNode     *nodes.MemoryNode
-	maxTokens      int
-	compressConfig compress.Config
+	messages     []core.LLMMessage
+	systemPrompt string
+	compressNode *nodes.CompressNode
 }
 
-// NewContextManager creates a new context manager for the given session.
-func NewContextManager(sessionID string) *ContextManager {
-	cfg := compress.DefaultConfig()
-	cfg.Algorithm = compress.AlgoHybrid
-	cfg.TargetRatio = 0.2
-	cfg.MaxOutputChars = 4000
-	cfg.PreserveHeaders = true
-	cfg.PreserveNumbers = true
-
+// NewContextManager creates a new context manager.
+func NewContextManager() *ContextManager {
 	return &ContextManager{
-		messages:       make([]core.LLMMessage, 0),
-		sessionID:      sessionID,
-		compressNode:   &nodes.CompressNode{},
-		memoryNode:     &nodes.MemoryNode{},
-		maxTokens:      DefaultMaxContextTokens,
-		compressConfig: cfg,
+		messages:     make([]core.LLMMessage, 0),
+		compressNode: &nodes.CompressNode{},
 	}
 }
 
-// Add appends a message to the conversation history and triggers compression
-// if the context window exceeds the token budget.
-func (cm *ContextManager) Add(role, content string) {
-	cm.messages = append(cm.messages, core.LLMMessage{
-		Role:    role,
-		Content: content,
-	})
-	if cm.estimateTokens() > cm.maxTokens {
-		cm.autoCompress()
-	}
-}
-
-// Messages returns the current conversation history.
-func (cm *ContextManager) Messages() []core.LLMMessage {
-	return cm.messages
-}
-
-// SetSystemPrompt sets or replaces the system message at the beginning of the conversation.
+// SetSystemPrompt sets the system prompt (shown at the top of the context).
 func (cm *ContextManager) SetSystemPrompt(prompt string) {
-	if len(cm.messages) > 0 && cm.messages[0].Role == "system" {
-		cm.messages[0].Content = prompt
-	} else {
-		cm.messages = append([]core.LLMMessage{{Role: "system", Content: prompt}}, cm.messages...)
-	}
+	cm.systemPrompt = prompt
 }
 
-// BuildPrompt constructs a single prompt string from the conversation history
-// suitable for agents that don't support multi-message chat formats.
-func (cm *ContextManager) BuildPrompt() string {
-	var parts []string
+// AddUser appends a user message to the history.
+func (cm *ContextManager) AddUser(content string) {
+	cm.messages = append(cm.messages, core.LLMMessage{Role: "user", Content: content})
+}
+
+// AddAssistant appends an assistant message to the history.
+func (cm *ContextManager) AddAssistant(content string) {
+	cm.messages = append(cm.messages, core.LLMMessage{Role: "assistant", Content: content})
+}
+
+// BuildPrefix returns the conversation history as a formatted string
+// suitable for inclusion in the agent's prompt. The system prompt is prepended.
+func (cm *ContextManager) BuildPrefix() string {
+	var sb strings.Builder
+	if cm.systemPrompt != "" {
+		sb.WriteString(cm.systemPrompt)
+		sb.WriteString("\n\n")
+	}
+	sb.WriteString("Conversation history:\n")
 	for _, m := range cm.messages {
-		parts = append(parts, fmt.Sprintf("%s: %s", m.Role, m.Content))
+		sb.WriteString(fmt.Sprintf("%s: %s\n", m.Role, m.Content))
 	}
-	return strings.Join(parts, "\n\n")
+	return sb.String()
 }
 
-// estimateTokens provides a rough token count estimate (4 chars ≈ 1 token).
-func (cm *ContextManager) estimateTokens() int {
-	total := 0
+// CompressIfNeeded checks the character budget and compresses older messages
+// if the total exceeds MaxContextChars. Recent messages are always preserved.
+func (cm *ContextManager) CompressIfNeeded() {
+	if cm.totalChars() <= MaxContextChars {
+		return
+	}
+	cm.compress()
+}
+
+// totalChars returns the total character count of all messages.
+func (cm *ContextManager) totalChars() int {
+	n := 0
 	for _, m := range cm.messages {
-		total += utf8.RuneCountInString(m.Content)
+		n += len(m.Content)
 	}
-	return total / 4
+	return n
 }
 
-// autoCompress compresses older messages while preserving the most recent ones.
-// Key facts from compressed messages are persisted to memory before compression.
-func (cm *ContextManager) autoCompress() {
-	if len(cm.messages) <= KeepLastN+2 {
-		return // Not enough messages to compress
+// compress replaces older messages with a summary, keeping the most recent ones.
+func (cm *ContextManager) compress() {
+	if len(cm.messages) <= KeepRecentN+2 {
+		return
 	}
 
-	keepIdx := len(cm.messages) - KeepLastN
-	if keepIdx <= 1 {
-		keepIdx = 2 // Always keep system message + at least 1 more
+	keepIdx := len(cm.messages) - KeepRecentN
+	if keepIdx <= 0 {
+		return
 	}
 
-	// Extract key facts from older messages and store in memory
-	oldMessages := cm.messages[1:keepIdx]
-	_ = cm.maybeRemember(oldMessages)
-
-	// Build text to compress from older messages
+	// Build text from older messages to compress
 	var oldText strings.Builder
-	for _, m := range oldMessages {
-		oldText.WriteString(fmt.Sprintf("[%s] %s\n", m.Role, m.Content))
+	for i := 0; i < keepIdx; i++ {
+		oldText.WriteString(fmt.Sprintf("[%s] %s\n", cm.messages[i].Role, cm.messages[i].Content))
 	}
 
-	// Compress older messages
 	compressed, err := cm.compressNode.Execute(
 		context.Background(),
 		oldText.String(),
 		map[string]string{
 			"algorithm":        "hybrid",
-			"ratio":            fmt.Sprintf("%.1f", cm.compressConfig.TargetRatio),
-			"max_chars":        fmt.Sprintf("%d", cm.compressConfig.MaxOutputChars),
-			"preserve_headers": "true",
+			"ratio":            "0.15",
+			"max_chars":        fmt.Sprintf("%d", MaxSummaryChars),
+			"preserve_headers": "false",
 			"preserve_numbers": "true",
 			"output":           "text",
 		},
 	)
 	if err != nil || compressed == "" {
-		return // Keep original messages if compression fails
+		// Fallback: truncate old messages to keep budget
+		cm.messages = cm.messages[keepIdx:]
+		return
 	}
 
-	// Replace older messages with a compressed summary
-	systemMsg := cm.messages[0]
+	// Replace old messages with summary, keep recent ones
 	recent := cm.messages[keepIdx:]
 	cm.messages = []core.LLMMessage{
-		systemMsg,
-		{
-			Role:    "system",
-			Content: fmt.Sprintf("[Compressed conversation history]\n%s\n[End compressed history]", compressed),
-		},
+		{Role: "system", Content: fmt.Sprintf("[Previous conversation summary]\n%s\n[End summary]", compressed)},
 	}
 	cm.messages = append(cm.messages, recent...)
 }
 
-// maybeRemember extracts key facts from messages and stores them in memory.
-func (cm *ContextManager) maybeRemember(messages []core.LLMMessage) error {
-	var combined strings.Builder
-	for _, m := range messages {
-		combined.WriteString(m.Content)
-		combined.WriteString("\n")
+// Summary returns a human-readable summary of the conversation state.
+// Used by the /history command.
+func (cm *ContextManager) Summary() string {
+	chars := cm.totalChars()
+	msgs := len(cm.messages)
+	status := "ok"
+	if chars > MaxContextChars {
+		status = "compressed"
 	}
-
-	text := combined.String()
-	if len(text) < 100 {
-		return nil
-	}
-
-	// Store as a summary of key facts from this conversation segment
-	_, err := cm.memoryNode.Execute(
-		context.Background(),
-		text,
-		map[string]string{
-			"operation":  "store",
-			"session_id": cm.sessionID,
-			"key":        fmt.Sprintf("chat_context_%d", len(cm.messages)),
-			"level":      "medium",
-			"type":       "context",
-			"tags":       "chat,conversation,auto",
-			"confidence": "0.7",
-		},
-	)
-	return err
-}
-
-// Retrieve searches memory for relevant context.
-func (cm *ContextManager) Retrieve(query string) (string, error) {
-	return cm.memoryNode.Execute(
-		context.Background(),
-		query,
-		map[string]string{
-			"operation":  "search",
-			"session_id": cm.sessionID,
-			"query":      query,
-			"top_k":      "5",
-			"threshold":  "0.4",
-		},
-	)
+	return fmt.Sprintf("Messages: %d | Characters: %d (limit: %d) | Status: %s",
+		msgs, chars, MaxContextChars, status)
 }
 
 // Reset clears the conversation history (keeps the system prompt).
 func (cm *ContextManager) Reset() {
-	var systemMsg core.LLMMessage
-	if len(cm.messages) > 0 && cm.messages[0].Role == "system" {
-		systemMsg = cm.messages[0]
-	}
-	cm.messages = []core.LLMMessage{}
-	if systemMsg.Role != "" {
-		cm.messages = append(cm.messages, systemMsg)
-	}
+	cm.messages = make([]core.LLMMessage, 0)
 }

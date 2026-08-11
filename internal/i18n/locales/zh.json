@@ -151,6 +151,7 @@
   "tui.press_q": "按 Q 退出",
   "tui.failed": "失败",
   "usage.resume": "恢复已暂停的工作流",
+  "usage.chat": "启动 AI 代理交互式对话",
   "resume.usage": "用法：aflare resume <run-id>\n       aflare resume list",
   "resume.list_empty": "没有已暂停的工作流。",
   "resume.list_title": "已暂停的工作流（%d）：",

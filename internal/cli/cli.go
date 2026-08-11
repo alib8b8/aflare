@@ -189,6 +189,7 @@ func PrintUsage() string {
   aflare self-update                     %s
   aflare autoupgrade <cmd>               %s
   aflare resume <run-id>                  %s
+  aflare chat                            %s
   aflare help                            %s
 
 %s:
@@ -216,6 +217,7 @@ func PrintUsage() string {
 		i18n.T("usage.self_update"),
 		i18n.T("usage.autoupgrade"),
 		i18n.T("usage.resume"),
+		i18n.T("usage.chat"),
 		i18n.T("usage.help"),
 		i18n.T("options"),
 		i18n.T("usage.safe_mode"),
