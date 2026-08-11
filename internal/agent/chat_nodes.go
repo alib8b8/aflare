@@ -542,6 +542,13 @@ func (n *createWorkflowNode) Execute(ctx context.Context, input string, params m
 		skillName := strings.ToLower(wf.Name)
 		skillName = strings.ReplaceAll(skillName, " ", "_")
 		skillName = strings.ReplaceAll(skillName, "-", "_")
+
+		// Strip any path components to prevent directory traversal.
+		// LLM-controlled wf.Name could contain "../" or "/" to escape templates/custom/.
+		skillName = filepath.Base(skillName)
+		if skillName == "." || skillName == ".." || skillName == "" {
+			return "", fmt.Errorf("invalid skill name: %q", wf.Name)
+		}
 		skillDir := filepath.Join(saveDir, skillName)
 		if err := os.MkdirAll(skillDir, 0o755); err != nil {
 			return "", fmt.Errorf("failed to create skill directory: %w", err)
