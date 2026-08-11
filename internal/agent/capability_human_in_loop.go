@@ -53,7 +53,8 @@ type HumanInLoopCapability struct {
 	mu              sync.RWMutex
 	policy          ApprovalPolicy
 	pendingApproval bool
-	lastApproval    string
+	pendingInput    string // original input that triggered the approval
+	pendingOutput   string // output that triggered the approval
 	approvalHistory []string
 }
 
@@ -89,19 +90,23 @@ func (h *HumanInLoopCapability) PreProcess(ctx context.Context, input string) (s
 		lower := strings.ToLower(strings.TrimSpace(input))
 		if lower == "yes" || lower == "y" || lower == "approve" || lower == "proceed" || lower == "confirm" {
 			h.pendingApproval = false
-			h.lastApproval = "approved"
-			h.approvalHistory = append(h.approvalHistory, fmt.Sprintf("APPROVED: %s", truncateStr(h.lastApproval, 80)))
-			// Return the original action the user was approving
-			return input, nil
+			origInput := h.pendingInput
+			h.approvalHistory = append(h.approvalHistory, fmt.Sprintf("APPROVED: %s", truncateStr(origInput, 80)))
+			h.pendingInput = ""
+			h.pendingOutput = ""
+			// Re-submit the original input so the agent can execute the action
+			return origInput, nil
 		}
 		if lower == "no" || lower == "n" || lower == "deny" || lower == "reject" || lower == "cancel" {
 			h.pendingApproval = false
-			h.lastApproval = "rejected"
-			h.approvalHistory = append(h.approvalHistory, fmt.Sprintf("REJECTED: %s", truncateStr(h.lastApproval, 80)))
-			return input, nil
+			h.approvalHistory = append(h.approvalHistory, fmt.Sprintf("REJECTED: %s", truncateStr(h.pendingInput, 80)))
+			h.pendingInput = ""
+			h.pendingOutput = ""
+			// Return a cancellation signal — the agent won't process this turn
+			return "", fmt.Errorf("action cancelled by user")
 		}
-		// Still waiting for a clear yes/no
-		return input, nil
+		// Still waiting for a clear yes/no — don't process this input
+		return "", fmt.Errorf("awaiting approval: type 'yes' to proceed or 'no' to cancel")
 	}
 
 	return "", nil
@@ -134,7 +139,8 @@ func (h *HumanInLoopCapability) PostProcess(ctx context.Context, input, output s
 
 	// Mark as pending and inject approval prompt
 	h.pendingApproval = true
-	h.lastApproval = output
+	h.pendingInput = input
+	h.pendingOutput = output
 
 	augmented := output + "\n\n" + h.buildApprovalPrompt(output)
 	return augmented, nil

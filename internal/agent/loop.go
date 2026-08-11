@@ -146,6 +146,12 @@ func (a *AgentLoop) ProcessInput(ctx context.Context, input string) (string, err
 	// Run capability PreProcess hooks
 	processedInput, err := a.caps.PreProcessAll(ctx, input)
 	if err != nil {
+		// If PreProcess returned an error with an empty input, it means
+		// "skip this turn" (e.g. human-in-the-loop cancellation or awaiting approval).
+		// Propagate the error to the caller so it can be displayed to the user.
+		if processedInput == "" {
+			return "", err
+		}
 		log.Printf("[agent] pre-process warning: %v", err)
 		processedInput = input // fall back to original
 	}

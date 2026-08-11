@@ -152,13 +152,17 @@ func (b *BDICapability) setBelief(key, value string, confidence float64) {
 }
 
 // extractDesiresFromInput parses user input for goal-like statements.
+// Only extracts goals from clear intent statements, not trivial queries.
 func (b *BDICapability) extractDesiresFromInput(input string) {
 	lower := strings.ToLower(input)
 
+	// Strong goal indicators — user clearly states a multi-step objective
 	goalIndicators := []string{
-		"i want to", "i need to", "i'd like to", "help me",
-		"can you", "please", "我需要", "我想", "帮我",
+		"i want to", "i need to", "i'd like to",
+		"我需要", "我想", "帮我",
 		"goal:", "target:", "objective:", "aim:",
+		"create a", "build a", "set up", "develop a",
+		"generate a", "automate", "deploy",
 	}
 
 	hasGoal := false
@@ -171,6 +175,14 @@ func (b *BDICapability) extractDesiresFromInput(input string) {
 
 	if !hasGoal {
 		return
+	}
+
+	// Don't create goals for trivial one-line queries (e.g. "what time is it")
+	trivialQueries := []string{"what time", "what day", "how are you", "hello", "hi ", "thanks"}
+	for _, q := range trivialQueries {
+		if strings.Contains(lower, q) {
+			return
+		}
 	}
 
 	// Don't create duplicate goals
@@ -220,25 +232,69 @@ func (b *BDICapability) extractBeliefsFromOutput(output string) {
 }
 
 // checkGoalCompletion checks if any goals were completed based on the output.
+// Only marks a goal as completed when the output contains completion language
+// AND the output is related to the specific goal (not just any completion word).
 func (b *BDICapability) checkGoalCompletion(input, output string) {
 	lowerOutput := strings.ToLower(output)
 	completionWords := []string{"completed", "done", "finished", "success", "resolved", "solved", "accomplished"}
 
+	// Only check for completion if the output actually contains completion language
+	hasCompletion := false
+	for _, word := range completionWords {
+		if strings.Contains(lowerOutput, word) {
+			hasCompletion = true
+			break
+		}
+	}
+	if !hasCompletion {
+		return
+	}
+
+	// Only mark a goal as completed if the goal's description keywords
+	// appear near the completion word in the output.
 	for _, d := range b.desires {
 		if d.Status == "completed" || d.Status == "abandoned" {
 			continue
 		}
-		// Check if the output mentions completing this goal
-		for _, word := range completionWords {
-			if strings.Contains(lowerOutput, word) {
-				// Simple heuristic: if the output contains completion words
-				// and the goal description is relevant, mark as completed
-				d.Status = "completed"
-				d.Progress = "completed based on agent output"
+		// Extract key terms from the goal description (first 3 significant words)
+		goalTerms := extractKeyTerms(d.Description)
+		related := false
+		for _, term := range goalTerms {
+			if len(term) > 3 && strings.Contains(lowerOutput, term) {
+				related = true
+				break
+			}
+		}
+		if related {
+			d.Status = "completed"
+			d.Progress = "completed based on agent output"
+		}
+	}
+}
+
+// extractKeyTerms extracts the most significant words from a description
+// for matching purposes. Skips common stop words.
+func extractKeyTerms(desc string) []string {
+	stopWords := map[string]bool{
+		"i": true, "me": true, "my": true, "you": true, "your": true,
+		"to": true, "the": true, "a": true, "an": true, "is": true,
+		"and": true, "or": true, "of": true, "in": true, "for": true,
+		"with": true, "on": true, "at": true, "it": true, "be": true,
+		"this": true, "that": true, "can": true, "will": true, "want": true,
+		"need": true, "like": true, "help": true, "please": true,
+	}
+	words := strings.Fields(strings.ToLower(desc))
+	var terms []string
+	for _, w := range words {
+		w = strings.Trim(w, ".,!?;:\"'()[]{}")
+		if len(w) > 3 && !stopWords[w] {
+			terms = append(terms, w)
+			if len(terms) >= 3 {
 				break
 			}
 		}
 	}
+	return terms
 }
 
 // buildBDIContext creates a context string summarizing active goals and beliefs
@@ -287,20 +343,25 @@ func (b *BDICapability) getActiveDesires() []*Desire {
 	return active
 }
 
-// pruneDesires removes completed or abandoned goals to keep the list manageable.
+// pruneDesires removes excess completed or abandoned goals to keep the list manageable.
+// Keeps the most recent 5 completed/abandoned goals, removes the rest.
 func (b *BDICapability) pruneDesires() {
-	var kept []*Desire
-	removed := 0
+	// Separate active and inactive goals
+	var active, completed []*Desire
 	for _, d := range b.desires {
 		if d.Status == "completed" || d.Status == "abandoned" {
-			if removed < 5 {
-				removed++
-				continue
-			}
+			completed = append(completed, d)
+		} else {
+			active = append(active, d)
 		}
-		kept = append(kept, d)
 	}
-	b.desires = kept
+
+	// Keep only the most recent 5 completed goals
+	if len(completed) > 5 {
+		completed = completed[len(completed)-5:]
+	}
+
+	b.desires = append(active, completed...)
 }
 
 // AddGoal allows programmatic addition of a goal.

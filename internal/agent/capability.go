@@ -108,12 +108,15 @@ func (cr *CapabilityRegistry) InitAll(loop *AgentLoop) error {
 
 // PreProcessAll runs PreProcess on all capabilities in order.
 // Each capability can modify the input; modifications are chained.
+// When a capability returns an error, the chain stops and the error is propagated.
 func (cr *CapabilityRegistry) PreProcessAll(ctx context.Context, input string) (string, error) {
 	current := input
 	for _, cap := range cr.capabilities {
 		modified, err := cap.PreProcess(ctx, current)
 		if err != nil {
-			return current, fmt.Errorf("capability %s pre-process failed: %w", cap.Name(), err)
+			// Return the modified value (even if empty) alongside the error
+			// to allow callers to detect "skip this turn" signals
+			return modified, fmt.Errorf("capability %s pre-process failed: %w", cap.Name(), err)
 		}
 		if modified != "" {
 			current = modified
@@ -182,13 +185,17 @@ var AvailableCapabilities = map[string]string{
 }
 
 // ParseCapabilities parses a comma-separated capability string into a list.
+// Special value "all" enables all available capabilities. Empty string returns empty list.
 func ParseCapabilities(input string) []string {
-	if input == "" || input == "all" {
+	if input == "all" {
 		names := make([]string, 0, len(AvailableCapabilities))
 		for name := range AvailableCapabilities {
 			names = append(names, name)
 		}
 		return names
+	}
+	if input == "" {
+		return nil
 	}
 	parts := strings.Split(input, ",")
 	var result []string

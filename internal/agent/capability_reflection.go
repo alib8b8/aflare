@@ -107,8 +107,9 @@ func (r *ReflectionCapability) Shutdown() error {
 func (r *ReflectionCapability) evaluateQuality(input, output string) []string {
 	var issues []string
 
-	// Check for empty/truncated output
-	if len(strings.TrimSpace(output)) < 20 {
+	// Check for empty/truncated output (only flag if < 10 chars — very short)
+	trimmed := strings.TrimSpace(output)
+	if len(trimmed) < 10 {
 		issues = append(issues, "output is too short or empty")
 	}
 
@@ -125,14 +126,29 @@ func (r *ReflectionCapability) evaluateQuality(input, output string) []string {
 		issues = append(issues, "output is identical to the previous response (stale/repeated)")
 	}
 
-	// Check for missing action (no tool calls or concrete steps)
+	// Check for missing action — only flag when the input clearly asks for action
+	// but the output contains no concrete steps or results. Don't flag when the
+	// output is a legitimate final answer (e.g. presenting results of a tool call).
 	hasAction := strings.Contains(output, "template_list") ||
 		strings.Contains(output, "run_workflow") ||
 		strings.Contains(output, "template_info") ||
 		strings.Contains(output, "I'll") ||
-		strings.Contains(output, "Let me")
-	if !hasAction && len(input) > 20 {
-		issues = append(issues, "response lacks concrete actions or tool calls")
+		strings.Contains(output, "Let me") ||
+		strings.Contains(output, "Here") ||
+		strings.Contains(output, "Result") ||
+		strings.Contains(lowerOutput, "step") ||
+		strings.Contains(lowerOutput, "done") ||
+		strings.Contains(lowerOutput, "completed") ||
+		strings.Contains(lowerOutput, "here is")
+	inputIsActionable := strings.Contains(strings.ToLower(input), "do") ||
+		strings.Contains(strings.ToLower(input), "run") ||
+		strings.Contains(strings.ToLower(input), "create") ||
+		strings.Contains(strings.ToLower(input), "make") ||
+		strings.Contains(strings.ToLower(input), "build") ||
+		strings.Contains(strings.ToLower(input), "帮我") ||
+		strings.Contains(strings.ToLower(input), "做")
+	if !hasAction && inputIsActionable && len(trimmed) > 30 {
+		issues = append(issues, "response lacks concrete actions or tool calls for an actionable request")
 	}
 
 	// Check for excessive hedging

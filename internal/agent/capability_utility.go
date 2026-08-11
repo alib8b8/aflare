@@ -212,14 +212,29 @@ func (u *UtilityCapability) scoreCorrectness(output, lower string, length int) f
 		score += 0.2
 	}
 
-	// Reward for data/facts
+	// Reward for data/facts — count substantial numbers (3+ consecutive digits)
+	// to avoid rewarding list markers like "1. 2. 3."
 	numbers := 0
+	inNumber := false
+	consecutive := 0
 	for _, ch := range output {
 		if ch >= '0' && ch <= '9' {
-			numbers++
+			consecutive++
+			if !inNumber {
+				inNumber = true
+			}
+		} else {
+			if inNumber && consecutive >= 3 {
+				numbers++
+			}
+			inNumber = false
+			consecutive = 0
 		}
 	}
-	if numbers > 20 {
+	if inNumber && consecutive >= 3 {
+		numbers++
+	}
+	if numbers > 3 {
 		score += 0.15
 	}
 
