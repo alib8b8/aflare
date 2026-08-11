@@ -21,114 +21,34 @@
 //   Maintains long-term memory across sessions, remembering user preferences,
 //   past decisions, and contextual facts. Persisted to ~/.config/aflare/memory.json
 //   as JSON Lines for durability.
+//
+// MemoryCapability shares the same persistent store with MemoryNode via
+// memory.GetPersistentStore(), ensuring both systems see the same data.
 
 package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/aflare/internal/memory"
 )
 
-// MemoryEntry is a single memory record persisted to disk.
-type MemoryEntry struct {
-	Key       string `json:"key"`
-	Value     string `json:"value"`
-	Category  string `json:"category"`  // "preference", "fact", "decision", "context"
-	Timestamp string `json:"timestamp"`
-	AccessCount int  `json:"access_count"`
-}
-
 // MemoryCapability provides cross-session long-term memory with persistence.
+// Uses the shared persistent store from the memory package, so data written
+// by MemoryNode (via memory_store tool) is visible here, and vice versa.
 type MemoryCapability struct {
 	mu      sync.RWMutex
-	entries map[string]*MemoryEntry // key → entry
-	store   *memoryStore
-}
-
-// memoryStore handles file I/O for memory persistence.
-type memoryStore struct {
-	mu   sync.Mutex
-	path string
-}
-
-var sharedMemoryStore = &memoryStore{}
-
-func initMemoryStore() {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
-	}
-	dir := filepath.Join(home, ".config", "aflare")
-	_ = os.MkdirAll(dir, 0o755)
-	sharedMemoryStore.path = filepath.Join(dir, "memory.json")
-}
-
-func (s *memoryStore) save(entries map[string]*MemoryEntry) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.path == "" {
-		initMemoryStore()
-	}
-
-	f, err := os.Create(s.path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	enc := json.NewEncoder(f)
-	for _, e := range entries {
-		if err := enc.Encode(e); err != nil {
-			return err
-		}
-	}
-	return f.Sync()
-}
-
-func (s *memoryStore) load() (map[string]*MemoryEntry, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.path == "" {
-		initMemoryStore()
-	}
-
-	data, err := os.ReadFile(s.path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return make(map[string]*MemoryEntry), nil
-		}
-		return nil, err
-	}
-
-	entries := make(map[string]*MemoryEntry)
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		var e MemoryEntry
-		if err := json.Unmarshal([]byte(line), &e); err != nil {
-			continue
-		}
-		entries[e.Key] = &e
-	}
-	return entries, nil
+	entries map[string]*memory.PersistentMemoryEntry // key → entry
 }
 
 func NewMemoryCapability() *MemoryCapability {
 	return &MemoryCapability{
-		entries: make(map[string]*MemoryEntry),
-		store:   sharedMemoryStore,
+		entries: make(map[string]*memory.PersistentMemoryEntry),
 	}
 }
 
@@ -136,11 +56,15 @@ func (m *MemoryCapability) Name() string       { return "memory" }
 func (m *MemoryCapability) Description() string { return "Cross-session memory: remembers preferences and history across sessions (有状态 Agent)" }
 
 func (m *MemoryCapability) Init(loop *AgentLoop) error {
-	entries, err := m.store.load()
-	if err != nil {
-		return fmt.Errorf("memory load failed: %w", err)
+	// Load entries from the shared persistent store.
+	store := memory.GetPersistentStore()
+	all := store.ListAll()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, e := range all {
+		entry := *e // Copy
+		m.entries[e.Key] = &entry
 	}
-	m.entries = entries
 	return nil
 }
 
@@ -181,9 +105,10 @@ func (m *MemoryCapability) PostProcess(ctx context.Context, input, output string
 	// Extract decisions: "let's use X", "we'll go with Y"
 	m.extractDecision(input, output)
 
-	// Persist if we have new entries.
-	if len(m.entries) > 0 {
-		_ = m.store.save(m.entries)
+	// Sync new entries to the shared persistent store.
+	store := memory.GetPersistentStore()
+	for _, e := range m.entries {
+		_ = store.Store(e.Key, e.Value, e.Category)
 	}
 
 	return "", nil
@@ -192,19 +117,20 @@ func (m *MemoryCapability) PostProcess(ctx context.Context, input, output string
 func (m *MemoryCapability) Shutdown() error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	if len(m.entries) > 0 {
-		return m.store.save(m.entries)
+	store := memory.GetPersistentStore()
+	for _, e := range m.entries {
+		_ = store.Store(e.Key, e.Value, e.Category)
 	}
 	return nil
 }
 
 // searchRelevant finds memories that are semantically related to the input.
 // Uses simple keyword overlap for now; future: embedding-based similarity.
-func (m *MemoryCapability) searchRelevant(input string, maxResults int) []*MemoryEntry {
+func (m *MemoryCapability) searchRelevant(input string, maxResults int) []*memory.PersistentMemoryEntry {
 	words := tokenize(strings.ToLower(input))
 
 	type scored struct {
-		entry *MemoryEntry
+		entry *memory.PersistentMemoryEntry
 		score int
 	}
 	var candidates []scored
@@ -246,7 +172,7 @@ func (m *MemoryCapability) searchRelevant(input string, maxResults int) []*Memor
 		candidates = candidates[:maxResults]
 	}
 
-	result := make([]*MemoryEntry, len(candidates))
+	result := make([]*memory.PersistentMemoryEntry, len(candidates))
 	for i, c := range candidates {
 		result[i] = c.entry
 	}
@@ -257,7 +183,7 @@ func (m *MemoryCapability) searchRelevant(input string, maxResults int) []*Memor
 func (m *MemoryCapability) extractPreference(input, output string) {
 	lower := strings.ToLower(input)
 	patterns := []struct {
-		prefix string
+		prefix   string
 		category string
 	}{
 		{"i prefer", "preference"},
@@ -283,7 +209,7 @@ func (m *MemoryCapability) extractPreference(input, output string) {
 			if m.hasSimilarEntry(p.category, value) {
 				continue
 			}
-			m.entries[key] = &MemoryEntry{
+			m.entries[key] = &memory.PersistentMemoryEntry{
 				Key:       key,
 				Value:     value,
 				Category:  p.category,
@@ -309,7 +235,7 @@ func (m *MemoryCapability) extractFact(input string) {
 			if m.hasSimilarEntry("fact", value) {
 				continue
 			}
-			m.entries[key] = &MemoryEntry{
+			m.entries[key] = &memory.PersistentMemoryEntry{
 				Key:       key,
 				Value:     value,
 				Category:  "fact",
@@ -335,7 +261,7 @@ func (m *MemoryCapability) extractDecision(input, output string) {
 			if m.hasSimilarEntry("decision", value) {
 				continue
 			}
-			m.entries[key] = &MemoryEntry{
+			m.entries[key] = &memory.PersistentMemoryEntry{
 				Key:       key,
 				Value:     value,
 				Category:  "decision",

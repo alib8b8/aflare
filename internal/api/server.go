@@ -69,6 +69,11 @@ func (s *Server) SetWorkflowsDir(dir string) {
 	s.workflowsDir = dir
 }
 
+// SetCapabilities sets the capability names to enable for the chat session.
+func (s *Server) SetCapabilities(caps []string) {
+	s.chat.setCapabilities(caps)
+}
+
 // Start begins listening and serving HTTP requests. It blocks until the
 // server is stopped or an error occurs.
 func (s *Server) Start() error {

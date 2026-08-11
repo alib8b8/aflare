@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/alib8b8/aflare/internal/agent"
 	"github.com/alib8b8/aflare/internal/api"
 )
 
@@ -28,6 +29,7 @@ func HandleServe(args []string) {
 	port := "8080"
 	apiKey := ""
 	workflowsDir := ""
+	capabilitiesStr := ""
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -51,6 +53,11 @@ func HandleServe(args []string) {
 				workflowsDir = args[i+1]
 				i++
 			}
+		case "--capabilities", "-c":
+			if i+1 < len(args) {
+				capabilitiesStr = args[i+1]
+				i++
+			}
 		case "--help", "-h":
 			PrintServeUsage()
 			return
@@ -64,6 +71,10 @@ func HandleServe(args []string) {
 	server := api.NewServer(host, port, apiKey)
 	if workflowsDir != "" {
 		server.SetWorkflowsDir(workflowsDir)
+	}
+	if capabilitiesStr != "" {
+		caps := agent.ParseCapabilities(capabilitiesStr)
+		server.SetCapabilities(caps)
 	}
 
 	// 启动前安全检查：禁止无认证时绑定所有接口
@@ -96,15 +107,18 @@ func HandleServe(args []string) {
 func PrintServeUsage() {
 	fmt.Println("Usage: aflare serve [options]")
 	fmt.Println("\nOptions:")
-	fmt.Println("  --port, -p <port>      - API server port (default: 8080)")
-	fmt.Println("  --host, -H <host>      - API server host (default: 127.0.0.1)")
-	fmt.Println("  --api-key, -k <key>    - API key for authentication")
-	fmt.Println("  --dir, -d <dir>        - Workflows directory")
-	fmt.Println("  --help, -h             - Show this help")
+	fmt.Println("  --port, -p <port>              - API server port (default: 8080)")
+	fmt.Println("  --host, -H <host>              - API server host (default: 127.0.0.1)")
+	fmt.Println("  --api-key, -k <key>            - API key for authentication")
+	fmt.Println("  --dir, -d <dir>                - Workflows directory")
+	fmt.Println("  --capabilities, -c <caps>      - Comma-separated capabilities (e.g. reflection,bdi,memory)")
+	fmt.Println("  --help, -h                     - Show this help")
+	fmt.Println("\nAvailable capabilities: reflection, bdi, utility, adaptive, memory, planning, human-in-loop, multi-agent, workflow, simulation")
 	fmt.Println("\nExamples:")
 	fmt.Println("  aflare serve")
 	fmt.Println("  aflare serve --port 9090")
 	fmt.Println("  aflare serve --api-key my-secret-key")
 	fmt.Println("  aflare serve --dir /path/to/workflows")
+	fmt.Println("  aflare serve --capabilities reflection,memory")
 	fmt.Println("  aflare --serve --port 8080")
 }

@@ -277,6 +277,12 @@ func (n *MemoryNode) storeMemory(session *memory.SessionMemory, key, value, leve
 		return nil, err
 	}
 
+	// Sync to persistent store so MemoryCapability can see the data.
+	// Map memory type to persistent store category.
+	persistentStore := memory.GetPersistentStore()
+	category := mapMemoryTypeToCategory(memType)
+	_ = persistentStore.Store(key, value, category)
+
 	return map[string]interface{}{
 		"operation":  "store",
 		"key":        key,
@@ -288,10 +294,41 @@ func (n *MemoryNode) storeMemory(session *memory.SessionMemory, key, value, leve
 	}, nil
 }
 
+// mapMemoryTypeToCategory maps MemoryNode memory types to persistent store categories.
+func mapMemoryTypeToCategory(memType string) string {
+	switch memType {
+	case "preference":
+		return "preference"
+	case "fact":
+		return "fact"
+	case "experience", "decision":
+		return "decision"
+	default:
+		return "general"
+	}
+}
+
 func (n *MemoryNode) retrieveMemory(session *memory.SessionMemory, key string) (map[string]interface{}, error) {
 	entry, err := session.Retrieve(key)
 	if err != nil {
-		return nil, err
+		// Fall back to persistent store (MemoryCapability's data).
+		persistentStore := memory.GetPersistentStore()
+		persistentEntry, pErr := persistentStore.Retrieve(key)
+		if pErr != nil {
+			return nil, err // Return original error.
+		}
+		return map[string]interface{}{
+			"operation": "retrieve",
+			"key":       key,
+			"entry": map[string]interface{}{
+				"key":      persistentEntry.Key,
+				"value":    persistentEntry.Value,
+				"type":     persistentEntry.Category,
+				"category": persistentEntry.Category,
+				"source":   "persistent",
+			},
+			"status": "success",
+		}, nil
 	}
 
 	return map[string]interface{}{
@@ -307,6 +344,9 @@ func (n *MemoryNode) deleteMemory(session *memory.SessionMemory, key string) (ma
 		return nil, err
 	}
 
+	// Also delete from persistent store.
+	_ = memory.GetPersistentStore().Delete(key)
+
 	return map[string]interface{}{
 		"operation": "delete",
 		"key":       key,
@@ -316,6 +356,30 @@ func (n *MemoryNode) deleteMemory(session *memory.SessionMemory, key string) (ma
 
 func (n *MemoryNode) searchMemory(session *memory.SessionMemory, query, level string, topK int, threshold float64) (map[string]interface{}, error) {
 	results := session.Search(query, level, topK, threshold)
+
+	// Also search the persistent store (MemoryCapability's data).
+	persistentStore := memory.GetPersistentStore()
+	persistentResults := persistentStore.Search(query, topK)
+
+	// Merge persistent results into the results list.
+	seenKeys := make(map[string]bool)
+	for _, r := range results {
+		seenKeys[r.Key] = true
+	}
+	for _, pe := range persistentResults {
+		if seenKeys[pe.Key] {
+			continue
+		}
+		seenKeys[pe.Key] = true
+		results = append(results, memory.MemoryEntry{
+			Key:        pe.Key,
+			Value:      pe.Value,
+			Type:       pe.Category,
+			Level:      "long",
+			Confidence: 0.9,
+			Source:     "persistent",
+		})
+	}
 
 	return map[string]interface{}{
 		"operation": "search",

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/alib8b8/aflare/internal/agent"
 	"github.com/alib8b8/aflare/internal/webui"
 )
 
@@ -27,6 +28,7 @@ func HandleWebUI(args []string) {
 	host := ""
 	port := ""
 	workflowsDir := ""
+	capabilitiesStr := ""
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -45,6 +47,11 @@ func HandleWebUI(args []string) {
 				workflowsDir = args[i+1]
 				i++
 			}
+		case "--capabilities", "-c":
+			if i+1 < len(args) {
+				capabilitiesStr = args[i+1]
+				i++
+			}
 		case "--help", "-h":
 			PrintWebUIUsage()
 			return
@@ -58,6 +65,10 @@ func HandleWebUI(args []string) {
 	server := webui.NewWebUIServer(host, port)
 	if workflowsDir != "" {
 		server.SetWorkflowsDir(workflowsDir)
+	}
+	if capabilitiesStr != "" {
+		caps := agent.ParseCapabilities(capabilitiesStr)
+		server.SetCapabilities(caps)
 	}
 
 	fmt.Printf("Starting WebUI server on http://localhost:%s\n", port)
@@ -73,11 +84,14 @@ func HandleWebUI(args []string) {
 func PrintWebUIUsage() {
 	fmt.Println("Usage: aflare webui [options]")
 	fmt.Println("\nOptions:")
-	fmt.Println("  --port, -p <port>    - WebUI server port (default: 8081)")
-	fmt.Println("  --dir, -d <dir>      - Workflows directory")
-	fmt.Println("  --help, -h           - Show this help")
+	fmt.Println("  --port, -p <port>              - WebUI server port (default: 8081)")
+	fmt.Println("  --dir, -d <dir>                - Workflows directory")
+	fmt.Println("  --capabilities, -c <caps>      - Comma-separated capabilities (e.g. reflection,bdi,memory)")
+	fmt.Println("  --help, -h                     - Show this help")
+	fmt.Println("\nAvailable capabilities: reflection, bdi, utility, adaptive, memory, planning, human-in-loop, multi-agent, workflow, simulation")
 	fmt.Println("\nExamples:")
 	fmt.Println("  aflare webui")
 	fmt.Println("  aflare webui --port 8080")
 	fmt.Println("  aflare webui --dir /path/to/workflows")
+	fmt.Println("  aflare webui --capabilities reflection,memory")
 }

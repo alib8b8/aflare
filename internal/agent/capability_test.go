@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/alib8b8/aflare/internal/memory"
 )
 
 // ── MemoryCapability Tests ────────────────────────────────────────────────
@@ -57,12 +59,12 @@ func TestMemoryCapability_PreProcess_WithEntries(t *testing.T) {
 	_ = m.Init(&AgentLoop{})
 
 	// Add some entries
-	m.entries["pref_1"] = &MemoryEntry{
+	m.entries["pref_1"] = &memory.PersistentMemoryEntry{
 		Key:      "pref_1",
 		Value:    "I prefer Python over JavaScript",
 		Category: "preference",
 	}
-	m.entries["fact_1"] = &MemoryEntry{
+	m.entries["fact_1"] = &memory.PersistentMemoryEntry{
 		Key:      "fact_1",
 		Value:    "My name is Alice",
 		Category: "fact",
@@ -92,12 +94,12 @@ func TestMemoryCapability_PostProcess_ExtractsPreference(t *testing.T) {
 
 func TestMemoryCapability_SearchRelevant(t *testing.T) {
 	m := NewMemoryCapability()
-	m.entries["pref_1"] = &MemoryEntry{
+	m.entries["pref_1"] = &memory.PersistentMemoryEntry{
 		Key:      "pref_1",
 		Value:    "I prefer Python",
 		Category: "preference",
 	}
-	m.entries["fact_1"] = &MemoryEntry{
+	m.entries["fact_1"] = &memory.PersistentMemoryEntry{
 		Key:      "fact_1",
 		Value:    "My favorite color is blue",
 		Category: "fact",
@@ -111,7 +113,7 @@ func TestMemoryCapability_SearchRelevant(t *testing.T) {
 
 func TestMemoryCapability_HasSimilarEntry(t *testing.T) {
 	m := NewMemoryCapability()
-	m.entries["pref_1"] = &MemoryEntry{
+	m.entries["pref_1"] = &memory.PersistentMemoryEntry{
 		Key:      "pref_1",
 		Value:    "I prefer Python",
 		Category: "preference",

@@ -25,8 +25,14 @@ import (
 
 // chatHandler manages the chat session for the API server.
 type chatHandler struct {
-	mu      sync.Mutex
-	session *agent.ChatSession
+	mu           sync.Mutex
+	session      *agent.ChatSession
+	capabilities []string
+}
+
+// setCapabilities sets the capability names to enable for the chat session.
+func (h *chatHandler) setCapabilities(caps []string) {
+	h.capabilities = caps
 }
 
 // getOrCreateSession returns the existing chat session or creates a new one.
@@ -35,6 +41,7 @@ func (h *chatHandler) getOrCreateSession() *agent.ChatSession {
 	defer h.mu.Unlock()
 	if h.session == nil {
 		cfg := agent.DefaultConfig()
+		cfg.Capabilities = h.capabilities
 		h.session = agent.NewChatSession(cfg)
 	}
 	return h.session

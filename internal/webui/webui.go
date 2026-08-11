@@ -97,6 +97,11 @@ func (s *WebUIServer) SetWorkflowsDir(dir string) {
 	s.workflowsDir = dir
 }
 
+// SetCapabilities sets the capability names to enable for the chat session.
+func (s *WebUIServer) SetCapabilities(caps []string) {
+	s.chat.setCapabilities(caps)
+}
+
 func (s *WebUIServer) Start() error {
 	srv := &http.Server{
 		Addr:         s.host + ":" + s.port,
