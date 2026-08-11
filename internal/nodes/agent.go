@@ -90,6 +90,10 @@ func (a *ReActAgent) buildToolDefinitions() []core.ToolDefinition {
 			if node, ok := a.registry.Get(t.NodeName); ok {
 				schema := node.Schema()
 				for _, p := range schema.Params {
+					// Skip "input" — already added as the primary parameter above
+					if p.Name == "input" {
+						continue
+					}
 					prop := map[string]interface{}{
 						"type":        mapParamType(p.Type),
 						"description": p.Description,
