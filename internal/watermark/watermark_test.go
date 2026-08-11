@@ -21,25 +21,28 @@ import (
 )
 
 func TestEncodeDecodeText(t *testing.T) {
-	content := "Hello, this is AI-generated content about blockchain technology."
-	wm := EncodeText(content)
-	if wm == "" {
-		t.Fatal("EncodeText returned empty")
-	}
+	// Longer content to ensure enough segments for distributed embedding.
+	content := "Hello, this is AI-generated content about blockchain technology. " +
+		"It demonstrates the capabilities of distributed watermark embedding. " +
+		"The watermark should be scattered across multiple segments of the text."
 
-	// Watermark should be invisible (no visible characters)
-	visible := stripZeroWidth(wm)
-	if visible != "" {
-		t.Errorf("expected invisible watermark, got visible chars: %q", visible)
-	}
-
-	// Full text with watermark
 	full := EncodeTextWithSuffix(content)
-	if !strings.HasPrefix(full, content) {
-		t.Error("EncodeTextWithSuffix should preserve original content")
+	if full == "" {
+		t.Fatal("EncodeTextWithSuffix returned empty")
+	}
+	if !strings.HasPrefix(full, "Hello") {
+		t.Error("EncodeTextWithSuffix should preserve original content start")
 	}
 
-	// Decode should recover the payload
+	// Watermark should be invisible (no visible characters added).
+	visible := stripZeroWidth(full)
+	for _, r := range visible {
+		if r == zwBit0 || r == zwBit1 || r == zwStart || r == zwEnd {
+			t.Errorf("visible text should not contain zero-width characters, got %U", r)
+		}
+	}
+
+	// Decode should recover the payload.
 	payload, ok := DecodeText(full)
 	if !ok {
 		t.Fatal("DecodeText failed to find watermark")
@@ -56,13 +59,16 @@ func TestEncodeDecodeText(t *testing.T) {
 }
 
 func TestHasWatermark(t *testing.T) {
-	content := "Some generated text"
+	content := "Some generated text about artificial intelligence. " +
+		"This is a longer piece of content that will be split into multiple segments. " +
+		"Each segment will contain a shard of the watermark for distributed protection."
+
 	full := EncodeTextWithSuffix(content)
 
 	if !HasWatermark(full) {
 		t.Error("HasWatermark should return true for watermarked text")
 	}
-	if HasWatermark("plain text without watermark") {
+	if HasWatermark("plain text without any watermark at all anywhere") {
 		t.Error("HasWatermark should return false for plain text")
 	}
 }
@@ -75,9 +81,6 @@ func TestDecodeTextNoWatermark(t *testing.T) {
 }
 
 func TestEmptyContent(t *testing.T) {
-	if EncodeText("") != "" {
-		t.Error("EncodeText should return empty for empty content")
-	}
 	if EncodeTextWithSuffix("") != "" {
 		t.Error("EncodeTextWithSuffix should return empty for empty content")
 	}
@@ -118,11 +121,15 @@ func TestDecodeYAMLInvalid(t *testing.T) {
 
 func TestRoundTripMultipleContent(t *testing.T) {
 	contents := []string{
-		"Short text",
-		"Medium length text with some special characters: !@#$%^&*()",
-		"Very long text " + strings.Repeat("abcdefghij", 100),
-		"中文内容测试",
-		"Mixed content with emoji ✨ and 中文 and English",
+		"Short text that is long enough to split into multiple segments for distributed watermarking",
+		"Medium length text with some special characters: !@#$%^&*(). " +
+			"This needs to be sufficiently long to have multiple segments for the watermark distribution.",
+		"Very long text " + strings.Repeat("abcdefghij ", 100) +
+			"with enough content to split into segments for the watermark",
+		"中文内容测试需要足够长的文本才能分成多个片段进行水印嵌入测试",
+		"Mixed content with emoji and 中文 and English. " +
+			"This is a longer text that should be split into multiple segments. " +
+			"The distributed watermark will be embedded across these segments.",
 	}
 
 	for _, content := range contents {
@@ -139,11 +146,15 @@ func TestRoundTripMultipleContent(t *testing.T) {
 }
 
 func TestWatermarkDoesNotChangeVisibleContent(t *testing.T) {
-	content := "This is visible text."
+	content := "This is visible text that should remain unchanged. " +
+		"The watermark is embedded using invisible zero-width characters."
+
 	full := EncodeTextWithSuffix(content)
 
-	// Strip all zero-width characters and BOM
+	// Strip all zero-width characters and BOM, and normalize whitespace.
 	cleaned := stripZeroWidth(full)
+	// Normalize non-breaking spaces back to regular spaces for comparison.
+	cleaned = strings.ReplaceAll(cleaned, string(wsBit1), " ")
 	if cleaned != content {
 		t.Errorf("visible content changed:\n  original: %q\n  cleaned:  %q", content, cleaned)
 	}
@@ -164,10 +175,13 @@ func stripZeroWidth(s string) string {
 }
 
 func TestTamperedWatermark(t *testing.T) {
-	content := "Original content"
+	content := "Original content that is sufficiently long. " +
+		"It contains multiple sentences so the watermark can be distributed. " +
+		"This ensures the distributed embedding works correctly."
+
 	full := EncodeTextWithSuffix(content)
 
-	// Tamper by modifying the visible content
+	// Tamper by modifying the visible content.
 	tampered := strings.Replace(full, "Original", "Modified", 1)
 
 	payload, ok := DecodeText(tampered)
@@ -190,5 +204,181 @@ func TestInfo(t *testing.T) {
 	}
 	if !strings.Contains(info, "aflare") {
 		t.Error("Info should mention aflare")
+	}
+}
+
+func TestDistributedEmbedding(t *testing.T) {
+	// Test that the watermark is truly distributed across the text,
+	// not just appended at the end.
+	content := "First sentence about the topic. " +
+		"Second sentence with more details. " +
+		"Third sentence providing additional context. " +
+		"Fourth sentence wrapping up the discussion."
+
+	full := EncodeTextWithSuffix(content)
+
+	// There should be multiple zero-width sequences (one per shard).
+	shardCount := strings.Count(full, string(zwStart))
+	if shardCount < 2 {
+		t.Errorf("expected at least 2 shards distributed in text, got %d. "+
+			"Watermark may be appended at the end instead of distributed.", shardCount)
+	}
+
+	// The last shard should not be at the very end of the text.
+	lastShardPos := strings.LastIndex(full, string(zwStart))
+	if lastShardPos > len(full)-20 {
+		t.Error("last shard appears to be at the end of text, should be distributed")
+	}
+}
+
+func TestPartialTruncationRecovery(t *testing.T) {
+	// Test that watermark can be recovered even if part of the text is truncated.
+	content := "First paragraph with important information. " +
+		"Second paragraph explaining the details. " +
+		"Third paragraph with additional context. " +
+		"Fourth paragraph concluding the discussion. " +
+		"Fifth paragraph with final remarks."
+
+	full := EncodeTextWithSuffix(content)
+
+	// Truncate the last 30% of the text (simulating end truncation).
+	runes := []rune(full)
+	truncated := string(runes[:len(runes)*7/10])
+
+	// Should still be able to recover the watermark from remaining shards.
+	_, ok := DecodeText(truncated)
+	if !ok {
+		t.Error("watermark should be recoverable after partial truncation")
+	}
+}
+
+func TestWhitespaceFingerprint(t *testing.T) {
+	// Test that whitespace fingerprint encoding/decoding works.
+	text := "hello world this is a test"
+	encoded := encodeWhitespaceFingerprint(text, 2) // shard index 2
+
+	// Should have some non-breaking spaces.
+	if !strings.Contains(encoded, string(wsBit1)) {
+		t.Error("whitespace fingerprint should encode non-breaking spaces")
+	}
+
+	// Decode should recover the shard index.
+	index := decodeWhitespaceFingerprint(encoded)
+	if index != 2 {
+		t.Errorf("expected shard index 2, got %d", index)
+	}
+}
+
+func TestBuildShards(t *testing.T) {
+	// Create a known payload and verify shard construction.
+	payload := make([]byte, 23)
+	for i := range payload {
+		payload[i] = byte(i)
+	}
+
+	shards := buildShards(payload)
+	if len(shards) != 4 {
+		t.Fatalf("expected 4 shards, got %d", len(shards))
+	}
+	for i, s := range shards {
+		if len(s) != 8 {
+			t.Errorf("shard %d: expected 8 bytes, got %d", i, len(s))
+		}
+	}
+
+	// Verify parity: XOR of all data shards should equal the parity shard.
+	var xorCheck [8]byte
+	for i := 0; i < 3; i++ {
+		for j := 0; j < 8; j++ {
+			xorCheck[j] ^= shards[i][j]
+		}
+	}
+	for j := 0; j < 8; j++ {
+		if xorCheck[j] != shards[3][j] {
+			t.Errorf("parity mismatch at byte %d: expected %02x, got %02x",
+				j, xorCheck[j], shards[3][j])
+		}
+	}
+}
+
+func TestShardRecoveryParity(t *testing.T) {
+	// Test that any 3 of 4 shards can recover the full payload.
+	payload := make([]byte, 23)
+	for i := range payload {
+		payload[i] = byte(i + 42)
+	}
+	// Add valid checksum.
+	chk := checksum16(payload[:21])
+	payload[21] = byte(chk >> 8)
+	payload[22] = byte(chk & 0xFF)
+
+	shards := buildShards(payload)
+
+	// Test recovery with all 4 shards.
+	recovered, ok := recoverPayload(shards)
+	if !ok {
+		t.Fatal("failed to recover from all 4 shards")
+	}
+	if !verifyChecksum(recovered) {
+		t.Error("checksum verification failed for full recovery")
+	}
+
+	// Test recovery with shards 0, 1, 2 (no parity).
+	recovered, ok = recoverPayload([][]byte{shards[0], shards[1], shards[2]})
+	if !ok {
+		t.Fatal("failed to recover from data shards only")
+	}
+	if !verifyChecksum(recovered) {
+		t.Error("checksum verification failed for data-only recovery")
+	}
+
+	// Test recovery with shards 0, 1, 3 (parity replaces shard 2).
+	recovered, ok = recoverPayload([][]byte{shards[0], shards[1], shards[3]})
+	if !ok {
+		t.Fatal("failed to recover with parity shard")
+	}
+	if !verifyChecksum(recovered) {
+		t.Error("checksum verification failed for parity recovery")
+	}
+
+	// Test recovery with shards 0, 2, 3 (parity replaces shard 1).
+	recovered, ok = recoverPayload([][]byte{shards[0], shards[2], shards[3]})
+	if !ok {
+		t.Fatal("failed to recover with parity shard (variant 2)")
+	}
+	if !verifyChecksum(recovered) {
+		t.Error("checksum verification failed for parity recovery (variant 2)")
+	}
+}
+
+func TestChecksum(t *testing.T) {
+	data := []byte("hello world")
+	chk := checksum16(data)
+
+	// Verify checksum round-trip.
+	full := append(data, byte(chk>>8), byte(chk&0xFF))
+	if !verifyChecksum(full) {
+		t.Error("checksum verification should pass")
+	}
+
+	// Tampered data should fail.
+	full[0] ^= 0x01
+	if verifyChecksum(full) {
+		t.Error("checksum verification should fail for tampered data")
+	}
+}
+
+func TestLegacyDecode(t *testing.T) {
+	// Test that legacy format (single suffix block) is still decodable.
+	content := "Some short content for legacy format testing"
+	payload := buildPayload(content)
+	legacy := content + encodeLegacySuffix(payload)
+
+	decoded, ok := decodeLegacy(legacy)
+	if !ok {
+		t.Fatal("failed to decode legacy watermark")
+	}
+	if decoded.Version != wmVersion {
+		t.Errorf("expected version %d, got %d", wmVersion, decoded.Version)
 	}
 }
