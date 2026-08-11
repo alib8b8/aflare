@@ -53,7 +53,7 @@ func (a *AdaptiveCapability) Init(loop *AgentLoop) error {
 
 func (a *AdaptiveCapability) PreProcess(ctx context.Context, input string) (string, error) {
 	// Inject past learnings as context
-	if len(a.feedback) > 0 && len(a.feedback) <= 5 {
+	if len(a.feedback) > 0 && len(a.feedback) <= 10 {
 		context := "\n[Adaptive Learning] Past feedback:\n"
 		for _, f := range a.feedback {
 			context += fmt.Sprintf("- %s\n", f)
