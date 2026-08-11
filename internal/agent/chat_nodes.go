@@ -27,6 +27,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -58,6 +59,7 @@ type extTemplate struct {
 
 // scanExternalTemplates scans the templates/ directory for external workflow files.
 // Returns templates sorted by category then name.
+// Errors are logged but not fatal — the agent can still operate with built-in templates.
 func scanExternalTemplates() []extTemplate {
 	// Try common locations for the templates directory
 	templatesDir := findTemplatesDir()
@@ -68,6 +70,7 @@ func scanExternalTemplates() []extTemplate {
 	var results []extTemplate
 	entries, err := os.ReadDir(templatesDir)
 	if err != nil {
+		log.Printf("[chat_nodes] failed to read templates directory %s: %v", templatesDir, err)
 		return nil
 	}
 
@@ -85,6 +88,7 @@ func scanExternalTemplates() []extTemplate {
 		catPath := filepath.Join(templatesDir, category)
 		templates, err := os.ReadDir(catPath)
 		if err != nil {
+			log.Printf("[chat_nodes] failed to read category %s: %v", category, err)
 			continue
 		}
 

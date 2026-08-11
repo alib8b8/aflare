@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/nodes/core"
@@ -38,7 +39,9 @@ const (
 
 // ContextManager manages multi-turn conversation history with automatic
 // compression when the context exceeds the character budget.
+// Safe for concurrent use via the HTTP API.
 type ContextManager struct {
+	mu           sync.RWMutex
 	messages     []core.LLMMessage
 	systemPrompt string
 	compressNode *nodes.CompressNode
@@ -54,22 +57,31 @@ func NewContextManager() *ContextManager {
 
 // SetSystemPrompt sets the system prompt (shown at the top of the context).
 func (cm *ContextManager) SetSystemPrompt(prompt string) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	cm.systemPrompt = prompt
 }
 
 // AddUser appends a user message to the history.
 func (cm *ContextManager) AddUser(content string) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	cm.messages = append(cm.messages, core.LLMMessage{Role: "user", Content: content})
 }
 
 // AddAssistant appends an assistant message to the history.
 func (cm *ContextManager) AddAssistant(content string) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	cm.messages = append(cm.messages, core.LLMMessage{Role: "assistant", Content: content})
 }
 
 // BuildPrefix returns the conversation history as a formatted string
 // suitable for inclusion in the agent's prompt. The system prompt is prepended.
 func (cm *ContextManager) BuildPrefix() string {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
 	var sb strings.Builder
 	if cm.systemPrompt != "" {
 		sb.WriteString(cm.systemPrompt)
@@ -85,6 +97,9 @@ func (cm *ContextManager) BuildPrefix() string {
 // CompressIfNeeded checks the character budget and compresses older messages
 // if the total exceeds MaxContextChars. Recent messages are always preserved.
 func (cm *ContextManager) CompressIfNeeded() {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
 	if cm.totalChars() <= MaxContextChars {
 		return
 	}
@@ -92,6 +107,7 @@ func (cm *ContextManager) CompressIfNeeded() {
 }
 
 // totalChars returns the total character count of all messages.
+// Caller must hold cm.mu.
 func (cm *ContextManager) totalChars() int {
 	n := 0
 	for _, m := range cm.messages {
@@ -101,6 +117,7 @@ func (cm *ContextManager) totalChars() int {
 }
 
 // compress replaces older messages with a summary, keeping the most recent ones.
+// Caller must hold cm.mu.
 func (cm *ContextManager) compress() {
 	if len(cm.messages) <= KeepRecentN+2 {
 		return
@@ -130,9 +147,9 @@ func (cm *ContextManager) compress() {
 		},
 	)
 	if err != nil || compressed == "" {
-		// Fallback: truncate old messages to keep budget
-		cm.messages = cm.messages[keepIdx:]
-		return
+		// Fallback: generate a simple summary from the truncated messages
+		// instead of silently dropping them.
+		compressed = cm.buildFallbackSummary(keepIdx)
 	}
 
 	// Replace old messages with summary, keep recent ones
@@ -143,9 +160,29 @@ func (cm *ContextManager) compress() {
 	cm.messages = append(cm.messages, recent...)
 }
 
+// buildFallbackSummary generates a simple text summary when the compression
+// node fails. It extracts the first 100 chars of each old message to avoid
+// complete data loss.
+func (cm *ContextManager) buildFallbackSummary(keepIdx int) string {
+	var sb strings.Builder
+	sb.WriteString("(compressed) ")
+	for i := 0; i < keepIdx && i < 10; i++ {
+		role := cm.messages[i].Role
+		content := cm.messages[i].Content
+		if len(content) > 100 {
+			content = content[:100] + "..."
+		}
+		sb.WriteString(fmt.Sprintf("[%s] %s | ", role, content))
+	}
+	return sb.String()
+}
+
 // Summary returns a human-readable summary of the conversation state.
 // Used by the /history command.
 func (cm *ContextManager) Summary() string {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
 	chars := cm.totalChars()
 	msgs := len(cm.messages)
 	status := "ok"
@@ -158,5 +195,7 @@ func (cm *ContextManager) Summary() string {
 
 // Reset clears the conversation history (keeps the system prompt).
 func (cm *ContextManager) Reset() {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	cm.messages = make([]core.LLMMessage, 0)
 }

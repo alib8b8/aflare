@@ -23,6 +23,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/alib8b8/aflare/internal/meta"
 	"github.com/alib8b8/aflare/internal/nodes"
@@ -37,6 +38,9 @@ var DefaultTools = []string{
 	"fetch_url", "http_request", "file_read", "json_parse",
 	"transform", "combine", "template",
 }
+
+// DefaultSendTimeout is the maximum time allowed for a single SendMessage call.
+const DefaultSendTimeout = 5 * time.Minute
 
 // Config holds the configuration for a ChatSession.
 type Config struct {
@@ -67,6 +71,7 @@ type ChatSession struct {
 	tools      []core.AgentTool
 	systemMsg  string
 	running    bool
+	safeMode   bool
 	interrupt  chan os.Signal
 }
 
@@ -87,7 +92,7 @@ func NewChatSession(cfg Config) *ChatSession {
 
 	reg := core.GetGlobalRegistry()
 	registerChatNodes(reg) // register template/workflow nodes so agent can use project's own functionality
-	tools := buildToolList(cfg.Tools)
+	tools := buildToolList(cfg.Tools, cfg.SafeMode)
 	version := meta.GetVersion()
 
 	cm := NewContextManager()
@@ -100,13 +105,15 @@ func NewChatSession(cfg Config) *ChatSession {
 		reg:       reg,
 		tools:     tools,
 		systemMsg: systemMsg,
+		safeMode:  cfg.SafeMode,
 		interrupt: make(chan os.Signal, 1),
 	}
 }
 
 // buildToolList creates the agent tool list from tool names.
 // Chat-specific tools (template_list, run_workflow, etc.) are always included.
-func buildToolList(toolNames []string) []core.AgentTool {
+// When safeMode is true, dangerous tools (execute, file_write, code_interpreter) are excluded.
+func buildToolList(toolNames []string, safeMode bool) []core.AgentTool {
 	// Always include core chat tools
 	chatTools := []core.AgentTool{
 		{Name: "template_list", Description: "Search available workflow templates by keyword or category", NodeName: "template_list"},
@@ -117,6 +124,13 @@ func buildToolList(toolNames []string) []core.AgentTool {
 		{Name: "memory_retrieve", Description: "Recall previously stored information", NodeName: "memory"},
 		{Name: "memory_search", Description: "Search memory for relevant context", NodeName: "memory"},
 		{Name: "context_compress", Description: "Compress conversation history to free context space", NodeName: "compress"},
+	}
+
+	// Dangerous tools blocked in safe mode
+	dangerousTools := map[string]bool{
+		"execute":          true,
+		"file_write":       true,
+		"code_interpreter": true,
 	}
 
 	// Parse user-requested tools
@@ -130,9 +144,13 @@ func buildToolList(toolNames []string) []core.AgentTool {
 		result = append(result, t)
 	}
 	for _, t := range userTools {
-		if !seen[t.Name] {
-			result = append(result, t)
+		if seen[t.Name] {
+			continue
 		}
+		if safeMode && dangerousTools[t.Name] {
+			continue
+		}
+		result = append(result, t)
 	}
 	return result
 }
@@ -240,8 +258,11 @@ func (s *ChatSession) processInput(ctx context.Context, input string) (string, e
 
 // SendMessage processes a single user message and returns the agent's response.
 // Public API for programmatic chat integration (HTTP endpoints).
+// The call is bounded by DefaultSendTimeout to prevent hanging indefinitely.
 func (s *ChatSession) SendMessage(input string) (string, error) {
-	return s.processInput(context.Background(), input)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultSendTimeout)
+	defer cancel()
+	return s.processInput(ctx, input)
 }
 
 // ResetSession clears the conversation history.
