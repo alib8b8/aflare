@@ -133,6 +133,8 @@ func main() {
 		cli.HandleSecrets(args)
 	case "resume":
 		cli.HandleResume(args)
+	case "chat":
+		handleChatCommand()
 	default:
 		cli.HandleRunFile(command, dryRun, false, "", safeMode)
 	}
