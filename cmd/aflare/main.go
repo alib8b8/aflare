@@ -135,6 +135,8 @@ func main() {
 		cli.HandleResume(args)
 	case "chat":
 		cli.HandleChat(args)
+	case "agent":
+		cli.HandleAgent(args)
 	default:
 		cli.HandleRunFile(command, dryRun, false, "", safeMode)
 	}
