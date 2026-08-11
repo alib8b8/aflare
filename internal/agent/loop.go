@@ -287,6 +287,7 @@ func buildToolList(toolNames []string, safeMode bool) []core.AgentTool {
 		{Name: "memory_retrieve", Description: "Recall previously stored information", NodeName: "memory"},
 		{Name: "memory_search", Description: "Search memory for relevant context", NodeName: "memory"},
 		{Name: "context_compress", Description: "Compress conversation history to free context space", NodeName: "compress"},
+		{Name: "self_update", Description: "Check and install aflare updates from GitHub releases", NodeName: "self_update"},
 	}
 
 	dangerousTools := map[string]bool{

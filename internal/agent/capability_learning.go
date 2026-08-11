@@ -21,8 +21,10 @@ package agent
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -98,4 +100,79 @@ func appendAdaptiveFeedback(feedback string) {
 		Capability: "adaptive",
 		Feedback:   feedback,
 	})
+}
+
+// loadEntries reads all learning entries from learning.json and returns
+// them grouped by capability type.
+func loadEntries() (reflection []LearningEntry, adaptive []LearningEntry) {
+	initLearningStore()
+
+	data, err := os.ReadFile(sharedLearning.path)
+	if err != nil {
+		return nil, nil
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var entry LearningEntry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue
+		}
+		switch entry.Capability {
+		case "reflection":
+			reflection = append(reflection, entry)
+		case "adaptive":
+			adaptive = append(adaptive, entry)
+		}
+	}
+	return reflection, adaptive
+}
+
+// loadRecentReflectionIssues loads the most recent reflection issues from
+// the learning journal, up to maxEntries. Returns a list of issue descriptions.
+func loadRecentReflectionIssues(maxEntries int) []string {
+	entries, _ := loadEntries()
+	if len(entries) == 0 {
+		return nil
+	}
+
+	// Take the most recent entries.
+	start := 0
+	if len(entries) > maxEntries {
+		start = len(entries) - maxEntries
+	}
+
+	var issues []string
+	for _, e := range entries[start:] {
+		for _, issue := range e.Issues {
+			issues = append(issues, fmt.Sprintf("[%s] %s: %s", e.Timestamp, truncateStr(e.Input, 50), issue))
+		}
+	}
+	return issues
+}
+
+// loadRecentAdaptiveFeedback loads the most recent adaptive feedback entries,
+// up to maxEntries.
+func loadRecentAdaptiveFeedback(maxEntries int) []string {
+	_, entries := loadEntries()
+	if len(entries) == 0 {
+		return nil
+	}
+
+	start := 0
+	if len(entries) > maxEntries {
+		start = len(entries) - maxEntries
+	}
+
+	var feedback []string
+	for _, e := range entries[start:] {
+		if e.Feedback != "" {
+			feedback = append(feedback, e.Feedback)
+		}
+	}
+	return feedback
 }

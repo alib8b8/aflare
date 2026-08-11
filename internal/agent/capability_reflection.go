@@ -61,6 +61,13 @@ func (r *ReflectionCapability) Name() string        { return "reflection" }
 func (r *ReflectionCapability) Description() string  { return "Self-reflection and self-correction: evaluates output quality and triggers improvement when needed" }
 
 func (r *ReflectionCapability) Init(loop *AgentLoop) error {
+	// Load past reflection issues from cross-session learning journal.
+	// These are used to improve the quality checker's awareness of
+	// recurring problems.
+	pastIssues := loadRecentReflectionIssues(20)
+	if len(pastIssues) > 0 {
+		r.reflectionLog = append(r.reflectionLog, pastIssues...)
+	}
 	return nil
 }
 
