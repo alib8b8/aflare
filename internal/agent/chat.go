@@ -86,6 +86,7 @@ func NewChatSession(cfg Config) *ChatSession {
 	}
 
 	reg := core.GetGlobalRegistry()
+	registerChatNodes(reg) // register template/workflow nodes so agent can use project's own functionality
 	tools := buildToolList(cfg.Tools)
 	version := meta.GetVersion()
 
@@ -255,10 +256,14 @@ func (s *ChatSession) handleCommand(cmd string) {
 	case "/help", "/h":
 		fmt.Println("Commands:")
 		fmt.Println("  /help, /h      Show this help")
+		fmt.Println("  /skills        List skill categories (300+ templates)")
 		fmt.Println("  /tools         List available tools")
 		fmt.Println("  /history       Show conversation state")
 		fmt.Println("  /clear         Clear conversation history")
 		fmt.Println("  /exit, /quit   Exit chat")
+
+	case "/skills":
+		fmt.Println(ListCategories())
 
 	case "/tools":
 		fmt.Println("Available tools:")
