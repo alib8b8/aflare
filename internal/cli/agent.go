@@ -151,8 +151,8 @@ func HandleAgent(args []string) {
 	}
 	for _, entry := range entries {
 		entry := entry // capture
-		sched.AddTask(entry.ID, entry.Cron, func(taskCtx context.Context) {
-			tq.Enqueue(&taskqueue.Task{
+		_ = sched.AddTask(entry.ID, entry.Cron, func(taskCtx context.Context) {
+			_ = tq.Enqueue(&taskqueue.Task{
 				ID:        fmt.Sprintf("sched-%s-%d", entry.ID, time.Now().Unix()),
 				Source:    "scheduler",
 				Message:   entry.Description,
@@ -181,8 +181,8 @@ func HandleAgent(args []string) {
 					case <-ctx.Done():
 						return
 					case event := <-watchEvents:
-						tq.Enqueue(&taskqueue.Task{
-							ID:        fmt.Sprintf("fw-%s-%d", event.Path, event.Timestamp.Unix()),
+						_ = tq.Enqueue(&taskqueue.Task{
+						ID:        fmt.Sprintf("fw-%s-%d", event.Path, event.Timestamp.Unix()),
 							Source:    "filewatch",
 							Message:   filewatch.FormatEvent(event),
 							CreatedAt: event.Timestamp,

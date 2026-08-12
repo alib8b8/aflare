@@ -584,6 +584,3 @@ func generateTaskID(desc string) string {
 	}
 	return strings.ToLower(id)
 }
-
-// timeNow is a package-level function for getting current time, overridable in tests.
-var timeNow = time.Now

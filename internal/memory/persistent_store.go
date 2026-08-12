@@ -105,30 +105,6 @@ func (s *PersistentMemoryStore) load() {
 	s.entries = entries
 }
 
-// save writes all entries to disk.
-func (s *PersistentMemoryStore) save() error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	if s.path == "" {
-		return nil
-	}
-
-	f, err := os.Create(s.path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	enc := json.NewEncoder(f)
-	for _, e := range s.entries {
-		if err := enc.Encode(e); err != nil {
-			return err
-		}
-	}
-	return f.Sync()
-}
-
 // Store persists a memory entry to disk.
 func (s *PersistentMemoryStore) Store(key, value, category string) error {
 	s.mu.Lock()

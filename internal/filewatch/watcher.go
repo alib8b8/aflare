@@ -137,7 +137,7 @@ func (w *Watcher) snapshot() (map[string]fileMeta, error) {
 
 	err := filepath.WalkDir(w.rootPath, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil // skip inaccessible files
+			return nil //nolint:nilerr // skip inaccessible files in WalkDir callback
 		}
 		// Skip symlinks
 		if d.Type()&os.ModeSymlink != 0 {
@@ -153,7 +153,7 @@ func (w *Watcher) snapshot() (map[string]fileMeta, error) {
 		// Check depth
 		rel, err := filepath.Rel(w.rootPath, p)
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr
 		}
 		if strings.Count(filepath.ToSlash(rel), "/") > MaxDepth {
 			if d.IsDir() {
@@ -171,7 +171,7 @@ func (w *Watcher) snapshot() (map[string]fileMeta, error) {
 		}
 		fi, err := d.Info()
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr
 		}
 		result[filepath.ToSlash(rel)] = fileMeta{
 			ModTime: fi.ModTime(),

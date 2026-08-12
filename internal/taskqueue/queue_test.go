@@ -17,6 +17,7 @@ package taskqueue
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -137,7 +138,7 @@ func TestDequeue_BlocksOnEmpty(t *testing.T) {
 	defer cancel()
 
 	_, err := q.Dequeue(ctx)
-	if err != context.DeadlineExceeded {
+	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("expected DeadlineExceeded on empty queue, got %v", err)
 	}
 }

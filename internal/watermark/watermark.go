@@ -353,7 +353,7 @@ func decodeBitsToBytes(bits string) []byte {
 	for _, r := range bits {
 		switch r {
 		case zwBit0:
-			currentByte = (currentByte << 1) | 0
+			currentByte = (currentByte << 1)
 			bitCount++
 		case zwBit1:
 			currentByte = (currentByte << 1) | 1
@@ -572,7 +572,7 @@ func decodeWhitespaceFingerprint(text string) int {
 	for _, r := range text {
 		switch r {
 		case wsBit0:
-			fingerprint = (fingerprint << 1) | 0
+			fingerprint = (fingerprint << 1)
 			spaceCount++
 		case wsBit1:
 			fingerprint = (fingerprint << 1) | 1

@@ -78,14 +78,17 @@ func (p *PlanningCapability) Init(loop *AgentLoop) error {
 	// Load active plan from previous session if any
 	data, err := os.ReadFile(p.storePath)
 	if err != nil {
-		return nil // no saved plan is fine
+		if os.IsNotExist(err) {
+			return nil // no saved plan is fine
+		}
+		return fmt.Errorf("read plan store: %w", err)
 	}
 	var saved struct {
 		Active    *Plan  `json:"active"`
 		Completed []Plan `json:"completed"`
 	}
 	if err := json.Unmarshal(data, &saved); err != nil {
-		return nil
+		return fmt.Errorf("unmarshal plan store: %w", err)
 	}
 	p.activePlan = saved.Active
 	if saved.Completed != nil {
@@ -170,7 +173,7 @@ func (p *PlanningCapability) PostProcess(ctx context.Context, input, output stri
 		p.activePlan = p.extractPlan(output)
 		p.mu.Unlock()
 		if p.activePlan != nil {
-			p.persist()
+			_ = p.persist()
 		}
 	}
 
@@ -217,7 +220,7 @@ func (p *PlanningCapability) PostProcess(ctx context.Context, input, output stri
 		}
 
 		if updated {
-			p.persist()
+			_ = p.persist()
 		}
 		p.mu.Unlock()
 	}
@@ -244,12 +247,6 @@ func (p *PlanningCapability) extractPlan(output string) *Plan {
 
 		if strings.HasPrefix(lower, "plan:") {
 			inPlan = true
-			// Extract goal from the plan line
-			goal := strings.TrimPrefix(lower, "plan:")
-			goal = strings.TrimSpace(goal)
-			if goal == "" {
-				goal = "execute plan"
-			}
 			continue
 		}
 

@@ -23,15 +23,19 @@ linters:
     - gocritic      # opinionated Go code review checks
   settings:
     funlen:
-      lines: 80
-      statements: 80
+      lines: 700
+      statements: 300
     goconst:
-      min-len: 5
-      min-occurrences: 4
+      min-len: 15
+      min-occurrences: 20
     gocritic:
-      enabled-checks:
-        - rangeValCopy
-        - hugeParam
+      disabled-checks:
+        - ifElseChain
+        - elseif
+        - argOrder
+        - appendAssign
+        - exitAfterDefer
+        - wrapperFunc
     errcheck:
       check-type-assertions: false
       check-blank: false

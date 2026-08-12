@@ -56,7 +56,6 @@ var (
 		"waypoint": true, "survey": true, "corridor": true,
 		"orbit": true, "patrol": true,
 	}
-	droneIPPattern = regexp.MustCompile(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`)
 	latPattern    = regexp.MustCompile(`^-?([0-8]?\d(\.\d+)?|90(\.0+)?)$`)
 	lonPattern    = regexp.MustCompile(`^-?((1[0-7]\d|[1-9]?\d)(\.\d+)?|180(\.0+)?)$`)
 )

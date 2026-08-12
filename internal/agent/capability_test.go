@@ -377,7 +377,7 @@ func TestWorkflowCapability_ExtractTemplateName(t *testing.T) {
 
 	for _, tt := range tests {
 		name := w.extractTemplateName(tt.output)
-		if strings.ToLower(name) != strings.ToLower(tt.expected) {
+		if !strings.EqualFold(name, tt.expected) {
 			t.Errorf("extractTemplateName(%q) = %q, want %q", tt.output, name, tt.expected)
 		}
 	}

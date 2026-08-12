@@ -128,7 +128,7 @@ func (s *learningStore) append(entry LearningEntry) {
 	}
 
 	n, err := f.Write(data)
-	f.Close()
+	_ = f.Close()
 	if err != nil || n == 0 {
 		return
 	}
@@ -322,28 +322,6 @@ func (s *learningStore) recognizePatterns() []LearningPattern {
 	s.patterns = patterns
 	s.patternsTime = time.Now()
 	return patterns
-}
-
-// getPatternSummary returns a human-readable summary of recognized patterns.
-// This is used by capabilities to inject learning into the agent's context.
-func getPatternSummary() string {
-	patterns := sharedLearning.recognizePatterns()
-	if len(patterns) == 0 {
-		return ""
-	}
-
-	var sb strings.Builder
-	sb.WriteString("\n[Learning Patterns — recurring issues across sessions]\n")
-	for _, p := range patterns {
-		if p.Count >= 5 {
-			sb.WriteString(fmt.Sprintf("  ⚠ FREQUENT: %s (occurred %d times, %s → %s)\n",
-				p.Pattern, p.Count, p.FirstSeen, p.LastSeen))
-		} else {
-			sb.WriteString(fmt.Sprintf("  • %s (occurred %d times)\n", p.Pattern, p.Count))
-		}
-	}
-	sb.WriteString("Address these recurring patterns to improve over time.\n")
-	return sb.String()
 }
 
 // ── Helper functions ──────────────────────────────────────────────────────
