@@ -19,6 +19,7 @@ package mcp
 // Extended tool schemas
 // ------------------------------------------------------------------
 
+//nolint:funlen // TODO(#issue): split into smaller helpers by tool category
 func (s *Server) getExtendedTools() []tool {
 	var tools []tool
 	tools = append(tools, s.backwardCompatTools()...)
