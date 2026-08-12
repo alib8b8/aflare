@@ -325,11 +325,6 @@ func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 	}
 }
 
-// processInput handles a single user message and returns the agent's response.
-func (s *ChatSession) processInput(ctx context.Context, input string) (string, error) {
-	return s.loop.Process(ctx, input, ProcessOptions{})
-}
-
 // SendMessage processes a single user message and returns the agent's response.
 // Public API for programmatic chat integration (HTTP endpoints).
 // The call is bounded by DefaultSendTimeout to prevent hanging indefinitely.
