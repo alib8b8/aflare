@@ -236,8 +236,8 @@ func PauseWorkflow(wfPath string, wf *Workflow, stepIndex int, stepName string, 
 			wfTmp := wfDest + ".tmp"
 			if writeErr := os.WriteFile(wfTmp, wfData, 0600); writeErr == nil {
 				_ = os.Rename(wfTmp, wfDest) // best-effort: atomic workflow copy
-		} else {
-			_ = os.Remove(wfTmp) // best-effort cleanup
+			} else {
+				_ = os.Remove(wfTmp) // best-effort cleanup
 			}
 		}
 	}
@@ -251,8 +251,8 @@ func PauseWorkflow(wfPath string, wf *Workflow, stepIndex int, stepName string, 
 			walTmp := walDest + ".tmp"
 			if writeErr := os.WriteFile(walTmp, walData, 0600); writeErr == nil {
 				_ = os.Rename(walTmp, walDest) // best-effort: atomic WAL copy
-		} else {
-			_ = os.Remove(walTmp) // best-effort cleanup
+			} else {
+				_ = os.Remove(walTmp) // best-effort cleanup
 			}
 		}
 	}
