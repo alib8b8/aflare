@@ -18,14 +18,17 @@ package agent
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/alib8b8/aflare/internal/meta"
+	"github.com/alib8b8/aflare/internal/metrics"
 )
 
 // DefaultTools is the default tool set for the chat agent.
@@ -65,28 +68,59 @@ func DefaultConfig() Config {
 // ChatSession manages an interactive REPL chat session with the aflare agent.
 // Under the hood it wraps an AgentLoop — the same core that powers daemon mode.
 type ChatSession struct {
-	loop      *AgentLoop
-	running   bool
-	interrupt chan os.Signal
+	loop        *AgentLoop
+	running     bool
+	interrupt   chan os.Signal
+	sessionPath string // path to persisted session file
+	provider    string // LLM provider (for ollama-specific streaming filter)
+
+	// Analytics
+	firstSession bool  // true if this is a new session (no restored session)
+	turnCount    int64 // number of user turns completed
+	startTime    time.Time
 }
 
 // NewChatSession creates a new chat session with the given configuration.
 func NewChatSession(cfg Config) *ChatSession {
+	loop := NewAgentLoop(cfg)
+	// Set up compression notification so the user sees context compression
+	loop.SetCompressCallback(func(before, after int) {
+		fmt.Printf("(context compressed: %d → %d messages)\n", before, after)
+	})
 	return &ChatSession{
-		loop:      NewAgentLoop(cfg),
-		interrupt: make(chan os.Signal, 1),
+		loop:        loop,
+		interrupt:   make(chan os.Signal, 1),
+		sessionPath: DefaultSessionPath(),
+		provider:    cfg.Provider,
 	}
+}
+
+// SetSessionPath overrides the default session persistence path.
+func (s *ChatSession) SetSessionPath(path string) {
+	s.sessionPath = path
 }
 
 // Run starts the interactive REPL loop.
 // Stdin input is fed into the AgentLoop, responses are printed to stdout.
 // Supports multi-line input: lines ending with \ are continued on the next line.
+// On exit, the session is persisted to disk. On next start, the user can /resume.
 func (s *ChatSession) Run() {
+	s.startTime = time.Now()
 	s.running = true
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1*1024*1024)
 
 	fmt.Println(WelcomeMessage(meta.GetVersion()))
+
+	// Check for saved session
+	session, hasSession := LoadSession(s.sessionPath)
+	if hasSession && len(session.Messages) > 0 {
+		fmt.Printf("\nPrevious session found (%d messages, saved %s).\n",
+			session.MessageCnt,
+			session.SavedAt.Format("2006-01-02 15:04"))
+		fmt.Println("Type /resume to restore the conversation, or just start chatting to begin fresh.")
+	}
+	s.firstSession = !hasSession || len(session.Messages) == 0
 	fmt.Println()
 
 	// Ctrl-C: interrupt current turn, Ctrl-D: exit
@@ -101,10 +135,9 @@ func (s *ChatSession) Run() {
 	const maxMultiLineBytes = 1 * 1024 * 1024 // 1MB limit for multi-line input
 
 	for s.running {
+		s.printPrompt()
 		if inMultiLine {
 			fmt.Print("... ")
-		} else {
-			fmt.Print("> ")
 		}
 
 		if !scanner.Scan() {
@@ -166,13 +199,42 @@ func (s *ChatSession) Run() {
 	}
 
 	cancel()
+
+	// Record session turns before exit
+	metrics.RecordSessionTurns(int(atomic.LoadInt64(&s.turnCount)))
+
+	// Persist session on exit
+	s.saveSession()
+	DeleteSession(s.sessionPath + ".lock")
 	fmt.Println("Goodbye!")
+}
+
+// printPrompt prints the prompt line with context window indicator.
+func (s *ChatSession) printPrompt() {
+	ctx := s.loop.Context()
+	chars := ctx.TotalChars()
+	limit := MaxContextChars
+	fmt.Printf("❯ [ctx: %d/%d] ", chars, limit)
+}
+
+// saveSession persists the current conversation to disk.
+func (s *ChatSession) saveSession() {
+	ctx := s.loop.Context()
+	if ctx.MessageCount() == 0 {
+		return
+	}
+	if err := ctx.SaveSession(s.sessionPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to save session: %v\n", err)
+	}
 }
 
 // handleTurn processes a single user message and prints the response.
 // Ctrl-C during execution interrupts the current turn but does not exit.
 // Streaming output is printed token-by-token in real time.
 func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
+	// Increment turn count atomically
+	atomic.AddInt64(&s.turnCount, 1)
+
 	// Drain any stale interrupt signals
 	select {
 	case <-s.interrupt:
@@ -193,11 +255,19 @@ func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 		}
 	}()
 
-	// Streaming output: print tokens as they arrive
+	// Streaming output: print tokens as they arrive.
+	// For ollama, wrap the chunk callback with a JSON ReAct filter
+	// so users see only the thought/final_answer text, not the JSON structure.
 	streamed := false
 	onChunk := func(chunk string) {
 		streamed = true
 		fmt.Print(chunk)
+	}
+
+	// For ollama provider, wrap onChunk with ReAct JSON filter
+	effectiveOnChunk := onChunk
+	if s.provider == "ollama" {
+		effectiveOnChunk = newReActStreamFilter(onChunk)
 	}
 
 	// Tool visibility: show tool calls and results
@@ -208,8 +278,27 @@ func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 		fmt.Printf("%s\n", truncateStr(result, 100))
 	}
 
-	response, err := s.loop.ProcessInputStream(ctx, input, onChunk, onToolCall, onToolResult)
+	response, err := s.loop.Process(ctx, input, ProcessOptions{
+		OnChunk:      effectiveOnChunk,
+		OnToolCall:   onToolCall,
+		OnToolResult: onToolResult,
+	})
 	close(done)
+
+	// Record first session success metric on the first turn
+	if s.firstSession && atomic.LoadInt64(&s.turnCount) == 1 {
+		outcome := "success"
+		if err != nil {
+			if ctx.Err() != nil {
+				outcome = "timeout"
+			} else {
+				outcome = "error"
+			}
+		} else if time.Since(s.startTime) > 2*time.Minute {
+			outcome = "timeout"
+		}
+		metrics.RecordFirstSession(s.provider, outcome)
+	}
 
 	if err != nil {
 		if ctx.Err() != nil {
@@ -230,7 +319,7 @@ func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 
 // processInput handles a single user message and returns the agent's response.
 func (s *ChatSession) processInput(ctx context.Context, input string) (string, error) {
-	return s.loop.ProcessInput(ctx, input)
+	return s.loop.Process(ctx, input, ProcessOptions{})
 }
 
 // SendMessage processes a single user message and returns the agent's response.
@@ -239,7 +328,7 @@ func (s *ChatSession) processInput(ctx context.Context, input string) (string, e
 func (s *ChatSession) SendMessage(input string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultSendTimeout)
 	defer cancel()
-	return s.loop.ProcessInput(ctx, input)
+	return s.loop.Process(ctx, input, ProcessOptions{})
 }
 
 // ResetSession clears the conversation history.
@@ -259,6 +348,8 @@ func (s *ChatSession) handleCommand(cmd string) {
 		fmt.Println("  /capabilities  List active capabilities")
 		fmt.Println("  /history       Show conversation state")
 		fmt.Println("  /clear         Clear conversation history")
+		fmt.Println("  /resume        Restore previous conversation")
+		fmt.Println("  /export        Export conversation to markdown file")
 		fmt.Println("  /exit, /quit   Exit chat")
 
 	case "/skills":
@@ -291,10 +382,181 @@ func (s *ChatSession) handleCommand(cmd string) {
 		s.loop.Context().Reset()
 		fmt.Println("Conversation cleared.")
 
+	case "/resume":
+		s.handleResume()
+
+	case "/export":
+		s.handleExport()
+
 	case "/exit", "/quit", "/q":
 		s.running = false
 
 	default:
 		fmt.Printf("Unknown command: %s. Type /help for commands.\n", parts[0])
 	}
+}
+
+// handleResume restores the previous conversation from the session file.
+func (s *ChatSession) handleResume() {
+	session, ok := LoadSession(s.sessionPath)
+	if !ok || len(session.Messages) == 0 {
+		fmt.Println("No saved session found.")
+		return
+	}
+
+	restored := s.loop.Context().RestoreSession(s.sessionPath)
+	if restored == 0 {
+		fmt.Println("No messages to restore.")
+		return
+	}
+
+	fmt.Printf("Restored %d messages from %s.\n", restored, session.SavedAt.Format("2006-01-02 15:04"))
+	fmt.Printf("Context: %d/%d chars\n", s.loop.Context().TotalChars(), MaxContextChars)
+}
+
+// handleExport exports the conversation to a markdown file.
+func (s *ChatSession) handleExport() {
+	messages := s.loop.Context().Messages()
+	if len(messages) == 0 {
+		fmt.Println("No conversation to export.")
+		return
+	}
+
+	timestamp := time.Now().Format("20060102-150405")
+	filename := fmt.Sprintf("export-%s.md", timestamp)
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("# aflare Chat Export\n\n"))
+	sb.WriteString(fmt.Sprintf("Exported: %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
+	sb.WriteString("---\n\n")
+
+	for _, m := range messages {
+		switch m.Role {
+		case "user":
+			sb.WriteString(fmt.Sprintf("**You:** %s\n\n", m.Content))
+		case "assistant":
+			sb.WriteString(fmt.Sprintf("**aflare:** %s\n\n", m.Content))
+		case "system":
+			// Skip system messages (internal summaries, etc.)
+			if !strings.HasPrefix(m.Content, "[Previous conversation summary]") {
+				sb.WriteString(fmt.Sprintf("*[System]* %s\n\n", m.Content))
+			}
+		}
+	}
+
+	if err := os.WriteFile(filename, []byte(sb.String()), 0644); err != nil {
+		fmt.Printf("Failed to export: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Conversation exported to %s (%d messages)\n", filename, len(messages))
+}
+
+// ── Ollama ReAct streaming filter ──────────────────────────────────────────
+//
+// When ollama generates a JSON ReAct response, the raw chunks contain
+// {"thought":"...","action":"...","action_input":"..."} etc.
+// The filter buffers chunks and extracts human-readable text from ReAct JSON
+// fields, so the user sees only the thought/final_answer content in real-time.
+
+// reActStreamFilter buffers ollama streaming chunks and extracts human-readable
+// text from JSON ReAct responses. It suppresses the JSON structure and only
+// passes through thought and final_answer content.
+type reActStreamFilter struct {
+	buf       strings.Builder
+	onChunk   func(string)
+	lastFlush int // track position of last flushed content
+}
+
+func newReActStreamFilter(onChunk func(string)) func(string) {
+	f := &reActStreamFilter{onChunk: onChunk}
+	return f.feed
+}
+
+func (f *reActStreamFilter) feed(chunk string) {
+	f.buf.WriteString(chunk)
+	f.tryExtract()
+}
+
+// tryExtract scans the buffer for ReAct JSON fields and streams their content.
+func (f *reActStreamFilter) tryExtract() {
+	raw := f.buf.String()
+	// Only process if we might have a complete JSON object
+	if !strings.Contains(raw, "{") {
+		return
+	}
+
+	// Try to extract "thought" content
+	f.extractField(raw, "thought")
+
+	// Try to extract "final_answer" content
+	f.extractField(raw, "final_answer")
+
+	// If the buffer ends with a complete JSON object, we can reset
+	trimmed := strings.TrimSpace(raw)
+	if strings.HasSuffix(trimmed, "}") {
+		// Try to parse as complete JSON
+		if f.isCompleteJSON(trimmed) {
+			// Flush any remaining new content
+			f.buf.Reset()
+			f.lastFlush = 0
+		}
+	}
+}
+
+// extractField extracts the content of a JSON string field from the buffer.
+// It looks for "fieldName": " and captures until the closing ".
+func (f *reActStreamFilter) extractField(raw, fieldName string) {
+	prefix := `"` + fieldName + `": "`
+	idx := strings.Index(raw[f.lastFlush:], prefix)
+	if idx < 0 {
+		return
+	}
+	start := f.lastFlush + idx + len(prefix)
+	if start >= len(raw) {
+		return
+	}
+
+	// Find the closing quote, handling escaped quotes
+	end := f.findClosingQuote(raw, start)
+	if end < 0 {
+		return
+	}
+
+	content := raw[start:end]
+	if content != "" {
+		// Unescape JSON string content
+		content = unescapeJSONString(content)
+		f.onChunk(content)
+		f.lastFlush = end + 1
+	}
+}
+
+// findClosingQuote finds the closing unescaped quote in raw starting from start.
+func (f *reActStreamFilter) findClosingQuote(raw string, start int) int {
+	for i := start; i < len(raw); i++ {
+		if raw[i] == '\\' && i+1 < len(raw) {
+			i++ // skip escaped char
+			continue
+		}
+		if raw[i] == '"' {
+			return i
+		}
+	}
+	return -1
+}
+
+// isCompleteJSON checks if the given string is a complete, valid JSON object.
+func (f *reActStreamFilter) isCompleteJSON(s string) bool {
+	var dummy interface{}
+	return json.Unmarshal([]byte(s), &dummy) == nil
+}
+
+// unescapeJSONString converts JSON escape sequences to their literal characters.
+func unescapeJSONString(s string) string {
+	var decoded string
+	if err := json.Unmarshal([]byte(`"`+s+`"`), &decoded); err != nil {
+		return s // fallback: return as-is
+	}
+	return decoded
 }

@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/alib8b8/aflare/internal/scheduler"
 	"github.com/alib8b8/aflare/internal/workflow"
@@ -56,8 +57,15 @@ func HandleSchedule(args []string) {
 }
 
 // HandleScheduleAdd handles the "schedule add" subcommand.
+// Supports both workflow-based and description-based tasks:
+//
+//	aflare schedule add --cron "0 9 * * *" my-workflow.yaml
+//	aflare schedule add --cron "0 9 * * *" --desc "Check git repo status"
+//	aflare schedule add --add "每天9点检查git仓库状态"  (auto-parse cron)
 func HandleScheduleAdd(args []string) {
-	var cronExpr, taskID, wfPath string
+	var cronExpr, taskID, wfPath, desc string
+	var autoParse string
+
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--cron":
@@ -67,12 +75,26 @@ func HandleScheduleAdd(args []string) {
 			}
 			cronExpr = args[i+1]
 			i++
+		case "--desc":
+			if i+1 >= len(args) {
+				fmt.Println("❌ --desc requires a value")
+				os.Exit(1)
+			}
+			desc = args[i+1]
+			i++
 		case "--id":
 			if i+1 >= len(args) {
 				fmt.Println("❌ --id requires a value")
 				os.Exit(1)
 			}
 			taskID = args[i+1]
+			i++
+		case "--add":
+			if i+1 >= len(args) {
+				fmt.Println("❌ --add requires a value")
+				os.Exit(1)
+			}
+			autoParse = args[i+1]
 			i++
 		case "--help", "-h":
 			PrintScheduleUsage()
@@ -82,6 +104,10 @@ func HandleScheduleAdd(args []string) {
 				cronExpr = strings.TrimPrefix(args[i], "--cron=")
 			} else if strings.HasPrefix(args[i], "--id=") {
 				taskID = strings.TrimPrefix(args[i], "--id=")
+			} else if strings.HasPrefix(args[i], "--desc=") {
+				desc = strings.TrimPrefix(args[i], "--desc=")
+			} else if strings.HasPrefix(args[i], "--add=") {
+				autoParse = strings.TrimPrefix(args[i], "--add=")
 			} else if !strings.HasPrefix(args[i], "-") && wfPath == "" {
 				wfPath = args[i]
 			} else {
@@ -91,33 +117,57 @@ func HandleScheduleAdd(args []string) {
 		}
 	}
 
+	// ── Auto-parse natural language ─────────────────────────────────────
+	if autoParse != "" {
+		parsedCron, parsedDesc := parseNaturalSchedule(autoParse)
+		if parsedCron == "" {
+			fmt.Printf("❌ Could not parse schedule from: %s\n", autoParse)
+			fmt.Println("   Please use --cron with an explicit cron expression.")
+			fmt.Println("   Examples: '0 9 * * *' (daily 9:00), '0 */2 * * *' (every 2 hours)")
+			os.Exit(1)
+		}
+		cronExpr = parsedCron
+		if desc == "" {
+			desc = parsedDesc
+		}
+	}
+
 	if cronExpr == "" {
-		fmt.Println("❌ --cron is required")
-		PrintScheduleUsage()
-		os.Exit(1)
-	}
-	if wfPath == "" {
-		fmt.Println("❌ workflow file path is required")
+		fmt.Println("❌ --cron is required (or use --add for natural language)")
 		PrintScheduleUsage()
 		os.Exit(1)
 	}
 
-	// Resolve to an absolute path so the schedule survives directory changes.
-	absPath, err := filepath.Abs(wfPath)
-	if err != nil {
-		fmt.Printf("❌ Failed to resolve workflow path: %v\n", err)
+	// At least one of: workflow file or description
+	if wfPath == "" && desc == "" {
+		fmt.Println("❌ Either a workflow file or --desc is required")
+		PrintScheduleUsage()
 		os.Exit(1)
 	}
-	if _, err := os.Stat(absPath); err != nil {
-		fmt.Printf("❌ Workflow file not found: %s\n", absPath)
-		os.Exit(1)
-	}
-	wfPath = absPath
 
-	// Default task ID: workflow filename stem.
+	// Validate workflow file if provided
+	if wfPath != "" {
+		absPath, err := filepath.Abs(wfPath)
+		if err != nil {
+			fmt.Printf("❌ Failed to resolve workflow path: %v\n", err)
+			os.Exit(1)
+		}
+		if _, err := os.Stat(absPath); err != nil {
+			fmt.Printf("❌ Workflow file not found: %s\n", absPath)
+			os.Exit(1)
+		}
+		wfPath = absPath
+	}
+
+	// Default task ID
 	if taskID == "" {
-		base := filepath.Base(wfPath)
-		taskID = strings.TrimSuffix(base, filepath.Ext(base))
+		if wfPath != "" {
+			base := filepath.Base(wfPath)
+			taskID = strings.TrimSuffix(base, filepath.Ext(base))
+		} else {
+			// Generate ID from description
+			taskID = generateTaskID(desc)
+		}
 	}
 
 	// Validate the cron expression using a throwaway scheduler.
@@ -145,6 +195,7 @@ func HandleScheduleAdd(args []string) {
 		ID:           taskID,
 		Cron:         cronExpr,
 		WorkflowPath: wfPath,
+		Description:  desc,
 	})
 	if err := scheduler.SaveSchedules(path, entries); err != nil {
 		fmt.Printf("❌ Failed to save schedule: %v\n", err)
@@ -153,8 +204,12 @@ func HandleScheduleAdd(args []string) {
 
 	fmt.Printf("✅ Scheduled task %q added\n", taskID)
 	fmt.Printf("   Cron:     %s\n", cronExpr)
-	fmt.Printf("   Workflow: %s\n", wfPath)
-	fmt.Printf("   Run 'aflare schedule start' to begin executing on schedule.\n")
+	if desc != "" {
+		fmt.Printf("   Task:     %s\n", desc)
+	}
+	if wfPath != "" {
+		fmt.Printf("   Workflow: %s\n", wfPath)
+	}
 }
 
 // HandleScheduleList handles the "schedule list" subcommand.
@@ -172,10 +227,14 @@ func HandleScheduleList() {
 
 	fmt.Printf("Scheduled tasks (%d):\n", len(entries))
 	fmt.Println("-" + strings.Repeat("-", 78))
-	fmt.Printf("  %-20s %-20s %s\n", "ID", "CRON", "WORKFLOW")
+	fmt.Printf("  %-20s %-20s %s\n", "ID", "CRON", "TASK")
 	fmt.Println("-" + strings.Repeat("-", 78))
 	for _, e := range entries {
-		fmt.Printf("  %-20s %-20s %s\n", e.ID, e.Cron, e.WorkflowPath)
+		display := e.WorkflowPath
+		if e.Description != "" {
+			display = e.Description
+		}
+		fmt.Printf("  %-20s %-20s %s\n", e.ID, e.Cron, display)
 	}
 }
 
@@ -231,25 +290,39 @@ func HandleScheduleStart() {
 	sched := scheduler.New()
 	for _, e := range entries {
 		entry := e // capture for closure
-		wf, reg, err := PrepareWorkflow(entry.WorkflowPath)
-		if err != nil {
-			fmt.Printf("❌ Failed to prepare workflow %q: %v\n", entry.WorkflowPath, err)
-			os.Exit(1)
-		}
-		taskFunc := func(ctx context.Context) {
-			if _, _, err := workflow.ExecuteWorkflow(ctx, wf, reg); err != nil {
-				log.Printf("scheduled workflow %q execution failed: %v", entry.ID, err)
+		if entry.WorkflowPath != "" {
+			// Workflow-based task
+			wf, reg, err := PrepareWorkflow(entry.WorkflowPath)
+			if err != nil {
+				fmt.Printf("❌ Failed to prepare workflow %q: %v\n", entry.WorkflowPath, err)
+				os.Exit(1)
 			}
+			taskFunc := func(ctx context.Context) {
+				if _, _, err := workflow.ExecuteWorkflow(ctx, wf, reg); err != nil {
+					log.Printf("scheduled workflow %q execution failed: %v", entry.ID, err)
+				}
+			}
+			if err := sched.AddTask(entry.ID, entry.Cron, taskFunc); err != nil {
+				fmt.Printf("❌ Failed to add task %q: %v\n", entry.ID, err)
+				os.Exit(1)
+			}
+			fmt.Printf("📋 Loaded workflow task %q (%s -> %s)\n", entry.ID, entry.Cron, entry.WorkflowPath)
+		} else {
+			// Description-based task (placeholder — executed by agent daemon, not here)
+			// The standalone scheduler can't execute description-based tasks;
+			// these are meant for `aflare agent` which has the LLM-powered agent loop.
+			fmt.Printf("📋 Skipped description task %q (%s) — use 'aflare agent' to run this\n", entry.ID, entry.Cron)
 		}
-		if err := sched.AddTask(entry.ID, entry.Cron, taskFunc); err != nil {
-			fmt.Printf("❌ Failed to add task %q: %v\n", entry.ID, err)
-			os.Exit(1)
-		}
-		fmt.Printf("📋 Loaded task %q (%s -> %s)\n", entry.ID, entry.Cron, entry.WorkflowPath)
 	}
 
 	sched.Start()
-	fmt.Printf("\n🚀 Scheduler started with %d task(s). Press Ctrl+C to stop.\n", len(entries))
+	activeCount := 0
+	for _, e := range entries {
+		if e.WorkflowPath != "" {
+			activeCount++
+		}
+	}
+	fmt.Printf("\n🚀 Scheduler started with %d task(s). Press Ctrl+C to stop.\n", activeCount)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
@@ -263,21 +336,254 @@ func HandleScheduleStart() {
 // PrintScheduleUsage prints usage information for the schedule command.
 func PrintScheduleUsage() {
 	fmt.Println("Usage: aflare schedule <command> [options]")
-	fmt.Println("\nSchedule workflows to run at specified times using cron expressions.")
+	fmt.Println("\nSchedule tasks to run at specified times using cron expressions.")
+	fmt.Println("Supports both workflow-based and natural language description-based tasks.")
 	fmt.Println("\nCommands:")
-	fmt.Println("  add --cron \"<expr>\" [--id <id>] <workflow.yaml>  Add a scheduled task")
-	fmt.Println("  list                                            List all scheduled tasks")
-	fmt.Println("  remove <id>                                     Remove a scheduled task")
-	fmt.Println("  start                                           Start the scheduler (foreground)")
-	fmt.Println("  -h, --help                                      Show this help message")
+	fmt.Println("  add --cron \"<expr>\" [--id <id>] [--desc \"<task>\"] [<workflow.yaml>]")
+	fmt.Println("  add --add \"<natural language schedule>\"                     Auto-parse schedule")
+	fmt.Println("  list                                                         List all scheduled tasks")
+	fmt.Println("  remove <id>                                                  Remove a scheduled task")
+	fmt.Println("  start                                                        Start the scheduler (foreground)")
+	fmt.Println("  -h, --help                                                   Show this help message")
 	fmt.Println("\nCron expression (5 fields): minute hour day-of-month month day-of-week")
 	fmt.Println("  e.g. \"0 9 * * *\"      - daily at 09:00")
 	fmt.Println("       \"*/15 * * * *\"   - every 15 minutes")
 	fmt.Println("       \"0 9 * * 1-5\"    - weekdays at 09:00")
+	fmt.Println("\nNatural language (--add):")
+	fmt.Println("  \"每天9点检查git仓库状态\"          → \"0 9 * * *\"")
+	fmt.Println("  \"每小时执行一次\"                  → \"0 * * * *\"")
+	fmt.Println("  \"每周一早上8点\"                    → \"0 8 * * 1\"")
 	fmt.Println("\nExamples:")
 	fmt.Println("  aflare schedule add --cron \"0 9 * * *\" my-workflow.yaml")
+	fmt.Println("  aflare schedule add --cron \"0 9 * * *\" --desc \"Check git repo status\"")
+	fmt.Println("  aflare schedule add --add \"每天9点检查git仓库状态\"")
 	fmt.Println("  aflare schedule add --id daily-report --cron \"0 9 * * *\" report.yaml")
 	fmt.Println("  aflare schedule list")
 	fmt.Println("  aflare schedule remove daily-report")
 	fmt.Println("  aflare schedule start")
 }
+
+// parseNaturalSchedule parses Chinese natural language schedule descriptions
+// into cron expressions. Supported patterns:
+//   - "每天N点" → "0 N * * *"
+//   - "每小时" → "0 * * * *"
+//   - "每周一/二/...早上N点" → "0 N * * 1/2/..."
+//   - "每N小时" → "0 */N * * *"
+//   - "每N分钟" → "*/N * * * *"
+func parseNaturalSchedule(input string) (cron, desc string) {
+	input = strings.TrimSpace(input)
+
+	// Try to extract time and schedule pattern
+	// Pattern: "每天X点" or "每天早上X点" etc.
+	if strings.Contains(input, "每天") {
+		hour := extractHour(input)
+		minute := extractMinute(input)
+		if hour >= 0 {
+			if minute < 0 {
+				minute = 0
+			}
+			cron = fmt.Sprintf("%d %d * * *", minute, hour)
+			desc = input
+			return
+		}
+	}
+
+	// Pattern: "每小时" or "每小时执行"
+	if strings.Contains(input, "每小时") {
+		cron = "0 * * * *"
+		desc = input
+		return
+	}
+
+	// Pattern: "每N小时"
+	if strings.Contains(input, "小时") {
+		for _, r := range []string{"每", "每隔"} {
+			if idx := strings.Index(input, r); idx >= 0 {
+				rest := input[idx+len(r):]
+				if n := extractNumber(rest); n > 0 && n <= 23 {
+					cron = fmt.Sprintf("0 */%d * * *", n)
+					desc = input
+					return
+				}
+			}
+		}
+	}
+
+	// Pattern: "每N分钟"
+	if strings.Contains(input, "分钟") {
+		for _, r := range []string{"每", "每隔"} {
+			if idx := strings.Index(input, r); idx >= 0 {
+				rest := input[idx+len(r):]
+				if n := extractNumber(rest); n > 0 && n <= 59 {
+					cron = fmt.Sprintf("*/%d * * * *", n)
+					desc = input
+					return
+				}
+			}
+		}
+	}
+
+	// Pattern: "每周X" where X is a weekday
+	weekdayMap := map[string]int{
+		"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "日": 0, "天": 0,
+		"1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "0": 0, "7": 0,
+	}
+	if strings.Contains(input, "每周") {
+		hour := extractHour(input)
+		minute := extractMinute(input)
+		if hour < 0 {
+			hour = 9
+		}
+		if minute < 0 {
+			minute = 0
+		}
+		for key, dow := range weekdayMap {
+			if strings.Contains(input, key) && key != "1" && key != "2" && key != "3" && key != "4" && key != "5" && key != "6" && key != "0" && key != "7" {
+				cron = fmt.Sprintf("%d %d * * %d", minute, hour, dow)
+				desc = input
+				return
+			}
+		}
+	}
+
+	// Pattern: "每天早上" (default 9:00)
+	if strings.Contains(input, "早上") || strings.Contains(input, "上午") {
+		hour := extractHour(input)
+		if hour < 0 {
+			hour = 9
+		}
+		minute := extractMinute(input)
+		if minute < 0 {
+			minute = 0
+		}
+		cron = fmt.Sprintf("%d %d * * *", minute, hour)
+		desc = input
+		return
+	}
+
+	// Pattern: "每天晚上" or "下午"
+	if strings.Contains(input, "晚上") || strings.Contains(input, "下午") {
+		hour := extractHour(input)
+		if hour < 0 {
+			hour = 20
+		}
+		// Convert 12-hour to 24-hour if needed
+		if strings.Contains(input, "下午") && hour >= 1 && hour <= 11 {
+			hour += 12
+		}
+		minute := extractMinute(input)
+		if minute < 0 {
+			minute = 0
+		}
+		cron = fmt.Sprintf("%d %d * * *", minute, hour)
+		desc = input
+		return
+	}
+
+	return "", input
+}
+
+// extractHour extracts the hour from a Chinese natural language string.
+// Returns -1 if not found.
+func extractHour(s string) int {
+	runes := []rune(s)
+	for i := 0; i < len(runes)-1; i++ {
+		if runes[i+1] == '点' || runes[i+1] == '时' {
+			if runes[i] >= '0' && runes[i] <= '9' {
+				j := i
+				for j >= 0 && runes[j] >= '0' && runes[j] <= '9' {
+					j--
+				}
+				j++
+				num := 0
+				for k := j; k <= i; k++ {
+					num = num*10 + int(runes[k]-'0')
+				}
+				if num >= 0 && num <= 23 {
+					return num
+				}
+			}
+		}
+	}
+	return -1
+}
+
+// extractMinute extracts the minute from a Chinese natural language string.
+// Returns -1 if not found.
+func extractMinute(s string) int {
+	runes := []rune(s)
+	for i := 0; i < len(runes)-1; i++ {
+		if runes[i+1] == '分' {
+			if runes[i] >= '0' && runes[i] <= '9' {
+				j := i
+				for j >= 0 && runes[j] >= '0' && runes[j] <= '9' {
+					j--
+				}
+				j++
+				num := 0
+				for k := j; k <= i; k++ {
+					num = num*10 + int(runes[k]-'0')
+				}
+				if num >= 0 && num <= 59 {
+					return num
+				}
+			}
+		}
+	}
+	// Look for "HH:MM" pattern in the original string
+	for i := 0; i < len(s)-2; i++ {
+		if s[i] >= '0' && s[i] <= '9' && s[i+1] == ':' && s[i+2] >= '0' && s[i+2] <= '9' {
+			j := i + 3
+			for j < len(s) && s[j] >= '0' && s[j] <= '9' {
+				j++
+			}
+			num := 0
+			for k := i + 2; k < j; k++ {
+				num = num*10 + int(s[k]-'0')
+			}
+			if num >= 0 && num <= 59 {
+				return num
+			}
+		}
+	}
+	return -1
+}
+
+// extractNumber extracts the first number found in a string.
+func extractNumber(s string) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= '0' && s[i] <= '9' {
+			j := i
+			for j < len(s) && s[j] >= '0' && s[j] <= '9' {
+				j++
+			}
+			num := 0
+			for k := i; k < j; k++ {
+				num = num*10 + int(s[k]-'0')
+			}
+			return num
+		}
+	}
+	return -1
+}
+
+// generateTaskID generates a simple task ID from a description string.
+func generateTaskID(desc string) string {
+	// Extract meaningful characters from the description
+	id := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			return r
+		}
+		return -1
+	}, desc)
+	if len(id) == 0 {
+		id = fmt.Sprintf("task-%d", time.Now().Unix())
+	}
+	if len(id) > 30 {
+		id = id[:30]
+	}
+	return strings.ToLower(id)
+}
+
+// timeNow is a package-level function for getting current time, overridable in tests.
+var timeNow = time.Now

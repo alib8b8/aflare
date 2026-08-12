@@ -28,18 +28,22 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/alib8b8/aflare/internal/agent"
+	"github.com/alib8b8/aflare/internal/filewatch"
 	"github.com/alib8b8/aflare/internal/i18n"
 	"github.com/alib8b8/aflare/internal/meta"
 	"github.com/alib8b8/aflare/internal/scheduler"
+	"github.com/alib8b8/aflare/internal/taskqueue"
 )
 
 // HandleAgent handles the "agent" command — unified daemon agent.
-// It supports stdin (interactive chat), scheduler events, and file-watch
-// events, all feeding into the same AgentLoop.
+// It supports stdin (interactive chat), scheduler events, file-watch
+// events, and task queue, all feeding into the same AgentLoop.
 func HandleAgent(args []string) {
 	cfg := agent.DefaultConfig()
+	var watchDir string
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -82,6 +86,11 @@ func HandleAgent(args []string) {
 			}
 		case "--safe-mode", "-s":
 			cfg.SafeMode = true
+		case "--watch":
+			if i+1 < len(args) {
+				watchDir = args[i+1]
+				i++
+			}
 		case "--no-stdin":
 			// daemon-only mode: no interactive input
 		case "--help", "-h":
@@ -99,38 +108,106 @@ func HandleAgent(args []string) {
 	defer cancel()
 
 	// Create the shared input channel
-	inputs := make(chan agent.AgentInput, 10)
+	inputs := make(chan agent.AgentInput, 100)
 
-	// Start the AgentLoop
+	// Start the AgentLoop in a goroutine
 	go loop.Run(ctx, inputs, nil)
 
-	// Start the scheduler
+	// ── Task Queue ──────────────────────────────────────────────────────
+	// All scheduler and filewatch tasks go through the task queue for
+	// ordered, non-duplicate execution.
+	tq := taskqueue.New(100)
+	go tq.Run(ctx, func(taskCtx context.Context, task *taskqueue.Task) taskqueue.TaskResult {
+		// Create a reply channel for the agent
+		replyCh := make(chan agent.AgentOutput, 1)
+		select {
+		case inputs <- agent.AgentInput{
+			Source:  agent.SourceScheduler,
+			Message: task.Message,
+			ReplyTo: replyCh,
+		}:
+		case <-taskCtx.Done():
+			return taskqueue.TaskResult{TaskID: task.ID, Error: taskCtx.Err()}
+		}
+
+		select {
+		case out := <-replyCh:
+			return taskqueue.TaskResult{TaskID: task.ID, Response: out.Response, Error: out.Error}
+		case <-taskCtx.Done():
+			return taskqueue.TaskResult{TaskID: task.ID, Error: taskCtx.Err()}
+		}
+	})
+
+	// ── Scheduler ───────────────────────────────────────────────────────
 	sched := scheduler.New()
 	sched.Start()
 	defer sched.Stop()
 
-	// Wire scheduler events into the agent loop
-	// The scheduler fires events as user messages to the agent
-	sched.AddTask("agent-heartbeat", "*/5 * * * *", func(taskCtx context.Context) {
-		select {
-		case inputs <- agent.AgentInput{
-			Source:  agent.SourceScheduler,
-			Message: "[system] Scheduled heartbeat. Review recent context and check if any pending tasks need attention.",
-		}:
-		case <-ctx.Done():
+	// Load persisted schedule entries and wire them into the task queue
+	schedPath := scheduler.DefaultSchedulesPath()
+	entries, err := scheduler.LoadSchedules(schedPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to load schedules: %v\n", err)
+	}
+	for _, entry := range entries {
+		entry := entry // capture
+		sched.AddTask(entry.ID, entry.Cron, func(taskCtx context.Context) {
+			tq.Enqueue(&taskqueue.Task{
+				ID:        fmt.Sprintf("sched-%s-%d", entry.ID, time.Now().Unix()),
+				Source:    "scheduler",
+				Message:   entry.Description,
+				CreatedAt: time.Now(),
+			})
+		})
+		if entry.Description != "" {
+			fmt.Printf("Loaded scheduled task: %s (%s) → %s\n", entry.ID, entry.Cron, entry.Description)
+		} else {
+			fmt.Printf("Loaded scheduled task: %s (%s)\n", entry.ID, entry.Cron)
 		}
-	})
+	}
 
-	// Signal handling
+	// ── File Watch ──────────────────────────────────────────────────────
+	if watchDir != "" {
+		watchEvents := make(chan filewatch.Event, 100)
+		watcher, err := filewatch.NewWatcher(watchDir, filewatch.DefaultPollInterval, watchEvents)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: filewatch setup failed: %v\n", err)
+		} else {
+			go watcher.Start(ctx)
+			// Feed filewatch events into the task queue as agent inputs
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case event := <-watchEvents:
+						tq.Enqueue(&taskqueue.Task{
+							ID:        fmt.Sprintf("fw-%s-%d", event.Path, event.Timestamp.Unix()),
+							Source:    "filewatch",
+							Message:   filewatch.FormatEvent(event),
+							CreatedAt: event.Timestamp,
+						})
+					}
+				}
+			}()
+			fmt.Printf("Watching directory: %s\n", watchDir)
+		}
+	}
+
+	// ── Signal Handling ─────────────────────────────────────────────────
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	fmt.Println(agent.WelcomeMessage(meta.GetVersion()))
-	fmt.Println("Agent running in daemon mode (scheduler + stdin).")
+	fmt.Println("Agent running in daemon mode (scheduler + filewatch + stdin).")
+	if watchDir != "" {
+		fmt.Printf("  Watch:   %s\n", watchDir)
+	}
+	fmt.Printf("  Queue:   %d tasks pending\n", tq.Size())
 	fmt.Println("Type messages to interact, /help for commands, Ctrl-C to interrupt, Ctrl-D to exit.")
 	fmt.Println()
 
-	// Stdin scanner
+	// ── Stdin Scanner ───────────────────────────────────────────────────
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1*1024*1024)
 
@@ -155,7 +232,7 @@ func HandleAgent(args []string) {
 			}
 
 			if strings.HasPrefix(line, "/") {
-				handleAgentCommand(line, loop, &running)
+				handleAgentCommand(line, loop, &running, tq)
 				continue
 			}
 
@@ -186,7 +263,7 @@ func HandleAgent(args []string) {
 }
 
 // handleAgentCommand processes slash commands in agent mode.
-func handleAgentCommand(cmd string, loop *agent.AgentLoop, running *bool) {
+func handleAgentCommand(cmd string, loop *agent.AgentLoop, running *bool, tq *taskqueue.Queue) {
 	parts := strings.SplitN(cmd, " ", 2)
 	switch parts[0] {
 	case "/help", "/h":
@@ -197,6 +274,7 @@ func handleAgentCommand(cmd string, loop *agent.AgentLoop, running *bool) {
 		fmt.Println("  /capabilities  List active capabilities")
 		fmt.Println("  /history       Show conversation state")
 		fmt.Println("  /clear         Clear conversation history")
+		fmt.Println("  /queue         Show task queue status")
 		fmt.Println("  /exit, /quit   Exit agent")
 
 	case "/skills":
@@ -229,6 +307,11 @@ func handleAgentCommand(cmd string, loop *agent.AgentLoop, running *bool) {
 		loop.Context().Reset()
 		fmt.Println("Conversation cleared.")
 
+	case "/queue":
+		fmt.Printf("Task queue: %d pending, %d active\n", tq.Size(), tq.ActiveCount())
+		summary := tq.StatusSummary()
+		fmt.Printf("  Status: %d done, %d failed\n", summary[taskqueue.StatusDone], summary[taskqueue.StatusFailed])
+
 	case "/exit", "/quit", "/q":
 		*running = false
 
@@ -244,7 +327,7 @@ func PrintAgentUsage() {
 	fmt.Println("Usage: aflare agent [options]")
 	fmt.Println()
 	fmt.Println("Starts a unified agent daemon that fuses interactive chat with")
-	fmt.Println("scheduled tasks and file-watch events in a single event loop.")
+	fmt.Println("scheduled tasks, file-watch events, and a task queue in a single event loop.")
 	fmt.Println()
 	fmt.Println("Options:")
 	fmt.Println("  --provider, -p <name>     LLM provider (default: ollama)")
@@ -255,25 +338,27 @@ func PrintAgentUsage() {
 	fmt.Println("  --capabilities, -c <list> Comma-separated capability names, or 'all'")
 	fmt.Println("  --max-iterations, -n <n>  Max agent iterations per turn (default: 10)")
 	fmt.Println("  --safe-mode, -s            Block execute and destructive tools")
+	fmt.Println("  --watch <dir>             Watch directory for file changes, feed to agent")
 	fmt.Println("  --help, -h                 Show this help")
 	fmt.Println()
 	fmt.Println("Capabilities (--capabilities):")
-	fmt.Println("  reflection     Self-reflection and self-correction (反思/自我批评)")
-	fmt.Println("  human-in-loop  Pause at critical decisions for human approval (人机协同)")
-	fmt.Println("  bdi            Belief-Desire-Intention goal management (BDI)")
-	fmt.Println("  utility        Utility-driven optimization of decisions (效用驱动)")
-	fmt.Println("  adaptive       Learning and adaptation from feedback (学习型/自适应)")
-	fmt.Println("  memory         Cross-session long-term memory (有状态)")
-	fmt.Println("  planning       Goal-driven planning and action sequencing (规划式)")
-	fmt.Println("  multi-agent    Multi-agent collaboration (多Agent协作式)")
-	fmt.Println("  workflow       Predefined workflow/pipeline execution (工作流/管道式)")
-	fmt.Println("  simulation     Simulation and generative behavior modeling (模拟/生成式)")
+	fmt.Println("  reflection     Self-reflection and self-correction")
+	fmt.Println("  human-in-loop  Pause at critical decisions for human approval")
+	fmt.Println("  bdi            Belief-Desire-Intention goal management")
+	fmt.Println("  utility        Utility-driven optimization of decisions")
+	fmt.Println("  adaptive       Learning and adaptation from feedback")
+	fmt.Println("  memory         Cross-session long-term memory")
+	fmt.Println("  planning       Goal-driven planning and action sequencing")
+	fmt.Println("  multi-agent    Multi-agent collaboration")
+	fmt.Println("  workflow       Predefined workflow/pipeline execution")
+	fmt.Println("  simulation     Simulation and generative behavior modeling")
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  aflare agent                                    # local ollama (default)")
 	fmt.Println("  aflare agent -p deepseek -m deepseek-chat       # DeepSeek")
 	fmt.Println("  aflare agent -s                                 # safe mode")
 	fmt.Println("  aflare agent -c reflection,bdi                  # with reflection + BDI")
+	fmt.Println("  aflare agent --watch ./logs                     # watch directory for changes")
 	fmt.Println("  aflare agent -c all                             # all capabilities")
 	fmt.Println()
 	fmt.Println("Agent commands:")
@@ -282,5 +367,6 @@ func PrintAgentUsage() {
 	fmt.Println("  /capabilities  List active capabilities")
 	fmt.Println("  /history    Show conversation state")
 	fmt.Println("  /clear      Clear conversation history")
+	fmt.Println("  /queue      Show task queue status")
 	fmt.Println("  /exit       Exit agent")
 }

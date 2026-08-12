@@ -31,6 +31,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alib8b8/aflare/internal/agent"
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/workflow"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -44,7 +45,8 @@ type Server struct {
 	readTimeout  time.Duration
 	writeTimeout time.Duration
 	workflowsDir string
-	chat         chatHandler
+	sessions     *agent.SessionManager
+	rateLimiter  *ipRateLimiter
 
 	// Metrics
 	requestsTotal   uint64
@@ -61,6 +63,8 @@ func NewServer(host, port, apiKey string) *Server {
 		apiKey:       apiKey,
 		readTimeout:  30 * time.Second,
 		writeTimeout: 60 * time.Second,
+		sessions:     agent.NewSessionManager(agent.DefaultMaxSessions, agent.DefaultSessionTTL),
+		rateLimiter:  newIPRateLimiter(DefaultRateLimitRPS, DefaultRateLimitBurst),
 	}
 }
 
@@ -69,9 +73,16 @@ func (s *Server) SetWorkflowsDir(dir string) {
 	s.workflowsDir = dir
 }
 
-// SetCapabilities sets the capability names to enable for the chat session.
+// SetCapabilities sets the capability names to enable for new chat sessions.
 func (s *Server) SetCapabilities(caps []string) {
-	s.chat.setCapabilities(caps)
+	s.sessions.SetCapabilities(caps)
+}
+
+// SetMaxSessions sets the maximum number of concurrent chat sessions.
+// Existing sessions are preserved; if the new limit is lower, excess
+// sessions are evicted using LRU.
+func (s *Server) SetMaxSessions(n int) {
+	s.sessions.SetMaxSessions(n)
 }
 
 // Start begins listening and serving HTTP requests. It blocks until the
@@ -87,6 +98,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/v1/workflows", s.handleListWorkflows)
 	mux.HandleFunc("/api/v1/workflows/", s.handleGetWorkflow)
 	mux.HandleFunc("/api/v1/chat", s.handleChat)
+	mux.HandleFunc("/api/v1/chat/", s.handleChat)
 
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
 	if s.host == "" {
@@ -131,7 +143,9 @@ func (s *Server) middlewareStack(next http.Handler) http.Handler {
 	return s.corsMiddleware(
 		s.loggingMiddleware(
 			s.metricsMiddleware(
-				s.authMiddleware(next),
+				s.authMiddleware(
+					s.rateLimitMiddleware(next),
+				),
 			),
 		),
 	)
@@ -235,6 +249,12 @@ func isLocalhost(r *http.Request) bool {
 		host = r.RemoteAddr
 	}
 	return host == "127.0.0.1" || host == "::1" || host == "localhost"
+}
+
+// rateLimitMiddleware applies per-IP rate limiting to API requests.
+// Limited to 10 req/min per IP; returns 429 when exceeded.
+func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
+	return rateLimitMiddleware(s.rateLimiter, next)
 }
 
 // handleHealth serves the health check endpoint.

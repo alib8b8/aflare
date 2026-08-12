@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/nodes/core"
@@ -28,6 +29,7 @@ import (
 const (
 	// MaxContextChars is the character budget for the full conversation context.
 	// When exceeded, older messages are compressed into a summary.
+	// With token estimation, this is ~2000 tokens for English, ~4000 for Chinese.
 	MaxContextChars = 8000
 
 	// KeepRecentN is the number of most recent messages preserved during compression.
@@ -37,6 +39,32 @@ const (
 	MaxSummaryChars = 2000
 )
 
+// estimateTokens estimates the number of tokens in text using a provider-aware
+// heuristic. For ollama (English-first), it uses 4 chars ≈ 1 token. For other
+// providers, it counts CJK characters at 1.5 tokens each and Latin characters
+// at 0.25 tokens each. This is intentionally approximate — better than raw
+// character count for mixed-language contexts.
+func estimateTokens(text string, provider string) int {
+	if provider == "ollama" {
+		return len(text) / 4
+	}
+	cjk := countCJK(text)
+	other := len([]rune(text)) - cjk
+	return int(float64(cjk)*1.5 + float64(other)*0.25)
+}
+
+// countCJK counts the number of CJK (Chinese/Japanese/Korean) characters.
+func countCJK(text string) int {
+	n := 0
+	for _, r := range text {
+		if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) ||
+			unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r) {
+			n++
+		}
+	}
+	return n
+}
+
 // ContextManager manages multi-turn conversation history with automatic
 // compression when the context exceeds the character budget.
 // Safe for concurrent use via the HTTP API.
@@ -45,6 +73,7 @@ type ContextManager struct {
 	messages     []core.LLMMessage
 	systemPrompt string
 	compressNode *nodes.CompressNode
+	provider     string // LLM provider for token estimation
 }
 
 // NewContextManager creates a new context manager.
@@ -60,6 +89,13 @@ func (cm *ContextManager) SetSystemPrompt(prompt string) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	cm.systemPrompt = prompt
+}
+
+// SetProvider sets the LLM provider for token estimation.
+func (cm *ContextManager) SetProvider(provider string) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	cm.provider = provider
 }
 
 // AddUser appends a user message to the history.
@@ -96,14 +132,18 @@ func (cm *ContextManager) BuildPrefix() string {
 
 // CompressIfNeeded checks the character budget and compresses older messages
 // if the total exceeds MaxContextChars. Recent messages are always preserved.
-func (cm *ContextManager) CompressIfNeeded() {
+// Returns (before, after) message counts when compression occurred, or (0,0) otherwise.
+func (cm *ContextManager) CompressIfNeeded() (int, int) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	if cm.totalChars() <= MaxContextChars {
-		return
+	if cm.totalTokens() <= MaxContextChars {
+		return 0, 0
 	}
+	before := len(cm.messages)
 	cm.compress()
+	after := len(cm.messages)
+	return before, after
 }
 
 // totalChars returns the total character count of all messages.
@@ -112,6 +152,16 @@ func (cm *ContextManager) totalChars() int {
 	n := 0
 	for _, m := range cm.messages {
 		n += len(m.Content)
+	}
+	return n
+}
+
+// totalTokens returns the estimated token count of all messages using
+// provider-aware heuristics. Caller must hold cm.mu.
+func (cm *ContextManager) totalTokens() int {
+	n := 0
+	for _, m := range cm.messages {
+		n += estimateTokens(m.Content, cm.provider)
 	}
 	return n
 }
@@ -184,13 +234,14 @@ func (cm *ContextManager) Summary() string {
 	defer cm.mu.RUnlock()
 
 	chars := cm.totalChars()
+	tokens := cm.totalTokens()
 	msgs := len(cm.messages)
 	status := "ok"
-	if chars > MaxContextChars {
+	if tokens > MaxContextChars {
 		status = "compressed"
 	}
-	return fmt.Sprintf("Messages: %d | Characters: %d (limit: %d) | Status: %s",
-		msgs, chars, MaxContextChars, status)
+	return fmt.Sprintf("Messages: %d | Characters: %d | Tokens: %d (limit: %d) | Status: %s",
+		msgs, chars, tokens, MaxContextChars, status)
 }
 
 // Reset clears the conversation history (keeps the system prompt).
@@ -198,4 +249,27 @@ func (cm *ContextManager) Reset() {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	cm.messages = make([]core.LLMMessage, 0)
+}
+
+// TotalChars returns the current character count of all messages.
+func (cm *ContextManager) TotalChars() int {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	return cm.totalChars()
+}
+
+// MessageCount returns the number of messages in the context.
+func (cm *ContextManager) MessageCount() int {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	return len(cm.messages)
+}
+
+// Messages returns a copy of all messages in the context.
+func (cm *ContextManager) Messages() []core.LLMMessage {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	cp := make([]core.LLMMessage, len(cm.messages))
+	copy(cp, cm.messages)
+	return cp
 }

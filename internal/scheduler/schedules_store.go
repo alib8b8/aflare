@@ -33,7 +33,8 @@ const SchedulesFileName = "schedules.json"
 type ScheduleEntry struct {
 	ID           string `json:"id"`
 	Cron         string `json:"cron"`
-	WorkflowPath string `json:"workflow_path"`
+	WorkflowPath string `json:"workflow_path,omitempty"`
+	Description  string `json:"description,omitempty"` // natural language task description
 }
 
 // DefaultSchedulesPath returns the default path to the schedules store file

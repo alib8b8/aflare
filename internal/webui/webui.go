@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alib8b8/aflare/internal/agent"
 	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/metrics"
 	"github.com/alib8b8/aflare/internal/nodes/core"
@@ -53,7 +54,7 @@ type WebUIServer struct {
 	port         string
 	workflowsDir string
 	authToken    string
-	chat         chatHandler
+	sessions     *agent.SessionManager
 
 	mu     sync.RWMutex
 	server *http.Server
@@ -68,9 +69,10 @@ func NewWebUIServer(host, port string) *WebUIServer {
 		port = defaultPort
 	}
 	return &WebUIServer{
-		host:   host,
-		port:   port,
-		stopCh: make(chan struct{}),
+		host:     host,
+		port:     port,
+		stopCh:   make(chan struct{}),
+		sessions: agent.NewSessionManager(agent.DefaultMaxSessions, agent.DefaultSessionTTL),
 	}
 }
 
@@ -97,9 +99,9 @@ func (s *WebUIServer) SetWorkflowsDir(dir string) {
 	s.workflowsDir = dir
 }
 
-// SetCapabilities sets the capability names to enable for the chat session.
+// SetCapabilities sets the capability names to enable for new chat sessions.
 func (s *WebUIServer) SetCapabilities(caps []string) {
-	s.chat.setCapabilities(caps)
+	s.sessions.SetCapabilities(caps)
 }
 
 func (s *WebUIServer) Start() error {
@@ -148,6 +150,7 @@ func (s *WebUIServer) buildHandler() http.Handler {
 	if os.Getenv("AFLARE_METRICS") == "1" {
 		registerMetricsProviders()
 		metrics.Register()
+		metrics.RegisterAnalytics()
 		limiter := newMetricsRateLimiter(metricsRPS)
 		mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 			if !limiter.allow() {
@@ -661,6 +664,16 @@ var indexHTML = `<!DOCTYPE html>
     <script>
         let currentWorkflow = '';
 
+        // Generate a persistent session ID for this browser tab.
+        function getSessionId() {
+            let id = localStorage.getItem('aflare_session_id');
+            if (!id) {
+                id = crypto.randomUUID ? crypto.randomUUID() : 'sess-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+                localStorage.setItem('aflare_session_id', id);
+            }
+            return id;
+        }
+
         async function loadWorkflows() {
             try {
                 const response = await fetch('/api/workflows');
@@ -884,8 +897,11 @@ var indexHTML = `<!DOCTYPE html>
             try {
                 const response = await fetch('/api/chat', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-Id': getSessionId()
+                    },
+                    body: JSON.stringify({ message: message, session_id: getSessionId() })
                 });
                 const data = await response.json();
 
@@ -908,8 +924,11 @@ var indexHTML = `<!DOCTYPE html>
             try {
                 await fetch('/api/chat', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: '/clear', reset: true })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-Id': getSessionId()
+                    },
+                    body: JSON.stringify({ message: '/clear', reset: true, session_id: getSessionId() })
                 });
             } catch (e) {}
             document.getElementById('chatMessages').innerHTML = '<div class="chat-message assistant">Conversation cleared. How can I help you?</div>';

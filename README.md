@@ -117,6 +117,21 @@ L2: Runtime      —  确定性执行层
 | **LangChain/AutoGPT** | 纯 Agent 无确定性执行保障 | Agent + Runtime 双重模式，Agent 可降级为确定性工作流 |
 | **Claude Code/Cursor** | 云端依赖，代码编辑场景 | 本地优先，通用自动化，300+ 技能，执行可审计 |
 
+### Benchmark 对比
+
+可复现的性能对比基准测试（单次任务执行，5 次取平均）：
+
+| 指标 | aflare | n8n | LangChain |
+|------|--------|-----|-----------|
+| **启动时间** | < 0.01s | 3-8s (Docker) | 1-3s (Python import) |
+| **空闲内存** | ~5MB | ~200MB+ (容器) | ~80MB+ (Python 进程) |
+| **部署方式** | 单二进制 | Docker + PostgreSQL | pip install |
+| **运行时依赖** | 零 | Node.js + DB | Python + 多包 |
+| **工作流生成** | 关键词匹配 | 手动拖拽 | 代码编写 |
+| **崩溃恢复** | WAL + Checkpoint | 数据库 | 无内置 |
+
+> 运行 benchmark: `./scripts/benchmark.sh`（需要 Ollama 运行 llama3）
+
 ---
 
 ## 核心能力
@@ -299,7 +314,18 @@ aflare 内置多层安全防护，支持四级安全等级（`--security-level`�
 3. 运行 `go test ./...` 验证
 4. 提交 PR，附上模板用途说明
 
-已有 300+ Skill 覆盖 16 个领域，你的模板可以补上缺失的一环。
+或者使用一键提交命令：
+
+```bash
+# 创建模板
+aflare template submit my-workflow.yaml --category devops-infra --author "Your Name"
+
+# 一键安装场景包
+aflare install-pack devops    # 安装 DevOps 全套模板 + 推荐能力配置
+aflare install-pack --list    # 查看所有可用场景包
+```
+
+已有 323 Skill 覆盖 16 个领域，目标 1000+。你的模板可以补上缺失的一环。
 
 [贡献指南 →](CONTRIBUTING.md)
 

@@ -1,107 +1,91 @@
-# Plugin System
+# Plugin Development Guide
 
-aflare supports a plugin system for extending functionality with community-contributed plugins.
+aflare supports loading community-contributed plugins as Go `.so` files. Plugins can add custom
+nodes to the workflow engine or extend core functionality — without modifying the aflare source code.
 
-## Overview
-
-The plugin system allows you to:
-
-- Add custom nodes to aflare
-- Extend existing functionality
-- Share plugins with the community
-- Build ecosystem around aflare
-
-## Plugin Types
-
-| Type | Description | Example |
-|------|-------------|---------|
-| **Node Plugin** | Adds new nodes to the workflow engine | Custom LLM provider, database connector |
-| **Extension Plugin** | Extends core functionality | Custom authentication, logging |
-
-## Quick Start
-
-### List Installed Plugins
-
-```bash
-aflare plugins list
-
-# List by type
-aflare plugins list --type node
-aflare plugins list --type extension
-```
-
-### Enable a Plugin
-
-```bash
-aflare plugins enable my-plugin
-```
-
-### Disable a Plugin
-
-```bash
-aflare plugins disable my-plugin
-```
-
-### Check Plugin Status
-
-```bash
-aflare plugins info my-plugin
-```
-
-## Plugin Structure
-
-### Directory Layout
+## Architecture
 
 ```
-~/.aflare/plugins/
-├── my-plugin/
-│   ├── plugin.yaml
-│   ├── main.go
-│   └── nodes/
-│       └── custom_node.py
-└── another-plugin/
-    ├── plugin.yaml
-    └── extension.js
+~/.config/aflare/plugins/
+├── my-node-plugin.so        # Go plugin: exports "Plugin" symbol
+├── db-connector.so          # Another custom node plugin
+└── custom-auth.so           # Extension plugin
 ```
 
-### plugin.yaml
+At startup, aflare scans `~/.config/aflare/plugins/*.so`, opens each shared object, and registers
+the exported `Plugin` symbol with the `PluginManager`. Each plugin is then enabled (initialized)
+after dependency checks pass.
 
-```yaml
-name: "my-plugin"
-version: "1.0.0"
-description: "A custom plugin for aflare"
-author: "John Doe"
-type: "node"
-dependencies:
-  - "base-plugin"
+## Plugin Interface
+
+Every plugin must implement the `plugins.Plugin` interface:
+
+```go
+// internal/plugins/plugin.go
+
+type PluginInfo struct {
+    Name         string
+    Version      string
+    Description  string
+    Author       string
+    Type         string   // "node" or "extension"
+    Dependencies []string
+}
+
+type Plugin interface {
+    GetInfo()  PluginInfo
+    Init()     error
+    Shutdown() error
+}
 ```
 
-## Developing Plugins
+For node-type plugins, also implement the `NodePlugin` interface:
 
-### Node Plugin Example (Go)
+```go
+type NodePlugin interface {
+    Plugin
+    GetNodes() []interface{}  // returns node names this plugin provides
+}
+```
+
+## Writing a Plugin
+
+### Step 1: Create the plugin package
+
+Create a new Go module for your plugin:
+
+```
+my-plugin/
+├── go.mod
+└── main.go
+```
+
+### Step 2: Implement the Plugin interface
 
 ```go
 package main
 
 import (
     "github.com/alib8b8/aflare/internal/plugins"
+    "github.com/alib8b8/aflare/internal/core"
 )
+
+// Plugin is the exported symbol that aflare discovers.
+// The name MUST be "Plugin" and its type MUST implement plugins.Plugin.
+var Plugin = &MyNodePlugin{
+    info: plugins.PluginInfo{
+        Name:        "my-custom-node",
+        Version:     "1.0.0",
+        Description: "Adds a custom weather lookup node to aflare",
+        Author:      "Your Name",
+        Type:        plugins.PluginTypeNode,
+        Dependencies: []string{},   // optional: list plugin names this depends on
+    },
+}
 
 type MyNodePlugin struct {
     info plugins.PluginInfo
-}
-
-func NewMyNodePlugin() *MyNodePlugin {
-    return &MyNodePlugin{
-        info: plugins.PluginInfo{
-            Name:         "my-node-plugin",
-            Version:      "1.0.0",
-            Description:  "Custom node plugin",
-            Author:       "John Doe",
-            Type:         plugins.PluginTypeNode,
-            Dependencies: []string{},
-        },
-    }
+    reg  *core.Registry
 }
 
 func (p *MyNodePlugin) GetInfo() plugins.PluginInfo {
@@ -109,143 +93,193 @@ func (p *MyNodePlugin) GetInfo() plugins.PluginInfo {
 }
 
 func (p *MyNodePlugin) Init() error {
-    // Initialize plugin
+    // Register your custom nodes with the global registry.
+    // core.RegisterNode("weather_lookup", &WeatherNode{})
     return nil
 }
 
 func (p *MyNodePlugin) Shutdown() error {
-    // Cleanup
+    // Cleanup resources (close connections, flush buffers, etc.)
     return nil
 }
 
 func (p *MyNodePlugin) GetNodes() []interface{} {
-    return []interface{}{"my_custom_node"}
+    return []interface{}{"weather_lookup"}
 }
 ```
 
-### Node Plugin Example (Python)
+### Step 3: Build the .so file
 
-```python
-#!/usr/bin/env python3
-"""Custom node plugin in Python"""
-
-import sys
-import json
-
-def execute(input_data, params):
-    """Execute the custom node"""
-    return f"Processed: {input_data}"
-
-if __name__ == "__main__":
-    payload = json.loads(sys.stdin.read())
-    result = execute(payload["input"], payload["params"])
-    print(json.dumps({"output": result}))
+```bash
+cd my-plugin
+go build -buildmode=plugin -o my-custom-node.so .
 ```
 
-### Registering the Plugin
+### Step 4: Install
 
-```go
-pm := plugins.NewPluginManager()
-pm.Register(NewMyNodePlugin())
-pm.Enable("my-node-plugin")
+```bash
+mkdir -p ~/.config/aflare/plugins
+cp my-custom-node.so ~/.config/aflare/plugins/
 ```
+
+Restart aflare. The plugin loads automatically at startup.
 
 ## Plugin Lifecycle
 
-1. **Register**: Plugin is added to the plugin manager
-2. **Enable**: Plugin is initialized and its nodes/resources are made available
-3. **Execute**: Plugin nodes are used in workflows
-4. **Disable**: Plugin is shutdown and removed from available resources
-5. **Unregister**: Plugin is completely removed  
+```mermaid
+sequenceDiagram
+    participant S as Startup
+    participant L as Loader
+    participant PM as PluginManager
+    participant P as Plugin
+
+    S->>L: Scan ~/.config/aflare/plugins/*.so
+    L->>L: plugin.Open(path)
+    L->>L: Lookup("Plugin")
+    L->>PM: Register(plugin)
+    PM->>PM: Validate name, type, no duplicates
+    L->>PM: Enable(name)
+    PM->>PM: Check dependencies
+    PM->>P: Init()
+    P-->>PM: nil
+    PM->>PM: Mark enabled
+```
+
+1. **Register** — Plugin is added to the manager and validated.
+2. **Enable** — Dependencies are checked; if all are satisfied, `Init()` is called.
+3. **Execute** — Plugin nodes are available in workflows.
+4. **Disable** — `Shutdown()` is called and the plugin is removed from the active set.
+5. **Unregister** — Plugin is completely removed from the manager.
 
 ## Dependency Management
 
-Plugins can declare dependencies on other plugins:
+If your plugin depends on another plugin, list it in `PluginInfo.Dependencies`:
 
-```yaml
-name: "advanced-plugin"
-version: "1.0.0"
-type: "node"
-dependencies:
-  - "base-plugin"
-  - "utils-plugin"
+```go
+var Plugin = &MyAdvancedPlugin{
+    info: plugins.PluginInfo{
+        Name:         "my-advanced-plugin",
+        Type:         plugins.PluginTypeNode,
+        Dependencies: []string{"my-custom-node"},
+    },
+}
 ```
 
-Dependencies are automatically checked when enabling a plugin:
-- Missing dependencies cause enablement to fail
-- Disabled dependencies cause enablement to fail
-- Dependencies are initialized before the dependent plugin
+The dependency plugin must be:
+- **Registered** — present in the plugin manager
+- **Enabled** — already initialized before the dependent plugin
+
+If a dependency is missing or disabled, `Enable()` returns an error.
+
+## Built-in Example Plugins
+
+The `internal/plugins/plugin.go` file includes two reference implementations:
+
+### EchoPlugin
+
+A simple node plugin that provides an `echo_node`:
+
+```go
+func (e *EchoPlugin) GetNodes() []interface{} {
+    return []interface{}{"echo_node"}
+}
+```
+
+### ReversePlugin
+
+A node plugin that depends on `echo`:
+
+```go
+func NewReversePlugin() *ReversePlugin {
+    return &ReversePlugin{
+        info: PluginInfo{
+            Name:         "reverse",
+            Type:         PluginTypeNode,
+            Dependencies: []string{"echo"},
+        },
+    }
+}
+```
+
+## Startup Integration
+
+In `cmd/aflare/main.go`, plugins are loaded during startup:
+
+```go
+pluginMgr := plugins.NewPluginManager()
+if n, err := plugins.LoadDir(plugins.DefaultPluginDir(), pluginMgr); err != nil {
+    log.Printf("[main] plugin loading: %v", err)
+} else if n > 0 {
+    log.Printf("[main] loaded %d plugin(s)", n)
+}
+```
+
+The default plugin directory is `~/.config/aflare/plugins/`. Non-`.so` files and directories
+are silently skipped.
+
+## Plugin Types
+
+| Type | Description | When to use |
+|------|-------------|-------------|
+| `node` | Adds new workflow nodes | Custom LLM providers, database connectors, API integrations |
+| `extension` | Extends core functionality | Custom authentication, logging, metrics |
 
 ## Security Considerations
 
-1. **Review Plugins**: Only install plugins from trusted sources
-2. **Sandbox Execution**: External node plugins run in a sandboxed environment
-3. **Sensitive Data**: Sensitive parameters (API keys, passwords) are filtered from external plugins
-4. **Permission Control**: Plugins run with the same permissions as the aflare process
-
-## Plugin Market
-
-### Finding Plugins
-
-- **GitHub**: Search for `aflare-plugin`
-- **Official Registry**: (Coming soon)
-- **Community**: Check Discord/Slack channels
-
-### Publishing Plugins
-
-1. Create a GitHub repository for your plugin
-2. Add a `plugin.yaml` file
-3. Implement the plugin interface
-4. Add documentation
-5. Tag releases with semantic versioning
-
-## Built-in Plugins
-
-### Echo Plugin
-
-A simple plugin that echoes input:
-
-```yaml
-steps:
-  - node: echo_node
-    input: "Hello World"
-```
-
-### Reverse Plugin
-
-Reverses string input (depends on Echo plugin):
-
-```yaml
-steps:
-  - node: reverse_node
-    input: "Hello World"
-```
-
-## Troubleshooting
-
-### Plugin Not Found
-
-1. Check plugin is registered: `aflare plugins list`
-2. Verify plugin directory exists in `~/.aflare/plugins/`
-3. Check `plugin.yaml` has correct format
-
-### Dependency Error
-
-1. Install required dependencies
-2. Enable dependencies before enabling the plugin
-3. Check dependency version compatibility
-
-### Plugin Initialization Failed
-
-1. Check plugin logs
-2. Verify all required dependencies are available
-3. Check for configuration errors
+1. **Trust the source** — `.so` plugins run in-process with the same privileges as aflare.
+   Only install plugins from trusted sources.
+2. **Review the code** — Go plugins have full access to the process memory and file system.
+3. **No sandbox** — Plugins are not isolated; a buggy plugin can crash the entire process.
+4. **Sensitive data** — Do not hard-code API keys or credentials in plugin code; use aflare's
+   configuration system instead.
 
 ## Best Practices
 
-1. **Keep It Simple**: Focus on one functionality per plugin
-2. **Document Well**: Provide clear documentation for users
-3. **Use Semantic Versioning**: Follow semantic versioning for releases
-4. **Handle Errors Gracefully**: Provide meaningful error messages
-5. **Test Thoroughly**: Test your plugin with different workflows
-6. **Respect Security**: Don't expose sensitive data
+1. **Version your plugins** — Use semantic versioning in `PluginInfo.Version`.
+2. **Keep `Init()` lightweight** — Heavy initialization delays startup; consider lazy loading.
+3. **Clean up in `Shutdown()`** — Close connections, stop goroutines, flush buffers.
+4. **Handle errors gracefully** — Return meaningful errors from `Init()` and `Shutdown()`.
+5. **Name your export `Plugin`** — The loader looks for the symbol named `Plugin` with the
+   exact `plugins.Plugin` interface type.
+6. **Match the aflare build** — Plugins must be compiled with the same Go version and
+   dependency versions as the aflare binary they target.
+
+## Troubleshooting
+
+### Plugin not loading at startup
+
+- Check the plugin file has `.so` extension
+- Verify it's in `~/.config/aflare/plugins/`
+- Check the startup log for `[plugins]` or `[main]` messages
+
+### "lookup Plugin symbol" error
+
+The `.so` file must export a package-level variable named `Plugin`:
+
+```go
+var Plugin plugins.Plugin = &MyPlugin{}
+```
+
+### "does not implement plugins.Plugin" error
+
+The exported symbol's type must match the `plugins.Plugin` interface exactly. Ensure both
+your plugin and aflare are compiled with the same `plugins` package (same import path).
+
+### Build errors
+
+Plugins must be built with the same Go toolchain version as aflare:
+
+```bash
+go version
+go build -buildmode=plugin -o myplugin.so .
+```
+
+## Current Status
+
+aflare ships with 100+ built-in nodes covering most use cases. The plugin system is available
+for community extensions, but the built-in set is sufficient for most users. Consider
+contributing a plugin when:
+
+- You need a custom LLM provider not yet supported
+- You want to integrate with an internal/proprietary API
+- You have a domain-specific node that benefits the broader community

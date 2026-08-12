@@ -66,13 +66,15 @@ type AgentOutput struct {
 // utility optimization, etc.) that hook into the execution cycle via
 // PreProcess and PostProcess.
 type AgentLoop struct {
-	config     Config
-	reg        *core.Registry
-	tools      []core.AgentTool
-	systemMsg  string
-	ctx        *ContextManager
-	interrupt  chan struct{}        // internal interrupt for Ctrl-C
-	caps       *CapabilityRegistry  // pluggable capabilities
+	config       Config
+	reg          *core.Registry
+	tools        []core.AgentTool
+	systemMsg    string
+	ctx          *ContextManager
+	interrupt    chan struct{}        // internal interrupt for Ctrl-C
+	caps         *CapabilityRegistry  // pluggable capabilities
+	onCompress   func(before, after int) // optional compression notification
+	llmProvider  nodes.LLMProvider        // optional: inject mock LLM provider for testing
 }
 
 // NewAgentLoop creates a new AgentLoop with the given configuration.
@@ -92,9 +94,11 @@ func NewAgentLoop(cfg Config) *AgentLoop {
 
 	reg := core.GetGlobalRegistry()
 	registerChatNodes(reg)
+	nodes.RegisterBuiltins(reg)
 	tools := buildToolList(cfg.Tools, cfg.SafeMode)
 
 	cm := NewContextManager()
+	cm.SetProvider(cfg.Provider)
 	systemMsg := BuildSystemPrompt(tools, "0.0.0")
 	cm.SetSystemPrompt(systemMsg)
 
@@ -139,19 +143,29 @@ func (a *AgentLoop) Capabilities() *CapabilityRegistry {
 	return a.caps
 }
 
-// ProcessInput processes a single input and returns the response.
-// This is the same core logic used by chat, scheduler, filewatch, and MCP.
-// Capabilities hook into the execution via PreProcess (before agent) and
-// PostProcess (after agent).
-func (a *AgentLoop) ProcessInput(ctx context.Context, input string) (string, error) {
-	return a.ProcessInputStream(ctx, input, nil, nil, nil)
+// SetCompressCallback sets a callback that is invoked when the context
+// manager compresses older messages. The callback receives the before/after
+// message counts.
+func (a *AgentLoop) SetCompressCallback(fn func(before, after int)) {
+	a.onCompress = fn
 }
 
-// ProcessInputStream processes a single input with optional streaming and
-// tool-visibility callbacks. onChunk is called for each token as the LLM
-// generates it. onToolCall is called before each tool execution. onToolResult
-// is called after each tool execution.
-func (a *AgentLoop) ProcessInputStream(ctx context.Context, input string, onChunk func(chunk string), onToolCall func(toolName, input string), onToolResult func(toolName, result string)) (string, error) {
+// SetLLMProvider injects a mock LLM provider for testing.
+// When set, the agent uses this provider instead of making real HTTP calls.
+func (a *AgentLoop) SetLLMProvider(p nodes.LLMProvider) {
+	a.llmProvider = p
+}
+
+// ProcessOptions configures streaming and visibility callbacks for Process.
+type ProcessOptions struct {
+	OnChunk      func(chunk string)            // called per token during streaming
+	OnToolCall   func(toolName, input string)  // called before tool execution
+	OnToolResult func(toolName, result string) // called after tool execution
+}
+
+// Process is the unified entry point for all agent input processing.
+// Both chat mode (with streaming) and daemon mode (no streaming) use this.
+func (a *AgentLoop) Process(ctx context.Context, input string, opts ProcessOptions) (string, error) {
 	// Run capability PreProcess hooks
 	processedInput, err := a.caps.PreProcessAll(ctx, input)
 	if err != nil {
@@ -184,11 +198,16 @@ func (a *AgentLoop) ProcessInputStream(ctx context.Context, input string, onChun
 	)
 
 	// Set streaming and tool-visibility callbacks
-	agent.SetCallbacks(onChunk, onToolCall, onToolResult)
+	agent.SetCallbacks(opts.OnChunk, opts.OnToolCall, opts.OnToolResult)
+
+	// Inject mock LLM provider if set (for testing)
+	if a.llmProvider != nil {
+		agent.SetLLMProvider(a.llmProvider)
+	}
 
 	var response string
-	if onChunk != nil {
-		response, err = agent.RunStream(ctx, a.ctx.BuildPrefix(), onChunk)
+	if opts.OnChunk != nil {
+		response, err = agent.RunStream(ctx, a.ctx.BuildPrefix(), opts.OnChunk)
 	} else {
 		response, err = agent.Run(ctx, a.ctx.BuildPrefix())
 	}
@@ -210,7 +229,13 @@ func (a *AgentLoop) ProcessInputStream(ctx context.Context, input string, onChun
 	response = watermark.EncodeTextWithSuffix(response)
 
 	a.ctx.AddAssistant(response)
-	a.ctx.CompressIfNeeded()
+	before, after := a.ctx.CompressIfNeeded()
+	if before > 0 && after > 0 && before != after {
+		log.Printf("[agent] context compressed: %d → %d messages", before, after)
+		if a.onCompress != nil {
+			a.onCompress(before, after)
+		}
+	}
 
 	return response, nil
 }
@@ -236,7 +261,7 @@ func (a *AgentLoop) handleInput(parentCtx context.Context, input AgentInput, out
 	processCtx, cancel := context.WithTimeout(parentCtx, DefaultSendTimeout)
 	defer cancel()
 
-	response, err := a.ProcessInput(processCtx, input.Message)
+	response, err := a.Process(processCtx, input.Message, ProcessOptions{})
 
 	out := AgentOutput{
 		Source:   input.Source,

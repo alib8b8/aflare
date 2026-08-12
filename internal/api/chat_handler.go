@@ -18,58 +18,43 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"sync"
-
-	"github.com/alib8b8/aflare/internal/agent"
+	"strings"
 )
-
-// chatHandler manages the chat session for the API server.
-type chatHandler struct {
-	mu           sync.Mutex
-	session      *agent.ChatSession
-	capabilities []string
-}
-
-// setCapabilities sets the capability names to enable for the chat session.
-func (h *chatHandler) setCapabilities(caps []string) {
-	h.capabilities = caps
-}
-
-// getOrCreateSession returns the existing chat session or creates a new one.
-func (h *chatHandler) getOrCreateSession() *agent.ChatSession {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.session == nil {
-		cfg := agent.DefaultConfig()
-		cfg.Capabilities = h.capabilities
-		h.session = agent.NewChatSession(cfg)
-	}
-	return h.session
-}
-
-// resetSession clears the current chat session.
-func (h *chatHandler) resetSession() {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.session != nil {
-		h.session.ResetSession()
-	}
-}
 
 // chatRequest is the JSON request body for the chat endpoint.
 type chatRequest struct {
-	Message string `json:"message"`
-	Reset   bool   `json:"reset,omitempty"`
+	Message   string `json:"message"`
+	Reset     bool   `json:"reset,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
 }
 
 // chatResponse is the JSON response for the chat endpoint.
 type chatResponse struct {
-	Response string `json:"response"`
-	Error    string `json:"error,omitempty"`
+	Response  string `json:"response"`
+	SessionID string `json:"session_id,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// extractSessionID extracts the session ID from the request. Priority:
+// 1. X-Session-Id header
+// 2. session_id field in JSON body
+// 3. URL path segment (e.g. /api/v1/chat/{sessionId})
+func extractSessionID(r *http.Request) string {
+	if id := r.Header.Get("X-Session-Id"); id != "" {
+		return id
+	}
+	// Try URL path: /api/v1/chat/{sessionId}
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/chat")
+	path = strings.TrimPrefix(path, "/")
+	if path != "" {
+		return path
+	}
+	return ""
 }
 
 // handleChat processes a chat message through the ReActAgent.
-// POST /api/v1/chat
+// POST /api/v1/chat[/{sessionId}]
+// Session is identified by X-Session-Id header, session_id in body, or URL path.
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		s.writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
@@ -91,21 +76,32 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Reset session if requested
-	if req.Reset {
-		s.chat.resetSession()
+	// Determine session ID
+	sessionID := extractSessionID(r)
+	if sessionID == "" {
+		sessionID = req.SessionID
+	}
+	if sessionID == "" {
+		sessionID = "default"
 	}
 
-	session := s.chat.getOrCreateSession()
+	// Reset session if requested
+	if req.Reset {
+		s.sessions.Reset(sessionID)
+	}
+
+	session := s.sessions.GetOrCreate(sessionID)
 	response, err := session.SendMessage(req.Message)
 	if err != nil {
 		s.writeJSON(w, http.StatusInternalServerError, chatResponse{
-			Error: err.Error(),
+			SessionID: sessionID,
+			Error:     err.Error(),
 		})
 		return
 	}
 
 	s.writeJSON(w, http.StatusOK, chatResponse{
-		Response: response,
+		Response:  response,
+		SessionID: sessionID,
 	})
 }

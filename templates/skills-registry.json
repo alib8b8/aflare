@@ -2939,7 +2939,7 @@
       "id": "finance/merger-model",
       "name": "merger-model",
       "version": "1.0.0",
-      "description": "M&A financial model with accretion/dilution analysis, synergy modeling, and sensitivity tables.",
+      "description": "M\u0026A financial model with accretion/dilution analysis, synergy modeling, and sensitivity tables.",
       "author": "aflare community",
       "category": "finance",
       "tags": [
@@ -4071,7 +4071,7 @@
         "learning",
         "development",
         "assessment",
-        "L&D"
+        "L\u0026D"
       ],
       "keywords": [
         "training",
@@ -4079,7 +4079,7 @@
         "gap-analysis",
         "learning",
         "development",
-        "L&D",
+        "L\u0026D",
         "competency",
         "assessment",
         "upskilling"
@@ -5158,7 +5158,7 @@
     },
     {
       "id": "legal/contract-review",
-      "name": "Contract Review & Risk Analysis",
+      "name": "Contract Review \u0026 Risk Analysis",
       "version": "1.0.0",
       "description": "AI-powered contract review workflow that classifies contracts, identifies legal risks, checks for missing clauses, and generates executive summaries with actionable recommendations.",
       "author": "aflare community",
@@ -5262,7 +5262,7 @@
     },
     {
       "id": "legal/gdpr-compliance",
-      "name": "GDPR Compliance Checklist & Assessment",
+      "name": "GDPR Compliance Checklist \u0026 Assessment",
       "version": "1.0.0",
       "description": "Comprehensive GDPR compliance workflow that generates tailored checklists, performs DPIA risk assessments, conducts gap analysis, and calculates readiness scores with prioritized remediation plans.",
       "author": "aflare community",
@@ -5289,7 +5289,7 @@
     },
     {
       "id": "legal/intellectual-property",
-      "name": "IP Portfolio Management & Analysis",
+      "name": "IP Portfolio Management \u0026 Analysis",
       "version": "1.0.0",
       "description": "Comprehensive IP portfolio management workflow that categorizes assets, performs gap analysis, estimates valuation, and generates strategic recommendations for commercialization and protection.",
       "author": "aflare community",
@@ -5340,7 +5340,7 @@
     },
     {
       "id": "legal/legal-research",
-      "name": "Legal Research & Case Law Search",
+      "name": "Legal Research \u0026 Case Law Search",
       "version": "1.0.0",
       "description": "Automated legal research workflow that searches case law databases, analyzes results, extracts key legal principles, and generates formal legal research memoranda with proper citations.",
       "author": "aflare community",
@@ -5366,7 +5366,7 @@
     },
     {
       "id": "legal/litigation-timeline",
-      "name": "Litigation Timeline & Deadline Tracker",
+      "name": "Litigation Timeline \u0026 Deadline Tracker",
       "version": "1.0.0",
       "description": "Generates comprehensive litigation timelines with calculated procedural deadlines, risk assessments, and preparation reminders for civil, criminal, and appellate cases.",
       "author": "aflare community",
@@ -5442,7 +5442,7 @@
     },
     {
       "id": "legal/patent-search",
-      "name": "Patent Search & Prior Art Analysis",
+      "name": "Patent Search \u0026 Prior Art Analysis",
       "version": "1.0.0",
       "description": "Comprehensive patent search workflow that searches patent databases, analyzes prior art relevance, assesses patentability (novelty, non-obviousness, utility), and evaluates freedom to operate risks.",
       "author": "aflare community",
@@ -5571,7 +5571,7 @@
     },
     {
       "id": "legal/trademark-monitor",
-      "name": "Trademark Monitoring & Infringement Detection",
+      "name": "Trademark Monitoring \u0026 Infringement Detection",
       "version": "1.0.0",
       "description": "Automated trademark monitoring workflow that checks registries for similar marks, analyzes potential conflicts, calculates risk scores, and generates enforcement recommendations with alerts.",
       "author": "aflare community",

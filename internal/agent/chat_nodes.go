@@ -36,6 +36,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/alib8b8/aflare/internal/meta"
+	"github.com/alib8b8/aflare/internal/metrics"
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/nodes/core"
 	"github.com/alib8b8/aflare/internal/templates"
@@ -473,6 +474,17 @@ func (n *runWorkflowNode) Execute(ctx context.Context, input string, params map[
 		return "", fmt.Errorf("workflow execution failed: %w", err)
 	}
 
+	// Record template usage metric
+	if templateName != "" {
+		source := "external"
+		// Check if it's a built-in template
+		tm := templates.NewTemplateManager()
+		if _, err := tm.Get(templateName); err == nil {
+			source = "builtin"
+		}
+		metrics.RecordTemplateUsage(templateName, source)
+	}
+
 	return result, nil
 }
 
@@ -627,6 +639,8 @@ func registerChatNodes(reg *core.Registry) {
 	reg.Register(&runWorkflowNode{})
 	reg.Register(&createWorkflowNode{})
 	reg.Register(&selfUpdateNode{})
+	reg.Register(&nodes.MemoryNode{})
+	reg.Register(&nodes.CompressNode{})
 }
 
 // ListCategories returns a summary of all template categories with counts.

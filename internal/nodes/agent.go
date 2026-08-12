@@ -37,6 +37,12 @@ type AgentThought struct {
 	Observation string `json:"observation,omitempty"`
 }
 
+// LLMProvider abstracts the LLM call so callers can inject mock providers
+// for testing. When nil, ReActAgent uses its built-in provider-specific logic.
+type LLMProvider interface {
+	Call(ctx context.Context, messages []LLMMessage, tools []core.ToolDefinition, onChunk func(chunk string)) (content string, toolCalls []core.LLMToolCall, err error)
+}
+
 type ReActAgent struct {
 	provider       string
 	model          string
@@ -52,6 +58,8 @@ type ReActAgent struct {
 	onChunk      func(chunk string)
 	onToolCall   func(toolName, input string)
 	onToolResult func(toolName, result string)
+	// Optional: inject a mock LLM provider for testing
+	llmProvider LLMProvider
 }
 
 func NewReActAgent(provider, model, apiKey, endpoint, systemPrompt string, maxIters int, tools []AgentTool, reg *Registry, enableThinking, showThinking bool) *ReActAgent {
@@ -80,6 +88,12 @@ func (a *ReActAgent) SetCallbacks(onChunk func(chunk string), onToolCall func(to
 	a.onChunk = onChunk
 	a.onToolCall = onToolCall
 	a.onToolResult = onToolResult
+}
+
+// SetLLMProvider injects a mock LLM provider for testing.
+// When set, the agent uses this provider instead of making real HTTP calls.
+func (a *ReActAgent) SetLLMProvider(p LLMProvider) {
+	a.llmProvider = p
 }
 
 // RunStream is a streaming version of Run. It calls onChunk for each token
@@ -413,8 +427,28 @@ func (a *ReActAgent) executeTool(ctx context.Context, toolName, toolInput string
 	// and all other string fields as named params (e.g. operation, key, value).
 	toolInput, params := parseToolArgs(toolInput)
 
+	// If the node has a "command" parameter that is required but not provided,
+	// use the toolInput as the command (for backward compatibility with
+	// simple-string ReAct action_input).
+	if params == nil || params["command"] == "" {
+		schema := node.Schema()
+		for _, p := range schema.Params {
+			if p.Name == "command" && p.Required {
+				if params == nil {
+					params = make(map[string]string)
+				}
+				params["command"] = toolInput
+				break
+			}
+		}
+	}
+
 	result, err := node.Execute(ctx, toolInput, params)
 	if err != nil {
+		// Notify tool result even on failure
+		if a.onToolResult != nil {
+			a.onToolResult(toolName, fmt.Sprintf("Error: %v", err))
+		}
 		return "", fmt.Errorf("tool %s execution failed: %w", toolName, err)
 	}
 
@@ -477,7 +511,13 @@ func (a *ReActAgent) toolNames() string {
 // callLLMWithTools sends messages to the LLM with optional tool definitions.
 // Returns the response content text and any tool_calls the model requested.
 // When onChunk is set, streaming is used for real-time token output.
+// If a mock LLMProvider is set, it is used instead of real HTTP calls.
 func (a *ReActAgent) callLLMWithTools(ctx context.Context, messages []LLMMessage, tools []core.ToolDefinition) (content string, toolCalls []core.LLMToolCall, err error) {
+	// If a mock LLM provider is injected, use it directly
+	if a.llmProvider != nil {
+		return a.llmProvider.Call(ctx, messages, tools, a.onChunk)
+	}
+
 	// Ollama path: use JSON-based ReAct (no native function calling via this path)
 	if a.provider == "ollama" {
 		content, err = a.callOllama(ctx, messages)
@@ -530,11 +570,17 @@ func (a *ReActAgent) callOllama(ctx context.Context, messages []LLMMessage) (str
 	}
 	fullPrompt := buildConversationPrompt(messages)
 	if a.onChunk != nil {
-		// Ollama returns JSON ReAct format — suppress raw JSON from streaming
-		// so users don't see {"thought":"...","action":"..."} noise.
-		// Tool calls are already visible via onToolCall/onToolResult callbacks;
-		// the final answer is rendered from the return value.
-		return node.ExecuteStream(ctx, fullPrompt, params, func(string) {})
+		// Ollama returns JSON ReAct format — filter out JSON lines and
+		// code-block markers so users see only plain-text content.
+		// Tool calls are already visible via onToolCall/onToolResult callbacks.
+		wrappedChunk := func(chunk string) {
+			line := strings.TrimSpace(chunk)
+			if line == "" || strings.HasPrefix(line, "{") || strings.HasPrefix(line, "```") {
+				return
+			}
+			a.onChunk(chunk)
+		}
+		return node.ExecuteStream(ctx, fullPrompt, params, wrappedChunk)
 	}
 	return node.Execute(ctx, fullPrompt, params)
 }

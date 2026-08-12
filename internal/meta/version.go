@@ -57,7 +57,7 @@ var (
 )
 
 var (
-	Version   = "0.6.0"
+	Version   = "0.7.0"
 	BuildDate = "2026-07-20"
 )
 

@@ -18,12 +18,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/alib8b8/aflare/internal/cli"
 	"github.com/alib8b8/aflare/internal/i18n"
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/output"
+	"github.com/alib8b8/aflare/internal/plugins"
 	"github.com/alib8b8/aflare/internal/telemetry"
 )
 
@@ -55,6 +57,15 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Warning: OpenTelemetry shutdown failed: %v\n", err)
 		}
 	}()
+
+	// Load community plugins from ~/.config/aflare/plugins/*.so
+	pluginMgr := plugins.NewPluginManager()
+	if n, err := plugins.LoadDir(plugins.DefaultPluginDir(), pluginMgr); err != nil {
+		log.Printf("[main] plugin loading: %v", err)
+	} else if n > 0 {
+		log.Printf("[main] loaded %d plugin(s)", n)
+	}
+
 	if mcpServer {
 		cli.HandleMCP()
 		return
@@ -137,6 +148,10 @@ func main() {
 		cli.HandleChat(args)
 	case "agent":
 		cli.HandleAgent(args)
+	case "template":
+		cli.HandleTemplateSubmit(args)
+	case "install-pack":
+		cli.HandleInstallPack(args)
 	case "watermark":
 		cli.HandleWatermark(args)
 	default:

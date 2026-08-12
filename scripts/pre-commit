@@ -1,0 +1,70 @@
+#!/bin/bash
+# pre-commit hook — run before each commit to catch issues early.
+# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+set -euo pipefail
+
+echo "=== pre-commit checks ==="
+
+# 1. Format
+echo "→ gofmt..."
+unformatted=$(gofmt -l .)
+if [ -n "$unformatted" ]; then
+    echo "  ❌ unformatted files:"
+    echo "$unformatted"
+    echo "  Run: gofmt -w ."
+    exit 1
+fi
+echo "  ✅ gofmt"
+
+# 2. Vet
+echo "→ go vet..."
+go vet ./...
+echo "  ✅ go vet"
+
+# 3. Fast unit tests on changed packages
+echo "→ go test (short)..."
+CHANGED=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' | grep -v '_test\.go$' | xargs -I{} dirname {} | sort -u | sed 's|^|./|')
+if [ -n "$CHANGED" ]; then
+    # Convert dirs to Go packages
+    PKGS=$(echo "$CHANGED" | while read d; do
+        # Try to find the Go package for this directory
+        if [ -f "$d/go.mod" ] || echo "$d" | grep -q '^\./'; then
+            echo "$d/..."
+        fi
+    done | sort -u)
+    if [ -n "$PKGS" ]; then
+        echo "$PKGS" | xargs go test -short -count=1 -timeout 60s
+    fi
+else
+    echo "  (no Go files changed)"
+fi
+echo "  ✅ go test"
+
+# 4. Check for security patterns in staged changes
+echo "→ security scan..."
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$')
+if [ -n "$STAGED" ]; then
+    ISSUES=""
+    # Check for path traversal
+    if git diff --cached $STAGED | grep -qE 'filepath\.Join.*(params|input|user)'; then
+        ISSUES="$ISSUES\n  ⚠ potential path traversal (filepath.Join with user input)"
+    fi
+    # Check for command injection
+    if git diff --cached $STAGED | grep -qE 'exec\.Command.*(params|input|user)'; then
+        ISSUES="$ISSUES\n  ⚠ potential command injection (exec.Command with user input)"
+    fi
+    # Check for HTTP SSRF
+    if git diff --cached $STAGED | grep -qE 'http\.(Get|Post).*(params|input|user)'; then
+        ISSUES="$ISSUES\n  ⚠ potential SSRF (http request with user-controlled URL)"
+    fi
+    if [ -n "$ISSUES" ]; then
+        echo -e "  ⚠ security warnings:$ISSUES"
+        echo "  (review these before committing)"
+    else
+        echo "  ✅ no security patterns detected"
+    fi
+else
+    echo "  (no Go files staged)"
+fi
+
+echo "=== all checks passed ==="

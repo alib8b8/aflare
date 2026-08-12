@@ -32,6 +32,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/alib8b8/aflare/internal/metrics"
 )
 
 // AgentCapability is a pluggable intelligence dimension for an AgentLoop.
@@ -102,6 +104,7 @@ func (cr *CapabilityRegistry) InitAll(loop *AgentLoop) error {
 		if err := cap.Init(loop); err != nil {
 			return fmt.Errorf("capability %s init failed: %w", cap.Name(), err)
 		}
+		metrics.RecordCapabilityInit(cap.Name())
 	}
 	return nil
 }
@@ -119,7 +122,9 @@ func (cr *CapabilityRegistry) PreProcessAll(ctx context.Context, input string) (
 			return modified, fmt.Errorf("capability %s pre-process failed: %w", cap.Name(), err)
 		}
 		if modified != "" {
-			current = modified
+			// Prepend each capability's output to chain them:
+			// cap1→cap2→cap3 on "hello" → "C B A hello"
+			current = modified + current
 		}
 	}
 	return current, nil

@@ -17,7 +17,21 @@ linters:
     - bodyclose      # unclosed http.Response.Body — real resource leak detection
     - unconvert      # unnecessary type conversions — zero-noise, already clean
     - usestdlibvars  # use net/http constants instead of string literals
+    # Code hygiene linters (blocking).
+    - funlen        # enforce function length limits
+    - goconst       # detect repeated string literals that should be constants
+    - gocritic      # opinionated Go code review checks
   settings:
+    funlen:
+      lines: 80
+      statements: 80
+    goconst:
+      min-len: 5
+      min-occurrences: 4
+    gocritic:
+      enabled-checks:
+        - rangeValCopy
+        - hugeParam
     errcheck:
       check-type-assertions: false
       check-blank: false

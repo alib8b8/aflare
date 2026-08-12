@@ -2,6 +2,93 @@
 
 Welcome to aflare! We appreciate your interest in contributing. This guide will help you get started.
 
+## 📦 Submit a Skill Template
+
+The fastest way to contribute is submitting a skill template. aflare has 323 templates across 16 categories, and we're growing toward 1000+. Here's how:
+
+### Quick Start: `aflare template submit`
+
+```bash
+# 1. Write your workflow YAML
+cat > my-slack-notifier.yaml << 'EOF'
+name: slack-notifier
+description: Send a notification to Slack when a condition is met
+steps:
+  - node: http_request
+    params:
+      url: "https://hooks.slack.com/services/{{.slack_webhook}}"
+      method: POST
+      body: '{"text": "{{.message}}"}'
+  - node: notify
+    params:
+      channel: stdout
+      message: "Notification sent"
+EOF
+
+# 2. Submit it
+aflare template submit my-slack-notifier.yaml --category integrations --author "Your Name"
+
+# 3. Follow the printed instructions to create a PR
+```
+
+### Manual Submission
+
+If you prefer manual control:
+
+1. **Fork** this repository
+2. Create your template in `templates/<category>/<template-name>/`:
+   ```
+   templates/<category>/<template-name>/
+   ├── workflow.yaml     # required: the workflow definition
+   ├── skill.json        # required: metadata (see below)
+   └── README.md         # optional: usage instructions
+   ```
+3. Create `skill.json`:
+   ```json
+   {
+     "id": "category/template-name",
+     "name": "template-name",
+     "version": "1.0.0",
+     "description": "What your template does",
+     "author": "Your Name",
+     "category": "category",
+     "tags": ["category", "workflow"],
+     "keywords": ["template-name", "category"]
+   }
+   ```
+4. Run `go test ./...` to verify
+5. Submit a PR with the `New Template` label
+
+### Template Guidelines
+
+- **Naming**: Use kebab-case (e.g., `slack-notifier`, `stock-analyzer`)
+- **Category**: Choose from the [16 standard categories](#categories)
+- **Description**: One sentence explaining what the template does
+- **Variables**: Use `{{.var_name}}` for user-configurable values
+- **Security**: No hardcoded credentials, use template variables
+- **Testing**: Include a README with example usage
+
+### Categories
+
+| Category | 中文 | Description |
+|----------|------|-------------|
+| `business` | 商业 | Business plans, contracts, churn analysis |
+| `content-creative` | 内容创作 | Content generation, creative writing |
+| `data-ai` | 数据/AI | Data processing, ETL, ML pipelines |
+| `devops-infra` | DevOps/基础设施 | CI/CD, monitoring, deployment |
+| `ecommerce` | 电商 | Product management, orders, inventory |
+| `education` | 教育 | Learning, assessment, course management |
+| `finance` | 金融 | Trading, risk analysis, reporting |
+| `healthcare` | 医疗 | Patient data, diagnostics, medical records |
+| `hr` | 人力资源 | Recruitment, onboarding, reviews |
+| `integrations` | 集成 | API connectors, webhooks, third-party |
+| `iot` | 物联网 | Sensors, device management, telemetry |
+| `legal` | 法律 | Contract review, compliance, legal docs |
+| `lifestyle` | 生活 | Personal productivity, health, travel |
+| `marketing` | 营销 | SEO, social media, campaigns |
+| `software-engineering` | 软件工程 | Code review, testing, refactoring |
+| `supply-chain` | 供应链 | Logistics, inventory, procurement |
+
 ## 🌟 Good First Issues
 
 New to the project? Start here — these issues are specifically curated for first-time contributors:

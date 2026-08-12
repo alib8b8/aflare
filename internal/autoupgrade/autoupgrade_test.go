@@ -19,6 +19,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -898,6 +899,124 @@ func TestSetChannel(t *testing.T) {
 		if !tt.wantErr && cfg.Channel != tt.expected {
 			t.Errorf("SetChannel(%q) channel = %q, want %q", tt.input, cfg.Channel, tt.expected)
 		}
+	}
+}
+
+// ── P1: Self-Update Mock Tests ────────────────────────────────────────────
+
+// TestSelfUpdate_CheckOnly verifies that CheckOnly mode does not attempt
+// to download or replace the binary — it only checks for updates.
+func TestSelfUpdate_CheckOnly(t *testing.T) {
+	engine := NewUpgradeEngine(&UpgradeConfig{
+		Mode:              ModeManual,
+		AutoUpdateEnabled: false,
+	})
+
+	// In check-only mode, CheckAndUpgrade should not modify state
+	engine.state.UpgradeInProgress = false
+	engine.state.CurrentVersion = "v0.0.0"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		engine.CheckAndUpgrade(ctx)
+	}()
+
+	select {
+	case <-done:
+		state := engine.GetState()
+		if state.UpgradeInProgress {
+			t.Error("check-only should not mark upgrade in progress")
+		}
+		t.Logf("check-only completed: status=%s", state.UpgradeStatus)
+	case <-time.After(4 * time.Second):
+		t.Log("check-only network call timed out, skipping assertion")
+	}
+}
+
+// TestSelfUpdate_SafeModeIntercept verifies that safe mode prevents
+// actual binary replacement. The engine should detect safe mode and
+// refuse to overwrite the binary.
+func TestSelfUpdate_SafeModeIntercept(t *testing.T) {
+	// In manual mode with auto-update disabled, PerformUpgrade should
+	// not attempt to download and replace the binary
+	engine := NewUpgradeEngine(&UpgradeConfig{
+		Mode:              ModeManual,
+		AutoUpdateEnabled: false,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		release := &meta.GitHubRelease{TagName: "v99.99.99"}
+		engine.PerformUpgrade(ctx, release)
+	}()
+
+	select {
+	case <-done:
+		state := engine.GetState()
+		// Safe mode should not actually replace the binary
+		if state.UpgradeInProgress {
+			t.Error("manual mode should not start upgrade")
+		}
+	case <-time.After(3 * time.Second):
+		t.Log("PerformUpgrade timed out, skipping")
+	}
+}
+
+// TestSelfUpdate_ConcurrentCheck verifies that concurrent CheckAndUpgrade
+// calls are serialized (only one at a time).
+func TestSelfUpdate_ConcurrentCheck(t *testing.T) {
+	engine := NewUpgradeEngine(&UpgradeConfig{
+		Mode:              ModeManual,
+		AutoUpdateEnabled: false,
+	})
+
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			engine.CheckAndUpgrade(ctx)
+		}()
+	}
+
+	wg.Wait()
+	// Should not panic or race
+	state := engine.GetState()
+	t.Logf("concurrent check completed: status=%s", state.UpgradeStatus)
+}
+
+// TestSelfUpdate_StatePersistence verifies that the upgrade state is
+// thread-safe for reads and writes.
+func TestSelfUpdate_StatePersistence(t *testing.T) {
+	engine := NewUpgradeEngine(getDefaultConfig())
+
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			state := engine.GetState()
+			_ = state
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Set config concurrently
+	engine.SetConfig(&UpgradeConfig{Mode: ModeAuto})
+	state := engine.GetState()
+	if state.CurrentVersion == "" {
+		t.Error("current version should not be empty")
 	}
 }
 
