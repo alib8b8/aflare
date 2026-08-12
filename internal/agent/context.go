@@ -244,6 +244,23 @@ func (cm *ContextManager) Summary() string {
 		msgs, chars, tokens, MaxContextChars, status)
 }
 
+// ContextUsage returns the current context usage as a fraction of the limit,
+// and whether compression is active. Suitable for prompt display.
+func (cm *ContextManager) ContextUsage() (chars int, limit int, compressed bool) {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	chars = cm.totalTokens()
+	limit = MaxContextChars
+	// Check if any message is a compression summary
+	for _, m := range cm.messages {
+		if m.Role == "system" && strings.Contains(m.Content, "[Previous conversation summary]") {
+			compressed = true
+			break
+		}
+	}
+	return
+}
+
 // Reset clears the conversation history (keeps the system prompt).
 func (cm *ContextManager) Reset() {
 	cm.mu.Lock()

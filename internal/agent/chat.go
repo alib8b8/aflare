@@ -213,11 +213,18 @@ func (s *ChatSession) Run() {
 }
 
 // printPrompt prints the prompt line with context window indicator.
+// Shows usage percentage and a warning when compression is active or near limit.
 func (s *ChatSession) printPrompt() {
-	ctx := s.loop.Context()
-	chars := ctx.TotalChars()
-	limit := MaxContextChars
-	fmt.Printf("❯ [ctx: %d/%d] ", chars, limit)
+	chars, limit, compressed := s.loop.Context().ContextUsage()
+	pct := chars * 100 / limit
+	switch {
+	case compressed:
+		fmt.Printf("[ctx: compressed] ❯ ")
+	case pct >= 80:
+		fmt.Printf("[ctx: %d%% ⚠] ❯ ", pct)
+	default:
+		fmt.Printf("[ctx: %d%%] ❯ ", pct)
+	}
 }
 
 // saveSession persists the current conversation to disk.
@@ -287,6 +294,10 @@ func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 		OnToolResult: onToolResult,
 	})
 	close(done)
+
+	// Always persist session after each turn, even on error.
+	// The user message was already added to context before the LLM call.
+	defer s.saveSession()
 
 	// Record first session success metric on the first turn
 	if s.firstSession && atomic.LoadInt64(&s.turnCount) == 1 {
