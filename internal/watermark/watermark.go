@@ -63,7 +63,7 @@ const (
 	zwEnd   = '\uFEFF' // zero-width no-break space (BOM) → shard end marker
 
 	// Whitespace characters for the secondary encoding layer.
-	wsBit0 = ' '     // regular space (U+0020) → bit 0
+	wsBit0 = ' '      // regular space (U+0020) → bit 0
 	wsBit1 = '\u00A0' // non-breaking space (U+00A0) → bit 1
 
 	// Magic bytes for watermark identification.

@@ -72,14 +72,14 @@ type ContributionType string
 
 const (
 	ContributionTemplate ContributionType = "template"
-	ContributionCode      ContributionType = "code"
-	ContributionDocs      ContributionType = "docs"
-	ContributionBugFix    ContributionType = "bugfix"
+	ContributionCode     ContributionType = "code"
+	ContributionDocs     ContributionType = "docs"
+	ContributionBugFix   ContributionType = "bugfix"
 )
 
 // Badge represents a single awarded badge.
 type Badge struct {
-	ID        string           `json:"id"`        // unique badge ID (hash of contributor + tier)
+	ID        string           `json:"id"`         // unique badge ID (hash of contributor + tier)
 	Tier      Tier             `json:"tier"`       // badge tier
 	Reason    string           `json:"reason"`     // human-readable reason
 	ContType  ContributionType `json:"cont_type"`  // type of contribution
@@ -89,12 +89,12 @@ type Badge struct {
 
 // ContributorRecord tracks a single contributor's badges and history.
 type ContributorRecord struct {
-	ID            string      `json:"id"`             // unique contributor identifier (email or name hash)
-	Name          string      `json:"name"`           // display name
-	Badges        []Badge     `json:"badges"`         // all awarded badges
-	ContributionCount int     `json:"contrib_count"`  // total accepted contributions
-	FirstContribution time.Time `json:"first_cont"`   // date of first contribution
-	LastContribution  time.Time `json:"last_cont"`    // date of most recent contribution
+	ID                string    `json:"id"`            // unique contributor identifier (email or name hash)
+	Name              string    `json:"name"`          // display name
+	Badges            []Badge   `json:"badges"`        // all awarded badges
+	ContributionCount int       `json:"contrib_count"` // total accepted contributions
+	FirstContribution time.Time `json:"first_cont"`    // date of first contribution
+	LastContribution  time.Time `json:"last_cont"`     // date of most recent contribution
 }
 
 // CurrentTier returns the contributor's current badge tier based on count.
@@ -114,8 +114,8 @@ func (c *ContributorRecord) HasBadge(tier Tier) bool {
 
 // Store is the persistent badge store backed by a JSON file.
 type Store struct {
-	mu          sync.RWMutex
-	path        string
+	mu           sync.RWMutex
+	path         string
 	Contributors map[string]*ContributorRecord `json:"contributors"`
 }
 

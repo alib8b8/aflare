@@ -32,6 +32,7 @@ import (
 	"github.com/alib8b8/aflare/internal/telemetry"
 	"github.com/alib8b8/aflare/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
+	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v3"
 )
 
@@ -162,51 +163,53 @@ func ExecuteWorkflowWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Regi
 // Callers that go through an Executor pass e.workflowTimeout; the legacy
 // ExecuteWorkflowWithTrace global entry point passes the package-level
 // WorkflowTimeout.
-func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, statePath string, walPath string, wfPath string, timeout time.Duration) (string, []StepResult, *WorkflowTrace, error) {
-	// Validate step count
+// seqExecState holds the mutable state shared across the sequential workflow
+// execution loop. It is created by initExecState and passed to each sub-function
+// that handles compound steps, conditions, and regular step execution.
+type seqExecState struct {
+	timeoutCtx    context.Context
+	otelCtx       context.Context
+	wf            *Workflow
+	reg           *nodes.Registry
+	program       *tea.Program
+	wfPath        string
+	walPath       string
+	statePath     string
+	engine        *ExpressionEngine
+	globalLimiter *ConcurrencyLimiter
+	trace         *WorkflowTrace
+	results       []StepResult
+	data          string
+	wal           *WAL
+	saveCP        func(int) // saveCheckpointIfEnabled closure
+}
+
+// initExecState validates the workflow, sets up tracing, timeouts, the
+// expression engine, secrets, concurrency limiter, and TUI.
+func initExecState(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, timeout time.Duration) (*seqExecState, context.CancelFunc, error) {
 	if len(wf.Steps) > MaxSteps {
-		return "", nil, nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
+		return nil, nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
 	}
-
-	// Validate input schema if defined
 	if err := validateInputSchema(wf); err != nil {
-		return "", nil, nil, fmt.Errorf("input validation failed: %w", err)
+		return nil, nil, fmt.Errorf("input validation failed: %w", err)
 	}
-
 	logger.Info("workflow execution started", "name", wf.Name, "steps", len(wf.Steps))
 
 	trace := newTrace(wf.Name, "sequential", time.Now(), len(wf.Steps))
-	defer func() { trace.finish(time.Now()) }()
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	// OpenTelemetry: root workflow span. Step spans are children of this span.
 	otelCtx, wfSpan := telemetry.StartWorkflowSpan(timeoutCtx, wf.Name)
-	defer func() {
-		if wfSpan != nil {
-			wfSpan.End()
-		}
-	}()
 
-	var results []StepResult
 	data := ""
-	// A branch sub-workflow (then/else of an if-step) inherits the if-step's
-	// input as its starting data so the flowing value isn't lost. Top-level
-	// executions leave data as "".
 	if v, ok := ctx.Value(ifInputKey).(string); ok {
 		data = v
 	}
 	engine := NewExpressionEngine()
-
-	// Load workflow-level vars into expression engine
 	if wf.Vars != nil {
 		for k, v := range wf.Vars {
 			engine.SetVariable(k, v)
 		}
 	}
-
-	// Set up secrets access
 	engine.SetSecretGetter(func(group, key string) (string, error) {
 		sm, err := secrets.GetSecretManager()
 		if err != nil {
@@ -214,82 +217,75 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		}
 		return sm.GetSecret(group, key)
 	})
-
-	// Create global concurrency limiter
 	globalLimiter := NewConcurrencyLimiter(wf.MaxConcurrency)
 
 	if program != nil {
-		program.Send(tui.WorkflowStartMsg{
-			Name:  wf.Name,
-			Path:  "",
-			Steps: len(wf.Steps),
-		})
+		program.Send(tui.WorkflowStartMsg{Name: wf.Name, Path: "", Steps: len(wf.Steps)})
 	}
 
-	// ── Resume support ──
-	// If a checkpoint file exists at statePath (or a WAL at walPath), restore
-	// the engine state (step outputs, variables, flowing data) and continue
-	// execution from the step after the one recorded in the checkpoint.
+	state := &seqExecState{
+		timeoutCtx:    timeoutCtx,
+		otelCtx:       otelCtx,
+		wf:            wf,
+		reg:           reg,
+		program:       program,
+		engine:        engine,
+		globalLimiter: globalLimiter,
+		trace:         trace,
+		data:          data,
+	}
+
+	// Deferred cleanup: finish trace, end OTel span, cancel context.
+	cleanup := func() {
+		trace.finish(time.Now())
+		if wfSpan != nil {
+			wfSpan.End()
+		}
+		cancel()
+	}
+
+	return state, cleanup, nil
+}
+
+// initResumeState sets up WAL and checkpoint resume, and populates the
+// saveCheckpointIfEnabled closure. Returns the step index to resume from.
+func (s *seqExecState) initResumeState(walPath, statePath string) int {
+	s.walPath = walPath
+	s.statePath = statePath
 	resumeFromStep := 0
 
-	// Open WAL for appends if configured. The WAL is kept open for the
-	// lifetime of this execution and closed via defer.
-	var wal *WAL
 	if walPath != "" {
 		w, err := NewWAL(walPath, WALOptions{})
 		if err != nil {
 			logger.Warn("failed to open WAL for writes, starting fresh", "path", walPath, "error", err)
 		} else {
-			wal = w
-			defer func() {
-				if err := wal.Close(); err != nil {
-					logger.Warn("failed to close WAL", "path", walPath, "error", err)
-				}
-			}()
+			s.wal = w
 		}
 	}
 
-	if wal != nil {
-		// Resume from WAL: replay yields the latest restorable state.
+	if s.wal != nil {
 		if state, err := LoadStateWAL(walPath); err == nil && state != nil {
-			data = RestoreState(state, engine)
+			s.data = RestoreState(state, s.engine)
 			resumeFromStep = state.StepIndex + 1
-			if resumeFromStep < 0 {
-				resumeFromStep = 0
-			}
-			if resumeFromStep > len(wf.Steps) {
-				resumeFromStep = len(wf.Steps)
-			}
-			logger.Info("Resuming workflow from step (WAL)", "name", wf.Name, "step", resumeFromStep, "wal", walPath)
+			resumeFromStep = clampStep(resumeFromStep, len(s.wf.Steps))
+			logger.Info("Resuming workflow from step (WAL)", "name", s.wf.Name, "step", resumeFromStep, "wal", walPath)
 		} else if err != nil {
 			logger.Warn("failed to replay WAL, starting fresh", "path", walPath, "error", err)
 		}
 	} else if statePath != "" {
 		if state, err := loadCheckpoint(statePath); err == nil && state != nil {
-			data = RestoreState(state, engine)
-			// state.StepIndex is the last successfully-completed step; resume
-			// from the step after it. Clamp to a valid range.
+			s.data = RestoreState(state, s.engine)
 			resumeFromStep = state.StepIndex + 1
-			if resumeFromStep < 0 {
-				resumeFromStep = 0
-			}
-			if resumeFromStep > len(wf.Steps) {
-				resumeFromStep = len(wf.Steps)
-			}
-			logger.Info("Resuming workflow from step", "name", wf.Name, "step", resumeFromStep, "checkpoint", statePath)
+			resumeFromStep = clampStep(resumeFromStep, len(s.wf.Steps))
+			logger.Info("Resuming workflow from step", "name", s.wf.Name, "step", resumeFromStep, "checkpoint", statePath)
 		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
-			// A corrupt/unreadable checkpoint is logged but non-fatal: we
-			// start a fresh run rather than blocking the user.
 			logger.Warn("failed to load checkpoint, starting fresh", "path", statePath, "error", err)
 		}
 	}
 
-	// saveCheckpointIfEnabled writes a per-step checkpoint when statePath is
-	// set (or appends to the WAL when walPath is set). Failures are logged
-	// but never interrupt the workflow.
-	saveCheckpointIfEnabled := func(stepIndex int) {
-		if wal != nil {
-			if err := SaveStateWAL(wal, wf, stepIndex, data, engine); err != nil {
+	s.saveCP = func(stepIndex int) {
+		if s.wal != nil {
+			if err := SaveStateWAL(s.wal, s.wf, stepIndex, s.data, s.engine); err != nil {
 				logger.Warn("failed to append WAL, continuing without", "path", walPath, "step", stepIndex, "error", err)
 			}
 			return
@@ -297,593 +293,520 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		if statePath == "" {
 			return
 		}
-		state := SaveCurrentState(wf, stepIndex, data, engine)
+		state := SaveCurrentState(s.wf, stepIndex, s.data, s.engine)
 		if err := saveCheckpoint(statePath, state); err != nil {
 			logger.Warn("failed to save checkpoint, continuing without", "path", statePath, "step", stepIndex, "error", err)
 		}
 	}
 
+	return resumeFromStep
+}
+
+// clampStep bounds a step index to [0, totalSteps].
+func clampStep(idx, totalSteps int) int {
+	if idx < 0 {
+		return 0
+	}
+	if idx > totalSteps {
+		return totalSteps
+	}
+	return idx
+}
+
+// handleCompoundStep dispatches if/loop/map/reduce/parallel/saga compound
+// steps. Returns (handled, error). When handled is false the caller should
+// fall through to regular step execution.
+func (s *seqExecState) handleCompoundStep(i int, wStep WorkflowStep, stepStart time.Time) (bool, error) {
+	switch {
+	case wStep.IsIf():
+		_, compSpan := telemetry.StartCompoundStepSpan(s.otelCtx, wStep.Name, "if", i)
+		branchResults, output, err := executeIfBranch(s.timeoutCtx, i, wStep.If, s.data, s.engine, s.reg, s.program, s.globalLimiter)
+		compDur := time.Since(stepStart)
+		telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
+		if err != nil {
+			s.results = append(s.results, branchResults...)
+			s.failTUI()
+			return true, err
+		}
+		s.results = append(s.results, branchResults...)
+		s.data = output
+		s.engine.SetStepOutput(i, wStep.Name, output)
+		s.trace.recordStep(compoundStepTrace(i, wStep.Node, wStep, compDur, len(s.data), len(output)))
+		s.saveCP(i)
+		return true, nil
+
+	case wStep.IsLoop():
+		_, compSpan := telemetry.StartCompoundStepSpan(s.otelCtx, wStep.Name, "loop", i)
+		loopResults, output, err := executeLoopStep(s.timeoutCtx, i, wStep, s.data, s.engine, s.reg, s.program, s.globalLimiter)
+		compDur := time.Since(stepStart)
+		telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
+		if err != nil {
+			s.results = append(s.results, loopResults...)
+			s.failTUI()
+			return true, err
+		}
+		s.results = append(s.results, loopResults...)
+		s.data = applyOutputStrategy(output, wStep.OutputStrategy)
+		s.engine.SetStepOutput(i, wStep.Name, output)
+		s.trace.recordStep(compoundStepTrace(i, wStep.Node, wStep, compDur, len(s.data), len(output)))
+		s.saveCP(i)
+		return true, nil
+
+	case wStep.IsMap():
+		_, compSpan := telemetry.StartCompoundStepSpan(s.otelCtx, wStep.Name, "map", i)
+		mapResults, output, err := executeMapStep(s.timeoutCtx, i, wStep, s.data, s.engine, s.reg, s.program, s.globalLimiter)
+		compDur := time.Since(stepStart)
+		telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
+		if err != nil {
+			s.results = append(s.results, mapResults...)
+			s.failTUI()
+			return true, err
+		}
+		s.results = append(s.results, mapResults...)
+		s.data = output
+		s.engine.SetStepOutput(i, wStep.Name, output)
+		s.trace.recordStep(compoundStepTrace(i, "map", wStep, compDur, len(s.data), len(output)))
+		s.saveCP(i)
+		return true, nil
+
+	case wStep.IsReduce():
+		_, compSpan := telemetry.StartCompoundStepSpan(s.otelCtx, wStep.Name, "reduce", i)
+		reduceResults, output, err := executeReduceStep(s.timeoutCtx, i, wStep, s.data, s.engine, s.reg, s.program, s.globalLimiter)
+		compDur := time.Since(stepStart)
+		telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
+		if err != nil {
+			s.results = append(s.results, reduceResults...)
+			s.failTUI()
+			return true, err
+		}
+		s.results = append(s.results, reduceResults...)
+		s.data = output
+		s.engine.SetStepOutput(i, wStep.Name, output)
+		s.trace.recordStep(compoundStepTrace(i, "reduce", wStep, compDur, len(s.data), len(output)))
+		s.saveCP(i)
+		return true, nil
+
+	case wStep.IsParallel():
+		_, compSpan := telemetry.StartCompoundStepSpan(s.otelCtx, wStep.Name, "parallel", i)
+		parallelResults, output, err := executeParallelStep(s.timeoutCtx, i, wStep, s.data, s.engine, s.reg, s.program, s.globalLimiter)
+		compDur := time.Since(stepStart)
+		telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
+		if err != nil {
+			s.results = append(s.results, parallelResults...)
+			s.failTUI()
+			return true, err
+		}
+		s.results = append(s.results, parallelResults...)
+		s.data = applyOutputStrategy(output, wStep.OutputStrategy)
+		s.engine.SetStepOutput(i, wStep.Name, output)
+		s.trace.recordStep(compoundStepTrace(i, wStep.Node, wStep, compDur, len(s.data), len(output)))
+		s.saveCP(i)
+		return true, nil
+
+	case wStep.IsSaga():
+		_, compSpan := telemetry.StartCompoundStepSpan(s.otelCtx, wStep.Name, "saga", i)
+		sagaResults, output, err := executeSagaStep(s.timeoutCtx, i, wStep, s.data, s.engine, s.reg, s.program, s.globalLimiter)
+		compDur := time.Since(stepStart)
+		telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
+		if err != nil {
+			s.results = append(s.results, sagaResults...)
+			s.failTUI()
+			return true, err
+		}
+		s.results = append(s.results, sagaResults...)
+		s.data = output
+		s.engine.SetStepOutput(i, wStep.Name, output)
+		s.trace.recordStep(compoundStepTrace(i, "saga", wStep, compDur, len(s.data), len(output)))
+		s.saveCP(i)
+		return true, nil
+
+	default:
+		return false, nil
+	}
+}
+
+// failTUI sends a failure message to the TUI program if one is attached.
+func (s *seqExecState) failTUI() {
+	if s.program != nil {
+		s.program.Send(tui.WorkflowEndMsg{Success: false})
+	}
+}
+
+// compoundStepTrace builds a StepTrace for a compound step.
+func compoundStepTrace(i int, nodeName string, wStep WorkflowStep, compDur time.Duration, inputLen, outputLen int) StepTrace {
+	return StepTrace{
+		Index:           i,
+		NodeName:        nodeName,
+		StepName:        wStep.Name,
+		BatchIndex:      -1,
+		ConditionPassed: true,
+		Attempts:        1,
+		TotalDuration:   compDur,
+		InputLen:        inputLen,
+		OutputLen:       outputLen,
+	}
+}
+
+// handleStepCondition evaluates the step's condition expression. Returns
+// (handled, error). When handled is true (condition failed or errored), the
+// step was fully processed and the caller should continue to the next step.
+// When handled is false, the condition passed and the caller should proceed
+// to regular step execution.
+func (s *seqExecState) handleStepCondition(i int, wStep WorkflowStep, stepStart time.Time) (bool, error) {
+	if wStep.Condition == "" {
+		return false, nil
+	}
+
+	evalStart := time.Now()
+	pass, err := evaluateCondition(wStep.Condition, s.data, s.engine)
+	evalDuration := time.Since(evalStart)
+
+	if err != nil {
+		logger.Error("condition evaluation failed", "index", i, "error", err)
+		result := StepResult{
+			StepIndex: i, NodeName: wStep.Node, Input: s.data,
+			Error: fmt.Errorf("condition evaluation failed: %w", err), Duration: 0,
+		}
+		result.Trace = s.trace.recordStep(StepTrace{
+			Index: i, NodeName: wStep.Node, StepName: wStep.Name, BatchIndex: -1,
+			ConditionExpr: wStep.Condition, ConditionPassed: false,
+			EvalDuration: evalDuration, TotalDuration: time.Since(stepStart),
+			InputLen: len(s.data), ErrorText: err.Error(),
+		})
+		s.results = append(s.results, result)
+		s.sendStepTUI(i, wStep.Node, err, 0)
+		s.failTUI()
+		return true, err
+	}
+
+	if !pass {
+		logger.Info("step skipped by condition", "index", i, "node", wStep.Node)
+		s.engine.SetStepOutput(i, wStep.Node, "")
+		result := StepResult{
+			StepIndex: i, NodeName: wStep.Node, Input: s.data, Output: "", Duration: 0,
+		}
+		result.Trace = s.trace.recordStep(StepTrace{
+			Index: i, NodeName: wStep.Node, StepName: wStep.Name, BatchIndex: -1,
+			Skipped: true, ConditionExpr: wStep.Condition, ConditionPassed: false,
+			EvalDuration: evalDuration, TotalDuration: time.Since(stepStart),
+			InputLen: len(s.data),
+		})
+		s.results = append(s.results, result)
+		s.sendStepTUI(i, wStep.Node, "", 0)
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// sendStepTUI sends step start/end messages to the TUI program.
+func (s *seqExecState) sendStepTUI(i int, nodeName string, output interface{}, duration time.Duration) {
+	if s.program == nil {
+		return
+	}
+	s.program.Send(tui.StepStartMsg{Index: i, Name: nodeName})
+
+	var err error
+	if e, ok := output.(error); ok {
+		err = e
+		output = ""
+	}
+	var outStr string
+	if s, ok := output.(string); ok {
+		outStr = s
+	}
+	s.program.Send(tui.StepEndMsg{Index: i, Name: nodeName, Output: outStr, Error: err, Duration: duration})
+}
+
+// executeRegularStep runs a single regular (non-compound) workflow step,
+// including parameter evaluation, node lookup, retry loop, error recovery,
+// trace recording, and TUI updates.
+func (s *seqExecState) executeRegularStep(i int, wStep WorkflowStep, stepStart time.Time) error {
+	logger.Info("step started", "index", i, "node", wStep.Node)
+	s.sendStepStartTUI(i, wStep.Node)
+
+	// Parameter evaluation.
+	evalStart := time.Now()
+	evaluatedParams, err := s.engine.EvaluateParams(wStep.Params, s.data)
+	evalDuration := time.Since(evalStart)
+	if err != nil {
+		return s.recordStepError(i, wStep, stepStart, evalDuration, fmt.Errorf("expression evaluation failed: %w", err))
+	}
+
+	// Node lookup.
+	node, ok := s.reg.Get(wStep.Node)
+	if !ok {
+		err := fmt.Errorf("node '%s' not found in registry", wStep.Node)
+		logger.Error("node not found", "node", wStep.Node, "error", err)
+		return s.recordStepError(i, wStep, stepStart, evalDuration, err)
+	}
+
+	// Retry configuration.
+	retryCount := wStep.GetRetryCount()
+	if retryCount > MaxRetry {
+		retryCount = MaxRetry
+	}
+	stepTimeout := wStep.GetTimeout()
+	if wStep.IsResumable() {
+		if rt := wStep.GetResumeTimeout(); rt > 0 {
+			stepTimeout = rt
+		}
+	} else if stepTimeout > MaxStepTimeout {
+		stepTimeout = MaxStepTimeout
+	}
+
+	stepBaseCtx, llmCollector := withLLMCollector(s.timeoutCtx)
+	_, stepSpan := telemetry.StartStepSpan(s.otelCtx, wStep.Name, wStep.Node, i)
+
+	// Retry loop.
+	var output string
+	var execErr error
+	var duration time.Duration
+	maxAttempts := retryCount + 1
+	attemptsMade := 0
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		attemptsMade = attempt
+		attemptStart := time.Now()
+
+		stepCtx, stepCancel := s.newStepContext(stepBaseCtx, stepTimeout)
+		output, execErr = s.executeNode(stepCtx, i, wStep, node, evaluatedParams)
+		duration = time.Since(attemptStart)
+		stepCancel()
+
+		if execErr == nil {
+			break
+		}
+		logger.Warn("step failed, retrying", "index", i, "node", wStep.Node, "attempt", attempt, "max", maxAttempts, "error", nodes.RedactSensitive(execErr.Error()))
+
+		if attempt < maxAttempts {
+			if timedOut := s.waitRetryDelay(wStep, attempt, stepSpan, duration, len(output)); timedOut {
+				return fmt.Errorf("workflow timed out during retry delay")
+			}
+		}
+	}
+
+	// Error recovery.
+	resultErr := execErr
+	var recoveries []string
+	if execErr != nil {
+		var abortErr error
+		recoveries, abortErr, resultErr = applyErrorRecovery(stepBaseCtx, &wStep, &output, execErr, s.engine, s.reg, s.data, s.program, s.globalLimiter, "step")
+		execErr = abortErr
+	}
+
+	s.engine.SetStepOutput(i, wStep.Name, output)
+
+	errText := ""
+	if resultErr != nil {
+		errText = resultErr.Error()
+	}
+	result := StepResult{
+		StepIndex: i, NodeName: wStep.Node, Input: s.data,
+		Output: output, Error: resultErr, Duration: duration,
+	}
+	result.Trace = s.trace.recordStep(StepTrace{
+		Index: i, NodeName: wStep.Node, StepName: wStep.Name, BatchIndex: -1,
+		ConditionExpr: wStep.Condition, ConditionPassed: true,
+		Attempts: attemptsMade, Recoveries: recoveries,
+		EvalDuration: evalDuration, ExecuteDuration: duration,
+		TotalDuration: time.Since(stepStart),
+		InputLen: len(s.data), OutputLen: len(output), ErrorText: errText,
+		LLM:    projectLLMTelemetry(llmCollector.drainCalls()),
+		Router: projectRouterDecisions(llmCollector.drainDecisions()),
+	})
+	s.results = append(s.results, result)
+
+	telemetry.StepSpanEnd(stepSpan, resultErr, duration.Milliseconds(), len(output), false)
+
+	if resultErr != nil {
+		logger.Error("step failed", "index", i, "node", wStep.Node, "duration", duration, "error", nodes.RedactSensitive(resultErr.Error()))
+	} else {
+		logger.Info("step completed", "index", i, "node", wStep.Node, "duration", duration)
+	}
+
+	s.sendStepEndTUI(i, wStep.Node, output, resultErr, duration)
+
+	if execErr != nil {
+		return s.handleStepFailure(i, wStep, execErr)
+	}
+
+	s.data = output
+	s.saveCP(i)
+	return nil
+}
+
+// newStepContext creates a context with the step-level timeout.
+func (s *seqExecState) newStepContext(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout > 0 {
+		return context.WithTimeout(parent, timeout)
+	}
+	return context.WithCancel(parent)
+}
+
+// executeNode dispatches node execution, handling streaming nodes when a TUI
+// program is attached.
+func (s *seqExecState) executeNode(ctx context.Context, i int, wStep WorkflowStep, node nodes.Node, evaluatedParams map[string]string) (string, error) {
+	if s.program != nil {
+		if streamingNode, ok := node.(nodes.StreamingNode); ok {
+			sink := newStreamSink(s.program, i, wStep.Node)
+			defer sink.flush()
+			return streamingNode.ExecuteStream(ctx, s.data, evaluatedParams, sink.onChunk)
+		}
+	}
+	return node.Execute(ctx, s.data, evaluatedParams)
+}
+
+// waitRetryDelay blocks for the retry backoff delay or until the workflow
+// context is cancelled.
+func (s *seqExecState) waitRetryDelay(wStep WorkflowStep, attempt int, stepSpan trace.Span, duration time.Duration, outputLen int) bool {
+	retryDelay := wStep.GetBackoffDelay(attempt)
+	select {
+	case <-time.After(retryDelay):
+		return false
+	case <-s.timeoutCtx.Done():
+		telemetry.StepSpanEnd(stepSpan, context.DeadlineExceeded, duration.Milliseconds(), outputLen, false)
+		return true
+	}
+}
+
+// sendStepStartTUI sends a step-start message to the TUI program.
+func (s *seqExecState) sendStepStartTUI(i int, nodeName string) {
+	if s.program != nil {
+		s.program.Send(tui.StepStartMsg{Index: i, Name: nodeName})
+	}
+}
+
+// sendStepEndTUI sends a step-end message to the TUI program.
+func (s *seqExecState) sendStepEndTUI(i int, nodeName, output string, resultErr error, duration time.Duration) {
+	if s.program == nil {
+		return
+	}
+	s.program.Send(tui.StepEndMsg{
+		Index: i, Name: nodeName, Output: output, Error: resultErr, Duration: duration,
+	})
+}
+
+// recordStepError records a step evaluation or lookup error and returns it.
+func (s *seqExecState) recordStepError(i int, wStep WorkflowStep, stepStart time.Time, evalDuration time.Duration, err error) error {
+	logger.Error("step error", "index", i, "error", err)
+	result := StepResult{
+		StepIndex: i, NodeName: wStep.Node, Input: s.data,
+		Error: err, Duration: time.Since(stepStart),
+	}
+	result.Trace = s.trace.recordStep(StepTrace{
+		Index: i, NodeName: wStep.Node, StepName: wStep.Name, BatchIndex: -1,
+		ConditionPassed: true, EvalDuration: evalDuration,
+		TotalDuration: time.Since(stepStart),
+		InputLen: len(s.data), ErrorText: err.Error(),
+	})
+	s.results = append(s.results, result)
+	s.sendStepEndTUI(i, wStep.Node, "", err, time.Since(stepStart))
+	s.failTUI()
+	return err
+}
+
+// handleStepFailure processes a step execution failure, including resumable
+// pause and WAL cleanup.
+func (s *seqExecState) handleStepFailure(i int, wStep WorkflowStep, execErr error) error {
+	if wStep.IsResumable() {
+		if s.wal != nil {
+			_ = s.wal.Close()
+			s.wal = nil
+		}
+		if i > 0 {
+			s.saveCP(i - 1)
+		}
+		resumeOn := wStep.ResumeOn
+		if resumeOn == "" {
+			resumeOn = "manual"
+		}
+		paused, pauseErr := PauseWorkflow(s.wfPath, s.wf, i, wStep.Name, resumeOn, execErr.Error(), s.walPath)
+		if pauseErr != nil {
+			logger.Error("failed to pause workflow", "name", s.wf.Name, "step", i, "error", pauseErr)
+			s.failTUI()
+			return fmt.Errorf("step %d (%s) failed: %w", i+1, wStep.Node, execErr)
+		}
+		logger.Info("workflow paused", "name", s.wf.Name, "step", i, "node", wStep.Node, "run_id", paused.RunID, "resume_on", resumeOn)
+		s.failTUI()
+		return paused
+	}
+	s.failTUI()
+	logger.Error("workflow failed", "name", s.wf.Name, "failed_step", i, "node", wStep.Node, "error", execErr)
+	return fmt.Errorf("step %d (%s) failed: %w", i+1, wStep.Node, execErr)
+}
+
+func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, statePath string, walPath string, wfPath string, timeout time.Duration) (string, []StepResult, *WorkflowTrace, error) {
+	state, cleanup, err := initExecState(ctx, wf, reg, program, timeout)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	defer cleanup()
+
+	state.wfPath = wfPath
+	resumeFromStep := state.initResumeState(walPath, statePath)
+
+	// Deferred WAL close.
+	if state.wal != nil {
+		defer func() {
+			if state.wal != nil {
+				if err := state.wal.Close(); err != nil {
+					logger.Warn("failed to close WAL", "path", walPath, "error", err)
+				}
+			}
+		}()
+	}
+
 	for i, wStep := range wf.Steps {
-		// Skip steps already completed in a prior (checkpointed) run.
 		if i < resumeFromStep {
 			continue
 		}
-
-		// Graceful shutdown: if a shutdown has been requested, stop starting
-		// new steps. The current step (if any) has already completed by the
-		// time we reach this check on the next iteration. Deferred cleanup
-		// (WAL close → flush, audit finalization) runs when the function
-		// returns.
 		if IsShuttingDown() {
 			logger.Info("shutdown requested, stopping workflow execution", "name", wf.Name, "completed_steps", i)
 			break
 		}
 		stepStart := time.Now()
 
-		// ── Handle if/else branch ──
-		if wStep.IsIf() {
-			_, compSpan := telemetry.StartCompoundStepSpan(otelCtx, wStep.Name, "if", i)
-			branchResults, output, err := executeIfBranch(timeoutCtx, i, wStep.If, data, engine, reg, program, globalLimiter)
-			compDur := time.Since(stepStart)
-			telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
+		// Compound steps: if/loop/map/reduce/parallel/saga.
+		if handled, err := state.handleCompoundStep(i, wStep, stepStart); handled {
 			if err != nil {
-				results = append(results, branchResults...)
-				if program != nil {
-					program.Send(tui.WorkflowEndMsg{Success: false})
-				}
-				return "", results, trace, err
+				return "", state.results, state.trace, err
 			}
-			results = append(results, branchResults...)
-			data = output
-			engine.SetStepOutput(i, wStep.Name, output)
-			// Compound steps record a coarse-grained trace entry.
-			trace.recordStep(StepTrace{
-				Index:           i,
-				NodeName:        wStep.Node,
-				StepName:        wStep.Name,
-				BatchIndex:      -1,
-				ConditionPassed: true,
-				Attempts:        1,
-				TotalDuration:   compDur,
-				InputLen:        len(data),
-				OutputLen:       len(output),
-			})
-			saveCheckpointIfEnabled(i)
 			continue
 		}
 
-		// Check condition - skip step if condition evaluates to false
-		if wStep.Condition != "" {
-			evalStart := time.Now()
-			pass, err := evaluateCondition(wStep.Condition, data, engine)
-			evalDuration := time.Since(evalStart)
+		// Condition evaluation.
+		if handled, err := state.handleStepCondition(i, wStep, stepStart); handled {
 			if err != nil {
-				logger.Error("condition evaluation failed", "index", i, "error", err)
-				result := StepResult{
-					StepIndex: i,
-					NodeName:  wStep.Node,
-					Input:     data,
-					Error:     fmt.Errorf("condition evaluation failed: %w", err),
-					Duration:  0,
-				}
-				result.Trace = trace.recordStep(StepTrace{
-					Index:           i,
-					NodeName:        wStep.Node,
-					StepName:        wStep.Name,
-					BatchIndex:      -1,
-					ConditionExpr:   wStep.Condition,
-					ConditionPassed: false,
-					EvalDuration:    evalDuration,
-					TotalDuration:   time.Since(stepStart),
-					InputLen:        len(data),
-					ErrorText:       err.Error(),
-				})
-				results = append(results, result)
-				if program != nil {
-					program.Send(tui.StepStartMsg{
-						Index: i,
-						Name:  wStep.Node,
-					})
-					program.Send(tui.StepEndMsg{
-						Index: i,
-						Name:  wStep.Node,
-						Error: err,
-					})
-					program.Send(tui.WorkflowEndMsg{Success: false})
-				}
-				return "", results, trace, err
+				return "", state.results, state.trace, err
 			}
-			if !pass {
-				logger.Info("step skipped by condition", "index", i, "node", wStep.Node)
-				// Register step output as empty so later step refs still work
-				engine.SetStepOutput(i, wStep.Node, "")
-				result := StepResult{
-					StepIndex: i,
-					NodeName:  wStep.Node,
-					Input:     data,
-					Output:    "",
-					Error:     nil,
-					Duration:  0,
-				}
-				result.Trace = trace.recordStep(StepTrace{
-					Index:           i,
-					NodeName:        wStep.Node,
-					StepName:        wStep.Name,
-					BatchIndex:      -1,
-					Skipped:         true,
-					ConditionExpr:   wStep.Condition,
-					ConditionPassed: false,
-					EvalDuration:    evalDuration,
-					TotalDuration:   time.Since(stepStart),
-					InputLen:        len(data),
-				})
-				results = append(results, result)
-				if program != nil {
-					program.Send(tui.StepStartMsg{
-						Index: i,
-						Name:  wStep.Node,
-					})
-					program.Send(tui.StepEndMsg{
-						Index:    i,
-						Name:     wStep.Node,
-						Output:   "",
-						Duration: 0,
-					})
-				}
-				continue
-			}
-		}
-
-		if wStep.IsLoop() {
-			_, compSpan := telemetry.StartCompoundStepSpan(otelCtx, wStep.Name, "loop", i)
-			loopResults, output, err := executeLoopStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
-			compDur := time.Since(stepStart)
-			telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
-			if err != nil {
-				results = append(results, loopResults...)
-				if program != nil {
-					program.Send(tui.WorkflowEndMsg{Success: false})
-				}
-				return "", results, trace, err
-			}
-			results = append(results, loopResults...)
-			data = applyOutputStrategy(output, wStep.OutputStrategy)
-			engine.SetStepOutput(i, wStep.Name, output)
-			trace.recordStep(StepTrace{
-				Index:           i,
-				NodeName:        wStep.Node,
-				StepName:        wStep.Name,
-				BatchIndex:      -1,
-				ConditionPassed: true,
-				Attempts:        1,
-				TotalDuration:   compDur,
-				InputLen:        len(data),
-				OutputLen:       len(output),
-			})
-			saveCheckpointIfEnabled(i)
 			continue
 		}
 
-		if wStep.IsMap() {
-			_, compSpan := telemetry.StartCompoundStepSpan(otelCtx, wStep.Name, "map", i)
-			mapResults, output, err := executeMapStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
-			compDur := time.Since(stepStart)
-			telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
-			if err != nil {
-				results = append(results, mapResults...)
-				if program != nil {
-					program.Send(tui.WorkflowEndMsg{Success: false})
-				}
-				return "", results, trace, err
+		// Regular step execution.
+		if err := state.executeRegularStep(i, wStep, stepStart); err != nil {
+			if paused, ok := err.(*ErrWorkflowPaused); ok {
+				return "", state.results, state.trace, paused
 			}
-			results = append(results, mapResults...)
-			data = output
-			engine.SetStepOutput(i, wStep.Name, output)
-			trace.recordStep(StepTrace{
-				Index:           i,
-				NodeName:        "map",
-				StepName:        wStep.Name,
-				BatchIndex:      -1,
-				ConditionPassed: true,
-				Attempts:        1,
-				TotalDuration:   compDur,
-				InputLen:        len(data),
-				OutputLen:       len(output),
-			})
-			saveCheckpointIfEnabled(i)
-			continue
+			return "", state.results, state.trace, err
 		}
-
-		if wStep.IsReduce() {
-			_, compSpan := telemetry.StartCompoundStepSpan(otelCtx, wStep.Name, "reduce", i)
-			reduceResults, output, err := executeReduceStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
-			compDur := time.Since(stepStart)
-			telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
-			if err != nil {
-				results = append(results, reduceResults...)
-				if program != nil {
-					program.Send(tui.WorkflowEndMsg{Success: false})
-				}
-				return "", results, trace, err
-			}
-			results = append(results, reduceResults...)
-			data = output
-			engine.SetStepOutput(i, wStep.Name, output)
-			trace.recordStep(StepTrace{
-				Index:           i,
-				NodeName:        "reduce",
-				StepName:        wStep.Name,
-				BatchIndex:      -1,
-				ConditionPassed: true,
-				Attempts:        1,
-				TotalDuration:   compDur,
-				InputLen:        len(data),
-				OutputLen:       len(output),
-			})
-			saveCheckpointIfEnabled(i)
-			continue
-		}
-
-		if wStep.IsParallel() {
-			_, compSpan := telemetry.StartCompoundStepSpan(otelCtx, wStep.Name, "parallel", i)
-			parallelResults, output, err := executeParallelStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
-			compDur := time.Since(stepStart)
-			telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
-			if err != nil {
-				results = append(results, parallelResults...)
-				if program != nil {
-					program.Send(tui.WorkflowEndMsg{Success: false})
-				}
-				return "", results, trace, err
-			}
-			results = append(results, parallelResults...)
-			data = applyOutputStrategy(output, wStep.OutputStrategy)
-			engine.SetStepOutput(i, wStep.Name, output)
-			trace.recordStep(StepTrace{
-				Index:           i,
-				NodeName:        wStep.Node,
-				StepName:        wStep.Name,
-				BatchIndex:      -1,
-				ConditionPassed: true,
-				Attempts:        1,
-				TotalDuration:   compDur,
-				InputLen:        len(data),
-				OutputLen:       len(output),
-			})
-			saveCheckpointIfEnabled(i)
-			continue
-		}
-
-		if wStep.IsSaga() {
-			_, compSpan := telemetry.StartCompoundStepSpan(otelCtx, wStep.Name, "saga", i)
-			sagaResults, output, err := executeSagaStep(timeoutCtx, i, wStep, data, engine, reg, program, globalLimiter)
-			compDur := time.Since(stepStart)
-			telemetry.StepSpanEnd(compSpan, err, compDur.Milliseconds(), len(output), false)
-			if err != nil {
-				results = append(results, sagaResults...)
-				if program != nil {
-					program.Send(tui.WorkflowEndMsg{Success: false})
-				}
-				return "", results, trace, err
-			}
-			results = append(results, sagaResults...)
-			data = output
-			engine.SetStepOutput(i, wStep.Name, output)
-			trace.recordStep(StepTrace{
-				Index:           i,
-				NodeName:        "saga",
-				StepName:        wStep.Name,
-				BatchIndex:      -1,
-				ConditionPassed: true,
-				Attempts:        1,
-				TotalDuration:   compDur,
-				InputLen:        len(data),
-				OutputLen:       len(output),
-			})
-			saveCheckpointIfEnabled(i)
-			continue
-		}
-
-		logger.Info("step started", "index", i, "node", wStep.Node)
-
-		if program != nil {
-			program.Send(tui.StepStartMsg{
-				Index: i,
-				Name:  wStep.Node,
-			})
-		}
-
-		evalStart := time.Now()
-		evaluatedParams, err := engine.EvaluateParams(wStep.Params, data)
-		evalDuration := time.Since(evalStart)
-		if err != nil {
-			logger.Error("expression evaluation failed", "index", i, "error", err)
-			result := StepResult{
-				StepIndex: i,
-				NodeName:  wStep.Node,
-				Input:     data,
-				Error:     err,
-				Duration:  time.Since(stepStart),
-			}
-			result.Trace = trace.recordStep(StepTrace{
-				Index:           i,
-				NodeName:        wStep.Node,
-				StepName:        wStep.Name,
-				BatchIndex:      -1,
-				ConditionPassed: true,
-				EvalDuration:    evalDuration,
-				TotalDuration:   time.Since(stepStart),
-				InputLen:        len(data),
-				ErrorText:       err.Error(),
-			})
-			results = append(results, result)
-			if program != nil {
-				program.Send(tui.StepEndMsg{
-					Index:    i,
-					Name:     wStep.Node,
-					Error:    err,
-					Duration: time.Since(stepStart),
-				})
-				program.Send(tui.WorkflowEndMsg{Success: false})
-			}
-			return "", results, trace, err
-		}
-
-		node, ok := reg.Get(wStep.Node)
-		if !ok {
-			err := fmt.Errorf("node '%s' not found in registry", wStep.Node)
-			logger.Error("node not found", "node", wStep.Node, "error", err)
-			result := StepResult{
-				StepIndex: i,
-				NodeName:  wStep.Node,
-				Input:     data,
-				Error:     err,
-				Duration:  time.Since(stepStart),
-			}
-			result.Trace = trace.recordStep(StepTrace{
-				Index:           i,
-				NodeName:        wStep.Node,
-				StepName:        wStep.Name,
-				BatchIndex:      -1,
-				ConditionPassed: true,
-				EvalDuration:    evalDuration,
-				TotalDuration:   time.Since(stepStart),
-				InputLen:        len(data),
-				ErrorText:       err.Error(),
-			})
-			results = append(results, result)
-
-			if program != nil {
-				program.Send(tui.StepEndMsg{
-					Index:    i,
-					Name:     wStep.Node,
-					Error:    err,
-					Duration: time.Since(stepStart),
-				})
-				program.Send(tui.WorkflowEndMsg{Success: false})
-			}
-
-			return "", results, trace, err
-		}
-
-		retryCount := wStep.GetRetryCount()
-		if retryCount > MaxRetry {
-			retryCount = MaxRetry
-		}
-		// For resumable steps, use the step-level timeout (e.g. 72h) which
-		// may exceed MaxStepTimeout. For non-resumable steps, the standard
-		// params._timeout is capped at MaxStepTimeout as before.
-		stepTimeout := wStep.GetTimeout()
-		if wStep.IsResumable() {
-			if rt := wStep.GetResumeTimeout(); rt > 0 {
-				stepTimeout = rt
-			}
-		} else if stepTimeout > MaxStepTimeout {
-			stepTimeout = MaxStepTimeout
-		}
-
-		// B-2: per-step LLM telemetry collector. stepBaseCtx carries the
-		// sink so every retry attempt (and any sub-call) of this step's
-		// node publishes to the same collector. Drained into StepTrace
-		// after the step finishes.
-		stepBaseCtx, llmCollector := withLLMCollector(timeoutCtx)
-
-		var output string
-		var execErr error
-		var duration time.Duration
-		maxAttempts := retryCount + 1
-		attemptsMade := 0
-
-		// OpenTelemetry: step span wrapping the node execution (including retries).
-		_, stepSpan := telemetry.StartStepSpan(otelCtx, wStep.Name, wStep.Node, i)
-
-		for attempt := 1; attempt <= maxAttempts; attempt++ {
-			attemptsMade = attempt
-			attemptStart := time.Now()
-
-			var stepCtx context.Context
-			var stepCancel context.CancelFunc
-			if stepTimeout > 0 {
-				stepCtx, stepCancel = context.WithTimeout(stepBaseCtx, stepTimeout)
-			} else {
-				stepCtx, stepCancel = context.WithCancel(stepBaseCtx)
-			}
-
-			if program != nil {
-				if streamingNode, ok := node.(nodes.StreamingNode); ok {
-					// Decouple the streaming producer (HTTP reader inside
-					// ExecuteStream) from the TUI consumer via a buffered
-					// channel: program.Send blocks on an unbuffered channel,
-					// so a slow TUI would otherwise stall the stream.
-					//
-					// Wrapped in an IIFE so sink.flush runs via defer at the
-					// end of each attempt: if ExecuteStream panics the
-					// forwarding goroutine would otherwise leak (it blocks on
-					// range s.ch until the channel is closed). onChunk is only
-					// invoked synchronously from inside ExecuteStream, so no
-					// concurrent senders exist by the time flush runs.
-					output, execErr = func() (string, error) {
-						sink := newStreamSink(program, i, wStep.Node)
-						defer sink.flush()
-						return streamingNode.ExecuteStream(stepCtx, data, evaluatedParams, sink.onChunk)
-					}()
-				} else {
-					output, execErr = node.Execute(stepCtx, data, evaluatedParams)
-				}
-			} else {
-				output, execErr = node.Execute(stepCtx, data, evaluatedParams)
-			}
-			duration = time.Since(attemptStart)
-
-			stepCancel()
-
-			if execErr == nil {
-				break
-			}
-
-			logger.Warn("step failed, retrying", "index", i, "node", wStep.Node, "attempt", attempt, "max", maxAttempts, "error", nodes.RedactSensitive(execErr.Error()))
-
-			if attempt < maxAttempts {
-				// Use backoff delay if configured, otherwise use fixed delay
-				retryDelayActual := wStep.GetBackoffDelay(attempt)
-				select {
-				case <-time.After(retryDelayActual):
-				case <-timeoutCtx.Done():
-					telemetry.StepSpanEnd(stepSpan, context.DeadlineExceeded, duration.Milliseconds(), len(output), false)
-					return "", results, trace, fmt.Errorf("workflow timed out during retry delay")
-				}
-			}
-		}
-
-		// ── Error recovery ──
-		// Delegated to applyErrorRecovery (shared with the DAG and map
-		// executors) so the four recovery primitives — capture_error,
-		// fallback, on_error, continue_on_error — have one implementation.
-		// abortErr controls whether the workflow stops (mapped to execErr);
-		// traceErr is recorded in StepResult so continue_on_error still
-		// honestly reflects the failure in the trace.
-		// stepBaseCtx is passed so the capture_error branch and on_error
-		// handler run under the same step-scoped context (LLM calls are
-		// captured by the step collector, step timeout still applies).
-		resultErr := execErr
-		var recoveries []string
-		if execErr != nil {
-			var abortErr error
-			recoveries, abortErr, resultErr = applyErrorRecovery(stepBaseCtx, &wStep, &output, execErr, engine, reg, data, program, globalLimiter, "step")
-			execErr = abortErr
-		}
-
-		engine.SetStepOutput(i, wStep.Name, output)
-
-		errText := ""
-		if resultErr != nil {
-			errText = resultErr.Error()
-		}
-		result := StepResult{
-			StepIndex: i,
-			NodeName:  wStep.Node,
-			Input:     data,
-			Output:    output,
-			Error:     resultErr,
-			Duration:  duration,
-		}
-		result.Trace = trace.recordStep(StepTrace{
-			Index:           i,
-			NodeName:        wStep.Node,
-			StepName:        wStep.Name,
-			BatchIndex:      -1,
-			ConditionExpr:   wStep.Condition,
-			ConditionPassed: true,
-			Attempts:        attemptsMade,
-			Recoveries:      recoveries,
-			EvalDuration:    evalDuration,
-			ExecuteDuration: duration,
-			TotalDuration:   time.Since(stepStart),
-			InputLen:        len(data),
-			OutputLen:       len(output),
-			ErrorText:       errText,
-			LLM:             projectLLMTelemetry(llmCollector.drainCalls()),
-			Router:          projectRouterDecisions(llmCollector.drainDecisions()),
-		})
-		results = append(results, result)
-
-		// End the OTel step span with the final outcome.
-		telemetry.StepSpanEnd(stepSpan, resultErr, duration.Milliseconds(), len(output), false)
-
-		if resultErr != nil {
-			logger.Error("step failed", "index", i, "node", wStep.Node, "duration", duration, "error", nodes.RedactSensitive(resultErr.Error()))
-		} else {
-			logger.Info("step completed", "index", i, "node", wStep.Node, "duration", duration)
-		}
-
-		if program != nil {
-			program.Send(tui.StepEndMsg{
-				Index:    i,
-				Name:     wStep.Node,
-				Output:   output,
-				Error:    resultErr,
-				Duration: duration,
-			})
-		}
-
-		if execErr != nil {
-			if wStep.IsResumable() {
-				// Close the WAL so it's flushed to disk before copying
-				if wal != nil {
-					_ = wal.Close()
-					wal = nil // prevent double-close in defer
-				}
-				// Save the last checkpoint to the WAL before pausing
-				// (the last completed step is i-1, save it now)
-				if i > 0 {
-					saveCheckpointIfEnabled(i - 1)
-				}
-				resumeOn := wStep.ResumeOn
-				if resumeOn == "" {
-					resumeOn = "manual"
-				}
-				paused, pauseErr := PauseWorkflow(wfPath, wf, i, wStep.Name, resumeOn, execErr.Error(), walPath)
-				if pauseErr != nil {
-					logger.Error("failed to pause workflow", "name", wf.Name, "step", i, "error", pauseErr)
-					if program != nil {
-						program.Send(tui.WorkflowEndMsg{Success: false})
-					}
-					return "", results, trace, fmt.Errorf("step %d (%s) failed: %w", i+1, wStep.Node, execErr)
-				}
-				logger.Info("workflow paused", "name", wf.Name, "step", i, "node", wStep.Node, "run_id", paused.RunID, "resume_on", resumeOn)
-				if program != nil {
-					program.Send(tui.WorkflowEndMsg{Success: false})
-				}
-				return "", results, trace, paused
-			}
-			if program != nil {
-				program.Send(tui.WorkflowEndMsg{Success: false})
-			}
-			logger.Error("workflow failed", "name", wf.Name, "failed_step", i, "node", wStep.Node, "error", execErr)
-			return "", results, trace, fmt.Errorf("step %d (%s) failed: %w", i+1, wStep.Node, execErr)
-		}
-
-		data = output
-		saveCheckpointIfEnabled(i)
 	}
 
 	if program != nil {
 		program.Send(tui.WorkflowEndMsg{Success: true})
 	}
-
 	logger.Info("workflow completed", "name", wf.Name, "steps", len(wf.Steps))
 
-	// If output expression is defined, evaluate it instead of returning last step output
+	// Evaluate output expression if defined.
 	if wf.Output != "" {
-		finalOutput, err := engine.Evaluate(wf.Output, data)
-		if err != nil {
+		if finalOutput, err := state.engine.Evaluate(wf.Output, state.data); err != nil {
 			logger.Warn("failed to evaluate output expression, using last step output", "error", err)
 		} else {
-			data = finalOutput
+			state.data = finalOutput
 		}
 	}
 
-	return data, results, trace, nil
+	return state.data, state.results, state.trace, nil
 }
 
 // Executor is a configurable workflow runner. It wraps the package-level
