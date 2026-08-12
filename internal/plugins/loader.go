@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"plugin"
+	"runtime"
 )
 
 // DefaultPluginDir returns the default directory for community .so plugins.
@@ -41,6 +42,10 @@ func DefaultPluginDir() string {
 //
 //	go build -buildmode=plugin -o myplugin.so ./myplugin
 func LoadPlugin(path string, pm *PluginManager) error {
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("Go plugins are not supported on Windows: the 'plugin' package is Linux/macOS only. Use aflare's built-in MCP server support for cross-platform extensibility")
+	}
+
 	p, err := plugin.Open(path)
 	if err != nil {
 		return fmt.Errorf("open %s: %w", path, err)

@@ -76,7 +76,6 @@ type ChatSession struct {
 	// Analytics
 	firstSession bool  // true if this is a new session (no restored session)
 	turnCount    int64 // number of user turns completed
-	startTime    time.Time
 }
 
 // NewChatSession creates a new chat session with the given configuration.
@@ -104,7 +103,6 @@ func (s *ChatSession) SetSessionPath(path string) {
 // Supports multi-line input: lines ending with \ are continued on the next line.
 // On exit, the session is persisted to disk. On next start, the user can /resume.
 func (s *ChatSession) Run() {
-	s.startTime = time.Now()
 	s.running = true
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1*1024*1024)
@@ -243,6 +241,7 @@ func (s *ChatSession) saveSession() {
 func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 	// Increment turn count atomically
 	atomic.AddInt64(&s.turnCount, 1)
+	turnStart := time.Now()
 
 	// Drain any stale interrupt signals
 	select {
@@ -302,7 +301,7 @@ func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 			} else {
 				outcome = "error"
 			}
-		} else if time.Since(s.startTime) > 2*time.Minute {
+		} else if time.Since(turnStart) > 2*time.Minute {
 			outcome = "timeout"
 		}
 		metrics.RecordFirstSession(s.provider, outcome)

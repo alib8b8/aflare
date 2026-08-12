@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **会话持久化**：退出时自动保存会话，`/resume` 恢复历史对话，文件锁防止并发写入
+- **上下文窗口指示**：prompt 显示 `[ctx: N%]`，80% 以上加 ⚠ 警告，压缩后显示 `[ctx: compressed]`
+- **`/export` 命令**：导出对话为 markdown 文件，含时间戳和消息角色标注
+- **多行输入**：`\` 续行 + 空行提交，进入多行模式时显示操作提示
+- **场景包安装**：`aflare install-pack <name>` 支持 12 个场景包，`--list` 列出已安装，`--force` 重装
+- **产品指标**：`first_session_success`、`session_turns`、`template_usage`、`capability_inits`，接入 Prometheus `/api/v1/metrics`
+- **插件系统**：Go 插件 `.so` 加载，支持 `PluginManager` 注册/启用/依赖管理
+- **插件文档**：`docs/plugins.md` 含平台说明、接口定义、示例代码、Troubleshooting
+- **文件监听**：daemon 模式 `--watch` 轮询监听目录变化，自动喂给 agent
+- **任务队列**：FIFO + 去重，任务状态追踪（pending → running → done/failed），并发控制
+- **API 限流**：基于令牌桶，10 req/min per IP，支持 `X-Forwarded-For` / `X-Real-IP`，超限返回 429
+- **代码质量**：`.golangci.yml` 14 个 linter（`funlen`/`errcheck`/`bodyclose`/`staticcheck`），pre-commit hook
+
+### Fixed
+- **Ollama 真流式**：字符级 `ollamaStreamFilter` 状态机，逐字符匹配 `"thought"` / `"final_answer"` 前缀，提取纯文本流式输出，抑制 JSON 结构噪声
+- **Tool call 累积**：`CallWithToolsStream` 后续 chunk 携带 `ID`/`Name` 时正确更新（兼容分块发送 name+arguments 的 provider）
+- **版本同步**：`version.go` 从 `0.6.0` 更新为 `0.7.0`
+- **多行输入提示**：从 `... ` 改为 `... (empty line to submit, \ to continue) `
+- **插件平台检查**：`LoadPlugin` 在 Windows 上返回友好错误提示，引导使用 MCP 替代方案
+
+### Changed
+- **Ollama 流式过滤重构**：`ReActStreamFilter` 从 `chat.go` 移至 `agent.go` 的 `callOllama`，删除冗余结构和 `json` import
+- **排序优化**：`CallWithToolsStream` 的 tool call 索引排序从 O(n²) 插入排序改为 `sort.Ints`
+- **死代码清理**：删除 `chat.go` 中无调用方的 `processInput` 方法
+- **文件重命名**：`capability_stubs.go` → `capability_adaptive.go`
+- **指标超时判定**：`first_session_success` 的 timeout 从会话级改为单轮级（`turnStart`），避免恢复会话误判
+
 ## [0.7.0] - 2026-08-07
 
 ### Added

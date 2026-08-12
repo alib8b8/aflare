@@ -14,7 +14,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // taskqueue provides a FIFO task queue with deduplication for the agent daemon.
-// Tasks from the scheduler are enqueued and executed sequentially by the agent
+// Tasks from the scheduler are enqueued and executed concurrently by the agent
 // loop, ensuring no task is dropped and no duplicate task runs concurrently.
 // Each task tracks its lifecycle status: pending → running → done/failed.
 package taskqueue
