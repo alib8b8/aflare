@@ -661,7 +661,7 @@ func NewSessionMemoryManager(storageDir string, maxSessions, maxPerSession int) 
 	}
 
 	if storageDir != "" {
-		_ = os.MkdirAll(storageDir, 0755)
+		_ = os.MkdirAll(storageDir, 0755) // best-effort: dir creation
 	}
 
 	return mgr
@@ -749,7 +749,7 @@ func (mgr *SessionMemoryManager) DeleteSession(sessionID string) {
 
 	if mgr.storageDir != "" {
 		path := mgr.sessionFilePath(sessionID)
-		_ = os.Remove(path)
+		_ = os.Remove(path) // best-effort: session file cleanup
 	}
 }
 
@@ -910,7 +910,7 @@ func (mgr *SessionMemoryManager) saveSessionLocked(session *SessionMemory) {
 	if err := os.WriteFile(tmpPath, jsonData, 0600); err != nil {
 		return
 	}
-	_ = os.Rename(tmpPath, path)
+	_ = os.Rename(tmpPath, path) // best-effort: atomic session persist
 }
 
 // loadSessionLocked loads a session from persistent storage (must hold write lock).

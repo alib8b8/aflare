@@ -609,7 +609,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 
 	if resp.StatusCode != http.StatusOK {
 		var errResp LLMResponse
-		_ = json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&errResp)
+		_ = json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&errResp) // best-effort: parse error body if present
 		if errResp.Error != nil && errResp.Error.Message != "" {
 			tel.ErrText = errResp.Error.Message
 			return "", aferrors.Newf(aferrors.CodeLLMProviderFailed, "%s API error (%d): %s", n.config.ProviderName, resp.StatusCode, errResp.Error.Message)
@@ -1024,7 +1024,7 @@ func (n *OpenAICompatibleNode) CallWithTools(ctx context.Context, messages []LLM
 
 	if resp.StatusCode != http.StatusOK {
 		var errResp LLMResponse
-		_ = json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&errResp)
+		_ = json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&errResp) // best-effort: parse error body if present
 		if errResp.Error != nil && errResp.Error.Message != "" {
 			return nil, aferrors.Newf(aferrors.CodeLLMProviderFailed, "%s API error (%d): %s", n.config.ProviderName, resp.StatusCode, errResp.Error.Message)
 		}
@@ -1107,7 +1107,7 @@ func (n *OpenAICompatibleNode) CallWithToolsStream(ctx context.Context, messages
 
 	if resp.StatusCode != http.StatusOK {
 		var errResp LLMResponse
-		_ = json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&errResp)
+		_ = json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&errResp) // best-effort: parse error body if present
 		if errResp.Error != nil && errResp.Error.Message != "" {
 			return nil, aferrors.Newf(aferrors.CodeLLMProviderFailed, "%s API error (%d): %s", n.config.ProviderName, resp.StatusCode, errResp.Error.Message)
 		}

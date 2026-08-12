@@ -130,7 +130,7 @@ type rotatingWriter struct {
 func newRotatingWriter(filename string, maxSize int64, maxBackups int) (*rotatingWriter, error) {
 	dir := filepath.Dir(filename)
 	if dir != "" && dir != "." {
-		_ = os.MkdirAll(dir, 0750)
+		_ = os.MkdirAll(dir, 0750) // best-effort: dir creation
 	}
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
@@ -167,26 +167,28 @@ func (w *rotatingWriter) Write(p []byte) (int, error) {
 // rotateLocked performs the file rotation. Caller must hold w.mu.
 func (w *rotatingWriter) rotateLocked() {
 	if w.f != nil {
-		_ = w.f.Close()
+		if err := w.f.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "logger: failed to close log file during rotation: %v\n", err)
+		}
 		w.f = nil
 	}
 
 	if w.maxBackups <= 0 {
 		// No backups retained: just remove the current file.
-		_ = os.Remove(w.filename)
+		_ = os.Remove(w.filename) // best-effort: rotate cleanup
 	} else {
 		// Drop the oldest backup, then shift .(N-1) -> .N, ..., .1 -> .2.
 		for i := w.maxBackups; i >= 1; i-- {
 			src := fmt.Sprintf("%s.%d", w.filename, i)
 			if i == w.maxBackups {
-				_ = os.Remove(src)
+				_ = os.Remove(src) // best-effort: rotate cleanup
 				continue
 			}
 			dst := fmt.Sprintf("%s.%d", w.filename, i+1)
-			_ = os.Rename(src, dst)
+			_ = os.Rename(src, dst) // best-effort: rotate shift
 		}
 		// Promote the current file to .1.
-		_ = os.Rename(w.filename, fmt.Sprintf("%s.1", w.filename))
+		_ = os.Rename(w.filename, fmt.Sprintf("%s.1", w.filename)) // best-effort: rotate promote
 	}
 
 	f, err := os.OpenFile(w.filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
@@ -221,7 +223,9 @@ func initLogger(level slog.Level, format string, output string) {
 	// Close any previously-opened rotating writer so re-init does not leak
 	// file descriptors.
 	if rotWriter != nil {
-		_ = rotWriter.Close()
+		if err := rotWriter.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "logger: failed to close previous log file: %v\n", err)
+		}
 		rotWriter = nil
 	}
 

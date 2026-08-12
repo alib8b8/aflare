@@ -199,13 +199,19 @@ func ResumeWorkflow(ctx context.Context, runID string) (string, []StepResult, er
 		// If it's paused again, update the meta
 		var pausedErr *ErrWorkflowPaused
 		if errors.As(err, &pausedErr) && pausedErr != nil {
-			_ = UpdateRunMetaStatus(runID, "paused")
+			if uerr := UpdateRunMetaStatus(runID, "paused"); uerr != nil {
+				logger.Warn("failed to update run meta status to paused", "run_id", runID, "err", uerr)
+			}
 		} else {
-			_ = UpdateRunMetaStatus(runID, "failed")
+			if uerr := UpdateRunMetaStatus(runID, "failed"); uerr != nil {
+				logger.Warn("failed to update run meta status to failed", "run_id", runID, "err", uerr)
+			}
 		}
 		return out, results, err
 	}
-	_ = UpdateRunMetaStatus(runID, "completed")
+	if err := UpdateRunMetaStatus(runID, "completed"); err != nil {
+		logger.Warn("failed to update run meta status to completed", "run_id", runID, "err", err)
+	}
 	_ = trace // trace is used internally by the executor
 	return out, results, nil
 }
@@ -229,9 +235,9 @@ func PauseWorkflow(wfPath string, wf *Workflow, stepIndex int, stepName string, 
 			wfDest := WorkflowPath(runID)
 			wfTmp := wfDest + ".tmp"
 			if writeErr := os.WriteFile(wfTmp, wfData, 0600); writeErr == nil {
-				_ = os.Rename(wfTmp, wfDest)
-			} else {
-				_ = os.Remove(wfTmp)
+				_ = os.Rename(wfTmp, wfDest) // best-effort: atomic workflow copy
+		} else {
+			_ = os.Remove(wfTmp) // best-effort cleanup
 			}
 		}
 	}
@@ -244,9 +250,9 @@ func PauseWorkflow(wfPath string, wf *Workflow, stepIndex int, stepName string, 
 			walDest := WALPath(runID)
 			walTmp := walDest + ".tmp"
 			if writeErr := os.WriteFile(walTmp, walData, 0600); writeErr == nil {
-				_ = os.Rename(walTmp, walDest)
-			} else {
-				_ = os.Remove(walTmp)
+				_ = os.Rename(walTmp, walDest) // best-effort: atomic WAL copy
+		} else {
+			_ = os.Remove(walTmp) // best-effort cleanup
 			}
 		}
 	}

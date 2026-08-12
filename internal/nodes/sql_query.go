@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
@@ -102,7 +103,9 @@ func openDB(driver, dsn string) (*sql.DB, error) {
 	// Evict if pool grew beyond 16 entries.
 	if len(dbCache) >= 16 {
 		for k, v := range dbCache {
-			_ = v.Close()
+			if err := v.Close(); err != nil {
+				logger.Error("evicted db connection close failed", "err", err)
+			}
 			delete(dbCache, k)
 			break
 		}
@@ -139,7 +142,9 @@ func scanRows(rows *sql.Rows, maxRows int) ([]map[string]interface{}, error) {
 		if len(out) >= maxRows {
 			// Drain remaining to avoid protocol desync; caller will
 			// see truncated result.
-			_ = rows.Close()
+			if err := rows.Close(); err != nil {
+				logger.Error("sql rows close failed", "err", err)
+			}
 			break
 		}
 		values := make([]interface{}, len(cols))
@@ -287,10 +292,14 @@ func (n *SQLQueryNode) actionSchema(ctx context.Context, db *sql.DB, table strin
 			tables = append(tables, name)
 		}
 		if err := rows.Err(); err != nil {
-			_ = rows.Close()
+			if cerr := rows.Close(); cerr != nil {
+				logger.Error("sql rows close failed", "err", cerr)
+			}
 			return "", fmt.Errorf("rows iteration: %w", err)
 		}
-		_ = rows.Close()
+		if err := rows.Close(); err != nil {
+			logger.Error("sql rows close failed", "err", err)
+		}
 	}
 
 	schema := make(map[string]interface{}, len(tables))
@@ -306,7 +315,9 @@ func (n *SQLQueryNode) actionSchema(ctx context.Context, db *sql.DB, table strin
 			}
 		}
 		cols, scanErr := scanRows(colRows, 1000)
-		_ = colRows.Close()
+		if err := colRows.Close(); err != nil {
+			logger.Error("sql rows close failed", "err", err)
+		}
 		if scanErr != nil {
 			schema[t] = []interface{}{}
 			continue

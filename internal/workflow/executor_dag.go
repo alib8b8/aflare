@@ -49,7 +49,7 @@ import (
 // Callers that go through an Executor pass e.workflowTimeout; the legacy
 // ExecuteWorkflowWithTrace global entry point passes DefaultWorkflowTimeout.
 //
-//nolint:funlen // TODO(#issue): split into smaller steps
+//nolint:funlen // TODO(#55): split into smaller steps by 2026-09-13
 func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, timeout time.Duration) (string, []StepResult, *WorkflowTrace, error) {
 	if len(wf.Steps) > MaxSteps {
 		return "", nil, nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)

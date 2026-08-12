@@ -165,7 +165,7 @@ func handleTemplateSubmit(args []string) {
 	readmeContent := fmt.Sprintf("# %s\n\n%s\n\n## Usage\n\n```bash\naflare run %s\n```\n",
 		templateName, desc, filepath.Join(category, baseName, "workflow.yaml"))
 	readmePath := filepath.Join(targetDir, "README.md")
-	_ = os.WriteFile(readmePath, []byte(readmeContent), 0644)
+	_ = os.WriteFile(readmePath, []byte(readmeContent), 0644) // best-effort: README stub is non-critical
 
 	// Rebuild the registry.
 	registry := skillsPkg.NewSkillRegistry(templatesDir)

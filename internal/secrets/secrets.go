@@ -452,7 +452,7 @@ func GetMasterPassword() (string, error) {
 	// 2. Try environment variable
 	if password := os.Getenv("AFLARE_SECRETS_PASSWORD"); password != "" {
 		// Store in keyring for future use (best-effort)
-		_ = keyring.Set(keyringService, "master", password)
+		_ = keyring.Set(keyringService, "master", password) // best-effort: cache password in keyring
 		return password, nil
 	}
 
@@ -468,7 +468,7 @@ func GetMasterPassword() (string, error) {
 			return "", errors.New("master password cannot be empty")
 		}
 		// Store in keyring for future use (best-effort)
-		_ = keyring.Set(keyringService, "master", string(password))
+		_ = keyring.Set(keyringService, "master", string(password)) // best-effort: cache password in keyring
 		return string(password), nil
 	}
 

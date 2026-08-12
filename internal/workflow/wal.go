@@ -41,6 +41,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 // WALRecord is a single append-only entry in the write-ahead log.
@@ -120,7 +122,9 @@ func NewWAL(path string, opts WALOptions) (*WAL, error) {
 	// Recover the high-water seq and bytes-since-compaction from existing
 	// records (if any).
 	if err := w.recoverSeq(); err != nil {
-		_ = w.Close()
+		if cerr := w.Close(); cerr != nil {
+			logger.Error("wal: close during failed init", "path", w.path, "error", cerr)
+		}
 		return nil, err
 	}
 	return w, nil
@@ -204,11 +208,15 @@ func (w *WAL) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if err := w.writer.Flush(); err != nil {
-		_ = w.file.Close()
+		if cerr := w.file.Close(); cerr != nil {
+			logger.Error("wal: close after flush failure", "path", w.path, "error", cerr)
+		}
 		return fmt.Errorf("wal: flush on close: %w", err)
 	}
 	if err := w.file.Sync(); err != nil {
-		_ = w.file.Close()
+		if cerr := w.file.Close(); cerr != nil {
+			logger.Error("wal: close after sync failure", "path", w.path, "error", cerr)
+		}
 		return fmt.Errorf("wal: sync on close: %w", err)
 	}
 	return w.file.Close()
@@ -319,32 +327,44 @@ func (w *WAL) Compact() error {
 		// Write single snapshot record (seq preserved).
 		data, err := json.Marshal(*lastRec)
 		if err != nil {
-			_ = snapFile.Close()
+			if cerr := snapFile.Close(); cerr != nil {
+				logger.Warn("wal: compact snap close error", "stage", "marshal", "path", tmpPath, "error", cerr)
+			}
 			return fmt.Errorf("wal: compact marshal: %w", err)
 		}
 		var lenBuf [walLenFieldLen]byte
 		binary.LittleEndian.PutUint32(lenBuf[:], uint32(len(data)))
 		if _, err := snapWriter.Write(lenBuf[:]); err != nil {
-			_ = snapFile.Close()
+			if cerr := snapFile.Close(); cerr != nil {
+				logger.Warn("wal: compact snap close error", "stage", "write_len", "path", tmpPath, "error", cerr)
+			}
 			return fmt.Errorf("wal: compact write len: %w", err)
 		}
 		if _, err := snapWriter.Write(data); err != nil {
-			_ = snapFile.Close()
+			if cerr := snapFile.Close(); cerr != nil {
+				logger.Warn("wal: compact snap close error", "stage", "write_data", "path", tmpPath, "error", cerr)
+			}
 			return fmt.Errorf("wal: compact write data: %w", err)
 		}
 		var crcBuf [walCRCLen]byte
 		binary.LittleEndian.PutUint32(crcBuf[:], crc32.ChecksumIEEE(data))
 		if _, err := snapWriter.Write(crcBuf[:]); err != nil {
-			_ = snapFile.Close()
+			if cerr := snapFile.Close(); cerr != nil {
+				logger.Warn("wal: compact snap close error", "stage", "write_crc", "path", tmpPath, "error", cerr)
+			}
 			return fmt.Errorf("wal: compact write crc: %w", err)
 		}
 	}
 	if err := snapWriter.Flush(); err != nil {
-		_ = snapFile.Close()
+		if cerr := snapFile.Close(); cerr != nil {
+			logger.Warn("wal: compact snap close error", "stage", "flush", "path", tmpPath, "error", cerr)
+		}
 		return fmt.Errorf("wal: compact snap flush: %w", err)
 	}
 	if err := snapFile.Sync(); err != nil {
-		_ = snapFile.Close()
+		if cerr := snapFile.Close(); cerr != nil {
+			logger.Warn("wal: compact snap close error", "stage", "sync", "path", tmpPath, "error", cerr)
+		}
 		return fmt.Errorf("wal: compact snap sync: %w", err)
 	}
 	if err := snapFile.Close(); err != nil {

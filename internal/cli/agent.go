@@ -94,14 +94,18 @@ func HandleAgent(args []string) {
 	}
 	for _, entry := range entries {
 		entry := entry // capture
-		_ = sched.AddTask(entry.ID, entry.Cron, func(taskCtx context.Context) {
-			_ = tq.Enqueue(&taskqueue.Task{
+		if err := sched.AddTask(entry.ID, entry.Cron, func(taskCtx context.Context) {
+			if err := tq.Enqueue(&taskqueue.Task{
 				ID:        fmt.Sprintf("sched-%s-%d", entry.ID, time.Now().Unix()),
 				Source:    "scheduler",
 				Message:   entry.Description,
 				CreatedAt: time.Now(),
-			})
-		})
+			}); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to enqueue scheduled task: %v\n", err)
+			}
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to add scheduled task %s: %v\n", entry.ID, err)
+		}
 		if entry.Description != "" {
 			fmt.Printf("Loaded scheduled task: %s (%s) → %s\n", entry.ID, entry.Cron, entry.Description)
 		} else {
@@ -124,12 +128,14 @@ func HandleAgent(args []string) {
 					case <-ctx.Done():
 						return
 					case event := <-watchEvents:
-						_ = tq.Enqueue(&taskqueue.Task{
+						if err := tq.Enqueue(&taskqueue.Task{
 							ID:        fmt.Sprintf("fw-%s-%d", event.Path, event.Timestamp.Unix()),
 							Source:    "filewatch",
 							Message:   filewatch.FormatEvent(event),
 							CreatedAt: event.Timestamp,
-						})
+						}); err != nil {
+							fmt.Fprintf(os.Stderr, "Warning: failed to enqueue filewatch task: %v\n", err)
+						}
 					}
 				}
 			}()

@@ -204,7 +204,7 @@ func (sr *SkillRegistry) GenerateMissingMetas() int {
 	defer sr.mu.Unlock()
 
 	generated := 0
-	for id, meta := range sr.skills {
+	for _, meta := range sr.skills {
 		if meta.Path == "" {
 			continue
 		}
@@ -217,7 +217,6 @@ func (sr *SkillRegistry) GenerateMissingMetas() int {
 				}
 			}
 		}
-		_ = id
 	}
 	return generated
 }

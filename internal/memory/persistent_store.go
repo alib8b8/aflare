@@ -60,7 +60,7 @@ func initPersistentStore() {
 		home = "."
 	}
 	dir := filepath.Join(home, ".config", "aflare")
-	_ = os.MkdirAll(dir, 0o755)
+	_ = os.MkdirAll(dir, 0o755) // best-effort init
 	sharedPersistentStore.path = filepath.Join(dir, "memory.json")
 	sharedPersistentStore.entries = make(map[string]*PersistentMemoryEntry)
 	sharedPersistentStore.load()

@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/alib8b8/aflare/internal/httpclient"
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 // Three shared clients for the self-update flow, built once via the
@@ -322,13 +323,17 @@ func SelfUpdate(repo string) (string, error) {
 	// truncating (which would only surface later as a checksum mismatch).
 	written, err := io.Copy(out, io.LimitReader(resp.Body, maxBinaryDownloadSize+1))
 	if err != nil {
-		_ = out.Close()        // best-effort close
+		if cerr := out.Close(); cerr != nil {
+			logger.Error("temp file close failed", "err", cerr)
+		}
 		_ = os.Remove(tmpPath) // best-effort cleanup
 		return "", fmt.Errorf("failed to write temp file: %w", err)
 	}
 	if written > maxBinaryDownloadSize {
-		_ = out.Close()
-		_ = os.Remove(tmpPath)
+		if cerr := out.Close(); cerr != nil {
+			logger.Error("temp file close failed", "err", cerr)
+		}
+		_ = os.Remove(tmpPath) // best-effort cleanup
 		return "", fmt.Errorf("downloaded binary exceeds max size of %d bytes", maxBinaryDownloadSize)
 	}
 	if err := out.Close(); err != nil {
@@ -339,24 +344,24 @@ func SelfUpdate(repo string) (string, error) {
 	if checksumsURL := findChecksumsURL(release); checksumsURL != "" {
 		checksums, err := downloadChecksums(checksumsURL)
 		if err != nil {
-			_ = os.Remove(tmpPath)
+			_ = os.Remove(tmpPath) // best-effort cleanup
 			return "", fmt.Errorf("failed to download checksums: %w (refusing to install without verification)", err)
 		}
 		if len(checksums) == 0 {
-			_ = os.Remove(tmpPath)
+			_ = os.Remove(tmpPath) // best-effort cleanup
 			return "", fmt.Errorf("checksums file is empty (refusing to install without verification)")
 		}
 		expected, ok := checksums[assetName]
 		if !ok {
-			_ = os.Remove(tmpPath)
+			_ = os.Remove(tmpPath) // best-effort cleanup
 			return "", fmt.Errorf("no checksum found for asset %q (refusing to install without verification)", assetName)
 		}
 		if err := verifyChecksum(tmpPath, expected); err != nil {
-			_ = os.Remove(tmpPath)
+			_ = os.Remove(tmpPath) // best-effort cleanup
 			return "", fmt.Errorf("checksum verification failed: %w", err)
 		}
 	} else {
-		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpPath) // best-effort cleanup
 		return "", fmt.Errorf("release has no checksums file (refusing to install without verification)")
 	}
 

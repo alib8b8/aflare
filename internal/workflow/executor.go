@@ -711,7 +711,9 @@ func (s *seqExecState) recordStepError(i int, wStep WorkflowStep, stepStart time
 func (s *seqExecState) handleStepFailure(i int, wStep WorkflowStep, execErr error) error {
 	if wStep.IsResumable() {
 		if s.wal != nil {
-			_ = s.wal.Close()
+			if err := s.wal.Close(); err != nil {
+				logger.Error("failed to close WAL during step failure", "err", err)
+			}
 			s.wal = nil
 		}
 		if i > 0 {

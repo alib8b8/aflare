@@ -302,7 +302,7 @@ func (s *FileIdempotencyStore) Check(key string) (IdempotencyRecord, bool, error
 	}
 	if s.ttl > 0 && time.Since(rec.UpdatedAt) > s.ttl {
 		// Expired: reap and report not found so the next run re-executes.
-		_ = os.Remove(s.pathFor(key))
+		_ = os.Remove(s.pathFor(key)) // best-effort: reap expired record
 		return IdempotencyRecord{}, false, nil
 	}
 	return rec, true, nil
@@ -353,21 +353,25 @@ func (s *FileIdempotencyStore) writeLocked(key string, rec IdempotencyRecord) er
 		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: write tmp")
 	}
 	if _, err := f.Write(data); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmpPath)
+		if cerr := f.Close(); cerr != nil {
+			logger.Error("idempotency tmp file close failed", "err", cerr)
+		}
+		_ = os.Remove(tmpPath) // best-effort cleanup
 		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: write tmp")
 	}
 	if err := f.Sync(); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmpPath)
+		if cerr := f.Close(); cerr != nil {
+			logger.Error("idempotency tmp file close failed", "err", cerr)
+		}
+		_ = os.Remove(tmpPath) // best-effort cleanup
 		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: fsync tmp")
 	}
 	if err := f.Close(); err != nil {
-		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpPath) // best-effort cleanup
 		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: close tmp")
 	}
 	if err := os.Rename(tmpPath, finalPath); err != nil {
-		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpPath) // best-effort cleanup
 		return aferrors.Wrap(err, aferrors.CodeIdempotencyInternal, "idempotency: rename")
 	}
 	// Best-effort fsync of the parent directory so the rename itself is
@@ -375,8 +379,12 @@ func (s *FileIdempotencyStore) writeLocked(key string, rec IdempotencyRecord) er
 	// rename, leaving the tmp file behind (never read) and the previous
 	// record intact — the safe direction.
 	if dir, err := os.Open(filepath.Dir(finalPath)); err == nil {
-		_ = dir.Sync()
-		_ = dir.Close()
+		if err := dir.Sync(); err != nil {
+			logger.Warn("idempotency dir sync failed (non-fatal)", "err", err)
+		}
+		if err := dir.Close(); err != nil {
+			logger.Error("idempotency dir close failed", "err", err)
+		}
 	}
 	return nil
 }
@@ -417,7 +425,7 @@ func (s *FileIdempotencyStore) Reserve(key string, runID string) (IdempotencyRec
 		// Reap expired records (including a stale in_progress left behind by a
 		// crashed holder) so the key is not blocked forever.
 		if s.ttl > 0 && time.Since(rec.UpdatedAt) > s.ttl {
-			_ = os.Remove(s.pathFor(key))
+			_ = os.Remove(s.pathFor(key)) // best-effort: reap expired record
 			rec, ok = IdempotencyRecord{}, false
 		}
 	}
@@ -461,8 +469,12 @@ func (s *FileIdempotencyStore) acquireCrossProcessLock(key string) (release func
 		f, oerr := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 		if oerr == nil {
 			_, _ = fmt.Fprintf(f, "%d\n%d\n", os.Getpid(), time.Now().UnixNano())
-			_ = f.Close()
-			return func() { _ = os.Remove(lockPath) }, nil
+			if err := f.Close(); err != nil {
+				logger.Error("idempotency lock file close failed", "err", err)
+			}
+			return func() {
+				_ = os.Remove(lockPath) // best-effort lock release
+			}, nil
 		}
 		if !errors.Is(oerr, os.ErrExist) {
 			return nil, oerr

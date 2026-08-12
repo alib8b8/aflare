@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/alib8b8/aflare/internal/httpclient"
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 // safeHTTPClient is the MCP client's shared HTTP client. It uses the
@@ -126,7 +127,9 @@ func Connect(serverURL string) (*Client, error) {
 	}
 
 	if err := c.initialize(); err != nil {
-		_ = c.Close() // best-effort close
+		if cerr := c.Close(); cerr != nil {
+			logger.Error("mcp client close failed", "err", cerr)
+		}
 		return nil, fmt.Errorf("failed to initialize MCP client: %w", err)
 	}
 
@@ -259,8 +262,11 @@ func (c *Client) initialize() error {
 	}
 	c.isInitialized = true
 
-	// Send initialized notification
-	_ = c.sendNotification("notifications/initialized")
+	// Send initialized notification (best-effort: server may not require it)
+	if err := c.sendNotification("notifications/initialized"); err != nil {
+		// Non-fatal: initialization already succeeded; notification is advisory.
+		_ = err // best-effort notification
+	}
 	return nil
 }
 

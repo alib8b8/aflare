@@ -184,8 +184,10 @@ func acquireAuditLock(dir string) (func(), error) {
 	}
 	fmt.Fprintf(f, "pid=%d started=%s\n", os.Getpid(), time.Now().Format(time.RFC3339))
 	return func() {
-		_ = f.Close()
-		_ = os.Remove(lockPath)
+		if err := f.Close(); err != nil {
+			logger.Error("audit lock file close failed", "err", err)
+		}
+		_ = os.Remove(lockPath) // best-effort cleanup
 	}, nil
 }
 

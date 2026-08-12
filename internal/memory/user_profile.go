@@ -353,7 +353,7 @@ func (m *UserProfileManager) saveProfile(userID string) {
 		return
 	}
 
-	_ = os.WriteFile(filePath, data, 0600)
+	_ = os.WriteFile(filePath, data, 0600) // best-effort cache persist
 }
 
 func (m *UserProfileManager) loadAllProfiles() {

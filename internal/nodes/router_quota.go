@@ -301,12 +301,16 @@ func (s *FileQuotaStore) Save(tenant, provider string, usage int64, day string) 
 		return fmt.Errorf("quota: write tmp %s/%s: %w", tenant, provider, err)
 	}
 	if _, err := f.Write(data); err != nil {
-		_ = f.Close()
+		if cerr := f.Close(); cerr != nil {
+			logger.Error("quota tmp file close failed", "err", cerr)
+		}
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("quota: write tmp %s/%s: %w", tenant, provider, err)
 	}
 	if err := f.Sync(); err != nil {
-		_ = f.Close()
+		if cerr := f.Close(); cerr != nil {
+			logger.Error("quota tmp file close failed", "err", cerr)
+		}
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("quota: fsync tmp %s/%s: %w", tenant, provider, err)
 	}
@@ -324,7 +328,9 @@ func (s *FileQuotaStore) Save(tenant, provider string, usage int64, day string) 
 	// direction.
 	if dir, err := os.Open(filepath.Dir(finalPath)); err == nil {
 		_ = dir.Sync()
-		_ = dir.Close()
+		if err := dir.Close(); err != nil {
+			logger.Error("quota dir close failed", "err", err)
+		}
 	}
 	return nil
 }

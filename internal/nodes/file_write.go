@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 // FileWriteNode writes content to a file
@@ -117,7 +119,9 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	tmpPath := tmpFile.Name()
 
 	cleanup := func() {
-		_ = tmpFile.Close()
+		if err := tmpFile.Close(); err != nil {
+			logger.Error("temp file close failed", "err", err)
+		}
 		_ = os.Remove(tmpPath)
 	}
 

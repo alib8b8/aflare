@@ -401,15 +401,21 @@ func (r *Registry) LoadExternalNodes(dir string) error {
 		}
 		info, err := f.Stat()
 		if err != nil {
-			_ = f.Close() // best-effort close
+			if cerr := f.Close(); cerr != nil {
+				logger.Error("metadata file close failed", "err", cerr)
+			}
 			continue
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			_ = f.Close() // best-effort close
+			if cerr := f.Close(); cerr != nil {
+				logger.Error("metadata file close failed", "err", cerr)
+			}
 			continue
 		}
 		metadataBytes, err := io.ReadAll(f)
-		_ = f.Close() // best-effort close
+		if cerr := f.Close(); cerr != nil {
+			logger.Error("metadata file close failed", "err", cerr)
+		}
 		if err != nil {
 			continue
 		}
