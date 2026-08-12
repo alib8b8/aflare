@@ -570,11 +570,110 @@ func (a *ReActAgent) callOllama(ctx context.Context, messages []LLMMessage) (str
 	}
 	fullPrompt := buildConversationPrompt(messages)
 	if a.onChunk != nil {
-		// Pass chunks directly to caller — the caller (chat.go) is responsible
-		// for ReAct JSON filtering via newReActStreamFilter.
-		return node.ExecuteStream(ctx, fullPrompt, params, a.onChunk)
+		// Stream with ReAct JSON-aware filtering: buffer tokens, extract
+		// thought/final_answer content, suppress JSON structure noise.
+		filter := newOllamaStreamFilter(a.onChunk)
+		result, err := node.ExecuteStream(ctx, fullPrompt, params, filter.feed)
+		filter.flush()
+		return result, err
 	}
 	return node.Execute(ctx, fullPrompt, params)
+}
+
+// ── Ollama ReAct stream filter ───────────────────────────────────────────
+//
+// Ollama sends individual JSON tokens (e.g. "{", "\"", "thought", ...).
+// This filter accumulates them and streams only the content of "thought"
+// and "final_answer" fields to the user in real-time. JSON structure
+// characters and field names are suppressed.
+
+type ollamaStreamFilter struct {
+	buf     strings.Builder
+	onChunk func(string)
+
+	// Streaming state
+	inField   bool   // true when inside a field value
+	fieldName string // which field we are reading ("thought" or "final_answer")
+	escaping  bool   // true when \ was just seen inside a string value
+
+	// Parsing state
+	pos    int // current position in jsonPrefix search
+	prefix string
+}
+
+const jsonThoughtPrefix  = `"thought": "`
+const jsonAnswerPrefix   = `"final_answer": "`
+
+func newOllamaStreamFilter(onChunk func(string)) *ollamaStreamFilter {
+	return &ollamaStreamFilter{
+		onChunk: onChunk,
+		prefix:  jsonThoughtPrefix,
+	}
+}
+
+func (f *ollamaStreamFilter) feed(chunk string) {
+	for _, c := range chunk {
+		f.buf.WriteByte(byte(c))
+
+		if f.inField {
+			f.handleFieldChar(c)
+			continue
+		}
+
+		// Looking for a field prefix
+		if f.prefix != "" {
+			if byte(c) == f.prefix[f.pos] {
+				f.pos++
+				if f.pos == len(f.prefix) {
+					// Found the prefix — start streaming the field value
+					f.inField = true
+					f.fieldName = f.prefix[1:strings.IndexByte(f.prefix, '"')] // "thought" or "final_answer"
+					f.pos = 0
+					f.prefix = ""
+				}
+			} else {
+				f.pos = 0
+			}
+		} else {
+			// After one field is done, look for the next
+			if f.fieldName == "thought" {
+				f.prefix = jsonAnswerPrefix
+			} else {
+				f.prefix = jsonThoughtPrefix
+			}
+			f.pos = 0
+			if byte(c) == f.prefix[0] {
+				f.pos = 1
+			}
+		}
+	}
+}
+
+func (f *ollamaStreamFilter) handleFieldChar(c rune) {
+	if f.escaping {
+		f.escaping = false
+		f.onChunk(string(c))
+		return
+	}
+	if c == '\\' {
+		f.escaping = true
+		return
+	}
+	if c == '"' {
+		// End of field value
+		f.inField = false
+		f.escaping = false
+		// Start looking for the other field
+		return
+	}
+	f.onChunk(string(c))
+}
+
+func (f *ollamaStreamFilter) flush() {
+	// If we were mid-field, send a newline
+	if f.inField {
+		f.onChunk("\n")
+	}
 }
 
 func buildConversationPrompt(messages []LLMMessage) string {

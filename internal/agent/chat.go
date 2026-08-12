@@ -18,7 +18,6 @@ package agent
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -137,7 +136,7 @@ func (s *ChatSession) Run() {
 	for s.running {
 		s.printPrompt()
 		if inMultiLine {
-			fmt.Print("... ")
+			fmt.Print("... (empty line to submit, \\ to continue) ")
 		}
 
 		if !scanner.Scan() {
@@ -274,13 +273,8 @@ func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 		fmt.Print(chunk)
 	}
 
-	// For ollama provider, wrap onChunk with ReAct JSON filter
-	effectiveOnChunk := onChunk
-	if s.provider == "ollama" {
-		effectiveOnChunk = newReActStreamFilter(onChunk)
-	}
-
-	// Tool visibility: show tool calls and results
+	// For ollama provider, onChunk is passed directly — the callOllama
+	// function in nodes/agent.go handles ReAct JSON filtering internally.
 	onToolCall := func(toolName, input string) {
 		fmt.Printf("  %s(\"%s\") → ", toolName, truncateStr(input, 50))
 	}
@@ -289,7 +283,7 @@ func (s *ChatSession) handleTurn(parentCtx context.Context, input string) {
 	}
 
 	response, err := s.loop.Process(ctx, input, ProcessOptions{
-		OnChunk:      effectiveOnChunk,
+		OnChunk:      onChunk,
 		OnToolCall:   onToolCall,
 		OnToolResult: onToolResult,
 	})
@@ -464,113 +458,4 @@ func (s *ChatSession) handleExport() {
 	}
 
 	fmt.Printf("Conversation exported to %s (%d messages)\n", filename, len(messages))
-}
-
-// ── Ollama ReAct streaming filter ──────────────────────────────────────────
-//
-// When ollama generates a JSON ReAct response, the raw chunks contain
-// {"thought":"...","action":"...","action_input":"..."} etc.
-// The filter buffers chunks and extracts human-readable text from ReAct JSON
-// fields, so the user sees only the thought/final_answer content in real-time.
-
-// reActStreamFilter buffers ollama streaming chunks and extracts human-readable
-// text from JSON ReAct responses. It suppresses the JSON structure and only
-// passes through thought and final_answer content.
-type reActStreamFilter struct {
-	buf       strings.Builder
-	onChunk   func(string)
-	lastFlush int // track position of last flushed content
-}
-
-func newReActStreamFilter(onChunk func(string)) func(string) {
-	f := &reActStreamFilter{onChunk: onChunk}
-	return f.feed
-}
-
-func (f *reActStreamFilter) feed(chunk string) {
-	f.buf.WriteString(chunk)
-	f.tryExtract()
-}
-
-// tryExtract scans the buffer for ReAct JSON fields and streams their content.
-func (f *reActStreamFilter) tryExtract() {
-	raw := f.buf.String()
-	// Only process if we might have a complete JSON object
-	if !strings.Contains(raw, "{") {
-		return
-	}
-
-	// Try to extract "thought" content
-	f.extractField(raw, "thought")
-
-	// Try to extract "final_answer" content
-	f.extractField(raw, "final_answer")
-
-	// If the buffer ends with a complete JSON object, we can reset
-	trimmed := strings.TrimSpace(raw)
-	if strings.HasSuffix(trimmed, "}") {
-		// Try to parse as complete JSON
-		if f.isCompleteJSON(trimmed) {
-			// Flush any remaining new content
-			f.buf.Reset()
-			f.lastFlush = 0
-		}
-	}
-}
-
-// extractField extracts the content of a JSON string field from the buffer.
-// It looks for "fieldName": " and captures until the closing ".
-func (f *reActStreamFilter) extractField(raw, fieldName string) {
-	prefix := `"` + fieldName + `": "`
-	idx := strings.Index(raw[f.lastFlush:], prefix)
-	if idx < 0 {
-		return
-	}
-	start := f.lastFlush + idx + len(prefix)
-	if start >= len(raw) {
-		return
-	}
-
-	// Find the closing quote, handling escaped quotes
-	end := f.findClosingQuote(raw, start)
-	if end < 0 {
-		return
-	}
-
-	content := raw[start:end]
-	if content != "" {
-		// Unescape JSON string content
-		content = unescapeJSONString(content)
-		f.onChunk(content)
-		f.lastFlush = end + 1
-	}
-}
-
-// findClosingQuote finds the closing unescaped quote in raw starting from start.
-func (f *reActStreamFilter) findClosingQuote(raw string, start int) int {
-	for i := start; i < len(raw); i++ {
-		if raw[i] == '\\' && i+1 < len(raw) {
-			i++ // skip escaped char
-			continue
-		}
-		if raw[i] == '"' {
-			return i
-		}
-	}
-	return -1
-}
-
-// isCompleteJSON checks if the given string is a complete, valid JSON object.
-func (f *reActStreamFilter) isCompleteJSON(s string) bool {
-	var dummy interface{}
-	return json.Unmarshal([]byte(s), &dummy) == nil
-}
-
-// unescapeJSONString converts JSON escape sequences to their literal characters.
-func unescapeJSONString(s string) string {
-	var decoded string
-	if err := json.Unmarshal([]byte(`"`+s+`"`), &decoded); err != nil {
-		return s // fallback: return as-is
-	}
-	return decoded
 }
