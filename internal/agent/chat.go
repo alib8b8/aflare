@@ -151,6 +151,9 @@ func (s *ChatSession) Run() {
 
 		// Multi-line continuation: lines ending with \ or empty lines in continuation mode
 		if strings.HasSuffix(line, "\\") {
+			if !inMultiLine {
+				fmt.Println("(Multi-line mode: type your lines, press Enter twice to submit)")
+			}
 			inMultiLine = true
 			// Append the line without the trailing backslash
 			multiLineBuf.WriteString(strings.TrimSuffix(line, "\\"))

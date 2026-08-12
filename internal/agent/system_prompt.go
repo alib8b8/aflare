@@ -87,7 +87,8 @@ func WelcomeMessage(version string) string {
 	return fmt.Sprintf(
 		"aflare v%s — local-first automation agent\n"+
 			"323+ templates | 100+ node types | ReAct agent\n"+
-			"Type /help for commands, /exit to quit\n",
+			"Type /help for commands, /exit to quit\n"+
+			"Multi-line: end line with \\, then empty line to submit\n",
 		version,
 	)
 }

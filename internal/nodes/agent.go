@@ -570,17 +570,9 @@ func (a *ReActAgent) callOllama(ctx context.Context, messages []LLMMessage) (str
 	}
 	fullPrompt := buildConversationPrompt(messages)
 	if a.onChunk != nil {
-		// Ollama returns JSON ReAct format — filter out JSON lines and
-		// code-block markers so users see only plain-text content.
-		// Tool calls are already visible via onToolCall/onToolResult callbacks.
-		wrappedChunk := func(chunk string) {
-			line := strings.TrimSpace(chunk)
-			if line == "" || strings.HasPrefix(line, "{") || strings.HasPrefix(line, "```") {
-				return
-			}
-			a.onChunk(chunk)
-		}
-		return node.ExecuteStream(ctx, fullPrompt, params, wrappedChunk)
+		// Pass chunks directly to caller — the caller (chat.go) is responsible
+		// for ReAct JSON filtering via newReActStreamFilter.
+		return node.ExecuteStream(ctx, fullPrompt, params, a.onChunk)
 	}
 	return node.Execute(ctx, fullPrompt, params)
 }
