@@ -28,6 +28,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -128,8 +129,14 @@ func (s *learningStore) append(entry LearningEntry) {
 	}
 
 	n, err := f.Write(data)
-	_ = f.Close()
 	if err != nil || n == 0 {
+		if closeErr := f.Close(); closeErr != nil {
+			log.Printf("[learning] close after write failure: %v", closeErr)
+		}
+		return
+	}
+	if closeErr := f.Close(); closeErr != nil {
+		log.Printf("[learning] close failed: %v", closeErr)
 		return
 	}
 

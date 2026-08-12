@@ -24,7 +24,7 @@ import (
 )
 
 // HandleWatermark handles the "watermark" command.
-// Subcommands: decode, verify, info
+// Subcommands: decode, verify, info, encode-source, decode-source, strip-source
 func HandleWatermark(args []string) {
 	if len(args) == 0 {
 		fmt.Println(watermark.Info())
@@ -50,14 +50,99 @@ func HandleWatermark(args []string) {
 	case "info":
 		fmt.Println(watermark.Info())
 
+	case "encode-source":
+		if len(args) < 2 {
+			fmt.Println("Usage: aflare watermark encode-source <file>")
+			fmt.Println("       Embeds an invisible source-code watermark in a Go file.")
+			os.Exit(1)
+		}
+		handleWatermarkEncodeSource(args[1])
+
+	case "decode-source":
+		if len(args) < 2 {
+			fmt.Println("Usage: aflare watermark decode-source <file>")
+			os.Exit(1)
+		}
+		handleWatermarkDecodeSource(args[1])
+
+	case "strip-source":
+		if len(args) < 2 {
+			fmt.Println("Usage: aflare watermark strip-source <file>")
+			os.Exit(1)
+		}
+		handleWatermarkStripSource(args[1])
+
 	default:
 		fmt.Printf("Unknown watermark subcommand: %s\n", subCmd)
 		fmt.Println("\nAvailable subcommands:")
-		fmt.Println("  decode <file>  — extract watermark from file")
-		fmt.Println("  verify <file>  — verify watermark integrity")
-		fmt.Println("  info           — show watermark system info")
+		fmt.Println("  decode <file>        — extract watermark from file")
+		fmt.Println("  verify <file>        — verify watermark integrity")
+		fmt.Println("  info                 — show watermark system info")
+		fmt.Println("  encode-source <file> — embed source-code watermark in Go file")
+		fmt.Println("  decode-source <file> — extract source-code watermark")
+		fmt.Println("  strip-source <file>  — remove source-code watermark")
 		os.Exit(1)
 	}
+}
+
+func handleWatermarkEncodeSource(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Printf("Error reading file: %v\n", err)
+		os.Exit(1)
+	}
+
+	src := string(data)
+	if watermark.HasSourceWatermark(src) {
+		fmt.Printf("Source file %s already has a watermark\n", path)
+		os.Exit(1)
+	}
+
+	encoded := watermark.EncodeSource(src)
+	if err := os.WriteFile(path, []byte(encoded), 0o644); err != nil {
+		fmt.Printf("Error writing file: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Source-code watermark embedded in %s\n", path)
+}
+
+func handleWatermarkDecodeSource(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Printf("Error reading file: %v\n", err)
+		os.Exit(1)
+	}
+
+	payload, ok := watermark.DecodeSource(string(data))
+	if !ok {
+		fmt.Printf("No source-code watermark found in %s\n", path)
+		os.Exit(1)
+	}
+
+	printPayload(payload, path, "source-code")
+}
+
+func handleWatermarkStripSource(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Printf("Error reading file: %v\n", err)
+		os.Exit(1)
+	}
+
+	src := string(data)
+	if !watermark.HasSourceWatermark(src) {
+		fmt.Printf("No source-code watermark found in %s\n", path)
+		os.Exit(1)
+	}
+
+	stripped := watermark.StripSourceWatermark(src)
+	if err := os.WriteFile(path, []byte(stripped), 0o644); err != nil {
+		fmt.Printf("Error writing file: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Source-code watermark removed from %s\n", path)
 }
 
 func handleWatermarkDecode(path string) {

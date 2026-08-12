@@ -382,3 +382,149 @@ func TestLegacyDecode(t *testing.T) {
 		t.Errorf("expected version %d, got %d", wmVersion, decoded.Version)
 	}
 }
+
+// ── Source code watermark tests ──
+
+const sampleGoSource = `// Copyright (c) 2026 aflare Contributors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("hello aflare")
+}
+`
+
+func TestEncodeSource_InsertsWatermark(t *testing.T) {
+	encoded := EncodeSource(sampleGoSource)
+	if encoded == sampleGoSource {
+		t.Fatal("EncodeSource should modify the source, but it returned the same string")
+	}
+	if !strings.Contains(encoded, zwPrefix) {
+		t.Fatal("encoded source should contain the \"// aflare\" prefix")
+	}
+	// The original content should still be present.
+	if !strings.Contains(encoded, "package main") {
+		t.Error("encoded source should preserve package declaration")
+	}
+	if !strings.Contains(encoded, "fmt.Println(\"hello aflare\")") {
+		t.Error("encoded source should preserve function body")
+	}
+}
+
+func TestEncodeSource_EmptySource(t *testing.T) {
+	if encoded := EncodeSource(""); encoded != "" {
+		t.Errorf("EncodeSource on empty should return empty, got %q", encoded)
+	}
+}
+
+func TestEncodeSource_NoCopyright(t *testing.T) {
+	src := "package main\n\nfunc main() {}\n"
+	encoded := EncodeSource(src)
+	if !strings.Contains(encoded, zwPrefix) {
+		t.Fatal("even without copyright header, watermark should be prepended")
+	}
+	if !strings.Contains(encoded, "package main") {
+		t.Error("original content should still be present")
+	}
+}
+
+func TestDecodeSource_RoundTrip(t *testing.T) {
+	encoded := EncodeSource(sampleGoSource)
+	payload, ok := DecodeSource(encoded)
+	if !ok {
+		t.Fatal("DecodeSource should find the watermark")
+	}
+	if payload.Version != wmVersion {
+		t.Errorf("expected version %d, got %d", wmVersion, payload.Version)
+	}
+	if payload.Timestamp.IsZero() {
+		t.Error("payload should have non-zero timestamp")
+	}
+}
+
+func TestDecodeSource_NoWatermark(t *testing.T) {
+	_, ok := DecodeSource(sampleGoSource)
+	if ok {
+		t.Error("DecodeSource should return false for unwatermarked source")
+	}
+}
+
+func TestDecodeSource_EmptySource(t *testing.T) {
+	_, ok := DecodeSource("")
+	if ok {
+		t.Error("DecodeSource should return false for empty source")
+	}
+}
+
+func TestHasSourceWatermark(t *testing.T) {
+	encoded := EncodeSource(sampleGoSource)
+	if !HasSourceWatermark(encoded) {
+		t.Error("HasSourceWatermark should return true for encoded source")
+	}
+	if HasSourceWatermark(sampleGoSource) {
+		t.Error("HasSourceWatermark should return false for unencoded source")
+	}
+}
+
+func TestStripSourceWatermark(t *testing.T) {
+	encoded := EncodeSource(sampleGoSource)
+	stripped := StripSourceWatermark(encoded)
+	if HasSourceWatermark(stripped) {
+		t.Error("StripSourceWatermark should remove the watermark")
+	}
+	// The stripped source should still be valid Go code.
+	if !strings.Contains(stripped, "package main") {
+		t.Error("stripped source should preserve package declaration")
+	}
+	if !strings.Contains(stripped, "fmt.Println(\"hello aflare\")") {
+		t.Error("stripped source should preserve function body")
+	}
+}
+
+func TestStripSourceWatermark_NoWatermark(t *testing.T) {
+	stripped := StripSourceWatermark(sampleGoSource)
+	if stripped != sampleGoSource {
+		t.Error("StripSourceWatermark on unwatermarked source should return unchanged")
+	}
+}
+
+func TestStripSourceWatermark_EmptySource(t *testing.T) {
+	if stripped := StripSourceWatermark(""); stripped != "" {
+		t.Errorf("StripSourceWatermark on empty should return empty, got %q", stripped)
+	}
+}
+
+func TestSourceWatermark_TamperResistant(t *testing.T) {
+	encoded := EncodeSource(sampleGoSource)
+	// Minor modification: add a comment line — watermark should still be detectable.
+	tampered := strings.Replace(encoded, "package main", "// minor edit\npackage main", 1)
+	_, ok := DecodeSource(tampered)
+	if !ok {
+		t.Error("watermark should survive minor edits like adding a comment")
+	}
+}
+
+func TestSourceWatermark_Idempotent(t *testing.T) {
+	// Encoding twice should not stack watermarks.
+	once := EncodeSource(sampleGoSource)
+	twice := EncodeSource(once)
+	// The second encode should not add another watermark line.
+	if strings.Count(twice, zwPrefix) > strings.Count(once, zwPrefix)+1 {
+		t.Error("double encoding should not stack watermarks")
+	}
+}

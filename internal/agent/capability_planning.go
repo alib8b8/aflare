@@ -27,6 +27,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -173,7 +174,9 @@ func (p *PlanningCapability) PostProcess(ctx context.Context, input, output stri
 		p.activePlan = p.extractPlan(output)
 		p.mu.Unlock()
 		if p.activePlan != nil {
-			_ = p.persist()
+			if err := p.persist(); err != nil {
+				log.Printf("[planning] persist failed: %v", err)
+			}
 		}
 	}
 
@@ -220,7 +223,9 @@ func (p *PlanningCapability) PostProcess(ctx context.Context, input, output stri
 		}
 
 		if updated {
-			_ = p.persist()
+			if err := p.persist(); err != nil {
+				log.Printf("[planning] persist failed: %v", err)
+			}
 		}
 		p.mu.Unlock()
 	}

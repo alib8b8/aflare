@@ -23,6 +23,9 @@ import (
 	"github.com/alib8b8/aflare/internal/badge"
 )
 
+// osExit is a package-level variable for testing os.Exit calls.
+var osExit = os.Exit
+
 // HandleBadge handles the "badge" command.
 // Subcommands: list, show, award
 func HandleBadge(args []string) {
@@ -38,7 +41,7 @@ func HandleBadge(args []string) {
 	case "show":
 		if len(args) < 2 {
 			fmt.Println("Usage: aflare badge show <contributor-id>")
-			os.Exit(1)
+			osExit(1)
 		}
 		handleBadgeShow(args[1])
 	case "award":
@@ -56,7 +59,7 @@ func HandleBadge(args []string) {
 		// First positional is "award", then name, email, reason.
 		if len(positional) < 4 {
 			fmt.Println("Usage: aflare badge award <name> <email> <reason> [--type template|code|docs|bugfix]")
-			os.Exit(1)
+			osExit(1)
 		}
 		handleBadgeAward(positional[1], positional[2], positional[3], contType)
 	case "--help", "-h", "help":
@@ -64,7 +67,7 @@ func HandleBadge(args []string) {
 	default:
 		fmt.Printf("Unknown badge subcommand: %s\n\n", subCmd)
 		printBadgeUsage()
-		os.Exit(1)
+		osExit(1)
 	}
 }
 
@@ -93,7 +96,7 @@ func handleBadgeList() {
 	store, err := badge.LoadStore(badge.DefaultStorePath())
 	if err != nil {
 		fmt.Printf("Error loading badge store: %v\n", err)
-		os.Exit(1)
+		osExit(1)
 	}
 
 	contributors := store.ListContributors()
@@ -130,7 +133,7 @@ func handleBadgeShow(id string) {
 	store, err := badge.LoadStore(badge.DefaultStorePath())
 	if err != nil {
 		fmt.Printf("Error loading badge store: %v\n", err)
-		os.Exit(1)
+		osExit(1)
 	}
 
 	rec := store.GetContributor(id)
@@ -147,7 +150,7 @@ func handleBadgeShow(id string) {
 	if rec == nil {
 		fmt.Printf("No contributor found with ID prefix: %s\n", id)
 		fmt.Println("Use 'aflare badge list' to see all contributors.")
-		os.Exit(1)
+		osExit(1)
 	}
 
 	tier := rec.CurrentTier()
@@ -170,7 +173,7 @@ func handleBadgeAward(name, email, reason string, contType badge.ContributionTyp
 	store, err := badge.LoadStore(badge.DefaultStorePath())
 	if err != nil {
 		fmt.Printf("Error loading badge store: %v\n", err)
-		os.Exit(1)
+		osExit(1)
 	}
 
 	cid := badge.ContributorID(name, email)
@@ -178,7 +181,7 @@ func handleBadgeAward(name, email, reason string, contType badge.ContributionTyp
 
 	if err := store.Save(); err != nil {
 		fmt.Printf("Error saving badge store: %v\n", err)
-		os.Exit(1)
+		osExit(1)
 	}
 
 	if awarded {

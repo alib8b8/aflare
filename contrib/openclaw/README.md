@@ -95,6 +95,8 @@ Edit your OpenClaw config file (`~/.openclaw/config.json`):
 | `llmboxPath` | `aflare` | Path to aflare binary (must be in PATH or use full path) |
 | `enableAutoDiscovery` | `true` | Auto-discover workflows in the configured directory |
 
+> **Note:** `llmboxPath` is a historical naming convention inherited from the project's earlier name (llmbox). It points to the `aflare` binary — the two names refer to the same tool.
+
 ## Available Tools
 
 ### `llmbox_list_workflows`
