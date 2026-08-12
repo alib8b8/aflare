@@ -596,20 +596,19 @@ type ollamaStreamFilter struct {
 	fieldName string // which field we are reading ("thought" or "final_answer")
 	escaping  bool   // true when \ was just seen inside a string value
 
-	// Parsing state
-	pos    int // current position in jsonPrefix search
-	prefix string
+	// Parsing state — look for both prefixes simultaneously
+	posThought int // match position in jsonThoughtPrefix
+	posAnswer  int // match position in jsonAnswerPrefix
 }
-
-const jsonThoughtPrefix  = `"thought": "`
-const jsonAnswerPrefix   = `"final_answer": "`
 
 func newOllamaStreamFilter(onChunk func(string)) *ollamaStreamFilter {
 	return &ollamaStreamFilter{
 		onChunk: onChunk,
-		prefix:  jsonThoughtPrefix,
 	}
 }
+
+const jsonThoughtPrefix = `"thought": "`
+const jsonAnswerPrefix = `"final_answer": "`
 
 func (f *ollamaStreamFilter) feed(chunk string) {
 	for _, c := range chunk {
@@ -620,33 +619,35 @@ func (f *ollamaStreamFilter) feed(chunk string) {
 			continue
 		}
 
-		// Looking for a field prefix
-		if f.prefix != "" {
-			if byte(c) == f.prefix[f.pos] {
-				f.pos++
-				if f.pos == len(f.prefix) {
-					// Found the prefix — start streaming the field value
-					f.inField = true
-					f.fieldName = f.prefix[1:strings.IndexByte(f.prefix, '"')] // "thought" or "final_answer"
-					f.pos = 0
-					f.prefix = ""
-				}
-			} else {
-				f.pos = 0
-			}
-		} else {
-			// After one field is done, look for the next
-			if f.fieldName == "thought" {
-				f.prefix = jsonAnswerPrefix
-			} else {
-				f.prefix = jsonThoughtPrefix
-			}
-			f.pos = 0
-			if byte(c) == f.prefix[0] {
-				f.pos = 1
-			}
+		// Looking for field prefixes — match both simultaneously
+		f.posThought = advancePrefix(f.posThought, jsonThoughtPrefix, byte(c))
+		f.posAnswer = advancePrefix(f.posAnswer, jsonAnswerPrefix, byte(c))
+
+		if f.posThought == len(jsonThoughtPrefix) {
+			f.inField = true
+			f.fieldName = "thought"
+			f.posThought = 0
+			f.posAnswer = 0
+		} else if f.posAnswer == len(jsonAnswerPrefix) {
+			f.inField = true
+			f.fieldName = "final_answer"
+			f.posThought = 0
+			f.posAnswer = 0
 		}
 	}
+}
+
+// advancePrefix advances the match position for a prefix. Returns the new
+// position — either incremented if the character matches, or reset to 0.
+func advancePrefix(pos int, prefix string, c byte) int {
+	if pos < len(prefix) && c == prefix[pos] {
+		return pos + 1
+	}
+	// Reset — but re-check if this char starts a new match
+	if c == prefix[0] {
+		return 1
+	}
+	return 0
 }
 
 func (f *ollamaStreamFilter) handleFieldChar(c rune) {

@@ -1162,9 +1162,11 @@ func (n *OpenAICompatibleNode) CallWithToolsStream(ctx context.Context, messages
 		delta := streamResp.Choices[0].Delta
 
 		// Content streaming
-		if delta.Content != "" && onChunk != nil {
-			onChunk(delta.Content)
+		if delta.Content != "" {
 			fullContent.WriteString(delta.Content)
+			if onChunk != nil {
+				onChunk(delta.Content)
+			}
 		}
 
 		// Tool call accumulation (streaming tool_calls arrive as incremental chunks)
