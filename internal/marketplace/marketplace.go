@@ -59,7 +59,13 @@ func NewRegistry() *Registry {
 
 // registerBuiltins populates the registry with five starter workflow packages.
 func (r *Registry) registerBuiltins() {
-	r.packages = []Package{
+	r.packages = append(r.packages, r.builtinCorePackages()...)
+	r.packages = append(r.packages, r.builtinDomainPackages()...)
+	r.packages = append(r.packages, r.builtinUtilityPackages()...)
+}
+
+func (r *Registry) builtinCorePackages() []Package {
+	return []Package{
 		{
 			Name:        "btc-monitor",
 			Version:     "1.0.0",
@@ -123,6 +129,11 @@ steps:
       message: "{{summary}}"
 `,
 		},
+	}
+}
+
+func (r *Registry) builtinDomainPackages() []Package {
+	return []Package{
 		{
 			Name:        "arxiv-daily",
 			Version:     "1.0.0",
@@ -192,6 +203,11 @@ steps:
       content: "{{report}}"
 `,
 		},
+	}
+}
+
+func (r *Registry) builtinUtilityPackages() []Package {
+	return []Package{
 		{
 			Name:        "habit-tracker",
 			Version:     "1.0.0",

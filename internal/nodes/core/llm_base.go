@@ -554,42 +554,9 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 	}
 
 	// LLM response cache — non-streaming only.
-	//
-	// Streaming responses are intentionally not cached: SSE chunk
-	// boundaries and timing are not byte-reproducible, and replaying a
-	// cached assembled string as a single chunk would violate the
-	// streaming contract. For non-streaming calls, caching the final
-	// content avoids paying for the upstream call on repeated identical
-	// requests within the TTL window — a performance optimization (M-10:
-	// NOT an audit mechanism; audit relies on the separate audit log +
-	// trace subsystem). The cache key (see llmCacheKey) covers every
-	// output-influencing field and a hash of the API key (M-4: isolate
-	// tenants / accounts sharing one cache); the raw key is never stored.
-	// A cache hit returns immediately without touching the network; a miss
-	// falls through to the upstream call and the result is written back
-	// after success (subject to the M-5 per-entry size cap).
-	var cacheKey string
-	var llmCache *cache.Cache
-	if !stream {
-		llmCache = n.effectiveCache()
-		if llmCache != nil {
-			// M-4: pass apiKey so the cache key includes its hash, isolating
-			// entries across tenants / accounts sharing one cache.
-			cacheKey = llmCacheKey(reqBody, apiKey)
-			if cached, ok := llmCache.Get(cacheKey); ok {
-				logger.Debug("[cache hit] LLM response served from cache",
-					"node", n.config.Name,
-					"provider", n.config.ProviderName,
-					"model", model,
-				)
-				return cached, nil
-			}
-			logger.Debug("[cache miss] LLM response not cached, calling upstream",
-				"node", n.config.Name,
-				"provider", n.config.ProviderName,
-				"model", model,
-			)
-		}
+	cachedContent, cacheHit, cacheKey, llmCache := n.checkLLMCache(reqBody, apiKey, model, stream)
+	if cacheHit {
+		return cachedContent, nil
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -715,6 +682,37 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		}
 	}
 	return content, nil
+}
+
+// checkLLMCache checks the LLM response cache for a non-streaming request.
+// On a cache hit it returns the cached content with cacheHit=true.
+// On a miss it returns cacheKey and llmCache for later use in cache write.
+// For streaming requests (stream=true) it returns empty values immediately.
+func (n *OpenAICompatibleNode) checkLLMCache(reqBody LLMRequest, apiKey string, model string, stream bool) (cachedContent string, cacheHit bool, cacheKey string, llmCache *cache.Cache) {
+	if stream {
+		return
+	}
+	llmCache = n.effectiveCache()
+	if llmCache == nil {
+		return
+	}
+	// M-4: pass apiKey so the cache key includes its hash, isolating
+	// entries across tenants / accounts sharing one cache.
+	cacheKey = llmCacheKey(reqBody, apiKey)
+	if cached, ok := llmCache.Get(cacheKey); ok {
+		logger.Debug("[cache hit] LLM response served from cache",
+			"node", n.config.Name,
+			"provider", n.config.ProviderName,
+			"model", model,
+		)
+		return cached, true, cacheKey, llmCache
+	}
+	logger.Debug("[cache miss] LLM response not cached, calling upstream",
+		"node", n.config.Name,
+		"provider", n.config.ProviderName,
+		"model", model,
+	)
+	return "", false, cacheKey, llmCache
 }
 
 func (n *OpenAICompatibleNode) readStreamResponse(resp *http.Response, onChunk func(chunk string)) (string, *LLMUsage, error) {

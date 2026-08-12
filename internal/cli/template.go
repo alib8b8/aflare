@@ -53,31 +53,7 @@ func HandleTemplateSubmit(args []string) {
 func handleTemplateSubmit(args []string) {
 	var yamlPath, category, author string
 
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--category", "-c":
-			if i+1 < len(args) {
-				category = args[i+1]
-				i++
-			}
-		case "--author", "-a":
-			if i+1 < len(args) {
-				author = args[i+1]
-				i++
-			}
-		case "--help", "-h":
-			PrintTemplateSubmitUsage()
-			return
-		default:
-			if !strings.HasPrefix(args[i], "-") && yamlPath == "" {
-				yamlPath = args[i]
-			} else {
-				fmt.Printf("Unknown argument: %s\n", args[i])
-				PrintTemplateSubmitUsage()
-				os.Exit(1)
-			}
-		}
-	}
+	parseTemplateSubmitArgs(args, &yamlPath, &category, &author)
 
 	if yamlPath == "" {
 		fmt.Println("Error: workflow YAML file path is required")
@@ -243,6 +219,35 @@ func handleTemplateSubmit(args []string) {
 
 	// Award a virtual badge for the template contribution.
 	awardBadgeForTemplate(author, skillID)
+}
+
+// parseTemplateSubmitArgs parses the command-line arguments for template submit.
+func parseTemplateSubmitArgs(args []string, yamlPath, category, author *string) {
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--category", "-c":
+			if i+1 < len(args) {
+				*category = args[i+1]
+				i++
+			}
+		case "--author", "-a":
+			if i+1 < len(args) {
+				*author = args[i+1]
+				i++
+			}
+		case "--help", "-h":
+			PrintTemplateSubmitUsage()
+			return
+		default:
+			if !strings.HasPrefix(args[i], "-") && *yamlPath == "" {
+				*yamlPath = args[i]
+			} else {
+				fmt.Printf("Unknown argument: %s\n", args[i])
+				PrintTemplateSubmitUsage()
+				os.Exit(1)
+			}
+		}
+	}
 }
 
 // PrintTemplateSubmitUsage prints usage for the template submit command.

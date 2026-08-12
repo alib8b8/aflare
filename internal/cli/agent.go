@@ -44,64 +44,7 @@ import (
 func HandleAgent(args []string) {
 	cfg := agent.DefaultConfig()
 	var watchDir string
-
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--provider", "-p":
-			if i+1 < len(args) {
-				cfg.Provider = args[i+1]
-				i++
-			}
-		case "--model", "-m":
-			if i+1 < len(args) {
-				cfg.Model = args[i+1]
-				i++
-			}
-		case "--api-key", "-k":
-			if i+1 < len(args) {
-				cfg.APIKey = args[i+1]
-				i++
-			}
-		case "--endpoint", "-e":
-			if i+1 < len(args) {
-				cfg.Endpoint = args[i+1]
-				i++
-			}
-		case "--tools", "-t":
-			if i+1 < len(args) {
-				cfg.Tools = parseToolsArg(args[i+1])
-				i++
-			}
-		case "--capabilities", "-c":
-			if i+1 < len(args) {
-				cfg.Capabilities = agent.ParseCapabilities(args[i+1])
-				i++
-			}
-		case "--max-iterations", "-n":
-			if i+1 < len(args) {
-				if n, err := strconv.Atoi(args[i+1]); err == nil && n > 0 {
-					cfg.MaxIterations = n
-				}
-				i++
-			}
-		case "--safe-mode", "-s":
-			cfg.SafeMode = true
-		case "--watch":
-			if i+1 < len(args) {
-				watchDir = args[i+1]
-				i++
-			}
-		case "--no-stdin":
-			// daemon-only mode: no interactive input
-		case "--help", "-h":
-			PrintAgentUsage()
-			return
-		default:
-			fmt.Printf("Unknown argument: %s\n", args[i])
-			PrintAgentUsage()
-			os.Exit(1)
-		}
-	}
+	parseAgentArgs(args, &cfg, &watchDir)
 
 	loop := agent.NewAgentLoop(cfg)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -360,13 +303,65 @@ func PrintAgentUsage() {
 	fmt.Println("  aflare agent -c reflection,bdi                  # with reflection + BDI")
 	fmt.Println("  aflare agent --watch ./logs                     # watch directory for changes")
 	fmt.Println("  aflare agent -c all                             # all capabilities")
-	fmt.Println()
-	fmt.Println("Agent commands:")
-	fmt.Println("  /help       Show commands")
-	fmt.Println("  /tools      List available tools")
-	fmt.Println("  /capabilities  List active capabilities")
-	fmt.Println("  /history    Show conversation state")
-	fmt.Println("  /clear      Clear conversation history")
-	fmt.Println("  /queue      Show task queue status")
-	fmt.Println("  /exit       Exit agent")
+}
+
+// parseAgentArgs parses CLI arguments for the agent command.
+func parseAgentArgs(args []string, cfg *agent.Config, watchDir *string) {
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--provider", "-p":
+			if i+1 < len(args) {
+				cfg.Provider = args[i+1]
+				i++
+			}
+		case "--model", "-m":
+			if i+1 < len(args) {
+				cfg.Model = args[i+1]
+				i++
+			}
+		case "--api-key", "-k":
+			if i+1 < len(args) {
+				cfg.APIKey = args[i+1]
+				i++
+			}
+		case "--endpoint", "-e":
+			if i+1 < len(args) {
+				cfg.Endpoint = args[i+1]
+				i++
+			}
+		case "--tools", "-t":
+			if i+1 < len(args) {
+				cfg.Tools = parseToolsArg(args[i+1])
+				i++
+			}
+		case "--capabilities", "-c":
+			if i+1 < len(args) {
+				cfg.Capabilities = agent.ParseCapabilities(args[i+1])
+				i++
+			}
+		case "--max-iterations", "-n":
+			if i+1 < len(args) {
+				if n, err := strconv.Atoi(args[i+1]); err == nil && n > 0 {
+					cfg.MaxIterations = n
+				}
+				i++
+			}
+		case "--safe-mode", "-s":
+			cfg.SafeMode = true
+		case "--watch":
+			if i+1 < len(args) {
+				*watchDir = args[i+1]
+				i++
+			}
+		case "--no-stdin":
+			// daemon-only mode: no interactive input
+		case "--help", "-h":
+			PrintAgentUsage()
+			return
+		default:
+			fmt.Printf("Unknown argument: %s\n", args[i])
+			PrintAgentUsage()
+			os.Exit(1)
+		}
+	}
 }

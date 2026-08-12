@@ -20,8 +20,19 @@ package mcp
 // ------------------------------------------------------------------
 
 func (s *Server) getExtendedTools() []tool {
+	var tools []tool
+	tools = append(tools, s.backwardCompatTools()...)
+	tools = append(tools, s.newRequestedTools()...)
+	tools = append(tools, s.memoryTools()...)
+	tools = append(tools, s.codeGraphTools()...)
+	tools = append(tools, s.verticalDomainTools()...)
+	tools = append(tools, s.preferenceTools()...)
+	return tools
+}
+
+// Backwards-compatible aliases
+func (s *Server) backwardCompatTools() []tool {
 	return []tool{
-		// Backwards-compatible aliases
 		{
 			Name:        "create_workflow",
 			Description: "Generate a YAML workflow from a plain English description. Returns the workflow YAML content.",
@@ -86,7 +97,12 @@ func (s *Server) getExtendedTools() []tool {
 				Required: []string{"file"},
 			},
 		},
-		// New tools (requested names)
+	}
+}
+
+// New tools (requested names)
+func (s *Server) newRequestedTools() []tool {
+	return []tool{
 		{
 			Name:        "workflow_run",
 			Description: "Run a workflow from a YAML file path with optional timeout override.",
@@ -234,7 +250,12 @@ func (s *Server) getExtendedTools() []tool {
 				Required: []string{"name"},
 			},
 		},
-		// Memory tools (session-isolated)
+	}
+}
+
+// Memory tools (session-isolated)
+func (s *Server) memoryTools() []tool {
+	return []tool{
 		{
 			Name:        "memory_store",
 			Description: "Store a memory entry in the session-isolated memory system.",
@@ -346,7 +367,12 @@ func (s *Server) getExtendedTools() []tool {
 				Properties: map[string]interface{}{},
 			},
 		},
-		// Code knowledge graph tools
+	}
+}
+
+// Code knowledge graph tools
+func (s *Server) codeGraphTools() []tool {
+	return []tool{
 		{
 			Name:        "code_graph_index",
 			Description: "Build or update the code knowledge graph index for a directory. Enables incremental updates and reduces token usage for large repos.",
@@ -387,7 +413,12 @@ func (s *Server) getExtendedTools() []tool {
 				Properties: map[string]interface{}{},
 			},
 		},
-		// Vertical domain tools (geeflow/headroom/last30days inspired)
+	}
+}
+
+// Vertical domain tools (geeflow/headroom/last30days inspired)
+func (s *Server) verticalDomainTools() []tool {
+	return []tool{
 		{
 			Name:        "context_compress",
 			Description: "Intelligent context compression with 6 algorithms (extract/keyword/cluster/sliding_window/hybrid). Reduces tokens by 60-95%.",
@@ -487,6 +518,11 @@ func (s *Server) getExtendedTools() []tool {
 				Required: []string{"query"},
 			},
 		},
+	}
+}
+
+func (s *Server) preferenceTools() []tool {
+	return []tool{
 		{
 			Name:        "preference_get",
 			Description: "Get a learned user preference from the user profile. Preferences are learned across sessions (MemSlides-inspired).",

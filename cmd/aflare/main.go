@@ -101,6 +101,10 @@ func main() {
 		fmt.Println(cli.PrintUsage())
 		os.Exit(1)
 	}
+	dispatchCommand(command, args, aiMode, dryRun, safeMode)
+}
+
+func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, safeMode bool) {
 	switch command {
 	case "create":
 		cli.HandleCreate(args, aiMode)

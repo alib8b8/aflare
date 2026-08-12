@@ -66,56 +66,7 @@ func HandleScheduleAdd(args []string) {
 	var cronExpr, taskID, wfPath, desc string
 	var autoParse string
 
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--cron":
-			if i+1 >= len(args) {
-				fmt.Println("❌ --cron requires a value")
-				os.Exit(1)
-			}
-			cronExpr = args[i+1]
-			i++
-		case "--desc":
-			if i+1 >= len(args) {
-				fmt.Println("❌ --desc requires a value")
-				os.Exit(1)
-			}
-			desc = args[i+1]
-			i++
-		case "--id":
-			if i+1 >= len(args) {
-				fmt.Println("❌ --id requires a value")
-				os.Exit(1)
-			}
-			taskID = args[i+1]
-			i++
-		case "--add":
-			if i+1 >= len(args) {
-				fmt.Println("❌ --add requires a value")
-				os.Exit(1)
-			}
-			autoParse = args[i+1]
-			i++
-		case "--help", "-h":
-			PrintScheduleUsage()
-			return
-		default:
-			if strings.HasPrefix(args[i], "--cron=") {
-				cronExpr = strings.TrimPrefix(args[i], "--cron=")
-			} else if strings.HasPrefix(args[i], "--id=") {
-				taskID = strings.TrimPrefix(args[i], "--id=")
-			} else if strings.HasPrefix(args[i], "--desc=") {
-				desc = strings.TrimPrefix(args[i], "--desc=")
-			} else if strings.HasPrefix(args[i], "--add=") {
-				autoParse = strings.TrimPrefix(args[i], "--add=")
-			} else if !strings.HasPrefix(args[i], "-") && wfPath == "" {
-				wfPath = args[i]
-			} else {
-				fmt.Printf("❌ Unknown argument: %s\n", args[i])
-				os.Exit(1)
-			}
-		}
-	}
+	parseScheduleAddArgs(args, &cronExpr, &taskID, &wfPath, &desc, &autoParse)
 
 	// ── Auto-parse natural language ─────────────────────────────────────
 	if autoParse != "" {
@@ -209,6 +160,60 @@ func HandleScheduleAdd(args []string) {
 	}
 	if wfPath != "" {
 		fmt.Printf("   Workflow: %s\n", wfPath)
+	}
+}
+
+// parseScheduleAddArgs parses the command-line arguments for schedule add.
+func parseScheduleAddArgs(args []string, cronExpr, taskID, wfPath, desc, autoParse *string) {
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--cron":
+			if i+1 >= len(args) {
+				fmt.Println("❌ --cron requires a value")
+				os.Exit(1)
+			}
+			*cronExpr = args[i+1]
+			i++
+		case "--desc":
+			if i+1 >= len(args) {
+				fmt.Println("❌ --desc requires a value")
+				os.Exit(1)
+			}
+			*desc = args[i+1]
+			i++
+		case "--id":
+			if i+1 >= len(args) {
+				fmt.Println("❌ --id requires a value")
+				os.Exit(1)
+			}
+			*taskID = args[i+1]
+			i++
+		case "--add":
+			if i+1 >= len(args) {
+				fmt.Println("❌ --add requires a value")
+				os.Exit(1)
+			}
+			*autoParse = args[i+1]
+			i++
+		case "--help", "-h":
+			PrintScheduleUsage()
+			return
+		default:
+			if strings.HasPrefix(args[i], "--cron=") {
+				*cronExpr = strings.TrimPrefix(args[i], "--cron=")
+			} else if strings.HasPrefix(args[i], "--id=") {
+				*taskID = strings.TrimPrefix(args[i], "--id=")
+			} else if strings.HasPrefix(args[i], "--desc=") {
+				*desc = strings.TrimPrefix(args[i], "--desc=")
+			} else if strings.HasPrefix(args[i], "--add=") {
+				*autoParse = strings.TrimPrefix(args[i], "--add=")
+			} else if !strings.HasPrefix(args[i], "-") && *wfPath == "" {
+				*wfPath = args[i]
+			} else {
+				fmt.Printf("❌ Unknown argument: %s\n", args[i])
+				os.Exit(1)
+			}
+		}
 	}
 }
 

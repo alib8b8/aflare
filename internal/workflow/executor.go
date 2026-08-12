@@ -785,7 +785,8 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 
 		// Regular step execution.
 		if err := state.executeRegularStep(i, wStep, stepStart); err != nil {
-			if paused, ok := err.(*ErrWorkflowPaused); ok {
+			var paused *ErrWorkflowPaused
+			if errors.As(err, &paused) {
 				return "", state.results, state.trace, paused
 			}
 			return "", state.results, state.trace, err

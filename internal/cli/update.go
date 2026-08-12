@@ -50,6 +50,11 @@ func HandleAutoUpgrade(args []string) {
 
 	engine := autoupgrade.NewUpgradeEngine(config)
 
+	handleAutoUpgradeSubCmd(args, config, engine)
+}
+
+// handleAutoUpgradeSubCmd dispatches the autoupgrade subcommand to the appropriate handler.
+func handleAutoUpgradeSubCmd(args []string, config *autoupgrade.UpgradeConfig, engine *autoupgrade.UpgradeEngine) {
 	subCmd := args[0]
 	switch subCmd {
 	case "status":

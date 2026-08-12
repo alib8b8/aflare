@@ -135,46 +135,9 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 		return "", fmt.Errorf("failed to stat path: %w", err)
 	}
 
-	var files []string
-	var idx *ckgIndex
-
-	// 使用持久化索引
-	if useCache && info.IsDir() {
-		indexPath := n.getIndexFilePath(safePath)
-		idx, err = n.loadIndex(indexPath)
-		if err != nil {
-			idx = nil // 索引不存在，需要重建
-		}
-
-		// 增量构建索引
-		idx, err = n.buildIndexIncremental(safePath, idx, forceRebuild)
-		if err != nil {
-			return "", fmt.Errorf("failed to build index: %w", err)
-		}
-
-		// 保存索引
-		if err := n.saveIndex(idx, indexPath); err != nil {
-			fmt.Fprintf(os.Stderr, "[ckg] warning: failed to save index: %v\n", err)
-		}
-
-		files, err = n.collectFiles(safePath)
-		if err != nil {
-			return "", fmt.Errorf("failed to collect files: %w", err)
-		}
-	} else {
-		// 不使用缓存，按原逻辑
-		if info.IsDir() {
-			if incrementalUpdate {
-				files, err = n.collectChangedFiles(safePath)
-			} else {
-				files, err = n.collectFiles(safePath)
-			}
-			if err != nil {
-				return "", fmt.Errorf("failed to collect files: %w", err)
-			}
-		} else {
-			files = []string{safePath}
-		}
+	files, idx, err := n.collectFilesForKG(useCache, safePath, info, forceRebuild, incrementalUpdate)
+	if err != nil {
+		return "", err
 	}
 
 	if len(files) == 0 {
@@ -260,4 +223,50 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 	}
 
 	return string(data), nil
+}
+
+// collectFilesForKG collects files and builds a persistent index when
+// useCache is enabled. It returns the list of files, the optional index,
+// and any error encountered.
+func (n *CodeKnowledgeGraphNode) collectFilesForKG(useCache bool, safePath string, info os.FileInfo, forceRebuild bool, incrementalUpdate bool) ([]string, *ckgIndex, error) {
+	var files []string
+	var idx *ckgIndex
+	var err error
+
+	if useCache && info.IsDir() {
+		indexPath := n.getIndexFilePath(safePath)
+		idx, err = n.loadIndex(indexPath)
+		if err != nil {
+			idx = nil
+		}
+
+		idx, err = n.buildIndexIncremental(safePath, idx, forceRebuild)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to build index: %w", err)
+		}
+
+		if err := n.saveIndex(idx, indexPath); err != nil {
+			fmt.Fprintf(os.Stderr, "[ckg] warning: failed to save index: %v\n", err)
+		}
+
+		files, err = n.collectFiles(safePath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to collect files: %w", err)
+		}
+	} else {
+		if info.IsDir() {
+			if incrementalUpdate {
+				files, err = n.collectChangedFiles(safePath)
+			} else {
+				files, err = n.collectFiles(safePath)
+			}
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to collect files: %w", err)
+			}
+		} else {
+			files = []string{safePath}
+		}
+	}
+
+	return files, idx, nil
 }
