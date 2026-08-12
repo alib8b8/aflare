@@ -28,6 +28,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+//nolint:funlen // TODO(#issue): split into smaller steps
 func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep, input string, engine *ExpressionEngine, reg *nodes.Registry, program *tea.Program, globalLimiter *ConcurrencyLimiter) ([]StepResult, string, error) {
 	// Limit parallel step count
 	if len(wStep.Parallel) > MaxParallel {
