@@ -510,45 +510,7 @@ func TestE2E_ErrorRecovery(t *testing.T) {
 		}
 	})
 
-	t.Run("Retry", func(t *testing.T) {
-		// A node that succeeds on the third attempt
-		attempt := 0
-		var mu sync.Mutex
-		reg := nodes.NewRegistry()
-		reg.Register(&retryNode{
-			name: "retryer",
-			exec: func() (string, error) {
-				mu.Lock()
-				attempt++
-				a := attempt
-				mu.Unlock()
-				if a < 3 {
-					return "", fmt.Errorf("attempt %d failed", a)
-				}
-				return "success-after-retry", nil
-			},
-		})
-
-		wf := &Workflow{
-			Steps: []WorkflowStep{
-				{Node: "retryer", Retry: 3, Delay: "10ms"},
-			},
-		}
-
-		output, results, err := ExecuteWorkflow(context.Background(), wf, reg)
-		if err != nil {
-			t.Fatalf("retry should eventually succeed: %v", err)
-		}
-		if output != "success-after-retry" {
-			t.Errorf("expected 'success-after-retry', got %q", output)
-		}
-		if len(results) != 1 {
-			t.Fatalf("expected 1 result, got %d", len(results))
-		}
-		if results[0].Error != nil {
-			t.Error("final result should have no error after retry")
-		}
-	})
+	t.Run("Retry", testErrorRecoveryRetry)
 
 	t.Run("RetryExhausted", func(t *testing.T) {
 		reg, _, tracePtr := newE2ERegistry([]captureNode{
@@ -572,6 +534,46 @@ func TestE2E_ErrorRecovery(t *testing.T) {
 			t.Fatalf("expected 3 attempts (1 + 2 retries), got %d: %v", len(trace), trace)
 		}
 	})
+}
+
+func testErrorRecoveryRetry(t *testing.T) {
+	// A node that succeeds on the third attempt
+	attempt := 0
+	var mu sync.Mutex
+	reg := nodes.NewRegistry()
+	reg.Register(&retryNode{
+		name: "retryer",
+		exec: func() (string, error) {
+			mu.Lock()
+			attempt++
+			a := attempt
+			mu.Unlock()
+			if a < 3 {
+				return "", fmt.Errorf("attempt %d failed", a)
+			}
+			return "success-after-retry", nil
+		},
+	})
+
+	wf := &Workflow{
+		Steps: []WorkflowStep{
+			{Node: "retryer", Retry: 3, Delay: "10ms"},
+		},
+	}
+
+	output, results, err := ExecuteWorkflow(context.Background(), wf, reg)
+	if err != nil {
+		t.Fatalf("retry should eventually succeed: %v", err)
+	}
+	if output != "success-after-retry" {
+		t.Errorf("expected 'success-after-retry', got %q", output)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Error != nil {
+		t.Error("final result should have no error after retry")
+	}
 }
 
 // ── Test 5: Variable Flow Between Steps ──
@@ -712,48 +714,50 @@ func TestE2E_VariableFlow(t *testing.T) {
 		}
 	})
 
-	t.Run("ConditionBasedStepSkipping", func(t *testing.T) {
-		reg, _, tracePtr := newE2ERegistry([]captureNode{
-			{name: "stepA", output: "true"},
-			{name: "stepB", output: "skipped-anyway"},
-			{name: "stepC", output: "final"},
-		})
+	t.Run("ConditionBasedStepSkipping", testVariableFlowConditionBasedStepSkipping)
+}
 
-		wf := &Workflow{
-			Steps: []WorkflowStep{
-				{Name: "stepA", Node: "stepA"},
-				{
-					Name:      "stepB",
-					Node:      "stepB",
-					Condition: "equals:true",
-				},
-				{Name: "stepC", Node: "stepC"},
-			},
-		}
-
-		output, results, err := ExecuteWorkflow(context.Background(), wf, reg)
-		if err != nil {
-			t.Fatalf("workflow failed: %v", err)
-		}
-		if output != "final" {
-			t.Errorf("expected 'final', got %q", output)
-		}
-
-		// All 3 steps should have results (stepB with skipped flag)
-		if len(results) != 3 {
-			t.Fatalf("expected 3 results, got %d", len(results))
-		}
-
-		trace := *tracePtr
-		if len(trace) != 3 {
-			t.Fatalf("expected 3 trace entries, got %d: %v", len(trace), trace)
-		}
-		// stepC should receive stepB's output (which is "true" from stepA)
-		// When condition is true, the node runs and its output flows
-		if !strings.Contains(trace[2], `in="skipped-anyway"`) {
-			t.Errorf("stepC should receive stepB's output: %q", trace[2])
-		}
+func testVariableFlowConditionBasedStepSkipping(t *testing.T) {
+	reg, _, tracePtr := newE2ERegistry([]captureNode{
+		{name: "stepA", output: "true"},
+		{name: "stepB", output: "skipped-anyway"},
+		{name: "stepC", output: "final"},
 	})
+
+	wf := &Workflow{
+		Steps: []WorkflowStep{
+			{Name: "stepA", Node: "stepA"},
+			{
+				Name:      "stepB",
+				Node:      "stepB",
+				Condition: "equals:true",
+			},
+			{Name: "stepC", Node: "stepC"},
+		},
+	}
+
+	output, results, err := ExecuteWorkflow(context.Background(), wf, reg)
+	if err != nil {
+		t.Fatalf("workflow failed: %v", err)
+	}
+	if output != "final" {
+		t.Errorf("expected 'final', got %q", output)
+	}
+
+	// All 3 steps should have results (stepB with skipped flag)
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+
+	trace := *tracePtr
+	if len(trace) != 3 {
+		t.Fatalf("expected 3 trace entries, got %d: %v", len(trace), trace)
+	}
+	// stepC should receive stepB's output (which is "true" from stepA)
+	// When condition is true, the node runs and its output flows
+	if !strings.Contains(trace[2], `in="skipped-anyway"`) {
+		t.Errorf("stepC should receive stepB's output: %q", trace[2])
+	}
 }
 
 // ── Helper: retryNode for testing retry behavior ──

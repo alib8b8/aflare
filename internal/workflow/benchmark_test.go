@@ -484,45 +484,7 @@ func BenchmarkSagaExecution(b *testing.B) {
 	})
 
 	// ── Multi-step saga with mid-failure and full compensation chain ──
-	b.Run("MultiStepCompensate", func(b *testing.B) {
-		reg, _, _, callCount := newSagaBenchRegistry([]sagaBenchNode{
-			{name: "step1", output: "out1", failOnCall: failNever},
-			{name: "step2", output: "out2", failOnCall: failNever},
-			{name: "step3", failOnCall: 2}, // fails on step3 (0-based call index)
-			{name: "step4", output: "out4", failOnCall: failNever},
-			{name: "step5", output: "out5", failOnCall: failNever},
-			{name: "comp1", output: "comp1", failOnCall: failNever},
-			{name: "comp2", output: "comp2", failOnCall: failNever},
-			{name: "comp3", output: "comp3", failOnCall: failNever},
-			{name: "comp4", output: "comp4", failOnCall: failNever},
-			{name: "comp5", output: "comp5", failOnCall: failNever},
-		})
-
-		wStep := WorkflowStep{
-			Name: "multi-rollback",
-			Saga: &SagaConfig{
-				Steps: []SagaStep{
-					{Forward: WorkflowStep{Node: "step1"}, Compensate: &WorkflowStep{Node: "comp1"}},
-					{Forward: WorkflowStep{Node: "step2"}, Compensate: &WorkflowStep{Node: "comp2"}},
-					{Forward: WorkflowStep{Node: "step3"}, Compensate: &WorkflowStep{Node: "comp3"}},
-					{Forward: WorkflowStep{Node: "step4"}, Compensate: &WorkflowStep{Node: "comp4"}},
-					{Forward: WorkflowStep{Node: "step5"}, Compensate: &WorkflowStep{Node: "comp5"}},
-				},
-			},
-		}
-
-		parentEngine := NewExpressionEngine()
-
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			*callCount = 0
-			_, _, err := executeSagaStep(context.Background(), 0, wStep, "initial", parentEngine, reg, nil, nil)
-			if err == nil {
-				b.Fatal("expected saga failure for multi-step compensate")
-			}
-		}
-	})
+	b.Run("MultiStepCompensate", benchSagaMultiStepCompensate)
 
 	// ── Saga with no compensate steps (side-effect-free forward steps) ──
 	b.Run("NoCompensate", func(b *testing.B) {
@@ -555,4 +517,44 @@ func BenchmarkSagaExecution(b *testing.B) {
 			}
 		}
 	})
+}
+
+func benchSagaMultiStepCompensate(b *testing.B) {
+	reg, _, _, callCount := newSagaBenchRegistry([]sagaBenchNode{
+		{name: "step1", output: "out1", failOnCall: failNever},
+		{name: "step2", output: "out2", failOnCall: failNever},
+		{name: "step3", failOnCall: 2}, // fails on step3 (0-based call index)
+		{name: "step4", output: "out4", failOnCall: failNever},
+		{name: "step5", output: "out5", failOnCall: failNever},
+		{name: "comp1", output: "comp1", failOnCall: failNever},
+		{name: "comp2", output: "comp2", failOnCall: failNever},
+		{name: "comp3", output: "comp3", failOnCall: failNever},
+		{name: "comp4", output: "comp4", failOnCall: failNever},
+		{name: "comp5", output: "comp5", failOnCall: failNever},
+	})
+
+	wStep := WorkflowStep{
+		Name: "multi-rollback",
+		Saga: &SagaConfig{
+			Steps: []SagaStep{
+				{Forward: WorkflowStep{Node: "step1"}, Compensate: &WorkflowStep{Node: "comp1"}},
+				{Forward: WorkflowStep{Node: "step2"}, Compensate: &WorkflowStep{Node: "comp2"}},
+				{Forward: WorkflowStep{Node: "step3"}, Compensate: &WorkflowStep{Node: "comp3"}},
+				{Forward: WorkflowStep{Node: "step4"}, Compensate: &WorkflowStep{Node: "comp4"}},
+				{Forward: WorkflowStep{Node: "step5"}, Compensate: &WorkflowStep{Node: "comp5"}},
+			},
+		},
+	}
+
+	parentEngine := NewExpressionEngine()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		*callCount = 0
+		_, _, err := executeSagaStep(context.Background(), 0, wStep, "initial", parentEngine, reg, nil, nil)
+		if err == nil {
+			b.Fatal("expected saga failure for multi-step compensate")
+		}
+	}
 }

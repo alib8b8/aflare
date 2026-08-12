@@ -195,101 +195,7 @@ func runPipeline(ctx context.Context, config PipelineConfig, timeoutSeconds int,
 			wg.Add(1)
 			go func(s *PipelineStep) {
 				defer wg.Done()
-				defer func() {
-					if r := recover(); r != nil {
-						logger.Error("pipeline step panicked",
-							"step", s.Name,
-							"node", s.Node,
-							"panic", r,
-							"stack", string(debug.Stack()),
-						)
-						// Ensure the step is marked as completed so the
-						// dispatcher does not deadlock waiting on it.
-						resultsMu.Lock()
-						if _, ok := results[s.Name]; !ok {
-							now := time.Now()
-							results[s.Name] = &PipelineStepResult{
-								Name:     s.Name,
-								Node:     s.Node,
-								Error:    fmt.Sprintf("panic: %v", r),
-								Started:  now,
-								Finished: now,
-							}
-						}
-						resultsMu.Unlock()
-						errorsMu.Lock()
-						allErrors = append(allErrors, fmt.Sprintf("%s: panic: %v", s.Name, r))
-						errorsMu.Unlock()
-						completedMu.Lock()
-						completed[s.Name] = true
-						completedMu.Unlock()
-					}
-				}()
-
-				stepStart := time.Now()
-				result := &PipelineStepResult{
-					Name:    s.Name,
-					Node:    s.Node,
-					Started: stepStart,
-				}
-
-				node, ok := reg.Get(s.Node)
-				if !ok {
-					result.Error = fmt.Sprintf("node %q not found", s.Node)
-					result.Finished = time.Now()
-					result.Duration = result.Finished.Sub(result.Started)
-					resultsMu.Lock()
-					results[s.Name] = result
-					resultsMu.Unlock()
-					errorsMu.Lock()
-					allErrors = append(allErrors, fmt.Sprintf("%s: %s", s.Name, result.Error))
-					errorsMu.Unlock()
-					completedMu.Lock()
-					completed[s.Name] = true
-					completedMu.Unlock()
-					return
-				}
-
-				stepInput := s.Input
-				if len(s.InputFrom) > 0 {
-					var parts []string
-					for _, src := range s.InputFrom {
-						resultsMu.Lock()
-						if r, ok := results[src]; ok && r.Error == "" {
-							parts = append(parts, r.Output)
-						}
-						resultsMu.Unlock()
-					}
-					if stepInput == "" {
-						stepInput = strings.Join(parts, "\n\n")
-					}
-				}
-
-				stepParams := make(map[string]string)
-				for k, v := range s.Params {
-					stepParams[k] = v
-				}
-
-				output, execErr := node.Execute(ctx, stepInput, stepParams)
-				if execErr != nil {
-					result.Error = execErr.Error()
-					errorsMu.Lock()
-					allErrors = append(allErrors, fmt.Sprintf("%s: %s", s.Name, execErr.Error()))
-					errorsMu.Unlock()
-				} else {
-					result.Output = output
-				}
-
-				result.Finished = time.Now()
-				result.Duration = result.Finished.Sub(result.Started)
-
-				resultsMu.Lock()
-				results[s.Name] = result
-				resultsMu.Unlock()
-
-				completedMu.Lock()
-				completed[s.Name] = true
-				completedMu.Unlock()
+				executePipelineStep(ctx, s, reg, results, &resultsMu, completed, &completedMu, &allErrors, &errorsMu)
 			}(step)
 		}
 
@@ -375,4 +281,112 @@ func runPipeline(ctx context.Context, config PipelineConfig, timeoutSeconds int,
 	}
 
 	return string(output), nil
+}
+
+func executePipelineStep(
+	ctx context.Context,
+	s *PipelineStep,
+	reg *Registry,
+	results map[string]*PipelineStepResult,
+	resultsMu *sync.Mutex,
+	completed map[string]bool,
+	completedMu *sync.Mutex,
+	allErrors *[]string,
+	errorsMu *sync.Mutex,
+) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("pipeline step panicked",
+				"step", s.Name,
+				"node", s.Node,
+				"panic", r,
+				"stack", string(debug.Stack()),
+			)
+			// Ensure the step is marked as completed so the
+			// dispatcher does not deadlock waiting on it.
+			resultsMu.Lock()
+			if _, ok := results[s.Name]; !ok {
+				now := time.Now()
+				results[s.Name] = &PipelineStepResult{
+					Name:     s.Name,
+					Node:     s.Node,
+					Error:    fmt.Sprintf("panic: %v", r),
+					Started:  now,
+					Finished: now,
+				}
+			}
+			resultsMu.Unlock()
+			errorsMu.Lock()
+			*allErrors = append(*allErrors, fmt.Sprintf("%s: panic: %v", s.Name, r))
+			errorsMu.Unlock()
+			completedMu.Lock()
+			completed[s.Name] = true
+			completedMu.Unlock()
+		}
+	}()
+
+	stepStart := time.Now()
+	result := &PipelineStepResult{
+		Name:    s.Name,
+		Node:    s.Node,
+		Started: stepStart,
+	}
+
+	node, ok := reg.Get(s.Node)
+	if !ok {
+		result.Error = fmt.Sprintf("node %q not found", s.Node)
+		result.Finished = time.Now()
+		result.Duration = result.Finished.Sub(result.Started)
+		resultsMu.Lock()
+		results[s.Name] = result
+		resultsMu.Unlock()
+		errorsMu.Lock()
+		*allErrors = append(*allErrors, fmt.Sprintf("%s: %s", s.Name, result.Error))
+		errorsMu.Unlock()
+		completedMu.Lock()
+		completed[s.Name] = true
+		completedMu.Unlock()
+		return
+	}
+
+	stepInput := s.Input
+	if len(s.InputFrom) > 0 {
+		var parts []string
+		for _, src := range s.InputFrom {
+			resultsMu.Lock()
+			if r, ok := results[src]; ok && r.Error == "" {
+				parts = append(parts, r.Output)
+			}
+			resultsMu.Unlock()
+		}
+		if stepInput == "" {
+			stepInput = strings.Join(parts, "\n\n")
+		}
+	}
+
+	stepParams := make(map[string]string)
+	for k, v := range s.Params {
+		stepParams[k] = v
+	}
+
+	output, execErr := node.Execute(ctx, stepInput, stepParams)
+	if execErr != nil {
+		result.Error = execErr.Error()
+		errorsMu.Lock()
+		*allErrors = append(*allErrors, fmt.Sprintf("%s: %s", s.Name, execErr.Error()))
+		errorsMu.Unlock()
+	} else {
+		result.Output = output
+	}
+
+	result.Finished = time.Now()
+	result.Duration = result.Finished.Sub(result.Started)
+
+	resultsMu.Lock()
+	results[s.Name] = result
+	resultsMu.Unlock()
+
+	completedMu.Lock()
+	completed[s.Name] = true
+	completedMu.Unlock()
 }

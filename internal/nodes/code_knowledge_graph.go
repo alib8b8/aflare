@@ -144,55 +144,10 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 		return "", fmt.Errorf("no files found at path: %s", rawPath)
 	}
 
-	result := ckgResult{
-		Entities:   []ckgEntity{},
-		Relations:  []ckgRelation{},
-		Concepts:   []ckgConcept{},
-		Results:    []ckgQueryResult{},
-		TokenSaved: 0,
+	result, queryTime, err := n.buildGraph(ctx, mode, query, queryType, topK, threshold, tokenEfficient, useCache, idx, files)
+	if err != nil {
+		return "", err
 	}
-
-	startTime := time.Now()
-
-	// 从索引获取数据（如果使用缓存）
-	if useCache && idx != nil {
-		result.Entities = idx.Entities
-		result.Relations = idx.Relations
-		result.Concepts = idx.Concepts
-	} else if mode != "query_only" {
-		for _, f := range files {
-			if err := ctx.Err(); err != nil {
-				return "", fmt.Errorf("context cancelled: %w", err)
-			}
-			entities, relations := n.extractFromFile(f)
-			result.Entities = append(result.Entities, entities...)
-			result.Relations = append(result.Relations, relations...)
-		}
-
-		result.Concepts = n.extractConcepts(result.Entities)
-	}
-
-	// 计算 Token 节省
-	if tokenEfficient && len(result.Entities) > 0 {
-		result.TokenSaved = len(result.Entities) * 200
-	} else if len(result.Entities) > 0 {
-		result.TokenSaved = len(result.Entities) * 100
-	}
-
-	if mode != "build" && query != "" {
-		if tokenEfficient {
-			result.Results = n.performTokenEfficientSearch(query, queryType, result.Entities, topK, threshold)
-		} else {
-			result.Results = n.performVectorSearch(query, queryType, result.Entities, topK, threshold)
-		}
-	}
-
-	if mode == "inkling_review" {
-		reviewResult := n.executeInklingReview(files)
-		result.ReviewResult = &reviewResult
-	}
-
-	queryTime := time.Since(startTime)
 
 	// 计算 FilesAnalyzed：如果使用缓存，统计文件总数；否则统计实际分析的文件数
 	filesAnalyzed := len(files)
@@ -223,6 +178,74 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 	}
 
 	return string(data), nil
+}
+
+// buildGraph builds the knowledge graph from indexed data or by extracting
+// from files, performs token-efficient or vector search when a query is
+// provided, and handles inkling review mode. It returns the populated result,
+// query duration, and any error.
+func (n *CodeKnowledgeGraphNode) buildGraph(
+	ctx context.Context,
+	mode string,
+	query string,
+	queryType string,
+	topK int,
+	threshold float64,
+	tokenEfficient bool,
+	useCache bool,
+	idx *ckgIndex,
+	files []string,
+) (ckgResult, time.Duration, error) {
+	result := ckgResult{
+		Entities:  []ckgEntity{},
+		Relations: []ckgRelation{},
+		Concepts:  []ckgConcept{},
+		Results:   []ckgQueryResult{},
+		TokenSaved: 0,
+	}
+
+	startTime := time.Now()
+
+	// 从索引获取数据（如果使用缓存）
+	if useCache && idx != nil {
+		result.Entities = idx.Entities
+		result.Relations = idx.Relations
+		result.Concepts = idx.Concepts
+	} else if mode != "query_only" {
+		for _, f := range files {
+			if err := ctx.Err(); err != nil {
+				return ckgResult{}, 0, fmt.Errorf("context cancelled: %w", err)
+			}
+			entities, relations := n.extractFromFile(f)
+			result.Entities = append(result.Entities, entities...)
+			result.Relations = append(result.Relations, relations...)
+		}
+
+		result.Concepts = n.extractConcepts(result.Entities)
+	}
+
+	// 计算 Token 节省
+	if tokenEfficient && len(result.Entities) > 0 {
+		result.TokenSaved = len(result.Entities) * 200
+	} else if len(result.Entities) > 0 {
+		result.TokenSaved = len(result.Entities) * 100
+	}
+
+	if mode != "build" && query != "" {
+		if tokenEfficient {
+			result.Results = n.performTokenEfficientSearch(query, queryType, result.Entities, topK, threshold)
+		} else {
+			result.Results = n.performVectorSearch(query, queryType, result.Entities, topK, threshold)
+		}
+	}
+
+	if mode == "inkling_review" {
+		reviewResult := n.executeInklingReview(files)
+		result.ReviewResult = &reviewResult
+	}
+
+	queryTime := time.Since(startTime)
+	return result, queryTime, nil
 }
 
 // collectFilesForKG collects files and builds a persistent index when

@@ -62,27 +62,12 @@ func handleTemplateSubmit(args []string) {
 	}
 
 	// Validate the file exists and is a YAML file.
-	absPath, err := filepath.Abs(yamlPath)
+	absPath, err := validateTemplateFile(yamlPath)
 	if err != nil {
-		fmt.Printf("Error: failed to resolve path: %v\n", err)
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
-
-	info, err := os.Stat(absPath)
-	if err != nil {
-		fmt.Printf("Error: file not found: %s\n", absPath)
-		os.Exit(1)
-	}
-	if info.IsDir() {
-		fmt.Printf("Error: %s is a directory, expected a .yaml workflow file\n", absPath)
-		os.Exit(1)
-	}
-
 	ext := strings.ToLower(filepath.Ext(absPath))
-	if ext != ".yaml" && ext != ".yml" {
-		fmt.Printf("Error: %s is not a YAML file (got %s)\n", absPath, ext)
-		os.Exit(1)
-	}
 
 	// Read the workflow file.
 	data, err := os.ReadFile(absPath)
@@ -219,6 +204,30 @@ func handleTemplateSubmit(args []string) {
 
 	// Award a virtual badge for the template contribution.
 	awardBadgeForTemplate(author, skillID)
+}
+
+// validateTemplateFile validates that the given path is an existing YAML file.
+// Returns the absolute path on success, or an error describing the problem.
+func validateTemplateFile(yamlPath string) (string, error) {
+	absPath, err := filepath.Abs(yamlPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve path: %v", err)
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return "", fmt.Errorf("file not found: %s", absPath)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("%s is a directory, expected a .yaml workflow file", absPath)
+	}
+
+	ext := strings.ToLower(filepath.Ext(absPath))
+	if ext != ".yaml" && ext != ".yml" {
+		return "", fmt.Errorf("%s is not a YAML file (got %s)", absPath, ext)
+	}
+
+	return absPath, nil
 }
 
 // parseTemplateSubmitArgs parses the command-line arguments for template submit.

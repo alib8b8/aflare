@@ -66,6 +66,21 @@ var (
 	memoryKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
 )
 
+// memoryExecParams holds the parsed parameters for memory node execution.
+type memoryExecParams struct {
+	level      string
+	memType    string
+	key        string
+	value      string
+	tags       []string
+	ttlHours   int
+	confidence float64
+	query      string
+	topK       int
+	threshold  float64
+	source     string
+}
+
 type MemoryNode struct{}
 
 var (
@@ -123,127 +138,49 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 
 	session := memory.GetSession(sessionID)
 
-	level := getParam(params, "level", "medium")
-	if !validMemoryLevels[level] {
-		return "", fmt.Errorf("invalid level: %s (supported: short, medium, long)", level)
+	execParams, err := n.parseMemoryExecParams(params, input, operation)
+	if err != nil {
+		return "", err
 	}
-
-	memType := getParam(params, "type", "fact")
-	if !validMemoryTypes[memType] {
-		return "", fmt.Errorf("invalid type: %s (supported: fact, concept, experience, preference, relationship, task, context)", memType)
-	}
-
-	key := getParam(params, "key", "")
-	if key != "" && !memoryKeyPattern.MatchString(key) {
-		return "", fmt.Errorf("invalid key format")
-	}
-
-	value := getParam(params, "value", "")
-	if input != "" && value == "" {
-		value = input
-	}
-
-	if operation == "store" && value == "" {
-		return "", fmt.Errorf("value is required for store operation")
-	}
-
-	if len(value) > maxMemoryValueSize {
-		return "", fmt.Errorf("value too large (max 1MB)")
-	}
-
-	if operation == "retrieve" && key == "" {
-		return "", fmt.Errorf("key is required for retrieve operation")
-	}
-	if operation == "link_kg" && key == "" {
-		return "", fmt.Errorf("key is required for link_kg operation")
-	}
-
-	tagsStr := getParam(params, "tags", "")
-	var tags []string
-	if tagsStr != "" {
-		for _, t := range strings.Split(tagsStr, ",") {
-			t = strings.TrimSpace(t)
-			if t != "" && len(t) <= 128 {
-				tags = append(tags, t)
-			}
-		}
-	}
-
-	ttlHours := parseIntSafe(getParam(params, "ttl_hours", "72"), 72)
-	if ttlHours < 1 {
-		ttlHours = 72
-	}
-	if ttlHours > 8760 {
-		ttlHours = 8760
-	}
-
-	confidence := parseFloatSafe(getParam(params, "confidence", "0.8"), 0.8)
-	if confidence < 0 || confidence > 1 {
-		confidence = 0.8
-	}
-
-	query := getParam(params, "query", "")
-	if operation == "search" && query == "" && input == "" {
-		return "", fmt.Errorf("query is required for search operation")
-	}
-	if query == "" {
-		query = input
-	}
-
-	topK := parseIntSafe(getParam(params, "top_k", "10"), 10)
-	if topK < 1 {
-		topK = 10
-	}
-	if topK > 100 {
-		topK = 100
-	}
-
-	threshold := parseFloatSafe(getParam(params, "threshold", "0.5"), 0.5)
-	if threshold < 0 || threshold > 1 {
-		threshold = 0.5
-	}
-
-	source := getParam(params, "source", "")
 
 	startTime := time.Now()
 	var result map[string]interface{}
-	var err error
 
 	switch operation {
 	case "store":
-		result, err = n.storeMemory(session, key, value, level, memType, tags, ttlHours, confidence, source)
+		result, err = n.storeMemory(session, execParams.key, execParams.value, execParams.level, execParams.memType, execParams.tags, execParams.ttlHours, execParams.confidence, execParams.source)
 	case "retrieve":
-		result, err = n.retrieveMemory(session, key)
+		result, err = n.retrieveMemory(session, execParams.key)
 	case "delete":
-		result, err = n.deleteMemory(session, key)
+		result, err = n.deleteMemory(session, execParams.key)
 	case "search":
-		result, err = n.searchMemory(session, query, level, topK, threshold)
+		result, err = n.searchMemory(session, execParams.query, execParams.level, execParams.topK, execParams.threshold)
 	case "summary":
 		result, err = n.getMemorySummary(session, sessionID)
 	case "forget":
-		result, err = n.forgetMemory(session, level)
+		result, err = n.forgetMemory(session, execParams.level)
 	case "transfer":
-		result, err = n.transferMemory(session, key, level)
+		result, err = n.transferMemory(session, execParams.key, execParams.level)
 	case "merge":
 		result, err = n.mergeMemory(session, params)
 	case "visualize":
 		result, err = n.visualizeMemory(session, params)
 	case "inkling_retrieve":
-		result, err = n.retrieveMemoryWithInkling(session, query, level, topK, threshold)
+		result, err = n.retrieveMemoryWithInkling(session, execParams.query, execParams.level, execParams.topK, execParams.threshold)
 	case "session_stats":
 		result, err = n.getMemorySummary(session, sessionID)
 	case "link_kg":
-		result, err = n.linkKGMemory(session, key, params)
+		result, err = n.linkKGMemory(session, execParams.key, params)
 	case "expand_kg":
 		// expand_kg is a retrieval-time operation: by default search all
 		// levels so KG-linked context is surfaced regardless of which
 		// level the memory was originally stored at. Callers can still
 		// narrow the search by passing an explicit level param.
-		expandLevel := level
+		expandLevel := execParams.level
 		if _, ok := params["level"]; !ok {
 			expandLevel = ""
 		}
-		result, err = n.expandKGMemory(ctx, session, query, expandLevel, topK, threshold)
+		result, err = n.expandKGMemory(ctx, session, execParams.query, expandLevel, execParams.topK, execParams.threshold)
 	case "compress":
 		result, err = n.compressMemory(ctx, session, params)
 	}
@@ -263,6 +200,94 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 	}
 
 	return string(data), nil
+}
+
+// parseMemoryExecParams parses and validates all parameters for memory node execution.
+func (n *MemoryNode) parseMemoryExecParams(params map[string]string, input, operation string) (*memoryExecParams, error) {
+	p := &memoryExecParams{}
+
+	p.level = getParam(params, "level", "medium")
+	if !validMemoryLevels[p.level] {
+		return nil, fmt.Errorf("invalid level: %s (supported: short, medium, long)", p.level)
+	}
+
+	p.memType = getParam(params, "type", "fact")
+	if !validMemoryTypes[p.memType] {
+		return nil, fmt.Errorf("invalid type: %s (supported: fact, concept, experience, preference, relationship, task, context)", p.memType)
+	}
+
+	p.key = getParam(params, "key", "")
+	if p.key != "" && !memoryKeyPattern.MatchString(p.key) {
+		return nil, fmt.Errorf("invalid key format")
+	}
+
+	p.value = getParam(params, "value", "")
+	if input != "" && p.value == "" {
+		p.value = input
+	}
+
+	if operation == "store" && p.value == "" {
+		return nil, fmt.Errorf("value is required for store operation")
+	}
+
+	if len(p.value) > maxMemoryValueSize {
+		return nil, fmt.Errorf("value too large (max 1MB)")
+	}
+
+	if operation == "retrieve" && p.key == "" {
+		return nil, fmt.Errorf("key is required for retrieve operation")
+	}
+	if operation == "link_kg" && p.key == "" {
+		return nil, fmt.Errorf("key is required for link_kg operation")
+	}
+
+	tagsStr := getParam(params, "tags", "")
+	if tagsStr != "" {
+		for _, t := range strings.Split(tagsStr, ",") {
+			t = strings.TrimSpace(t)
+			if t != "" && len(t) <= 128 {
+				p.tags = append(p.tags, t)
+			}
+		}
+	}
+
+	p.ttlHours = parseIntSafe(getParam(params, "ttl_hours", "72"), 72)
+	if p.ttlHours < 1 {
+		p.ttlHours = 72
+	}
+	if p.ttlHours > 8760 {
+		p.ttlHours = 8760
+	}
+
+	p.confidence = parseFloatSafe(getParam(params, "confidence", "0.8"), 0.8)
+	if p.confidence < 0 || p.confidence > 1 {
+		p.confidence = 0.8
+	}
+
+	p.query = getParam(params, "query", "")
+	if operation == "search" && p.query == "" && input == "" {
+		return nil, fmt.Errorf("query is required for search operation")
+	}
+	if p.query == "" {
+		p.query = input
+	}
+
+	p.topK = parseIntSafe(getParam(params, "top_k", "10"), 10)
+	if p.topK < 1 {
+		p.topK = 10
+	}
+	if p.topK > 100 {
+		p.topK = 100
+	}
+
+	p.threshold = parseFloatSafe(getParam(params, "threshold", "0.5"), 0.5)
+	if p.threshold < 0 || p.threshold > 1 {
+		p.threshold = 0.5
+	}
+
+	p.source = getParam(params, "source", "")
+
+	return p, nil
 }
 
 func (n *MemoryNode) storeMemory(session *memory.SessionMemory, key, value, level, memType string, tags []string, ttlHours int, confidence float64, source string) (map[string]interface{}, error) {

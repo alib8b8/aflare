@@ -57,51 +57,55 @@ func (n *TransformNode) Execute(ctx context.Context, input string, params map[st
 		return input, nil
 	}
 
-	switch strings.ToLower(operation) {
+	return n.executeTransformOp(input, strings.ToLower(operation)), nil
+}
+
+func (n *TransformNode) executeTransformOp(input, operation string) string {
+	switch operation {
 	case "upper":
-		return strings.ToUpper(input), nil
+		return strings.ToUpper(input)
 	case "lower":
-		return strings.ToLower(input), nil
+		return strings.ToLower(input)
 	case "trim":
-		return strings.TrimSpace(input), nil
+		return strings.TrimSpace(input)
 	case "lines":
 		lines := strings.Split(input, "\n")
-		return fmt.Sprintf("%d lines", len(lines)), nil
+		return fmt.Sprintf("%d lines", len(lines))
 	case "words":
 		words := strings.Fields(input)
-		return fmt.Sprintf("%d words", len(words)), nil
+		return fmt.Sprintf("%d words", len(words))
 	case "chars":
-		return fmt.Sprintf("%d characters", len(input)), nil
+		return fmt.Sprintf("%d characters", len(input))
 	case "first_line":
 		lines := strings.SplitN(input, "\n", 2)
 		if len(lines) > 0 {
-			return lines[0], nil
+			return lines[0]
 		}
-		return "", nil
+		return ""
 	case "first_500":
 		runes := []rune(input)
 		if len(runes) > 500 {
-			return string(runes[:500]) + "...", nil
+			return string(runes[:500]) + "..."
 		}
-		return input, nil
+		return input
 	case "first_1000":
 		runes := []rune(input)
 		if len(runes) > 1000 {
-			return string(runes[:1000]) + "...", nil
+			return string(runes[:1000]) + "..."
 		}
-		return input, nil
+		return input
 	case "summary":
 		runes := []rune(input)
 		if len(runes) > 200 {
-			return string(runes[:200]) + "...", nil
+			return string(runes[:200]) + "..."
 		}
-		return input, nil
+		return input
 	case "reverse":
 		runes := []rune(input)
 		for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
 			runes[i], runes[j] = runes[j], runes[i]
 		}
-		return string(runes), nil
+		return string(runes)
 	case "unique_lines":
 		lines := strings.Split(input, "\n")
 		seen := make(map[string]bool)
@@ -116,11 +120,11 @@ func (n *TransformNode) Execute(ctx context.Context, input string, params map[st
 				result = append(result, line)
 			}
 		}
-		return strings.Join(result, "\n"), nil
+		return strings.Join(result, "\n")
 	case "sort_lines":
 		lines := strings.Split(input, "\n")
 		sort.Strings(lines)
-		return strings.Join(lines, "\n"), nil
+		return strings.Join(lines, "\n")
 	case "remove_blank_lines":
 		lines := strings.Split(input, "\n")
 		var result []string
@@ -129,7 +133,7 @@ func (n *TransformNode) Execute(ctx context.Context, input string, params map[st
 				result = append(result, line)
 			}
 		}
-		return strings.Join(result, "\n"), nil
+		return strings.Join(result, "\n")
 	case "filter_errors":
 		lines := strings.Split(input, "\n")
 		var result []string
@@ -139,33 +143,33 @@ func (n *TransformNode) Execute(ctx context.Context, input string, params map[st
 				result = append(result, line)
 			}
 		}
-		return strings.Join(result, "\n"), nil
+		return strings.Join(result, "\n")
 	case "extract_urls":
 		re := regexp.MustCompile(`https?://[^\s<>"']+`)
 		urls := re.FindAllString(input, -1)
-		return strings.Join(urls, "\n"), nil
+		return strings.Join(urls, "\n")
 	case "extract_emails":
 		re := regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
 		emails := re.FindAllString(input, -1)
-		return strings.Join(emails, "\n"), nil
+		return strings.Join(emails, "\n")
 	case "markdown_to_html":
-		return markdownToHTML(input), nil
+		return markdownToHTML(input)
 	case "html_to_markdown":
-		return htmlToMarkdownTransform(input), nil
+		return htmlToMarkdownTransform(input)
 	case "extract_repos_and_activity":
-		return extractReposAndActivity(input), nil
+		return extractReposAndActivity(input)
 	case "combine_and_summarize":
-		return combineAndSummarize(input), nil
+		return combineAndSummarize(input)
 	case "extract_functions_and_types":
-		return extractFunctionsAndTypes(input), nil
+		return extractFunctionsAndTypes(input)
 	case "group_by_commit_type":
-		return groupByCommitType(input), nil
+		return groupByCommitType(input)
 	case "group_by_extension":
-		return groupByExtension(input), nil
+		return groupByExtension(input)
 	case "count_by_label":
-		return countByLabel(input), nil
+		return countByLabel(input)
 	default:
-		return input, nil
+		return input
 	}
 }
 

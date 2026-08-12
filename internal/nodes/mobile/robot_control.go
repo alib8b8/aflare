@@ -185,6 +185,24 @@ type SafetyCheckResult struct {
 }
 
 func generateTaskPlan(task, robotType string, speed, forceLimit, safetyZone float64) *RobotActionPlan {
+	actions := generateTaskActions(task, speed, forceLimit)
+
+	totalMs := 0
+	for _, a := range actions {
+		totalMs += a.EstimatedMs
+	}
+
+	return &RobotActionPlan{
+		Task:         task,
+		RobotType:    robotType,
+		Actions:      actions,
+		TotalSteps:   len(actions),
+		EstimatedMs:  totalMs,
+		FallbackPlan: "Ask human operator for assistance",
+	}
+}
+
+func generateTaskActions(task string, speed, forceLimit float64) []RobotAction {
 	actions := []RobotAction{}
 	lowerTask := strings.ToLower(task)
 
@@ -327,19 +345,7 @@ func generateTaskPlan(task, robotType string, speed, forceLimit, safetyZone floa
 		})
 	}
 
-	totalMs := 0
-	for _, a := range actions {
-		totalMs += a.EstimatedMs
-	}
-
-	return &RobotActionPlan{
-		Task:         task,
-		RobotType:    robotType,
-		Actions:      actions,
-		TotalSteps:   len(actions),
-		EstimatedMs:  totalMs,
-		FallbackPlan: "Ask human operator for assistance",
-	}
+	return actions
 }
 
 func generateDirectActionPlan(action, targetObject, targetLocation string, speed, forceLimit float64) *RobotActionPlan {

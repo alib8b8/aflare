@@ -634,6 +634,10 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		return out, err
 	}
 
+	return n.processNonStreamingResponse(resp, &tel, cacheKey, llmCache, model)
+}
+
+func (n *OpenAICompatibleNode) processNonStreamingResponse(resp *http.Response, tel *LLMCallTelemetry, cacheKey string, llmCache *cache.Cache, model string) (string, error) {
 	var llmResp LLMResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&llmResp); err != nil {
 		tel.ErrText = err.Error()
@@ -648,26 +652,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 
 	content := llmResp.Choices[0].Message.Content
 	tel.Response = content
-	// Persist the successful non-streaming response so subsequent identical
-	// calls are served from cache. cacheKey is non-empty only when caching
-	// is enabled and this was a non-streaming call that missed. cache.Set
-	// is an in-memory map write (sub-microsecond) so it does not
-	// meaningfully block the response; doing it synchronously keeps
-	// behaviour deterministic and avoids the duplicate-upstream-call race
-	// an async write would introduce for concurrent identical requests.
-	//
-	// L-8: do NOT cache when the provider returned HTTP 200 but also
-	// included an error object in the body. Some providers signal partial
-	// failures this way, and the message content may itself be the error
-	// text — caching it would make subsequent identical requests hit the
-	// cached error instead of retrying upstream.
-	//
-	// M-5: do NOT cache responses larger than maxCacheableResponseBytes.
-	// The cache caps entry COUNT (MaxEntries) but not entry SIZE; without
-	// a per-entry cap, a handful of large LLM responses (up to ~10MB each)
-	// could pin gigabytes of memory. The response is still returned to
-	// the caller — only the cache write is skipped, so correctness is
-	// unaffected.
+
 	if cacheKey != "" && llmCache != nil && llmResp.Error == nil {
 		if len(content) > maxCacheableResponseBytes {
 			logger.Debug("[cache skip] LLM response exceeds per-entry size cap, not cached",
