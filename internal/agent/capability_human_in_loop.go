@@ -44,7 +44,7 @@ type ApprovalPolicy string
 const (
 	PolicyAlwaysAsk ApprovalPolicy = "always-ask" // Ask for every action
 	PolicySmart     ApprovalPolicy = "smart"      // Ask only for dangerous/ambiguous actions
-	PolicyNone      ApprovalPolicy = "none"        // Never ask (full autonomy)
+	PolicyNone      ApprovalPolicy = "none"       // Never ask (full autonomy)
 )
 
 // HumanInLoopCapability implements human-in-the-loop approval for
@@ -74,8 +74,10 @@ func (h *HumanInLoopCapability) SetPolicy(policy ApprovalPolicy) {
 	h.policy = policy
 }
 
-func (h *HumanInLoopCapability) Name() string        { return "human-in-loop" }
-func (h *HumanInLoopCapability) Description() string  { return "Human-in-the-loop: pauses at critical decisions for human approval (人机协同)" }
+func (h *HumanInLoopCapability) Name() string { return "human-in-loop" }
+func (h *HumanInLoopCapability) Description() string {
+	return "Human-in-the-loop: pauses at critical decisions for human approval (人机协同)"
+}
 
 func (h *HumanInLoopCapability) Init(loop *AgentLoop) error {
 	return nil

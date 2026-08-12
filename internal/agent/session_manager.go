@@ -38,10 +38,10 @@ type sessionEntry struct {
 // SessionManager manages multiple concurrent ChatSession instances with
 // LRU eviction and TTL-based cleanup. Safe for concurrent use.
 type SessionManager struct {
-	mu          sync.RWMutex
-	sessions    map[string]*sessionEntry
-	maxSessions int
-	ttl         time.Duration
+	mu           sync.RWMutex
+	sessions     map[string]*sessionEntry
+	maxSessions  int
+	ttl          time.Duration
 	capabilities []string
 }
 

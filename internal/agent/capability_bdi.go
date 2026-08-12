@@ -46,8 +46,8 @@ import (
 
 // Belief represents a fact the agent believes to be true about the world.
 type Belief struct {
-	Key       string
-	Value     string
+	Key        string
+	Value      string
 	Confidence float64 // 0.0 - 1.0
 	UpdatedAt  time.Time
 }
@@ -56,20 +56,20 @@ type Belief struct {
 type Desire struct {
 	ID          string
 	Description string
-	Priority    int       // 1 (highest) - 5 (lowest)
-	Status      string    // "active", "in-progress", "completed", "abandoned"
+	Priority    int    // 1 (highest) - 5 (lowest)
+	Status      string // "active", "in-progress", "completed", "abandoned"
 	CreatedAt   time.Time
-	Progress    string    // human-readable progress note
+	Progress    string // human-readable progress note
 }
 
 // Intention represents a committed plan of action.
 type Intention struct {
 	ID          string
-	GoalID      string    // which goal this intention serves
+	GoalID      string // which goal this intention serves
 	Description string
-	Steps       []string  // action steps
+	Steps       []string // action steps
 	CurrentStep int
-	Status      string    // "pending", "active", "completed", "failed"
+	Status      string // "pending", "active", "completed", "failed"
 	CreatedAt   time.Time
 }
 
@@ -94,8 +94,10 @@ func NewBDICapability() *BDICapability {
 	}
 }
 
-func (b *BDICapability) Name() string        { return "bdi" }
-func (b *BDICapability) Description() string  { return "Belief-Desire-Intention: goal management and tracking (BDI Agent)" }
+func (b *BDICapability) Name() string { return "bdi" }
+func (b *BDICapability) Description() string {
+	return "Belief-Desire-Intention: goal management and tracking (BDI Agent)"
+}
 
 func (b *BDICapability) Init(loop *AgentLoop) error {
 	// Initialize with some base beliefs about the system

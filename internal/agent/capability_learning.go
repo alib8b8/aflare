@@ -48,32 +48,32 @@ type LearningEntry struct {
 
 // LearningPattern represents a recognized pattern across multiple learning entries.
 type LearningPattern struct {
-	Pattern     string `json:"pattern"`     // the identified pattern description
-	Category    string `json:"category"`    // "reflection" or "adaptive"
-	Count       int    `json:"count"`       // how many times this pattern appeared
-	FirstSeen   string `json:"first_seen"`  // timestamp of first occurrence
-	LastSeen    string `json:"last_seen"`   // timestamp of latest occurrence
-	Examples    []string `json:"examples"`  // up to 3 example entries
+	Pattern   string   `json:"pattern"`    // the identified pattern description
+	Category  string   `json:"category"`   // "reflection" or "adaptive"
+	Count     int      `json:"count"`      // how many times this pattern appeared
+	FirstSeen string   `json:"first_seen"` // timestamp of first occurrence
+	LastSeen  string   `json:"last_seen"`  // timestamp of latest occurrence
+	Examples  []string `json:"examples"`   // up to 3 example entries
 }
 
 // learningStore persists learning entries to ~/.config/aflare/learning.json
 // as JSON Lines (one JSON object per line). This is append-only and thread-safe.
 type learningStore struct {
-	mu           sync.Mutex
-	path         string
-	appendCount  int            // number of appends since last compaction
-	recentKeys   []string       // recent keys for dedup window
-	maxRecentKeys int           // max size of dedup window
-	patterns     []LearningPattern // cached patterns
-	patternsTime time.Time      // when patterns were last computed
+	mu            sync.Mutex
+	path          string
+	appendCount   int               // number of appends since last compaction
+	recentKeys    []string          // recent keys for dedup window
+	maxRecentKeys int               // max size of dedup window
+	patterns      []LearningPattern // cached patterns
+	patternsTime  time.Time         // when patterns were last computed
 }
 
 const (
-	maxAppendsBeforeCompact = 100   // compact after this many appends
-	maxEntriesKept          = 500   // keep at most this many entries
-	dedupWindowSize         = 50    // check last N entries for duplicates
-	dedupSimilarityThreshold = 0.7  // Jaccard similarity threshold for dedup
-	patternMinOccurrences   = 3     // min occurrences to recognize a pattern
+	maxAppendsBeforeCompact  = 100 // compact after this many appends
+	maxEntriesKept           = 500 // keep at most this many entries
+	dedupWindowSize          = 50  // check last N entries for duplicates
+	dedupSimilarityThreshold = 0.7 // Jaccard similarity threshold for dedup
+	patternMinOccurrences    = 3   // min occurrences to recognize a pattern
 )
 
 var sharedLearning = &learningStore{

@@ -56,7 +56,7 @@ type Plan struct {
 // It decomposes complex goals into steps, tracks progress, and persists
 // active plans across sessions for recovery.
 type PlanningCapability struct {
-	mu        sync.RWMutex
+	mu         sync.RWMutex
 	activePlan *Plan
 	completed  []Plan
 	storePath  string
@@ -72,8 +72,10 @@ func NewPlanningCapability() *PlanningCapability {
 	}
 }
 
-func (p *PlanningCapability) Name() string       { return "planning" }
-func (p *PlanningCapability) Description() string { return "Goal-driven planning: generates action sequences and tracks progress (规划式 Agent)" }
+func (p *PlanningCapability) Name() string { return "planning" }
+func (p *PlanningCapability) Description() string {
+	return "Goal-driven planning: generates action sequences and tracks progress (规划式 Agent)"
+}
 
 func (p *PlanningCapability) Init(loop *AgentLoop) error {
 	// Load active plan from previous session if any

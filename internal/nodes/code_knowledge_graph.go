@@ -197,10 +197,10 @@ func (n *CodeKnowledgeGraphNode) buildGraph(
 	files []string,
 ) (ckgResult, time.Duration, error) {
 	result := ckgResult{
-		Entities:  []ckgEntity{},
-		Relations: []ckgRelation{},
-		Concepts:  []ckgConcept{},
-		Results:   []ckgQueryResult{},
+		Entities:   []ckgEntity{},
+		Relations:  []ckgRelation{},
+		Concepts:   []ckgConcept{},
+		Results:    []ckgQueryResult{},
 		TokenSaved: 0,
 	}
 

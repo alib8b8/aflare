@@ -611,7 +611,7 @@ func (s *seqExecState) executeRegularStep(i int, wStep WorkflowStep, stepStart t
 		Attempts: attemptsMade, Recoveries: recoveries,
 		EvalDuration: evalDuration, ExecuteDuration: duration,
 		TotalDuration: time.Since(stepStart),
-		InputLen: len(s.data), OutputLen: len(output), ErrorText: errText,
+		InputLen:      len(s.data), OutputLen: len(output), ErrorText: errText,
 		LLM:    projectLLMTelemetry(llmCollector.drainCalls()),
 		Router: projectRouterDecisions(llmCollector.drainDecisions()),
 	})
@@ -698,7 +698,7 @@ func (s *seqExecState) recordStepError(i int, wStep WorkflowStep, stepStart time
 		Index: i, NodeName: wStep.Node, StepName: wStep.Name, BatchIndex: -1,
 		ConditionPassed: true, EvalDuration: evalDuration,
 		TotalDuration: time.Since(stepStart),
-		InputLen: len(s.data), ErrorText: err.Error(),
+		InputLen:      len(s.data), ErrorText: err.Error(),
 	})
 	s.results = append(s.results, result)
 	s.sendStepEndTUI(i, wStep.Node, "", err, time.Since(stepStart))

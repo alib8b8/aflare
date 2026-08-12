@@ -178,8 +178,10 @@ func extractDescription(path string) string {
 
 type templateListNode struct{}
 
-func (n *templateListNode) Name() string       { return "template_list" }
-func (n *templateListNode) Description() string { return "Search available workflow templates (skills) by keyword or category. Returns 300+ pre-built skills across 16 domains." }
+func (n *templateListNode) Name() string { return "template_list" }
+func (n *templateListNode) Description() string {
+	return "Search available workflow templates (skills) by keyword or category. Returns 300+ pre-built skills across 16 domains."
+}
 
 func (n *templateListNode) Schema() core.NodeSchema {
 	return core.NodeSchema{
@@ -297,8 +299,10 @@ func matchKeyword(name, description, category, keyword string) bool {
 
 type templateInfoNode struct{}
 
-func (n *templateInfoNode) Name() string       { return "template_info" }
-func (n *templateInfoNode) Description() string { return "Get detailed info about a template including its YAML content and required parameters" }
+func (n *templateInfoNode) Name() string { return "template_info" }
+func (n *templateInfoNode) Description() string {
+	return "Get detailed info about a template including its YAML content and required parameters"
+}
 
 func (n *templateInfoNode) Schema() core.NodeSchema {
 	return core.NodeSchema{
@@ -402,8 +406,10 @@ func lookupExternalTemplate(name, category string) string {
 
 type runWorkflowNode struct{}
 
-func (n *runWorkflowNode) Name() string       { return "run_workflow" }
-func (n *runWorkflowNode) Description() string { return "Run a workflow template by name (e.g. 'stock-screener'), file path, or YAML content" }
+func (n *runWorkflowNode) Name() string { return "run_workflow" }
+func (n *runWorkflowNode) Description() string {
+	return "Run a workflow template by name (e.g. 'stock-screener'), file path, or YAML content"
+}
 
 func (n *runWorkflowNode) Schema() core.NodeSchema {
 	return core.NodeSchema{
@@ -509,8 +515,10 @@ func resolveTemplatePath(name string) string {
 
 type createWorkflowNode struct{}
 
-func (n *createWorkflowNode) Name() string       { return "create_workflow" }
-func (n *createWorkflowNode) Description() string { return "Generate a new workflow from a natural language description. Use when no existing template matches." }
+func (n *createWorkflowNode) Name() string { return "create_workflow" }
+func (n *createWorkflowNode) Description() string {
+	return "Generate a new workflow from a natural language description. Use when no existing template matches."
+}
 
 func (n *createWorkflowNode) Schema() core.NodeSchema {
 	return core.NodeSchema{
@@ -582,8 +590,10 @@ func (n *createWorkflowNode) Execute(ctx context.Context, input string, params m
 
 type selfUpdateNode struct{}
 
-func (n *selfUpdateNode) Name() string       { return "self_update" }
-func (n *selfUpdateNode) Description() string { return "Check for aflare updates and install the latest version. Use when the user asks to upgrade or if you detect the version is outdated." }
+func (n *selfUpdateNode) Name() string { return "self_update" }
+func (n *selfUpdateNode) Description() string {
+	return "Check for aflare updates and install the latest version. Use when the user asks to upgrade or if you detect the version is outdated."
+}
 
 func (n *selfUpdateNode) Schema() core.NodeSchema {
 	return core.NodeSchema{

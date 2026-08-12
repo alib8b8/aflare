@@ -33,20 +33,20 @@ import (
 
 // SimulationPersona defines a character or role for simulation.
 type SimulationPersona struct {
-	Name        string   `json:"name"`
-	Role        string   `json:"role"`
-	Traits      []string `json:"traits"`
-	Background  string   `json:"background"`
-	Goals       []string `json:"goals"`
+	Name       string   `json:"name"`
+	Role       string   `json:"role"`
+	Traits     []string `json:"traits"`
+	Background string   `json:"background"`
+	Goals      []string `json:"goals"`
 }
 
 // SimulationState tracks the current state of a simulation.
 type SimulationState struct {
-	Persona     SimulationPersona `json:"persona"`
-	Turn        int               `json:"turn"`
-	Context     string            `json:"context"`
-	Memory      []string          `json:"memory"`      // key events in the simulation
-	WorldState  map[string]string `json:"world_state"`  // shared world state
+	Persona    SimulationPersona `json:"persona"`
+	Turn       int               `json:"turn"`
+	Context    string            `json:"context"`
+	Memory     []string          `json:"memory"`      // key events in the simulation
+	WorldState map[string]string `json:"world_state"` // shared world state
 }
 
 // SimulationCapability enables generative behavior modeling for
@@ -61,8 +61,10 @@ func NewSimulationCapability() *SimulationCapability {
 	return &SimulationCapability{}
 }
 
-func (s *SimulationCapability) Name() string       { return "simulation" }
-func (s *SimulationCapability) Description() string { return "Simulation and generative modeling: produces human-like behavior outputs (模拟/生成式 Agent)" }
+func (s *SimulationCapability) Name() string { return "simulation" }
+func (s *SimulationCapability) Description() string {
+	return "Simulation and generative modeling: produces human-like behavior outputs (模拟/生成式 Agent)"
+}
 
 func (s *SimulationCapability) Init(loop *AgentLoop) error { return nil }
 
@@ -333,10 +335,10 @@ func (s *SimulationCapability) trackWorldState(output string) {
 
 	// Track state changes signaled by keywords
 	statePatterns := map[string][]string{
-		"location":   {"arrive at", "go to", "move to", "enter", "leave"},
-		"mood":       {"feel", "happy", "sad", "angry", "excited", "nervous", "calm"},
+		"location":     {"arrive at", "go to", "move to", "enter", "leave"},
+		"mood":         {"feel", "happy", "sad", "angry", "excited", "nervous", "calm"},
 		"relationship": {"trust", "friend", "enemy", "ally", "rival"},
-		"status":     {"success", "fail", "complete", "progress"},
+		"status":       {"success", "fail", "complete", "progress"},
 	}
 
 	for key, patterns := range statePatterns {

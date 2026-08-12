@@ -230,20 +230,20 @@ func TestE2E_AgentMaxIterations(t *testing.T) {
 
 // fakeCapability is a test capability that records Pre/Post calls.
 type fakeCapability struct {
-	name        string
-	preCalled   int
-	postCalled  int
-	preReturn   string
-	preErr      error
-	postReturn  string
-	postErr     error
-	initCalled  bool
-	initErr     error
-	mu          sync.Mutex
+	name       string
+	preCalled  int
+	postCalled int
+	preReturn  string
+	preErr     error
+	postReturn string
+	postErr    error
+	initCalled bool
+	initErr    error
+	mu         sync.Mutex
 }
 
 func (f *fakeCapability) Name() string        { return f.name }
-func (f *fakeCapability) Description() string  { return "fake test capability" }
+func (f *fakeCapability) Description() string { return "fake test capability" }
 
 func (f *fakeCapability) Init(loop *AgentLoop) error {
 	f.mu.Lock()
@@ -380,7 +380,7 @@ func TestE2E_StreamingCallbacks(t *testing.T) {
 		},
 		// Simulate token-by-token streaming for the second response
 		chunkedResponses: [][]string{
-			nil, // first call: use default (full response as one chunk)
+			nil,                                // first call: use default (full response as one chunk)
 			{"Stream", " test", " completed."}, // second call: chunked
 		},
 	}

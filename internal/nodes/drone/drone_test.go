@@ -182,9 +182,9 @@ func TestDroneNode_Execute_InvalidAltitude(t *testing.T) {
 	ctx := context.Background()
 
 	params := map[string]string{
-		"action":             "takeoff",
-		"mode":               "simulate",
-		"target_altitude_m":  "1000", // exceed 500m max
+		"action":            "takeoff",
+		"mode":              "simulate",
+		"target_altitude_m": "1000", // exceed 500m max
 	}
 	_, err := n.Execute(ctx, "takeoff", params)
 	if err == nil {
@@ -241,7 +241,7 @@ func TestDroneNode_Execute_InferAction(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		input         string
+		input          string
 		expectedAction string
 	}{
 		{"起飞到 20 米", "takeoff"},
@@ -329,12 +329,12 @@ func TestDroneNode_Execute_SafetyChecks(t *testing.T) {
 
 	// Test takeoff with safety checks
 	params := map[string]string{
-		"action":             "takeoff",
-		"mode":               "simulate",
-		"target_altitude_m":  "50",
-		"safety_altitude_m":  "1.5", // low safety altitude
-		"geofence_radius_m":  "5",   // too small
-		"max_flight_time_s":  "900", // long flight
+		"action":            "takeoff",
+		"mode":              "simulate",
+		"target_altitude_m": "50",
+		"safety_altitude_m": "1.5", // low safety altitude
+		"geofence_radius_m": "5",   // too small
+		"max_flight_time_s": "900", // long flight
 	}
 	result, err := n.Execute(ctx, "takeoff", params)
 	if err != nil {

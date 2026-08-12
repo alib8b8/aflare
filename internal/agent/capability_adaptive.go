@@ -42,8 +42,10 @@ func NewAdaptiveCapability() *AdaptiveCapability {
 	return &AdaptiveCapability{feedback: make([]string, 0)}
 }
 
-func (a *AdaptiveCapability) Name() string        { return "adaptive" }
-func (a *AdaptiveCapability) Description() string  { return "Learning and adaptation: improves from feedback and experience (学习型/自适应 Agent)" }
+func (a *AdaptiveCapability) Name() string { return "adaptive" }
+func (a *AdaptiveCapability) Description() string {
+	return "Learning and adaptation: improves from feedback and experience (学习型/自适应 Agent)"
+}
 
 func (a *AdaptiveCapability) Init(loop *AgentLoop) error {
 	// Load past adaptive feedback from cross-session learning journal.
@@ -82,4 +84,3 @@ func (a *AdaptiveCapability) PostProcess(ctx context.Context, input, output stri
 }
 
 func (a *AdaptiveCapability) Shutdown() error { return nil }
-

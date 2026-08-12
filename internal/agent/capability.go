@@ -177,16 +177,16 @@ func (cr *CapabilityRegistry) Names() []string {
 // AvailableCapabilities is the list of all recognized capability names.
 // These map to the Agent type taxonomy dimensions.
 var AvailableCapabilities = map[string]string{
-	"reflection":     "Self-reflection and self-correction after each turn (反思/自我批评 Agent)",
-	"human-in-loop":  "Pause at critical decisions for human approval (Human-in-the-loop Agent)",
-	"bdi":            "Belief-Desire-Intention goal management and tracking (BDI Agent)",
-	"utility":        "Utility-driven optimization of decisions (效用驱动 Agent)",
-	"adaptive":       "Learning and adaptation from feedback (学习型/自适应 Agent)",
-	"memory":         "Cross-session long-term memory and state (有状态 Agent)",
-	"planning":       "Goal-driven planning and action sequencing (规划式 Agent)",
-	"multi-agent":    "Multi-agent collaboration and coordination (多 Agent 协作式)",
-	"workflow":       "Predefined workflow/pipeline execution (工作流/管道式 Agent)",
-	"simulation":     "Simulation and generative behavior modeling (模拟/生成式 Agent)",
+	"reflection":    "Self-reflection and self-correction after each turn (反思/自我批评 Agent)",
+	"human-in-loop": "Pause at critical decisions for human approval (Human-in-the-loop Agent)",
+	"bdi":           "Belief-Desire-Intention goal management and tracking (BDI Agent)",
+	"utility":       "Utility-driven optimization of decisions (效用驱动 Agent)",
+	"adaptive":      "Learning and adaptation from feedback (学习型/自适应 Agent)",
+	"memory":        "Cross-session long-term memory and state (有状态 Agent)",
+	"planning":      "Goal-driven planning and action sequencing (规划式 Agent)",
+	"multi-agent":   "Multi-agent collaboration and coordination (多 Agent 协作式)",
+	"workflow":      "Predefined workflow/pipeline execution (工作流/管道式 Agent)",
+	"simulation":    "Simulation and generative behavior modeling (模拟/生成式 Agent)",
 }
 
 // ParseCapabilities parses a comma-separated capability string into a list.

@@ -182,7 +182,7 @@ func TestDiff_MultipleEvents(t *testing.T) {
 	}
 	cur := map[string]fileMeta{
 		"a.txt": {ModTime: now.Add(1 * time.Hour), Size: 150}, // modified
-		"c.txt": {ModTime: now, Size: 300},                     // created
+		"c.txt": {ModTime: now, Size: 300},                    // created
 		// b.txt deleted
 	}
 

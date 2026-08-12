@@ -57,8 +57,10 @@ func NewReflectionCapability() *ReflectionCapability {
 	}
 }
 
-func (r *ReflectionCapability) Name() string        { return "reflection" }
-func (r *ReflectionCapability) Description() string  { return "Self-reflection and self-correction: evaluates output quality and triggers improvement when needed" }
+func (r *ReflectionCapability) Name() string { return "reflection" }
+func (r *ReflectionCapability) Description() string {
+	return "Self-reflection and self-correction: evaluates output quality and triggers improvement when needed"
+}
 
 func (r *ReflectionCapability) Init(loop *AgentLoop) error {
 	// Load past reflection issues from cross-session learning journal.

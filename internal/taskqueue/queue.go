@@ -42,14 +42,14 @@ const (
 
 // Task represents a queued task to be executed by the agent.
 type Task struct {
-	ID        string    // unique task identifier (for dedup)
-	Source    string    // source of the task (e.g. "scheduler")
-	Message   string    // the agent input message
-	CreatedAt time.Time // when the task was created
-	Status    TaskStatus // current lifecycle status
-	Error     string     // error message if status is failed
-	StartedAt time.Time  // when execution started
-	DoneAt    time.Time  // when execution completed (done or failed)
+	ID        string            // unique task identifier (for dedup)
+	Source    string            // source of the task (e.g. "scheduler")
+	Message   string            // the agent input message
+	CreatedAt time.Time         // when the task was created
+	Status    TaskStatus        // current lifecycle status
+	Error     string            // error message if status is failed
+	StartedAt time.Time         // when execution started
+	DoneAt    time.Time         // when execution completed (done or failed)
 	ReplyTo   chan<- TaskResult // where to send the result (nil = discard)
 }
 

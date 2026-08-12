@@ -49,8 +49,8 @@ type WorkflowExecution struct {
 // It tracks execution history, validates templates, and provides
 // guidance on template selection and composition.
 type WorkflowCapability struct {
-	mu       sync.RWMutex
-	history  []WorkflowExecution
+	mu        sync.RWMutex
+	history   []WorkflowExecution
 	templates map[string]TemplateMeta // cached template metadata
 }
 
@@ -69,8 +69,10 @@ func NewWorkflowCapability() *WorkflowCapability {
 	}
 }
 
-func (w *WorkflowCapability) Name() string       { return "workflow" }
-func (w *WorkflowCapability) Description() string { return "Predefined workflow execution: stable, predictable pipeline steps (工作流/管道式 Agent)" }
+func (w *WorkflowCapability) Name() string { return "workflow" }
+func (w *WorkflowCapability) Description() string {
+	return "Predefined workflow execution: stable, predictable pipeline steps (工作流/管道式 Agent)"
+}
 
 func (w *WorkflowCapability) Init(loop *AgentLoop) error {
 	// Scan templates directory for available workflows

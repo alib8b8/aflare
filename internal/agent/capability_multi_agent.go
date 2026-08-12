@@ -86,8 +86,10 @@ func NewMultiAgentCapability() *MultiAgentCapability {
 	}
 }
 
-func (m *MultiAgentCapability) Name() string       { return "multi-agent" }
-func (m *MultiAgentCapability) Description() string { return "Multi-agent collaboration: coordinates multiple specialized agents (多 Agent 协作式)" }
+func (m *MultiAgentCapability) Name() string { return "multi-agent" }
+func (m *MultiAgentCapability) Description() string {
+	return "Multi-agent collaboration: coordinates multiple specialized agents (多 Agent 协作式)"
+}
 
 func (m *MultiAgentCapability) Init(loop *AgentLoop) error { return nil }
 

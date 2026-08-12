@@ -241,11 +241,11 @@ func TestStore_LoadStore_NonExistent(t *testing.T) {
 
 func TestFormatBadge(t *testing.T) {
 	badge := Badge{
-		ID:        "test-bronze",
-		Tier:      TierBronze,
-		Reason:    "Submitted template: hello-world",
-		ContType:  ContributionTemplate,
-		Project:   "aflare",
+		ID:       "test-bronze",
+		Tier:     TierBronze,
+		Reason:   "Submitted template: hello-world",
+		ContType: ContributionTemplate,
+		Project:  "aflare",
 	}
 
 	result := FormatBadge(badge)

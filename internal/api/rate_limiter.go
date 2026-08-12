@@ -49,8 +49,8 @@ type ipRateLimiter struct {
 
 // rateLimiterEntry holds a rate limiter and its last access time.
 type rateLimiterEntry struct {
-	limiter   *rate.Limiter
-	lastSeen  time.Time
+	limiter  *rate.Limiter
+	lastSeen time.Time
 }
 
 // newIPRateLimiter creates a per-IP rate limiter with the given rate and burst.

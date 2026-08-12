@@ -125,7 +125,7 @@ func HandleAgent(args []string) {
 						return
 					case event := <-watchEvents:
 						_ = tq.Enqueue(&taskqueue.Task{
-						ID:        fmt.Sprintf("fw-%s-%d", event.Path, event.Timestamp.Unix()),
+							ID:        fmt.Sprintf("fw-%s-%d", event.Path, event.Timestamp.Unix()),
 							Source:    "filewatch",
 							Message:   filewatch.FormatEvent(event),
 							CreatedAt: event.Timestamp,

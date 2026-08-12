@@ -52,8 +52,10 @@ func NewMemoryCapability() *MemoryCapability {
 	}
 }
 
-func (m *MemoryCapability) Name() string       { return "memory" }
-func (m *MemoryCapability) Description() string { return "Cross-session memory: remembers preferences and history across sessions (有状态 Agent)" }
+func (m *MemoryCapability) Name() string { return "memory" }
+func (m *MemoryCapability) Description() string {
+	return "Cross-session memory: remembers preferences and history across sessions (有状态 Agent)"
+}
 
 func (m *MemoryCapability) Init(loop *AgentLoop) error {
 	// Load entries from the shared persistent store.

@@ -56,8 +56,8 @@ var (
 		"waypoint": true, "survey": true, "corridor": true,
 		"orbit": true, "patrol": true,
 	}
-	latPattern    = regexp.MustCompile(`^-?([0-8]?\d(\.\d+)?|90(\.0+)?)$`)
-	lonPattern    = regexp.MustCompile(`^-?((1[0-7]\d|[1-9]?\d)(\.\d+)?|180(\.0+)?)$`)
+	latPattern = regexp.MustCompile(`^-?([0-8]?\d(\.\d+)?|90(\.0+)?)$`)
+	lonPattern = regexp.MustCompile(`^-?((1[0-7]\d|[1-9]?\d)(\.\d+)?|180(\.0+)?)$`)
 )
 
 // DroneNode controls MAVLink-compatible drones (PX4, ArduPilot) via HTTP bridge.
@@ -102,18 +102,18 @@ func (n *DroneNode) Schema() core.NodeSchema {
 
 // DroneResult is the JSON output from the node.
 type DroneResult struct {
-	Type         string                 `json:"type"`
-	DroneModel   string                 `json:"drone_model"`
-	DroneID      string                 `json:"drone_id"`
-	Action       string                 `json:"action"`
-	Mode         string                 `json:"mode"`
-	Success      bool                   `json:"success"`
-	Description  string                 `json:"description"`
-	Telemetry    *DroneTelemetry        `json:"telemetry,omitempty"`
-	Mission      *DroneMissionStatus    `json:"mission,omitempty"`
-	SafetyChecks *DroneSafetyResult     `json:"safety_checks,omitempty"`
-	Error        string                 `json:"error,omitempty"`
-	Timestamp    string                 `json:"timestamp"`
+	Type         string              `json:"type"`
+	DroneModel   string              `json:"drone_model"`
+	DroneID      string              `json:"drone_id"`
+	Action       string              `json:"action"`
+	Mode         string              `json:"mode"`
+	Success      bool                `json:"success"`
+	Description  string              `json:"description"`
+	Telemetry    *DroneTelemetry     `json:"telemetry,omitempty"`
+	Mission      *DroneMissionStatus `json:"mission,omitempty"`
+	SafetyChecks *DroneSafetyResult  `json:"safety_checks,omitempty"`
+	Error        string              `json:"error,omitempty"`
+	Timestamp    string              `json:"timestamp"`
 }
 
 // DroneTelemetry holds telemetry data returned by the drone.

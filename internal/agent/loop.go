@@ -45,8 +45,8 @@ const (
 
 // AgentInput carries a single input message with its source metadata.
 type AgentInput struct {
-	Source  InputSource // where the input came from
-	Message string      // the input text
+	Source  InputSource        // where the input came from
+	Message string             // the input text
 	ReplyTo chan<- AgentOutput // where to send the response (nil = discard)
 }
 
@@ -66,15 +66,15 @@ type AgentOutput struct {
 // utility optimization, etc.) that hook into the execution cycle via
 // PreProcess and PostProcess.
 type AgentLoop struct {
-	config       Config
-	reg          *core.Registry
-	tools        []core.AgentTool
-	systemMsg    string
-	ctx          *ContextManager
-	interrupt    chan struct{}        // internal interrupt for Ctrl-C
-	caps         *CapabilityRegistry  // pluggable capabilities
-	onCompress   func(before, after int) // optional compression notification
-	llmProvider  nodes.LLMProvider        // optional: inject mock LLM provider for testing
+	config      Config
+	reg         *core.Registry
+	tools       []core.AgentTool
+	systemMsg   string
+	ctx         *ContextManager
+	interrupt   chan struct{}           // internal interrupt for Ctrl-C
+	caps        *CapabilityRegistry     // pluggable capabilities
+	onCompress  func(before, after int) // optional compression notification
+	llmProvider nodes.LLMProvider       // optional: inject mock LLM provider for testing
 }
 
 // NewAgentLoop creates a new AgentLoop with the given configuration.
