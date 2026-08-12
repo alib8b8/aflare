@@ -26,6 +26,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -1170,7 +1171,14 @@ func (n *OpenAICompatibleNode) CallWithToolsStream(ctx context.Context, messages
 		for _, tc := range delta.ToolCalls {
 			idx := tc.Index
 			if existing, ok := toolCallAccum[idx]; ok {
-				// Append arguments fragment
+				// Update ID/Name if the new chunk carries them (some providers
+				// split ID/Name and arguments across separate chunks).
+				if tc.ID != "" {
+					existing.ID = tc.ID
+				}
+				if tc.Function.Name != "" {
+					existing.Function.Name = tc.Function.Name
+				}
 				existing.Function.Arguments += tc.Function.Arguments
 			} else {
 				cp := tc
@@ -1179,20 +1187,13 @@ func (n *OpenAICompatibleNode) CallWithToolsStream(ctx context.Context, messages
 		}
 	}
 
-	// Convert accumulated tool_calls to slice
+	// Convert accumulated tool_calls to slice, sorted by index
 	if len(toolCallAccum) > 0 {
 		indices := make([]int, 0, len(toolCallAccum))
 		for i := range toolCallAccum {
 			indices = append(indices, i)
 		}
-		// Sort by index (simple insertion)
-		for i := 0; i < len(indices); i++ {
-			for j := i + 1; j < len(indices); j++ {
-				if indices[j] < indices[i] {
-					indices[i], indices[j] = indices[j], indices[i]
-				}
-			}
-		}
+		sort.Ints(indices)
 		for _, i := range indices {
 			toolCalls = append(toolCalls, *toolCallAccum[i])
 		}
