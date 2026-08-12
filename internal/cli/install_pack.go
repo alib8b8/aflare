@@ -22,15 +22,65 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/alib8b8/aflare/internal/meta"
 	"github.com/alib8b8/aflare/internal/packs"
 	"github.com/alib8b8/aflare/internal/skills"
 )
 
+// installedPackManifest records the result of a pack installation.
+type installedPackManifest struct {
+	Pack         string   `json:"pack"`
+	Description  string   `json:"description"`
+	InstalledAt  string   `json:"installed_at"`
+	Templates    int      `json:"templates"`
+	Capabilities []string `json:"capabilities"`
+	Categories   []string `json:"categories"`
+}
+
+// installedPacksDir returns the directory where pack installation manifests
+// are stored (~/.aflare/installed-packs/).
+func installedPacksDir() string {
+	return filepath.Join(meta.DataDir(), "installed-packs")
+}
+
+// isPackInstalled checks whether a pack manifest exists on disk.
+func isPackInstalled(name string) bool {
+	_, err := os.Stat(filepath.Join(installedPacksDir(), name+".json"))
+	return err == nil
+}
+
+// loadInstalledPack reads a previously installed pack manifest.
+func loadInstalledPack(name string) (*installedPackManifest, error) {
+	data, err := os.ReadFile(filepath.Join(installedPacksDir(), name+".json"))
+	if err != nil {
+		return nil, err
+	}
+	var m installedPackManifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// saveInstalledPack writes a pack installation manifest to disk.
+func saveInstalledPack(m *installedPackManifest) error {
+	dir := installedPacksDir()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create installed-packs directory: %w", err)
+	}
+	data, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+	return os.WriteFile(filepath.Join(dir, m.Pack+".json"), data, 0644)
+}
+
 // HandleInstallPack handles the "install-pack" command.
 // Usage: aflare install-pack <pack-name>
 // Usage: aflare install-pack --list
+// Usage: aflare install-pack <pack-name> --force
 func HandleInstallPack(args []string) {
 	if len(args) == 0 {
 		PrintInstallPackUsage()
@@ -49,12 +99,33 @@ func HandleInstallPack(args []string) {
 	}
 
 	packName := args[0]
+	force := false
+	for _, a := range args[1:] {
+		if a == "--force" || a == "-f" {
+			force = true
+		}
+	}
+
 	pack := packs.GetPack(packName)
 	if pack == nil {
 		fmt.Printf("Error: pack %q not found.\n\n", packName)
 		fmt.Println("Available packs:")
 		listPacks()
 		os.Exit(1)
+	}
+
+	// Idempotent: check if already installed.
+	if isPackInstalled(packName) && !force {
+		existing, err := loadInstalledPack(packName)
+		if err == nil {
+			fmt.Printf("Pack %q is already installed (since %s).\n", packName, existing.InstalledAt)
+			fmt.Printf("  Templates:    %d\n", existing.Templates)
+			fmt.Printf("  Capabilities: %s\n", strings.Join(existing.Capabilities, ", "))
+			fmt.Println()
+			fmt.Println("Use --force to reinstall:")
+			fmt.Printf("  aflare install-pack %s --force\n", packName)
+			return
+		}
 	}
 
 	// Load the skills registry.
@@ -68,7 +139,6 @@ func HandleInstallPack(args []string) {
 	// Collect matching skills.
 	var matchingSkills []*skills.SkillMeta
 	if packName == "all" || len(pack.Categories) == 0 {
-		// "all" pack includes everything.
 		matchingSkills = registry.List()
 	} else {
 		for _, cat := range pack.Categories {
@@ -96,29 +166,28 @@ func HandleInstallPack(args []string) {
 	})
 
 	// Display summary.
-	fmt.Printf("Installing pack: %s\n", pack.Name)
+	if force {
+		fmt.Printf("Reinstalling pack: %s\n", pack.Name)
+	} else {
+		fmt.Printf("Installing pack: %s\n", pack.Name)
+	}
 	fmt.Printf("  Description:  %s\n", pack.Description)
 	fmt.Printf("  Templates:    %d\n", len(unique))
 	fmt.Printf("  Capabilities: %s\n", strings.Join(pack.Capabilities, ", "))
 	fmt.Println()
 
-	// Generate recommended config.
-	configDir := meta.DataDir()
-	configPath := filepath.Join(configDir, "pack-config.json")
-	config := map[string]interface{}{
-		"pack":         pack.Name,
-		"installed_at": os.Getenv("TIMESTAMP"), // filled by the runner
-		"templates":    len(unique),
-		"capabilities": pack.Capabilities,
-		"categories":   pack.Categories,
+	// Save installation manifest.
+	manifest := &installedPackManifest{
+		Pack:         pack.Name,
+		Description:  pack.Description,
+		InstalledAt:  time.Now().Format(time.RFC3339),
+		Templates:    len(unique),
+		Capabilities: pack.Capabilities,
+		Categories:   pack.Categories,
 	}
 
-	configData, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		fmt.Printf("Warning: failed to generate config: %v\n", err)
-	} else {
-		_ = os.MkdirAll(configDir, 0755)
-		_ = os.WriteFile(configPath, configData, 0644)
+	if err := saveInstalledPack(manifest); err != nil {
+		fmt.Printf("Warning: failed to save installation manifest: %v\n", err)
 	}
 
 	// Print template list.
@@ -143,17 +212,23 @@ func HandleInstallPack(args []string) {
 	fmt.Printf("Pack %q installed successfully. %d templates ready to use.\n", pack.Name, len(unique))
 }
 
-// listPacks prints all available scenario packs.
+// listPacks prints all available scenario packs and marks installed ones.
 func listPacks() {
 	allPacks := packs.AllPacks()
 	fmt.Printf("Available scenario packs (%d):\n\n", len(allPacks))
 	for _, p := range allPacks {
-		fmt.Printf("  %-16s %s", p.Name, p.Description)
+		marker := " "
+		if isPackInstalled(p.Name) {
+			marker = "*"
+		}
+		fmt.Printf(" %s %-16s %s", marker, p.Name, p.Description)
 		if len(p.Capabilities) > 0 {
 			fmt.Printf("  [caps: %s]", strings.Join(p.Capabilities, ", "))
 		}
 		fmt.Println()
 	}
+	fmt.Println()
+	fmt.Println("  * = installed")
 	fmt.Println()
 	fmt.Println("Install a pack: aflare install-pack <name>")
 }
@@ -162,6 +237,7 @@ func listPacks() {
 func PrintInstallPackUsage() {
 	fmt.Println("Usage: aflare install-pack <pack-name>")
 	fmt.Println("       aflare install-pack --list")
+	fmt.Println("       aflare install-pack <pack-name> --force")
 	fmt.Println()
 	fmt.Println("Installs a scenario-based pack of templates with recommended capabilities.")
 	fmt.Println("Each pack bundles all templates from one or more categories, plus")
@@ -169,7 +245,8 @@ func PrintInstallPackUsage() {
 	fmt.Println()
 	fmt.Println("Commands:")
 	fmt.Println("  <pack-name>    Install the named pack")
-	fmt.Println("  --list, -l     List all available packs")
+	fmt.Println("  --list, -l     List all available packs (* = installed)")
+	fmt.Println("  --force, -f    Reinstall even if already installed")
 	fmt.Println("  --help, -h     Show this help")
 	fmt.Println()
 	fmt.Println("Examples:")
@@ -178,6 +255,7 @@ func PrintInstallPackUsage() {
 	fmt.Println("  aflare install-pack finance")
 	fmt.Println("  aflare install-pack --list")
 	fmt.Println("  aflare install-pack all")
+	fmt.Println("  aflare install-pack devops --force")
 	fmt.Println()
 	listPacks()
 }

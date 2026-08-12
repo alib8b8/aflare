@@ -3,6 +3,10 @@
 aflare supports loading community-contributed plugins as Go `.so` files. Plugins can add custom
 nodes to the workflow engine or extend core functionality — without modifying the aflare source code.
 
+> **Platform support**: Go plugins (`-buildmode=plugin`) are only available on **Linux** and **macOS**.
+> The `plugin` package is not supported on Windows. If you need cross-platform extensibility,
+> consider using aflare's built-in MCP server support or contributing a built-in node instead.
+
 ## Architecture
 
 ```
@@ -273,6 +277,12 @@ Plugins must be built with the same Go toolchain version as aflare:
 go version
 go build -buildmode=plugin -o myplugin.so .
 ```
+
+### Windows: "plugin" package not available
+
+Go's `plugin` package is not available on Windows. If you see `plugin: not implemented on
+windows/amd64`, you are running on an unsupported platform. Use Linux or macOS for plugin
+development, or use aflare's MCP server support for cross-platform extensibility.
 
 ## Current Status
 
