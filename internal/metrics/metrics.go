@@ -45,19 +45,19 @@ import (
 // Metric name constants. Centralised so collectors and tests share one source
 // of truth.
 const (
-	NodeExecutionsName       = "llmbox_node_executions_total"
-	NodeExecDurationName     = "llmbox_node_execution_duration_seconds"
-	WorkflowExecutionsName   = "llmbox_workflow_executions_total"
-	WorkflowExecDurationName = "llmbox_workflow_execution_duration_seconds"
-	SecurityBlocksName       = "llmbox_security_blocks_total"
-	CacheHitsName            = "llmbox_cache_hits_total"
-	CacheMissesName          = "llmbox_cache_misses_total"
-	LLMCallsName             = "llmbox_llm_calls_total"
-	LLMTokensName            = "llmbox_llm_tokens_total"
-	LLMCostName              = "llmbox_llm_cost_usd_total"
-	NodeCallsGaugeName       = "llmbox_node_calls"
-	NodeErrorsGaugeName      = "llmbox_node_errors"
-	SecurityBlocksGaugeName  = "llmbox_security_blocks"
+	NodeExecutionsName       = "aflare_node_executions_total"
+	NodeExecDurationName     = "aflare_node_execution_duration_seconds"
+	WorkflowExecutionsName   = "aflare_workflow_executions_total"
+	WorkflowExecDurationName = "aflare_workflow_execution_duration_seconds"
+	SecurityBlocksName       = "aflare_security_blocks_total"
+	CacheHitsName            = "aflare_cache_hits_total"
+	CacheMissesName          = "aflare_cache_misses_total"
+	LLMCallsName             = "aflare_llm_calls_total"
+	LLMTokensName            = "aflare_llm_tokens_total"
+	LLMCostName              = "aflare_llm_cost_usd_total"
+	NodeCallsGaugeName       = "aflare_node_calls"
+	NodeErrorsGaugeName      = "aflare_node_errors"
+	SecurityBlocksGaugeName  = "aflare_security_blocks"
 )
 
 var (

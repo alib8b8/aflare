@@ -62,7 +62,7 @@ func newCacheTestNode(t *testing.T, srvURL string, c *cache.Cache) *OpenAICompat
 		Name:            "cachetest",
 		DefaultModel:    "test-model",
 		DefaultEndpoint: srvURL,
-		EnvAPIKey:       "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET",
+		EnvAPIKey:       "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET",
 		ProviderName:    "TestProvider",
 	})
 	n.SetCache(c)
@@ -204,7 +204,7 @@ func TestLLMCache_DisabledByDefault(t *testing.T) {
 		Name:            "cachetest",
 		DefaultModel:    "test-model",
 		DefaultEndpoint: srv.URL,
-		EnvAPIKey:       "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET",
+		EnvAPIKey:       "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET",
 		ProviderName:    "TestProvider",
 	})
 	params := map[string]string{"api_key": "sk-test", "endpoint": srv.URL}

@@ -154,6 +154,8 @@ func main() {
 		cli.HandleInstallPack(args)
 	case "watermark":
 		cli.HandleWatermark(args)
+	case "badge":
+		cli.HandleBadge(args)
 	default:
 		cli.HandleRunFile(command, dryRun, false, "", safeMode)
 	}

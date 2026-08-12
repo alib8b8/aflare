@@ -352,7 +352,7 @@ func TestOpenAICompatibleNode_Execute_B1ParamsReachServer(t *testing.T) {
 		Name:            "testnode",
 		DefaultModel:    "test-model",
 		DefaultEndpoint: "http://localhost:11434",
-		EnvAPIKey:       "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET",
+		EnvAPIKey:       "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET",
 		ProviderName:    "TestProvider",
 	}
 	n := NewOpenAICompatibleNode(cfg)
@@ -400,7 +400,7 @@ func TestOpenAICompatibleNode_Execute_B1InvalidParamErrors(t *testing.T) {
 		Name:            "testnode",
 		DefaultModel:    "test-model",
 		DefaultEndpoint: "http://localhost:11434",
-		EnvAPIKey:       "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET",
+		EnvAPIKey:       "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET",
 		ProviderName:    "TestProvider",
 	}
 	n := NewOpenAICompatibleNode(cfg)

@@ -141,7 +141,7 @@ func TestLLMClient_MultiProviderShapesEquivalence(t *testing.T) {
 				Name:            "test_" + tc.name,
 				DefaultModel:    "test-model",
 				DefaultEndpoint: srv.URL,
-				EnvAPIKey:       "LLMBOX_B5_NEVER_SET",
+				EnvAPIKey:       "AFLARE_B5_NEVER_SET",
 				ProviderName:    tc.name,
 			})
 
@@ -203,7 +203,7 @@ func TestLLMClient_MissingUsageDoesntPanic(t *testing.T) {
 		Name:            "no_usage",
 		DefaultModel:    "m",
 		DefaultEndpoint: srv.URL,
-		EnvAPIKey:       "LLMBOX_B5_NEVER_SET2",
+		EnvAPIKey:       "AFLARE_B5_NEVER_SET2",
 		ProviderName:    "noUsage",
 	})
 	sink := &recordingSink{}
@@ -261,7 +261,7 @@ func TestLLMClient_TokenCountingPropagates(t *testing.T) {
 				Name:            "tok_" + tc.name,
 				DefaultModel:    "m",
 				DefaultEndpoint: srv.URL,
-				EnvAPIKey:       "LLMBOX_B5_NEVER_SET3",
+				EnvAPIKey:       "AFLARE_B5_NEVER_SET3",
 				ProviderName:    "tok",
 			})
 			sink := &recordingSink{}
@@ -309,7 +309,7 @@ func TestLLMClient_RequestShapeSentToProvider(t *testing.T) {
 		Name:            "req_shape",
 		DefaultModel:    "default-model",
 		DefaultEndpoint: srv.URL,
-		EnvAPIKey:       "LLMBOX_B5_NEVER_SET4",
+		EnvAPIKey:       "AFLARE_B5_NEVER_SET4",
 		ProviderName:    "reqshape",
 	})
 
@@ -387,7 +387,7 @@ func TestLLMClient_ErrorResponsePropagates(t *testing.T) {
 		Name:            "err",
 		DefaultModel:    "m",
 		DefaultEndpoint: srv.URL,
-		EnvAPIKey:       "LLMBOX_B5_NEVER_SET5",
+		EnvAPIKey:       "AFLARE_B5_NEVER_SET5",
 		ProviderName:    "err",
 	})
 	sink := &recordingSink{}
@@ -423,7 +423,7 @@ func TestLLMClient_TelemetryRecordsLatency(t *testing.T) {
 		Name:            "slow",
 		DefaultModel:    "m",
 		DefaultEndpoint: srv.URL,
-		EnvAPIKey:       "LLMBOX_B5_NEVER_SET6",
+		EnvAPIKey:       "AFLARE_B5_NEVER_SET6",
 		ProviderName:    "slow",
 	})
 	sink := &recordingSink{}
@@ -455,7 +455,7 @@ func BenchmarkLLMClient_Execute_NoTelemetry(b *testing.B) {
 		Name:            "bench",
 		DefaultModel:    "m",
 		DefaultEndpoint: srv.URL,
-		EnvAPIKey:       "LLMBOX_B5_NEVER_SET7",
+		EnvAPIKey:       "AFLARE_B5_NEVER_SET7",
 		ProviderName:    "bench",
 	})
 	ctx := context.Background()
@@ -484,7 +484,7 @@ func BenchmarkLLMClient_Execute_WithTelemetry(b *testing.B) {
 		Name:            "bench",
 		DefaultModel:    "m",
 		DefaultEndpoint: srv.URL,
-		EnvAPIKey:       "LLMBOX_B5_NEVER_SET8",
+		EnvAPIKey:       "AFLARE_B5_NEVER_SET8",
 		ProviderName:    "bench",
 	})
 	sink := &recordingSink{}
@@ -513,7 +513,7 @@ func BenchmarkLLMClient_Parallel_NoTelemetry(b *testing.B) {
 		Name:            "benchpar",
 		DefaultModel:    "m",
 		DefaultEndpoint: srv.URL,
-		EnvAPIKey:       "LLMBOX_B5_NEVER_SET9",
+		EnvAPIKey:       "AFLARE_B5_NEVER_SET9",
 		ProviderName:    "benchpar",
 	})
 	ctx := context.Background()
@@ -604,7 +604,7 @@ func BenchmarkLLMClient_ExecuteStream(b *testing.B) {
 		Name:            "benchstream",
 		DefaultModel:    "m",
 		DefaultEndpoint: srv.URL,
-		EnvAPIKey:       "LLMBOX_B5_NEVER_SET10",
+		EnvAPIKey:       "AFLARE_B5_NEVER_SET10",
 		ProviderName:    "benchstream",
 	})
 	ctx := context.Background()
@@ -631,7 +631,7 @@ func BenchmarkLLMClient_ExecuteStream_Parallel(b *testing.B) {
 		Name:            "benchstreampar",
 		DefaultModel:    "m",
 		DefaultEndpoint: srv.URL,
-		EnvAPIKey:       "LLMBOX_B5_NEVER_SET11",
+		EnvAPIKey:       "AFLARE_B5_NEVER_SET11",
 		ProviderName:    "benchstreampar",
 	})
 	ctx := context.Background()

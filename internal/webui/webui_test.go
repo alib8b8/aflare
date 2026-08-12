@@ -1379,7 +1379,7 @@ func TestMetricsEndpoint_DisabledByDefault(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 (index fallback), got %d", resp.StatusCode)
 	}
-	if strings.Contains(string(body), "llmbox_node_executions_total") {
+	if strings.Contains(string(body), "aflare_node_executions_total") {
 		t.Error("/metrics should not expose prometheus text when disabled")
 	}
 }
@@ -1408,10 +1408,10 @@ func TestMetricsEndpoint_Enabled(t *testing.T) {
 	// a stable marker that the endpoint is serving Prometheus format. Labelled
 	// CounterVecs only appear once a label combination has been touched (see
 	// TestMetricsEndpoint_IncrementAfterNodeExecution).
-	if !strings.Contains(string(body), "llmbox_cache_hits_total") {
-		t.Errorf("expected llmbox_cache_hits_total in /metrics output\n%s", string(body))
+	if !strings.Contains(string(body), "aflare_cache_hits_total") {
+		t.Errorf("expected aflare_cache_hits_total in /metrics output\n%s", string(body))
 	}
-	if !strings.Contains(string(body), "# TYPE llmbox_cache_hits_total counter") {
+	if !strings.Contains(string(body), "# TYPE aflare_cache_hits_total counter") {
 		t.Errorf("expected prometheus TYPE line for cache_hits_total")
 	}
 }
@@ -1423,7 +1423,7 @@ func TestMetricsEndpoint_IncrementAfterNodeExecution(t *testing.T) {
 	defer ts.Close()
 
 	// Execute a node through ExecuteWithStats; this direct-Incs
-	// llmbox_node_executions_total{node_name="echo_metrics_test",status="success"}.
+	// aflare_node_executions_total{node_name="echo_metrics_test",status="success"}.
 	reg := core.NewRegistry()
 	reg.Register(echoMetricsNode{})
 	if _, err := reg.ExecuteWithStats("echo_metrics_test", context.Background(), "hello", nil); err != nil {
@@ -1439,7 +1439,7 @@ func TestMetricsEndpoint_IncrementAfterNodeExecution(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	needle := `llmbox_node_executions_total{node_name="echo_metrics_test",status="success"}`
+	needle := `aflare_node_executions_total{node_name="echo_metrics_test",status="success"}`
 	if !strings.Contains(string(body), needle) {
 		t.Errorf("expected %q in /metrics output after node execution\nbody:\n%s", needle, string(body))
 	}

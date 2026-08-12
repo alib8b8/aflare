@@ -97,8 +97,8 @@ COPY --from=builder /app/aflare /app/aflare
 RUN mkdir -p /workflows /output /nodes
 
 # 设置环境变量
-ENV LLMBOX_CONFIG=/app/config.yaml
-ENV LLMBOX_LOG_LEVEL=info
+ENV AFLARE_CONFIG=/app/config.yaml
+ENV AFLARE_LOG_LEVEL=info
 ENV TZ=Asia/Shanghai
 
 # 设置工作目录
@@ -115,9 +115,9 @@ CMD ["--help"]
 
 | 变量 | 描述 | 默认值 |
 |------|------|--------|
-| `LLMBOX_CONFIG` | 配置文件路径 | `/app/config.yaml` |
-| `LLMBOX_LOG_LEVEL` | 日志级别 | `info` |
-| `LLMBOX_CACHE_DIR` | 缓存目录 | `/tmp/aflare-cache` |
+| `AFLARE_CONFIG` | 配置文件路径 | `/app/config.yaml` |
+| `AFLARE_LOG_LEVEL` | 日志级别 | `info` |
+| `AFLARE_CACHE_DIR` | 缓存目录 | `/tmp/aflare-cache` |
 | `ANTHROPIC_API_KEY` | Anthropic API 密钥 | - |
 | `OPENAI_API_KEY` | OpenAI API 密钥 | - |
 | `DEEPSEEK_API_KEY` | DeepSeek API 密钥 | - |
@@ -130,7 +130,7 @@ docker run --rm \
   -v $(pwd)/output:/output \            # 输出目录
   -v $(pwd)/nodes:/nodes \              # 自定义节点
   -v $(pwd)/config.yaml:/app/config.yaml \  # 配置文件
-  -v llmbox-cache:/tmp/aflare-cache \  # 持久化缓存
+  -v aflare-cache:/tmp/aflare-cache \  # 持久化缓存
   ghcr.io/alib8b8/aflare:latest \
   run /workflows/my-workflow.yaml
 ```
@@ -188,15 +188,15 @@ services:
       - ./workflows:/workflows
       - ./output:/output
       - ./nodes:/nodes
-      - llmbox-cache:/tmp/aflare-cache
+      - aflare-cache:/tmp/aflare-cache
     environment:
-      - LLMBOX_LOG_LEVEL=info
+      - AFLARE_LOG_LEVEL=info
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     command: ["run", "--watch", "/workflows"]
 
 volumes:
-  llmbox-cache:
+  aflare-cache:
 ```
 
 ### 带本地 Ollama
@@ -297,7 +297,7 @@ spec:
         - name: ANTHROPIC_API_KEY
           valueFrom:
             secretKeyRef:
-              name: llmbox-secrets
+              name: aflare-secrets
               key: anthropic-api-key
         volumeMounts:
         - name: workflows
@@ -307,7 +307,7 @@ spec:
       volumes:
       - name: workflows
         configMap:
-          name: llmbox-workflows
+          name: aflare-workflows
       - name: output
         emptyDir: {}
 ```
@@ -335,7 +335,7 @@ spec:
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: llmbox-secrets
+                  name: aflare-secrets
                   key: anthropic-api-key
           restartPolicy: OnFailure
 ```
@@ -363,7 +363,7 @@ Linux 用户可能需要添加：
 
 ```bash
 docker run --rm \
-  -v llmbox-cache:/tmp/aflare-cache \
+  -v aflare-cache:/tmp/aflare-cache \
   ghcr.io/alib8b8/aflare:latest \
   run my-workflow.yaml
 ```
@@ -381,7 +381,7 @@ docker logs aflare
 
 # 详细日志
 docker run --rm \
-  -e LLMBOX_LOG_LEVEL=debug \
+  -e AFLARE_LOG_LEVEL=debug \
   ghcr.io/alib8b8/aflare:latest \
   run my-workflow.yaml
 ```

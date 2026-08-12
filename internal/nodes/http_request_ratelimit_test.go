@@ -26,12 +26,12 @@ import (
 	"time"
 )
 
-// allowLoopback sets LLMBOX_ALLOW_LOOPBACK so the http_request node's SSRF
+// allowLoopback sets AFLARE_ALLOW_LOOPBACK so the http_request node's SSRF
 // guard permits httptest servers on 127.0.0.1. Every test in this file hits
 // a local mock server, so every test needs it.
 func allowLoopback(t *testing.T) {
 	t.Helper()
-	t.Setenv("LLMBOX_ALLOW_LOOPBACK", "1")
+	t.Setenv("AFLARE_ALLOW_LOOPBACK", "1")
 }
 
 // TestHTTPRequest_RateLimit verifies that a token-bucket limiter throttles

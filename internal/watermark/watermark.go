@@ -701,3 +701,145 @@ func verifyChecksum(payload []byte) bool {
 	actual := uint16(payload[len(payload)-2])<<8 | uint16(payload[len(payload)-1])
 	return expected == actual
 }
+
+// ── Source code watermark ─────────────────────────────────────────────────
+
+// zero-width watermark comment prefix markers.
+// These are embedded in a comment line that looks like a normal copyright
+// notice but contains invisible machine-readable zero-width characters.
+const (
+	zwPrefix = "// aflare" // visible prefix
+)
+
+// EncodeSource adds an invisible watermark to Go source code by embedding
+// zero-width characters into the copyright header comment. The watermark is
+// placed after the "// Copyright (c) 2026 aflare Contributors" line.
+//
+// The watermark is invisible to human readers (zero-width characters are not
+// rendered) but can be detected by DecodeSource. It survives copy-paste and
+// partial file truncation because the payload is sharded redundantly.
+func EncodeSource(src string) string {
+	if src == "" {
+		return src
+	}
+
+	// Build the watermark payload from the source content.
+	payload := buildPayload(src)
+	chk := checksum16(payload)
+	payload = append(payload, byte(chk>>8), byte(chk&0xFF))
+
+	// Encode as a single zero-width block embedded in a comment.
+	zwBlock := encodeZeroWidth(payload)
+
+	// Insert the watermark comment after the copyright header.
+	// Look for the first blank line after the copyright block.
+	lines := strings.Split(src, "\n")
+	var result strings.Builder
+	inCopyright := false
+	watermarkInserted := false
+
+	for i, line := range lines {
+		result.WriteString(line)
+		if i < len(lines)-1 {
+			result.WriteString("\n")
+		}
+
+		if strings.HasPrefix(line, "// Copyright") && strings.Contains(line, "aflare") {
+			inCopyright = true
+			continue
+		}
+		if inCopyright && line == "//" {
+			// End of copyright block — insert watermark here.
+			if !watermarkInserted {
+				result.WriteString(zwPrefix + zwBlock + "\n")
+				watermarkInserted = true
+			}
+			inCopyright = false
+		}
+	}
+
+	// If no copyright header found, prepend the watermark.
+	if !watermarkInserted {
+		prepend := zwPrefix + zwBlock + "\n" + src
+		return prepend
+	}
+
+	return result.String()
+}
+
+// DecodeSource extracts and validates the invisible watermark from Go source
+// code. It searches for the zero-width marker after the copyright header.
+func DecodeSource(src string) (Payload, bool) {
+	// Search for the zero-width watermark in the source.
+	// Look for the zwStart character after "// aflare".
+	idx := strings.Index(src, zwPrefix)
+	if idx == -1 {
+		return Payload{}, false
+	}
+
+	rest := src[idx+len(zwPrefix):]
+	startIdx := strings.IndexRune(rest, zwStart)
+	if startIdx == -1 {
+		return Payload{}, false
+	}
+
+	rest = rest[startIdx+utf8.RuneLen(zwStart):]
+	endIdx := strings.IndexRune(rest, zwEnd)
+	if endIdx == -1 {
+		return Payload{}, false
+	}
+
+	bits := rest[:endIdx]
+	bytes := decodeBitsToBytes(bits)
+	if len(bytes) < payloadSize+checksumSize {
+		return Payload{}, false
+	}
+
+	if !verifyChecksum(bytes) {
+		return Payload{}, false
+	}
+
+	return parsePayload(bytes[:payloadSize])
+}
+
+// HasSourceWatermark checks if the source code contains a valid aflare
+// invisible watermark.
+func HasSourceWatermark(src string) bool {
+	_, ok := DecodeSource(src)
+	return ok
+}
+
+// StripSourceWatermark removes the invisible watermark from source code.
+func StripSourceWatermark(src string) string {
+	idx := strings.Index(src, zwPrefix)
+	if idx == -1 {
+		return src
+	}
+
+	rest := src[idx+len(zwPrefix):]
+	startIdx := strings.IndexRune(rest, zwStart)
+	if startIdx == -1 {
+		return src
+	}
+
+	rest = rest[startIdx+utf8.RuneLen(zwStart):]
+	endIdx := strings.IndexRune(rest, zwEnd)
+	if endIdx == -1 {
+		return src
+	}
+
+	// Remove the entire watermark line.
+	lineStart := idx
+	// Find the start of the line.
+	if nl := strings.LastIndex(src[:idx], "\n"); nl >= 0 {
+		lineStart = nl + 1
+	}
+
+	lineEnd := idx + len(zwPrefix) + startIdx + utf8.RuneLen(zwStart) + endIdx + utf8.RuneLen(zwEnd)
+	// Extend to the next newline.
+	if nl := strings.Index(src[lineEnd:], "\n"); nl >= 0 {
+		lineEnd += nl
+	}
+
+	return src[:lineStart] + src[lineEnd:]
+}

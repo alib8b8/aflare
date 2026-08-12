@@ -109,7 +109,7 @@ echo ""
 echo "══════════════════════════════════════════════════════════"
 echo " 运行 AML 可疑交易审查工作流"
 echo "══════════════════════════════════════════════════════════"
-LLMBOX_ALLOW_LOOPBACK=1 go run ./cmd/aflare run "$MATCHED_WF"
+AFLARE_ALLOW_LOOPBACK=1 go run ./cmd/aflare run "$MATCHED_WF"
 
 # ── 展示报告 ──
 echo ""

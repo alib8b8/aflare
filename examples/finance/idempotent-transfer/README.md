@@ -50,8 +50,8 @@ mock 银行 API 行为：
 
 ```bash
 # 从仓库根目录运行（先启动 mock 银行 API，见上一步）
-# LLMBOX_ALLOW_LOOPBACK=1 允许访问 localhost mock 服务（SSRF 防护默认拦截内网地址）
-LLMBOX_ALLOW_LOOPBACK=1 aflare run examples/finance/idempotent-transfer/workflow.yaml
+# AFLARE_ALLOW_LOOPBACK=1 允许访问 localhost mock 服务（SSRF 防护默认拦截内网地址）
+AFLARE_ALLOW_LOOPBACK=1 aflare run examples/finance/idempotent-transfer/workflow.yaml
 ```
 
 > 参数（`bank_api_url`、`from_account`、`amount` 等）在 `workflow.yaml` 的 `vars`

@@ -63,8 +63,8 @@ mock 银行 API 端点：
 
 ```bash
 # 从仓库根目录运行
-# LLMBOX_ALLOW_LOOPBACK=1 允许访问 localhost mock 服务（SSRF 防护默认拦截内网地址）
-LLMBOX_ALLOW_LOOPBACK=1 aflare run examples/finance/saga-transfer/workflow.yaml
+# AFLARE_ALLOW_LOOPBACK=1 允许访问 localhost mock 服务（SSRF 防护默认拦截内网地址）
+AFLARE_ALLOW_LOOPBACK=1 aflare run examples/finance/saga-transfer/workflow.yaml
 ```
 
 预期行为：

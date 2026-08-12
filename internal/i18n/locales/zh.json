@@ -154,6 +154,7 @@
   "usage.chat": "启动 AI 代理交互式对话",
   "usage.agent": "启动统一代理守护进程（对话 + 定时任务 + 文件监控）",
   "usage.watermark": "提取或验证内容溯源水印",
+  "usage.badge": "查看或颁发共建者虚拟徽章",
   "resume.usage": "用法：aflare resume <run-id>\n       aflare resume list",
   "resume.list_empty": "没有已暂停的工作流。",
   "resume.list_title": "已暂停的工作流（%d）：",

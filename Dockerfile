@@ -15,14 +15,14 @@ RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o aflare ./cmd/aflare
 FROM alpine:3.21
 
 RUN apk add --no-cache ca-certificates bash && \
-    adduser -D llmbox
+    adduser -D aflare
 
 COPY --from=builder /app/aflare /usr/local/bin/aflare
 COPY --from=builder /app/install.sh /usr/local/share/aflare/install.sh
 
 ENV PATH="/usr/local/bin:${PATH}"
 
-USER llmbox
+USER aflare
 
 ENTRYPOINT ["aflare"]
 CMD ["--help"]

@@ -165,12 +165,12 @@ func TestOpenAICompatibleNode_Schema(t *testing.T) {
 func TestOpenAICompatibleNode_Execute_NoAPIKey(t *testing.T) {
 	// Use a unique env var name that is guaranteed unset, and ensure it is
 	// empty so config.GetAPIKey falls through to an unknown provider.
-	t.Setenv("LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET", "")
+	t.Setenv("AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET", "")
 	cfg := LLMNodeConfig{
 		Name:            "testnode",
 		DefaultModel:    "test-model",
 		DefaultEndpoint: "http://localhost:11434",
-		EnvAPIKey:       "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET",
+		EnvAPIKey:       "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET",
 		ProviderName:    "TestProvider",
 	}
 	n := NewOpenAICompatibleNode(cfg)
@@ -188,7 +188,7 @@ func TestOpenAICompatibleNode_Execute_InvalidEndpoint(t *testing.T) {
 		Name:            "testnode",
 		DefaultModel:    "test-model",
 		DefaultEndpoint: "http://localhost:11434",
-		EnvAPIKey:       "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET",
+		EnvAPIKey:       "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET",
 		ProviderName:    "TestProvider",
 	}
 	n := NewOpenAICompatibleNode(cfg)
@@ -242,7 +242,7 @@ func TestOpenAICompatibleNode_Execute_Success(t *testing.T) {
 		Name:            "testnode",
 		DefaultModel:    "test-model",
 		DefaultEndpoint: "http://localhost:11434",
-		EnvAPIKey:       "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET",
+		EnvAPIKey:       "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET",
 		ProviderName:    "TestProvider",
 	}
 	n := NewOpenAICompatibleNode(cfg)
@@ -293,7 +293,7 @@ func TestOpenAICompatibleNode_Execute_DefaultModelAndEndpoint(t *testing.T) {
 		Name:            "testnode",
 		DefaultModel:    "test-model",
 		DefaultEndpoint: srv.URL, // default endpoint points to the mock
-		EnvAPIKey:       "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET",
+		EnvAPIKey:       "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET",
 		ProviderName:    "TestProvider",
 	}
 	n := NewOpenAICompatibleNode(cfg)
@@ -321,7 +321,7 @@ func TestOpenAICompatibleNode_Execute_APIError(t *testing.T) {
 
 	n := NewOpenAICompatibleNode(LLMNodeConfig{
 		Name: "testnode", DefaultModel: "m", DefaultEndpoint: srv.URL,
-		EnvAPIKey: "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET", ProviderName: "TestProvider",
+		EnvAPIKey: "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET", ProviderName: "TestProvider",
 	})
 	_, err := n.Execute(context.Background(), "hi", map[string]string{
 		"api_key":  "sk-test",
@@ -344,7 +344,7 @@ func TestOpenAICompatibleNode_Execute_APIErrorNoMessage(t *testing.T) {
 
 	n := NewOpenAICompatibleNode(LLMNodeConfig{
 		Name: "testnode", DefaultModel: "m", DefaultEndpoint: srv.URL,
-		EnvAPIKey: "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET", ProviderName: "TestProvider",
+		EnvAPIKey: "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET", ProviderName: "TestProvider",
 	})
 	_, err := n.Execute(context.Background(), "hi", map[string]string{
 		"api_key":  "sk-test",
@@ -367,7 +367,7 @@ func TestOpenAICompatibleNode_Execute_NoChoices(t *testing.T) {
 
 	n := NewOpenAICompatibleNode(LLMNodeConfig{
 		Name: "testnode", DefaultModel: "m", DefaultEndpoint: srv.URL,
-		EnvAPIKey: "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET", ProviderName: "TestProvider",
+		EnvAPIKey: "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET", ProviderName: "TestProvider",
 	})
 	_, err := n.Execute(context.Background(), "hi", map[string]string{
 		"api_key":  "sk-test",
@@ -391,7 +391,7 @@ func TestOpenAICompatibleNode_Execute_InvalidJSON(t *testing.T) {
 
 	n := NewOpenAICompatibleNode(LLMNodeConfig{
 		Name: "testnode", DefaultModel: "m", DefaultEndpoint: srv.URL,
-		EnvAPIKey: "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET", ProviderName: "TestProvider",
+		EnvAPIKey: "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET", ProviderName: "TestProvider",
 	})
 	_, err := n.Execute(context.Background(), "hi", map[string]string{
 		"api_key":  "sk-test",
@@ -439,7 +439,7 @@ func TestOpenAICompatibleNode_ExecuteStream_Success(t *testing.T) {
 
 	n := NewOpenAICompatibleNode(LLMNodeConfig{
 		Name: "testnode", DefaultModel: "m", DefaultEndpoint: srv.URL,
-		EnvAPIKey: "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET", ProviderName: "TestProvider",
+		EnvAPIKey: "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET", ProviderName: "TestProvider",
 	})
 
 	var chunks []string
@@ -470,7 +470,7 @@ func TestOpenAICompatibleNode_ExecuteStream_Empty(t *testing.T) {
 
 	n := NewOpenAICompatibleNode(LLMNodeConfig{
 		Name: "testnode", DefaultModel: "m", DefaultEndpoint: srv.URL,
-		EnvAPIKey: "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET", ProviderName: "TestProvider",
+		EnvAPIKey: "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET", ProviderName: "TestProvider",
 	})
 	out, err := n.ExecuteStream(context.Background(), "hi", map[string]string{
 		"api_key":  "sk-test",

@@ -155,8 +155,8 @@ Mock 银行 API 行为：
 
 ```bash
 # 从仓库根目录运行
-# LLMBOX_ALLOW_LOOPBACK=1 允许访问 localhost mock 服务（SSRF 防护默认拦截内网地址）
-LLMBOX_ALLOW_LOOPBACK=1 aflare run examples/killer-demos/02-financial-workflow/workflow.yaml
+# AFLARE_ALLOW_LOOPBACK=1 允许访问 localhost mock 服务（SSRF 防护默认拦截内网地址）
+AFLARE_ALLOW_LOOPBACK=1 aflare run examples/killer-demos/02-financial-workflow/workflow.yaml
 ```
 
 ### 3. 观察不同路径
@@ -300,4 +300,4 @@ curl http://localhost:17901/ops | python3 -m json.tool
 | **审计密钥保管** | `AFLARE_AUDIT_HMAC_KEY` 泄露可伪造审计链 | 通过 KMS/Secret Manager 注入，不落盘 |
 | **金额精度** | 浮点精度问题 | 生产环境用 decimal/整数分 |
 | **LLM 成本** | 每次 fraud_check 消耗 token | 开启 `AFLARE_LLM_CACHE=1` 缓存相同输入，或使用更便宜的模型 |
-| **SSRF 防护** | 默认拦截内网地址 | 生产环境用真实外部 API，不需要 `LLMBOX_ALLOW_LOOPBACK` |
+| **SSRF 防护** | 默认拦截内网地址 | 生产环境用真实外部 API，不需要 `AFLARE_ALLOW_LOOPBACK` |

@@ -46,7 +46,7 @@ func newTestNode(srvURL string) *OpenAICompatibleNode {
 		Name:            "testnode",
 		DefaultModel:    "test-model",
 		DefaultEndpoint: srvURL,
-		EnvAPIKey:       "LLMBOX_TEST_UNIQUE_API_KEY_NEVER_SET",
+		EnvAPIKey:       "AFLARE_TEST_UNIQUE_API_KEY_NEVER_SET",
 		ProviderName:    "TestProvider",
 	})
 }

@@ -357,11 +357,11 @@ func ValidateURL(rawURL string) error {
 
 // loopbackAllowed reports whether loopback/localhost URLs are permitted by
 // the http_request node. This is OFF by default (strict SSRF protection) and
-// only enabled via the LLMBOX_ALLOW_LOOPBACK=1 env var, intended solely for
+// only enabled via the AFLARE_ALLOW_LOOPBACK=1 env var, intended solely for
 // local development and demos that run mock services on localhost. Production
 // deployments must leave this unset.
 func loopbackAllowed() bool {
-	v := strings.ToLower(strings.TrimSpace(os.Getenv("LLMBOX_ALLOW_LOOPBACK")))
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("AFLARE_ALLOW_LOOPBACK")))
 	return v == "1" || v == "true" || v == "yes"
 }
 
@@ -381,7 +381,7 @@ func ValidateIP(ip net.IP, displayHost string) error {
 // IdleConnTimeout) live in one place rather than being copy-pasted.
 //
 // The validator is a closure (not a pre-built httpclient.Validator) on
-// purpose: SafeHTTPClient honors LLMBOX_ALLOW_LOOPBACK at *dial* time,
+// purpose: SafeHTTPClient honors AFLARE_ALLOW_LOOPBACK at *dial* time,
 // not at init time, so flipping the env var takes effect for the next
 // connection without restarting the process. The closure dispatches to
 // ValidateIP (loopback blocked) or ValidateLMLEndpointIPAllowLoopback

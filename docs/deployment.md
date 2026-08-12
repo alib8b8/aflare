@@ -80,7 +80,7 @@ services:
       - ./workflows:/workflows
       - ./output:/output
       - ./nodes:/nodes
-      - aflare-data:/home/llmbox/.aflare
+      - aflare-data:/home/aflare/.aflare
     environment:
       - AFLARE_LOG_LEVEL=info
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -122,7 +122,7 @@ services:
     volumes:
       - ./workflows:/workflows
       - ./output:/output
-      - aflare-data:/home/llmbox/.aflare
+      - aflare-data:/home/aflare/.aflare
     environment:
       - AFLARE_LOG_LEVEL=info
       - AFLARE_PPROF=0
@@ -146,7 +146,7 @@ services:
     volumes:
       - ./workflows:/workflows
       - ./output:/output
-      - aflare-data:/home/llmbox/.aflare
+      - aflare-data:/home/aflare/.aflare
     environment:
       - AFLARE_LOG_LEVEL=info
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}

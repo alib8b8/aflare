@@ -158,26 +158,26 @@ scrape_configs:
 
 | Metric | Type | Labels | Source |
 |--------|------|--------|--------|
-| `llmbox_node_executions_total` | counter | `node_name`, `status` | `Registry.ExecuteWithStats` |
-| `llmbox_node_execution_duration_seconds` | histogram | `node_name` | `Registry.ExecuteWithStats` |
-| `llmbox_workflow_executions_total` | counter | `status` | workflow executor |
-| `llmbox_workflow_execution_duration_seconds` | histogram | — | workflow executor |
-| `llmbox_security_blocks_total` | counter | `block_type` | `SecurityStats.RecordBlock` |
-| `llmbox_cache_hits_total` | counter | — | `CacheStats` (pull via `CollectSnapshot`) |
-| `llmbox_cache_misses_total` | counter | — | `CacheStats` (pull via `CollectSnapshot`) |
-| `llmbox_llm_calls_total` | counter | `provider`, `model`, `status` | workflow LLM trace |
-| `llmbox_llm_tokens_total` | counter | `provider`, `model`, `type` | workflow LLM trace |
-| `llmbox_llm_cost_usd_total` | counter | `provider`, `model` | workflow LLM trace |
-| `llmbox_node_calls` | gauge | `node_name` | `Registry` stats snapshot |
-| `llmbox_node_errors` | gauge | `node_name` | `Registry` stats snapshot |
-| `llmbox_security_blocks` | gauge | `block_type` | `SecurityStats` snapshot |
+| `aflare_node_executions_total` | counter | `node_name`, `status` | `Registry.ExecuteWithStats` |
+| `aflare_node_execution_duration_seconds` | histogram | `node_name` | `Registry.ExecuteWithStats` |
+| `aflare_workflow_executions_total` | counter | `status` | workflow executor |
+| `aflare_workflow_execution_duration_seconds` | histogram | — | workflow executor |
+| `aflare_security_blocks_total` | counter | `block_type` | `SecurityStats.RecordBlock` |
+| `aflare_cache_hits_total` | counter | — | `CacheStats` (pull via `CollectSnapshot`) |
+| `aflare_cache_misses_total` | counter | — | `CacheStats` (pull via `CollectSnapshot`) |
+| `aflare_llm_calls_total` | counter | `provider`, `model`, `status` | workflow LLM trace |
+| `aflare_llm_tokens_total` | counter | `provider`, `model`, `type` | workflow LLM trace |
+| `aflare_llm_cost_usd_total` | counter | `provider`, `model` | workflow LLM trace |
+| `aflare_node_calls` | gauge | `node_name` | `Registry` stats snapshot |
+| `aflare_node_errors` | gauge | `node_name` | `Registry` stats snapshot |
+| `aflare_security_blocks` | gauge | `block_type` | `SecurityStats` snapshot |
 
 Hot-path counters (node/workflow/security/LLM) are incremented inline at the
 execution sites. Cache counters and the snapshot gauges are pulled on each
 scrape from the existing internal stats accumulators via `CollectSnapshot`.
 
 > **Note:** Labelled counters only appear in the output once a label
-> combination has been touched (e.g. `llmbox_node_executions_total` shows up
+> combination has been touched (e.g. `aflare_node_executions_total` shows up
 > after the first node execution). Plain counters (cache hits/misses) are
 > always emitted, even at zero.
 

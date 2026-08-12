@@ -42,7 +42,7 @@ func newTraceLLMNode(endpoint string) *traceLLMNode {
 			Name:            "tracellm",
 			DefaultModel:    "test-model",
 			DefaultEndpoint: endpoint,
-			EnvAPIKey:       "LLMBOX_TRACE_TEST_API_KEY_NEVER_SET",
+			EnvAPIKey:       "AFLARE_TRACE_TEST_API_KEY_NEVER_SET",
 			ProviderName:    "TraceTestProvider",
 		}),
 	}

@@ -536,8 +536,8 @@ COPY . .
 
 RUN go build -o aflare ./cmd/aflare
 
-ENV LLMBOX_CONFIG=/app/config.yaml
-ENV LLMBOX_LOG_LEVEL=info
+ENV AFLARE_CONFIG=/app/config.yaml
+ENV AFLARE_LOG_LEVEL=info
 
 ENTRYPOINT ["./aflare"]
 ```
@@ -567,7 +567,7 @@ spec:
             - name: API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: llmbox-secrets
+                  name: aflare-secrets
                   key: api-key
           restartPolicy: OnFailure
 ```

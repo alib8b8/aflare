@@ -145,7 +145,7 @@ func ValidateCommand(command string) error {
 		return fmt.Errorf("no command provided")
 	}
 	switch command {
-	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "review", "version", "--version", "-v", "self-update", "update", "autoupgrade", "au", "init", "webui", "skills", "schedule", "audit", "serve", "marketplace", "secrets", "resume", "chat", "agent", "template", "install-pack", "watermark":
+	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "review", "version", "--version", "-v", "self-update", "update", "autoupgrade", "au", "init", "webui", "skills", "schedule", "audit", "serve", "marketplace", "secrets", "resume", "chat", "agent", "template", "install-pack", "watermark", "badge":
 		return nil
 	}
 	return fmt.Errorf("unknown command: %s", command)
@@ -192,6 +192,7 @@ func PrintUsage() string {
   aflare chat                            %s
   aflare agent                           %s
   aflare watermark <decode|verify|info>  %s
+  aflare badge <list|show|award>         %s
   aflare help                            %s
 
 %s:
@@ -222,6 +223,7 @@ func PrintUsage() string {
 		i18n.T("usage.chat"),
 		i18n.T("usage.agent"),
 		i18n.T("usage.watermark"),
+		i18n.T("usage.badge"),
 		i18n.T("usage.help"),
 		i18n.T("options"),
 		i18n.T("usage.safe_mode"),

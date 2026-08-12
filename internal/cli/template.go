@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/alib8b8/aflare/internal/badge"
 	"github.com/alib8b8/aflare/internal/meta"
 	skillsPkg "github.com/alib8b8/aflare/internal/skills"
 )
@@ -239,6 +240,9 @@ func handleTemplateSubmit(args []string) {
 	fmt.Println("     Use the \"New Template\" PR template.")
 	fmt.Println()
 	fmt.Println("Thank you for contributing to the aflare community!")
+
+	// Award a virtual badge for the template contribution.
+	awardBadgeForTemplate(author, skillID)
 }
 
 // PrintTemplateSubmitUsage prints usage for the template submit command.
@@ -355,5 +359,31 @@ func validSkillCategories() []string {
 		"marketing",
 		"software-engineering",
 		"supply-chain",
+	}
+}
+
+// awardBadgeForTemplate records a contribution and awards a badge if earned.
+// The author name is used as the contributor identifier. If no email is
+// available, a placeholder is used.
+func awardBadgeForTemplate(author, templateID string) {
+	// Generate a contributor ID from the author name alone (email unknown).
+	cid := badge.ContributorID(author, author+"@contributor.aflare.dev")
+
+	store, err := badge.LoadStore(badge.DefaultStorePath())
+	if err != nil {
+		// Non-fatal: badge store failure should not block template submission.
+		return
+	}
+
+	reason := fmt.Sprintf("Submitted template: %s", templateID)
+	b, awarded := store.RecordContribution(cid, author, reason, badge.ContributionTemplate)
+	if err := store.Save(); err != nil {
+		return
+	}
+
+	if awarded {
+		fmt.Println()
+		fmt.Printf("  %s Virtual badge earned: %s!\n", badge.TierEmoji[b.Tier], b.Tier)
+		fmt.Printf("  View your badges: aflare badge show %s\n", cid[:8])
 	}
 }
