@@ -211,7 +211,7 @@ func handleTemplateSubmit(args []string) {
 func validateTemplateFile(yamlPath string) (string, error) {
 	absPath, err := filepath.Abs(yamlPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve path: %v", err)
+		return "", fmt.Errorf("failed to resolve path: %w", err)
 	}
 
 	info, err := os.Stat(absPath)
