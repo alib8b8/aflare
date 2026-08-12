@@ -152,17 +152,9 @@ func (s *ChatSession) Run() {
 				fmt.Println("(Multi-line mode: type your lines, press Enter twice to submit)")
 			}
 			inMultiLine = true
-			// Append the line without the trailing backslash
-			multiLineBuf.WriteString(strings.TrimSuffix(line, "\\"))
-			multiLineBuf.WriteString("\n")
-			// Force submit if buffer exceeds 1MB
-			if multiLineBuf.Len() > maxMultiLineBytes {
-				input := strings.TrimSpace(multiLineBuf.String())
-				multiLineBuf.Reset()
-				inMultiLine = false
-				if input != "" {
-					s.handleTurn(ctx, input)
-				}
+			forceSubmit, input := appendMultiLine(&multiLineBuf, line, maxMultiLineBytes)
+			if forceSubmit && input != "" {
+				s.handleTurn(ctx, input)
 			}
 			continue
 		}
@@ -336,6 +328,20 @@ func (s *ChatSession) SendMessage(input string) (string, error) {
 // ResetSession clears the conversation history.
 func (s *ChatSession) ResetSession() {
 	s.loop.Context().Reset()
+}
+
+// appendMultiLine appends a continuation line (stripped of trailing \) to the
+// buffer. Returns (true, result) if the buffer exceeded maxBytes and was
+// force-submitted, or (false, "") otherwise.
+func appendMultiLine(buf *strings.Builder, line string, maxBytes int) (forceSubmit bool, result string) {
+	buf.WriteString(strings.TrimSuffix(line, "\\"))
+	buf.WriteString("\n")
+	if buf.Len() > maxBytes {
+		result = strings.TrimSpace(buf.String())
+		buf.Reset()
+		return true, result
+	}
+	return false, ""
 }
 
 // handleCommand processes slash commands.

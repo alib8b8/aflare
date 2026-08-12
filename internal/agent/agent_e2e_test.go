@@ -37,10 +37,16 @@ import (
 // mockLLMProvider implements nodes.LLMProvider for testing. It returns
 // predefined ReAct JSON responses in sequence, simulating an LLM without
 // making real HTTP calls. Each Call() invocation returns the next response.
+//
+// Two modes for streaming:
+//   - If chunkedResponses[i] is non-empty, send those chunks via onChunk
+//     in order. This allows tests to verify chunk content and ordering.
+//   - Otherwise, send the full response as a single chunk (backward compat).
 type mockLLMProvider struct {
-	responses []string
-	callCount int
-	mu        sync.Mutex
+	responses        []string
+	chunkedResponses [][]string // per-call chunk sequences for streaming
+	callCount        int
+	mu               sync.Mutex
 }
 
 func (m *mockLLMProvider) Call(ctx context.Context, messages []nodes.LLMMessage, tools []core.ToolDefinition, onChunk func(chunk string)) (content string, toolCalls []core.LLMToolCall, err error) {
@@ -57,9 +63,15 @@ func (m *mockLLMProvider) Call(ctx context.Context, messages []nodes.LLMMessage,
 
 	resp := m.responses[i]
 
-	// If onChunk is set, simulate streaming by sending the response in chunks
+	// If onChunk is set, simulate streaming by sending chunks
 	if onChunk != nil {
-		onChunk(resp)
+		if i < len(m.chunkedResponses) && len(m.chunkedResponses[i]) > 0 {
+			for _, chunk := range m.chunkedResponses[i] {
+				onChunk(chunk)
+			}
+		} else {
+			onChunk(resp)
+		}
 	}
 
 	return resp, nil, nil
@@ -358,12 +370,18 @@ func TestE2E_CapabilityChain_PostProcess(t *testing.T) {
 // ── P0: Streaming Output Tests ────────────────────────────────────────────
 
 // TestE2E_StreamingCallbacks verifies that onChunk, onToolCall, and
-// onToolResult are called in the correct order during agent execution.
+// onToolResult receive the correct content in the correct order during
+// agent execution.
 func TestE2E_StreamingCallbacks(t *testing.T) {
 	mock := &mockLLMProvider{
 		responses: []string{
 			`{"thought": "I will execute a command", "action": "execute", "action_input": "echo stream_test"}`,
 			`{"thought": "Command executed", "final_answer": "Stream test completed."}`,
+		},
+		// Simulate token-by-token streaming for the second response
+		chunkedResponses: [][]string{
+			nil, // first call: use default (full response as one chunk)
+			{"Stream", " test", " completed."}, // second call: chunked
 		},
 	}
 
@@ -406,25 +424,51 @@ func TestE2E_StreamingCallbacks(t *testing.T) {
 		t.Fatalf("Process failed: %v", err)
 	}
 
-	// Verify tool call was recorded
+	// Verify chunk content and order — the second call sends 3 chunks
+	if len(chunks) == 0 {
+		t.Error("expected at least one chunk callback")
+	}
+	// Check that chunked response chunks arrived in order
+	allChunks := strings.Join(chunks, "")
+	if !strings.Contains(allChunks, "Stream") {
+		t.Errorf("expected chunk content to contain 'Stream', got: %v", chunks)
+	}
+	if !strings.Contains(allChunks, "completed") {
+		t.Errorf("expected chunk content to contain 'completed', got: %v", chunks)
+	}
+	// Verify order: "Stream" must appear before "completed"
+	streamIdx := strings.Index(allChunks, "Stream")
+	completedIdx := strings.Index(allChunks, "completed")
+	if streamIdx < 0 || completedIdx < 0 || streamIdx >= completedIdx {
+		t.Errorf("chunks out of order: 'Stream' at %d, 'completed' at %d", streamIdx, completedIdx)
+	}
+
+	// Verify tool call was recorded with correct content
 	if len(toolCalls) == 0 {
 		t.Error("expected at least one tool call")
 	} else {
 		found := false
 		for _, tc := range toolCalls {
-			if strings.Contains(tc, "execute") {
+			if strings.Contains(tc, "execute") && strings.Contains(tc, "echo stream_test") {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Errorf("expected 'execute' tool call, got: %v", toolCalls)
+			t.Errorf("expected 'execute:echo stream_test' tool call, got: %v", toolCalls)
 		}
 	}
 
-	// Verify tool result was recorded
+	// Verify tool result was recorded with non-empty content
 	if len(toolResults) == 0 {
 		t.Error("expected at least one tool result")
+	} else {
+		for _, tr := range toolResults {
+			parts := strings.SplitN(tr, ":", 2)
+			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+				t.Errorf("tool result should have non-empty name and result, got: %q", tr)
+			}
+		}
 	}
 
 	t.Logf("chunks received: %d, tool calls: %d, tool results: %d",
@@ -519,26 +563,65 @@ func TestE2E_MultiLineInput_BufferLogic(t *testing.T) {
 	}
 }
 
-// TestE2E_MultiLineInput_BufferLimit tests that the buffer truncates
-// when exceeding the maxMultiLineBytes limit.
+// TestE2E_MultiLineInput_BufferLimit tests that appendMultiLine force-submits
+// when the buffer exceeds maxMultiLineBytes, and resets the buffer properly.
 func TestE2E_MultiLineInput_BufferLimit(t *testing.T) {
-	const maxMultiLineBytes = 1 * 1024 * 1024
+	const maxBytes = 100
 
-	// Build a buffer that exceeds the limit
-	var multiLineBuf strings.Builder
-	for i := 0; i < maxMultiLineBytes/2+10; i++ {
-		multiLineBuf.WriteString("a")
-	}
+	t.Run("force_submit_when_exceeded", func(t *testing.T) {
+		var buf strings.Builder
+		// Fill buffer under the limit
+		forceSubmit, _ := appendMultiLine(&buf, strings.Repeat("a", 50)+"\\", maxBytes)
+		if forceSubmit {
+			t.Error("should not force-submit below limit")
+		}
 
-	if multiLineBuf.Len() <= maxMultiLineBytes {
-		t.Skip("buffer didn't exceed limit in this test environment")
-	}
+		// Add another line that pushes it over
+		forceSubmit, result := appendMultiLine(&buf, strings.Repeat("b", 60)+"\\", maxBytes)
+		if !forceSubmit {
+			t.Error("should force-submit when buffer exceeds limit")
+		}
+		if result == "" {
+			t.Error("force-submit result should be non-empty")
+		}
+	})
 
-	// The buffer should be forcible truncated
-	result := multiLineBuf.String()
-	if len(result) <= maxMultiLineBytes {
-		t.Error("expected buffer to exceed limit")
-	}
+	t.Run("buffer_reset_after_force_submit", func(t *testing.T) {
+		var buf strings.Builder
+		// Push over limit
+		appendMultiLine(&buf, strings.Repeat("x", 120)+"\\", maxBytes)
+		// Buffer should be reset after force-submit
+		if buf.Len() != 0 {
+			t.Errorf("buffer should be empty after force-submit, got %d bytes", buf.Len())
+		}
+	})
+
+	t.Run("no_submit_at_limit", func(t *testing.T) {
+		var buf strings.Builder
+		// Exactly at limit (line + \n)
+		line := strings.Repeat("a", maxBytes-1) + "\\"
+		forceSubmit, _ := appendMultiLine(&buf, line, maxBytes)
+		if forceSubmit {
+			t.Error("should not force-submit when buffer equals limit")
+		}
+		// One more byte over
+		forceSubmit, _ = appendMultiLine(&buf, "b\\", maxBytes)
+		if !forceSubmit {
+			t.Error("should force-submit when buffer exceeds limit by 1 byte")
+		}
+	})
+
+	t.Run("strips_trailing_backslash", func(t *testing.T) {
+		var buf strings.Builder
+		appendMultiLine(&buf, "hello world\\", 1024*1024)
+		content := buf.String()
+		if strings.Contains(content, "\\") {
+			t.Errorf("trailing backslash should be stripped, got: %q", content)
+		}
+		if !strings.HasPrefix(content, "hello world") {
+			t.Errorf("expected content to start with 'hello world', got: %q", content)
+		}
+	})
 }
 
 // TestE2E_MultiLineInput_EmptySubmit tests that empty multi-line buffer
