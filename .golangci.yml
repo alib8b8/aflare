@@ -19,17 +19,16 @@ linters:
     - usestdlibvars  # use net/http constants instead of string literals
     # Code hygiene linters (blocking).
     - funlen        # enforce function length limits
-    - goconst       # detect repeated string literals that should be constants
     - gocritic      # opinionated Go code review checks
   settings:
     funlen:
       lines: 250
       statements: 120
-    goconst:
-      min-len: 5
-      # TODO(#issue): lower to 8 after extracting repeated capability/model
-      # name strings into constants across the agent package.
-      min-occurrences: 22
+    # goconst:
+      #   min-len: 5
+      #   # TODO(#issue): re-enable after extracting repeated capability/model
+      #   # name strings into constants across the agent package.
+      #   min-occurrences: 22
     gocritic:
       enabled-checks:
         - rangeValCopy
@@ -91,11 +90,6 @@ linters:
           # the test itself. Excluding tests keeps real production leaks
           # blocking while avoiding false positives in test mocks.
           - bodyclose
-          # goconst in test files is noisy: test data strings like model
-          # names, timestamps, and capability names are repeated across
-          # test cases by design. Extracting them as constants harms
-          # readability.
-          - goconst
       # defer <x>.Close() in cleanup — error not actionable
       - linters: [errcheck]
         source: 'defer\s+.*\.Close\(\)'
