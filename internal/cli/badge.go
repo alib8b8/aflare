@@ -129,6 +129,7 @@ func handleBadgeList() {
 	fmt.Printf("Total: %d contributors\n", len(contributors))
 }
 
+//nolint:staticcheck // osExit is os.Exit wrapper; staticcheck can't track termination
 func handleBadgeShow(id string) {
 	store, err := badge.LoadStore(badge.DefaultStorePath())
 	if err != nil {
