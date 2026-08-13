@@ -81,15 +81,19 @@ var sharedLearning = &learningStore{
 	appendCount:   0,
 }
 
-// initLearningStore ensures the config directory exists and sets the path.
-func initLearningStore() {
+// ensurePathLocked ensures the config directory exists and sets s.path.
+// The caller MUST hold s.mu: the path field is mutated here and read under
+// the same lock by append/compact/loadEntries, so all path access is
+// serialized (fixing the race where loadEntries read sharedLearning.path
+// without the lock while append wrote it under the lock).
+func (s *learningStore) ensurePathLocked() {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "."
 	}
 	dir := filepath.Join(home, ".config", "aflare")
 	_ = os.MkdirAll(dir, 0o755)
-	sharedLearning.path = filepath.Join(dir, "learning.json")
+	s.path = filepath.Join(dir, "learning.json")
 }
 
 // appendLearning appends a learning entry to the learning.json file.
@@ -100,7 +104,7 @@ func (s *learningStore) append(entry LearningEntry) {
 	defer s.mu.Unlock()
 
 	if s.path == "" {
-		initLearningStore()
+		s.ensurePathLocked()
 	}
 
 	// Build a dedup key for this entry.
@@ -397,9 +401,14 @@ func appendAdaptiveFeedback(feedback string) {
 }
 
 // loadEntries reads all learning entries from learning.json and returns
-// them grouped by capability type.
+// them grouped by capability type. All path and file access is performed
+// under sharedLearning.mu so it cannot race with concurrent append/compact
+// (which mutate the same file and path field under the same lock).
 func loadEntries() (reflection []LearningEntry, adaptive []LearningEntry) {
-	initLearningStore()
+	sharedLearning.mu.Lock()
+	defer sharedLearning.mu.Unlock()
+
+	sharedLearning.ensurePathLocked()
 
 	data, err := os.ReadFile(sharedLearning.path)
 	if err != nil {

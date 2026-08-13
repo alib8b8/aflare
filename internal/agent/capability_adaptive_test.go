@@ -18,6 +18,7 @@ package agent
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -26,9 +27,10 @@ import (
 // do not pollute the real ~/.config/aflare/learning.json.
 //
 // We redirect $HOME rather than sharedLearning.path because loadEntries()
-// unconditionally calls initLearningStore(), which rebuilds the path from
-// os.UserHomeDir() — so any direct path mutation would be overwritten on the
-// next read. t.Setenv restores $HOME automatically on cleanup.
+// unconditionally calls sharedLearning.ensurePathLocked(), which rebuilds
+// the path from os.UserHomeDir() — so any direct path mutation would be
+// overwritten on the next read. t.Setenv restores $HOME automatically on
+// cleanup.
 func setupLearningStore(t *testing.T) {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
@@ -185,4 +187,50 @@ func TestAdaptiveCapability_PostProcess(t *testing.T) {
 			t.Errorf("expected feedback trimmed to 20, got %d", len(a.feedback))
 		}
 	})
+}
+
+// TestLearningStore_ConcurrentAppendLoad exercises the learning store under
+// concurrent append + load to ensure sharedLearning.path access is race-free.
+// Run with -race to catch the previously-unprotected path read/write in
+// loadEntries/initLearningStore racing against append's locked path write.
+//
+// Before the fix, loadEntries() read sharedLearning.path without holding
+// sharedLearning.mu while append() wrote it under the lock — the race
+// detector flagged this. Now both paths are serialized under the mutex.
+func TestLearningStore_ConcurrentAppendLoad(t *testing.T) {
+	setupLearningStore(t)
+
+	const writers = 8
+	const readers = 8
+	const iters = 50
+
+	var wg sync.WaitGroup
+	wg.Add(writers + readers)
+
+	for w := 0; w < writers; w++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < iters; i++ {
+				appendAdaptiveFeedback("concurrent feedback entry")
+			}
+		}()
+	}
+	for r := 0; r < readers; r++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < iters; i++ {
+				// loadRecentAdaptiveFeedback calls loadEntries(), which
+				// previously raced on sharedLearning.path.
+				_ = loadRecentAdaptiveFeedback(10)
+			}
+		}()
+	}
+	wg.Wait()
+
+	// Sanity: the store should have recorded entries (dedup may reduce the
+	// count, but it must be non-zero since all feedback strings are identical
+	// and the first one is always kept).
+	if fb := loadRecentAdaptiveFeedback(10); len(fb) == 0 {
+		t.Fatal("expected at least one feedback entry after concurrent appends")
+	}
 }
