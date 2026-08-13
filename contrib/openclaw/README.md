@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/alib8b8/aflare">
-    <img src="https://img.shields.io/badge/llm--box-v1.0.0-blue" alt="aflare"/>
+    <img src="https://img.shields.io/badge/aflare-v1.0.0-blue" alt="aflare"/>
   </a>
   <a href="https://github.com/alib8b8/openclaw-llmbox">
     <img src="https://img.shields.io/badge/OpenClaw-Plugin-green" alt="OpenClaw Plugin"/>
@@ -41,9 +41,9 @@ This plugin integrates **aflare** with **OpenClaw**, allowing you to invoke afla
 │                                                               │
 │  You: "Summarize this article using my kimi_summary workflow"│
 │                                                               │
-│  Agent → llmbox_list_workflows (tool)                        │
+│  Agent → aflare_list_workflows (tool)                        │
 │         ↓                                                    │
-│  Agent → llmbox_run_workflow(workflow_file="kimi_summary")   │
+│  Agent → aflare_run_workflow(workflow_file="kimi_summary")   │
 │         ↓                                                    │
 │  aflare executes:                                            │
 │    [STEP 1] fetch_url → Extract article content              │
@@ -96,10 +96,12 @@ Edit your OpenClaw config file (`~/.openclaw/config.json`):
 | `enableAutoDiscovery` | `true` | Auto-discover workflows in the configured directory |
 
 > **Note:** `llmboxPath` is a historical naming convention inherited from the project's earlier name (llmbox). It points to the `aflare` binary — the two names refer to the same tool.
+>
+> **v0.8 migration:** The `openclaw-llmbox` plugin id, package name, and `llmboxPath` config key will be renamed to `openclaw-aflare` / `aflarePath` in v0.8. See [#59](https://github.com/alib8b8/aflare/issues/59).
 
 ## Available Tools
 
-### `llmbox_list_workflows`
+### `aflare_list_workflows`
 
 List all available aflare workflows in your configured directory.
 
@@ -109,7 +111,7 @@ List all available aflare workflows in your configured directory.
 ```
 User: What workflows do I have available?
 
-Agent calls llmbox_list_workflows:
+Agent calls aflare_list_workflows:
 → {"workflows": [
     {"name": "kimi_summary", "file": "kimi_summary.yaml", "steps": 2},
     {"name": "deepseek_coder", "file": "deepseek_coder.yaml", "steps": 3},
@@ -117,7 +119,7 @@ Agent calls llmbox_list_workflows:
   ], "count": 3}
 ```
 
-### `llmbox_run_workflow`
+### `aflare_run_workflow`
 
 Execute a specific aflare workflow.
 
@@ -129,11 +131,11 @@ Execute a specific aflare workflow.
 ```
 User: Summarize https://example.com/article using kimi_summary
 
-Agent calls llmbox_run_workflow:
+Agent calls aflare_run_workflow:
 → {"workflow_file": "kimi_summary.yaml", "input": "https://example.com/article", ...}
 ```
 
-### `llmbox_describe_workflow`
+### `aflare_describe_workflow`
 
 Get detailed information about a specific workflow.
 
@@ -144,7 +146,7 @@ Get detailed information about a specific workflow.
 ```
 User: What does the deepseek_coder workflow do?
 
-Agent calls llmbox_describe_workflow:
+Agent calls aflare_describe_workflow:
 → {"workflow": "deepseek_coder.yaml", "name": "deepseek_coder", 
    "description": "Code review and fix workflow using DeepSeek Coder",
    "steps": [
@@ -222,7 +224,7 @@ You: I want to summarize this article: https://example.com/tech-news
 
 🤖: Let me use the kimi_summary workflow to summarize that article.
 
-[Calling llmbox_run_workflow]
+[Calling aflare_run_workflow]
 → Workflow: kimi_summary.yaml
 → Steps executed: 2
 → Duration: 3.2s
