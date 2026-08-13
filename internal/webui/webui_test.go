@@ -1205,6 +1205,20 @@ func TestMetricsRateLimiter_RefillOverTime(t *testing.T) {
 
 func TestMetricsRateLimiter_Concurrent(t *testing.T) {
 	rl := newMetricsRateLimiter(100)
+	// Freeze the clock so the token bucket does not refill during the burst.
+	// The limiter is a standard token bucket: it adds rps*elapsed tokens on
+	// every allow() call. Under real time, scheduling the 200 goroutines
+	// takes a few milliseconds, which refills ~1 token and lets one extra
+	// request through (101 instead of 100). That is correct limiter
+	// behavior, not a bug — the original assertion ("at most 100") assumed
+	// instantaneous execution. Freezing the clock makes the burst invariant
+	// deterministic: with zero refill, exactly `burst` requests succeed.
+	frozen := time.Now()
+	rl.mu.Lock()
+	rl.now = func() time.Time { return frozen }
+	rl.lastTime = frozen
+	rl.mu.Unlock()
+
 	var wg sync.WaitGroup
 	allowed := make(chan bool, 200)
 

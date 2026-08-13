@@ -220,6 +220,7 @@ type metricsRateLimiter struct {
 	max      float64
 	rps      float64
 	lastTime time.Time
+	now      func() time.Time
 }
 
 // newMetricsRateLimiter returns a token bucket allowing up to rps requests per
@@ -232,6 +233,7 @@ func newMetricsRateLimiter(rps int) *metricsRateLimiter {
 		tokens:   float64(rps),
 		max:      float64(rps),
 		rps:      float64(rps),
+		now:      time.Now,
 		lastTime: time.Now(),
 	}
 }
@@ -240,7 +242,7 @@ func newMetricsRateLimiter(rps int) *metricsRateLimiter {
 func (rl *metricsRateLimiter) allow() bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	now := time.Now()
+	now := rl.now()
 	elapsed := now.Sub(rl.lastTime).Seconds()
 	rl.lastTime = now
 	rl.tokens += elapsed * rl.rps
