@@ -92,7 +92,9 @@ func (s *learningStore) ensurePathLocked() {
 		home = "."
 	}
 	dir := filepath.Join(home, ".config", "aflare")
-	_ = os.MkdirAll(dir, 0o755)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		log.Printf("[learning] failed to create config dir: dir=%s err=%v", dir, err)
+	}
 	s.path = filepath.Join(dir, "learning.json")
 }
 
@@ -218,7 +220,9 @@ func (s *learningStore) compact() {
 			return
 		}
 	}
-	_ = f.Sync()
+	if err := f.Sync(); err != nil {
+		log.Printf("[learning] failed to sync learning store file: path=%s err=%v", s.path, err)
+	}
 }
 
 // readAllEntries reads all entries from the learning log (for compaction).

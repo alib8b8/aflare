@@ -326,42 +326,42 @@ func SelfUpdate(repo string) (string, error) {
 		if cerr := out.Close(); cerr != nil {
 			logger.Error("temp file close failed", "err", cerr)
 		}
-		_ = os.Remove(tmpPath) // best-effort cleanup
+		removeBestEffort(tmpPath)
 		return "", fmt.Errorf("failed to write temp file: %w", err)
 	}
 	if written > maxBinaryDownloadSize {
 		if cerr := out.Close(); cerr != nil {
 			logger.Error("temp file close failed", "err", cerr)
 		}
-		_ = os.Remove(tmpPath) // best-effort cleanup
+		removeBestEffort(tmpPath)
 		return "", fmt.Errorf("downloaded binary exceeds max size of %d bytes", maxBinaryDownloadSize)
 	}
 	if err := out.Close(); err != nil {
-		_ = os.Remove(tmpPath) // best-effort cleanup
+		removeBestEffort(tmpPath)
 		return "", fmt.Errorf("failed to close temp file: %w", err)
 	}
 
 	if checksumsURL := findChecksumsURL(release); checksumsURL != "" {
 		checksums, err := downloadChecksums(checksumsURL)
 		if err != nil {
-			_ = os.Remove(tmpPath) // best-effort cleanup
+			removeBestEffort(tmpPath)
 			return "", fmt.Errorf("failed to download checksums: %w (refusing to install without verification)", err)
 		}
 		if len(checksums) == 0 {
-			_ = os.Remove(tmpPath) // best-effort cleanup
+			removeBestEffort(tmpPath)
 			return "", fmt.Errorf("checksums file is empty (refusing to install without verification)")
 		}
 		expected, ok := checksums[assetName]
 		if !ok {
-			_ = os.Remove(tmpPath) // best-effort cleanup
+			removeBestEffort(tmpPath)
 			return "", fmt.Errorf("no checksum found for asset %q (refusing to install without verification)", assetName)
 		}
 		if err := verifyChecksum(tmpPath, expected); err != nil {
-			_ = os.Remove(tmpPath) // best-effort cleanup
+			removeBestEffort(tmpPath)
 			return "", fmt.Errorf("checksum verification failed: %w", err)
 		}
 	} else {
-		_ = os.Remove(tmpPath) // best-effort cleanup
+		removeBestEffort(tmpPath)
 		return "", fmt.Errorf("release has no checksums file (refusing to install without verification)")
 	}
 
@@ -371,11 +371,21 @@ func SelfUpdate(repo string) (string, error) {
 	}
 
 	if err := os.Rename(tmpPath, exePath); err != nil {
-		_ = os.Rename(backupPath, exePath) // best-effort rollback restore
+		if rerr := os.Rename(backupPath, exePath); rerr != nil {
+			logger.Error("failed to restore backup binary after update failure", "backup", backupPath, "err", rerr)
+		}
 		return "", fmt.Errorf("failed to replace binary: %w", err)
 	}
 
-	_ = os.Remove(backupPath) // best-effort cleanup
+	removeBestEffort(backupPath)
 
 	return fmt.Sprintf("Updated to %s (was %s)", release.TagName, Version), nil
+}
+
+// removeBestEffort removes a file, logging a warning if the removal fails for
+// reasons other than the file not existing (expected in cleanup paths).
+func removeBestEffort(path string) {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		logger.Warn("best-effort cleanup failed", "path", path, "err", err)
+	}
 }

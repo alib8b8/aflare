@@ -661,7 +661,9 @@ func NewSessionMemoryManager(storageDir string, maxSessions, maxPerSession int) 
 	}
 
 	if storageDir != "" {
-		_ = os.MkdirAll(storageDir, 0755) // best-effort: dir creation
+		if err := os.MkdirAll(storageDir, 0755); err != nil {
+			logger.Warn("failed to create session storage dir", "dir", storageDir, "err", err)
+		}
 	}
 
 	return mgr
@@ -749,7 +751,9 @@ func (mgr *SessionMemoryManager) DeleteSession(sessionID string) {
 
 	if mgr.storageDir != "" {
 		path := mgr.sessionFilePath(sessionID)
-		_ = os.Remove(path) // best-effort: session file cleanup
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			logger.Warn("failed to remove session file", "path", path, "err", err)
+		}
 	}
 }
 
@@ -910,7 +914,9 @@ func (mgr *SessionMemoryManager) saveSessionLocked(session *SessionMemory) {
 	if err := os.WriteFile(tmpPath, jsonData, 0600); err != nil {
 		return
 	}
-	_ = os.Rename(tmpPath, path) // best-effort: atomic session persist
+	if err := os.Rename(tmpPath, path); err != nil {
+		logger.Warn("failed to atomically persist session file", "path", path, "err", err)
+	}
 }
 
 // loadSessionLocked loads a session from persistent storage (must hold write lock).

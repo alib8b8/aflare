@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"regexp"
 	"strings"
@@ -306,7 +307,9 @@ func (n *MemoryNode) storeMemory(session *memory.SessionMemory, key, value, leve
 	// Map memory type to persistent store category.
 	persistentStore := memory.GetPersistentStore()
 	category := mapMemoryTypeToCategory(memType)
-	_ = persistentStore.Store(key, value, category)
+	if err := persistentStore.Store(key, value, category); err != nil {
+		log.Printf("[memory_node] failed to sync to persistent store: key=%s err=%v", key, err)
+	}
 
 	return map[string]interface{}{
 		"operation":  "store",
@@ -370,7 +373,9 @@ func (n *MemoryNode) deleteMemory(session *memory.SessionMemory, key string) (ma
 	}
 
 	// Also delete from persistent store.
-	_ = memory.GetPersistentStore().Delete(key)
+	if err := memory.GetPersistentStore().Delete(key); err != nil {
+		log.Printf("[memory_node] failed to delete from persistent store: key=%s err=%v", key, err)
+	}
 
 	return map[string]interface{}{
 		"operation": "delete",

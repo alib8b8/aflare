@@ -122,7 +122,9 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 		if err := tmpFile.Close(); err != nil {
 			logger.Error("temp file close failed", "err", err)
 		}
-		_ = os.Remove(tmpPath) // best-effort: tmp file already gone or removal will fail silently
+		if err := os.Remove(tmpPath); err != nil && !os.IsNotExist(err) {
+			logger.Warn("temp file cleanup failed", "path", tmpPath, "err", err)
+		}
 	}
 
 	if _, err := tmpFile.Write(data); err != nil {
@@ -141,12 +143,16 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	}
 
 	if err := tmpFile.Close(); err != nil {
-		_ = os.Remove(tmpPath) // best-effort: tmp file already gone or removal will fail silently
+		if rerr := os.Remove(tmpPath); rerr != nil && !os.IsNotExist(rerr) {
+			logger.Warn("temp file cleanup failed", "path", tmpPath, "err", rerr)
+		}
 		return err
 	}
 
 	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath) // best-effort: tmp file already gone or removal will fail silently
+		if rerr := os.Remove(tmpPath); rerr != nil && !os.IsNotExist(rerr) {
+			logger.Warn("temp file cleanup failed", "path", tmpPath, "err", rerr)
+		}
 		return err
 	}
 

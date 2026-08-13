@@ -14,14 +14,14 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // capability.go defines the AgentCapability interface — a pluggable system
-// that lets users enable agent intelligence dimensions (reflection, BDI,
+// that lets users enable agent intelligence dimensions (reflection,
 // human-in-the-loop, utility optimization) on demand.
 //
 // Each capability hooks into the AgentLoop lifecycle:
 //   Init → PreProcess → [agent execution] → PostProcess → Shutdown
 //
 // This mirrors the full Agent type taxonomy:
-//   4. Decision & Reasoning — BDI, utility-driven, planning
+//   4. Decision & Reasoning — utility-driven, planning
 //   5. Internal Architecture — reflection/self-criticism, hybrid
 //   9. Human-Machine Collaboration — human-in-the-loop
 //   6. Learning & Adaptation — adaptive learning from feedback
@@ -40,7 +40,7 @@ import (
 // Each capability lives as a middleware around the agent's execution cycle,
 // modifying inputs, outputs, or internal state before/after each turn.
 type AgentCapability interface {
-	// Name returns a short identifier for this capability (e.g. "reflection", "bdi").
+	// Name returns a short identifier for this capability (e.g. "reflection", "utility").
 	Name() string
 
 	// Description returns a human-readable description of what the capability does.
@@ -179,14 +179,11 @@ func (cr *CapabilityRegistry) Names() []string {
 var AvailableCapabilities = map[string]string{
 	"reflection":    "Self-reflection and self-correction after each turn (反思/自我批评 Agent)",
 	"human-in-loop": "Pause at critical decisions for human approval (Human-in-the-loop Agent)",
-	"bdi":           "Belief-Desire-Intention goal management and tracking (BDI Agent)",
 	"utility":       "Utility-driven optimization of decisions (效用驱动 Agent)",
 	"adaptive":      "Learning and adaptation from feedback (学习型/自适应 Agent)",
 	"memory":        "Cross-session long-term memory and state (有状态 Agent)",
 	"planning":      "Goal-driven planning and action sequencing (规划式 Agent)",
-	"multi-agent":   "Multi-agent collaboration and coordination (多 Agent 协作式)",
 	"workflow":      "Predefined workflow/pipeline execution (工作流/管道式 Agent)",
-	"simulation":    "Simulation and generative behavior modeling (模拟/生成式 Agent)",
 }
 
 // ParseCapabilities parses a comma-separated capability string into a list.
@@ -223,8 +220,6 @@ func CreateCapability(name string) AgentCapability {
 		return NewReflectionCapability()
 	case "human-in-loop":
 		return NewHumanInLoopCapability()
-	case "bdi":
-		return NewBDICapability()
 	case "utility":
 		return NewUtilityCapability()
 	case "adaptive":
@@ -233,12 +228,8 @@ func CreateCapability(name string) AgentCapability {
 		return NewMemoryCapability()
 	case "planning":
 		return NewPlanningCapability()
-	case "multi-agent":
-		return NewMultiAgentCapability()
 	case "workflow":
 		return NewWorkflowCapability()
-	case "simulation":
-		return NewSimulationCapability()
 	default:
 		return nil
 	}

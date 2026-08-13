@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
@@ -309,14 +310,13 @@ func callVisionLLMMultiImage(ctx context.Context, provider, model, apiKey, endpo
 		Text: prompt,
 	})
 
-	for i, url := range imageURLs {
+	for _, url := range imageURLs {
 		imgContent := visionMessageContent{Type: "image_url"}
 		imgContent.ImageURL.URL = url
 		if detail != "" {
 			imgContent.ImageURL.Detail = detail
 		}
 		contents = append(contents, imgContent)
-		_ = i
 	}
 
 	msgs := []visionMessage{
@@ -384,7 +384,9 @@ func fallbackVisionCall(ctx context.Context, provider, model, apiKey, endpoint s
 
 	if resp.StatusCode != http.StatusOK {
 		var errResp core.LLMResponse
-		_ = json.NewDecoder(io.LimitReader(resp.Body, core.MaxHTTPResponseSize)).Decode(&errResp)
+		if err := json.NewDecoder(io.LimitReader(resp.Body, core.MaxHTTPResponseSize)).Decode(&errResp); err != nil {
+			logger.Warn("failed to decode vision API error response", "provider", provider, "err", err)
+		}
 		if errResp.Error != nil && errResp.Error.Message != "" {
 			return "", fmt.Errorf("%s vision API error (%d): %s", provider, resp.StatusCode, errResp.Error.Message)
 		}

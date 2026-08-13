@@ -246,96 +246,6 @@ func TestPlanningCapability_Persist(t *testing.T) {
 	}
 }
 
-// ── MultiAgentCapability Tests ────────────────────────────────────────────
-
-func TestMultiAgentCapability_Init(t *testing.T) {
-	m := NewMultiAgentCapability()
-	err := m.Init(&AgentLoop{})
-	if err != nil {
-		t.Fatalf("Init failed: %v", err)
-	}
-	if len(m.roles) == 0 {
-		t.Fatal("roles should be initialized")
-	}
-}
-
-func TestMultiAgentCapability_PreProcess_ShortInput(t *testing.T) {
-	m := NewMultiAgentCapability()
-	_ = m.Init(&AgentLoop{})
-
-	result, err := m.PreProcess(context.Background(), "hello")
-	if err != nil {
-		t.Fatalf("PreProcess failed: %v", err)
-	}
-	if result != "" {
-		t.Fatal("short input should not trigger multi-agent mode")
-	}
-}
-
-func TestMultiAgentCapability_PreProcess_ComplexInput(t *testing.T) {
-	m := NewMultiAgentCapability()
-	_ = m.Init(&AgentLoop{})
-
-	longInput := strings.Repeat("This is a complex task that requires multiple steps and coordination between different roles. ", 5)
-	result, err := m.PreProcess(context.Background(), longInput)
-	if err != nil {
-		t.Fatalf("PreProcess failed: %v", err)
-	}
-	if result == "" || !strings.Contains(result, "Multi-Agent Mode") {
-		t.Fatal("complex input should trigger multi-agent mode")
-	}
-	if !m.active {
-		t.Fatal("multi-agent should be active")
-	}
-}
-
-func TestMultiAgentCapability_InferRole(t *testing.T) {
-	m := NewMultiAgentCapability()
-
-	tests := []struct {
-		task string
-		role string
-	}{
-		{"search for templates", "researcher"},
-		{"find the answer", "researcher"},
-		{"run the workflow", "executor"},
-		{"create a new pipeline", "executor"},
-		{"analyze the results", "analyst"},
-		{"validate the output", "analyst"},
-		{"combine all findings", "coordinator"},
-		{"summarize the report", "coordinator"},
-		{"unknown task", "executor"},
-	}
-
-	for _, tt := range tests {
-		role := m.inferRole(tt.task)
-		if role != tt.role {
-			t.Errorf("inferRole(%q) = %q, want %q", tt.task, role, tt.role)
-		}
-	}
-}
-
-func TestMultiAgentCapability_ParseSubTasks(t *testing.T) {
-	m := NewMultiAgentCapability()
-
-	output := `Task decomposition:
-1. Search for CI templates
-2. Run the CI testing workflow
-3. Analyze test results
-4. Combine into a report`
-
-	tasks := m.parseSubTasks(output)
-	if len(tasks) != 4 {
-		t.Fatalf("expected 4 sub-tasks, got %d", len(tasks))
-	}
-	if tasks[0].Role != "researcher" {
-		t.Errorf("task 1 should be researcher, got %s", tasks[0].Role)
-	}
-	if tasks[1].Role != "executor" {
-		t.Errorf("task 2 should be executor, got %s", tasks[1].Role)
-	}
-}
-
 // ── WorkflowCapability Tests ──────────────────────────────────────────────
 
 func TestWorkflowCapability_Init(t *testing.T) {
@@ -405,90 +315,6 @@ func TestWorkflowCapability_SuggestsTask(t *testing.T) {
 		if suggestsTask(input) {
 			t.Errorf("should not suggest task for: %s", input)
 		}
-	}
-}
-
-// ── SimulationCapability Tests ────────────────────────────────────────────
-
-func TestSimulationCapability_Init(t *testing.T) {
-	s := NewSimulationCapability()
-	err := s.Init(&AgentLoop{})
-	if err != nil {
-		t.Fatalf("Init failed: %v", err)
-	}
-}
-
-func TestSimulationCapability_IsSimulationRequest(t *testing.T) {
-	s := NewSimulationCapability()
-
-	simInputs := []string{
-		"simulate a conversation between a doctor and patient",
-		"role-play as a teacher explaining math",
-		"pretend you are a medieval knight",
-	}
-	for _, input := range simInputs {
-		if !s.isSimulationRequest(input) {
-			t.Errorf("should detect simulation request: %s", input)
-		}
-	}
-
-	nonSimInputs := []string{
-		"hello",
-		"what is the weather",
-		"you are a helpful assistant",
-		"create a workflow",
-	}
-	for _, input := range nonSimInputs {
-		if s.isSimulationRequest(input) {
-			t.Errorf("should not detect simulation request: %s", input)
-		}
-	}
-}
-
-func TestSimulationCapability_InitializeSimulation(t *testing.T) {
-	s := NewSimulationCapability()
-
-	input := "simulate a wise old wizard named Merlin, role: advisor, traits: wise, patient, mysterious, background: lives in a tower"
-	state := s.initializeSimulation(input)
-
-	if state.Persona.Name != "Merlin" {
-		t.Errorf("expected name Merlin, got %s", state.Persona.Name)
-	}
-	if state.Persona.Role != "advisor" {
-		t.Errorf("expected role advisor, got %s", state.Persona.Role)
-	}
-	if len(state.Persona.Traits) == 0 {
-		t.Error("should have traits")
-	}
-	if state.Turn != 0 {
-		t.Errorf("expected turn 0, got %d", state.Turn)
-	}
-}
-
-func TestSimulationCapability_ExtractEvents(t *testing.T) {
-	s := NewSimulationCapability()
-
-	output := `* The wizard strokes his beard thoughtfully
-- He opens the ancient tome
-* A spell is cast with a flash of light`
-
-	events := s.extractEvents(output)
-	if len(events) == 0 {
-		t.Fatal("should extract events")
-	}
-}
-
-func TestSimulationCapability_IsSimulationEnd(t *testing.T) {
-	s := NewSimulationCapability()
-
-	if !s.isSimulationEnd("End simulation") {
-		t.Error("should detect end simulation")
-	}
-	if !s.isSimulationEnd("The simulation is complete.") {
-		t.Error("should detect simulation complete")
-	}
-	if s.isSimulationEnd("Let's continue the conversation") {
-		t.Error("should not detect end in normal text")
 	}
 }
 
@@ -629,7 +455,7 @@ func TestParseCapabilities(t *testing.T) {
 		input    string
 		expected int
 	}{
-		{"all", 10},
+		{"all", 7},
 		{"", 0},
 		{"memory,planning", 2},
 		{"memory,invalid,planning", 2},
@@ -645,9 +471,8 @@ func TestParseCapabilities(t *testing.T) {
 
 func TestCreateCapability(t *testing.T) {
 	tests := []string{
-		"reflection", "human-in-loop", "bdi", "utility",
-		"adaptive", "memory", "planning", "multi-agent",
-		"workflow", "simulation",
+		"reflection", "human-in-loop", "utility",
+		"adaptive", "memory", "planning", "workflow",
 	}
 
 	for _, name := range tests {
@@ -761,10 +586,7 @@ func TestIntegration_FullCapabilityChain(t *testing.T) {
 		NewMemoryCapability(),
 		NewPlanningCapability(),
 		NewReflectionCapability(),
-		NewBDICapability(),
-		NewMultiAgentCapability(),
 		NewWorkflowCapability(),
-		NewSimulationCapability(),
 	}
 
 	for _, cap := range capabilities {
@@ -776,8 +598,8 @@ func TestIntegration_FullCapabilityChain(t *testing.T) {
 		t.Fatalf("InitAll failed: %v", err)
 	}
 
-	if cr.Count() != 7 {
-		t.Errorf("expected 7 capabilities, got %d", cr.Count())
+	if cr.Count() != 4 {
+		t.Errorf("expected 4 capabilities, got %d", cr.Count())
 	}
 
 	// Test PreProcess chain

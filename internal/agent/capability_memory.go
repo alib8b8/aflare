@@ -30,6 +30,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"sync"
@@ -110,7 +111,9 @@ func (m *MemoryCapability) PostProcess(ctx context.Context, input, output string
 	// Sync new entries to the shared persistent store.
 	store := memory.GetPersistentStore()
 	for _, e := range m.entries {
-		_ = store.Store(e.Key, e.Value, e.Category)
+		if err := store.Store(e.Key, e.Value, e.Category); err != nil {
+			log.Printf("[memory] failed to sync entry to persistent store: key=%s err=%v", e.Key, err)
+		}
 	}
 
 	return "", nil
@@ -121,7 +124,9 @@ func (m *MemoryCapability) Shutdown() error {
 	defer m.mu.RUnlock()
 	store := memory.GetPersistentStore()
 	for _, e := range m.entries {
-		_ = store.Store(e.Key, e.Value, e.Category)
+		if err := store.Store(e.Key, e.Value, e.Category); err != nil {
+			log.Printf("[memory] failed to sync entry to persistent store on shutdown: key=%s err=%v", e.Key, err)
+		}
 	}
 	return nil
 }

@@ -28,39 +28,33 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-//nolint:funlen // TODO(#54): split into smaller steps by 2026-09-13
-func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep, input string, engine *ExpressionEngine, reg *nodes.Registry, program *tea.Program, globalLimiter *ConcurrencyLimiter) ([]StepResult, string, error) {
-	// Limit parallel step count
-	if len(wStep.Parallel) > MaxParallel {
-		return nil, "", fmt.Errorf("too many parallel steps (%d, max %d)", len(wStep.Parallel), MaxParallel)
-	}
+// parallelResult captures the outcome of a single parallel sub-step.
+type parallelResult struct {
+	stepIndex int
+	nodeName  string
+	output    string
+	err       error
+	duration  time.Duration
+}
 
-	logger.Info("parallel step started", "index", stepIndex, "parallel_count", len(wStep.Parallel))
+// parallelPreEval holds condition/params evaluated in the main goroutine
+// before spawning workers, to avoid data races on the ExpressionEngine.
+type parallelPreEval struct {
+	nodeName        string
+	evaluatedParams map[string]string
+	paramsErr       error
+	condPass        bool // valid only when hasCond && condErr == nil
+	condErr         error
+	hasCond         bool
+}
 
-	type parallelResult struct {
-		stepIndex int
-		nodeName  string
-		output    string
-		err       error
-		duration  time.Duration
-	}
-
-	// Pre-evaluate conditions and params in the main goroutine before spawning
-	// goroutines. The ExpressionEngine reads its internal maps (stepOutputs,
-	// variables, etc.) without synchronization, so concurrent access from
-	// parallel goroutines would cause a data race.
-	type preEval struct {
-		nodeName        string
-		evaluatedParams map[string]string
-		paramsErr       error
-		condPass        bool // valid only when hasCond && condErr == nil
-		condErr         error
-		hasCond         bool
-	}
-
-	preEvals := make([]preEval, len(wStep.Parallel))
+// preEvaluateParallelSteps evaluates conditions and params for all parallel
+// sub-steps in the main goroutine. The ExpressionEngine reads its internal
+// maps without synchronization, so this must happen before spawning workers.
+func preEvaluateParallelSteps(wStep WorkflowStep, input string, engine *ExpressionEngine) []parallelPreEval {
+	preEvals := make([]parallelPreEval, len(wStep.Parallel))
 	for j, step := range wStep.Parallel {
-		pe := preEval{nodeName: step.Node}
+		pe := parallelPreEval{nodeName: step.Node}
 		if step.Condition != "" {
 			pe.hasCond = true
 			pe.condPass, pe.condErr = evaluateCondition(step.Condition, input, engine)
@@ -71,171 +65,131 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 		}
 		preEvals[j] = pe
 	}
+	return preEvals
+}
 
-	resultsChan := make(chan parallelResult, len(wStep.Parallel))
+// runParallelSubStep executes a single parallel sub-step (the goroutine body).
+// It handles condition checks, node lookup, retry, and telemetry.
+func runParallelSubStep(ctx context.Context, stepIndex, j int, step Step, pe parallelPreEval, input string, reg *nodes.Registry, program *tea.Program, globalLimiter *ConcurrencyLimiter) parallelResult {
+	// Acquire global concurrency slot if configured
+	if globalLimiter != nil {
+		if err := globalLimiter.Acquire(ctx); err != nil {
+			return parallelResult{stepIndex: stepIndex*MaxParallel + j, nodeName: pe.nodeName, err: err}
+		}
+		defer globalLimiter.Release()
+	}
+	start := time.Now()
+	nodeName := pe.nodeName
+	// Use compound index (stepIndex*MaxParallel+j) to distinguish
+	// parallel sub-steps from main steps in the TUI display.
 
-	for j, step := range wStep.Parallel {
-		pe := preEvals[j]
-		go func(j int, step Step, pe preEval) {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error("parallel step panicked",
-						"step_index", stepIndex*MaxParallel+j,
-						"node", pe.nodeName,
-						"panic", r,
-						"stack", string(debug.Stack()),
-					)
-					resultsChan <- parallelResult{
-						stepIndex: stepIndex*MaxParallel + j,
-						nodeName:  pe.nodeName,
-						err:       fmt.Errorf("parallel step panicked: %v", r),
-						duration:  0,
-					}
-				}
-			}()
-			// Acquire global concurrency slot if configured
-			if globalLimiter != nil {
-				if err := globalLimiter.Acquire(ctx); err != nil {
-					resultsChan <- parallelResult{
-						stepIndex: stepIndex*MaxParallel + j,
-						nodeName:  pe.nodeName,
-						err:       err,
-						duration:  0,
-					}
-					return
-				}
-				defer globalLimiter.Release()
-			}
-			start := time.Now()
-			nodeName := pe.nodeName
-			// Use compound index (stepIndex*MaxParallel+j) to distinguish
-			// parallel sub-steps from main steps in the TUI display.
-
-			// Handle pre-evaluated condition
-			if pe.hasCond {
-				if pe.condErr != nil {
-					resultsChan <- parallelResult{
-						stepIndex: stepIndex*MaxParallel + j,
-						nodeName:  nodeName,
-						err:       fmt.Errorf("condition evaluation failed: %w", pe.condErr),
-						duration:  time.Since(start),
-					}
-					return
-				}
-				if !pe.condPass {
-					if program != nil {
-						program.Send(tui.StepStartMsg{
-							Index: stepIndex*MaxParallel + j,
-							Name:  nodeName,
-						})
-						program.Send(tui.StepEndMsg{
-							Index:    stepIndex*MaxParallel + j,
-							Name:     nodeName,
-							Output:   "",
-							Duration: 0,
-						})
-					}
-					resultsChan <- parallelResult{
-						stepIndex: stepIndex*MaxParallel + j,
-						nodeName:  nodeName,
-						output:    "",
-						duration:  0,
-					}
-					return
-				}
-			}
-
-			if program != nil {
-				program.Send(tui.StepStartMsg{
-					Index: stepIndex*MaxParallel + j,
-					Name:  nodeName,
-				})
-			}
-
-			// Handle pre-evaluated params
-			if pe.paramsErr != nil {
-				resultsChan <- parallelResult{
-					stepIndex: stepIndex*MaxParallel + j,
-					nodeName:  nodeName,
-					err:       pe.paramsErr,
-					duration:  time.Since(start),
-				}
-				return
-			}
-
-			node, ok := reg.Get(nodeName)
-			if !ok {
-				resultsChan <- parallelResult{
-					stepIndex: stepIndex*MaxParallel + j,
-					nodeName:  nodeName,
-					err:       fmt.Errorf("node '%s' not found in registry", nodeName),
-					duration:  time.Since(start),
-				}
-				return
-			}
-
-			retryCount := step.GetRetryCount()
-			if retryCount > MaxRetry {
-				retryCount = MaxRetry
-			}
-			retryDelay := step.GetRetryDelay()
-			if retryDelay > MaxRetryDelay {
-				retryDelay = MaxRetryDelay
-			}
-
-			_, subSpan := telemetry.StartSubStepSpan(ctx, "", nodeName, stepIndex*MaxParallel+j)
-			var output string
-			var execErr error
-			maxAttempts := retryCount + 1
-
-		retryLoop:
-			for attempt := 1; attempt <= maxAttempts; attempt++ {
-				var stepCtx context.Context
-				var stepCancel context.CancelFunc
-				stepTimeout := step.GetTimeout()
-				if stepTimeout > 0 {
-					stepCtx, stepCancel = context.WithTimeout(ctx, stepTimeout)
-				} else {
-					stepCtx, stepCancel = context.WithCancel(ctx)
-				}
-
-				// Note: parallel steps do not support streaming output.
-				// Interleaving chunks from multiple concurrent streams in the
-				// TUI would be confusing, so we always use the non-streaming
-				// Execute API here.
-				output, execErr = node.Execute(stepCtx, input, pe.evaluatedParams)
-				stepCancel()
-
-				if execErr == nil {
-					break
-				}
-				if attempt < maxAttempts {
-					select {
-					case <-time.After(retryDelay):
-					case <-ctx.Done():
-						execErr = ctx.Err()
-						break retryLoop
-					}
-				}
-			}
-			dur := time.Since(start)
-			telemetry.SubStepSpanEnd(subSpan, execErr, dur.Milliseconds(), len(output))
-
-			resultsChan <- parallelResult{
+	// Handle pre-evaluated condition
+	if pe.hasCond {
+		if pe.condErr != nil {
+			return parallelResult{
 				stepIndex: stepIndex*MaxParallel + j,
 				nodeName:  nodeName,
-				output:    output,
-				err:       execErr,
-				duration:  dur,
+				err:       fmt.Errorf("condition evaluation failed: %w", pe.condErr),
+				duration:  time.Since(start),
 			}
-		}(j, step, pe)
+		}
+		if !pe.condPass {
+			if program != nil {
+				program.Send(tui.StepStartMsg{Index: stepIndex*MaxParallel + j, Name: nodeName})
+				program.Send(tui.StepEndMsg{Index: stepIndex*MaxParallel + j, Name: nodeName})
+			}
+			return parallelResult{stepIndex: stepIndex*MaxParallel + j, nodeName: nodeName}
+		}
 	}
 
+	if program != nil {
+		program.Send(tui.StepStartMsg{Index: stepIndex*MaxParallel + j, Name: nodeName})
+	}
+
+	// Handle pre-evaluated params
+	if pe.paramsErr != nil {
+		return parallelResult{
+			stepIndex: stepIndex*MaxParallel + j,
+			nodeName:  nodeName,
+			err:       pe.paramsErr,
+			duration:  time.Since(start),
+		}
+	}
+
+	node, ok := reg.Get(nodeName)
+	if !ok {
+		return parallelResult{
+			stepIndex: stepIndex*MaxParallel + j,
+			nodeName:  nodeName,
+			err:       fmt.Errorf("node '%s' not found in registry", nodeName),
+			duration:  time.Since(start),
+		}
+	}
+
+	retryCount := step.GetRetryCount()
+	if retryCount > MaxRetry {
+		retryCount = MaxRetry
+	}
+	retryDelay := step.GetRetryDelay()
+	if retryDelay > MaxRetryDelay {
+		retryDelay = MaxRetryDelay
+	}
+
+	_, subSpan := telemetry.StartSubStepSpan(ctx, "", nodeName, stepIndex*MaxParallel+j)
+	var output string
+	var execErr error
+	maxAttempts := retryCount + 1
+
+retryLoop:
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		var stepCtx context.Context
+		var stepCancel context.CancelFunc
+		stepTimeout := step.GetTimeout()
+		if stepTimeout > 0 {
+			stepCtx, stepCancel = context.WithTimeout(ctx, stepTimeout)
+		} else {
+			stepCtx, stepCancel = context.WithCancel(ctx)
+		}
+
+		// Note: parallel steps do not support streaming output.
+		// Interleaving chunks from multiple concurrent streams in the
+		// TUI would be confusing, so we always use the non-streaming
+		// Execute API here.
+		output, execErr = node.Execute(stepCtx, input, pe.evaluatedParams)
+		stepCancel()
+
+		if execErr == nil {
+			break
+		}
+		if attempt < maxAttempts {
+			select {
+			case <-time.After(retryDelay):
+			case <-ctx.Done():
+				execErr = ctx.Err()
+				break retryLoop
+			}
+		}
+	}
+	dur := time.Since(start)
+	telemetry.SubStepSpanEnd(subSpan, execErr, dur.Milliseconds(), len(output))
+
+	return parallelResult{
+		stepIndex: stepIndex*MaxParallel + j,
+		nodeName:  nodeName,
+		output:    output,
+		err:       execErr,
+		duration:  dur,
+	}
+}
+
+// collectParallelResults drains the results channel, builds StepResult slices,
+// updates the TUI, and returns the aggregated results and first error.
+func collectParallelResults(resultsChan <-chan parallelResult, count int, input string, program *tea.Program) ([]StepResult, []string, error) {
 	var stepResults []StepResult
 	var outputs []string
 	var firstErr error
 
-	for i := 0; i < len(wStep.Parallel); i++ {
+	for i := 0; i < count; i++ {
 		res := <-resultsChan
 		sr := StepResult{
 			StepIndex: res.stepIndex,
@@ -267,9 +221,12 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 			logger.Info("parallel step completed", "index", res.stepIndex, "node", res.nodeName, "duration", res.duration)
 		}
 	}
+	return stepResults, outputs, firstErr
+}
 
+// finalizeParallelOutput applies the max_failures threshold and joins outputs.
+func finalizeParallelOutput(stepResults []StepResult, outputs []string, firstErr error, wStep WorkflowStep) ([]StepResult, string, error) {
 	if firstErr != nil {
-		// Check max_failures threshold for parallel groups
 		maxFailures := wStep.MaxFailures
 		if maxFailures < 0 {
 			maxFailures = 0
@@ -293,8 +250,45 @@ func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep,
 		}
 		finalOutput += out
 	}
-
 	return stepResults, finalOutput, nil
+}
+
+func executeParallelStep(ctx context.Context, stepIndex int, wStep WorkflowStep, input string, engine *ExpressionEngine, reg *nodes.Registry, program *tea.Program, globalLimiter *ConcurrencyLimiter) ([]StepResult, string, error) {
+	// Limit parallel step count
+	if len(wStep.Parallel) > MaxParallel {
+		return nil, "", fmt.Errorf("too many parallel steps (%d, max %d)", len(wStep.Parallel), MaxParallel)
+	}
+
+	logger.Info("parallel step started", "index", stepIndex, "parallel_count", len(wStep.Parallel))
+
+	preEvals := preEvaluateParallelSteps(wStep, input, engine)
+
+	resultsChan := make(chan parallelResult, len(wStep.Parallel))
+
+	for j, step := range wStep.Parallel {
+		pe := preEvals[j]
+		go func(j int, step Step, pe parallelPreEval) {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("parallel step panicked",
+						"step_index", stepIndex*MaxParallel+j,
+						"node", pe.nodeName,
+						"panic", r,
+						"stack", string(debug.Stack()),
+					)
+					resultsChan <- parallelResult{
+						stepIndex: stepIndex*MaxParallel + j,
+						nodeName:  pe.nodeName,
+						err:       fmt.Errorf("parallel step panicked: %v", r),
+					}
+				}
+			}()
+			resultsChan <- runParallelSubStep(ctx, stepIndex, j, step, pe, input, reg, program, globalLimiter)
+		}(j, step, pe)
+	}
+
+	stepResults, outputs, firstErr := collectParallelResults(resultsChan, len(wStep.Parallel), input, program)
+	return finalizeParallelOutput(stepResults, outputs, firstErr, wStep)
 }
 
 // executeWithRetry runs a node with retry logic. Used by loop iterations.

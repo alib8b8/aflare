@@ -17,9 +17,7 @@
 // Other capabilities have been promoted to their own fully-implemented files:
 //   - capability_memory.go     (MemoryCapability)
 //   - capability_planning.go   (PlanningCapability)
-//   - capability_multi_agent.go (MultiAgentCapability)
 //   - capability_workflow.go   (WorkflowCapability)
-//   - capability_simulation.go (SimulationCapability)
 
 package agent
 

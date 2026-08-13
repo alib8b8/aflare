@@ -270,7 +270,7 @@ func extractEntitiesSimple(text string, kg *KnowledgeGraph) {
 	}
 
 	words := strings.Fields(text)
-	for i, word := range words {
+	for _, word := range words {
 		if len(word) > 3 && word[0] >= 'A' && word[0] <= 'Z' {
 			cleanWord := strings.Trim(word, ".,;:!?()[]{}\"'")
 			if len(cleanWord) > 3 {
@@ -279,7 +279,6 @@ func extractEntitiesSimple(text string, kg *KnowledgeGraph) {
 				}
 			}
 		}
-		_ = i
 	}
 }
 

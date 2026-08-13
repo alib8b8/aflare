@@ -17,10 +17,10 @@ package agent
 
 // CapabilityPresets defines named capability bundles for common scenarios
 // (断点14: Agent 模式概念过重). Instead of requiring users to understand and
-// manually combine individual capabilities (reflection/bdi/utility/...), we
+// manually combine individual capabilities (reflection/utility/...), we
 // offer curated presets that match real-world usage patterns.
 //
-// Users can still use --custom -c reflection,bdi for full control.
+// Users can still use --custom -c reflection,utility for full control.
 var CapabilityPresets = map[string]CapabilityPreset{
 	"smart": {
 		Name:         "smart",

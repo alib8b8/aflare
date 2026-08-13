@@ -221,7 +221,7 @@ func TestSessionManager_Capabilities(t *testing.T) {
 		t.Errorf("expected 0 capabilities initially, got %d", len(caps))
 	}
 
-	sm.SetCapabilities([]string{"reflection", "bdi"})
+	sm.SetCapabilities([]string{"reflection", "utility"})
 	caps = sm.Capabilities()
 	if len(caps) != 2 {
 		t.Errorf("expected 2 capabilities, got %d", len(caps))

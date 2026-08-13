@@ -62,7 +62,7 @@ type AgentOutput struct {
 // Multiple input sources (stdin, scheduler, filewatch, MCP, HTTP) feed into
 // the same loop — the agent doesn't care where the input came from.
 //
-// The loop supports pluggable capabilities (reflection, BDI, human-in-the-loop,
+// The loop supports pluggable capabilities (reflection, human-in-the-loop,
 // utility optimization, etc.) that hook into the execution cycle via
 // PreProcess and PostProcess.
 type AgentLoop struct {

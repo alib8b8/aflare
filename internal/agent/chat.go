@@ -51,7 +51,7 @@ type Config struct {
 	Tools         []string // Tool names to enable (default: DefaultTools)
 	MaxIterations int      // Max agent iterations per turn (default: 10)
 	SafeMode      bool     // Block execute and destructive tools
-	Capabilities  []string // Capability names to enable (e.g. "reflection", "bdi")
+	Capabilities  []string // Capability names to enable (e.g. "reflection", "utility")
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -395,7 +395,7 @@ func (s *ChatSession) handleCommand(cmd string) {
 	case "/capabilities":
 		caps := s.loop.Capabilities()
 		if caps.Count() == 0 {
-			fmt.Println("No capabilities active. Use --capabilities to enable (e.g. -c reflection,bdi,utility).")
+			fmt.Println("No capabilities active. Use --capabilities to enable (e.g. -c reflection,utility).")
 		} else {
 			fmt.Printf("Active capabilities (%d):\n", caps.Count())
 			for _, name := range caps.Names() {
