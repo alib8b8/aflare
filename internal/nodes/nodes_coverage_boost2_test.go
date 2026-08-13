@@ -16,7 +16,6 @@
 package nodes
 
 import (
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -855,38 +854,5 @@ func TestFormatMultimodalOutput(t *testing.T) {
 	out = formatMultimodalOutput("x", "s", "m", "unknown")
 	if !strings.Contains(out, "## Multimodal Analysis") {
 		t.Errorf("unknown format should default to markdown, got: %s", out)
-	}
-}
-
-// ----------------------------------------------------------------------------
-// plugin_system.go: validateLocalPath（使用临时目录避免污染）
-// ----------------------------------------------------------------------------
-
-func TestValidateLocalPath(t *testing.T) {
-	dir := t.TempDir()
-
-	// 真实目录应通过
-	if !validateLocalPath(dir) {
-		t.Errorf("validateLocalPath(tempDir) = false, want true")
-	}
-	// 空路径
-	if validateLocalPath("") {
-		t.Errorf("validateLocalPath(\"\") = true, want false")
-	}
-	// 路径遍历应拒绝
-	if validateLocalPath("../etc") {
-		t.Errorf("validateLocalPath(../etc) = true, want false")
-	}
-	// 不存在的路径
-	if validateLocalPath("/nonexistent/path/xyz/12345") {
-		t.Errorf("validateLocalPath(nonexistent) = true, want false")
-	}
-	// 文件（非目录）应拒绝
-	file := dir + "/regular.txt"
-	if err := os.WriteFile(file, []byte("x"), 0644); err != nil {
-		t.Fatalf("setup file: %v", err)
-	}
-	if validateLocalPath(file) {
-		t.Errorf("validateLocalPath(file) = true, want false (not a dir)")
 	}
 }

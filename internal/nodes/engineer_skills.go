@@ -457,7 +457,3 @@ func min(a, b int) int {
 	}
 	return b
 }
-
-func init() {
-	Register(&EngineerSkillsNode{})
-}

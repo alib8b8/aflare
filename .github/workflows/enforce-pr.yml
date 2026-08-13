@@ -1,0 +1,32 @@
+# Enforces PR-only flow: blocks direct pushes to protected branches.
+# This is defense-in-depth; the primary enforcement is GitHub branch protection
+# (Settings → Branches → Branch protection rules → Require pull request reviews
+#  + Require status checks → set "PR Review / gate (required)" as required).
+#
+# Applies to both GitHub (origin) and GitCode (mirror) since workflows are synced.
+name: Enforce PR Flow
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  block-direct-push:
+    name: Block direct push to main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject direct push (must go through PR + CI gate + review)
+        run: |
+          echo "::error::Direct pushes to main are not allowed."
+          echo "::error::Create a feature branch, open a PR, and wait for the"
+          echo "::error::'PR Review / gate (required)' check to pass + CODEOWNERS review."
+          echo "::error::To override in an emergency, include [skip-pr-gate] in the commit message."
+          # Allow override via commit message for emergency hotfixes (documented escape hatch).
+          if git log -1 --pretty=%B | grep -q '\[skip-pr-gate\]'; then
+            echo "::warning::Emergency override detected ([skip-pr-gate]). Proceeding."
+            exit 0
+          fi
+          exit 1
