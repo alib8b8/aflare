@@ -568,3 +568,72 @@ func TestContainsActionKeyword_UnknownAction(t *testing.T) {
 		t.Error("unknown action should not match")
 	}
 }
+
+// TestHasMeaningfulSteps verifies the signal used by the CLI (断点9) to decide
+// whether keyword matching produced a real workflow or only the placeholder
+// combine fallback.
+func TestHasMeaningfulSteps(t *testing.T) {
+	tests := []struct {
+		name string
+		wf   *Workflow
+		want bool
+	}{
+		{
+			name: "nil workflow",
+			wf:   nil,
+			want: false,
+		},
+		{
+			name: "no steps",
+			wf:   &Workflow{Steps: nil},
+			want: false,
+		},
+		{
+			name: "only placeholder combine",
+			wf: &Workflow{Steps: []WorkflowStep{{
+				Node:   "combine",
+				Params: map[string]string{"format": "text"},
+			}}},
+			want: false,
+		},
+		{
+			name: "single real fetch_url step",
+			wf: &Workflow{Steps: []WorkflowStep{{
+				Node:   "fetch_url",
+				Params: map[string]string{"url": "https://example.com"},
+			}}},
+			want: true,
+		},
+		{
+			name: "combine plus real step",
+			wf: &Workflow{Steps: []WorkflowStep{
+				{Node: "combine", Params: map[string]string{"format": "text"}},
+				{Node: "file_write", Params: map[string]string{"path": "out.txt"}},
+			}},
+			want: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := HasMeaningfulSteps(tc.wf); got != tc.want {
+				t.Errorf("HasMeaningfulSteps = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestGenerateWorkflow_UnmatchedDescriptionProducesPlaceholder verifies that a
+// description matching no keyword yields a non-meaningful (placeholder) workflow,
+// which is the precondition for the CLI's suggestion/LLM-fallback path (断点9).
+func TestGenerateWorkflow_UnmatchedDescriptionProducesPlaceholder(t *testing.T) {
+	// "安排明天的会议日程" contains none of the llm/action/domain/url/file
+	// keywords, so the rule-based generator falls back to the placeholder
+	// combine step.
+	wf, err := GenerateWorkflow("安排明天的会议日程")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if HasMeaningfulSteps(wf) {
+		t.Errorf("unmatched description should produce placeholder workflow, got steps: %+v", wf.Steps)
+	}
+}

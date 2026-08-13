@@ -194,6 +194,27 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	return wf, nil
 }
 
+// HasMeaningfulSteps reports whether GenerateWorkflow actually matched any
+// keyword/domain/file in the description and produced real workflow steps,
+// as opposed to falling back to the default placeholder `combine` step.
+//
+// This is the signal used by the CLI (断点9) to decide whether to silently
+// accept the generated workflow or offer suggestions / fall back to LLM
+// generation: a workflow that contains only the default combine placeholder
+// conveys no real intent and would mislead the user into thinking a useful
+// workflow was produced.
+func HasMeaningfulSteps(wf *Workflow) bool {
+	if wf == nil || len(wf.Steps) == 0 {
+		return false
+	}
+	// The rule-based generator emits exactly one `combine` step with
+	// format=text only as a last-resort placeholder when nothing matched.
+	if len(wf.Steps) == 1 && wf.Steps[0].Node == "combine" {
+		return false
+	}
+	return true
+}
+
 func addLLMStep(wf *Workflow, llmNode, llmModel, action string) {
 	systemPrompt := getSystemPrompt(action)
 	if systemPrompt == "" {

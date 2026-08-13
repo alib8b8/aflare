@@ -130,6 +130,8 @@ func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, sa
 		cli.HandleAutoUpgrade(args)
 	case "init":
 		cli.HandleInit(args)
+	case "config":
+		cli.HandleConfig(args)
 	case "skills":
 		cli.HandleSkills(args)
 	case "-h", "--help", "help":
@@ -161,6 +163,6 @@ func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, sa
 	case "badge":
 		cli.HandleBadge(args)
 	default:
-		cli.HandleRunFile(command, dryRun, false, "", safeMode)
+		cli.HandleRunFile(command, dryRun, false, "", safeMode, nil)
 	}
 }

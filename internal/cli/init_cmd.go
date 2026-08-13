@@ -65,8 +65,9 @@ func HandleInit(args []string) {
 	}
 
 	if mcpTarget == "" && agentTarget == "" && channel == "" {
-		PrintInitUsage()
-		os.Exit(1)
+		// No flags: run the interactive first-run setup wizard.
+		runInitWizard()
+		return
 	}
 
 	if mcpTarget != "" {
@@ -116,13 +117,15 @@ func HandleInit(args []string) {
 // PrintInitUsage prints usage information for the init command.
 func PrintInitUsage() {
 	fmt.Println("Usage: aflare init [options]")
-	fmt.Println("\nInitialize aflare integration with AI agents and configure settings.")
+	fmt.Println("\nWithout options, runs the interactive first-run setup wizard")
+	fmt.Println("(environment detection + LLM provider configuration).")
 	fmt.Println("\nOptions:")
 	fmt.Println("  --mcp <agent>       Setup MCP server configuration (claude-code, opencode, all)")
 	fmt.Println("  --agent <agent>     Install aflare skills to agent (claude-code, opencode, all)")
 	fmt.Println("  --channel <channel> Set update channel (stable, beta, nightly)")
 	fmt.Println("  -h, --help          Show this help message")
 	fmt.Println("\nExamples:")
+	fmt.Println("  aflare init                        # interactive first-run wizard")
 	fmt.Println("  aflare init --mcp all")
 	fmt.Println("  aflare init --mcp claude-code --agent all")
 	fmt.Println("  aflare init --channel beta")
