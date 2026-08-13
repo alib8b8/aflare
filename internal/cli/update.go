@@ -17,10 +17,13 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/alib8b8/aflare/internal/autoupgrade"
+	"github.com/alib8b8/aflare/internal/meta"
 )
 
 // HandleSelfUpdate handles the "self-update" / "update" command.
@@ -33,6 +36,82 @@ func HandleSelfUpdate() {
 		os.Exit(1)
 	}
 	fmt.Printf("✅ %s\n", result)
+}
+
+// HandleUpgrade handles the "upgrade" command (断点17: 没有 aflare upgrade
+// 一键升级). It wraps SelfUpdate with a friendlier, step-by-step progress
+// output so users get clear feedback during the update process.
+func HandleUpgrade(args []string) {
+	repo := "alib8b8/aflare"
+	current := meta.GetVersion()
+
+	fmt.Println("检查最新版本...")
+	latestTag, hasUpdate, err := CheckUpdate(repo)
+	if err != nil {
+		fmt.Printf("❌ 检查更新失败: %v\n", err)
+		fmt.Println("提示：检查网络连接，或设置 HTTPS_PROXY 后重试。")
+		os.Exit(1)
+	}
+
+	fmt.Printf("当前版本：%s\n", current)
+	fmt.Printf("最新版本：%s\n", latestTag)
+
+	if !hasUpdate {
+		fmt.Println("已是最新版本。")
+		return
+	}
+
+	fmt.Print("下载中... ")
+	result, err := SelfUpdate(repo)
+	if err != nil {
+		fmt.Println()
+		fmt.Printf("❌ 更新失败: %v\n", err)
+		os.Exit(1)
+	}
+	// SelfUpdate verifies the SHA256 checksum internally before replacing the
+	// binary; reaching here means verification passed.
+	fmt.Println("████████████████████ 100%")
+	fmt.Println("校验 SHA256... ✓")
+	fmt.Printf("更新完成。%s\n", result)
+}
+
+// CheckUpdateNotice performs a short, non-blocking check for a newer aflare
+// release and returns a one-line notice string when an update is available.
+// Returns "" when no update is available or the check fails (callers should
+// treat failure as "no notice" to avoid noisy startup output).
+func CheckUpdateNotice() string {
+	repo := "alib8b8/aflare"
+	current := meta.GetVersion()
+	latestTag, hasUpdate, err := CheckUpdate(repo)
+	if err != nil || !hasUpdate {
+		return ""
+	}
+	return fmt.Sprintf("aflare %s (有新版本 %s，运行 aflare upgrade 更新)", current, latestTag)
+}
+
+// PrintUpdateNoticeAsync checks for a newer aflare release bounded by timeout
+// and writes a one-line notice to w when an update is available. It blocks
+// for at most timeout, so callers that want truly non-blocking startup output
+// should invoke it in a goroutine. On timeout or failure it writes nothing.
+//
+// This implements the 断点17 startup hint: "aflare vX.Y.Z (有新版本 vX.Y.Z，
+// 运行 aflare upgrade 更新)".
+func PrintUpdateNoticeAsync(w io.Writer, timeout time.Duration) {
+	if timeout <= 0 {
+		return
+	}
+	type result struct{ notice string }
+	ch := make(chan result, 1)
+	go func() {
+		ch <- result{notice: CheckUpdateNotice()}
+	}()
+	select {
+	case r := <-ch:
+		if r.notice != "" {
+			fmt.Fprintln(w, r.notice)
+		}
+	case <-time.After(timeout):
+	}
 }
 
 // HandleAutoUpgrade handles the "autoupgrade" / "au" command.

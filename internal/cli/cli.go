@@ -145,7 +145,7 @@ func ValidateCommand(command string) error {
 		return fmt.Errorf("no command provided")
 	}
 	switch command {
-	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "review", "version", "--version", "-v", "self-update", "update", "autoupgrade", "au", "init", "webui", "skills", "schedule", "audit", "serve", "marketplace", "secrets", "resume", "chat", "agent", "template", "install-pack", "watermark", "badge":
+	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "review", "version", "--version", "-v", "self-update", "update", "upgrade", "autoupgrade", "au", "init", "config", "webui", "skills", "schedule", "audit", "serve", "marketplace", "secrets", "resume", "chat", "agent", "template", "install-pack", "watermark", "badge", "doctor":
 		return nil
 	}
 	return fmt.Errorf("unknown command: %s", command)
@@ -187,6 +187,8 @@ func PrintUsage() string {
   aflare registry search <query>          %s
   aflare version                         %s
   aflare self-update                     %s
+  aflare upgrade                         %s
+  aflare doctor                          %s
   aflare autoupgrade <cmd>               %s
   aflare resume <run-id>                  %s
   aflare chat                            %s
@@ -200,6 +202,8 @@ func PrintUsage() string {
   --lang <lang>  %s (en, zh)
 
 %s:
+  aflare init                            # interactive first-run wizard
+  aflare config show                     # view current config
   aflare create "fetch example.com and save to file"
   aflare run examples/basic_summary.yaml
   aflare --safe-mode run examples/multi_step.yaml
@@ -218,6 +222,8 @@ func PrintUsage() string {
 		i18n.T("usage.registry_search"),
 		i18n.T("usage.version"),
 		i18n.T("usage.self_update"),
+		i18n.T("usage.upgrade"),
+		i18n.T("usage.doctor"),
 		i18n.T("usage.autoupgrade"),
 		i18n.T("usage.resume"),
 		i18n.T("usage.chat"),

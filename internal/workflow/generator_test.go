@@ -568,3 +568,296 @@ func TestContainsActionKeyword_UnknownAction(t *testing.T) {
 		t.Error("unknown action should not match")
 	}
 }
+
+// TestHasMeaningfulSteps verifies the signal used by the CLI (断点9) to decide
+// whether keyword matching produced a real workflow or only the placeholder
+// combine fallback.
+func TestHasMeaningfulSteps(t *testing.T) {
+	tests := []struct {
+		name string
+		wf   *Workflow
+		want bool
+	}{
+		{
+			name: "nil workflow",
+			wf:   nil,
+			want: false,
+		},
+		{
+			name: "no steps",
+			wf:   &Workflow{Steps: nil},
+			want: false,
+		},
+		{
+			name: "only placeholder combine",
+			wf: &Workflow{Steps: []WorkflowStep{{
+				Node:   "combine",
+				Params: map[string]string{"format": "text"},
+			}}},
+			want: false,
+		},
+		{
+			name: "single real fetch_url step",
+			wf: &Workflow{Steps: []WorkflowStep{{
+				Node:   "fetch_url",
+				Params: map[string]string{"url": "https://example.com"},
+			}}},
+			want: true,
+		},
+		{
+			name: "combine plus real step",
+			wf: &Workflow{Steps: []WorkflowStep{
+				{Node: "combine", Params: map[string]string{"format": "text"}},
+				{Node: "file_write", Params: map[string]string{"path": "out.txt"}},
+			}},
+			want: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := HasMeaningfulSteps(tc.wf); got != tc.want {
+				t.Errorf("HasMeaningfulSteps = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestGenerateWorkflow_UnmatchedDescriptionProducesPlaceholder verifies that a
+// description matching no keyword yields a non-meaningful (placeholder) workflow,
+// which is the precondition for the CLI's suggestion/LLM-fallback path (断点9).
+func TestGenerateWorkflow_UnmatchedDescriptionProducesPlaceholder(t *testing.T) {
+	// "安排明天的会议日程" contains none of the llm/action/domain/url/file
+	// keywords, so the rule-based generator falls back to the placeholder
+	// combine step.
+	wf, err := GenerateWorkflow("安排明天的会议日程")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if HasMeaningfulSteps(wf) {
+		t.Errorf("unmatched description should produce placeholder workflow, got steps: %+v", wf.Steps)
+	}
+}
+
+// ── 遗留修复: price / condition / schedule keyword tests ──
+
+func TestGenerateWorkflow_PriceKeyword(t *testing.T) {
+	wf, err := GenerateWorkflow("检查 BTC 价格")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var foundHTTP, foundJSONParse bool
+	for _, step := range wf.Steps {
+		if step.Node == "http_request" {
+			foundHTTP = true
+			if !strings.Contains(step.Params["url"], "coingecko") {
+				t.Errorf("expected coingecko url, got %s", step.Params["url"])
+			}
+		}
+		if step.Node == "json_parse" {
+			foundJSONParse = true
+			if step.Params["path"] != "bitcoin.usd" {
+				t.Errorf("expected path bitcoin.usd, got %s", step.Params["path"])
+			}
+		}
+	}
+	if !foundHTTP || !foundJSONParse {
+		t.Errorf("expected http_request + json_parse steps, got: %+v", wf.Steps)
+	}
+	if !HasMeaningfulSteps(wf) {
+		t.Error("price workflow should be meaningful")
+	}
+}
+
+func TestGenerateWorkflow_PriceKeywordETH(t *testing.T) {
+	wf, err := GenerateWorkflow("获取以太坊 ETH 价格")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, step := range wf.Steps {
+		if step.Node == "json_parse" && step.Params["path"] != "ethereum.usd" {
+			t.Errorf("expected path ethereum.usd for ETH, got %s", step.Params["path"])
+		}
+	}
+}
+
+func TestGenerateWorkflow_ConditionWrapsNotify(t *testing.T) {
+	wf, err := GenerateWorkflow("超过 70000 发 telegram 通知")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Expect an if-step whose condition is gt:70000 and whose then-branch
+	// contains a notify step with channel=telegram.
+	var ifStep *WorkflowStep
+	for i := range wf.Steps {
+		if wf.Steps[i].If != nil {
+			ifStep = &wf.Steps[i]
+			break
+		}
+	}
+	if ifStep == nil {
+		t.Fatalf("expected an if-step, got: %+v", wf.Steps)
+	}
+	if ifStep.If.Condition != "gt:70000" {
+		t.Errorf("expected condition gt:70000, got %s", ifStep.If.Condition)
+	}
+	if len(ifStep.If.Then) != 1 || ifStep.If.Then[0].Node != "notify" {
+		t.Errorf("expected then-branch with one notify step, got: %+v", ifStep.If.Then)
+	}
+	if ifStep.If.Then[0].Params["channel"] != "telegram" {
+		t.Errorf("expected telegram channel, got %s", ifStep.If.Then[0].Params["channel"])
+	}
+	// The notify step should NOT also appear as a top-level step.
+	for _, step := range wf.Steps {
+		if step.Node == "notify" {
+			t.Error("notify should be inside the if-branch, not a top-level step")
+		}
+	}
+}
+
+func TestGenerateWorkflow_ConditionBelow(t *testing.T) {
+	wf, err := GenerateWorkflow("低于 50000 发通知")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for i := range wf.Steps {
+		if wf.Steps[i].If != nil {
+			if wf.Steps[i].If.Condition != "lt:50000" {
+				t.Errorf("expected lt:50000, got %s", wf.Steps[i].If.Condition)
+			}
+			return
+		}
+	}
+	t.Error("expected an if-step for 低于 50000")
+}
+
+func TestGenerateWorkflow_NotifyWithoutCondition(t *testing.T) {
+	wf, err := GenerateWorkflow("发 telegram 通知")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Without a condition, notify should be a top-level step (not wrapped in if).
+	for _, step := range wf.Steps {
+		if step.Node == "notify" {
+			return // found top-level notify
+		}
+	}
+	t.Error("expected a top-level notify step when no condition is present")
+}
+
+func TestGenerateWorkflow_ScheduleEveryNMinutes(t *testing.T) {
+	wf, err := GenerateWorkflow("每 10 分钟检查 BTC 价格")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wf.Schedule == nil {
+		t.Fatal("expected wf.Schedule to be set")
+	}
+	if wf.Schedule.Cron != "*/10 * * * *" {
+		t.Errorf("expected cron */10 * * * *, got %s", wf.Schedule.Cron)
+	}
+	if !wf.Schedule.Enabled {
+		t.Error("expected schedule enabled")
+	}
+}
+
+func TestGenerateWorkflow_ScheduleEveryHour(t *testing.T) {
+	wf, err := GenerateWorkflow("每 2 小时运行")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wf.Schedule == nil || wf.Schedule.Cron != "0 */2 * * *" {
+		t.Errorf("expected cron 0 */2 * * *, got: %+v", wf.Schedule)
+	}
+}
+
+func TestGenerateWorkflow_FullBTCExample(t *testing.T) {
+	// The exact example from the user's original complaint:
+	// "每 10 分钟检查 BTC 价格，超过 70000 发 Telegram 通知"
+	wf, err := GenerateWorkflow("每 10 分钟检查 BTC 价格，超过 70000 发 Telegram 通知")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !HasMeaningfulSteps(wf) {
+		t.Fatal("expected a meaningful workflow for the BTC example")
+	}
+	// 1. schedule set
+	if wf.Schedule == nil || wf.Schedule.Cron != "*/10 * * * *" {
+		t.Errorf("expected schedule cron */10 * * * *, got: %+v", wf.Schedule)
+	}
+	// 2. http_request + json_parse present
+	var foundHTTP, foundJSON, foundIf bool
+	for i := range wf.Steps {
+		s := &wf.Steps[i]
+		if s.Node == "http_request" {
+			foundHTTP = true
+		}
+		if s.Node == "json_parse" {
+			foundJSON = true
+		}
+		if s.If != nil {
+			foundIf = true
+			if s.If.Condition != "gt:70000" {
+				t.Errorf("expected if condition gt:70000, got %s", s.If.Condition)
+			}
+			if len(s.If.Then) != 1 || s.If.Then[0].Node != "notify" {
+				t.Errorf("expected notify in then-branch, got: %+v", s.If.Then)
+			}
+			if s.If.Then[0].Params["channel"] != "telegram" {
+				t.Errorf("expected telegram channel, got %s", s.If.Then[0].Params["channel"])
+			}
+		}
+	}
+	if !foundHTTP {
+		t.Error("expected http_request step for BTC price fetch")
+	}
+	if !foundJSON {
+		t.Error("expected json_parse step for BTC price")
+	}
+	if !foundIf {
+		t.Error("expected if-step for threshold condition")
+	}
+}
+
+func TestExtractCondition(t *testing.T) {
+	cases := []struct {
+		desc   string
+		want   string
+		wantOk bool
+	}{
+		{"超过 70000", "gt:70000", true},
+		{"价格大于 50000", "gt:50000", true},
+		{"above 100", "gt:100", true},
+		{"over 99.5", "gt:99.5", true},
+		{"低于 30000", "lt:30000", true},
+		{"below 50", "lt:50", true},
+		{"检查价格", "", false},
+		{"", "", false},
+	}
+	for _, c := range cases {
+		got, ok := extractCondition(c.desc)
+		if got != c.want || ok != c.wantOk {
+			t.Errorf("extractCondition(%q) = (%q, %v), want (%q, %v)", c.desc, got, ok, c.want, c.wantOk)
+		}
+	}
+}
+
+func TestParseScheduleCron(t *testing.T) {
+	cases := []struct {
+		desc string
+		want string
+	}{
+		{"每 10 分钟", "*/10 * * * *"},
+		{"每隔 5 分钟", "*/5 * * * *"},
+		{"每 2 小时", "0 */2 * * *"},
+		{"每小时", "0 * * * *"},
+		{"每分钟", "* * * * *"},
+		{"每天", "0 9 * * *"},
+		{"检查价格", ""},
+	}
+	for _, c := range cases {
+		got := parseScheduleCron(c.desc)
+		if got != c.want {
+			t.Errorf("parseScheduleCron(%q) = %q, want %q", c.desc, got, c.want)
+		}
+	}
+}

@@ -279,6 +279,9 @@ func PrintAgentUsage() {
 	fmt.Println("scheduled tasks, file-watch events, and a task queue in a single event loop.")
 	fmt.Println()
 	fmt.Println("Options:")
+	fmt.Println("  --smart                   智能模式预设（reflection + adaptive + memory）")
+	fmt.Println("  --careful                 谨慎模式预设（human-in-loop + planning + reflection）")
+	fmt.Println("  --custom -c <list>        自定义 capability 组合（高级用户）")
 	fmt.Println("  --provider, -p <name>     LLM provider (default: ollama)")
 	fmt.Println("  --model, -m <name>        Model name (default: llama3)")
 	fmt.Println("  --api-key, -k <key>       API key for cloud providers")
@@ -290,7 +293,7 @@ func PrintAgentUsage() {
 	fmt.Println("  --watch <dir>             Watch directory for file changes, feed to agent")
 	fmt.Println("  --help, -h                 Show this help")
 	fmt.Println()
-	fmt.Println("Capabilities (--capabilities):")
+	fmt.Println("Capabilities (--custom -c):")
 	fmt.Println("  reflection     Self-reflection and self-correction")
 	fmt.Println("  human-in-loop  Pause at critical decisions for human approval")
 	fmt.Println("  bdi            Belief-Desire-Intention goal management")
@@ -303,10 +306,12 @@ func PrintAgentUsage() {
 	fmt.Println("  simulation     Simulation and generative behavior modeling")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  aflare agent                                    # local ollama (default)")
+	fmt.Println("  aflare agent                                    # 默认模式（无 capability）")
+	fmt.Println("  aflare agent --smart                           # 智能模式（推荐）")
+	fmt.Println("  aflare agent --careful                         # 谨慎模式（有风险操作时）")
+	fmt.Println("  aflare agent --custom -c reflection,bdi        # 自定义组合")
 	fmt.Println("  aflare agent -p deepseek -m deepseek-chat       # DeepSeek")
 	fmt.Println("  aflare agent -s                                 # safe mode")
-	fmt.Println("  aflare agent -c reflection,bdi                  # with reflection + BDI")
 	fmt.Println("  aflare agent --watch ./logs                     # watch directory for changes")
 	fmt.Println("  aflare agent -c all                             # all capabilities")
 }
@@ -315,6 +320,14 @@ func PrintAgentUsage() {
 func parseAgentArgs(args []string, cfg *agent.Config, watchDir *string) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--smart":
+			// 断点14: 智能模式预设。
+			cfg.Capabilities = agent.ResolvePreset("smart")
+		case "--careful":
+			// 断点14: 谨慎模式预设。
+			cfg.Capabilities = agent.ResolvePreset("careful")
+		case "--custom":
+			// 断点14: 标记使用自定义组合，-c 紧随其后。
 		case "--provider", "-p":
 			if i+1 < len(args) {
 				cfg.Provider = args[i+1]
@@ -342,6 +355,7 @@ func parseAgentArgs(args []string, cfg *agent.Config, watchDir *string) {
 			}
 		case "--capabilities", "-c":
 			if i+1 < len(args) {
+				// 断点14: --custom -c xxx 时覆盖预设；否则 -c 单独使用也生效。
 				cfg.Capabilities = agent.ParseCapabilities(args[i+1])
 				i++
 			}

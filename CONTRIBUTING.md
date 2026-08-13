@@ -171,10 +171,16 @@ We take code quality seriously. Here's what to expect:
    - You may receive feedback and revision requests
 
 3. **Approval & merge**:
-   - At least 1 approval required
+   - The **`PR Review / gate (required)`** status check must pass (aggregates build + security + multi-platform build)
+   - At least 1 CODEOWNER approval required (enforced via branch protection)
+   - Direct pushes to `main` are blocked (`enforce-pr.yml`); all changes must go through a PR
    - All review comments resolved
    - Branch is up-to-date with `main`
    - Squash merge is used for clean history
+
+> **Branch protection setup** (repo admin, one-time): Settings → Branches → Add rule for `main` →
+> enable "Require a pull request before merging" (1 approval) + "Require status checks to pass"
+> (select `gate (required)`). This applies to both GitHub and GitCode (mirrored workflows).
 
 ### What Reviewers Look For
 

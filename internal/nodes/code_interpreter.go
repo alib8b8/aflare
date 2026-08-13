@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -168,16 +169,40 @@ func (n *CodeInterpreterNode) Execute(ctx context.Context, input string, params 
 
 // checkSandbox verifies that bubblewrap is available for sandboxed execution.
 // It logs a warning when bwrap is missing, and returns an error at L2+ security
-// levels where running without sandbox isolation is not acceptable.
+// levels where running without sandbox isolation is not acceptable. The error
+// message includes platform-specific install instructions so the user knows
+// exactly how to fix the problem.
 func checkSandbox() error {
 	if _, err := exec.LookPath("bwrap"); err != nil {
+		hint := bwrapInstallHint()
 		logger.Warn("bwrap not found, code will execute without sandbox isolation",
-			"hint", "install bubblewrap for full sandbox protection")
+			"hint", hint)
 		if config.SecurityLevelAtLeast(config.SecurityLevelL2) {
-			return fmt.Errorf("code_interpreter requires bubblewrap sandbox at L2+ security level; install bubblewrap or lower security level")
+			return fmt.Errorf("code_interpreter 需要 bubblewrap 沙箱（当前安全等级 L2+ 不允许无沙箱执行）\n  %s\n  或降低安全等级：aflare config set security_level L1", hint)
 		}
 	}
 	return nil
+}
+
+// bwrapInstallHint returns a platform-specific install command for bubblewrap.
+func bwrapInstallHint() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "安装命令：brew install bubblewrap"
+	case "linux":
+		if _, err := exec.LookPath("apt"); err == nil {
+			return "安装命令：sudo apt install bubblewrap"
+		}
+		if _, err := exec.LookPath("dnf"); err == nil {
+			return "安装命令：sudo dnf install bubblewrap"
+		}
+		if _, err := exec.LookPath("pacman"); err == nil {
+			return "安装命令：sudo pacman -S bubblewrap"
+		}
+		return "请使用你的包管理器安装 bubblewrap"
+	default:
+		return "bubblewrap 在此平台不可用，部分模板将不可用"
+	}
 }
 
 func runPython(ctx context.Context, code, workDir string, timeout time.Duration, stdin string, allowNetwork bool) (string, error) {

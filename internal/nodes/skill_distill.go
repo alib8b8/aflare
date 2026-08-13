@@ -297,7 +297,3 @@ func generatePitfalls(distillType string) []string {
 
 	return pitfalls
 }
-
-func init() {
-	Register(&SkillDistillNode{})
-}

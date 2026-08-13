@@ -28,7 +28,7 @@ import (
 )
 
 // HandleTemplateSubmit handles the "template" command.
-// Usage: aflare template submit <workflow.yaml> [--category <cat>] [--author <name>]
+// Usage: aflare template <list|new|clone|submit> [args]
 func HandleTemplateSubmit(args []string) {
 	if len(args) == 0 {
 		PrintTemplateSubmitUsage()
@@ -39,6 +39,12 @@ func HandleTemplateSubmit(args []string) {
 	switch subCmd {
 	case "submit":
 		handleTemplateSubmit(args[1:])
+	case "list":
+		handleTemplateList(args[1:])
+	case "new":
+		handleTemplateNew(args[1:])
+	case "clone":
+		handleTemplateClone(args[1:])
 	case "--help", "-h", "help":
 		PrintTemplateSubmitUsage()
 	default:
@@ -259,30 +265,31 @@ func parseTemplateSubmitArgs(args []string, yamlPath, category, author *string) 
 	}
 }
 
-// PrintTemplateSubmitUsage prints usage for the template submit command.
+// PrintTemplateSubmitUsage prints usage for the template command.
 func PrintTemplateSubmitUsage() {
-	fmt.Println("Usage: aflare template submit <workflow.yaml> [options]")
+	fmt.Println("Usage: aflare template <list|new|clone|submit> [args]")
 	fmt.Println()
-	fmt.Println("Validates and prepares a community-contributed workflow template for submission.")
-	fmt.Println("The command will:")
-	fmt.Println("  1. Validate the YAML file exists and is well-formed")
-	fmt.Println("  2. Generate skill.json metadata")
-	fmt.Println("  3. Place the template in the correct templates/ directory")
-	fmt.Println("  4. Rebuild the skills registry")
+	fmt.Println("子命令：")
+	fmt.Println("  list                        列出可用模板（默认只显示 easy，--all 显示全部）")
+	fmt.Println("  new <name>                  创建工作流骨架到 ./<name>/workflow.yaml")
+	fmt.Println("  clone <source> <dest>       复制已有模板到本地进行改造")
+	fmt.Println("  submit <file.yaml>          校验并准备社区模板提交")
 	fmt.Println()
-	fmt.Println("Options:")
-	fmt.Println("  --category, -c <name>   Skill category (default: auto-detected)")
-	fmt.Println("  --author, -a <name>     Author name (default: \"community contributor\")")
-	fmt.Println("  --help, -h              Show this help")
+	fmt.Println("list 选项：")
+	fmt.Println("  --all                       显示全部模板（含需要 LLM/沙箱的）")
+	fmt.Println("  --category <name>           按分类筛选")
 	fmt.Println()
-	fmt.Println("Standard categories:")
-	fmt.Printf("  %s\n", strings.Join(validSkillCategories(), ", "))
+	fmt.Println("submit 选项：")
+	fmt.Println("  --category, -c <name>       技能分类（默认自动检测）")
+	fmt.Println("  --author, -a <name>         作者名（默认 \"community contributor\"）")
 	fmt.Println()
-	fmt.Println("Examples:")
+	fmt.Println("示例：")
+	fmt.Println("  aflare template list")
+	fmt.Println("  aflare template list --all")
+	fmt.Println("  aflare template list --category devops-infra")
+	fmt.Println("  aflare template new my-workflow")
+	fmt.Println("  aflare template clone ssl-cert-checker my-cert-checker")
 	fmt.Println("  aflare template submit my-workflow.yaml --category devops-infra")
-	fmt.Println("  aflare template submit stock-analyzer.yaml -c finance -a \"Your Name\"")
-	fmt.Println()
-	fmt.Println("After submission, follow the printed instructions to create a PR.")
 }
 
 // extractYAMLField extracts a simple top-level YAML field value.

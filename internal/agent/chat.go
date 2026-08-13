@@ -118,6 +118,14 @@ func (s *ChatSession) Run() {
 		fmt.Println("Type /resume to restore the conversation, or just start chatting to begin fresh.")
 	}
 	s.firstSession = !hasSession || len(session.Messages) == 0
+
+	// 断点15/断点D: 首次启动显示完整引导，降低新用户门槛；之后只显示
+	// 一行提示，避免老用户每次都被完整引导打扰。
+	if s.firstSession {
+		fmt.Println(OnboardingMessage())
+	} else {
+		fmt.Println("输入 /help 查看命令，/exit 退出")
+	}
 	fmt.Println()
 
 	// Ctrl-C: interrupt current turn, Ctrl-D: exit

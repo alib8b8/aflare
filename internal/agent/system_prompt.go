@@ -92,3 +92,18 @@ func WelcomeMessage(version string) string {
 		version,
 	)
 }
+
+// OnboardingMessage returns the first-session guidance shown to new users
+// (断点15: 首次 chat 无引导). It gives concrete examples the user can try
+// immediately, plus pointers to /help and /exit, so the blank-prompt
+// confusion is eliminated.
+func OnboardingMessage() string {
+	return "aflare Agent 已启动。试试这些：\n" +
+		"\n" +
+		"  • 帮我生成一个监控 BTC 价格的工作流\n" +
+		"  • 分析当前目录的 Go 代码质量\n" +
+		"  • 每 5 分钟检查 https://example.com 是否可访问\n" +
+		"\n" +
+		"输入 /help 查看所有命令\n" +
+		"输入 /exit 退出"
+}

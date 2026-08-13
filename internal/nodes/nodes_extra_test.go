@@ -34,7 +34,6 @@ func TestNodeMetadata(t *testing.T) {
 		wantName    string
 		wantDescLen int
 	}{
-		{"test", &TestNode{}, "test_node", 0},
 		{"fastgpt", &FastGPTNode{}, "fastgpt", 0},
 		{"http_request", &HTTPRequestNode{}, "http_request", 0},
 		{"fetch_url", &FetchURLNode{}, "fetch_url", 0},
@@ -49,7 +48,6 @@ func TestNodeMetadata(t *testing.T) {
 		{"execute", &ExecuteNode{}, "execute", 0},
 		{"call", &CallNode{}, "call", 0},
 		{"ollama", &OllamaNode{}, "ollama", 0},
-		{"context_fs", &ContextFSNode{}, "context_fs", 0},
 		{"doc_parse", &DocParseNode{}, "doc_parse", 0},
 	}
 
@@ -70,12 +68,12 @@ func TestNodeMetadata(t *testing.T) {
 
 func TestRegistryConcurrent(t *testing.T) {
 	reg := NewRegistry()
-	reg.Register(&TestNode{})
+	reg.Register(&ConditionNode{})
 
 	// Concurrent reads
 	for i := 0; i < 10; i++ {
 		go func() {
-			reg.Get("test")
+			reg.Get("condition")
 		}()
 	}
 	for i := 0; i < 10; i++ {

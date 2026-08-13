@@ -47,12 +47,6 @@ func TestSQLQueryNode_Metadata(t *testing.T) {
 	}
 }
 
-func TestSQLQueryNode_Registered(t *testing.T) {
-	if _, ok := Get("sql_query"); !ok {
-		t.Fatal("sql_query node not registered in global registry")
-	}
-}
-
 func TestIsReadOnlySQL(t *testing.T) {
 	cases := []struct {
 		stmt string

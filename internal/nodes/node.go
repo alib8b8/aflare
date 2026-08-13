@@ -118,8 +118,8 @@ func RegisterBuiltins(reg *Registry) {
 	reg.Register(&NotifyNode{})
 	reg.Register(&OllamaNode{})
 	reg.Register(&CallNode{})
-	reg.Register(&SandboxNode{})
-	reg.Register(&AgentOrchestratorNode{})
+	// reg.Register(&SandboxNode{})      // frozen: not exposed via registry
+	// reg.Register(&AgentOrchestratorNode{}) // frozen: not exposed via registry
 
 	// OpenAI-compatible providers (openai, glm, kimi, qwen, deepseek,
 	// anthropic, gemini, mistral, yi, baichuan, internlm, minimax,

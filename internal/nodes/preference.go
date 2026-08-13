@@ -26,10 +26,6 @@ import (
 
 type PreferenceNode struct{}
 
-func init() {
-	Register(&PreferenceNode{})
-}
-
 func (n *PreferenceNode) Name() string {
 	return "preference"
 }

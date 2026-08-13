@@ -151,3 +151,10 @@ func (pe *PolicyExecutor) WithCheckpoint(path string) *PolicyExecutor {
 	pe.Executor = pe.Executor.WithCheckpoint(path)
 	return pe
 }
+
+// WithProgress registers a CLI progress callback on the underlying executor
+// (断点13). See Executor.WithProgress for details.
+func (pe *PolicyExecutor) WithProgress(cb StepProgressFunc) *PolicyExecutor {
+	pe.Executor = pe.Executor.WithProgress(cb)
+	return pe
+}

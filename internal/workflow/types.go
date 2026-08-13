@@ -25,6 +25,23 @@ type Workflow struct {
 	Output         string            `yaml:"output,omitempty"`          // expression for final output (default: last step output)
 	InputSchema    []InputField      `yaml:"input_schema,omitempty"`    // optional input validation
 	MaxConcurrency int               `yaml:"max_concurrency,omitempty"` // global concurrency limit (default: 0=unlimited)
+	// Schedule is an optional cron schedule hint. The workflow engine itself
+	// does not auto-schedule; this field is parsed & preserved so generated
+	// workflows carry their intended cadence, and `aflare run` prints an
+	// actionable hint to register it via `aflare schedule add`. (遗留修复:
+	// previously a `schedule:` block in YAML was silently dropped by the
+	// parser, misleading users who copied it from docs/examples.)
+	Schedule *ScheduleConfig `yaml:"schedule,omitempty"`
+}
+
+// ScheduleConfig carries an optional cron expression describing how often a
+// workflow should run. It is metadata: the engine does not honor it at run
+// time (scheduling is done externally via `aflare schedule add`), but
+// preserving it in the Workflow struct means it survives parse/save
+// round-trips and the CLI can surface an activation hint.
+type ScheduleConfig struct {
+	Cron    string `yaml:"cron,omitempty"`
+	Enabled bool   `yaml:"enabled,omitempty"`
 }
 
 // InputField defines an expected input parameter for schema validation.
