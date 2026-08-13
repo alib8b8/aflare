@@ -23,9 +23,8 @@
 // files without changing any provider's name, default model, default
 // endpoint, or env-var contract.
 //
-// Providers with bespoke request/response shapes (ollama, fastgpt) or
-// simulated implementations (sensenova, antling, andesgpt) remain in
-// their own files because they cannot be expressed as a plain
+// Providers with bespoke request/response shapes (ollama, fastgpt) remain
+// in their own files because they cannot be expressed as a plain
 // OpenAI-compatible config entry.
 package providers
 

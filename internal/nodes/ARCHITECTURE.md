@@ -9,13 +9,12 @@ Node 文件按功能分为以下几类（均在 `nodes` 包内）：
 - `llm_base.go` - LLM 节点基础类
 - `pipeline.go` - Pipeline 节点
 - `router.go` - 路由节点基类
-- `test_node.go` - 测试节点
 
 ## 2. LLM Providers (模型供应商)
 - `openai.go`, `ollama.go`, `anthropic.go`, `gemini.go`
 - `deepseek.go`, `qwen.go`, `kimi.go`, `glm.go`, `yi.go`, `mistral.go`
 - `baichuan.go`, `internlm.go`, `minimax.go`, `xverse.go`, `coze.go`
-- `fastgpt.go`, `ima.go`, `sensenova_node.go`, `andesgpt_node.go`
+- `fastgpt.go`, `ima.go`
 - `ondevice_llm.go`, `inference_backend.go`
 
 ## 3. Agent Nodes (智能体节点)
@@ -57,8 +56,6 @@ Node 文件按功能分为以下几类（均在 `nodes` 包内）：
 - `quality_guard.go` - 质量守卫
 - `output_quality.go` - 输出质量检测
 - `mcp_bridge.go`, `mcp_server.go` - MCP 集成
-- `plugin_system.go` - 插件系统
-- `marketplace.go` - 市场节点
 - `tools_compat.go` - 工具兼容层
 
 ## 6. Code Intelligence (代码智能)
@@ -68,26 +65,13 @@ Node 文件按功能分为以下几类（均在 `nodes` 包内）：
 - `doc_gen.go` - 文档生成
 - `engineer_skills.go` - 工程师技能
 - `self_heal.go` - 自修复
-- `antling_node.go` - 百灵代码助手
 - `skill_distill.go` - 技能蒸馏
-- `skill_explorer.go` - 技能探索
 
 ## 7. Data & Memory (数据与记忆)
 - `memory_node.go` - 记忆节点
 - `knowledge_graph.go` - 知识图谱
 - `rag.go` - RAG 检索增强
 - `history.go` (in workflow) - 历史管理
-
-## 8. Specialized Nodes (专业领域节点)
-- `mobile_nodes.go` - 鸿蒙/移动端节点
-- `blockchain_audit.go` - 区块链审计
-- `voice_input.go`, `voice_output.go` - 语音输入输出
-- `power_manager.go` - 电源管理
-- `screen_understanding.go` - 屏幕理解
-- `robot_control.go` - 机器人控制
-- `video_edit.go` - 视频编辑
-- `system_event.go` - 系统事件
-- `cli_session.go` - CLI 会话模拟
 
 ## 9. Security (安全)
 - `security.go` - 安全检查
@@ -100,4 +84,3 @@ Node 文件按功能分为以下几类（均在 `nodes` 包内）：
 
 ## 11. Multimodal (多模态)
 - `multimodal.go` - 多模态处理
-- `moe_streaming.go` - MoE 流式输出

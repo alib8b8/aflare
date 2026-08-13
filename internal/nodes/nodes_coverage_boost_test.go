@@ -190,54 +190,6 @@ func TestIsSensitiveFile(t *testing.T) {
 	}
 }
 
-func TestValidateGitURL(t *testing.T) {
-	tests := []struct {
-		url  string
-		want bool
-	}{
-		{"", false},
-		{"git@github.com:user/repo.git", true},
-		{"https://github.com/user/repo", true},
-		{"https://gitlab.com/user/repo", true},
-		{"https://gitee.com/user/repo", true},
-		{"ftp://example.com/repo", false},
-	}
-	for _, tt := range tests {
-		got := validateGitURL(tt.url)
-		if got != tt.want {
-			t.Errorf("validateGitURL(%q) = %v, want %v", tt.url, got, tt.want)
-		}
-	}
-}
-
-func TestValidatePluginURL(t *testing.T) {
-	tests := []struct {
-		url  string
-		want bool
-	}{
-		{"", false},
-		{"https://example.com/plugin", true},
-		{"http://example.com/plugin", false},
-		{"https://localhost/plugin", false},
-		{"https://127.0.0.1/plugin", false},
-	}
-	for _, tt := range tests {
-		got := validatePluginURL(tt.url)
-		if got != tt.want {
-			t.Errorf("validatePluginURL(%q) = %v, want %v", tt.url, got, tt.want)
-		}
-	}
-}
-
-func TestValidateMarketID(t *testing.T) {
-	if validateMarketID("") {
-		t.Error("empty id should be invalid")
-	}
-	if !validateMarketID("valid-id-123") {
-		t.Error("valid id should pass")
-	}
-}
-
 func TestLooksLikeURL(t *testing.T) {
 	tests := []struct {
 		s    string

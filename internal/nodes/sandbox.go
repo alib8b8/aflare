@@ -38,16 +38,12 @@ import (
 type sandboxMode string
 
 const (
-	sandboxShell   sandboxMode = "shell"
-	sandboxBrowser sandboxMode = "browser"
-	sandboxDesktop sandboxMode = "desktop"
+	sandboxShell sandboxMode = "shell"
 )
 
 var (
 	validSandboxModes = map[sandboxMode]bool{
-		sandboxShell:   true,
-		sandboxBrowser: true,
-		sandboxDesktop: true,
+		sandboxShell: true,
 	}
 
 	// sandboxCommandWhitelist is deprecated; use SafeCommandWhitelist instead.
@@ -72,19 +68,16 @@ type sandboxState struct {
 	lastUsed  time.Time
 	workDir   string
 	envVars   map[string]string
-	cookies   map[string]string // browser session cookies
-	userAgent string            // browser user-agent for anti-detection
 }
 
-// SandboxNode provides an isolated execution environment for running code,
-// browser operations, and desktop operations. It acts as the "virtual computer"
-// execution layer for AI agents, similar to Cloudflare/computer.
+// SandboxNode provides an isolated execution environment for running shell
+// commands. It acts as the "virtual computer" execution layer for AI agents.
 type SandboxNode struct{}
 
 func (n *SandboxNode) Name() string { return "sandbox" }
 
 func (n *SandboxNode) Description() string {
-	return "沙箱执行节点。为AI Agent提供隔离的执行环境，支持三种模式：shell（命令执行）、browser（浏览器操作）、desktop（桌面应用操作）。命令白名单+超时+资源限制，安全可控。"
+	return "沙箱执行节点。为AI Agent提供隔离的执行环境，支持shell模式（命令执行）。命令白名单+超时+资源限制，安全可控。"
 }
 
 func (n *SandboxNode) Schema() NodeSchema {
@@ -94,7 +87,7 @@ func (n *SandboxNode) Schema() NodeSchema {
 		Input:       "string - 要执行的命令或操作指令",
 		Output:      "string - JSON格式的执行结果",
 		Params: []ParamSchema{
-			{Name: "mode", Type: "string", Description: "执行模式：shell（命令执行）、browser（浏览器操作）、desktop（桌面操作）", Required: false, Default: "shell"},
+			{Name: "mode", Type: "string", Description: "执行模式：shell（命令执行）", Required: false, Default: "shell"},
 			{Name: "sandbox_id", Type: "string", Description: "沙箱ID（自动生成或指定，用于保持会话状态）", Required: false},
 			{Name: "timeout_ms", Type: "int", Description: "超时时间（毫秒，默认30000）", Required: false, Default: "30000"},
 			{Name: "work_dir", Type: "string", Description: "工作目录", Required: false, Default: "/tmp/aflare-sandbox"},
@@ -111,7 +104,7 @@ func (n *SandboxNode) Execute(ctx context.Context, input string, params map[stri
 
 	mode := sandboxMode(getParam(params, "mode", "shell"))
 	if !validSandboxModes[mode] {
-		return "", fmt.Errorf("invalid mode: %s (valid: shell, browser, desktop)", mode)
+		return "", fmt.Errorf("invalid mode: %s (valid: shell)", mode)
 	}
 
 	sandboxID := getParam(params, "sandbox_id", "")
@@ -152,7 +145,6 @@ func (n *SandboxNode) Execute(ctx context.Context, input string, params map[stri
 				createdAt: time.Now(),
 				workDir:   workDir,
 				envVars:   envVars,
-				cookies:   make(map[string]string),
 			}
 		} else {
 			// When loading from disk, sync the workDir to the current param value
@@ -181,10 +173,6 @@ func (n *SandboxNode) Execute(ctx context.Context, input string, params map[stri
 	switch mode {
 	case sandboxShell:
 		result = n.executeShell(ctx, input, state, timeoutMs, safeMode)
-	case sandboxBrowser:
-		result = n.executeBrowser(input, state)
-	case sandboxDesktop:
-		result = n.executeDesktop(input, state)
 	}
 
 	result["sandbox_id"] = sandboxID
@@ -250,100 +238,6 @@ func (n *SandboxNode) executeShell(ctx context.Context, input string, state *san
 	result["status"] = "completed"
 	result["stdout"] = outputStr
 	result["work_dir"] = state.workDir
-	return result
-}
-
-func (n *SandboxNode) executeBrowser(input string, state *sandboxState) map[string]interface{} {
-	result := map[string]interface{}{
-		"action": input,
-	}
-
-	lower := strings.ToLower(input)
-
-	switch {
-	case strings.Contains(lower, "navigate") || strings.Contains(lower, "打开"):
-		result["status"] = "completed"
-		result["action_type"] = "navigate"
-		result["message"] = fmt.Sprintf("浏览器导航到目标页面（模拟模式）")
-	case strings.Contains(lower, "click") || strings.Contains(lower, "点击"):
-		result["status"] = "completed"
-		result["action_type"] = "click"
-		result["message"] = fmt.Sprintf("浏览器点击操作（模拟模式）")
-	case strings.Contains(lower, "type") || strings.Contains(lower, "输入") || strings.Contains(lower, "fill"):
-		result["status"] = "completed"
-		result["action_type"] = "type"
-		result["message"] = fmt.Sprintf("浏览器输入操作（模拟模式）")
-	case strings.Contains(lower, "screenshot") || strings.Contains(lower, "截图"):
-		result["status"] = "completed"
-		result["action_type"] = "screenshot"
-		result["message"] = fmt.Sprintf("浏览器截图（模拟模式，实际运行需Xvfb+Chrome）")
-	case strings.Contains(lower, "extract") || strings.Contains(lower, "提取") || strings.Contains(lower, "scrape"):
-		result["status"] = "completed"
-		result["action_type"] = "extract"
-		result["message"] = fmt.Sprintf("浏览器内容提取（模拟模式，实际运行需playwright）")
-	case strings.Contains(lower, "captcha") || strings.Contains(lower, "验证码") || strings.Contains(lower, "recaptcha") || strings.Contains(lower, "hcaptcha"):
-		// Captcha detected — requires human intervention
-		// This integrates with the Policy Engine's approval mechanism.
-		// When a workflow encounters a captcha, it pauses and requests human
-		// approval via the configured approval channel.
-		result["status"] = "human_intervention_required"
-		result["action_type"] = "captcha"
-		result["intervention_type"] = "captcha_solve"
-		result["message"] = "CAPTCHA detected — human intervention required. The workflow will pause and request approval via the Policy Engine."
-		result["requires_approval"] = true
-		result["approval_action"] = "browser:captcha"
-		result["approval_details"] = input
-	case strings.Contains(lower, "login") || strings.Contains(lower, "登录") || strings.Contains(lower, "signin"):
-		// Login operations may require session persistence
-		result["status"] = "completed"
-		result["action_type"] = "login"
-		result["message"] = fmt.Sprintf("浏览器登录操作（模拟模式，session已持久化）")
-		result["session_persisted"] = true
-	case strings.Contains(lower, "cookie") || strings.Contains(lower, "cookies"):
-		// Cookie management for session persistence
-		result["status"] = "completed"
-		result["action_type"] = "cookie_management"
-		result["message"] = fmt.Sprintf("浏览器Cookie管理（模拟模式）")
-		result["cookies_count"] = len(state.cookies)
-	default:
-		result["status"] = "completed"
-		result["action_type"] = "unknown"
-		result["message"] = fmt.Sprintf("浏览器操作（模拟模式）：%s", input)
-	}
-
-	return result
-}
-
-func (n *SandboxNode) executeDesktop(input string, state *sandboxState) map[string]interface{} {
-	result := map[string]interface{}{
-		"action": input,
-	}
-
-	lower := strings.ToLower(input)
-
-	switch {
-	case strings.Contains(lower, "launch") || strings.Contains(lower, "启动") || strings.Contains(lower, "open"):
-		result["status"] = "completed"
-		result["action_type"] = "launch"
-		result["message"] = fmt.Sprintf("桌面应用启动（模拟模式，实际运行需xdotool/Windows COM）")
-	case strings.Contains(lower, "click") || strings.Contains(lower, "点击"):
-		result["status"] = "completed"
-		result["action_type"] = "click"
-		result["message"] = fmt.Sprintf("桌面点击操作（模拟模式）")
-	case strings.Contains(lower, "type") || strings.Contains(lower, "输入") || strings.Contains(lower, "keyboard"):
-		result["status"] = "completed"
-		result["action_type"] = "type"
-		result["message"] = fmt.Sprintf("桌面键盘输入（模拟模式）")
-	case strings.Contains(lower, "screenshot") || strings.Contains(lower, "截图"):
-		result["status"] = "completed"
-		result["action_type"] = "screenshot"
-		result["message"] = fmt.Sprintf("桌面截图（模拟模式，实际运行需Xvfb+scrot）")
-	default:
-		result["status"] = "completed"
-		result["action_type"] = "unknown"
-		result["message"] = fmt.Sprintf("桌面操作（模拟模式）：%s", input)
-	}
-
 	return result
 }
 
@@ -472,8 +366,6 @@ type sessionFile struct {
 	LastUsed  string            `json:"last_used"`
 	WorkDir   string            `json:"work_dir"`
 	EnvVars   map[string]string `json:"env_vars"`
-	Cookies   map[string]string `json:"cookies"`
-	UserAgent string            `json:"user_agent"`
 }
 
 // saveSessionToDisk persists the sandbox session state to disk.
@@ -497,8 +389,6 @@ func saveSessionToDisk(id string, state *sandboxState) {
 		LastUsed:  state.lastUsed.Format(time.RFC3339),
 		WorkDir:   state.workDir,
 		EnvVars:   state.envVars,
-		Cookies:   state.cookies,
-		UserAgent: state.userAgent,
 	}
 
 	data, err := json.MarshalIndent(sf, "", "  ")
@@ -540,8 +430,6 @@ func loadSessionFromDisk(id string) *sandboxState {
 		lastUsed:  lastUsed,
 		workDir:   sf.WorkDir,
 		envVars:   sf.EnvVars,
-		cookies:   sf.Cookies,
-		userAgent: sf.UserAgent,
 	}
 }
 
@@ -582,5 +470,5 @@ func init() {
 		sandboxBlockedPatterns = append(sandboxBlockedPatterns, regexp.MustCompile(`(?i)`+p))
 	}
 
-	Register(&SandboxNode{})
+	// Register(&SandboxNode{}) // frozen: not exposed via registry
 }

@@ -27,10 +27,6 @@ import (
 
 type CodeKnowledgeGraphNode struct{}
 
-func init() {
-	Register(&CodeKnowledgeGraphNode{})
-}
-
 func (n *CodeKnowledgeGraphNode) Name() string {
 	return "code_knowledge_graph"
 }

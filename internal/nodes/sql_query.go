@@ -40,10 +40,6 @@ import (
 // limits, and an optional schema introspection action.
 type SQLQueryNode struct{}
 
-func init() {
-	Register(&SQLQueryNode{})
-}
-
 func (n *SQLQueryNode) Name() string { return "sql_query" }
 
 func (n *SQLQueryNode) Description() string {

@@ -26,10 +26,6 @@ import (
 
 type CompressNode struct{}
 
-func init() {
-	Register(&CompressNode{})
-}
-
 func (n *CompressNode) Name() string {
 	return "compress"
 }

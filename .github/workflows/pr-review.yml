@@ -127,3 +127,23 @@ jobs:
         with:
           name: aflare-${{ matrix.os }}-${{ matrix.arch }}
           path: aflare-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+
+  # Aggregate gate: single required status check for branch protection.
+  # Enable branch protection on main and set this job ("gate" / "PR Review / gate")
+  # as the required status check. This ensures CI gate + review enforcement.
+  gate:
+    name: gate (required)
+    runs-on: ubuntu-latest
+    needs: [build, security-scan, multi-platform-build]
+    if: always()
+    steps:
+      - name: Check all required jobs passed
+        if: ${{ !(needs.build.result == 'success' && needs.security-scan.result == 'success' && needs.multi-platform-build.result == 'success') }}
+        run: |
+          echo "::error::CI gate failed - not all required checks passed"
+          echo "build: ${{ needs.build.result }}"
+          echo "security-scan: ${{ needs.security-scan.result }}"
+          echo "multi-platform-build: ${{ needs.multi-platform-build.result }}"
+          exit 1
+      - name: Gate passed
+        run: echo "::notice::All CI gate checks passed - ready for code review and merge"

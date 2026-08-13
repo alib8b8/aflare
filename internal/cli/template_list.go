@@ -40,8 +40,8 @@ var llmNodes = map[string]bool{
 	"critic": true, "evaluator": true, "supervisor": true,
 	"doc_gen": true, "rag": true, "knowledge_graph_llm": true,
 	"code_review": true, "code_knowledge_graph": true,
-	"skill_distill": true, "skill_explorer": true,
-	"subagent": true, "agent_orchestrator": true,
+	"skill_distill": true,
+	"subagent":      true, "agent_orchestrator": true,
 	"clarify": true, "human_in_loop": true,
 	"search_aggregate": true, "structured_output": true,
 }

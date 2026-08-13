@@ -443,7 +443,3 @@ func generateArchitectureDoc(moduleName string, depth int, input string) string 
 	}
 	return sb.String()
 }
-
-func init() {
-	Register(&DocGenNode{})
-}

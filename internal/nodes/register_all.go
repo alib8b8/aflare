@@ -23,12 +23,8 @@ import (
 	// Register drone nodes (MAVLink-compatible drone control via PX4/ArduPilot).
 	_ "github.com/alib8b8/aflare/internal/nodes/drone"
 
-	// Register mobile/hardware nodes (OnDeviceLLM, PowerManager, Robot,
-	// Voice I/O, Screen, Video, AgentBrowser, BlockchainAudit, etc.).
-	_ "github.com/alib8b8/aflare/internal/nodes/mobile"
-
 	// Register LLM provider nodes (OpenAI, Anthropic, Gemini, GLM, Qwen,
 	// Kimi, DeepSeek, Ollama, Mistral, MiniMax, Baichuan, InternLM, Yi,
-	// XVERSE, MiMo, Coze, FastGPT, IMA, SenseNova, AntLing, AndesGPT).
+	// XVERSE, MiMo, Coze, FastGPT, IMA).
 	_ "github.com/alib8b8/aflare/internal/nodes/providers"
 )
