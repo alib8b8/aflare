@@ -35,7 +35,7 @@ import (
 //  3. 关键词未匹配到有意义步骤时:
 //     - 若已配置 LLM (aflare init 配置或环境变量), 自动降级到 LLM 生成。
 //     - 若未配置 LLM, 打印可操作的建议 (改造已有模板 / --ai / 手动创建),
-//       而不是静默生成一个只有占位 combine 节点的无意义工作流。
+//     而不是静默生成一个只有占位 combine 节点的无意义工作流。
 func HandleCreate(args []string, aiMode bool) {
 	interactive := false
 

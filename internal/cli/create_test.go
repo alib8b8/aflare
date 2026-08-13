@@ -53,7 +53,7 @@ func TestParseParams(t *testing.T) {
 			name:   "multiple tokens",
 			tokens: []string{"domains=example.com", "notify_url=https://hook.example"},
 			want: map[string]string{
-				"domains":     "example.com",
+				"domains":    "example.com",
 				"notify_url": "https://hook.example",
 			},
 		},
@@ -187,9 +187,9 @@ func TestPrintInputSchemaHelp(t *testing.T) {
 
 	for _, want := range []string{
 		"此模板需要以下参数",
-		"domains",      // required field
+		"domains", // required field
 		"必填",
-		"notify_url",   // optional field
+		"notify_url", // optional field
 		"选填",
 		"（默认: 30）", // default value marker for timeout
 		"示例：",

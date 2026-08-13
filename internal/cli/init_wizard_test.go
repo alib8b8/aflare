@@ -162,9 +162,9 @@ func TestRedactAPIKey(t *testing.T) {
 		want  string
 	}{
 		{"sk-abcd1234efgh5678ijkl", "sk-a***************ijkl"}, // 23 chars: 4 + 15 stars + 4
-		{"short", "*****"},                                      // len <= 8 → all masked (5 stars)
-		{"12345678", "********"},                                // len == 8 → all masked
-		{"123456789", "1234*6789"},                              // 9 chars: 4 + 1 star + 4
+		{"short", "*****"},         // len <= 8 → all masked (5 stars)
+		{"12345678", "********"},   // len == 8 → all masked
+		{"123456789", "1234*6789"}, // 9 chars: 4 + 1 star + 4
 	}
 	for _, tt := range tests {
 		got := redactAPIKey(tt.input)
