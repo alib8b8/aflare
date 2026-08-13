@@ -61,9 +61,32 @@ release:
     name: aflare
   name_template: "aflare {{ .Tag }}"
   footer: |
-    ### Install (Linux / macOS)
-    Download the install script from the repository and run it locally:
-    https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh
+    ## Install
+
+    **macOS / Linux:**
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash
+    ```
+
+    **Windows (PowerShell):**
+    ```powershell
+    irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 | iex
+    ```
+
+    Homebrew: `brew install alib8b8/tap/aflare`
+
+    ## Build verification status
+
+    | Artifact        | CI verified                                                       |
+    |-----------------|-------------------------------------------------------------------|
+    | `linux-amd64`   | ✅ tested on `ubuntu-latest` (build + vet + race tests + lint)    |
+    | `linux-arm64`   | ✅ tested on `ubuntu-24.04-arm` (build + vet + race tests + lint) |
+    | `darwin-amd64`  | ⚠️ build-only (not exercised in CI)                               |
+    | `darwin-arm64`  | ⚠️ build-only (not exercised in CI)                               |
+    | `windows-amd64` | ⚠️ build-only (not exercised in CI)                               |
+    | `windows-arm64` | ⚠️ build-only (not exercised in CI)                               |
+
+    > Verification status reflects the CI matrix in `.github/workflows/ci.yml` at release time.
 
 nfpms:
   - id: packages

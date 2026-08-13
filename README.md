@@ -27,16 +27,41 @@
 
 ## 快速开始
 
-```bash
-# 安装
-brew install alib8b8/tap/aflare
-# 或: curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash
+### 安装
 
-# 可选：安装 bubblewrap 以获得完整沙箱隔离（code_interpreter 节点需要）
-# Ubuntu/Debian: sudo apt install bubblewrap
-# macOS:        brew install bubblewrap
-# Fedora:       sudo dnf install bubblewrap
+**macOS / Linux** —— 一键安装(自动检测平台与架构,含校验和验证):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash
 ```
+
+**Windows** —— PowerShell 一键安装(自动检测架构并加入用户 PATH):
+
+```powershell
+irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 | iex
+```
+
+<details>
+<summary><b>其他安装方式</b>(Homebrew / 手动下载 / deb · rpm)</summary>
+
+```bash
+# Homebrew(macOS / Linuxbrew)
+brew install alib8b8/tap/aflare
+
+# 手动下载二进制
+#   GitHub:  https://github.com/alib8b8/aflare/releases
+#   国内镜像: https://gitcode.com/aflare/aflare/-/releases
+```
+
+- `deb` / `rpm` 包见每个 Release 的附件。
+- 国内网络下安装脚本会自动切换到镜像加速下载。
+
+</details>
+
+> **可选**:安装 bubblewrap 以获得完整沙箱隔离(`code_interpreter` 节点需要)
+> - Ubuntu/Debian: `sudo apt install bubblewrap`
+> - macOS:        `brew install bubblewrap`
+> - Fedora:       `sudo dnf install bubblewrap`
 
 ```bash
 # 关键词生成工作流

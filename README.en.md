@@ -27,16 +27,41 @@
 
 ## Quick Start
 
-```bash
-# Install
-brew install alib8b8/tap/aflare
-# or: curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash
+### Install
 
-# Optional: install bubblewrap for full sandbox isolation (required by code_interpreter node)
-# Ubuntu/Debian: sudo apt install bubblewrap
-# macOS:        brew install bubblewrap
-# Fedora:       sudo dnf install bubblewrap
+**macOS / Linux** — one-line install (auto-detects OS & arch, verifies checksum):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash
 ```
+
+**Windows** — PowerShell one-line install (auto-detects arch, adds to user PATH):
+
+```powershell
+irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 | iex
+```
+
+<details>
+<summary><b>Other install methods</b> (Homebrew / manual download / deb · rpm)</summary>
+
+```bash
+# Homebrew (macOS / Linuxbrew)
+brew install alib8b8/tap/aflare
+
+# Manual binary download
+#   GitHub:  https://github.com/alib8b8/aflare/releases
+#   Mirror:  https://gitcode.com/aflare/aflare/-/releases
+```
+
+- `deb` / `rpm` packages are attached to each Release.
+- The install script auto-switches to mirror-accelerated downloads on CN networks.
+
+</details>
+
+> **Optional**: install bubblewrap for full sandbox isolation (required by `code_interpreter` node)
+> - Ubuntu/Debian: `sudo apt install bubblewrap`
+> - macOS:        `brew install bubblewrap`
+> - Fedora:       `sudo dnf install bubblewrap`
 
 ```bash
 # Generate workflow from keywords
