@@ -10,7 +10,7 @@ Every PR must pass all checks below before merge.
 | 2 | Static analysis | `go vet ./...` | Yes |
 | 3 | Linting | `golangci-lint` (errcheck, staticcheck, funlen, etc.) | Yes |
 | 4 | Unit tests | `go test ./... -short` | Yes |
-| 5 | Coverage threshold | `go test -cover` ≥ 60% | Yes |
+| 5 | Coverage threshold | total `go test -cover` ≥ 60% **and** per-package ≥ 60% (agent, nodes, workflow, memory) | Yes |
 | 6 | Race detector | `go test -race ./internal/agent/... ./internal/memory/...` | Yes |
 | 7 | Vulnerability scan | `govulncheck ./...` | Yes |
 | 8 | Benchmark regression | `benchstat` baseline vs current | Warn |
@@ -77,10 +77,14 @@ Examples:
 
 ## Test Coverage Targets
 
-| Package | Current | Target |
-|---------|---------|--------|
-| `internal/agent` | ~50% | 60% |
-| `internal/nodes` | ~55% | 60% |
-| `internal/workflow` | ~45% | 60% |
-| `internal/memory` | ~40% | 60% |
-| Overall | ~45% | 60% |
+Per-package thresholds are **enforced in CI** (`.github/workflows/ci.yml`,
+"Check per-package coverage thresholds"). A package below its threshold
+fails the build.
+
+| Package | Target | Enforced |
+|---------|--------|----------|
+| `internal/agent` | 60% | Yes |
+| `internal/nodes` | 60% | Yes |
+| `internal/workflow` | 60% | Yes |
+| `internal/memory` | 60% | Yes |
+| Overall | 60% | Yes |

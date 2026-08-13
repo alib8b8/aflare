@@ -46,6 +46,42 @@ jobs:
           echo "::notice::Coverage ${total}% meets threshold ${threshold}%"
         fi
 
+    - name: Check per-package coverage thresholds (enforced)
+      run: |
+        set -uo pipefail
+        fail=0
+        # Per-package coverage gates (see docs/code-review.md Test Coverage Targets).
+        # Format: "package_prefix:threshold". coverage.out is generated above.
+        targets=(
+          "internal/agent:60"
+          "internal/nodes:60"
+          "internal/workflow:60"
+          "internal/memory:60"
+        )
+        for entry in "${targets[@]}"; do
+          pkg="${entry%:*}"
+          threshold="${entry#*:}"
+          # Aggregate weighted coverage from coverage.out by package prefix.
+          # Each coverprofile line is: file:start.col,end.col numStmts count
+          read -r total covered < <(awk -v p="/$pkg/" '
+            $1 ~ p && $1 !~ /^mode:/ { t+=$2; if($3>0) c+=$2 }
+            END { print t+0, c+0 }
+          ' coverage.out)
+          if [ "$total" -eq 0 ]; then
+            echo "::warning::No coverage data for $pkg (package may have no tests)"
+            continue
+          fi
+          cov=$(awk -v c="$covered" -v t="$total" 'BEGIN { printf "%.1f", c/t*100 }')
+          pass=$(awk -v cov="$cov" -v th="$threshold" 'BEGIN { print (cov >= th) ? 1 : 0 }')
+          if [ "$pass" -eq 0 ]; then
+            echo "::error::$pkg coverage ${cov}% is below required ${threshold}%"
+            fail=1
+          else
+            echo "::notice::$pkg coverage ${cov}% meets threshold ${threshold}%"
+          fi
+        done
+        exit $fail
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       with:
