@@ -65,7 +65,9 @@ func TestBDICapability_GetGoals_ReturnsCopy(t *testing.T) {
 	b.AddGoal("original", 1)
 	goals := b.GetGoals()
 	// Appending to the returned slice must not affect the internal state.
-	goals = append(goals, &Desire{ID: "extra", Description: "injected"})
+	// The append result is intentionally discarded: the point is that the
+	// call itself (growing the returned slice) does not mutate b.desires.
+	_ = append(goals, &Desire{ID: "extra", Description: "injected"})
 	if len(b.GetGoals()) != 1 {
 		t.Error("GetGoals should return a copy, internal state was mutated by append")
 	}
