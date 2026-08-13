@@ -44,7 +44,11 @@ type SkillMeta struct {
 	Inputs       []SkillIO `json:"inputs"`
 	Outputs      []SkillIO `json:"outputs"`
 	Dependencies []string  `json:"dependencies"`
-	Path         string    `json:"-"`
+	// Difficulty is "easy" (no LLM/sandbox), "medium" (needs LLM), or "hard"
+	// (needs LLM + bubblewrap sandbox). When empty it is auto-inferred from
+	// the workflow's node types at list time.
+	Difficulty string `json:"difficulty,omitempty"`
+	Path       string `json:"-"`
 }
 
 type SkillRegistry struct {

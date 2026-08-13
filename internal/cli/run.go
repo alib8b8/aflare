@@ -63,14 +63,14 @@ func redactParams(params map[string]string) map[string]string {
 
 // HandleRun handles the "run" command.
 func HandleRun(args []string, dryRun bool, safeMode bool) {
-	// Parse --resume flag. Two forms are supported:
-	//   aflare run --resume my-workflow.yaml
-	//     → boolean flag; checkpoint defaults to ~/.aflare/checkpoints/<name>.json
-	//   aflare run --resume /path/to/state.json my-workflow.yaml
-	//   aflare run --resume=/path/to/state.json my-workflow.yaml
-	//     → explicit checkpoint path
+	// Parse --resume and --params flags.
+	//   --resume [path] <file>           enable checkpoint resume
+	//   --resume=/path <file>             explicit checkpoint path
+	//   --params k=v [k2=v2 ...] <file>   pass input parameters
+	//   --params="k=v k2=v2" <file>       single-token form
 	resumeEnabled := false
 	resumePath := ""
+	var params []string
 	var filtered []string
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -84,6 +84,17 @@ func HandleRun(args []string, dryRun bool, safeMode bool) {
 		} else if strings.HasPrefix(arg, "--resume=") {
 			resumeEnabled = true
 			resumePath = strings.TrimPrefix(arg, "--resume=")
+		} else if arg == "--params" {
+			// Consume following key=value tokens until the next flag or end.
+			for j := i + 1; j < len(args); j++ {
+				if strings.HasPrefix(args[j], "-") {
+					break
+				}
+				params = append(params, args[j])
+				i = j
+			}
+		} else if strings.HasPrefix(arg, "--params=") {
+			params = append(params, strings.TrimPrefix(arg, "--params="))
 		} else {
 			filtered = append(filtered, arg)
 		}
@@ -92,15 +103,94 @@ func HandleRun(args []string, dryRun bool, safeMode bool) {
 		fmt.Println(i18n.T("run.usage"))
 		os.Exit(1)
 	}
-	HandleRunFile(filtered[0], dryRun, resumeEnabled, resumePath, safeMode)
+	HandleRunFile(filtered[0], dryRun, resumeEnabled, resumePath, safeMode, parseParams(params))
+}
+
+// printInputSchemaHelp prints a human-readable description of a workflow's
+// input_schema along with a copy-pasteable example command pre-filled with
+// defaults/placeholders. Used when the user runs a parameterized template
+// without --params (断点8).
+func printInputSchemaHelp(wfPath string, wf *workflow.Workflow) {
+	fmt.Println("此模板需要以下参数：")
+	fmt.Println()
+	for _, field := range wf.InputSchema {
+		req := "必填"
+		if !field.Required {
+			req = "选填"
+		}
+		typeStr := field.Type
+		if typeStr == "" {
+			typeStr = "string"
+		}
+		def := ""
+		if field.Default != "" {
+			def = fmt.Sprintf("（默认: %s）", field.Default)
+		}
+		fmt.Printf("  %-12s (%s) %s %s\n", field.Name, typeStr, req, def)
+	}
+	fmt.Println()
+	fmt.Println("示例：")
+	// Build an example command using defaults when available, placeholders otherwise.
+	exampleParts := make([]string, 0, len(wf.InputSchema))
+	for _, field := range wf.InputSchema {
+		val := field.Default
+		if val == "" {
+			val = "your_" + field.Name
+		}
+		exampleParts = append(exampleParts, field.Name+"="+val)
+	}
+	fmt.Printf("  aflare run %s --params \"%s\"\n", wfPath, strings.Join(exampleParts, " "))
+	fmt.Println()
+	fmt.Println("提示：多个参数用空格分隔，例如 --params \"key1=val1 key2=val2\"")
+}
+
+// parseParams converts a list of "key=value" tokens into a map.
+// Tokens without "=" are ignored.
+func parseParams(tokens []string) map[string]string {
+	if len(tokens) == 0 {
+		return nil
+	}
+	m := make(map[string]string)
+	for _, t := range tokens {
+		// A single --params token may contain space-separated pairs.
+		for _, pair := range strings.Fields(t) {
+			if idx := strings.IndexByte(pair, '='); idx > 0 {
+				m[pair[:idx]] = pair[idx+1:]
+			}
+		}
+	}
+	if len(m) == 0 {
+		return nil
+	}
+	return m
 }
 
 // HandleRunFile runs a workflow file with optional resume support.
-func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath string, safeMode bool) {
+// params (from --params) are injected into wf.Vars; when the workflow declares
+// an input_schema but no params are supplied, the schema is printed as guidance
+// and the process exits (断点8: 模板参数不透明).
+func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath string, safeMode bool, params map[string]string) {
 	wf, reg, err := PrepareWorkflow(wfPath)
 	if err != nil {
 		fmt.Printf("Error preparing workflow: %v\n", err)
 		os.Exit(1)
+	}
+
+	// 断点8: 当工作流声明了 input_schema 但未通过 --params 传参时，打印参数
+	// 说明并给出可复制的示例命令，而不是让用户对着空参数报错发呆。
+	if len(wf.InputSchema) > 0 && len(params) == 0 {
+		printInputSchemaHelp(wfPath, wf)
+		os.Exit(1)
+	}
+
+	// 注入 --params 到 wf.Vars，使其可通过 {{var.name}} 在工作流中引用。
+	if len(params) > 0 {
+		if wf.Vars == nil {
+			wf.Vars = make(map[string]string)
+		}
+		for k, v := range params {
+			wf.Vars[k] = v
+		}
 	}
 
 	if suggestions := workflow.ValidateWorkflow(wf); len(suggestions) > 0 {

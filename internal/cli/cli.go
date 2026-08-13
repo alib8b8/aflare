@@ -145,7 +145,7 @@ func ValidateCommand(command string) error {
 		return fmt.Errorf("no command provided")
 	}
 	switch command {
-	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "review", "version", "--version", "-v", "self-update", "update", "autoupgrade", "au", "init", "webui", "skills", "schedule", "audit", "serve", "marketplace", "secrets", "resume", "chat", "agent", "template", "install-pack", "watermark", "badge":
+	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "review", "version", "--version", "-v", "self-update", "update", "autoupgrade", "au", "init", "config", "webui", "skills", "schedule", "audit", "serve", "marketplace", "secrets", "resume", "chat", "agent", "template", "install-pack", "watermark", "badge":
 		return nil
 	}
 	return fmt.Errorf("unknown command: %s", command)
@@ -200,6 +200,8 @@ func PrintUsage() string {
   --lang <lang>  %s (en, zh)
 
 %s:
+  aflare init                            # interactive first-run wizard
+  aflare config show                     # view current config
   aflare create "fetch example.com and save to file"
   aflare run examples/basic_summary.yaml
   aflare --safe-mode run examples/multi_step.yaml
