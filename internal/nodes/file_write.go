@@ -122,7 +122,7 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 		if err := tmpFile.Close(); err != nil {
 			logger.Error("temp file close failed", "err", err)
 		}
-		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpPath) // best-effort: tmp file already gone or removal will fail silently
 	}
 
 	if _, err := tmpFile.Write(data); err != nil {
@@ -141,12 +141,12 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	}
 
 	if err := tmpFile.Close(); err != nil {
-		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpPath) // best-effort: tmp file already gone or removal will fail silently
 		return err
 	}
 
 	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpPath) // best-effort: tmp file already gone or removal will fail silently
 		return err
 	}
 

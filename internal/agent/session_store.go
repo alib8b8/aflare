@@ -117,5 +117,5 @@ func (cm *ContextManager) RestoreSession(path string) int {
 
 // DeleteSession removes the session file if it exists.
 func DeleteSession(path string) {
-	_ = os.Remove(path)
+	_ = os.Remove(path) // best-effort: missing file is not an error
 }

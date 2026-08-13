@@ -304,22 +304,22 @@ func (s *FileQuotaStore) Save(tenant, provider string, usage int64, day string) 
 		if cerr := f.Close(); cerr != nil {
 			logger.Error("quota tmp file close failed", "err", cerr)
 		}
-		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpPath) // best-effort: tmp file already gone or removal will fail silently
 		return fmt.Errorf("quota: write tmp %s/%s: %w", tenant, provider, err)
 	}
 	if err := f.Sync(); err != nil {
 		if cerr := f.Close(); cerr != nil {
 			logger.Error("quota tmp file close failed", "err", cerr)
 		}
-		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpPath) // best-effort: tmp file already gone or removal will fail silently
 		return fmt.Errorf("quota: fsync tmp %s/%s: %w", tenant, provider, err)
 	}
 	if err := f.Close(); err != nil {
-		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpPath) // best-effort: tmp file already gone or removal will fail silently
 		return fmt.Errorf("quota: close tmp %s/%s: %w", tenant, provider, err)
 	}
 	if err := os.Rename(tmpPath, finalPath); err != nil {
-		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpPath) // best-effort: tmp file already gone or removal will fail silently
 		return fmt.Errorf("quota: rename %s/%s: %w", tenant, provider, err)
 	}
 	// Best-effort fsync of the parent directory so the rename is durable. A
@@ -327,7 +327,9 @@ func (s *FileQuotaStore) Save(tenant, provider string, usage int64, day string) 
 	// the tmp file (never read) and the previous record intact — the safe
 	// direction.
 	if dir, err := os.Open(filepath.Dir(finalPath)); err == nil {
-		_ = dir.Sync()
+		if err := dir.Sync(); err != nil {
+			logger.Warn("quota dir fsync failed (non-fatal: rename already applied)", "err", err)
+		}
 		if err := dir.Close(); err != nil {
 			logger.Error("quota dir close failed", "err", err)
 		}
@@ -865,7 +867,10 @@ func (r *LLMRouter) scheduleQuotaClearLocked(name string) {
 	// goroutine, off the statsMu critical section. Best-effort: returns
 	// false once the saver has been closed (after CloseQuota), which we
 	// ignore — quota persistence is advisory.
-	_ = r.quotaSaver.EnqueueClear(tenant, name)
+	if !r.quotaSaver.EnqueueClear(tenant, name) {
+		logger.Warn("quota clear not enqueued (saver closed); quota persistence is advisory",
+			"tenant", tenant, "provider", name)
+	}
 }
 
 // scheduleQuotaSaveLocked queues a debounced write of the current
@@ -879,7 +884,10 @@ func (r *LLMRouter) scheduleQuotaSaveLocked(name string, stats *ProviderStats) {
 	// Best-effort: Save returns false once the saver has been closed (e.g.
 	// after CloseQuota). Quota persistence is advisory and must never block
 	// a routing decision, so the return value is intentionally ignored.
-	_ = r.quotaSaver.Save(r.effectiveTenant(), name, stats.DailyUsage, stats.LastResetDate)
+	if !r.quotaSaver.Save(r.effectiveTenant(), name, stats.DailyUsage, stats.LastResetDate) {
+		logger.Warn("quota save dropped (saver closed); quota persistence is advisory",
+			"tenant", r.effectiveTenant(), "provider", name)
+	}
 }
 
 // FlushQuota forces any pending debounced quota writes to flush immediately.
