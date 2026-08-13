@@ -30,6 +30,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/alib8b8/aflare/internal/config"
 	"github.com/alib8b8/aflare/internal/watermark"
 )
 
@@ -41,6 +42,13 @@ var (
 	cleanCharRegex = regexp.MustCompile(`[^a-z0-9._-]`)
 	cleanNameRegex = regexp.MustCompile(`[^a-z0-9 .]`)
 	cleanFileRegex = regexp.MustCompile(`[^a-z0-9_]`)
+	// 遗留修复: threshold + schedule parsing for the condition/price/schedule
+	// keywords. aboveRegex matches "超过 70000" / "above 70000" / "> 70000";
+	// belowRegex matches "低于 70000" / "below 70000" / "< 70000".
+	aboveRegex     = regexp.MustCompile(`(?:超过|大于|高于|above|over|greater\s*than|>)\s*(\d+(?:\.\d+)?)`)
+	belowRegex     = regexp.MustCompile(`(?:低于|小于|below|under|less\s*than|<)\s*(\d+(?:\.\d+)?)`)
+	everyMinRegex  = regexp.MustCompile(`(?:每|每隔)\s*(\d+)\s*分钟`)
+	everyHourRegex = regexp.MustCompile(`(?:每|每隔)\s*(\d+)\s*小时`)
 )
 
 // GenerateWorkflow creates a workflow from a description using rule-based
@@ -179,6 +187,74 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 		wf.Steps = append(wf.Steps, step)
 	}
 
+	// 遗留修复: price — recognize BTC/价格/crypto and emit a CoinGecko
+	// http_request + json_parse pair so "检查 BTC 价格" produces real fetch
+	// steps instead of only matching the notify keyword.
+	if containsActionKeyword(desc, "price") {
+		coin := "bitcoin"
+		if strings.Contains(desc, "eth") || strings.Contains(desc, "以太坊") {
+			coin = "ethereum"
+		}
+		wf.Steps = append(wf.Steps, WorkflowStep{
+			Node: "http_request",
+			Params: map[string]string{
+				"url":    "https://api.coingecko.com/api/v3/simple/price?ids=" + coin + "&vs_currencies=usd",
+				"method": "GET",
+			},
+		})
+		wf.Steps = append(wf.Steps, WorkflowStep{
+			Node:   "json_parse",
+			Params: map[string]string{"path": coin + ".usd"},
+		})
+	}
+
+	// 断点C + 遗留修复: notify — recognize 通知/telegram/slack/webhook and
+	// emit a real notify step. If a condition (超过/低于 N) is also present,
+	// the notify step is wrapped in an if-branch so "超过 70000 发 Telegram
+	// 通知" produces if(gt:70000, then: notify) instead of an unconditional
+	// notify.
+	var notifyStep *WorkflowStep
+	if containsActionKeyword(desc, "notify") {
+		channel := "webhook"
+		if strings.Contains(desc, "telegram") {
+			channel = "telegram"
+		} else if strings.Contains(desc, "slack") {
+			channel = "slack"
+		}
+		params := map[string]string{"channel": channel}
+		if channel == "telegram" {
+			params["token"] = "{{var.telegram_token}}"
+			params["chat_id"] = "{{var.telegram_chat_id}}"
+		} else if channel == "webhook" {
+			params["url"] = "{{var.webhook_url}}"
+		}
+		notifyStep = &WorkflowStep{Node: "notify", Params: params}
+	}
+
+	// 遗留修复: condition — "超过 70000" / "低于 70000" wraps the notify step
+	// (if any) in an if-branch using the gt/lt numeric operators added to
+	// evaluateCondition. The if-step's input is the previous step's output
+	// (e.g. the parsed price), so gt:N compares that value against N.
+	if cond, ok := extractCondition(desc); ok {
+		ifStep := WorkflowStep{If: &IfConfig{Condition: cond}}
+		if notifyStep != nil {
+			ifStep.If.Then = []WorkflowStep{*notifyStep}
+		}
+		wf.Steps = append(wf.Steps, ifStep)
+	} else if notifyStep != nil {
+		wf.Steps = append(wf.Steps, *notifyStep)
+	}
+
+	// 遗留修复: schedule — "每 10 分钟" / "定时" / "每天" sets a cron hint on
+	// the workflow. The engine does not auto-schedule; `aflare run` prints an
+	// activation hint. This makes the generated YAML carry the intended
+	// cadence instead of silently dropping it.
+	if containsActionKeyword(desc, "schedule") {
+		if cron := parseScheduleCron(desc); cron != "" {
+			wf.Schedule = &ScheduleConfig{Cron: cron, Enabled: true}
+		}
+	}
+
 	// Generate workflow name
 	wf.Name = generateWorkflowName(description)
 	wf.Description = description
@@ -213,6 +289,43 @@ func HasMeaningfulSteps(wf *Workflow) bool {
 		return false
 	}
 	return true
+}
+
+// extractCondition scans a (lowercased) description for a threshold phrase
+// like "超过 70000" / "above 70000" / "低于 70000" / "below 70000" and returns
+// the corresponding condition expression ("gt:70000" / "lt:70000") plus ok.
+// Used by GenerateWorkflow to wrap a notify step in an if-branch.
+func extractCondition(desc string) (string, bool) {
+	if m := aboveRegex.FindStringSubmatch(desc); len(m) > 1 {
+		return "gt:" + m[1], true
+	}
+	if m := belowRegex.FindStringSubmatch(desc); len(m) > 1 {
+		return "lt:" + m[1], true
+	}
+	return "", false
+}
+
+// parseScheduleCron extracts a cron expression from a (lowercased) description
+// containing a schedule phrase. Supported forms: "每N分钟" → "*/N * * * *",
+// "每N小时" → "0 */N * * *", "每小时" → "0 * * * *", "每分钟" → "* * * * *".
+// Returns "" if no recognizable schedule phrase is found.
+func parseScheduleCron(desc string) string {
+	if m := everyMinRegex.FindStringSubmatch(desc); len(m) > 1 {
+		return "*/" + m[1] + " * * * *"
+	}
+	if m := everyHourRegex.FindStringSubmatch(desc); len(m) > 1 {
+		return "0 */" + m[1] + " * * *"
+	}
+	if strings.Contains(desc, "每小时") {
+		return "0 * * * *"
+	}
+	if strings.Contains(desc, "每分钟") || strings.Contains(desc, "every minute") {
+		return "* * * * *"
+	}
+	if strings.Contains(desc, "每天") {
+		return "0 9 * * *"
+	}
+	return ""
 }
 
 func addLLMStep(wf *Workflow, llmNode, llmModel, action string) {
@@ -478,11 +591,38 @@ type llmChatResponse struct {
 	} `json:"error,omitempty"`
 }
 
-// getLLMConfig returns the API key, endpoint, and model for LLM workflow generation.
-// It checks common env vars: OPENAI_API_KEY, DEEPSEEK_API_KEY, etc.
-// Falls back to the AFLARE_LLM_GENERATOR env vars for explicit configuration.
+// getLLMConfig returns the API key, endpoint, and model for LLM workflow
+// generation. Resolution order (断点B: --ai 配置与 init 脱节):
+//  1. config.yaml providers written by `aflare init` — so a user who configured
+//     DeepSeek/OpenAI/Qwen etc. via init can use `aflare create --ai` without
+//     separately exporting env vars. A keyed cloud provider is preferred;
+//     ollama (keyless local) is used only when no keyed provider is configured.
+//  2. AFLARE_LLM_GENERATOR_* env vars (explicit override).
+//  3. Common provider env vars (OPENAI_API_KEY, DEEPSEEK_API_KEY, ...).
 func getLLMConfig() (apiKey, endpoint, model string) {
-	// Try AFLARE_LLM_GENERATOR_* env vars first (explicit config)
+	// 1. config.yaml providers (written by `aflare init`).
+	if cfg, err := config.LoadConfig(); err == nil && cfg != nil && len(cfg.Providers) > 0 {
+		var chosen string
+		for name, pcfg := range cfg.Providers {
+			if pcfg.APIKey != "" {
+				chosen = name
+				break
+			}
+		}
+		if chosen == "" {
+			if _, ok := cfg.Providers["ollama"]; ok {
+				chosen = "ollama"
+			}
+		}
+		if chosen != "" {
+			pcfg := cfg.Providers[chosen]
+			apiKey = pcfg.APIKey
+			endpoint = pcfg.Endpoint
+			model = pcfg.Model
+		}
+	}
+
+	// 2. AFLARE_LLM_GENERATOR_* env vars (explicit override).
 	if key := os.Getenv("AFLARE_LLM_GENERATOR_API_KEY"); key != "" {
 		apiKey = key
 	}
@@ -493,7 +633,7 @@ func getLLMConfig() (apiKey, endpoint, model string) {
 		model = m
 	}
 
-	// Fall back to common provider env vars
+	// 3. Fall back to common provider env vars.
 	if apiKey == "" {
 		for _, envVar := range []string{
 			"OPENAI_API_KEY", "DEEPSEEK_API_KEY", "QWEN_API_KEY",
@@ -646,7 +786,10 @@ func GenerateWorkflowWithLLM(description string) (*Workflow, error) {
 // CreateWorkflowFromDescriptionWithAI creates a workflow from a description.
 // When useAI is true, it first tries LLM-based generation with YAML validation.
 // If LLM generation fails (API error, invalid YAML, empty steps), it falls back
-// to rule-based keyword matching and prints a warning.
+// to rule-based keyword matching. 断点C: when the fallback also produces no
+// meaningful steps, it returns an error instead of silently saving a useless
+// combine-only placeholder YAML — the caller (CLI) is responsible for surfacing
+// actionable suggestions to the user.
 func CreateWorkflowFromDescriptionWithAI(description string, useAI bool) (string, error) {
 	if !useAI {
 		return CreateWorkflowFromDescription(description)
@@ -655,9 +798,21 @@ func CreateWorkflowFromDescriptionWithAI(description string, useAI bool) (string
 	// Try LLM-based generation
 	wf, err := GenerateWorkflowWithLLM(description)
 	if err != nil {
-		// Fall back to rule-based generation
-		fmt.Fprintf(os.Stderr, "⚠️  AI 生成失败，已用模板生成 (%v)\n", err)
-		return CreateWorkflowFromDescription(description)
+		// Fall back to rule-based generation.
+		fmt.Fprintf(os.Stderr, "⚠️  AI 生成失败，尝试关键词匹配 (%v)\n", err)
+		wf, gerr := GenerateWorkflow(description)
+		if gerr != nil {
+			return "", gerr
+		}
+		if !HasMeaningfulSteps(wf) {
+			// 断点C: 不要给用户一个看起来像结果但实际没用的 YAML。
+			return "", fmt.Errorf("无法从该描述生成工作流：关键词未匹配到可用步骤，且 LLM 生成失败（%w）。请用 `aflare template list` 查找现成模板，或配置 LLM 后用 `aflare create \"%s\" --ai`", err, description)
+		}
+		filename := GetSuggestedFilename(description)
+		if err := SaveWorkflow(wf, filename); err != nil {
+			return "", err
+		}
+		return filepath.Join(".", filename), nil
 	}
 
 	filename := GetSuggestedFilename(description)
