@@ -63,6 +63,32 @@ type ifInputKeyType struct{}
 
 var ifInputKey = ifInputKeyType{}
 
+// StepProgressStatus enumerates the lifecycle events emitted via
+// StepProgressFunc (断点13: 实时进度输出).
+const (
+	StepProgressStarted   = "started"
+	StepProgressCompleted = "completed"
+	StepProgressFailed    = "failed"
+	StepProgressSkipped   = "skipped"
+)
+
+// StepProgressEvent is passed to StepProgressFunc for each step lifecycle
+// event, enabling real-time progress output in the CLI (断点13).
+type StepProgressEvent struct {
+	Index    int           // 0-based step index
+	Total    int           // total number of steps in the workflow
+	NodeName string        // node type (e.g. "http_request")
+	StepName string        // human-readable step name (may be empty)
+	Status   string        // one of StepProgress*
+	Duration time.Duration // only meaningful for completed/failed/skipped
+	Error    error         // only meaningful for failed
+}
+
+// StepProgressFunc is a callback invoked at each step lifecycle event
+// (started/completed/failed/skipped). It is called synchronously from the
+// executor goroutine, so implementations must be non-blocking.
+type StepProgressFunc func(ev StepProgressEvent)
+
 // StepResult stores the result of executing a single step
 type StepResult struct {
 	StepIndex int
@@ -141,7 +167,7 @@ func ExecuteWorkflowWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Regi
 		recordWorkflowMetrics(trace, err)
 		return out, results, trace, err
 	}
-	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, "", "", "", DefaultWorkflowTimeout)
+	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, "", "", "", DefaultWorkflowTimeout, nil)
 	recordWorkflowMetrics(trace, err)
 	return out, results, trace, err
 }
@@ -181,12 +207,14 @@ type seqExecState struct {
 	results       []StepResult
 	data          string
 	wal           *WAL
-	saveCP        func(int) // saveCheckpointIfEnabled closure
+	saveCP        func(int)        // saveCheckpointIfEnabled closure
+	progressCB    StepProgressFunc // 断点13: CLI 实时进度回调
 }
 
 // initExecState validates the workflow, sets up tracing, timeouts, the
 // expression engine, secrets, concurrency limiter, and TUI.
-func initExecState(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, timeout time.Duration) (*seqExecState, context.CancelFunc, error) {
+// progressCB (断点13) is an optional CLI progress callback; nil disables it.
+func initExecState(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, timeout time.Duration, progressCB StepProgressFunc) (*seqExecState, context.CancelFunc, error) {
 	if len(wf.Steps) > MaxSteps {
 		return nil, nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
 	}
@@ -233,6 +261,7 @@ func initExecState(ctx context.Context, wf *Workflow, reg *nodes.Registry, progr
 		globalLimiter: globalLimiter,
 		trace:         trace,
 		data:          data,
+		progressCB:    progressCB,
 	}
 
 	// Deferred cleanup: finish trace, end OTel span, cancel context.
@@ -493,6 +522,10 @@ func (s *seqExecState) handleStepCondition(i int, wStep WorkflowStep, stepStart 
 		})
 		s.results = append(s.results, result)
 		s.sendStepTUI(i, wStep.Node, "", 0)
+		s.emitProgress(StepProgressEvent{
+			Index: i, Total: len(s.wf.Steps), NodeName: wStep.Node, StepName: wStep.Name,
+			Status: StepProgressSkipped, Duration: time.Since(stepStart),
+		})
 		return true, nil
 	}
 
@@ -524,6 +557,9 @@ func (s *seqExecState) sendStepTUI(i int, nodeName string, output interface{}, d
 func (s *seqExecState) executeRegularStep(i int, wStep WorkflowStep, stepStart time.Time) error {
 	logger.Info("step started", "index", i, "node", wStep.Node)
 	s.sendStepStartTUI(i, wStep.Node)
+	s.emitProgress(StepProgressEvent{
+		Index: i, Total: len(s.wf.Steps), NodeName: wStep.Node, StepName: wStep.Name, Status: StepProgressStarted,
+	})
 
 	// Parameter evaluation.
 	evalStart := time.Now()
@@ -627,6 +663,19 @@ func (s *seqExecState) executeRegularStep(i int, wStep WorkflowStep, stepStart t
 
 	s.sendStepEndTUI(i, wStep.Node, output, resultErr, duration)
 
+	// 断点13: 实时进度回调（完成或失败）。
+	if resultErr != nil {
+		s.emitProgress(StepProgressEvent{
+			Index: i, Total: len(s.wf.Steps), NodeName: wStep.Node, StepName: wStep.Name,
+			Status: StepProgressFailed, Duration: duration, Error: resultErr,
+		})
+	} else {
+		s.emitProgress(StepProgressEvent{
+			Index: i, Total: len(s.wf.Steps), NodeName: wStep.Node, StepName: wStep.Name,
+			Status: StepProgressCompleted, Duration: duration,
+		})
+	}
+
 	if execErr != nil {
 		return s.handleStepFailure(i, wStep, execErr)
 	}
@@ -687,6 +736,14 @@ func (s *seqExecState) sendStepEndTUI(i int, nodeName, output string, resultErr 
 	})
 }
 
+// emitProgress invokes the CLI progress callback if one is registered (断点13).
+// It is safe to call when progressCB is nil (no-op).
+func (s *seqExecState) emitProgress(ev StepProgressEvent) {
+	if s.progressCB != nil {
+		s.progressCB(ev)
+	}
+}
+
 // recordStepError records a step evaluation or lookup error and returns it.
 func (s *seqExecState) recordStepError(i int, wStep WorkflowStep, stepStart time.Time, evalDuration time.Duration, err error) error {
 	logger.Error("step error", "index", i, "error", err)
@@ -702,6 +759,10 @@ func (s *seqExecState) recordStepError(i int, wStep WorkflowStep, stepStart time
 	})
 	s.results = append(s.results, result)
 	s.sendStepEndTUI(i, wStep.Node, "", err, time.Since(stepStart))
+	s.emitProgress(StepProgressEvent{
+		Index: i, Total: len(s.wf.Steps), NodeName: wStep.Node, StepName: wStep.Name,
+		Status: StepProgressFailed, Duration: time.Since(stepStart), Error: err,
+	})
 	s.failTUI()
 	return err
 }
@@ -738,8 +799,8 @@ func (s *seqExecState) handleStepFailure(i int, wStep WorkflowStep, execErr erro
 	return fmt.Errorf("step %d (%s) failed: %w", i+1, wStep.Node, execErr)
 }
 
-func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, statePath string, walPath string, wfPath string, timeout time.Duration) (string, []StepResult, *WorkflowTrace, error) {
-	state, cleanup, err := initExecState(ctx, wf, reg, program, timeout)
+func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, statePath string, walPath string, wfPath string, timeout time.Duration, progressCB StepProgressFunc) (string, []StepResult, *WorkflowTrace, error) {
+	state, cleanup, err := initExecState(ctx, wf, reg, program, timeout, progressCB)
 	if err != nil {
 		return "", nil, nil, err
 	}
@@ -852,6 +913,9 @@ type Executor struct {
 	// wfPath is the original workflow file path, used for pause-resume
 	// metadata when a resumable step is paused.
 	wfPath string
+	// progressCB (断点13) is an optional CLI progress callback invoked at
+	// each step lifecycle event. nil disables progress output.
+	progressCB StepProgressFunc
 	// wg tracks in-flight executions so Shutdown can wait for all running
 	// steps to complete before returning.
 	wg sync.WaitGroup
@@ -975,6 +1039,21 @@ func (e *Executor) WithIdempotencyStore(store IdempotencyStore) *Executor {
 // run metadata so the resume command can locate the original workflow.
 func (e *Executor) WithWorkflowPath(path string) *Executor {
 	e.wfPath = path
+	return e
+}
+
+// WithProgress registers a StepProgressFunc callback that is invoked at each
+// step lifecycle event (started/completed/failed/skipped) during sequential
+// workflow execution (断点13: 实时进度输出). This is intended for the CLI's
+// non-interactive RunCLI path to print real-time progress like:
+//
+//	[1/5] ✓ http_request  → CoinGecko API          (0.3s)
+//	[2/5] ✗ agent          → FAILED
+//
+// The callback is called synchronously from the executor goroutine and must
+// be non-blocking. Pass nil to disable. Returns the receiver for chaining.
+func (e *Executor) WithProgress(cb StepProgressFunc) *Executor {
+	e.progressCB = cb
 	return e
 }
 
@@ -1147,7 +1226,7 @@ func (e *Executor) ExecuteWithTrace(ctx context.Context, wf *Workflow, reg *node
 		if walPath != "" {
 			statePath = "" // WAL path is the source of truth
 		}
-		out, results, trace, err = executeWorkflowSequential(ctx, wf, reg, program, statePath, walPath, e.wfPath, e.workflowTimeout)
+		out, results, trace, err = executeWorkflowSequential(ctx, wf, reg, program, statePath, walPath, e.wfPath, e.workflowTimeout, e.progressCB)
 	}
 	recordWorkflowMetrics(trace, err)
 	audit.recordCompletion(results, trace, err)
