@@ -28,11 +28,27 @@ import (
 )
 
 // HandleChat handles the "chat" command — interactive agent REPL.
+//
+// 断点14: 支持 --smart / --careful 预设场景，替代手动 capability 组合。
+//
+//	aflare chat             # 默认模式（无 capability）
+//	aflare chat --smart     # 智能模式（reflection + adaptive + memory）
+//	aflare chat --careful   # 谨慎模式（human-in-loop + planning + reflection）
+//	aflare chat --custom -c reflection,bdi  # 自定义组合（高级用户）
 func HandleChat(args []string) {
 	cfg := agent.DefaultConfig()
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--smart":
+			// 断点14: 智能模式预设。
+			cfg.Capabilities = agent.ResolvePreset("smart")
+		case "--careful":
+			// 断点14: 谨慎模式预设。
+			cfg.Capabilities = agent.ResolvePreset("careful")
+		case "--custom":
+			// 断点14: 标记使用自定义组合，-c 紧随其后。无需特殊处理，
+			// -c 分支会覆盖任何已应用的预设。
 		case "--provider", "-p":
 			if i+1 < len(args) {
 				cfg.Provider = args[i+1]
@@ -60,6 +76,7 @@ func HandleChat(args []string) {
 			}
 		case "--capabilities", "-c":
 			if i+1 < len(args) {
+				// 断点14: --custom -c xxx 时覆盖预设；否则 -c 单独使用也生效。
 				cfg.Capabilities = agent.ParseCapabilities(args[i+1])
 				i++
 			}
@@ -112,6 +129,11 @@ func PrintChatUsage() {
 	fmt.Println()
 	fmt.Println("Usage: aflare chat [options]")
 	fmt.Println()
+	fmt.Println("预设模式（推荐，无需理解每个 capability）：")
+	fmt.Println("  --smart                   智能模式（reflection + adaptive + memory）")
+	fmt.Println("  --careful                 谨慎模式（human-in-loop + planning + reflection）")
+	fmt.Println("  --custom -c <list>        自定义组合（高级用户）")
+	fmt.Println()
 	fmt.Println("Options:")
 	fmt.Println("  --provider, -p <name>     LLM provider (default: ollama)")
 	fmt.Println("  --model, -m <name>        Model name (default: llama3)")
@@ -123,7 +145,7 @@ func PrintChatUsage() {
 	fmt.Println("  --safe-mode, -s            Block execute and destructive tools")
 	fmt.Println("  --help, -h                 Show this help")
 	fmt.Println()
-	fmt.Println("Capabilities (--capabilities):")
+	fmt.Println("Capabilities (--custom -c):")
 	fmt.Println("  reflection     Self-reflection and self-correction")
 	fmt.Println("  human-in-loop  Pause at critical decisions for human approval")
 	fmt.Println("  bdi            Belief-Desire-Intention goal management")
@@ -131,12 +153,13 @@ func PrintChatUsage() {
 	fmt.Println("  adaptive, memory, planning, multi-agent, workflow, simulation")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  aflare chat                                    # local ollama (default)")
-	fmt.Println("  aflare chat -p deepseek -m deepseek-chat       # DeepSeek")
-	fmt.Println("  aflare chat -p openai -k $OPENAI_API_KEY       # OpenAI")
-	fmt.Println("  aflare chat -t fetch_url,file_read,execute     # custom tools")
-	fmt.Println("  aflare chat -c reflection,bdi,utility          # with capabilities")
-	fmt.Println("  aflare chat -s                                 # safe mode")
+	fmt.Println("  aflare chat                                    # 默认模式（无 capability）")
+	fmt.Println("  aflare chat --smart                           # 智能模式（推荐）")
+	fmt.Println("  aflare chat --careful                         # 谨慎模式（有风险操作时）")
+	fmt.Println("  aflare chat --custom -c reflection,bdi        # 自定义组合")
+	fmt.Println("  aflare chat -p deepseek -m deepseek-chat      # DeepSeek")
+	fmt.Println("  aflare chat -p openai -k $OPENAI_API_KEY      # OpenAI")
+	fmt.Println("  aflare chat -s                                # safe mode")
 	fmt.Println()
 	fmt.Println("Chat commands:")
 	fmt.Println("  /help          Show commands")

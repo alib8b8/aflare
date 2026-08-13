@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/alib8b8/aflare/internal/cli"
 	"github.com/alib8b8/aflare/internal/i18n"
@@ -101,7 +102,36 @@ func main() {
 		fmt.Println(cli.PrintUsage())
 		os.Exit(1)
 	}
+	// 断点17: 启动时检测新版本（非阻塞，提示一行）。仅对交互/信息类命令
+	// 生效，避免延迟工作流执行或与输出交错。交互类命令在进入主流程前提示，
+	// 信息类命令在输出后提示。
+	if wantsUpdateNoticeBefore(command) {
+		cli.PrintUpdateNoticeAsync(os.Stderr, 1500*time.Millisecond)
+	}
 	dispatchCommand(command, args, aiMode, dryRun, safeMode)
+	if wantsUpdateNoticeAfter(command) {
+		cli.PrintUpdateNoticeAsync(os.Stderr, 1500*time.Millisecond)
+	}
+}
+
+// wantsUpdateNoticeBefore returns true for interactive commands that should
+// receive the "new version available" hint before entering their main loop.
+func wantsUpdateNoticeBefore(command string) bool {
+	switch command {
+	case "chat", "agent", "doctor", "init":
+		return true
+	}
+	return false
+}
+
+// wantsUpdateNoticeAfter returns true for one-shot informational commands that
+// should receive the "new version available" hint after their output.
+func wantsUpdateNoticeAfter(command string) bool {
+	switch command {
+	case "version", "--version", "-v", "help", "-h", "--help", "list", "config", "skills", "registry":
+		return true
+	}
+	return false
 }
 
 func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, safeMode bool) {
@@ -126,6 +156,10 @@ func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, sa
 		fmt.Println(cli.PrintVersion())
 	case "self-update", "update":
 		cli.HandleSelfUpdate()
+	case "upgrade":
+		cli.HandleUpgrade(args)
+	case "doctor":
+		cli.HandleDoctor(args)
 	case "autoupgrade", "au":
 		cli.HandleAutoUpgrade(args)
 	case "init":
