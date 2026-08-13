@@ -1,5 +1,5 @@
 {
-  "id": "openclaw-llmbox",
+  "id": "openclaw-aflare",
   "name": "aflare Workflow Integration",
   "version": "1.1.0",
   "description": "Invoke aflare workflows as tools in OpenClaw conversations",
@@ -13,7 +13,7 @@
         "description": "Directory containing aflare workflow YAML files (default: ./workflows)",
         "default": "./workflows"
       },
-      "llmboxPath": {
+      "aflarePath": {
         "type": "string",
         "description": "Path to aflare binary (default: aflare)",
         "default": "aflare"

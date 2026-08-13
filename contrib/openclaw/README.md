@@ -12,10 +12,10 @@
   <a href="https://github.com/alib8b8/aflare">
     <img src="https://img.shields.io/badge/aflare-v1.0.0-blue" alt="aflare"/>
   </a>
-  <a href="https://github.com/alib8b8/openclaw-llmbox">
+  <a href="https://github.com/alib8b8/openclaw-aflare">
     <img src="https://img.shields.io/badge/OpenClaw-Plugin-green" alt="OpenClaw Plugin"/>
   </a>
-  <a href="https://github.com/alib8b8/openclaw-llmbox/blob/main/LICENSE">
+  <a href="https://github.com/alib8b8/openclaw-aflare/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-AGPL%20v3.0-yellow" alt="License"/>
   </a>
 </p>
@@ -63,11 +63,11 @@ This plugin integrates **aflare** with **OpenClaw**, allowing you to invoke afla
 
 ```bash
 # Install the plugin
-openclaw plugin install alib8b8/openclaw-llmbox
+openclaw plugin install alib8b8/openclaw-aflare
 
 # Or clone and install locally
-git clone https://github.com/alib8b8/openclaw-llmbox.git
-cd openclaw-llmbox
+git clone https://github.com/alib8b8/openclaw-aflare.git
+cd openclaw-aflare
 npm install
 npm run build
 openclaw plugin install ./dist
@@ -80,9 +80,9 @@ Edit your OpenClaw config file (`~/.openclaw/config.json`):
 ```json
 {
   "plugins": {
-    "openclaw-llmbox": {
+    "openclaw-aflare": {
       "workflowDir": "./workflows",
-      "llmboxPath": "aflare",
+      "aflarePath": "aflare",
       "enableAutoDiscovery": true
     }
   }
@@ -92,12 +92,10 @@ Edit your OpenClaw config file (`~/.openclaw/config.json`):
 | Config Option | Default | Description |
 |--------------|---------|-------------|
 | `workflowDir` | `./workflows` | Directory containing your aflare workflow YAML files |
-| `llmboxPath` | `aflare` | Path to aflare binary (must be in PATH or use full path) |
+| `aflarePath` | `aflare` | Path to aflare binary (must be in PATH or use full path) |
 | `enableAutoDiscovery` | `true` | Auto-discover workflows in the configured directory |
 
-> **Note:** `llmboxPath` is a historical naming convention inherited from the project's earlier name (llmbox). It points to the `aflare` binary — the two names refer to the same tool.
->
-> **v0.8 migration:** The `openclaw-llmbox` plugin id, package name, and `llmboxPath` config key will be renamed to `openclaw-aflare` / `aflarePath` in v0.8. See [#59](https://github.com/alib8b8/aflare/issues/59).
+> **Renamed in v0.8:** The plugin id, package name, and config key were renamed from `openclaw-llmbox` / `llmboxPath` to `openclaw-aflare` / `aflarePath`. If upgrading from a pre-v0.8 version, update your config keys. See [#59](https://github.com/alib8b8/aflare/issues/59).
 
 ## Available Tools
 
