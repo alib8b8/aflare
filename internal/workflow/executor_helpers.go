@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -42,6 +43,14 @@ import (
 //	starts_with:https       - input starts with "https"
 //	ends_with:.json         - input ends with ".json"
 //	not contains:skip       - input does NOT contain "skip"
+//	gt:70000                - input is numerically greater than 70000 (遗留修复)
+//	lt:70000                - input is numerically less than 70000
+//	gte:70000 / lte:70000  - numeric greater-or-equal / less-or-equal
+//	ne:70000                - input is not equal to 70000 (string compare)
+//
+// The gt/lt/gte/lte operators parse both input and value as float64. If either
+// side is not numeric, the result is false — use equals/contains for string
+// comparisons.
 func evaluateCondition(cond string, input string, engine *ExpressionEngine) (bool, error) {
 	if cond == "" {
 		return true, nil
@@ -93,6 +102,10 @@ func evaluateCondition(cond string, input string, engine *ExpressionEngine) (boo
 		result = input == ""
 	case "not_empty":
 		result = input != ""
+	case "ne":
+		result = input != value
+	case "gt", "lt", "gte", "lte":
+		result = compareNumeric(op, input, value)
 	default:
 		return false, fmt.Errorf("unknown condition operator: %s", op)
 	}
@@ -101,6 +114,29 @@ func evaluateCondition(cond string, input string, engine *ExpressionEngine) (boo
 		result = !result
 	}
 	return result, nil
+}
+
+// compareNumeric compares input against value for the gt/lt/gte/lte operators.
+// Both sides are parsed as float64; if either fails to parse, the result is
+// false — numeric operators are numeric-only. Use equals/contains for string
+// comparisons.
+func compareNumeric(op, input, value string) bool {
+	a, errA := strconv.ParseFloat(strings.TrimSpace(input), 64)
+	b, errB := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if errA != nil || errB != nil {
+		return false
+	}
+	switch op {
+	case "gt":
+		return a > b
+	case "lt":
+		return a < b
+	case "gte":
+		return a >= b
+	case "lte":
+		return a <= b
+	}
+	return false
 }
 
 // executeIfBranch evaluates an if/else condition and executes the appropriate branch.

@@ -42,6 +42,13 @@ var (
 	cleanCharRegex = regexp.MustCompile(`[^a-z0-9._-]`)
 	cleanNameRegex = regexp.MustCompile(`[^a-z0-9 .]`)
 	cleanFileRegex = regexp.MustCompile(`[^a-z0-9_]`)
+	// 遗留修复: threshold + schedule parsing for the condition/price/schedule
+	// keywords. aboveRegex matches "超过 70000" / "above 70000" / "> 70000";
+	// belowRegex matches "低于 70000" / "below 70000" / "< 70000".
+	aboveRegex     = regexp.MustCompile(`(?:超过|大于|高于|above|over|greater\s*than|>)\s*(\d+(?:\.\d+)?)`)
+	belowRegex     = regexp.MustCompile(`(?:低于|小于|below|under|less\s*than|<)\s*(\d+(?:\.\d+)?)`)
+	everyMinRegex  = regexp.MustCompile(`(?:每|每隔)\s*(\d+)\s*分钟`)
+	everyHourRegex = regexp.MustCompile(`(?:每|每隔)\s*(\d+)\s*小时`)
 )
 
 // GenerateWorkflow creates a workflow from a description using rule-based
@@ -180,9 +187,33 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 		wf.Steps = append(wf.Steps, step)
 	}
 
-	// 断点C: notify — recognize 通知/telegram/slack/webhook and emit a real
-	// notify step so descriptions like "超过 70000 发 Telegram 通知" produce a
-	// meaningful step instead of falling through to the combine placeholder.
+	// 遗留修复: price — recognize BTC/价格/crypto and emit a CoinGecko
+	// http_request + json_parse pair so "检查 BTC 价格" produces real fetch
+	// steps instead of only matching the notify keyword.
+	if containsActionKeyword(desc, "price") {
+		coin := "bitcoin"
+		if strings.Contains(desc, "eth") || strings.Contains(desc, "以太坊") {
+			coin = "ethereum"
+		}
+		wf.Steps = append(wf.Steps, WorkflowStep{
+			Node: "http_request",
+			Params: map[string]string{
+				"url":    "https://api.coingecko.com/api/v3/simple/price?ids=" + coin + "&vs_currencies=usd",
+				"method": "GET",
+			},
+		})
+		wf.Steps = append(wf.Steps, WorkflowStep{
+			Node:   "json_parse",
+			Params: map[string]string{"path": coin + ".usd"},
+		})
+	}
+
+	// 断点C + 遗留修复: notify — recognize 通知/telegram/slack/webhook and
+	// emit a real notify step. If a condition (超过/低于 N) is also present,
+	// the notify step is wrapped in an if-branch so "超过 70000 发 Telegram
+	// 通知" produces if(gt:70000, then: notify) instead of an unconditional
+	// notify.
+	var notifyStep *WorkflowStep
 	if containsActionKeyword(desc, "notify") {
 		channel := "webhook"
 		if strings.Contains(desc, "telegram") {
@@ -197,7 +228,31 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 		} else if channel == "webhook" {
 			params["url"] = "{{var.webhook_url}}"
 		}
-		wf.Steps = append(wf.Steps, WorkflowStep{Node: "notify", Params: params})
+		notifyStep = &WorkflowStep{Node: "notify", Params: params}
+	}
+
+	// 遗留修复: condition — "超过 70000" / "低于 70000" wraps the notify step
+	// (if any) in an if-branch using the gt/lt numeric operators added to
+	// evaluateCondition. The if-step's input is the previous step's output
+	// (e.g. the parsed price), so gt:N compares that value against N.
+	if cond, ok := extractCondition(desc); ok {
+		ifStep := WorkflowStep{If: &IfConfig{Condition: cond}}
+		if notifyStep != nil {
+			ifStep.If.Then = []WorkflowStep{*notifyStep}
+		}
+		wf.Steps = append(wf.Steps, ifStep)
+	} else if notifyStep != nil {
+		wf.Steps = append(wf.Steps, *notifyStep)
+	}
+
+	// 遗留修复: schedule — "每 10 分钟" / "定时" / "每天" sets a cron hint on
+	// the workflow. The engine does not auto-schedule; `aflare run` prints an
+	// activation hint. This makes the generated YAML carry the intended
+	// cadence instead of silently dropping it.
+	if containsActionKeyword(desc, "schedule") {
+		if cron := parseScheduleCron(desc); cron != "" {
+			wf.Schedule = &ScheduleConfig{Cron: cron, Enabled: true}
+		}
 	}
 
 	// Generate workflow name
@@ -234,6 +289,43 @@ func HasMeaningfulSteps(wf *Workflow) bool {
 		return false
 	}
 	return true
+}
+
+// extractCondition scans a (lowercased) description for a threshold phrase
+// like "超过 70000" / "above 70000" / "低于 70000" / "below 70000" and returns
+// the corresponding condition expression ("gt:70000" / "lt:70000") plus ok.
+// Used by GenerateWorkflow to wrap a notify step in an if-branch.
+func extractCondition(desc string) (string, bool) {
+	if m := aboveRegex.FindStringSubmatch(desc); len(m) > 1 {
+		return "gt:" + m[1], true
+	}
+	if m := belowRegex.FindStringSubmatch(desc); len(m) > 1 {
+		return "lt:" + m[1], true
+	}
+	return "", false
+}
+
+// parseScheduleCron extracts a cron expression from a (lowercased) description
+// containing a schedule phrase. Supported forms: "每N分钟" → "*/N * * * *",
+// "每N小时" → "0 */N * * *", "每小时" → "0 * * * *", "每分钟" → "* * * * *".
+// Returns "" if no recognizable schedule phrase is found.
+func parseScheduleCron(desc string) string {
+	if m := everyMinRegex.FindStringSubmatch(desc); len(m) > 1 {
+		return "*/" + m[1] + " * * * *"
+	}
+	if m := everyHourRegex.FindStringSubmatch(desc); len(m) > 1 {
+		return "0 */" + m[1] + " * * *"
+	}
+	if strings.Contains(desc, "每小时") {
+		return "0 * * * *"
+	}
+	if strings.Contains(desc, "每分钟") || strings.Contains(desc, "every minute") {
+		return "* * * * *"
+	}
+	if strings.Contains(desc, "每天") {
+		return "0 9 * * *"
+	}
+	return ""
 }
 
 func addLLMStep(wf *Workflow, llmNode, llmModel, action string) {

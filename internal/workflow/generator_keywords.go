@@ -57,6 +57,12 @@ var actionKeywords = map[string][]string{
 	"test":      {"test", "测试", "单元测试", "unittest"},
 	"doc":       {"doc", "文档", "documentation", "readme", "注释"},
 	"notify":    {"notify", "通知", "alert", "警报", "提醒", "推送", "telegram", "slack", "webhook"},
+	// 遗留修复: price/schedule/condition keywords so the keyword generator
+	// recognizes the full "每 10 分钟检查 BTC 价格，超过 70000 发 Telegram 通知"
+	// example instead of only matching the notify keyword.
+	"price":     {"price", "价格", "btc", "bitcoin", "crypto", "比特币", "以太坊", "eth"},
+	"schedule":  {"schedule", "cron", "定时", "定期", "周期", "every", "每", "每天", "每小时", "每分钟"},
+	"condition": {"condition", "threshold", "超过", "大于", "高于", "低于", "小于", "if", "when", "如果"},
 }
 
 func containsAny(desc string, keywords []string) bool {

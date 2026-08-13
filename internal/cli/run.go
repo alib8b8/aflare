@@ -339,6 +339,14 @@ func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath st
 		}
 	}
 
+	// 遗留修复: 工作流携带 schedule 配置时，引擎本身不会自动定时执行（调度由
+	// `aflare schedule add` 外部管理）。这里打印一行激活提示，避免用户以为
+	// 写了 schedule: cron 就会自动周期运行。
+	if wf.Schedule != nil && wf.Schedule.Cron != "" {
+		fmt.Printf("⏰ 检测到调度配置 (cron: %s)。引擎不会自动定时执行，激活请运行：\n", wf.Schedule.Cron)
+		fmt.Printf("   aflare schedule add --cron \"%s\" %s\n", wf.Schedule.Cron, wfPath)
+	}
+
 	if dryRun {
 		fmt.Println("\n✅ Dry run completed - workflow is valid")
 		return

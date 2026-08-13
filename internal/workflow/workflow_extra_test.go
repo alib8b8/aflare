@@ -191,6 +191,112 @@ func TestEvaluateCondition_NotPrefix(t *testing.T) {
 	}
 }
 
+// ── numeric comparison operator tests (遗留修复: gt/lt/gte/lte/ne) ──
+
+func TestEvaluateCondition_Gt(t *testing.T) {
+	engine := NewExpressionEngine()
+	cases := []struct {
+		cond, input string
+		want        bool
+	}{
+		{"gt:70000", "75000", true},
+		{"gt:70000", "70000", false}, // equal is not greater
+		{"gt:70000", "65000", false},
+		{"gt:70000", "70000.5", true}, // float
+		{"gt:70000", "not_a_number", false},
+	}
+	for _, c := range cases {
+		pass, err := evaluateCondition(c.cond, c.input, engine)
+		if err != nil {
+			t.Fatalf("evaluateCondition(%q, %q) error: %v", c.cond, c.input, err)
+		}
+		if pass != c.want {
+			t.Errorf("evaluateCondition(%q, %q) = %v, want %v", c.cond, c.input, pass, c.want)
+		}
+	}
+}
+
+func TestEvaluateCondition_Lt(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, err := evaluateCondition("lt:70000", "65000", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected 65000 lt:70000 = true")
+	}
+	pass, _ = evaluateCondition("lt:70000", "75000", engine)
+	if pass {
+		t.Error("expected 75000 lt:70000 = false")
+	}
+}
+
+func TestEvaluateCondition_GteLte(t *testing.T) {
+	engine := NewExpressionEngine()
+	// gte: equal should pass
+	pass, _ := evaluateCondition("gte:70000", "70000", engine)
+	if !pass {
+		t.Error("expected 70000 gte:70000 = true")
+	}
+	pass, _ = evaluateCondition("gte:70000", "70001", engine)
+	if !pass {
+		t.Error("expected 70001 gte:70000 = true")
+	}
+	pass, _ = evaluateCondition("gte:70000", "69999", engine)
+	if pass {
+		t.Error("expected 69999 gte:70000 = false")
+	}
+	// lte: equal should pass
+	pass, _ = evaluateCondition("lte:70000", "70000", engine)
+	if !pass {
+		t.Error("expected 70000 lte:70000 = true")
+	}
+	pass, _ = evaluateCondition("lte:70000", "69999", engine)
+	if !pass {
+		t.Error("expected 69999 lte:70000 = true")
+	}
+	pass, _ = evaluateCondition("lte:70000", "70001", engine)
+	if pass {
+		t.Error("expected 70001 lte:70000 = false")
+	}
+}
+
+func TestEvaluateCondition_Ne(t *testing.T) {
+	engine := NewExpressionEngine()
+	pass, _ := evaluateCondition("ne:70000", "75000", engine)
+	if !pass {
+		t.Error("expected 75000 ne:70000 = true")
+	}
+	pass, _ = evaluateCondition("ne:70000", "70000", engine)
+	if pass {
+		t.Error("expected 70000 ne:70000 = false")
+	}
+}
+
+func TestEvaluateCondition_GtWithVarExpression(t *testing.T) {
+	engine := NewExpressionEngine()
+	engine.SetVariable("threshold", "70000")
+	pass, err := evaluateCondition("gt:{{var.threshold}}", "75000", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected 75000 gt:{{var.threshold=70000}} = true")
+	}
+}
+
+func TestEvaluateCondition_NotGt(t *testing.T) {
+	engine := NewExpressionEngine()
+	// not gt:70000 with 65000 → not(false) → true
+	pass, err := evaluateCondition("not gt:70000", "65000", engine)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pass {
+		t.Error("expected not gt:70000 with 65000 = true")
+	}
+}
+
 // ── executeIfBranch tests ──
 
 func TestExecuteIfBranch_ThenBranch(t *testing.T) {
