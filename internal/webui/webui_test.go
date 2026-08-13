@@ -51,8 +51,10 @@ func TestConstants_ServerTimeouts(t *testing.T) {
 	if serverReadTimeout != 30*time.Second {
 		t.Errorf("serverReadTimeout = %v, want 30s", serverReadTimeout)
 	}
-	if serverWriteTimeout != 30*time.Second {
-		t.Errorf("serverWriteTimeout = %v, want 30s", serverWriteTimeout)
+	// WriteTimeout is 0 (disabled) so SSE streaming connections are not
+	// cut off mid-response. See the comment on serverWriteTimeout.
+	if serverWriteTimeout != 0 {
+		t.Errorf("serverWriteTimeout = %v, want 0 (disabled for SSE)", serverWriteTimeout)
 	}
 	if serverShutdownTimeout != 10*time.Second {
 		t.Errorf("serverShutdownTimeout = %v, want 10s", serverShutdownTimeout)
@@ -3165,5 +3167,88 @@ func TestHandleVisualize_JSONWorkflowFieldNotString(t *testing.T) {
 	// JSON decoder will fail because workflow field is not a string
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", rec.Code)
+	}
+}
+
+// =============================================================================
+// SSE streaming endpoint tests (/api/chat/stream)
+// =============================================================================
+
+func TestHandleChatStream_InvalidMethod(t *testing.T) {
+	s := NewWebUIServer("", "")
+	req := httptest.NewRequest(http.MethodGet, "/api/chat/stream", nil)
+	rec := httptest.NewRecorder()
+	s.handleChatStream(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status = %d, want 405", rec.Code)
+	}
+}
+
+func TestHandleChatStream_InvalidJSON(t *testing.T) {
+	s := NewWebUIServer("", "")
+	req := httptest.NewRequest(http.MethodPost, "/api/chat/stream", strings.NewReader("not json"))
+	rec := httptest.NewRecorder()
+	s.handleChatStream(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestHandleChatStream_EmptyMessage(t *testing.T) {
+	s := NewWebUIServer("", "")
+	body := `{"message": ""}`
+	req := httptest.NewRequest(http.MethodPost, "/api/chat/stream", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	s.handleChatStream(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestBuildHandler_ChatStreamRouteRegistered(t *testing.T) {
+	s := NewWebUIServer("", "")
+	ts := httptest.NewServer(s.buildHandler())
+	defer ts.Close()
+
+	// GET on the stream endpoint should return 405 (route is registered, POST only)
+	resp, err := http.Get(ts.URL + "/api/chat/stream")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("GET /api/chat/stream status = %d, want 405 (route should be registered)", resp.StatusCode)
+	}
+}
+
+func TestWriteSSE_EmitsValidSSE(t *testing.T) {
+	rec := httptest.NewRecorder()
+	flusher, ok := http.ResponseWriter(rec).(http.Flusher)
+	if !ok {
+		t.Fatal("recorder does not implement Flusher")
+	}
+	writeSSE(rec, flusher, sseEvent{Type: "chunk", Content: "hello"})
+
+	body := rec.Body.String()
+	// SSE format: "data: <json>\n\n"
+	if !strings.HasPrefix(body, "data: ") {
+		t.Errorf("SSE output does not start with 'data: ': %q", body)
+	}
+	if !strings.HasSuffix(body, "\n\n") {
+		t.Errorf("SSE output does not end with '\\n\\n': %q", body)
+	}
+
+	// Verify the JSON payload
+	jsonStr := strings.TrimSuffix(strings.TrimPrefix(body, "data: "), "\n\n")
+	var ev sseEvent
+	if err := json.Unmarshal([]byte(jsonStr), &ev); err != nil {
+		t.Fatalf("failed to parse SSE JSON: %v", err)
+	}
+	if ev.Type != "chunk" || ev.Content != "hello" {
+		t.Errorf("SSE event = %+v, want {Type:chunk, Content:hello}", ev)
 	}
 }

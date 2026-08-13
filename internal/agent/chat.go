@@ -325,6 +325,21 @@ func (s *ChatSession) SendMessage(input string) (string, error) {
 	return s.loop.Process(ctx, input, ProcessOptions{})
 }
 
+// SendMessageStream processes a single user message and streams chunks via
+// onChunk as they arrive from the LLM. The ctx parameter allows callers (e.g.
+// HTTP handlers) to cancel processing when the client disconnects.
+//
+// If the provider suppresses streaming (e.g. ollama ReAct JSON filtering),
+// onChunk is never called and the full response is returned — callers should
+// fall back to displaying the returned string in that case.
+func (s *ChatSession) SendMessageStream(ctx context.Context, input string, onChunk func(chunk string)) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, DefaultSendTimeout)
+	defer cancel()
+	return s.loop.Process(ctx, input, ProcessOptions{
+		OnChunk: onChunk,
+	})
+}
+
 // ResetSession clears the conversation history.
 func (s *ChatSession) ResetSession() {
 	s.loop.Context().Reset()

@@ -38,10 +38,15 @@ import (
 )
 
 const (
-	defaultHost           = "127.0.0.1"
-	defaultPort           = "8081"
-	serverReadTimeout     = 30 * time.Second
-	serverWriteTimeout    = 30 * time.Second
+	defaultHost       = "127.0.0.1"
+	defaultPort       = "8081"
+	serverReadTimeout = 30 * time.Second
+	// serverWriteTimeout is 0 (disabled) so SSE streaming connections
+	// (/api/chat/stream) are not cut off mid-response. This is safe because:
+	//   - the server binds to localhost by default
+	//   - authMiddleware gates all endpoints when a token is set
+	//   - agent SendMessageStream is bounded by DefaultSendTimeout (5m)
+	serverWriteTimeout    = 0
 	serverShutdownTimeout = 10 * time.Second
 	maxWorkflowFileSize   = 5 * 1024 * 1024 // 5MB
 	// metricsRPS caps the number of /metrics scrapes per second. The endpoint
@@ -133,6 +138,7 @@ func (s *WebUIServer) buildHandler() http.Handler {
 	mux.HandleFunc("/api/workflow", s.authMiddleware(s.handleWorkflow))
 	mux.HandleFunc("/api/validate", s.authMiddleware(s.handleValidate))
 	mux.HandleFunc("/api/chat", s.authMiddleware(s.handleChat))
+	mux.HandleFunc("/api/chat/stream", s.authMiddleware(s.handleChatStream))
 
 	// pprof 调试端点:默认关闭,仅当环境变量 AFLARE_PPROF=1 时启用。
 	// 生产环境保持关闭以避免安全暴露;需要在线性能剖析时显式开启。
@@ -891,11 +897,18 @@ var indexHTML = `<!DOCTYPE html>
             const messages = document.getElementById('chatMessages');
             messages.innerHTML += '<div class="chat-message user">' + escapeHtml(message) + '</div>';
             input.value = '';
-            messages.innerHTML += '<div class="chat-loading">Thinking...</div>';
+            input.disabled = true; // Disable input during streaming
+
+            // Create assistant message element that we'll stream into
+            const assistantDiv = document.createElement('div');
+            assistantDiv.className = 'chat-message assistant';
+            assistantDiv.innerHTML = '<span class="chat-loading">Thinking...</span>';
+            messages.appendChild(assistantDiv);
             messages.scrollTop = messages.scrollHeight;
 
+            let firstChunk = true;
             try {
-                const response = await fetch('/api/chat', {
+                const response = await fetch('/api/chat/stream', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -903,21 +916,61 @@ var indexHTML = `<!DOCTYPE html>
                     },
                     body: JSON.stringify({ message: message, session_id: getSessionId() })
                 });
-                const data = await response.json();
 
-                // Remove loading indicator
-                messages.removeChild(messages.lastChild);
+                if (!response.ok) {
+                    assistantDiv.innerHTML = 'Error: HTTP ' + response.status;
+                    assistantDiv.className = 'chat-message error';
+                    return;
+                }
 
-                if (data.error) {
-                    messages.innerHTML += '<div class="chat-message error">Error: ' + escapeHtml(data.error) + '</div>';
-                } else {
-                    messages.innerHTML += '<div class="chat-message assistant">' + escapeHtml(data.response) + '</div>';
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // Parse SSE events (separated by \n\n)
+                    const events = buffer.split('\n\n');
+                    buffer = events.pop(); // keep incomplete event in buffer
+
+                    for (const event of events) {
+                        const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+                        if (!dataLine) continue;
+                        try {
+                            const data = JSON.parse(dataLine.slice(6));
+                            if (data.type === 'chunk') {
+                                if (firstChunk) {
+                                    assistantDiv.textContent = '';
+                                    firstChunk = false;
+                                }
+                                assistantDiv.textContent += data.content;
+                                messages.scrollTop = messages.scrollHeight;
+                            } else if (data.type === 'error') {
+                                assistantDiv.innerHTML = 'Error: ' + escapeHtml(data.error);
+                                assistantDiv.className = 'chat-message error';
+                            } else if (data.type === 'done') {
+                                // If nothing was streamed, use the full response
+                                if (firstChunk && data.response) {
+                                    assistantDiv.textContent = data.response;
+                                    firstChunk = false;
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse SSE event:', e);
+                        }
+                    }
                 }
             } catch (e) {
-                messages.removeChild(messages.lastChild);
-                messages.innerHTML += '<div class="chat-message error">Network error: ' + escapeHtml(e.message) + '</div>';
+                assistantDiv.innerHTML = 'Network error: ' + escapeHtml(e.message);
+                assistantDiv.className = 'chat-message error';
+            } finally {
+                input.disabled = false;
+                input.focus();
+                messages.scrollTop = messages.scrollHeight;
             }
-            messages.scrollTop = messages.scrollHeight;
         }
 
         async function clearChat() {
