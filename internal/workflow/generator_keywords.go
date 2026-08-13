@@ -56,6 +56,7 @@ var actionKeywords = map[string][]string{
 	"api":       {"api", "接口", "rest", "http request", "调用"},
 	"test":      {"test", "测试", "单元测试", "unittest"},
 	"doc":       {"doc", "文档", "documentation", "readme", "注释"},
+	"notify":    {"notify", "通知", "alert", "警报", "提醒", "推送", "telegram", "slack", "webhook"},
 }
 
 func containsAny(desc string, keywords []string) bool {

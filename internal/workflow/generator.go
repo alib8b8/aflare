@@ -30,6 +30,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/alib8b8/aflare/internal/config"
 	"github.com/alib8b8/aflare/internal/watermark"
 )
 
@@ -177,6 +178,26 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 			Params: map[string]string{"command": "git log --oneline -10"},
 		}
 		wf.Steps = append(wf.Steps, step)
+	}
+
+	// 断点C: notify — recognize 通知/telegram/slack/webhook and emit a real
+	// notify step so descriptions like "超过 70000 发 Telegram 通知" produce a
+	// meaningful step instead of falling through to the combine placeholder.
+	if containsActionKeyword(desc, "notify") {
+		channel := "webhook"
+		if strings.Contains(desc, "telegram") {
+			channel = "telegram"
+		} else if strings.Contains(desc, "slack") {
+			channel = "slack"
+		}
+		params := map[string]string{"channel": channel}
+		if channel == "telegram" {
+			params["token"] = "{{var.telegram_token}}"
+			params["chat_id"] = "{{var.telegram_chat_id}}"
+		} else if channel == "webhook" {
+			params["url"] = "{{var.webhook_url}}"
+		}
+		wf.Steps = append(wf.Steps, WorkflowStep{Node: "notify", Params: params})
 	}
 
 	// Generate workflow name
@@ -478,11 +499,38 @@ type llmChatResponse struct {
 	} `json:"error,omitempty"`
 }
 
-// getLLMConfig returns the API key, endpoint, and model for LLM workflow generation.
-// It checks common env vars: OPENAI_API_KEY, DEEPSEEK_API_KEY, etc.
-// Falls back to the AFLARE_LLM_GENERATOR env vars for explicit configuration.
+// getLLMConfig returns the API key, endpoint, and model for LLM workflow
+// generation. Resolution order (断点B: --ai 配置与 init 脱节):
+//  1. config.yaml providers written by `aflare init` — so a user who configured
+//     DeepSeek/OpenAI/Qwen etc. via init can use `aflare create --ai` without
+//     separately exporting env vars. A keyed cloud provider is preferred;
+//     ollama (keyless local) is used only when no keyed provider is configured.
+//  2. AFLARE_LLM_GENERATOR_* env vars (explicit override).
+//  3. Common provider env vars (OPENAI_API_KEY, DEEPSEEK_API_KEY, ...).
 func getLLMConfig() (apiKey, endpoint, model string) {
-	// Try AFLARE_LLM_GENERATOR_* env vars first (explicit config)
+	// 1. config.yaml providers (written by `aflare init`).
+	if cfg, err := config.LoadConfig(); err == nil && cfg != nil && len(cfg.Providers) > 0 {
+		var chosen string
+		for name, pcfg := range cfg.Providers {
+			if pcfg.APIKey != "" {
+				chosen = name
+				break
+			}
+		}
+		if chosen == "" {
+			if _, ok := cfg.Providers["ollama"]; ok {
+				chosen = "ollama"
+			}
+		}
+		if chosen != "" {
+			pcfg := cfg.Providers[chosen]
+			apiKey = pcfg.APIKey
+			endpoint = pcfg.Endpoint
+			model = pcfg.Model
+		}
+	}
+
+	// 2. AFLARE_LLM_GENERATOR_* env vars (explicit override).
 	if key := os.Getenv("AFLARE_LLM_GENERATOR_API_KEY"); key != "" {
 		apiKey = key
 	}
@@ -493,7 +541,7 @@ func getLLMConfig() (apiKey, endpoint, model string) {
 		model = m
 	}
 
-	// Fall back to common provider env vars
+	// 3. Fall back to common provider env vars.
 	if apiKey == "" {
 		for _, envVar := range []string{
 			"OPENAI_API_KEY", "DEEPSEEK_API_KEY", "QWEN_API_KEY",
@@ -646,7 +694,10 @@ func GenerateWorkflowWithLLM(description string) (*Workflow, error) {
 // CreateWorkflowFromDescriptionWithAI creates a workflow from a description.
 // When useAI is true, it first tries LLM-based generation with YAML validation.
 // If LLM generation fails (API error, invalid YAML, empty steps), it falls back
-// to rule-based keyword matching and prints a warning.
+// to rule-based keyword matching. 断点C: when the fallback also produces no
+// meaningful steps, it returns an error instead of silently saving a useless
+// combine-only placeholder YAML — the caller (CLI) is responsible for surfacing
+// actionable suggestions to the user.
 func CreateWorkflowFromDescriptionWithAI(description string, useAI bool) (string, error) {
 	if !useAI {
 		return CreateWorkflowFromDescription(description)
@@ -655,9 +706,21 @@ func CreateWorkflowFromDescriptionWithAI(description string, useAI bool) (string
 	// Try LLM-based generation
 	wf, err := GenerateWorkflowWithLLM(description)
 	if err != nil {
-		// Fall back to rule-based generation
-		fmt.Fprintf(os.Stderr, "⚠️  AI 生成失败，已用模板生成 (%v)\n", err)
-		return CreateWorkflowFromDescription(description)
+		// Fall back to rule-based generation.
+		fmt.Fprintf(os.Stderr, "⚠️  AI 生成失败，尝试关键词匹配 (%v)\n", err)
+		wf, gerr := GenerateWorkflow(description)
+		if gerr != nil {
+			return "", gerr
+		}
+		if !HasMeaningfulSteps(wf) {
+			// 断点C: 不要给用户一个看起来像结果但实际没用的 YAML。
+			return "", fmt.Errorf("无法从该描述生成工作流：关键词未匹配到可用步骤，且 LLM 生成失败（%w）。请用 `aflare template list` 查找现成模板，或配置 LLM 后用 `aflare create \"%s\" --ai`", err, description)
+		}
+		filename := GetSuggestedFilename(description)
+		if err := SaveWorkflow(wf, filename); err != nil {
+			return "", err
+		}
+		return filepath.Join(".", filename), nil
 	}
 
 	filename := GetSuggestedFilename(description)

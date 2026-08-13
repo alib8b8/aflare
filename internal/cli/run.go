@@ -198,6 +198,25 @@ func printInputSchemaHelp(wfPath string, wf *workflow.Workflow) {
 	fmt.Println("提示：使用 --set key=value 传参（可重复），或 --params-file params.json 从文件读取。")
 }
 
+// printExtractedParamsHelp prints a parameter hint for templates that lack an
+// explicit input_schema but reference {{var.xxx}} / {{ .params.xxx }} in their
+// YAML (断点E). All extracted names are treated as required strings since the
+// generator cannot infer type/default/required from a bare template reference.
+func printExtractedParamsHelp(wfPath string, refs []string) {
+	fmt.Println("此模板引用了以下参数（未声明 input_schema，已从 YAML 自动提取）：")
+	fmt.Println()
+	for _, name := range refs {
+		fmt.Printf("  %-16s (string) 必填\n", name)
+	}
+	fmt.Println()
+	fmt.Println("示例：")
+	for _, name := range refs {
+		fmt.Printf("  aflare run %s --set %s=your_%s\n", wfPath, name, name)
+	}
+	fmt.Println()
+	fmt.Println("提示：使用 --set key=value 传参（可重复），或 --params-file params.json 从文件读取。")
+}
+
 // parseParams converts a list of "key=value" tokens into a map.
 // Tokens without "=" are ignored.
 func parseParams(tokens []string) map[string]string {
@@ -283,6 +302,16 @@ func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath st
 		os.Exit(1)
 	}
 
+	// 断点E: 对没有 input_schema 但 YAML 里引用了 {{var.xxx}} / {{ .params.xxx }}
+	// 的模板，自动提取参数列表并提示，避免拿到空值后在 http_request / execute
+	// 等节点报晦涩的 "variable not found" 错误。
+	if len(wf.InputSchema) == 0 && len(params) == 0 {
+		if refs := workflow.ExtractReferencedVars(wf); len(refs) > 0 {
+			printExtractedParamsHelp(wfPath, refs)
+			os.Exit(1)
+		}
+	}
+
 	// 注入 --params 到 wf.Vars，使其可通过 {{var.name}} 在工作流中引用。
 	if len(params) > 0 {
 		if wf.Vars == nil {
@@ -291,6 +320,16 @@ func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath st
 		for k, v := range params {
 			wf.Vars[k] = v
 		}
+	}
+
+	// 断点A: 若工作流需要 LLM 但未配置任何 LLM provider，提前提示并退出，
+	// 而不是跑到 LLM 节点才报错。仅当完全没有配置 provider 时触发
+	// （ollama 已配置但未运行的情况由运行时的 humanizeError 处理）。
+	if !detectLLMConfig() && workflow.RequiresLLM(wf) {
+		fmt.Println("此工作流需要 LLM，但尚未配置 LLM provider。")
+		fmt.Println("运行 aflare init 完成首次配置（推荐 Ollama 本地，或配置 DeepSeek/OpenAI API Key）。")
+		fmt.Printf("配置后重试：aflare run %s\n", wfPath)
+		os.Exit(1)
 	}
 
 	if suggestions := workflow.ValidateWorkflow(wf); len(suggestions) > 0 {

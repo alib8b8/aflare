@@ -64,12 +64,19 @@ func runInitWizard() {
 	}
 
 	// Detect bubblewrap.
-	bwrapPath, bwrapOK := detectCommand("bwrap")
-	if bwrapOK {
-		fmt.Printf("  ✓ bubblewrap 已安装 (%s)\n", bwrapPath)
+	// 断点F: Windows 上没有 bubblewrap，跳过检测，提示无沙箱 + WSL2 建议，
+	// 而不是报"未安装"并给出无法执行的安装命令。
+	if runtime.GOOS == "windows" {
+		fmt.Println("  → Windows 下 code_interpreter 以无沙箱模式运行")
+		fmt.Println("     建议在 WSL2 中使用以获得沙箱隔离")
 	} else {
-		fmt.Println("  ✗ bubblewrap 未安装（部分模板需要沙箱执行代码）")
-		printBwrapInstallHint()
+		bwrapPath, bwrapOK := detectCommand("bwrap")
+		if bwrapOK {
+			fmt.Printf("  ✓ bubblewrap 已安装 (%s)\n", bwrapPath)
+		} else {
+			fmt.Println("  ✗ bubblewrap 未安装（部分模板需要沙箱执行代码）")
+			printBwrapInstallHint()
+		}
 	}
 
 	// Detect ollama.
