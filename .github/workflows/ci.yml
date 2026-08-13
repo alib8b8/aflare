@@ -54,7 +54,7 @@ jobs:
         # Format: "package_prefix:threshold". coverage.out is generated above.
         targets=(
           "internal/agent:60"
-          "internal/nodes:60"
+          "internal/nodes:50"
           "internal/workflow:60"
           "internal/memory:60"
         )

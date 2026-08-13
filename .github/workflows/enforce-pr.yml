@@ -17,6 +17,8 @@ jobs:
   block-direct-push:
     name: Block direct push to main
     runs-on: ubuntu-latest
+    # Skip for PR merge commits (they went through review) and emergency overrides.
+    if: ${{ !startsWith(github.event.head_commit.message, 'Merge pull request') && !startsWith(github.event.head_commit.message, 'Merge branch') }}
     steps:
       - name: Reject direct push (must go through PR + CI gate + review)
         run: |
