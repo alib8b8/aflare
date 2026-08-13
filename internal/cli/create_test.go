@@ -193,7 +193,8 @@ func TestPrintInputSchemaHelp(t *testing.T) {
 		"选填",
 		"（默认: 30）", // default value marker for timeout
 		"示例：",
-		"aflare run ssl-cert-checker.yaml --params",
+		"aflare run ssl-cert-checker.yaml --set", // 断点12: --set 替代 --params
+		"--params-file",                          // 断点12: 提示文件参数
 	} {
 		if !bytes.Contains(out, []byte(want)) {
 			t.Errorf("input schema help missing %q in output:\n%s", want, got)

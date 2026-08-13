@@ -17,6 +17,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -35,6 +36,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
+	"gopkg.in/yaml.v3"
 )
 
 var sensitiveKeyPrefixes = []string{"api", "token", "bearer", "password", "passwd", "secret", "auth"}
@@ -62,16 +64,27 @@ func redactParams(params map[string]string) map[string]string {
 }
 
 // HandleRun handles the "run" command.
+//
+// Supported flags (断点12):
+//
+//	--resume [path] <file>            enable checkpoint resume
+//	--resume=/path <file>             explicit checkpoint path
+//	--set key=value <file>            pass a single parameter (repeatable)
+//	--set=key=value <file>            single-token form
+//	--params-file <path> <file>      load parameters from JSON/YAML file
+//	--params-file=<path> <file>      single-token form
+//	--params k=v [k2=v2 ...] <file>  [deprecated] legacy params, use --set
+//	--params="k=v k2=v2" <file>      [deprecated] single-token legacy form
+//
+// Merge priority (later overrides earlier): --params < --set < --params-file
 func HandleRun(args []string, dryRun bool, safeMode bool) {
-	// Parse --resume and --params flags.
-	//   --resume [path] <file>           enable checkpoint resume
-	//   --resume=/path <file>             explicit checkpoint path
-	//   --params k=v [k2=v2 ...] <file>   pass input parameters
-	//   --params="k=v k2=v2" <file>       single-token form
 	resumeEnabled := false
 	resumePath := ""
-	var params []string
+	var legacyParams []string // from --params (deprecated)
+	var setParams []string    // from --set
+	var paramsFile string     // from --params-file
 	var filtered []string
+
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if arg == "--resume" {
@@ -84,17 +97,37 @@ func HandleRun(args []string, dryRun bool, safeMode bool) {
 		} else if strings.HasPrefix(arg, "--resume=") {
 			resumeEnabled = true
 			resumePath = strings.TrimPrefix(arg, "--resume=")
-		} else if arg == "--params" {
+		} else if arg == "--set" {
 			// Consume following key=value tokens until the next flag or end.
 			for j := i + 1; j < len(args); j++ {
 				if strings.HasPrefix(args[j], "-") {
 					break
 				}
-				params = append(params, args[j])
+				setParams = append(setParams, args[j])
+				i = j
+			}
+		} else if strings.HasPrefix(arg, "--set=") {
+			setParams = append(setParams, strings.TrimPrefix(arg, "--set="))
+		} else if arg == "--params-file" {
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				paramsFile = args[i+1]
+				i++
+			}
+		} else if strings.HasPrefix(arg, "--params-file=") {
+			paramsFile = strings.TrimPrefix(arg, "--params-file=")
+		} else if arg == "--params" {
+			// Deprecated: warn but keep working.
+			fmt.Fprintln(os.Stderr, "⚠️  --params 已弃用，请改用 --set key=value（可重复）或 --params-file")
+			for j := i + 1; j < len(args); j++ {
+				if strings.HasPrefix(args[j], "-") {
+					break
+				}
+				legacyParams = append(legacyParams, args[j])
 				i = j
 			}
 		} else if strings.HasPrefix(arg, "--params=") {
-			params = append(params, strings.TrimPrefix(arg, "--params="))
+			fmt.Fprintln(os.Stderr, "⚠️  --params 已弃用，请改用 --set key=value（可重复）或 --params-file")
+			legacyParams = append(legacyParams, strings.TrimPrefix(arg, "--params="))
 		} else {
 			filtered = append(filtered, arg)
 		}
@@ -103,7 +136,30 @@ func HandleRun(args []string, dryRun bool, safeMode bool) {
 		fmt.Println(i18n.T("run.usage"))
 		os.Exit(1)
 	}
-	HandleRunFile(filtered[0], dryRun, resumeEnabled, resumePath, safeMode, parseParams(params))
+
+	// Merge params: --params (lowest) < --set < --params-file (highest).
+	merged := make(map[string]string)
+	for k, v := range parseParams(legacyParams) {
+		merged[k] = v
+	}
+	for k, v := range parseParams(setParams) {
+		merged[k] = v
+	}
+	if paramsFile != "" {
+		fileParams, err := loadParamsFile(paramsFile)
+		if err != nil {
+			fmt.Printf("读取参数文件失败：%v\n", err)
+			os.Exit(1)
+		}
+		for k, v := range fileParams {
+			merged[k] = v
+		}
+	}
+	if len(merged) == 0 {
+		HandleRunFile(filtered[0], dryRun, resumeEnabled, resumePath, safeMode, nil)
+	} else {
+		HandleRunFile(filtered[0], dryRun, resumeEnabled, resumePath, safeMode, merged)
+	}
 }
 
 // printInputSchemaHelp prints a human-readable description of a workflow's
@@ -130,18 +186,16 @@ func printInputSchemaHelp(wfPath string, wf *workflow.Workflow) {
 	}
 	fmt.Println()
 	fmt.Println("示例：")
-	// Build an example command using defaults when available, placeholders otherwise.
-	exampleParts := make([]string, 0, len(wf.InputSchema))
+	// Build an example command using --set (断点12推荐方式).
 	for _, field := range wf.InputSchema {
 		val := field.Default
 		if val == "" {
 			val = "your_" + field.Name
 		}
-		exampleParts = append(exampleParts, field.Name+"="+val)
+		fmt.Printf("  aflare run %s --set %s=%s\n", wfPath, field.Name, val)
 	}
-	fmt.Printf("  aflare run %s --params \"%s\"\n", wfPath, strings.Join(exampleParts, " "))
 	fmt.Println()
-	fmt.Println("提示：多个参数用空格分隔，例如 --params \"key1=val1 key2=val2\"")
+	fmt.Println("提示：使用 --set key=value 传参（可重复），或 --params-file params.json 从文件读取。")
 }
 
 // parseParams converts a list of "key=value" tokens into a map.
@@ -163,6 +217,52 @@ func parseParams(tokens []string) map[string]string {
 		return nil
 	}
 	return m
+}
+
+// loadParamsFile reads workflow parameters from a JSON or YAML file (断点12).
+//
+// Supported formats:
+//   - JSON:  {"key": "value", ...}  (values are stringified if non-string)
+//   - YAML:  key: value             (flat map only)
+//
+// The file extension determines the parser: .json → JSON, .yaml/.yml → YAML.
+// When the extension is ambiguous, the content is tried as JSON first, then YAML.
+func loadParamsFile(path string) (map[string]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("无法读取参数文件 %s: %w", path, err)
+	}
+	content := strings.TrimSpace(string(data))
+	if content == "" {
+		return nil, fmt.Errorf("参数文件 %s 为空", path)
+	}
+
+	ext := strings.ToLower(filepath.Ext(path))
+	var raw map[string]interface{}
+
+	switch ext {
+	case ".json":
+		if err := json.Unmarshal([]byte(content), &raw); err != nil {
+			return nil, fmt.Errorf("解析 JSON 失败: %w", err)
+		}
+	case ".yaml", ".yml":
+		if err := yaml.Unmarshal([]byte(content), &raw); err != nil {
+			return nil, fmt.Errorf("解析 YAML 失败: %w", err)
+		}
+	default:
+		// Auto-detect: try JSON first, then YAML.
+		if err := json.Unmarshal([]byte(content), &raw); err != nil {
+			if err := yaml.Unmarshal([]byte(content), &raw); err != nil {
+				return nil, fmt.Errorf("无法解析参数文件（尝试 JSON 和 YAML 均失败）: %w", err)
+			}
+		}
+	}
+
+	result := make(map[string]string, len(raw))
+	for k, v := range raw {
+		result[k] = fmt.Sprintf("%v", v)
+	}
+	return result, nil
 }
 
 // HandleRunFile runs a workflow file with optional resume support.
@@ -352,7 +452,18 @@ func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 	}
 }
 
-// RunCLI runs a workflow in CLI (non-interactive) mode.
+// RunCLI runs a workflow in CLI (non-interactive) mode with real-time progress
+// output (断点13). Each step prints a progress line as it starts/completes/fails:
+//
+//	[1/5] ✓ http_request  → CoinGecko API          (0.3s)
+//	[2/5] ✗ agent          → FAILED
+//	      错误：LLM 调用超时（30s）
+//	      排查建议：
+//	        1. 检查 Ollama 是否运行：ollama list
+//	        ...
+//
+// Errors are translated to user-friendly messages via humanizeError (断点11),
+// while the raw error is logged at debug level for troubleshooting.
 func RunCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string, safeMode bool) {
 	if wf.Name != "" {
 		fmt.Printf("%s\n", i18n.T("workflow.name", wf.Name))
@@ -370,32 +481,50 @@ func RunCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string, safeMo
 
 	fmt.Printf("\n=== %s ===\n", i18n.T("workflow.executing"))
 
+	// 断点13: 实时进度回调。在 step 开始/完成/失败/跳过时立即打印进度行。
+	progressCB := func(ev workflow.StepProgressEvent) {
+		label := ev.StepName
+		if label == "" {
+			label = ev.NodeName
+		}
+		switch ev.Status {
+		case workflow.StepProgressStarted:
+			fmt.Printf("[%d/%d] ⏳ %-14s → %s\n", ev.Index+1, ev.Total, ev.NodeName, label)
+		case workflow.StepProgressCompleted:
+			fmt.Printf("[%d/%d] ✓ %-14s → %-20s (%s)\n", ev.Index+1, ev.Total, ev.NodeName, label, formatDuration(ev.Duration))
+		case workflow.StepProgressFailed:
+			human, debug := humanizeError(ev.Error, ev.NodeName)
+			fmt.Printf("[%d/%d] ✗ %-14s → %s FAILED\n", ev.Index+1, ev.Total, ev.NodeName, label)
+			fmt.Printf("      错误：%s\n", human)
+			// 底层错误保留在日志中供 debug (断点11).
+			logger.Error("step failed", "index", ev.Index, "node", ev.NodeName, "raw_error", debug, "duration", ev.Duration)
+			if hint := troubleshootHint(ev.NodeName, ev.Error); hint != "" {
+				fmt.Printf("      %s\n", hint)
+			}
+		case workflow.StepProgressSkipped:
+			fmt.Printf("[%d/%d] ⊘ %-14s → skipped (condition not met)\n", ev.Index+1, ev.Total, ev.NodeName)
+		}
+	}
+
 	var finalOutput string
-	var stepResults []workflow.StepResult
 	var execErr error
 	exec, releaseAudit := newAuditEnabledExecutor("", safeMode)
 	defer releaseAudit()
 	if statePath != "" {
 		exec = exec.WithCheckpoint(statePath)
 	}
+	exec = exec.WithProgress(progressCB)
 	if err := exec.ValidateWorkflow(context.Background(), wf); err != nil {
 		fmt.Printf("Policy validation failed: %v\n", err)
 		os.Exit(1)
 	}
-	finalOutput, stepResults, execErr = exec.Execute(context.Background(), wf, reg)
-
-	for _, result := range stepResults {
-		status := "✅"
-		if result.Error != nil {
-			status = "❌"
-			fmt.Printf("\n%s Step %d (%s): %v\n", status, result.StepIndex+1, result.NodeName, result.Error)
-		} else {
-			fmt.Printf("%s Step %d (%s): %s\n", status, result.StepIndex+1, result.NodeName, i18n.T("step.duration", result.Duration))
-		}
-	}
+	finalOutput, _, execErr = exec.Execute(context.Background(), wf, reg)
 
 	if execErr != nil {
-		fmt.Printf("\n%s\n", i18n.T("workflow.failed", execErr))
+		// 工作流级错误也走翻译层 (断点11).
+		human, debug := humanizeError(execErr, "")
+		fmt.Printf("\n%s\n", i18n.T("workflow.failed", human))
+		logger.Error("workflow failed", "raw_error", debug)
 		os.Exit(1)
 	}
 
