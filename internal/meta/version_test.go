@@ -163,81 +163,67 @@ func containsHelper(s, substr string) bool {
 }
 
 func TestCheckLatestRelease_NetworkError(t *testing.T) {
-	// Force HTTP requests to fail immediately by pointing to non-existent proxy
-	t.Setenv("HTTP_PROXY", "http://127.0.0.1:1")
-	t.Setenv("HTTPS_PROXY", "http://127.0.0.1:1")
+	// Use the mock transport so the request fails deterministically without
+	// touching the network. The previous proxy-based approach was flaky:
+	// dialing 127.0.0.1:1 may hang (firewall/CI) and trip the 5s deadline.
+	m := &mockTransport{
+		errs: map[string]error{
+			"api.github.com/repos/alib8b8/aflare/releases/latest": fmt.Errorf("network error"),
+		},
+	}
+	setMockTransport(t, m)
 
-	done := make(chan struct{})
-	var release *GitHubRelease
-	var err error
-	go func() {
-		defer close(done)
-		release, err = CheckLatestRelease("alib8b8/aflare")
-	}()
-	select {
-	case <-done:
-		if err == nil {
-			t.Error("expected error due to proxy failure")
-		}
-		if release != nil {
-			t.Error("expected nil release on error")
-		}
-	case <-time.After(5 * time.Second):
-		t.Skip("CheckLatestRelease took too long, skipping")
+	release, err := CheckLatestRelease("alib8b8/aflare")
+	if err == nil {
+		t.Error("expected error due to mock failure")
+	}
+	if release != nil {
+		t.Error("expected nil release on error")
 	}
 }
 
 func TestCheckLatestRelease_GitHubToken(t *testing.T) {
-	// Just verify the function reads GITHUB_TOKEN env var by setting it
+	// Verify CheckLatestRelease forwards GITHUB_TOKEN as a Bearer token.
+	// The mock captures the Authorization header; we assert it was set.
 	t.Setenv("GITHUB_TOKEN", "fake-token-for-test")
-	// We still need network to fail quickly
-	t.Setenv("HTTP_PROXY", "http://127.0.0.1:1")
-	t.Setenv("HTTPS_PROXY", "http://127.0.0.1:1")
 
-	done := make(chan struct{})
-	var err error
-	go func() {
-		defer close(done)
-		_, err = CheckLatestRelease("alib8b8/aflare")
-	}()
-	select {
-	case <-done:
-		if err == nil {
-			t.Error("expected error due to proxy failure")
-		}
-	case <-time.After(5 * time.Second):
-		t.Skip("CheckLatestRelease took too long, skipping")
+	body := makeMockReleaseJSON("v1.2.3")
+	m := &mockTransport{
+		responses: map[string]*http.Response{
+			"api.github.com/repos/alib8b8/aflare/releases/latest": mockResponse(body, http.StatusOK),
+		},
+	}
+	setMockTransport(t, m)
+
+	release, err := CheckLatestRelease("alib8b8/aflare")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if release == nil || release.TagName != "v1.2.3" {
+		t.Fatalf("unexpected release: %+v", release)
+	}
+	if m.lastAuth != "Bearer fake-token-for-test" {
+		t.Errorf("expected Authorization header %q, got %q", "Bearer fake-token-for-test", m.lastAuth)
 	}
 }
 
 func TestSelfUpdate_NetworkError(t *testing.T) {
-	t.Setenv("HTTP_PROXY", "http://127.0.0.1:1")
-	t.Setenv("HTTPS_PROXY", "http://127.0.0.1:1")
-
-	done := make(chan struct{})
-	var result string
-	var err error
-	go func() {
-		defer close(done)
-		result, err = SelfUpdate("alib8b8/aflare")
-	}()
-	select {
-	case <-done:
-		if err == nil {
-			t.Error("expected error due to proxy failure")
-		}
-		if result != "" {
-			t.Error("expected empty result on error")
-		}
-	case <-time.After(5 * time.Second):
-		t.Skip("SelfUpdate took too long, skipping")
+	// SelfUpdate calls CheckLatestRelease first; make it fail via the mock
+	// so the whole flow returns an error deterministically.
+	m := &mockTransport{
+		errs: map[string]error{
+			"api.github.com/repos/alib8b8/aflare/releases/latest": fmt.Errorf("network error"),
+		},
 	}
-}
+	setMockTransport(t, m)
 
-func TestSelfUpdate_AlreadyUpToDate(t *testing.T) {
-	// To test "Already up to date", we need CheckLatestRelease to succeed and return same version.
-	// Since we can't mock the network easily, we skip this test.
-	t.Skip("requires mocking GitHub API")
+	result, err := SelfUpdate("alib8b8/aflare")
+	if err == nil {
+		t.Error("expected error due to mock failure")
+	}
+	if result != "" {
+		t.Error("expected empty result on error")
+	}
 }
 
 func TestGitHubReleaseStruct(t *testing.T) {
@@ -280,12 +266,18 @@ func TestFindAssetWindows(t *testing.T) {
 }
 
 // mockTransport intercepts HTTP requests for testing.
+//
+// lastAuth captures the Authorization header of the most recent request so
+// tests can assert that CheckLatestRelease / downloadChecksums correctly
+// forward GITHUB_TOKEN. Tests are single-threaded, so no locking is needed.
 type mockTransport struct {
 	responses map[string]*http.Response
 	errs      map[string]error
+	lastAuth  string
 }
 
 func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	m.lastAuth = req.Header.Get("Authorization")
 	if err, ok := m.errs[req.URL.Host+req.URL.Path]; ok {
 		return nil, err
 	}
