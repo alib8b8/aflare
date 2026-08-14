@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-14
+
+本版本主题：**离线 / 内网首选项体验、隐私安全硬化、CLI 体验优化**。面向内网 / 本地优先、对数据隐私与安全敏感的企业用户与个人。
+
 ### Added
+- **离线 / 内网首选项体验**：air-gapped 离线安装（`install.sh` 支持本地归档）、`aflare doctor --offline` 离线环境自检、WebUI Mermaid 离线回退、323 模板内嵌进二进制首跑自动释放到 `~/aflare/templates`
+- **本地 / 离线 LLM 丝滑接入**：Ollama / vLLM / LM Studio / 本地 DeepSeek / 任何 OpenAI 兼容 endpoint，loopback 地址（127.0.0.1 / localhost）免 API Key 接入；有本地 LLM 走意图理解 + 动态生成工作流（`--ai` / `chat`），无 LLM 关键词匹配兜底
+- **隐私安全硬化**：面向本地 / 气隙部署的隐私强化，遥测可关闭，aflare 不回传用户数据
+- **`template run <id>` 命令**：一键运行模板，无需 clone 或记 `workflow.yaml` 路径，复用 `--set` / `--params-file` / `--resume`，支持 fuzzy 短名匹配
+- **未知命令智能提示**：`aflare node list` 不再静默回退到 usage，报错 + did-you-mean（前缀匹配 + 编辑距离 ≤2）
+- **secrets 友好提示**：headless / CI / 容器无系统密钥环时，给出 `export AFLARE_SECRETS_PASSWORD='你的主密码'` 中文指引
+- **create LLM 提示**：已配置 LLM 时提示 `--ai` / `chat` 更强生成路径
+- **内置节点注册修复**：注册 14 个此前孤儿化的内置节点
 - **会话持久化**：退出时自动保存会话，`/resume` 恢复历史对话，文件锁防止并发写入
 - **上下文窗口指示**：prompt 显示 `[ctx: N%]`，80% 以上加 ⚠ 警告，压缩后显示 `[ctx: compressed]`
 - **`/export` 命令**：导出对话为 markdown 文件，含时间戳和消息角色标注
@@ -22,13 +34,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **代码质量**：`.golangci.yml` 14 个 linter（`funlen`/`errcheck`/`bodyclose`/`staticcheck`），pre-commit hook
 
 ### Fixed
+- **template list/clone 不一致**：裸二进制 `template list` 显示模板但 `template clone` 提示"未找到模板"——`SkillMeta.Path` 在从 `skills-registry.json` 反序列化时丢失，改为根据 ID 重建 Path；并将 323 模板内嵌进二进制首跑自动释放
+- **模板释放污染工作目录**：`ResolveTemplatesPath` 兜底返回用户主目录下 `~/aflare/templates`，避免在当前工作目录创建模板目录
+- **虚构功能清理**：移除虚构的 `unitree_robot` 节点、`SandboxNode` / `AgentOrchestratorNode` 死代码、虚构的 unitree-patrol 市场包；修正 MCP 工具列表与 `custom-nodes.md` 文档
+- **GitCode 镜像 URL**：修正为 `gitcode.com/llm-box/llm-box`（原 `aflare/aflare` 错误）
+- **enforce-pr 误判**：修复对 squash merge 的误判与 fake PR ref 安全绕过漏洞（后因用户要求只留 main、不走 PR 流程，该 workflow 已整体移除）
 - **Ollama 真流式**：字符级 `ollamaStreamFilter` 状态机，逐字符匹配 `"thought"` / `"final_answer"` 前缀，提取纯文本流式输出，抑制 JSON 结构噪声
 - **Tool call 累积**：`CallWithToolsStream` 后续 chunk 携带 `ID`/`Name` 时正确更新（兼容分块发送 name+arguments 的 provider）
-- **版本同步**：`version.go` 从 `0.6.0` 更新为 `0.7.0`
+- **版本同步**：`version.go` 从 `0.6.0` 更新为 `0.7.0`，本次更新为 `0.8.0`
 - **多行输入提示**：从 `... ` 改为 `... (empty line to submit, \ to continue) `
 - **插件平台检查**：`LoadPlugin` 在 Windows 上返回友好错误提示，引导使用 MCP 替代方案
 
 ### Changed
+- **项目介绍重构**：README「和别的工具有什么区别」对比表替换为「项目优势」章节，聚焦 aflare 自身价值，不与其他工具对比（中英文同步）
+- **CI 提速**：benchmark 步骤（count=5 跑两遍 `./...`）改为只在 release tag / 手动触发时跑，普通 push main 跳过，CI 从近 40 分钟降至约 7 分钟；质量门（build/race test/coverage/lint/vulncheck）未削弱
+- **分支清理**：删除所有已合并的残留源分支，仓库只留 main
 - **Ollama 流式过滤重构**：`ReActStreamFilter` 从 `chat.go` 移至 `agent.go` 的 `callOllama`，删除冗余结构和 `json` import
 - **排序优化**：`CallWithToolsStream` 的 tool call 索引排序从 O(n²) 插入排序改为 `sort.Ints`
 - **死代码清理**：删除 `chat.go` 中无调用方的 `processInput` 方法

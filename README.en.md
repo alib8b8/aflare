@@ -90,7 +90,7 @@ aflare agent -c reflection,planning,utility
 
 ## Project Status
 
-aflare is currently at **v0.7 early stage**. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. Agent features (ReAct Agent chat, 300+ skill templates, 7 pluggable capabilities, unified event loop) are complete. Some advanced features (domestic chip support) are experimental. Feedback and contributions welcome.
+aflare is currently at **v0.8 stage**. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. v0.8 focuses on offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding and CLI UX improvements. Domestic-chip (Ascend/Cambricon/Hygon) adaptation is at base level and continuously improving. Hardware device control (robots etc.) is not built in — users can integrate via custom nodes or MCP Server, with data staying on their intranet.
 
 ---
 
@@ -296,7 +296,8 @@ aflare is built for intranet / local-first users — enterprises and individuals
 |---------|--------|-------|
 | v0.6 | Done | Agent memory infrastructure, voice AI toolchain, WAL persistence, TLA+ verification |
 | v0.7 | Done | Financial scenario enhancement (Saga / Idempotency / Audit chain), ReAct Agent chat, 300+ skill templates, 7 pluggable capabilities, Agent unified event loop |
-| **v0.8** | **Current** | Domestic chip support refinement, offline/intranet-first experience, Agent capability deepening, privacy/security hardening |
+| **v0.8** | **Done** | Offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding, CLI UX improvements (template run / smart command hints), CI speedup |
+| v0.9 | Planned | Domestic chip support refinement, Agent capability deepening |
 | v1.0 | Planned | Stable API, LTS |
 
 See [CHANGELOG.md](CHANGELOG.md) for details.
