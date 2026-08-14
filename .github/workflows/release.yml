@@ -91,6 +91,10 @@ jobs:
             --clobber
 
       - name: Update Homebrew formula
+        # Optional: only works when the <owner>/homebrew-tap repo exists
+        # and a token with dispatch rights is available. Don't fail the
+        # whole release if the tap repo hasn't been set up yet.
+        continue-on-error: true
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN || secrets.GITHUB_TOKEN }}
