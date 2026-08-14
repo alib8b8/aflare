@@ -36,16 +36,16 @@ import (
 
 // Pre-compiled regexes for workflow generation (avoid recompiling on each call)
 var (
-	urlRegex       = regexp.MustCompile(`(https?://[^\s]+)`)
-	domainRegex    = regexp.MustCompile(`\b([a-zA-Z0-9][-a-zA-Z0-9]*\.(?:com|org|net|io|edu|gov|me|dev|ai|app|xyz|co|info)\S*)\b`)
-	fileRegex      = regexp.MustCompile(`(save|write|to)\s+([a-zA-Z0-9_-]+\.(txt|md|yaml|json|html|csv|xml))`)
+	urlRegex    = regexp.MustCompile(`(https?://[^\s]+)`)
+	domainRegex = regexp.MustCompile(`\b([a-zA-Z0-9][-a-zA-Z0-9]*\.(?:com|org|net|io|edu|gov|me|dev|ai|app|xyz|co|info)\S*)\b`)
+	fileRegex   = regexp.MustCompile(`(save|write|to)\s+([a-zA-Z0-9_-]+\.(txt|md|yaml|json|html|csv|xml))`)
 	// saveFileFallbackRegex matches "save to file" / "write file" / "export to
 	// file" when no concrete filename was given. The generator then defaults to
 	// output.txt so the user's save intent isn't silently dropped.
 	saveFileFallbackRegex = regexp.MustCompile(`\b(save|write|export)\s+(?:to\s+)?file\b`)
-	cleanCharRegex = regexp.MustCompile(`[^a-z0-9._-]`)
-	cleanNameRegex = regexp.MustCompile(`[^a-z0-9 .]`)
-	cleanFileRegex = regexp.MustCompile(`[^a-z0-9_]`)
+	cleanCharRegex        = regexp.MustCompile(`[^a-z0-9._-]`)
+	cleanNameRegex        = regexp.MustCompile(`[^a-z0-9 .]`)
+	cleanFileRegex        = regexp.MustCompile(`[^a-z0-9_]`)
 	// 遗留修复: threshold + schedule parsing for the condition/price/schedule
 	// keywords. aboveRegex matches "超过 70000" / "above 70000" / "> 70000";
 	// belowRegex matches "低于 70000" / "below 70000" / "< 70000".
