@@ -668,7 +668,20 @@ var indexHTML = `<!DOCTYPE html>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        // Mermaid is loaded from a public CDN. In air-gapped/intranet
+        // environments the CDN is unreachable, so we detect load failure
+        // and fall back to rendering the Mermaid source as preformatted
+        // text (see renderVisualization) instead of leaving a blank page.
+        // The server-side visualizer already generates the Mermaid source,
+        // so the diagram structure stays visible/copyable offline; only the
+        // rendered graph degrades. Vendoring the ~3MB mermaid.min.js into
+        // the binary was considered but rejected to keep the binary lean.
+        window.mermaidAvailable = false;
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"
+            onload="window.mermaidAvailable=true"
+            onerror="console.warn('Mermaid CDN unreachable (offline/intranet mode): showing diagram source as text.')"></script>
     <script>
         let currentWorkflow = '';
 
@@ -819,9 +832,26 @@ var indexHTML = `<!DOCTYPE html>
                 const result = await response.text();
 
                 if (format === 'mermaid') {
-                    preview.innerHTML = '<div class="mermaid-container"><div class="mermaid"></div></div>';
-                    preview.querySelector('.mermaid').textContent = result;
-                    mermaid.init(undefined, '.mermaid');
+                    if (window.mermaidAvailable && typeof mermaid !== 'undefined') {
+                        preview.innerHTML = '<div class="mermaid-container"><div class="mermaid"></div></div>';
+                        preview.querySelector('.mermaid').textContent = result;
+                        try { mermaid.init(undefined, '.mermaid'); }
+                        catch (e) {
+                            // mermaid.init can throw on malformed graphs; show source.
+                            preview.innerHTML = '<div class="preview">' + escapeHtml(result) + '</div>';
+                        }
+                    } else {
+                        // Offline/intranet: CDN unreachable. Show the Mermaid
+                        // source as preformatted text so the workflow graph
+                        // structure stays readable/copyable without the renderer.
+                        preview.innerHTML =
+                            '<div class="mermaid-container">' +
+                            '<div style="color:#8080a0;font-size:12px;margin-bottom:8px">' +
+                            'Mermaid 渲染器离线不可用（CDN 不可达），以下为 Mermaid 源码，可复制到本地渲染器查看。' +
+                            '</div>' +
+                            '<div class="preview">' + escapeHtml(result) + '</div>' +
+                            '</div>';
+                    }
                 } else if (format === 'json') {
                     preview.innerHTML = '<div class="preview">' + syntaxHighlight(result) + '</div>';
                 } else {

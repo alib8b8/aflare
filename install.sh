@@ -123,16 +123,40 @@ download_file() {
 }
 
 main() {
+    # --offline <archive>: install from a pre-downloaded release tarball
+    # without any network access. Intended for air-gapped/intranet hosts
+    # where the GitHub/GitCode release download is unavailable. The user
+    # transfers the tarball (e.g. aflare-linux-amd64.tar.gz) onto the host
+    # and runs: bash install.sh --offline aflare-linux-amd64.tar.gz
+    if [ "${1:-}" = "--offline" ] || [ "${1:-}" = "-o" ]; then
+        local archive="${2:-}"
+        if [ -z "$archive" ]; then
+            error "--offline 需要指定本地安装包路径"
+            echo "用法: bash install.sh --offline <aflare-linux-amd64.tar.gz>"
+            echo "  请先从有网的机器下载发布包，再传输到本机："
+            echo "  GitHub:  https://github.com/$REPO/releases"
+            echo "  GitCode: https://gitcode.com/$GITCODE_REPO/-/releases"
+            exit 1
+        fi
+        if [ ! -f "$archive" ]; then
+            error "安装包不存在: $archive"
+            exit 1
+        fi
+        local rc=0
+        install_from_archive "$archive" || rc=$?
+        return $rc
+    fi
+
     echo ""
     echo "╔══════════════════════════════════════════╗"
     echo "║          aflare 安装向导                ║"
     echo "║   AI Workflow Engine Installer          ║"
     echo "╚══════════════════════════════════════════╝"
     echo ""
-    
+
     detect_platform
     info "检测系统: $OS / $ARCH"
-    
+
     info "检测网络环境..."
     REGION=$(detect_region)
     if [ "$REGION" = "cn" ]; then
@@ -140,7 +164,7 @@ main() {
     else
         info "检测到国际网络环境"
     fi
-    
+
     info "获取最新版本..."
     VERSION=$(get_latest_release "$REGION")
     if [ -z "$VERSION" ]; then
@@ -149,17 +173,20 @@ main() {
         echo "手动下载地址："
         echo "  GitHub:  https://github.com/$REPO/releases"
         echo "  GitCode: https://gitcode.com/$GITCODE_REPO/-/releases"
+        echo ""
+        echo "离线安装：先下载发布包到本机，再运行："
+        echo "  bash install.sh --offline aflare-\$OS-\$ARCH.tar.gz"
         exit 1
     fi
     success "最新版本: $VERSION"
-    
+
     ARCHIVE_NAME="$BINARY_NAME-$OS-$ARCH.tar.gz"
     DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ARCHIVE_NAME"
     CHECKSUMS_URL="https://github.com/$REPO/releases/download/$VERSION/checksums.txt"
-    
+
     TMP_DIR=$(mktemp -d)
     cd "$TMP_DIR"
-    
+
     info "下载 $ARCHIVE_NAME..."
     if ! download_file "$DOWNLOAD_URL" "$ARCHIVE_NAME" "$REGION"; then
         error "下载失败"
@@ -167,10 +194,12 @@ main() {
         echo "请尝试手动下载："
         echo "  GitHub:  $DOWNLOAD_URL"
         echo "  镜像加速: https://ghproxy.com/$DOWNLOAD_URL"
+        echo ""
+        echo "离线安装：下载后运行 bash install.sh --offline $ARCHIVE_NAME"
         rm -rf "$TMP_DIR"
         exit 1
     fi
-    
+
     info "下载校验和..."
     if download_file "$CHECKSUMS_URL" "checksums.txt" "$REGION"; then
         info "校验文件完整性..."
@@ -187,18 +216,32 @@ main() {
     else
         warn "无法下载校验文件，跳过校验"
     fi
-    
+
+    local rc=0
+    install_from_archive "$ARCHIVE_NAME" || rc=$?
+    rm -rf "$TMP_DIR"
+    return $rc
+}
+
+# install_from_archive extracts a release tarball (which must contain the
+# aflare binary at its root, matching goreleaser output) and installs it to
+# INSTALL_DIR. Shared by both the online and --offline paths so the
+# install/permission logic is identical. Caller is responsible for the
+# working directory containing the archive; on success the binary is moved
+# out of the CWD so the caller's rm -rf TMP_DIR is safe.
+install_from_archive() {
+    local archive="$1"
+
     info "解压..."
-    tar -xzf "$ARCHIVE_NAME"
-    
+    tar -xzf "$archive"
+
     if [ ! -f "$BINARY_NAME" ]; then
         error "解压后未找到 $BINARY_NAME"
-        rm -rf "$TMP_DIR"
-        exit 1
+        return 1
     fi
-    
+
     chmod +x "$BINARY_NAME"
-    
+
     info "安装到 $INSTALL_DIR..."
     if [ -w "$INSTALL_DIR" ]; then
         mv "$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
@@ -216,13 +259,16 @@ main() {
             echo ""
             echo "请手动添加到 PATH："
             echo "  export PATH=\"\$PATH:$(pwd)\""
-            rm -rf "$TMP_DIR"
-            exit 0
+            print_post_install_hints
+            return 0
         fi
     fi
-    
-    rm -rf "$TMP_DIR"
-    
+
+    print_post_install_hints
+    return 0
+}
+
+print_post_install_hints() {
     echo ""
     echo "╔══════════════════════════════════════════╗"
     echo "║           安装完成！🎉                   ║"
@@ -230,6 +276,7 @@ main() {
     echo ""
     echo "快速开始："
     echo "  $BINARY_NAME doctor                          # 环境自检（零配置可跑）"
+    echo "  $BINARY_NAME doctor --offline                # 离线/内网自检（跳过外网探测）"
     echo "  $BINARY_NAME run examples/content-processor.yaml  # 零配置示例"
     echo "  $BINARY_NAME init                            # 配置 LLM（交互式向导）"
     echo "  $BINARY_NAME create \"Summarize today's AI news\"   # 关键词匹配，无需 LLM"

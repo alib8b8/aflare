@@ -33,8 +33,25 @@ import (
 // 诊断命令). It checks aflare version, Go, bubblewrap, config file, LLM
 // provider reachability, and network connectivity, then prints a summary with
 // actionable suggestions for any problems found.
+//
+// --offline (or -o) skips the two outbound network probes
+// (github.com connectivity and registry-source reachability) so the command
+// is safe to run in air-gapped/intranet environments where those probes
+// would simply time out and add noise. All local checks (aflare/Go/bwrap,
+// config file, Ollama binary+port, LLM config, proxy env) still run.
 func HandleDoctor(args []string) {
+	offline := false
+	for _, a := range args {
+		switch a {
+		case "--offline", "-o":
+			offline = true
+		}
+	}
+
 	fmt.Println("环境检查：")
+	if offline {
+		fmt.Println("（--offline：已跳过外网连通性检查，仅检查本地环境）")
+	}
 	fmt.Println()
 
 	var problems []doctorProblem
@@ -87,7 +104,12 @@ func HandleDoctor(args []string) {
 	checkProxyEnv()
 
 	// 8. Network connectivity (non-blocking, short timeout).
-	if netOK, netDetail := checkNetworkConnectivity(); netOK {
+	// Skipped in --offline mode: in air-gapped/intranet environments the
+	// github.com probe just times out and would be reported as a "problem"
+	// even though the user's setup is intentionally offline.
+	if offline {
+		fmt.Println("  ⊘ 网络连通性检查已跳过（--offline）")
+	} else if netOK, netDetail := checkNetworkConnectivity(); netOK {
 		fmt.Printf("  ✓ 网络连接正常%s\n", netDetail)
 	} else {
 		fmt.Println("  ✗ 网络连接异常" + netDetail)
@@ -96,13 +118,17 @@ func HandleDoctor(args []string) {
 			desc:     "网络连接异常",
 			hint: "部分模板需要访问外部 API，检查代理或网络设置\n" +
 				"  - 如果使用代理：export HTTPS_PROXY=http://127.0.0.1:7890\n" +
-				"  - 如果不需要外网：使用本地模板（aflare list 查看 easy 模板）",
+				"  - 如果不需要外网：使用本地模板（aflare list 查看 easy 模板）\n" +
+				"  - 内网/离线环境：运行 aflare doctor --offline 跳过此项",
 		})
 	}
 
 	// 9. Registry source reachability (distinct from github.com — registry
 	// uses raw.githubusercontent.com by default, or AFLARE_REGISTRY_URL).
-	if regOK, regDetail := checkRegistryReachability(); regOK {
+	// Skipped in --offline mode for the same reason as step 8.
+	if offline {
+		fmt.Println("  ⊘ 节点注册表可达性检查已跳过（--offline）")
+	} else if regOK, regDetail := checkRegistryReachability(); regOK {
 		fmt.Printf("  ✓ 节点注册表可达%s\n", regDetail)
 	} else {
 		fmt.Println("  ✗ 节点注册表不可达" + regDetail)
