@@ -42,9 +42,14 @@ jobs:
         id: hash
         run: |
           set -euo pipefail
-          cd dist/
-          sha256sum * > ../checksums.txt
-          echo "hashes=$(base64 -w0 ../checksums.txt)" >> "$GITHUB_OUTPUT"
+          # GoReleaser v2 lays out build artifacts under per-target subdirs
+          # (e.g. dist/aflare_darwin_amd64_v1/aflare). Hash files only, not
+          # the subdirs themselves, otherwise sha256sum errors on directories.
+          find dist/ -type f \
+            ! -name '*.sig' ! -name '*.pem' \
+            ! -name 'checksums.txt' \
+            -exec sha256sum {} + | sed 's|dist/||' > checksums.txt
+          echo "hashes=$(base64 -w0 checksums.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
