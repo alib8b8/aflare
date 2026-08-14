@@ -47,15 +47,33 @@ import (
 //
 // GitHub release assets are served only from the public hosts in
 // allowedGitHubHosts; loopback/private ranges are never legitimate
-// targets, so we use ValidatePublic. validateGitHubURL still enforces
-// the host allow-list (a superset of SSRF: even a public IP we'd reject
-// if it weren't on the list, because the release JSON could otherwise
-// redirect us to an arbitrary public host).
+// targets, so by default we use ValidatePublic. validateGitHubURL still
+// enforces the host allow-list (a superset of SSRF: even a public IP
+// we'd reject if it weren't on the list, because the release JSON could
+// otherwise redirect us to an arbitrary public host).
+//
+// Escape hatch: when AFLARE_SELF_UPDATE_ALLOW_PRIVATE is set, the
+// validator switches to ValidateAllowAll. This is for environments where
+// split-horizon DNS / a corporate GitHub mirror / a zero-trust gateway
+// resolves a whitelisted host (e.g. github.com) to a private IP. The host
+// allow-list above still applies, so only api.github.com / github.com /
+// objects.githubusercontent.com may be contacted — only the IP check is
+// relaxed, not the destination.
 var (
-	githubAPIClient  = httpclient.NewClient(httpclient.Options{Timeout: 10 * time.Second, Validator: httpclient.ValidatePublic})
-	githubFileClient = httpclient.NewClient(httpclient.Options{Timeout: 30 * time.Second, Validator: httpclient.ValidatePublic})
-	githubDLClient   = httpclient.NewClient(httpclient.Options{Timeout: 5 * time.Minute, Validator: httpclient.ValidatePublic})
+	githubAPIClient  = httpclient.NewClient(httpclient.Options{Timeout: 10 * time.Second, Validator: selfUpdateValidator()})
+	githubFileClient = httpclient.NewClient(httpclient.Options{Timeout: 30 * time.Second, Validator: selfUpdateValidator()})
+	githubDLClient   = httpclient.NewClient(httpclient.Options{Timeout: 5 * time.Minute, Validator: selfUpdateValidator()})
 )
+
+// selfUpdateValidator picks the dial-time IP validator for the self-update
+// clients. ValidatePublic by default; ValidateAllowAll when the user opts in
+// via AFLARE_SELF_UPDATE_ALLOW_PRIVATE (any non-empty value).
+func selfUpdateValidator() httpclient.Validator {
+	if os.Getenv("AFLARE_SELF_UPDATE_ALLOW_PRIVATE") != "" {
+		return httpclient.ValidateAllowAll
+	}
+	return httpclient.ValidatePublic
+}
 
 var (
 	Version   = "0.7.0"

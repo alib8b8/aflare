@@ -103,6 +103,7 @@
   "options": "Опции",
   "options.lang": "Установить язык интерфейса",
   "examples": "Примеры",
+  "usage.first_run_hint": "Впервые? Запустите `aflare init` для настройки LLM и окружения.",
   "table.name": "НАЗВАНИЕ",
   "table.description": "ОПИСАНИЕ",
   "table.version": "ВЕРСИЯ",

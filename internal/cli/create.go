@@ -37,6 +37,16 @@ import (
 //     - 若未配置 LLM, 打印可操作的建议 (改造已有模板 / --ai / 手动创建),
 //     而不是静默生成一个只有占位 combine 节点的无意义工作流。
 func HandleCreate(args []string, aiMode bool) {
+	// Short-circuit --help/-h before any processing. Without this, --help
+	// is treated as the workflow description and a file gets generated
+	// (e.g. `aflare create --help` → writes a workflow from prompt "--help").
+	for _, a := range args {
+		if a == "--help" || a == "-h" {
+			printCreateUsage()
+			return
+		}
+	}
+
 	interactive := false
 
 	// Filter out --interactive flag from args
@@ -50,13 +60,7 @@ func HandleCreate(args []string, aiMode bool) {
 	}
 
 	if len(filteredArgs) < 1 {
-		fmt.Println(i18n.T("create.usage"))
-		fmt.Println("\nExamples:")
-		fmt.Println("  aflare create \"fetch example.com and save to file\"")
-		fmt.Println("  aflare create \"fetch Hacker News and save to hn.txt\"")
-		fmt.Println("  aflare create \"summarize article and write to summary.md\"")
-		fmt.Println("  aflare --ai create \"generate a weekly report from github commits\"")
-		fmt.Println("  aflare create --interactive \"fetch example.com\"")
+		printCreateUsage()
 		os.Exit(1)
 	}
 
@@ -85,6 +89,18 @@ func HandleCreate(args []string, aiMode bool) {
 		fmt.Println("Type /quit to exit.")
 		EnterChatMode()
 	}
+}
+
+// printCreateUsage prints the create command usage and examples. Shared by the
+// --help short-circuit and the missing-prompt error path.
+func printCreateUsage() {
+	fmt.Println(i18n.T("create.usage"))
+	fmt.Println("\nExamples:")
+	fmt.Println("  aflare create \"fetch example.com and save to file\"")
+	fmt.Println("  aflare create \"fetch Hacker News and save to hn.txt\"")
+	fmt.Println("  aflare create \"summarize article and write to summary.md\"")
+	fmt.Println("  aflare --ai create \"generate a weekly report from github commits\"")
+	fmt.Println("  aflare create --interactive \"fetch example.com\"")
 }
 
 // createWithKeywordOrFallback runs the rule-based keyword matcher first (fast

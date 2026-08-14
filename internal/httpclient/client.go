@@ -175,6 +175,17 @@ func ValidateAllowLoopback(ip net.IP, displayHost string) error {
 	return validateNonLoopback(ip, displayHost)
 }
 
+// ValidateAllowAll disables all IP-class checks. It is an escape hatch for
+// environments where a public hostname (e.g. github.com) is intentionally
+// resolved to a private address by split-horizon DNS, a corporate GitHub
+// mirror, or a zero-trust gateway. Callers that use it MUST still enforce a
+// hostname allow-list at a higher layer (as meta/version.go does via
+// validateGitHubURL) so that only a fixed set of trusted hostnames may be
+// contacted, regardless of the IP they resolve to.
+func ValidateAllowAll(ip net.IP, displayHost string) error {
+	return nil
+}
+
 // validateNonLoopback contains the checks shared by ValidatePublic and
 // ValidateAllowLoopback: private, link-local, unspecified, multicast,
 // and reserved ranges. Splitting it out keeps the loopback policy the

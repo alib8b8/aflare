@@ -1,8 +1,8 @@
 name: Content Processor
 steps:
-  - node: fetch_url
+  - node: file_read
     params:
-      url: file://post.md
+      path: post.md
   - node: transform
     params:
       operation: markdown_to_html

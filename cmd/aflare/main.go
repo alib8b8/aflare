@@ -34,6 +34,7 @@ func main() {
 	if len(os.Args) < 2 {
 		i18n.Init("")
 		fmt.Println(cli.PrintUsage())
+		fmt.Println(cli.FirstRunHint())
 		os.Exit(1)
 	}
 	command, args, safeMode, dryRun, mcpServer, lang, concise, initMCP, initAgent, updateChannel, serveMode, aiMode, otelEndpoint, otelServiceName := cli.ParseArgs(os.Args[1:])

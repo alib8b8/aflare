@@ -78,6 +78,16 @@ func redactParams(params map[string]string) map[string]string {
 //
 // Merge priority (later overrides earlier): --params < --set < --params-file
 func HandleRun(args []string, dryRun bool, safeMode bool) {
+	// Short-circuit --help/-h before flag parsing. Without this, --help
+	// falls into the position-args path and gets treated as a workflow
+	// file path (e.g. `aflare run --help` → "failed to parse workflow").
+	for _, a := range args {
+		if a == "--help" || a == "-h" {
+			fmt.Println(i18n.T("run.usage"))
+			return
+		}
+	}
+
 	resumeEnabled := false
 	resumePath := ""
 	var legacyParams []string // from --params (deprecated)

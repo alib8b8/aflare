@@ -103,6 +103,7 @@
   "options": "Options",
   "options.lang": "Set interface language",
   "examples": "Examples",
+  "usage.first_run_hint": "First time? Run `aflare init` to configure your LLM provider and environment.",
   "table.name": "NAME",
   "table.description": "DESCRIPTION",
   "table.version": "VERSION",

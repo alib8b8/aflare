@@ -107,44 +107,15 @@ func runInitWizard() {
 	}
 	fmt.Println("  2. OpenAI（云端，需要 API Key）")
 	fmt.Println("  3. DeepSeek（云端，国内推荐）")
-	fmt.Println("  4. 跳过（仅使用不需要 LLM 的工作流）")
+	fmt.Println("  4. 通义千问 Qwen（云端，需要 API Key）")
+	fmt.Println("  5. 智谱 GLM（云端，需要 API Key）")
+	fmt.Println("  6. Kimi（云端，需要 API Key）")
+	fmt.Println("  7. 跳过（仅使用不需要 LLM 的工作流）")
 	fmt.Println()
 
-	choice := prompt(reader, "请选择 [1-4]（默认 4）：", "4")
+	choice := prompt(reader, "请选择 [1-7]（默认 7）：", "7")
 
-	var provider, apiKey, model, endpoint string
-	switch strings.TrimSpace(choice) {
-	case "1":
-		provider = "ollama"
-		d := providerDefaultsMap["ollama"]
-		model = prompt(reader, fmt.Sprintf("模型（默认 %s）：", d.model), d.model)
-		if ollamaOK {
-			fmt.Println("  → 提示：确保已拉取模型：ollama pull " + model)
-		}
-		endpoint = d.endpoint
-	case "2":
-		provider = "openai"
-		d := providerDefaultsMap["openai"]
-		apiKey = prompt(reader, "输入 API Key：", "")
-		if apiKey == "" {
-			fmt.Println("  ⚠ 未输入 API Key，可稍后用 aflare config set llm.api_key <key> 配置")
-		}
-		model = prompt(reader, fmt.Sprintf("默认模型（默认 %s）：", d.model), d.model)
-		endpoint = d.endpoint
-	case "3":
-		provider = "deepseek"
-		d := providerDefaultsMap["deepseek"]
-		apiKey = prompt(reader, "输入 API Key：", "")
-		if apiKey == "" {
-			fmt.Println("  ⚠ 未输入 API Key，可稍后用 aflare config set llm.api_key <key> 配置")
-		}
-		model = prompt(reader, fmt.Sprintf("默认模型（默认 %s）：", d.model), d.model)
-		endpoint = d.endpoint
-	default:
-		provider = ""
-		fmt.Println()
-		fmt.Println("已跳过 LLM 配置。你仍可使用不需要 LLM 的工作流。")
-	}
+	provider, apiKey, model, endpoint := readLLMChoice(reader, strings.TrimSpace(choice), ollamaOK)
 
 	cfgPath, err := writeWizardConfig(provider, model, apiKey, endpoint)
 	if err != nil {
@@ -160,6 +131,93 @@ func runInitWizard() {
 	fmt.Println("或者启动 Agent 对话：")
 	fmt.Println("  aflare chat")
 	fmt.Println()
+}
+
+// cloudProviderByChoice maps the wizard menu choice (2-6) to the provider key
+// in providerDefaultsMap. Choices outside 2-6 return "".
+func cloudProviderByChoice(choice string) string {
+	switch choice {
+	case "2":
+		return "openai"
+	case "3":
+		return "deepseek"
+	case "4":
+		return "qwen"
+	case "5":
+		return "glm"
+	case "6":
+		return "kimi"
+	default:
+		return ""
+	}
+}
+
+// readLLMChoice resolves a menu choice into provider credentials. Used by both
+// the wizard and the flag-mode LLM offer. provider is "" when the user skips.
+func readLLMChoice(reader *bufio.Reader, choice string, ollamaOK bool) (provider, model, apiKey, endpoint string) {
+	if choice == "1" {
+		provider = "ollama"
+		d := providerDefaultsMap["ollama"]
+		model = prompt(reader, fmt.Sprintf("模型（默认 %s）：", d.model), d.model)
+		if ollamaOK {
+			fmt.Println("  → 提示：确保已拉取模型：ollama pull " + model)
+		}
+		endpoint = d.endpoint
+		return
+	}
+	if name := cloudProviderByChoice(choice); name != "" {
+		provider = name
+		d := providerDefaultsMap[name]
+		apiKey = prompt(reader, "输入 API Key：", "")
+		if apiKey == "" {
+			fmt.Println("  ⚠ 未输入 API Key，可稍后用 aflare config set llm.api_key <key> 配置")
+		}
+		model = prompt(reader, fmt.Sprintf("默认模型（默认 %s）：", d.model), d.model)
+		endpoint = d.endpoint
+		return
+	}
+	// default: skip
+	fmt.Println()
+	fmt.Println("已跳过 LLM 配置。你仍可使用不需要 LLM 的工作流。")
+	return "", "", "", ""
+}
+
+// offerLLMConfig checks whether an LLM provider is configured and, if not,
+// offers to walk the user through setup. Used by flag-mode init (e.g.
+// `aflare init --mcp all`) so that LLM guidance is not skipped. Returns true
+// when a provider was configured (or already present).
+func offerLLMConfig() bool {
+	if detectLLMConfig() {
+		return true
+	}
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println()
+	fmt.Println("ℹ 未检测到 LLM 配置。Agent 模式和 agent 节点需要 LLM。")
+	fmt.Println("选择你的方式：")
+	fmt.Println()
+	fmt.Println("  1. Ollama（本地，免费，推荐）")
+	fmt.Println("  2. OpenAI（云端，需要 API Key）")
+	fmt.Println("  3. DeepSeek（云端，国内推荐）")
+	fmt.Println("  4. 通义千问 Qwen（云端，需要 API Key）")
+	fmt.Println("  5. 智谱 GLM（云端，需要 API Key）")
+	fmt.Println("  6. Kimi（云端，需要 API Key）")
+	fmt.Println("  7. 跳过（仅使用不需要 LLM 的工作流）")
+	fmt.Println()
+
+	choice := prompt(reader, "请选择 [1-7]（默认 7）：", "7")
+	_, ollamaOK := detectCommand("ollama")
+	provider, model, apiKey, endpoint := readLLMChoice(reader, strings.TrimSpace(choice), ollamaOK)
+	if provider == "" {
+		fmt.Println("可稍后运行 `aflare init`（无参数）重新配置。")
+		return false
+	}
+	cfgPath, err := writeWizardConfig(provider, model, apiKey, endpoint)
+	if err != nil {
+		fmt.Printf("\n❌ 保存 LLM 配置失败：%v\n", err)
+		return false
+	}
+	fmt.Printf("\n配置已保存到 %s ✓\n", cfgPath)
+	return true
 }
 
 // prompt reads a line from stdin with the given prompt, returning the default

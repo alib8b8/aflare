@@ -33,9 +33,25 @@ func HandleSelfUpdate() {
 	result, err := SelfUpdate(repo)
 	if err != nil {
 		fmt.Printf("❌ Update failed: %v\n", err)
+		fmt.Print(updateNetworkHint(err))
 		os.Exit(1)
 	}
 	fmt.Printf("✅ %s\n", result)
+}
+
+// updateNetworkHint returns a actionable hint when an update error looks like
+// a network/SSRF rejection (private/loopback address, or a generic dial
+// failure). Empty string when the error is unrelated.
+func updateNetworkHint(err error) string {
+	msg := err.Error()
+	if strings.Contains(msg, "private address") ||
+		strings.Contains(msg, "loopback address") ||
+		strings.Contains(msg, "is not allowed") {
+		return "\n提示：你的网络环境可能把 github.com 解析到了内网地址（企业镜像/VPN/零信任网关）。\n" +
+			"      可设置 export AFLARE_SELF_UPDATE_ALLOW_PRIVATE=1 后重试（仍只允许访问 GitHub 官方域名），\n" +
+			"      或设置 HTTPS_PROXY 指向可出公网的代理。\n"
+	}
+	return "\n提示：检查网络连接，或设置 HTTPS_PROXY 后重试。\n"
 }
 
 // HandleUpgrade handles the "upgrade" command (断点17: 没有 aflare upgrade
@@ -66,6 +82,7 @@ func HandleUpgrade(args []string) {
 	if err != nil {
 		fmt.Println()
 		fmt.Printf("❌ 更新失败: %v\n", err)
+		fmt.Print(updateNetworkHint(err))
 		os.Exit(1)
 	}
 	// SelfUpdate verifies the SHA256 checksum internally before replacing the

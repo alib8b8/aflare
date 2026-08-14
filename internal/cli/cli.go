@@ -210,7 +210,7 @@ func PrintUsage() string {
   aflare --lang zh run examples/basic_summary.yaml
   aflare registry sync
   aflare registry search weather
-  aflare install weather_api`,
+  aflare doctor`,
 		i18n.T("usage.title"),
 		i18n.T("usage.help"),
 		i18n.T("usage.create"),
@@ -236,6 +236,12 @@ func PrintUsage() string {
 		i18n.T("options.lang"),
 		i18n.T("examples"),
 	)
+}
+
+// FirstRunHint returns a short, localized pointer shown after the usage text
+// when aflare is invoked with no arguments, guiding new users to `aflare init`.
+func FirstRunHint() string {
+	return "\n" + i18n.T("usage.first_run_hint")
 }
 
 // RunWorkflow executes a workflow and returns the final output and results.

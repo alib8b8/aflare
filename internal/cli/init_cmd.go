@@ -112,6 +112,11 @@ func HandleInit(args []string) {
 		}
 		fmt.Printf("✅ Update channel set to: %s\n", channel)
 	}
+
+	// Flag-mode previously skipped LLM guidance entirely (only the no-flag
+	// wizard configured LLM). Offer LLM setup so `aflare init --mcp all`
+	// also leaves the user with a working provider.
+	offerLLMConfig()
 }
 
 // PrintInitUsage prints usage information for the init command.

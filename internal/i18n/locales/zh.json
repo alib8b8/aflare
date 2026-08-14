@@ -103,6 +103,7 @@
   "options": "选项",
   "options.lang": "设置界面语言",
   "examples": "示例",
+  "usage.first_run_hint": "首次使用？运行 `aflare init` 配置 LLM 与环境。",
   "table.name": "名称",
   "table.description": "描述",
   "table.version": "版本",
