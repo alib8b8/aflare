@@ -265,65 +265,6 @@ steps:
       content: "{{state}}"
 `,
 		},
-		{
-			Name:        "unitree-patrol",
-			Version:     "1.0.0",
-			Description: "Autonomous robot patrol routine using Unitree robot with vision-based inspection",
-			Category:    "robot",
-			Author:      "aflare",
-			WorkflowYAML: `name: "Unitree Patrol Routine"
-description: "Execute an autonomous patrol route with the Unitree robot, capturing images and detecting anomalies"
-steps:
-  - node: robot_control
-    id: initialize
-    params:
-      action: "stand"
-      robot_model: "unitree_go2"
-  - node: robot_action
-    id: patrol_waypoint_1
-    params:
-      action: "navigate"
-      x: "0"
-      y: "5"
-      speed: "0.5"
-  - node: robot_control
-    id: capture_image_1
-    params:
-      action: "capture_image"
-      camera: "front"
-      save_path: "patrol/waypoint_1.jpg"
-  - node: robot_action
-    id: patrol_waypoint_2
-    params:
-      action: "navigate"
-      x: "5"
-      y: "5"
-      speed: "0.5"
-  - node: robot_control
-    id: capture_image_2
-    params:
-      action: "capture_image"
-      camera: "front"
-      save_path: "patrol/waypoint_2.jpg"
-  - node: llm
-    id: analyze_images
-    params:
-      model: "gpt-4-vision"
-      prompt: "Analyze the patrol images for anomalies: unauthorized personnel, equipment damage, or environmental hazards."
-  - node: robot_control
-    id: return_home
-    params:
-      action: "navigate"
-      x: "0"
-      y: "0"
-      speed: "0.5"
-  - node: notify
-    id: patrol_report
-    params:
-      channel: "telegram"
-      message: "Patrol completed. Anomalies: {{anomalies}}"
-`,
-		},
 	}
 }
 

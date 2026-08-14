@@ -118,8 +118,6 @@ func RegisterBuiltins(reg *Registry) {
 	reg.Register(&NotifyNode{})
 	reg.Register(&OllamaNode{})
 	reg.Register(&CallNode{})
-	// reg.Register(&SandboxNode{})      // frozen: not exposed via registry
-	// reg.Register(&AgentOrchestratorNode{}) // frozen: not exposed via registry
 
 	// Data, knowledge and document nodes. These also self-register via
 	// init() into the global registry, but RegisterBuiltins is invoked on

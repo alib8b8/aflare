@@ -58,11 +58,14 @@ The MCP server follows the JSON-RPC 2.0 protocol over stdin/stdout or HTTP.
     },
     "serverInfo": {
       "name": "aflare",
-      "version": "0.3.0"
+      "version": "0.7.0"
     }
   }
 }
 ```
+
+`serverInfo.version` echoes the installed aflare version (shown illustratively
+as `0.7.0` above); query `aflare version` for the exact value on your host.
 
 ### List Tools
 
@@ -147,43 +150,30 @@ List workflow files in a directory.
 }
 ```
 
-### secrets_list
+### Other tools
 
-List available secrets.
+aflare exposes many more MCP tools than the workflow trio above. The
+authoritative list is available at runtime via `tools/list`; the groups are:
 
-**Parameters**:
-- `group` (optional): Filter by secret group
+| Group | Tools |
+|-------|-------|
+| Workflow | `workflow_run`, `workflow_create`, `workflow_list`, `workflow_validate` |
+| Nodes | `node_list`, `node_info` |
+| History | `history_list` |
+| Templates | `template_list`, `template_render` |
+| Memory | `memory_store`, `memory_retrieve`, `memory_search`, `memory_stats`, `memory_list_sessions` |
+| Code knowledge graph | `code_graph_index`, `code_graph_query`, `code_graph_stats` |
+| Context | `context_compress` |
+| Search | `search_aggregated` |
+| Geospatial | `geospatial_query` |
+| Preferences | `preference_get`, `preference_set` |
 
-**Example**:
-```json
-{
-  "name": "secrets_list",
-  "arguments": {
-    "group": "llm"
-  }
-}
-```
+Backwards-compatible aliases (`create_workflow`, `run_workflow`,
+`run_workflow_yaml`, `list_nodes`) are also accepted by `tools/call`.
 
-### secrets_add
-
-Add a new secret.
-
-**Parameters**:
-- `group` (required): Secret group name
-- `key` (required): Secret key name
-- `value` (required): Secret value
-
-**Example**:
-```json
-{
-  "name": "secrets_add",
-  "arguments": {
-    "group": "api",
-    "key": "service",
-    "value": "sk-..."
-  }
-}
-```
+> **Note:** secrets are **not** exposed as MCP tools. Manage them with the
+> `aflare secrets` CLI (`set` / `get` / `list`) so secret values never transit
+> the MCP JSON-RPC channel.
 
 ## Configuration
 
