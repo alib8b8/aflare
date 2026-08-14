@@ -64,14 +64,21 @@ brew install alib8b8/tap/aflare
 > - Fedora:       `sudo dnf install bubblewrap`
 
 ```bash
-# 关键词生成工作流
+# 1. 环境自检（零配置，立即可跑）
+aflare doctor
+
+# 2. 零配置示例：读取 post.md → 转 HTML → 写 post.html
+aflare run examples/content-processor.yaml
+
+# 3. 配置 LLM（交互式向导，本地 Ollama 或云厂商二选一）
+aflare init
+
+# 4. 关键词生成工作流（无需 LLM，纯模板匹配；加 --ai 用 LLM 生成更复杂的）
 aflare create "每 10 分钟检查 BTC 价格，超过 70000 发 Telegram 通知"
 # 输出: 工作流已生成 → btc-monitor.yaml
-
-# 运行工作流
 aflare run btc-monitor.yaml
 
-# 交互式 AI Agent 对话（ReAct Agent + 300+ 技能）
+# 5. 交互式 AI Agent 对话（ReAct Agent + 300+ 技能）
 aflare chat
 # 或者: aflare chat -p deepseek -m deepseek-chat
 
