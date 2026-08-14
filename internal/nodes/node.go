@@ -121,6 +121,26 @@ func RegisterBuiltins(reg *Registry) {
 	// reg.Register(&SandboxNode{})      // frozen: not exposed via registry
 	// reg.Register(&AgentOrchestratorNode{}) // frozen: not exposed via registry
 
+	// Data, knowledge and document nodes. These also self-register via
+	// init() into the global registry, but RegisterBuiltins is invoked on
+	// freshly created registries (e.g. `aflare list`, MCP servers) that
+	// do not share the global one, so they must be registered here too.
+	// Register is idempotent on the global registry.
+	reg.Register(&SQLQueryNode{})
+	reg.Register(&RAGNode{})
+	reg.Register(&KnowledgeGraphNode{})
+	reg.Register(&CodeKnowledgeGraphNode{})
+	reg.Register(&OfficeNode{})
+	reg.Register(&DocParseNode{})
+	reg.Register(&DocGenNode{})
+	reg.Register(&MultimodalNode{})
+	reg.Register(&VerifyNode{})
+	reg.Register(&ClarifyNode{})
+	reg.Register(&PreferenceNode{})
+	reg.Register(&SkillDistillNode{})
+	reg.Register(&EngineerSkillsNode{})
+	reg.Register(&CompressNode{})
+
 	// OpenAI-compatible providers (openai, glm, kimi, qwen, deepseek,
 	// anthropic, gemini, mistral, yi, baichuan, internlm, minimax,
 	// xverse, mimo, coze, ima) are registered from the consolidated

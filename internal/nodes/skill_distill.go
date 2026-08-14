@@ -50,6 +50,10 @@ var (
 
 type SkillDistillNode struct{}
 
+func init() {
+	Register(&SkillDistillNode{})
+}
+
 func (n *SkillDistillNode) Name() string { return "skill_distill" }
 
 func (n *SkillDistillNode) Description() string {

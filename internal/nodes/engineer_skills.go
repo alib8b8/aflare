@@ -276,6 +276,10 @@ var engineerSkills = map[string]map[string]SkillDetail{
 
 type EngineerSkillsNode struct{}
 
+func init() {
+	Register(&EngineerSkillsNode{})
+}
+
 func (n *EngineerSkillsNode) Name() string { return "engineer_skills" }
 
 func (n *EngineerSkillsNode) Description() string {

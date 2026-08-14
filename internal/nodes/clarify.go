@@ -39,6 +39,10 @@ type ClarificationResult struct {
 
 type ClarifyNode struct{}
 
+func init() {
+	Register(&ClarifyNode{})
+}
+
 func (n *ClarifyNode) Name() string {
 	return "clarify"
 }

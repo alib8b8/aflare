@@ -26,6 +26,13 @@ import (
 
 type CompressNode struct{}
 
+func init() {
+	// Also registered by chat mode (agent/chat_nodes.go); Register is
+	// idempotent so the duplicate is safe and makes the node usable from
+	// plain YAML workflows, not just chat sessions.
+	Register(&CompressNode{})
+}
+
 func (n *CompressNode) Name() string {
 	return "compress"
 }
