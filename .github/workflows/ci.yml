@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:  # allows manually triggering the full run incl. benchmarks
 
 jobs:
   test:
@@ -104,27 +105,36 @@ jobs:
         go install golang.org/x/vuln/cmd/govulncheck@latest
         govulncheck ./...
 
+    # Benchmarks are expensive (count=5 across ./... twice — current + baseline).
+    # Skip them on ordinary push-to-main so the quality gate (build/test/race/
+    # coverage/lint) returns fast; run them only on release tags and manual
+    # dispatches where regression detection actually matters.
     - name: Install benchstat
+      if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
       run: go install golang.org/x/perf/cmd/benchstat@latest
 
     - name: Run benchmarks (current branch)
+      if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
       run: |
         go test -bench=. -benchmem -run=^a -count=5 ./... > bench-current.txt 2>&1
         cat bench-current.txt
 
     - name: Checkout base branch for baseline
+      if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
       uses: actions/checkout@v7
       with:
         ref: ${{ github.event.pull_request.base.ref || 'main' }}
         path: baseline-checkout
 
     - name: Run benchmarks (base branch)
+      if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
       run: |
         cd baseline-checkout
         go test -bench=. -benchmem -run=^a -count=5 ./... > ../bench-baseline.txt 2>&1
         cat ../bench-baseline.txt
 
     - name: Compare benchmarks
+      if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
       run: |
         echo "=== benchstat comparison (baseline vs current) ==="
         benchstat bench-baseline.txt bench-current.txt | tee bench-comparison.txt
