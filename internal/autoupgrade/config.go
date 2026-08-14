@@ -63,7 +63,15 @@ func getConfigPaths() []string {
 
 func getDefaultConfig() *UpgradeConfig {
 	return &UpgradeConfig{
-		Mode: ModeMonitor,
+		// Mode defaults to manual to honour the local-first / data-stays-local
+		// philosophy: aflare must not phone home to GitHub from air-gapped or
+		// privacy-sensitive enterprise networks. Users who want release
+		// notifications can set `mode: monitor` in autoupgrade.yaml; users who
+		// want auto-update can additionally set `auto_update_enabled: true`.
+		// Previously this defaulted to monitor, which still issued a network
+		// request to api.github.com every 24h even though no auto-update was
+		// performed — that was a real egress for intra-net users.
+		Mode: ModeManual,
 		// AutoUpdateEnabled defaults to false to align with the local-first /
 		// data-stays-local philosophy: phone-home is off by default, so actual
 		// auto-update never fires anyway. Keeping the config flag false avoids

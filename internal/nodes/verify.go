@@ -23,6 +23,10 @@ import (
 
 type VerifyNode struct{}
 
+func init() {
+	Register(&VerifyNode{})
+}
+
 func (n *VerifyNode) Name() string {
 	return "verify"
 }

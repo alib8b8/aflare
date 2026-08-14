@@ -716,11 +716,35 @@ func (r *LLMRouter) callProvider(ctx context.Context, p RouterProvider, input, s
 	}
 	callParams["model"] = p.Model
 	callParams["endpoint"] = p.Endpoint
-	if p.APIKey != "" {
+	// Ollama's native endpoint (http://localhost:11434) is NOT OpenAI-
+	// compatible at the root; the OpenAI-compatible path lives under
+	// /v1. The router drives every provider through the OpenAI-compatible
+	// execute path, so for ollama we must point at the /v1 base. Without
+	// this, the router's auto-detected ollama fallback 404s on
+	// http://localhost:11434/chat/completions. (Users who already
+	// configure an explicit /v1 endpoint are unaffected.)
+	if p.Name == "ollama" && !strings.HasSuffix(p.Endpoint, "/v1") {
+		callParams["endpoint"] = strings.TrimRight(p.Endpoint, "/") + "/v1"
+	}
+	// Ollama's OpenAI-compatible endpoint accepts any non-empty bearer
+	// token; supply a placeholder so the compat node's mandatory-key
+	// check passes when the user has not configured one.
+	if p.Name == "ollama" && p.APIKey == "" {
+		callParams["api_key"] = "ollama-router-placeholder"
+	} else if p.APIKey != "" {
 		callParams["api_key"] = p.APIKey
 	}
 	if systemPrompt != "" {
 		callParams["system"] = systemPrompt
+	}
+	// tools / tool_choice are forwarded so the router path supports
+	// function calling. Previously callProvider dropped these, which
+	// silently downgraded router-routed ReAct agents to text-only.
+	if v, ok := params["tools"]; ok && v != "" {
+		callParams["tools"] = v
+	}
+	if v, ok := params["tool_choice"]; ok && v != "" {
+		callParams["tool_choice"] = v
 	}
 
 	return compatNode.Execute(ctx, input, callParams)

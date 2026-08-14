@@ -27,6 +27,10 @@ import (
 
 type RAGNode struct{}
 
+func init() {
+	Register(&RAGNode{})
+}
+
 func (n *RAGNode) Name() string {
 	return "rag"
 }

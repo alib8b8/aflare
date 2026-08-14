@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -481,5 +482,62 @@ func TestOpenAICompatibleNode_ExecuteStream_Empty(t *testing.T) {
 	}
 	if out != "" {
 		t.Errorf("expected empty output, got %q", out)
+	}
+}
+
+// --- Outbound data monitoring (RecordOutbound / SetGlobalOutboundRecorder) ---
+
+// fakeOutboundRecorder is a test double for OutboundRecorder that sums the
+// recorded bytes. It is concurrency-safe because the global recorder may be
+// invoked from multiple goroutines during a test.
+type fakeOutboundRecorder struct {
+	mu    sync.Mutex
+	total int
+	calls int
+}
+
+func (f *fakeOutboundRecorder) Record(n int) {
+	f.mu.Lock()
+	f.total += n
+	f.calls++
+	f.mu.Unlock()
+}
+
+func TestRecordOutbound_NilSafe(t *testing.T) {
+	// 安装 nil 监控器时 RecordOutbound 必须是 no-op 且不 panic。
+	orig := GlobalOutboundRecorder()
+	defer SetGlobalOutboundRecorder(orig)
+	SetGlobalOutboundRecorder(nil)
+	RecordOutbound(100) // must not panic
+}
+
+func TestRecordOutbound_DelegatesToInstalledRecorder(t *testing.T) {
+	orig := GlobalOutboundRecorder()
+	defer SetGlobalOutboundRecorder(orig)
+	fr := &fakeOutboundRecorder{}
+	SetGlobalOutboundRecorder(fr)
+	RecordOutbound(100)
+	RecordOutbound(50)
+	fr.mu.Lock()
+	defer fr.mu.Unlock()
+	if fr.calls != 2 {
+		t.Errorf("calls = %d, want 2", fr.calls)
+	}
+	if fr.total != 150 {
+		t.Errorf("total = %d, want 150", fr.total)
+	}
+}
+
+func TestSetGlobalOutboundRecorder_RoundTrip(t *testing.T) {
+	orig := GlobalOutboundRecorder()
+	defer SetGlobalOutboundRecorder(orig)
+	fr := &fakeOutboundRecorder{}
+	SetGlobalOutboundRecorder(fr)
+	if got := GlobalOutboundRecorder(); got != fr {
+		t.Errorf("GlobalOutboundRecorder did not return installed recorder")
+	}
+	SetGlobalOutboundRecorder(nil)
+	if got := GlobalOutboundRecorder(); got != nil {
+		t.Errorf("expected nil after setting nil, got %v", got)
 	}
 }

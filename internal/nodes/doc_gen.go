@@ -50,6 +50,10 @@ var (
 
 type DocGenNode struct{}
 
+func init() {
+	Register(&DocGenNode{})
+}
+
 func (n *DocGenNode) Name() string { return "doc_gen" }
 
 func (n *DocGenNode) Description() string {

@@ -1,6 +1,6 @@
 # Node Reference
 
-> Auto-generated from `Schema()` metadata. 52 nodes registered.
+> Auto-generated from `Schema()` metadata. 66 nodes registered.
 
 | Node | Description | Params |
 |------|-------------|--------|
@@ -10,15 +10,21 @@
 | [`baichuan`](#baichuan) | Call Baichuan LLM API | 15 |
 | [`call`](#call) | Call another workflow file | 2 |
 | [`cambricon`](#cambricon) | Call Cambricon MLU LLM API | 15 |
+| [`clarify`](#clarify) | Pre-execution ambiguity checker: identifies unclear requirements and generates clarifying questions (ACQUIRE framework) | 8 |
 | [`cli_session`](#cli_session) | 交互式CLI会话节点。支持上下文保持、命令历史、快捷键、流式输出和自动补全，提供类... | 5 |
 | [`code_interpreter`](#code_interpreter) | Execute Python/Node.js/Rust code in a sandboxed environment with file I/O | 6 |
+| [`code_knowledge_graph`](#code_knowledge_graph) | Semantic code knowledge graph with vector retrieval, 158 language support, MCP tool exposure, and token-efficient rev... | 13 |
 | [`code_review`](#code_review) | Hybrid code review combining deterministic rule engine (NPE, thread-safety, security) with LLM deep analysis. Inspire... | 11 |
 | [`combine`](#combine) | Combine multiple inputs into one | 1 |
+| [`compress`](#compress) | Intelligent context compression with 6 algorithms: extractive, keyword, cluster, sliding_window, hybrid (headroom-ins... | 7 |
 | [`condition`](#condition) | Evaluate conditional expressions (contains, equals, regex, empty) | 2 |
 | [`coze`](#coze) | Call Coze LLM API | 15 |
 | [`critic`](#critic) | Critic agent that reviews output, identifies issues, and suggests improvements | 8 |
 | [`deepseek`](#deepseek) | Call DeepSeek LLM API | 15 |
+| [`doc_gen`](#doc_gen) | AI自动文档生成节点。自动生成和更新代码库文档，支持README、API文档、函数注释、模块�... | 6 |
+| [`doc_parse`](#doc_parse) | Parse documents (PDF/images/HTML) into text, LaTeX, or HTML table format | 7 |
 | [`drone`](#drone) | Control MAVLink-compatible drones (PX4/ArduPilot) via HTTP bridge. Supports arm/disarm, takeoff, land, RTL, waypoint ... | 17 |
+| [`engineer_skills`](#engineer_skills) | 预置工程技能包，覆盖前端/后端/DevOps/架构/安全/数据/信创七大领域共 24 项技能。支持�... | 5 |
 | [`evaluator`](#evaluator) | Evaluator agent that scores output against criteria with structured rubrics | 9 |
 | [`execute`](#execute) | Execute shell commands (disabled in safe mode) | 3 |
 | [`fastgpt`](#fastgpt) | Call FastGPT API | 5 |
@@ -35,25 +41,33 @@
 | [`internlm`](#internlm) | Call InternLM LLM API | 15 |
 | [`json_parse`](#json_parse) | Parse and extract JSON data | 1 |
 | [`kimi`](#kimi) | Call Kimi LLM API | 15 |
+| [`knowledge_graph`](#knowledge_graph) | Knowledge graph node - extract entities/relations, build graph, query and traverse | 13 |
 | [`llm_router`](#llm_router) | Smart LLM router that automatically selects the best provider with fallback, quota tracking, and cost optimization | 5 |
 | [`memory`](#memory) | AI Agent memory infrastructure with session-isolated persistent knowledge graph engine. Supports multi-session parall... | 16 |
 | [`mimo`](#mimo) | Call MiMo LLM API | 15 |
 | [`minimax`](#minimax) | Call MiniMax LLM API | 15 |
 | [`mistral`](#mistral) | Call Mistral LLM API | 15 |
+| [`multimodal`](#multimodal) | Multimodal node for image analysis, OCR, and audio transcription using vision-capable LLMs | 10 |
 | [`notify`](#notify) | Send notifications (stdout, stderr, slack, discord, telegram, webhook) | 10 |
+| [`office`](#office) | Read .docx/.xlsx/.pptx documents (text, tables, slides) using pure-Go OOXML parsing | 5 |
 | [`ollama`](#ollama) | Call Ollama local LLM server | 3 |
 | [`openai`](#openai) | Call OpenAI LLM API | 15 |
 | [`pipeline`](#pipeline) | Dependency-based parallel workflow executor: steps run as soon as their dependencies are met, no global barriers (Tun... | 2 |
 | [`planner`](#planner) | Task decomposition agent that breaks complex goals into actionable steps | 9 |
+| [`preference`](#preference) | User preference memory: store, retrieve, and learn user habits across sessions (MemSlides-inspired user profiling) | 7 |
 | [`qwen`](#qwen) | Call Qwen LLM API | 15 |
+| [`rag`](#rag) | Retrieval Augmented Generation node - chunk documents, search by query, and assemble context | 7 |
 | [`reflector`](#reflector) | Self-reflection agent that critiques output and iteratively improves it (Reflexion pattern) | 7 |
 | [`researcher`](#researcher) | Research agent that fetches information from URLs and summarizes findings | 7 |
 | [`search_aggregate`](#search_aggregate) | Multi-platform search aggregator with real-signal ranking: Reddit/Twitter/YouTube/HN/GitHub, sorted by votes/comments... | 8 |
 | [`session_manager`](#session_manager) | Multi-session memory management. Create isolated sessions, fork a session from a parent, merge sessions, and share fa... | 11 |
+| [`skill_distill`](#skill_distill) | Distill methodologies from books, videos, podcasts, and documents into callable skills. Supports workflow, decision, ... | 6 |
+| [`sql_query`](#sql_query) | Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1)... | 8 |
 | [`structured_output`](#structured_output) | LLM-driven structured output with local JSON Schema validation and self-correction retries | 11 |
 | [`supervisor`](#supervisor) | Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates | 13 |
 | [`template_render`](#template_render) | Render Go templates with input data | 2 |
 | [`transform`](#transform) | Transform text using string operations | 1 |
+| [`verify`](#verify) | Agent-as-a-Judge verifier that validates outputs, claims, and results against specified criteria | 10 |
 | [`xverse`](#xverse) | Call XVERSE LLM API | 15 |
 | [`yi`](#yi) | Call Yi LLM API | 15 |
 
@@ -214,6 +228,28 @@ Call Cambricon MLU LLM API
 
 ---
 
+## clarify
+
+Pre-execution ambiguity checker: identifies unclear requirements and generates clarifying questions (ACQUIRE framework)
+
+- **Input**: string - the task or goal to analyze for ambiguity
+- **Output**: string - JSON with clarification result: needs_clarification, questions, confidence, clarified_goal
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `provider` | string | No | ollama | LLM provider (default: ollama) |
+| `model` | string | No | llama3 | Model name (default: llama3) |
+| `api_key` | string | No |  | API key |
+| `endpoint` | string | No |  | API endpoint URL |
+| `threshold` | string | No | 70 | Confidence threshold 0-100, below this trigger clarification (default: 70) |
+| `max_questions` | string | No | 5 | Max clarification questions to ask (default: 5) |
+| `context` | string | No |  | Additional context about the task |
+| `user_answers` | string | No |  | JSON object of user's answers to previous questions (question -> answer) |
+
+---
+
 ## cli_session
 
 交互式CLI会话节点。支持上下文保持、命令历史、快捷键、流式输出和自动补全，提供类似Claude Code的流畅CLI体验。
@@ -250,6 +286,33 @@ Execute Python/Node.js/Rust code in a sandboxed environment with file I/O
 | `work_dir` | string | No |  | Working directory for code execution (default: temp dir) |
 | `save_outputs` | string | No | true | If true, save output files to work_dir (default: true) |
 | `network` | string | No | false | Allow network access during execution (L0/L1 only, default: false) |
+
+---
+
+## code_knowledge_graph
+
+Semantic code knowledge graph with vector retrieval, 158 language support, MCP tool exposure, and token-efficient review. Supports incremental updates and persistent indexing.
+
+- **Input**: string - optional query context or MCP tool call
+- **Output**: string - JSON format with entities, relations, concepts, query results, or MCP tool response
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `path` | string | Yes |  | Code path to analyze |
+| `mode` | string | No | build_and_query | Mode: build/build_and_query/query_only/incremental/mcp_tool (default: build_and_query) |
+| `query` | string | No |  | Query statement (text or vector) |
+| `query_type` | string | No | semantic | Query type: semantic/symbol/path/relation (default: semantic) |
+| `top_k` | int | No | 10 | Number of results to return (1-100, default: 10) |
+| `threshold` | float | No | 0.7 | Similarity threshold 0.0-1.0 (default: 0.7) |
+| `vector_dim` | int | No | 384 | Vector dimension (default: 384) |
+| `mcp_tool` | string | No |  | MCP tool to call: list_entities/search_graph/analyze_dependencies/get_entity_details/list_relations/generate_summary |
+| `entity_name` | string | No |  | Entity name for get_entity_details tool |
+| `token_efficient` | bool | No | true | Enable token-efficient review mode (default: true) |
+| `incremental_update` | bool | No | false | Use incremental update (only process changed files) |
+| `use_cache` | bool | No | true | Use persistent cache index (default: true) |
+| `force_rebuild` | bool | No | false | Force rebuild index from scratch (default: false) |
 
 ---
 
@@ -290,6 +353,27 @@ Combine multiple inputs into one
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `format` | string | No | text | Output format: text, markdown, csv, json (default: text) |
+
+---
+
+## compress
+
+Intelligent context compression with 6 algorithms: extractive, keyword, cluster, sliding_window, hybrid (headroom-inspired, 60-95% token reduction)
+
+- **Input**: string - text to compress
+- **Output**: string - compressed text with metadata
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `algorithm` | string | No | hybrid | extract|keyword|cluster|sliding_window|hybrid (default: hybrid) |
+| `ratio` | string | No | 0.2 | Target compression ratio 0.01-1.0, lower=more aggressive (default: 0.2) |
+| `max_chars` | string | No | 4000 | Maximum output characters (default: 4000) |
+| `preserve_headers` | string | No | true | Preserve section headers (default: true) |
+| `preserve_numbers` | string | No | true | Preserve sentences with numbers/stats (default: true) |
+| `output` | string | No | text | text|json|stats (default: text) |
+| `keywords` | string | No | 0 | Also extract top N keywords (default: 0) |
 
 ---
 
@@ -389,6 +473,47 @@ Call DeepSeek LLM API
 
 ---
 
+## doc_gen
+
+AI自动文档生成节点。自动生成和更新代码库文档，支持README、API文档、函数注释、模块文档、更新日志、教程和架构文档等多种类型，让代码库对AI Agent更友好。
+
+- **Input**: string - 代码内容或文档生成指令
+- **Output**: string - 生成的文档内容（markdown或JSON格式）
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `doc_type` | string | Yes |  | 文档类型：readme/api/function/module/changelog/tutorial/architecture |
+| `path` | string | Yes |  | 代码路径（相对工作目录） |
+| `language` | string | No | auto | 代码语言：go/python/javascript/typescript/auto（默认auto） |
+| `output_format` | string | No | markdown | 输出格式：markdown/json（默认markdown） |
+| `depth` | int | No | 3 | 文档深度1-5（默认3） |
+| `auto_update` | bool | No | false | 是否自动更新现有文档（默认false） |
+
+---
+
+## doc_parse
+
+Parse documents (PDF/images/HTML) into text, LaTeX, or HTML table format
+
+- **Input**: string - document text (source=text), base64-encoded image/PDF (source=base64), or URL (source=URL)
+- **Output**: string - parsed document content in the requested output format
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `source` | string | No | text | Input source type: text|base64|URL (default: text) |
+| `output_format` | string | No | text | Output format: text|latex|html_table (default: text) |
+| `extract_tables` | bool | No | false | Extract markdown tables and return their count/content (default: false) |
+| `extract_formulas` | bool | No | false | Extract LaTeX formulas ($...$, $$...$$) and return their list (default: false) |
+| `lang` | string | No | auto | Document language hint: zh|en|auto (default: auto, passed to OCR API) |
+| `api_endpoint` | string | No |  | OCR API endpoint URL (optional). When set with api_key, calls external OCR (e.g. OvisOCR2) |
+| `api_key` | string | No |  | OCR API key (optional) |
+
+---
+
 ## drone
 
 Control MAVLink-compatible drones (PX4/ArduPilot) via HTTP bridge. Supports arm/disarm, takeoff, land, RTL, waypoint mission upload, telemetry polling, patrol, survey, orbit, follow-me, and camera capture. Requires a MAVSDK server (drone_bridge.py) running on the drone's companion computer or ground station.
@@ -417,6 +542,25 @@ Control MAVLink-compatible drones (PX4/ArduPilot) via HTTP bridge. Supports arm/
 | `max_flight_time_s` | string | No | 300 | Maximum flight time in seconds (default: 300) |
 | `geofence_radius_m` | float | No | 200 | Geofence radius in meters (default: 200) |
 | `timeout` | string | No | 15 | HTTP request timeout in seconds (default: 15) |
+
+---
+
+## engineer_skills
+
+预置工程技能包，覆盖前端/后端/DevOps/架构/安全/数据/信创七大领域共 24 项技能。支持技能匹配、应用和版本管理。
+
+- **Input**: string - task description for skill matching
+- **Output**: string - JSON with skills information
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `action` | string | No | list | Action: list/match/apply/get (default: list) |
+| `skill_category` | string | No |  | Skill category: frontend/backend/devops/architecture |
+| `skill_name` | string | No |  | Skill name |
+| `task_description` | string | No |  | Task description for matching (max 5000 chars) |
+| `version` | string | No | 1.0.0 | Skill version |
 
 ---
 
@@ -782,6 +926,33 @@ Call Kimi LLM API
 
 ---
 
+## knowledge_graph
+
+Knowledge graph node - extract entities/relations, build graph, query and traverse
+
+- **Input**: string - text to extract knowledge from, or a query for an existing graph
+- **Output**: string - knowledge graph data or query results
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `action` | string | No | extract | Action: extract, extract_llm, query, traverse, stats, visualize (default: extract). extract_llm calls an LLM for higher-quality entity/relation extraction. |
+| `graph_path` | string | No |  | Path to save/load the graph JSON file |
+| `query` | string | No |  | Query for search/traverse (entity name or relation type) |
+| `max_depth` | string | No | 2 | Max traversal depth (default: 2) |
+| `top_k` | string | No | 10 | Max results to return (default: 10) |
+| `format` | string | No | markdown | Output format: json, markdown, mermaid (default: markdown) |
+| `provider` | string | No | openai | LLM provider for extract_llm (default: openai) |
+| `model` | string | No |  | LLM model name for extract_llm |
+| `api_key` | string | No |  | LLM API key for extract_llm (or set <PROVIDER>_API_KEY env var) |
+| `endpoint` | string | No |  | LLM API base URL for extract_llm |
+| `language` | string | No | en | Prompt language hint for extract_llm: en or zh (default: en) |
+| `session_id` | string | No |  | C-3: when set with memory_key, links extracted entities to that memory entry |
+| `memory_key` | string | No |  | C-3: memory entry key to link extracted entities to |
+
+---
+
 ## llm_router
 
 Smart LLM router that automatically selects the best provider with fallback, quota tracking, and cost optimization
@@ -918,6 +1089,30 @@ Call Mistral LLM API
 
 ---
 
+## multimodal
+
+Multimodal node for image analysis, OCR, and audio transcription using vision-capable LLMs
+
+- **Input**: string - the question or instruction about the media
+- **Output**: string - analysis result from the multimodal model
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `mode` | string | No | describe | Mode: image, ocr, describe, compare (default: describe) |
+| `image_path` | string | No |  | Path to image file (local path or URL) |
+| `image_paths` | string | No |  | Comma-separated paths for compare mode |
+| `lang` | string | No | eng+chi_sim | OCR languages for tesseract (default: eng+chi_sim) |
+| `provider` | string | No | openai | LLM provider with vision support (default: openai) |
+| `model` | string | No | gpt-4o | Vision model name (default: gpt-4o) |
+| `api_key` | string | No |  | API key |
+| `endpoint` | string | No |  | API endpoint |
+| `detail` | string | No | auto | Image detail level: low, high, auto (default: auto) |
+| `output_format` | string | No | markdown | Output format: text, json, markdown (default: markdown) |
+
+---
+
 ## notify
 
 Send notifications (stdout, stderr, slack, discord, telegram, webhook)
@@ -939,6 +1134,25 @@ Send notifications (stdout, stderr, slack, discord, telegram, webhook)
 | `method` | string | No | POST | HTTP method for webhook: GET/POST/PUT (default: POST) |
 | `headers` | string | No |  | JSON headers for webhook (optional) |
 | `body` | string | No |  | Custom body for webhook (optional) |
+
+---
+
+## office
+
+Read .docx/.xlsx/.pptx documents (text, tables, slides) using pure-Go OOXML parsing
+
+- **Input**: string - path to the office document (.docx/.xlsx/.pptx)
+- **Output**: string - extracted content in the requested output format
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `path` | string | No |  | Path to the office document (overrides input if set) |
+| `format` | string | No |  | Source format hint: docx|xlsx|pptx (default: inferred from extension) |
+| `output` | string | No | markdown | Output format: text|markdown|json (default: markdown) |
+| `sheet` | string | No |  | xlsx only: sheet name to read (default: all sheets) |
+| `max_rows` | int | No | 1000 | xlsx only: max rows per sheet (default: 1000, 0 = unlimited) |
 
 ---
 
@@ -1027,6 +1241,27 @@ Task decomposition agent that breaks complex goals into actionable steps
 
 ---
 
+## preference
+
+User preference memory: store, retrieve, and learn user habits across sessions (MemSlides-inspired user profiling)
+
+- **Input**: string - input depends on operation (value to set, key to get, etc.)
+- **Output**: string - result of the operation
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `operation` | string | No | get | get|set|learn|summary|category|prompt_addon (default: get) |
+| `user_id` | string | No | default | User identifier (default: default) |
+| `category` | string | No | custom | coding_style|output_format|model_choice|verbosity|language|safety|workflow|custom |
+| `key` | string | No |  | Preference key name |
+| `value` | string | No |  | Preference value (for set/learn operations) |
+| `confidence` | string | No |  | Confidence 0-1, default 0.6 for learn, 1.0 for set |
+| `source` | string | No | explicit | Where this preference came from (explicit|learned|config) |
+
+---
+
 ## qwen
 
 Call Qwen LLM API
@@ -1053,6 +1288,27 @@ Call Qwen LLM API
 | `tools` | string | No |  | JSON array of tool definitions for function calling |
 | `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
 | `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
+
+---
+
+## rag
+
+Retrieval Augmented Generation node - chunk documents, search by query, and assemble context
+
+- **Input**: string - the query to search for
+- **Output**: string - assembled context from relevant document chunks
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `source` | string | Yes |  | Source: file path, directory path, or text content |
+| `source_type` | string | No | auto | Type of source: file, dir, text (default: auto) |
+| `chunk_size` | string | No | 1000 | Chunk size in characters (default: 1000) |
+| `chunk_overlap` | string | No | 200 | Chunk overlap in characters (default: 200) |
+| `top_k` | string | No | 5 | Number of top chunks to retrieve (default: 5) |
+| `search_method` | string | No | keyword | Search method: keyword, hybrid (default: keyword) |
+| `include_metadata` | string | No | true | Include chunk metadata in output (default: true) |
 
 ---
 
@@ -1145,6 +1401,48 @@ Multi-session memory management. Create isolated sessions, fork a session from a
 
 ---
 
+## skill_distill
+
+Distill methodologies from books, videos, podcasts, and documents into callable skills. Supports workflow, decision, analysis, creative, prompt, and checklist skill types.
+
+- **Input**: string - source content to distill
+- **Output**: string - JSON with distilled skill structure
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `source_type` | string | No | article | Source type: book/video/podcast/article/documentation/conversation (default: article) |
+| `distill_type` | string | No | workflow | Distill type: workflow/decision/analysis/creative/prompt/checklist (default: workflow) |
+| `content` | string | No |  | Source content text (max 100000 chars) |
+| `skill_name` | string | No |  | Target skill name |
+| `max_steps` | int | No | 10 | Max number of steps (default: 10) |
+| `quality` | string | No | standard | Quality level: basic/standard/expert (default: standard) |
+
+---
+
+## sql_query
+
+Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1) to prevent SQL injection. Read-only by default (SELECT/SHOW/EXPLAIN/PRAGMA only); set read_only=false to allow DML/DDL. Supports a 'schema' action that lists tables and columns.
+
+- **Input**: string - SQL query (when action=query and no `sql` param, input is used as the query)
+- **Output**: string - JSON array of rows (query), or schema description (schema action)
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `action` | string | No | query | query (default) | schema | tables |
+| `driver` | string | Yes |  | database/sql driver name (e.g. sqlite3, postgres, mysql) |
+| `dsn` | string | Yes |  | Data source name (driver-specific). For SQLite: path to .db file. |
+| `sql` | string | No |  | SQL statement. Use ? (mysql/sqlite) or $1,$2 (postgres) placeholders for `args`. |
+| `args` | string | No |  | JSON array of bind parameters, e.g. ["foo", 42]. Optional. |
+| `read_only` | string | No | true | Reject writes if true (default). Set false to allow INSERT/UPDATE/DELETE/DDL. |
+| `max_rows` | string | No | 1000 | Max rows to return (default 1000). Protects against huge result sets. |
+| `timeout` | string | No | 30 | Query timeout in seconds (default 30). |
+
+---
+
 ## structured_output
 
 LLM-driven structured output with local JSON Schema validation and self-correction retries
@@ -1225,6 +1523,30 @@ Transform text using string operations
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `operation` | string | No |  | Transformation operation |
+
+---
+
+## verify
+
+Agent-as-a-Judge verifier that validates outputs, claims, and results against specified criteria
+
+- **Input**: string - the content to verify (used as claim if claim param is empty)
+- **Output**: string - verification result with pass/fail, score, or detailed analysis
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `provider` | string | No | ollama | LLM provider (default: ollama) |
+| `model` | string | No | llama3 | Model name (default: llama3) |
+| `api_key` | string | No |  | API key |
+| `endpoint` | string | No |  | API endpoint URL |
+| `claim` | string | No |  | The claim or output to verify |
+| `evidence` | string | No |  | Evidence or context to verify against |
+| `criteria` | string | No |  | Verification criteria (comma-separated or natural language) |
+| `verifier_type` | string | No | factual | Type: factual, code_correctness, security, logic, consistency, custom (default: factual) |
+| `output_format` | string | No | detailed | Output: pass_fail, score, detailed, json (default: detailed) |
+| `rubric` | string | No |  | Custom scoring rubric for verification (optional) |
 
 ---
 

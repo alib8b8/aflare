@@ -34,6 +34,10 @@ import (
 
 type MultimodalNode struct{}
 
+func init() {
+	Register(&MultimodalNode{})
+}
+
 func (n *MultimodalNode) Name() string {
 	return "multimodal"
 }

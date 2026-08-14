@@ -25,11 +25,11 @@ func TestBuiltinRegistry(t *testing.T) {
 	reg := NewRegistry()
 
 	pkgs := reg.List()
-	if len(pkgs) != 6 {
-		t.Fatalf("expected 6 builtin packages, got %d", len(pkgs))
+	if len(pkgs) != 5 {
+		t.Fatalf("expected 5 builtin packages, got %d", len(pkgs))
 	}
 
-	expected := []string{"arxiv-daily", "btc-monitor", "financial-aml", "github-alert", "habit-tracker", "unitree-patrol"}
+	expected := []string{"arxiv-daily", "btc-monitor", "financial-aml", "github-alert", "habit-tracker"}
 	for _, name := range expected {
 		pkg, err := reg.Get(name)
 		if err != nil || pkg == nil {
@@ -53,10 +53,11 @@ func TestSearch(t *testing.T) {
 		t.Fatalf("search 'finance' should return 2 results, got %d", len(results))
 	}
 
-	// Search by description
+	// Search by description (no builtin robot package remains after the
+	// fictional unitree_robot node was removed; "robot" now matches none).
 	results = reg.Search("robot")
-	if len(results) != 1 || results[0].Name != "unitree-patrol" {
-		t.Fatalf("search 'robot' should return 1 result, got %d", len(results))
+	if len(results) != 0 {
+		t.Fatalf("search 'robot' should return 0 results, got %d", len(results))
 	}
 
 	// No match
@@ -75,8 +76,8 @@ func TestListByCategory(t *testing.T) {
 	}
 
 	robot := reg.ListByCategory("robot")
-	if len(robot) != 1 {
-		t.Fatalf("expected 1 robot package, got %d", len(robot))
+	if len(robot) != 0 {
+		t.Fatalf("expected 0 robot packages (unitree-patrol removed), got %d", len(robot))
 	}
 
 	devops := reg.ListByCategory("devops")

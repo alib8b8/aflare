@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -225,8 +226,15 @@ func (a *AgentLoop) Process(ctx context.Context, input string, opts ProcessOptio
 		response = processedOutput
 	}
 
-	// Embed invisible watermark for content provenance
-	response = watermark.EncodeTextWithSuffix(response)
+	// Embed invisible watermark for content provenance. Disabled when
+	// AFLARE_WATERMARK_DISABLE=1 (e.g. for compliance-sensitive deployments
+	// where any extra metadata embedded in agent output — including the
+	// generation timestamp carried by the watermark payload — must not
+	// leak to downstream consumers). Default is enabled to preserve
+	// content-provenance guarantees.
+	if os.Getenv("AFLARE_WATERMARK_DISABLE") != "1" {
+		response = watermark.EncodeTextWithSuffix(response)
+	}
 
 	a.ctx.AddAssistant(response)
 	before, after := a.ctx.CompressIfNeeded()

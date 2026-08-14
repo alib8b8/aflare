@@ -26,6 +26,10 @@ import (
 
 type KnowledgeGraphNode struct{}
 
+func init() {
+	Register(&KnowledgeGraphNode{})
+}
+
 func (n *KnowledgeGraphNode) Name() string {
 	return "knowledge_graph"
 }

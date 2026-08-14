@@ -59,6 +59,10 @@ var validOfficeOutputs = map[string]bool{
 // of scope for this iteration; the node is read-only.
 type OfficeNode struct{}
 
+func init() {
+	Register(&OfficeNode{})
+}
+
 // Name returns the node name.
 func (n *OfficeNode) Name() string { return "office" }
 

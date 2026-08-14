@@ -35,7 +35,6 @@ Available Workflows (5)
   btc-monitor        finance    Monitor Bitcoin price movements and send alerts
   financial-aml      finance    AML transaction screening and risk scoring
   github-alert       devops     Aggregate GitHub activity and send daily digest
-  unitree-patrol     robot      Autonomous robot patrol with Unitree robot
 ```
 
 ### Search for workflows
@@ -82,7 +81,6 @@ aflare uninstall btc-monitor
 | `github-alert`   | devops    | Aggregate GitHub repo activity into daily digest          |
 | `arxiv-daily`    | research  | Fetch latest arXiv papers and generate AI summaries       |
 | `financial-aml`  | finance   | AML transaction screening with risk scoring               |
-| `unitree-patrol` | robot     | Autonomous patrol routine with Unitree robot              |
 
 ## Publishing Your Own Workflow
 
@@ -153,8 +151,7 @@ Installed workflows are stored in `~/.aflare/workflows/`:
       ├── btc-monitor.yaml
       ├── github-alert.yaml
       ├── arxiv-daily.yaml
-      ├── financial-aml.yaml
-      └── unitree-patrol.yaml
+      └── financial-aml.yaml
 ```
 
 Set `AFLARE_DATA` to override the base directory:

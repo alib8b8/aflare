@@ -291,10 +291,24 @@ func main() {
 echo '{"input": "test", "params": {"prefix": "Test: "}}' | python3 ~/.aflare/nodes/my_custom_node/main.py
 ```
 
-### Using aflare run-node
+### Testing via aflare
+
+There is no dedicated `run-node` command. Exercise a custom node by running a
+small workflow that calls it (the same mechanism `aflare run` uses for every
+node), or feed it stdin directly as shown in "Manual Testing" above.
+
+```yaml
+# test-custom-node.yaml
+name: test-custom-node
+steps:
+  - node: my_custom_node
+    params:
+      prefix: "Output: "
+    input: "Hello"
+```
 
 ```bash
-aflare run-node my_custom_node --input "Hello" --params '{"prefix": "Output: "}'
+aflare run test-custom-node.yaml
 ```
 
 ### Integration Testing
@@ -361,10 +375,12 @@ steps:
       api_key: "{{secret.api.service}}"
 ```
 
-**Note**: Sensitive parameters are filtered from the params passed to external nodes. Access secrets through environment variables instead:
+**Note**: Sensitive parameters are filtered from the params passed to external nodes. Access secrets through the `aflare secrets` CLI instead (positional args, not flags):
 
 ```bash
-SECRET=$(aflare secrets get --group api --key service)
+aflare secrets set api service sk-...      # store (prompts hidden if value omitted)
+aflare secrets get api service             # retrieve
+aflare secrets list                        # list groups/keys (values masked)
 ```
 
 ### Using Environment Variables

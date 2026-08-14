@@ -72,6 +72,10 @@ var validDocParseOutputFormats = map[string]bool{
 //     table/formula extraction without any external service.
 type DocParseNode struct{}
 
+func init() {
+	Register(&DocParseNode{})
+}
+
 // Name returns the node name.
 func (n *DocParseNode) Name() string { return "doc_parse" }
 

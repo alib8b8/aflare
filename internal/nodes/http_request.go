@@ -218,6 +218,11 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 		if err != nil {
 			return "", err
 		}
+		// http_request 也是出站流量：成功返回前上报响应体大小（best-effort，
+		// 监控器为 nil 即关闭时 no-op）。
+		if m := GetGlobalOutboundMonitor(); m != nil {
+			m.Record(len(result))
+		}
 		return result, nil
 	}
 
