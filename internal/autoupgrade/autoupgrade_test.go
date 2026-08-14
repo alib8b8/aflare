@@ -45,8 +45,11 @@ func TestNewUpgradeEngine(t *testing.T) {
 
 func TestGetDefaultConfig(t *testing.T) {
 	config := getDefaultConfig()
-	if config.Mode != ModeMonitor {
-		t.Errorf("expected mode %s, got %s", ModeMonitor, config.Mode)
+	// Default mode is manual: aflare must not phone home to GitHub from
+	// air-gapped or privacy-sensitive networks. Users who want release
+	// notifications must opt in via `mode: monitor` in autoupgrade.yaml.
+	if config.Mode != ModeManual {
+		t.Errorf("expected mode %s, got %s", ModeManual, config.Mode)
 	}
 	if config.AutoUpdateEnabled {
 		t.Error("expected AutoUpdateEnabled to be false (local-first default)")
@@ -66,8 +69,8 @@ func TestLoadConfig_NotFound(t *testing.T) {
 	if config == nil {
 		t.Fatal("expected non-nil config")
 	}
-	if config.Mode != ModeMonitor {
-		t.Errorf("expected default mode monitor, got %s", config.Mode)
+	if config.Mode != ModeManual {
+		t.Errorf("expected default mode manual (no phone-home), got %s", config.Mode)
 	}
 }
 
@@ -104,8 +107,8 @@ func TestLoadConfig_InvalidYAML(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if config.Mode != ModeMonitor {
-		t.Errorf("expected default mode monitor, got %s", config.Mode)
+	if config.Mode != ModeManual {
+		t.Errorf("expected default mode manual (no phone-home), got %s", config.Mode)
 	}
 }
 

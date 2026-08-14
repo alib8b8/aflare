@@ -724,3 +724,121 @@ func TestHTTPRedirectValidator_ValidatorError(t *testing.T) {
 		t.Fatal("expected error from validator, got nil")
 	}
 }
+
+// --- RedactSecrets (core 移植版) ---
+
+func TestRedactSecrets_NoMatch(t *testing.T) {
+	in := "just normal text no secrets"
+	out, hits := RedactSecrets(in, false)
+	if hits != 0 {
+		t.Errorf("no-match hits = %d, want 0", hits)
+	}
+	if out != in {
+		t.Errorf("no-match output changed: %q", out)
+	}
+}
+
+func TestRedactSecrets_AWSKey(t *testing.T) {
+	in := "key=AKIAABCDEFGHIJKLMNOP"
+	out, hits := RedactSecrets(in, false)
+	if hits < 1 {
+		t.Errorf("aws key hits = %d, want >=1", hits)
+	}
+	if strings.Contains(out, "AKIAABCDEFGHIJKLMNOP") {
+		t.Errorf("aws key not redacted: %s", out)
+	}
+	if !strings.Contains(out, "REDACTED") {
+		t.Errorf("expected REDACTED placeholder, got: %s", out)
+	}
+}
+
+func TestRedactSecrets_GitHubToken(t *testing.T) {
+	tok := "ghp_" + strings.Repeat("a", 36)
+	out, hits := RedactSecrets("token: "+tok, false)
+	if hits < 1 {
+		t.Errorf("github token hits = %d, want >=1", hits)
+	}
+	if strings.Contains(out, tok) {
+		t.Errorf("github token not redacted: %s", out)
+	}
+}
+
+func TestRedactSecrets_JWT(t *testing.T) {
+	in := "eyJ" + strings.Repeat("a", 12) + ".eyJ" + strings.Repeat("a", 12) + "." + strings.Repeat("a", 12)
+	_, hits := RedactSecrets(in, false)
+	if hits < 1 {
+		t.Errorf("jwt hits = %d, want >=1", hits)
+	}
+}
+
+func TestRedactSecrets_PrivateKey(t *testing.T) {
+	out, hits := RedactSecrets("-----BEGIN RSA PRIVATE KEY-----", false)
+	if hits < 1 {
+		t.Errorf("private key hits = %d, want >=1", hits)
+	}
+	if !strings.Contains(out, "REDACTED PRIVATE KEY") {
+		t.Errorf("private key not redacted: %s", out)
+	}
+}
+
+func TestRedactSecrets_WholeFile(t *testing.T) {
+	out, hits := RedactSecrets("some content", true)
+	if hits != 1 {
+		t.Errorf("wholeFile hits = %d, want 1", hits)
+	}
+	if !strings.Contains(out, "REDACTED") || !strings.Contains(out, "敏感文件") {
+		t.Errorf("wholeFile output unexpected: %s", out)
+	}
+}
+
+func TestRedactSecrets_Truncation(t *testing.T) {
+	huge := strings.Repeat("A", MaxRedactInputSize+100)
+	out, _ := RedactSecrets(huge, false)
+	if len(out) > MaxRedactInputSize {
+		t.Errorf("output length %d exceeds max %d", len(out), MaxRedactInputSize)
+	}
+}
+
+// --- MaybeRedactLLMSecrets (opt-in) ---
+
+func TestMaybeRedactLLMSecrets_DisabledByDefault(t *testing.T) {
+	// 不设置 AFLARE_LLM_REDACT_SECRETS：原样返回
+	t.Setenv("AFLARE_LLM_REDACT_SECRETS", "")
+	in := "token: ghp_" + strings.Repeat("a", 36)
+	sys := "AKIAABCDEFGHIJKLMNOP"
+	ri, rs := MaybeRedactLLMSecrets("TestProvider", in, sys)
+	if ri != in || rs != sys {
+		t.Errorf("disabled redaction should be no-op: ri changed=%v rs changed=%v", ri != in, rs != sys)
+	}
+}
+
+func TestMaybeRedactLLMSecrets_Enabled(t *testing.T) {
+	t.Setenv("AFLARE_LLM_REDACT_SECRETS", "1")
+	tokBody := strings.Repeat("a", 36)
+	in := "token: ghp_" + tokBody
+	sys := "key AKIAABCDEFGHIJKLMNOP"
+	ri, rs := MaybeRedactLLMSecrets("TestProvider", in, sys)
+	if ri == in {
+		t.Errorf("input should be redacted when enabled")
+	}
+	if rs == sys {
+		t.Errorf("system should be redacted when enabled")
+	}
+	// mask 保留 "ghp_" 前缀但替换主体，因此 token 主体（36 个 a）必须消失
+	if strings.Contains(ri, tokBody) {
+		t.Errorf("input still contains github token body: %s", ri)
+	}
+	if strings.Contains(rs, "AKIAABCDEFGHIJKLMNOP") {
+		t.Errorf("system still contains aws key: %s", rs)
+	}
+}
+
+func TestMaybeRedactLLMSecrets_EnabledNoSecrets(t *testing.T) {
+	t.Setenv("AFLARE_LLM_REDACT_SECRETS", "1")
+	in := "just a normal prompt"
+	sys := "be helpful"
+	ri, rs := MaybeRedactLLMSecrets("TestProvider", in, sys)
+	if ri != in || rs != sys {
+		t.Errorf("no-secret redaction should be no-op")
+	}
+}

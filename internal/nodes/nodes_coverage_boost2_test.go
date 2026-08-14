@@ -856,3 +856,102 @@ func TestFormatMultimodalOutput(t *testing.T) {
 		t.Errorf("unknown format should default to markdown, got: %s", out)
 	}
 }
+
+// ----------------------------------------------------------------------------
+// secretdetect.go: GetGlobalOutboundMonitor / newGlobalOutboundMonitorFromEnv
+// ----------------------------------------------------------------------------
+
+func TestNewGlobalOutboundMonitorFromEnv_Default(t *testing.T) {
+	// 显式清空，确保使用默认值（不被其他测试残留 env 影响）
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_DISABLE", "")
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_BASELINE_BYTES", "")
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_MULTIPLIER", "")
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_WINDOW", "")
+
+	m := newGlobalOutboundMonitorFromEnv()
+	if m == nil {
+		t.Fatal("expected non-nil monitor with default env, got nil")
+	}
+	if m.windowDuration != 60*time.Second {
+		t.Errorf("windowDuration = %v, want 60s", m.windowDuration)
+	}
+	if m.baselineBytes != 1024*1024 {
+		t.Errorf("baselineBytes = %d, want 1MB", m.baselineBytes)
+	}
+	if m.anomalyMultiplier != 100 {
+		t.Errorf("anomalyMultiplier = %d, want 100", m.anomalyMultiplier)
+	}
+	if m.anomalyThreshold != m.baselineBytes*m.anomalyMultiplier {
+		t.Errorf("anomalyThreshold = %d, want %d", m.anomalyThreshold, m.baselineBytes*m.anomalyMultiplier)
+	}
+}
+
+func TestNewGlobalOutboundMonitorFromEnv_Disabled(t *testing.T) {
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_DISABLE", "1")
+	if m := newGlobalOutboundMonitorFromEnv(); m != nil {
+		t.Errorf("expected nil when disabled, got %+v", m)
+	}
+	// "true" 也应关闭
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_DISABLE", "true")
+	if m := newGlobalOutboundMonitorFromEnv(); m != nil {
+		t.Errorf("expected nil when disabled=true, got %+v", m)
+	}
+}
+
+func TestNewGlobalOutboundMonitorFromEnv_CustomParams(t *testing.T) {
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_DISABLE", "")
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_BASELINE_BYTES", "2048")
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_MULTIPLIER", "7")
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_WINDOW", "2m")
+
+	m := newGlobalOutboundMonitorFromEnv()
+	if m == nil {
+		t.Fatal("expected non-nil monitor, got nil")
+	}
+	if m.windowDuration != 2*time.Minute {
+		t.Errorf("windowDuration = %v, want 2m", m.windowDuration)
+	}
+	if m.baselineBytes != 2048 {
+		t.Errorf("baselineBytes = %d, want 2048", m.baselineBytes)
+	}
+	if m.anomalyMultiplier != 7 {
+		t.Errorf("anomalyMultiplier = %d, want 7", m.anomalyMultiplier)
+	}
+	if m.anomalyThreshold != 2048*7 {
+		t.Errorf("anomalyThreshold = %d, want %d", m.anomalyThreshold, 2048*7)
+	}
+}
+
+func TestNewGlobalOutboundMonitorFromEnv_InvalidParamsFallBack(t *testing.T) {
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_DISABLE", "")
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_BASELINE_BYTES", "not-a-number")
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_MULTIPLIER", "-5")
+	t.Setenv("AFLARE_OUTBOUND_MONITOR_WINDOW", "badduration")
+
+	m := newGlobalOutboundMonitorFromEnv()
+	if m == nil {
+		t.Fatal("expected non-nil monitor with fallback defaults, got nil")
+	}
+	if m.baselineBytes != 1024*1024 {
+		t.Errorf("invalid baseline should fall back to default, got %d", m.baselineBytes)
+	}
+	if m.anomalyMultiplier != 100 {
+		t.Errorf("invalid multiplier should fall back to default, got %d", m.anomalyMultiplier)
+	}
+	if m.windowDuration != 60*time.Second {
+		t.Errorf("invalid window should fall back to default, got %v", m.windowDuration)
+	}
+}
+
+func TestGetGlobalOutboundMonitor_Singleton(t *testing.T) {
+	// sync.Once 在进程 init 时已触发（默认 env）；两次调用应返回同一指针。
+	a := GetGlobalOutboundMonitor()
+	b := GetGlobalOutboundMonitor()
+	if a != b {
+		t.Errorf("GetGlobalOutboundMonitor should return the same pointer (singleton)")
+	}
+	// 默认未禁用时应非 nil
+	if a == nil {
+		t.Errorf("expected non-nil monitor by default (env not disabled at init)")
+	}
+}

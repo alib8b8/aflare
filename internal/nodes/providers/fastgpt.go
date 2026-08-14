@@ -129,6 +129,8 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 	}
 
 	systemPrompt, _ := params["system"]
+	// Opt-in LLM 出口密钥脱敏（AFLARE_LLM_REDACT_SECRETS=1，默认关闭）。
+	input, systemPrompt = core.MaybeRedactLLMSecrets("FastGPT", input, systemPrompt)
 	messages := []fastGPTMessage{}
 	if systemPrompt != "" {
 		messages = append(messages, fastGPTMessage{Role: "system", Content: systemPrompt})
@@ -176,7 +178,11 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 	}
 
 	if stream {
-		return n.readStreamResponse(resp, onChunk)
+		out, err := n.readStreamResponse(resp, onChunk)
+		if err == nil {
+			core.RecordOutbound(len(out))
+		}
+		return out, err
 	}
 
 	var fgResp fastGPTResponse
@@ -188,6 +194,7 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 		return "", fmt.Errorf("no choices in FastGPT response")
 	}
 
+	core.RecordOutbound(len(fgResp.Choices[0].Message.Content))
 	return fgResp.Choices[0].Message.Content, nil
 }
 

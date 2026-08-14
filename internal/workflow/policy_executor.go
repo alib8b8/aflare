@@ -84,6 +84,21 @@ func (pe *PolicyExecutor) validateStep(ctx context.Context, index int, step *Wor
 			return fmt.Errorf("network access not allowed: %w", err)
 		}
 
+	case isLLMProviderNode(step.Node):
+		// LLM provider calls are outbound HTTP too: route them through the
+		// network policy so `outbound: denied` or `allowlist` actually
+		// blocks prompt exfiltration to cloud LLM endpoints. Previously
+		// LLM traffic bypassed policy_engine entirely, which broke the
+		// "禁止外发" (no egress) promise for privacy-sensitive users.
+		endpoint := ""
+		if step.Params != nil {
+			endpoint = step.Params["endpoint"]
+		}
+		_, err := pe.policyEngine.Check(ctx, policy.ActionNetworkHTTP, endpoint)
+		if err != nil {
+			return fmt.Errorf("LLM provider endpoint not allowed by network policy: %w", err)
+		}
+
 	case step.Node == "file_write" || step.Node == "file_save":
 		_, err := pe.policyEngine.Check(ctx, policy.ActionFileWrite, step.Node)
 		if err != nil {
@@ -157,4 +172,45 @@ func (pe *PolicyExecutor) WithCheckpoint(path string) *PolicyExecutor {
 func (pe *PolicyExecutor) WithProgress(cb StepProgressFunc) *PolicyExecutor {
 	pe.Executor = pe.Executor.WithProgress(cb)
 	return pe
+}
+
+// llmProviderNodes is the set of node names that perform outbound LLM API
+// calls. PolicyExecutor routes these through the network policy so a
+// `denied` or `allowlist` outbound rule actually blocks prompt
+// exfiltration to cloud LLM endpoints. The list must stay in sync with
+// internal/nodes/providers (OpenAI-compatible table + Ollama + FastGPT)
+// and the llm_router node.
+var llmProviderNodes = map[string]struct{}{
+	// OpenAI-compatible providers (see providers/openai_compatible.go)
+	"openai":    {},
+	"anthropic": {},
+	"gemini":    {},
+	"glm":       {},
+	"kimi":      {},
+	"qwen":      {},
+	"deepseek":  {},
+	"mistral":   {},
+	"yi":        {},
+	"baichuan":  {},
+	"internlm":  {},
+	"minimax":   {},
+	"xverse":    {},
+	"mimo":      {},
+	"coze":      {},
+	"ima":       {},
+	"ascend":    {},
+	"cambricon": {},
+	"hygon":     {},
+	// Independent provider implementations
+	"ollama":  {},
+	"fastgpt": {},
+	// Router node fans out to providers; treat as LLM egress too
+	"llm_router": {},
+}
+
+// isLLMProviderNode reports whether the given node name is an LLM provider
+// (or the LLM router), and therefore subject to the network policy.
+func isLLMProviderNode(name string) bool {
+	_, ok := llmProviderNodes[name]
+	return ok
 }

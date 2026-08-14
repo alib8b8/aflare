@@ -16,10 +16,14 @@
 package nodes
 
 import (
-	"regexp"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
 // secretdetect.go — 密钥脱敏与出站数据量监控
@@ -29,43 +33,15 @@ import (
 //   1. 文件读取时自动识别并脱敏常见密钥格式（API Key / Token / 密码）
 //   2. .env / .env.* / 含密钥特征的文件按整文件脱敏
 //   3. 出站数据量监控：追踪累计发送字节，异常倍数告警
+//
+// 密钥模式识别与 RedactSecrets 的实现已下沉到 internal/nodes/core
+// （core/security.go），以便 LLM 出口路径（package core 与 providers）
+// 在不引入循环依赖的前提下复用同一份脱敏逻辑；本文件的 RedactSecrets
+// 委托到 core.RedactSecrets，保持原有公开 API 不变。
 
 // ------------------------------------------------------------
-// 密钥模式识别
+// 敏感文件名识别
 // ------------------------------------------------------------
-
-// secretPattern 描述一类密钥的识别规则
-type secretPattern struct {
-	name    string
-	pattern *regexp.Regexp
-	mask    string // 脱敏后的占位符
-}
-
-// 常见密钥格式（高置信度，避免误伤普通文本）
-// 设计原则：仅匹配明显具备密钥特征的字符串（长随机串 + 前缀/结构），
-// 不做宽泛匹配以免破坏正常代码内容。
-var secretPatterns = []secretPattern{
-	// AWS Access Key ID：20位大写字母数字，AKIA 开头
-	{name: "aws_access_key", pattern: regexp.MustCompile(`AKIA[0-9A-Z]{16}`), mask: "AKIA[REDACTED]"},
-	// AWS Secret Access Key：40位 base64，通常跟在 = 后
-	{name: "aws_secret", pattern: regexp.MustCompile(`(?i)aws_secret_access_key["'\s:=]+([A-Za-z0-9/+=]{40})`), mask: "aws_secret_access_key=[REDACTED]"},
-	// GitHub Personal Access Token：ghp_/gho_/ghu_/ghs_/ghr_ + 36位
-	{name: "github_token", pattern: regexp.MustCompile(`gh[posur]_[A-Za-z0-9]{36}`), mask: "ghp_[REDACTED]"},
-	// GitLab Token：glpat- + 20位
-	{name: "gitlab_token", pattern: regexp.MustCompile(`glpat-[A-Za-z0-9_-]{20}`), mask: "glpat-[REDACTED]"},
-	// Slack Token：xox[baprs]- + 10+位
-	{name: "slack_token", pattern: regexp.MustCompile(`xox[baprs]-[A-Za-z0-9-]{10,}`), mask: "xox-[REDACTED]"},
-	// Generic API Key：key/api_key 后跟 32+ 位十六进制或 base64
-	{name: "generic_api_key", pattern: regexp.MustCompile(`(?i)(api[_-]?key|secret[_-]?key)["'\s:=]+([A-Za-z0-9+/=_-]{32,})`), mask: "${1}=[REDACTED]"},
-	// Bearer Token
-	{name: "bearer_token", pattern: regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9+/=_-]{20,}`), mask: "bearer [REDACTED]"},
-	// 私钥头
-	{name: "private_key", pattern: regexp.MustCompile(`-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----`), mask: "-----BEGIN [REDACTED PRIVATE KEY]-----"},
-	// JWT（三段式）
-	{name: "jwt", pattern: regexp.MustCompile(`eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}`), mask: "eyJ[REDACTED].eyJ[REDACTED].[REDACTED]"},
-	// 数据库连接串中的密码 password=xxx
-	{name: "db_password", pattern: regexp.MustCompile(`(?i)(postgres|mysql|mongodb|redis)://[^:]+:([^@]{3,})@`), mask: "${1}://[REDACTED]:[REDACTED]@"},
-}
 
 // 整文件脱敏的文件名特征（不区分大小写）
 var sensitiveFileNamePatterns = []string{
@@ -132,39 +108,11 @@ const MaxRedactInputSize = 10 * 1024 * 1024 // 10MB
 //   - 否则逐条密钥模式匹配替换为占位符
 //
 // wholeFile=true 适用于 .env / 私钥等文件，避免逐行处理泄露结构信息。
+//
+// 实现已下沉到 core.RedactSecrets（见 core/security.go），此处委托以保持
+// 原有公开 API（file_read 等调用方）不变，并避免与 core 重复维护密钥模式。
 func RedactSecrets(content string, wholeFile bool) (string, int) {
-	if len(content) > MaxRedactInputSize {
-		// 超长内容截断后再脱敏，防止正则 DoS
-		content = content[:MaxRedactInputSize]
-	}
-
-	if wholeFile {
-		return "[REDACTED: 敏感文件内容已隐藏，共 " + formatBytes(len(content)) + "]", 1
-	}
-
-	masked := content
-	totalHits := 0
-	for _, sp := range secretPatterns {
-		// 限制单模式替换次数，防止异常输入导致过度回溯
-		matches := sp.pattern.FindAllStringSubmatchIndex(masked, 64)
-		if len(matches) == 0 {
-			continue
-		}
-		// 从后往前替换，避免索引偏移
-		mask := sp.mask
-		for i := len(matches) - 1; i >= 0; i-- {
-			m := matches[i]
-			// 若 mask 含 ${1} 占位（保留前缀），用分组替换
-			if strings.Contains(mask, "${1}") && len(m) >= 4 {
-				replacement := strings.ReplaceAll(mask, "${1}", masked[m[2]:m[3]])
-				masked = masked[:m[0]] + replacement + masked[m[1]:]
-			} else {
-				masked = masked[:m[0]] + mask + masked[m[1]:]
-			}
-			totalHits++
-		}
-	}
-	return masked, totalHits
+	return core.RedactSecrets(content, wholeFile)
 }
 
 // formatBytes 友好格式化字节数
@@ -321,4 +269,90 @@ func (m *OutboundDataMonitor) Snapshot() OutboundStats {
 		WindowStart:  time.Unix(0, m.windowStart),
 		WindowActive: time.Duration(now - m.windowStart),
 	}
+}
+
+// ------------------------------------------------------------
+// 全局出站数据监控器（singleton）
+// ------------------------------------------------------------
+//
+// OutboundDataMonitor 之前没有任何生产代码调用——README 宣称的"出站数据量
+// 异常监控"形同虚设。这里提供一个进程级 singleton，供 LLM 出口与 HTTP 出口
+// 节点统一上报出站字节数；当窗口内发送量超过基准的指定倍数时打 Warn 日志。
+//
+// core 与 providers 无法直接 import nodes（会循环依赖），因此 nodes 在 init
+// 时把本 singleton 通过 core.SetGlobalOutboundRecorder 注入到 core，core 与
+// providers 改用 core.RecordOutbound 上报。
+
+const (
+	envOutboundMonitorDisable       = "AFLARE_OUTBOUND_MONITOR_DISABLE"
+	envOutboundMonitorBaselineBytes = "AFLARE_OUTBOUND_MONITOR_BASELINE_BYTES"
+	envOutboundMonitorMultiplier    = "AFLARE_OUTBOUND_MONITOR_MULTIPLIER"
+	envOutboundMonitorWindow        = "AFLARE_OUTBOUND_MONITOR_WINDOW"
+
+	defaultOutboundWindow        = 60 * time.Second
+	defaultOutboundBaselineBytes = int64(1024 * 1024) // 1MB
+	defaultOutboundMultiplier    = int64(100)
+)
+
+var (
+	globalOutboundMonitorOnce sync.Once
+	globalOutboundMonitor     *OutboundDataMonitor
+)
+
+// newGlobalOutboundMonitorFromEnv 根据环境变量构造一个监控器；当
+// AFLARE_OUTBOUND_MONITOR_DISABLE=1 时返回 nil。每次调用都重新读取环境变量，
+// 便于单元测试；进程级 singleton（GetGlobalOutboundMonitor）通过 sync.Once
+// 缓存首次结果。
+func newGlobalOutboundMonitorFromEnv() *OutboundDataMonitor {
+	if v := strings.ToLower(strings.TrimSpace(os.Getenv(envOutboundMonitorDisable))); v == "1" || v == "true" {
+		return nil
+	}
+
+	window := defaultOutboundWindow
+	if raw := os.Getenv(envOutboundMonitorWindow); raw != "" {
+		if d, err := time.ParseDuration(raw); err == nil && d > 0 {
+			window = d
+		}
+	}
+
+	baseline := defaultOutboundBaselineBytes
+	if raw := os.Getenv(envOutboundMonitorBaselineBytes); raw != "" {
+		if n, err := strconv.ParseInt(raw, 10, 64); err == nil && n > 0 {
+			baseline = n
+		}
+	}
+
+	multiplier := defaultOutboundMultiplier
+	if raw := os.Getenv(envOutboundMonitorMultiplier); raw != "" {
+		if n, err := strconv.ParseInt(raw, 10, 64); err == nil && n > 0 {
+			multiplier = n
+		}
+	}
+
+	return NewOutboundDataMonitor(window, baseline, multiplier, func(s OutboundStats) {
+		// 用 internal/logger 打 Warn（不用标准 log）。OutboundDataMonitor.Record
+		// 已在异步 goroutine 中 recover，回调 panic 不会影响主流程。
+		logger.Warn("[security] outbound data anomaly detected",
+			"window_bytes", s.WindowBytes,
+			"baseline", s.Baseline,
+			"ratio", s.Ratio,
+		)
+	})
+}
+
+// GetGlobalOutboundMonitor 返回进程级出站数据监控器 singleton，首次调用时
+// 根据 AFLARE_OUTBOUND_MONITOR_* 环境变量初始化。当
+// AFLARE_OUTBOUND_MONITOR_DISABLE=1 时返回 nil（监控关闭）。结果通过
+// sync.Once 缓存整个进程生命周期，请在进程启动前设置环境变量。
+func GetGlobalOutboundMonitor() *OutboundDataMonitor {
+	globalOutboundMonitorOnce.Do(func() {
+		globalOutboundMonitor = newGlobalOutboundMonitorFromEnv()
+	})
+	return globalOutboundMonitor
+}
+
+func init() {
+	// 把 nodes 拥有的 monitor 注入 core，使 core 与 providers 能通过
+	// core.RecordOutbound 上报出站字节，避免 core 反向 import nodes。
+	core.SetGlobalOutboundRecorder(GetGlobalOutboundMonitor())
 }

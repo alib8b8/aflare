@@ -90,6 +90,10 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 		prompt = input
 	}
 
+	// Opt-in LLM 出口密钥脱敏（AFLARE_LLM_REDACT_SECRETS=1，默认关闭）。
+	// Ollama 无 system 概念，仅对 prompt 脱敏。
+	prompt, _ = core.MaybeRedactLLMSecrets("Ollama", prompt, "")
+
 	// Validate endpoint URL to prevent SSRF (localhost is allowed for Ollama)
 	if err := core.ValidateLMLEndpoint(endpoint); err != nil {
 		return "", fmt.Errorf("endpoint URL validation failed: %w", err)
@@ -131,7 +135,11 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 	}
 
 	if stream {
-		return n.readStreamResponse(resp, onChunk)
+		out, err := n.readStreamResponse(resp, onChunk)
+		if err == nil {
+			core.RecordOutbound(len(out))
+		}
+		return out, err
 	}
 
 	var ollamaResp ollamaResponse
@@ -139,6 +147,7 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 		return "", fmt.Errorf("failed to parse ollama response: %w", err)
 	}
 
+	core.RecordOutbound(len(ollamaResp.Response))
 	return ollamaResp.Response, nil
 }
 

@@ -28,6 +28,7 @@ import (
 
 	"github.com/alib8b8/aflare/internal/config"
 	"github.com/alib8b8/aflare/internal/httpclient"
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 var (
@@ -522,4 +523,112 @@ const MaxHTTPResponseSize = 10 * 1024 * 1024 // 10MB
 // GetWorkDir returns the cached working directory used for path validation.
 func GetWorkDir() string {
 	return workDir
+}
+
+// ------------------------------------------------------------
+// LLM 出口密钥脱敏（opt-in）
+// ------------------------------------------------------------
+//
+// 这部分是 nodes.RedactSecrets 的核心逻辑下沉：LLM 出口路径（package core
+// 以及子包 providers）需要对 prompt 做密钥脱敏，但 core 不能 import nodes
+// （nodes 已 import core，会形成循环依赖）。因此把密钥模式与 RedactSecrets
+// 实现放在 core，nodes.RedactSecrets 改为委托此处，避免重复代码。
+
+// MaxRedactInputSize limits redact input length to avoid regex backtracking.
+const MaxRedactInputSize = 10 * 1024 * 1024 // 10MB
+
+// secretPattern 描述一类密钥的识别规则。
+type secretPattern struct {
+	name    string
+	pattern *regexp.Regexp
+	mask    string // 脱敏后的占位符
+}
+
+// secretPatterns 常见密钥格式（高置信度，避免误伤普通文本）。
+var secretPatterns = []secretPattern{
+	{name: "aws_access_key", pattern: regexp.MustCompile(`AKIA[0-9A-Z]{16}`), mask: "AKIA[REDACTED]"},
+	{name: "aws_secret", pattern: regexp.MustCompile(`(?i)aws_secret_access_key["'\s:=]+([A-Za-z0-9/+=]{40})`), mask: "aws_secret_access_key=[REDACTED]"},
+	{name: "github_token", pattern: regexp.MustCompile(`gh[posur]_[A-Za-z0-9]{36}`), mask: "ghp_[REDACTED]"},
+	{name: "gitlab_token", pattern: regexp.MustCompile(`glpat-[A-Za-z0-9_-]{20}`), mask: "glpat-[REDACTED]"},
+	{name: "slack_token", pattern: regexp.MustCompile(`xox[baprs]-[A-Za-z0-9-]{10,}`), mask: "xox-[REDACTED]"},
+	{name: "generic_api_key", pattern: regexp.MustCompile(`(?i)(api[_-]?key|secret[_-]?key)["'\s:=]+([A-Za-z0-9+/=_-]{32,})`), mask: "${1}=[REDACTED]"},
+	{name: "bearer_token", pattern: regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9+/=_-]{20,}`), mask: "bearer [REDACTED]"},
+	{name: "private_key", pattern: regexp.MustCompile(`-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----`), mask: "-----BEGIN [REDACTED PRIVATE KEY]-----"},
+	{name: "jwt", pattern: regexp.MustCompile(`eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}`), mask: "eyJ[REDACTED].eyJ[REDACTED].[REDACTED]"},
+	{name: "db_password", pattern: regexp.MustCompile(`(?i)(postgres|mysql|mongodb|redis)://[^:]+:([^@]{3,})@`), mask: "${1}://[REDACTED]:[REDACTED]@"},
+}
+
+// RedactSecrets 对文本内容进行密钥脱敏，返回脱敏后的内容与命中的密钥数量。
+//   - 若 wholeFile 为 true，则整文件标记为 [REDACTED]（适用于 .env / 私钥等）
+//   - 否则逐条密钥模式匹配替换为占位符
+//
+// 这是 nodes.RedactSecrets 的实现：core 与 providers 通过它脱敏 LLM 出口
+// prompt，nodes.RedactSecrets 委托到此以避免重复代码。
+func RedactSecrets(content string, wholeFile bool) (string, int) {
+	if len(content) > MaxRedactInputSize {
+		// 超长内容截断后再脱敏，防止正则 DoS
+		content = content[:MaxRedactInputSize]
+	}
+
+	if wholeFile {
+		return fmt.Sprintf("[REDACTED: 敏感文件内容已隐藏，共 %d 字节]", len(content)), 1
+	}
+
+	masked := content
+	totalHits := 0
+	for _, sp := range secretPatterns {
+		// 限制单模式替换次数，防止异常输入导致过度回溯
+		matches := sp.pattern.FindAllStringSubmatchIndex(masked, 64)
+		if len(matches) == 0 {
+			continue
+		}
+		// 从后往前替换，避免索引偏移
+		mask := sp.mask
+		for i := len(matches) - 1; i >= 0; i-- {
+			m := matches[i]
+			// 若 mask 含 ${1} 占位（保留前缀），用分组替换
+			if strings.Contains(mask, "${1}") && len(m) >= 4 {
+				replacement := strings.ReplaceAll(mask, "${1}", masked[m[2]:m[3]])
+				masked = masked[:m[0]] + replacement + masked[m[1]:]
+			} else {
+				masked = masked[:m[0]] + mask + masked[m[1]:]
+			}
+			totalHits++
+		}
+	}
+	return masked, totalHits
+}
+
+// LLMRedactEnv 是开启 LLM 出口密钥脱敏的环境变量。
+const LLMRedactEnv = "AFLARE_LLM_REDACT_SECRETS"
+
+// llmRedactEnabled 报告是否开启了 LLM 出口密钥脱敏（opt-in，默认关闭）。
+func llmRedactEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(LLMRedactEnv))) {
+	case "1", "true":
+		return true
+	}
+	return false
+}
+
+// MaybeRedactLLMSecrets 在 AFLARE_LLM_REDACT_SECRETS=1 时对 input 与
+// systemPrompt 调用 RedactSecrets 进行脱敏，返回（可能已脱敏的）input 与
+// systemPrompt。未开启时原样返回。发生脱敏时打一条 Info 日志，包含 provider
+// 名称与命中计数，绝不记录原始 secret 内容。
+//
+// 供 core/llm_base.go 与 providers（ollama/fastgpt）在构造 messages 之前
+// 调用，确保 prompt 里的 secret 不会原样发给 LLM 服务商。
+func MaybeRedactLLMSecrets(providerName, input, systemPrompt string) (string, string) {
+	if !llmRedactEnabled() {
+		return input, systemPrompt
+	}
+	ri, hi := RedactSecrets(input, false)
+	rs, hs := RedactSecrets(systemPrompt, false)
+	if total := hi + hs; total > 0 {
+		logger.Info("[security] LLM egress secrets redacted",
+			"provider", providerName,
+			"redacted_count", total,
+		)
+	}
+	return ri, rs
 }
