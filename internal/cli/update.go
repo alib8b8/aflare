@@ -113,9 +113,21 @@ func CheckUpdateNotice() string {
 //
 // This implements the 断点17 startup hint: "aflare vX.Y.Z (有新版本 vX.Y.Z，
 // 运行 aflare upgrade 更新)".
+//
+// Default is OFF. aflare's audience is local-first / data-sensitive users
+// who should not phone-home to api.github.com on every launch. Opt in by
+// setting AFLARE_UPDATE_CHECK=1 (any non-empty value). The legacy
+// AFLARE_NO_UPDATE_CHECK is still respected as a redundant opt-out.
+// Manual `aflare self-update` always works regardless of these flags.
 func PrintUpdateNoticeAsync(w io.Writer, timeout time.Duration) {
 	if timeout <= 0 {
 		return
+	}
+	if os.Getenv("AFLARE_NO_UPDATE_CHECK") != "" {
+		return
+	}
+	if os.Getenv("AFLARE_UPDATE_CHECK") == "" {
+		return // default off for local-first / data-sensitive users
 	}
 	type result struct{ notice string }
 	ch := make(chan result, 1)

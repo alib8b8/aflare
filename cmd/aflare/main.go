@@ -60,12 +60,22 @@ func main() {
 		}
 	}()
 
-	// Load community plugins from ~/.config/aflare/plugins/*.so
+	// Load community plugins from ~/.config/aflare/plugins/*.so.
+	// Opt-out via AFLARE_NO_PLUGINS for air-gapped / data-sensitive
+	// deployments where auto-loading .so files is an unwanted code-exec
+	// surface. We also lock the dir to 0700 on first use so only the owner
+	// can drop plugins.
 	pluginMgr := plugins.NewPluginManager()
-	if n, err := plugins.LoadDir(plugins.DefaultPluginDir(), pluginMgr); err != nil {
-		log.Printf("[main] plugin loading: %v", err)
-	} else if n > 0 {
-		log.Printf("[main] loaded %d plugin(s)", n)
+	if os.Getenv("AFLARE_NO_PLUGINS") == "" {
+		pluginDir := plugins.DefaultPluginDir()
+		if err := plugins.EnsurePluginDirSecure(pluginDir); err != nil {
+			log.Printf("[main] plugin dir security: %v", err)
+		}
+		if n, err := plugins.LoadDir(pluginDir, pluginMgr); err != nil {
+			log.Printf("[main] plugin loading: %v", err)
+		} else if n > 0 {
+			log.Printf("[main] loaded %d plugin(s)", n)
+		}
 	}
 
 	if mcpServer {

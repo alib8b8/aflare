@@ -18,6 +18,7 @@ package cli
 import (
 	"fmt"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/alib8b8/aflare/internal/config"
 	"github.com/alib8b8/aflare/internal/meta"
+	"github.com/alib8b8/aflare/internal/registry"
 )
 
 // HandleDoctor runs a one-shot environment diagnostic (断点16: 没有 aflare doctor
@@ -67,7 +69,12 @@ func HandleDoctor(args []string) {
 		})
 	}
 
-	// 5. LLM provider reachability.
+	// 5. Local Ollama environment (binary + default port), independent of
+	// whether it's configured as a provider. Local-first users need to know
+	// if Ollama is available even before configuring it.
+	checkOllamaEnvironment(&problems)
+
+	// 6. LLM provider reachability.
 	if llmStatus, llmProblem := checkLLMStatus(); llmStatus != "" {
 		fmt.Println(llmStatus)
 		if llmProblem.desc != "" {
@@ -75,7 +82,11 @@ func HandleDoctor(args []string) {
 		}
 	}
 
-	// 6. Network connectivity (non-blocking, short timeout).
+	// 7. Proxy environment variables (critical for intranet users to verify
+	// their proxy is actually picked up by aflare).
+	checkProxyEnv()
+
+	// 8. Network connectivity (non-blocking, short timeout).
 	if netOK, netDetail := checkNetworkConnectivity(); netOK {
 		fmt.Printf("  ✓ 网络连接正常%s\n", netDetail)
 	} else {
@@ -86,6 +97,21 @@ func HandleDoctor(args []string) {
 			hint: "部分模板需要访问外部 API，检查代理或网络设置\n" +
 				"  - 如果使用代理：export HTTPS_PROXY=http://127.0.0.1:7890\n" +
 				"  - 如果不需要外网：使用本地模板（aflare list 查看 easy 模板）",
+		})
+	}
+
+	// 9. Registry source reachability (distinct from github.com — registry
+	// uses raw.githubusercontent.com by default, or AFLARE_REGISTRY_URL).
+	if regOK, regDetail := checkRegistryReachability(); regOK {
+		fmt.Printf("  ✓ 节点注册表可达%s\n", regDetail)
+	} else {
+		fmt.Println("  ✗ 节点注册表不可达" + regDetail)
+		problems = append(problems, doctorProblem{
+			category: "网络",
+			desc:     "节点注册表不可达",
+			hint: "aflare registry sync 需要访问注册表源\n" +
+				"  - 内网用户：export AFLARE_REGISTRY_URL=https://内网镜像/registry.json\n" +
+				"  - 或使用代理：export HTTPS_PROXY=http://内网代理:端口",
 		})
 	}
 
@@ -158,7 +184,11 @@ func findConfigFile() string {
 func checkLLMStatus() (string, doctorProblem) {
 	cfg, err := config.LoadConfig()
 	if err != nil || cfg == nil || len(cfg.Providers) == 0 {
-		return "  ⊘ LLM 未配置（运行 aflare init 配置 LLM）", doctorProblem{}
+		return "  ⊘ LLM 未配置（运行 aflare init 配置 LLM）", doctorProblem{
+			category: "LLM",
+			desc:     "LLM 未配置",
+			hint:     "运行 aflare init 配置 LLM（本地优先推荐 Ollama）",
+		}
 	}
 
 	// Pick the first configured provider for the status line.
@@ -230,4 +260,84 @@ func checkNetworkConnectivity() (bool, string) {
 		return true, "（github.com 可达）"
 	}
 	return false, fmt.Sprintf("（github.com 返回状态 %d）", resp.StatusCode)
+}
+
+// checkOllamaEnvironment probes the local Ollama setup independent of config:
+// whether the binary is on PATH and whether the default port (11434) responds.
+// Local-first users need this signal even before running `aflare init`.
+func checkOllamaEnvironment(problems *[]doctorProblem) {
+	binPath, binOK := detectCommand("ollama")
+	portOK := probeOllamaPort("http://localhost:11434")
+	switch {
+	case binOK && portOK:
+		fmt.Printf("  ✓ Ollama 已安装且服务在运行 (%s)\n", binPath)
+	case binOK && !portOK:
+		fmt.Println("  → Ollama 已安装但服务未运行（ollama serve 启动）")
+		*problems = append(*problems, doctorProblem{
+			category: "LLM",
+			desc:     "Ollama 服务未运行",
+			hint:     "启动 Ollama：ollama serve\n拉取模型：ollama pull llama3",
+		})
+	case !binOK && portOK:
+		// Port responds but binary not on PATH (e.g. installed elsewhere).
+		fmt.Println("  → Ollama 服务在运行（11434 端口可达），但 ollama 命令不在 PATH")
+	default:
+		fmt.Println("  ⊘ 未检测到 Ollama（本地优先推荐安装）")
+	}
+}
+
+// probeOllamaPort returns true if the Ollama /api/tags endpoint responds
+// within 3s. Used by checkOllamaEnvironment and reusable elsewhere.
+func probeOllamaPort(endpoint string) bool {
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get(strings.TrimRight(endpoint, "/") + "/api/tags")
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
+// checkProxyEnv prints the current proxy-related environment variables so
+// intranet users can verify aflare will pick up their proxy configuration.
+func checkProxyEnv() {
+	httpProxy := os.Getenv("HTTP_PROXY")
+	httpsProxy := os.Getenv("HTTPS_PROXY")
+	noProxy := os.Getenv("NO_PROXY")
+	if httpProxy == "" && httpsProxy == "" && noProxy == "" {
+		fmt.Println("  ⊘ 未设置代理环境变量（HTTP_PROXY/HTTPS_PROXY/NO_PROXY）")
+		return
+	}
+	if httpsProxy != "" {
+		fmt.Printf("  ✓ HTTPS_PROXY=%s\n", httpsProxy)
+	}
+	if httpProxy != "" {
+		fmt.Printf("  ✓ HTTP_PROXY=%s\n", httpProxy)
+	}
+	if noProxy != "" {
+		fmt.Printf("  ✓ NO_PROXY=%s\n", noProxy)
+	}
+}
+
+// checkRegistryReachability tests whether the registry source URL is
+// reachable, using the same SSRF policy that `aflare registry sync` would.
+// This is distinct from checkNetworkConnectivity (github.com) because the
+// registry uses raw.githubusercontent.com by default or AFLARE_REGISTRY_URL.
+func checkRegistryReachability() (bool, string) {
+	srcURL := registry.RegistryURL()
+	client := registry.HTTPClientFor(srcURL)
+	client.Timeout = 5 * time.Second
+	resp, err := client.Get(srcURL)
+	if err != nil {
+		return false, "（注册表源不可达）"
+	}
+	resp.Body.Close()
+	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+		host := srcURL
+		if u, perr := neturl.Parse(srcURL); perr == nil {
+			host = u.Host
+		}
+		return true, fmt.Sprintf("（%s 可达）", host)
+	}
+	return false, fmt.Sprintf("（注册表源返回状态 %d）", resp.StatusCode)
 }

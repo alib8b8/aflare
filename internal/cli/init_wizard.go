@@ -52,6 +52,7 @@ func runInitWizard() {
 
 	fmt.Println()
 	fmt.Println("欢迎使用 aflare 👋")
+	fmt.Println("数据不出本地：默认不上报遥测，LLM 默认走本地 Ollama。")
 	fmt.Println()
 	fmt.Println("检测环境：")
 
@@ -113,9 +114,9 @@ func runInitWizard() {
 	fmt.Println("  7. 跳过（仅使用不需要 LLM 的工作流）")
 	fmt.Println()
 
-	choice := prompt(reader, "请选择 [1-7]（默认 7）：", "7")
+	choice := prompt(reader, "请选择 [1-7]（默认 1）：", "1")
 
-	provider, apiKey, model, endpoint := readLLMChoice(reader, strings.TrimSpace(choice), ollamaOK)
+	provider, model, apiKey, endpoint := readLLMChoice(reader, strings.TrimSpace(choice), ollamaOK)
 
 	cfgPath, err := writeWizardConfig(provider, model, apiKey, endpoint)
 	if err != nil {
@@ -123,6 +124,7 @@ func runInitWizard() {
 		os.Exit(1)
 	}
 	fmt.Printf("\n配置已保存到 %s ✓\n", cfgPath)
+	printAPIKeyHint(provider, apiKey)
 
 	fmt.Println()
 	fmt.Println("试试这个不需要 LLM 的模板：")
@@ -150,6 +152,29 @@ func cloudProviderByChoice(choice string) string {
 	default:
 		return ""
 	}
+}
+
+// envVarForProvider returns the <PROVIDER>_API_KEY env var name aflare reads
+// for the given provider. Matches the names in internal/nodes/providers.
+func envVarForProvider(provider string) string {
+	return strings.ToUpper(provider) + "_API_KEY"
+}
+
+// printAPIKeyHint tells the user how to export their API key instead of
+// storing it in plaintext config. No-op for providers without a key (ollama)
+// or when no key was entered.
+func printAPIKeyHint(provider, apiKey string) {
+	if apiKey == "" {
+		return
+	}
+	envVar := envVarForProvider(provider)
+	if envVar == "" {
+		return
+	}
+	fmt.Println()
+	fmt.Println("ℹ 为避免明文存储，API Key 未写入配置文件。请设置环境变量：")
+	fmt.Printf("   export %s=%s\n", envVar, apiKey)
+	fmt.Printf("   (加到 ~/.bashrc / ~/.zshrc 持久化；config.GetAPIKey 会优先读取此环境变量)\n")
 }
 
 // readLLMChoice resolves a menu choice into provider credentials. Used by both
@@ -204,7 +229,7 @@ func offerLLMConfig() bool {
 	fmt.Println("  7. 跳过（仅使用不需要 LLM 的工作流）")
 	fmt.Println()
 
-	choice := prompt(reader, "请选择 [1-7]（默认 7）：", "7")
+	choice := prompt(reader, "请选择 [1-7]（默认 1）：", "1")
 	_, ollamaOK := detectCommand("ollama")
 	provider, model, apiKey, endpoint := readLLMChoice(reader, strings.TrimSpace(choice), ollamaOK)
 	if provider == "" {
@@ -217,6 +242,7 @@ func offerLLMConfig() bool {
 		return false
 	}
 	fmt.Printf("\n配置已保存到 %s ✓\n", cfgPath)
+	printAPIKeyHint(provider, apiKey)
 	return true
 }
 
@@ -308,8 +334,13 @@ func writeWizardConfig(provider, model, apiKey, endpoint string) (string, error)
 		if endpoint == "" {
 			endpoint = d.endpoint
 		}
+		// Do NOT persist api_key to config.yaml — it is plaintext on disk and
+		// a real risk for data-sensitive / enterprise users (backups, sync,
+		// accidental git commit). config.GetAPIKey already prefers the env
+		// var <PROVIDER>_API_KEY, so we leave the field empty and print the
+		// export instruction to the caller instead.
 		existing.Providers[provider] = config.LLMProviderConfig{
-			APIKey:   apiKey,
+			APIKey:   "",
 			Endpoint: endpoint,
 			Model:    model,
 		}

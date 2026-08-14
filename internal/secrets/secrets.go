@@ -490,3 +490,10 @@ func GetSecretManager() (*SecretManager, error) {
 	}
 	return LoadFromFile(defaultSecretsPath, password)
 }
+
+// DefaultPath returns the on-disk path of the encrypted secrets store
+// (~/.config/aflare/secrets.dat). Exported so the CLI can call SaveToFile
+// after mutating the manager returned by GetSecretManager.
+func DefaultPath() string {
+	return defaultSecretsPath
+}

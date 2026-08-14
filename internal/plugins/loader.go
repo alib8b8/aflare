@@ -34,6 +34,27 @@ func DefaultPluginDir() string {
 	return filepath.Join(home, ".config", "aflare", "plugins")
 }
 
+// EnsurePluginDirSecure creates the plugin dir with 0700 if missing and
+// best-effort tightens an existing dir that is more permissive. Loading .so
+// files grants in-process code execution, so the directory must be writable
+// only by the owner. Returns nil if the dir is already secure or was fixed.
+func EnsurePluginDirSecure(dir string) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("create plugin dir %s: %w", dir, err)
+	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		return err
+	}
+	// Best-effort: if the dir is more permissive than 0700, tighten it.
+	if info.Mode().Perm()&0o077 != 0 {
+		if err := os.Chmod(dir, 0o700); err != nil {
+			return fmt.Errorf("tighten plugin dir perms %s: %w", dir, err)
+		}
+	}
+	return nil
+}
+
 // LoadPlugin opens a Go plugin .so file, extracts the exported "Plugin" symbol,
 // registers it with the manager, and enables it. The .so must export a symbol
 // named "Plugin" that implements the Plugin interface.

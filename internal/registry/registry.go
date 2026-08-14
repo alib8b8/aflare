@@ -37,12 +37,34 @@ import (
 // time, closing the DNS-rebinding TOCTOU window) and connection-pool
 // tuning (MaxIdleConns / MaxIdleConnsPerHost / IdleConnTimeout) are
 // shared with every other outbound client in aflare rather than
-// re-implemented here. Registry endpoints are public-only, so we use
-// ValidatePublic (loopback blocked).
+// re-implemented here. Registry endpoints are public-only by default, so we
+// use ValidatePublic (loopback blocked).
+//
+// Intranet mirror support: when AFLARE_REGISTRY_URL points to a custom
+// registry (e.g. an internal Nexus/Artifactory mirror), the user is opting
+// into trusting that host, so we relax the dial-time IP check to
+// ValidateAllowAll for the configured host. The URL-level validateRegistryURL
+// still enforces HTTPS + rejects userinfo/localhost, and the custom host is
+// the user's explicit choice — no SSRF vector is introduced beyond what the
+// user configured.
 var safeHTTPClient = httpclient.NewClient(httpclient.Options{
 	Timeout:   30 * time.Second,
 	Validator: httpclient.ValidatePublic,
 })
+
+// safeHTTPClientFor returns the HTTP client to use for a given registry URL.
+// For the default public registry, the strict ValidatePublic client is used.
+// For a user-configured AFLARE_REGISTRY_URL (intranet mirror), a client with
+// ValidateAllowAll is returned so private/loopback IPs are reachable.
+func safeHTTPClientFor(rawURL string) *http.Client {
+	if rawURL != defaultRegistryURL {
+		return httpclient.NewClient(httpclient.Options{
+			Timeout:   30 * time.Second,
+			Validator: httpclient.ValidateAllowAll,
+		})
+	}
+	return safeHTTPClient
+}
 
 type NodeInfo struct {
 	Name        string   `json:"name"`
@@ -59,6 +81,29 @@ type Registry struct {
 }
 
 const defaultRegistryURL = "https://raw.githubusercontent.com/alib8b8/aflare/main/nodes-registry.json"
+
+// registryURL returns the registry source URL. Priority: AFLARE_REGISTRY_URL
+// env > default public GitHub URL. This lets enterprise/intranet users point
+// `aflare registry sync` at an internal mirror.
+func registryURL() string {
+	if u := os.Getenv("AFLARE_REGISTRY_URL"); u != "" {
+		return u
+	}
+	return defaultRegistryURL
+}
+
+// RegistryURL exported for diagnostics (e.g. `aflare doctor` reachability
+// check). Returns the same URL SyncRegistry would use.
+func RegistryURL() string {
+	return registryURL()
+}
+
+// HTTPClientFor exports the client-selection logic so callers that need to
+// fetch the registry with the correct SSRF policy (e.g. doctor probing a
+// user-configured intranet mirror) reuse the same rules as SyncRegistry.
+func HTTPClientFor(rawURL string) *http.Client {
+	return safeHTTPClientFor(rawURL)
+}
 
 func GetRegistryPath() string {
 	configDir, err := os.UserConfigDir()
@@ -87,13 +132,14 @@ func LoadRegistry() (*Registry, error) {
 }
 
 func SyncRegistry() error {
-	logger.Info("syncing node registry")
+	srcURL := registryURL()
+	logger.Info("syncing node registry", "source", srcURL)
 
-	if err := validateRegistryURL(defaultRegistryURL); err != nil {
+	if err := validateRegistryURL(srcURL); err != nil {
 		return fmt.Errorf("invalid registry URL: %w", err)
 	}
 
-	resp, err := safeHTTPClient.Get(defaultRegistryURL)
+	resp, err := safeHTTPClientFor(srcURL).Get(srcURL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch registry: %w", err)
 	}
