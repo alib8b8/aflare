@@ -1,0 +1,55 @@
+# Mirror main branch and tags from GitHub to AtomGit.
+#
+# Triggered on every push to main (and manually / weekly as a fallback).
+# Requires the ATOMGIT_TOKEN repository secret (AtomGit personal access
+# token with repository write permission). GitHub automatically masks
+# secret values in logs, so the token never appears in output.
+name: Sync to AtomGit
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Weekly fallback re-sync (Sundays 02:17 UTC) in case a push-triggered
+    # run failed silently.
+    - cron: "17 2 * * 0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-atomgit
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    # Never run on forks of this repository.
+    if: github.repository == 'alib8b8/aflare'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Push main and tags to AtomGit
+        env:
+          ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ATOMGIT_TOKEN}" ]; then
+            echo "::error::ATOMGIT_TOKEN secret is not configured. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          # Token is passed via a per-remote credential helper so it never
+          # becomes part of the remote URL (which git may print on errors).
+          git config credential.https://atomgit.com.helper '!f() { echo "username=oauth2"; echo "password=${ATOMGIT_TOKEN}"; }; f'
+          git remote add atomgit https://atomgit.com/llm-box/llm-box.git
+          # Mirror semantics: force-push so AtomGit always matches GitHub
+          # exactly (the GitHub repo is the single source of truth).
+          git push atomgit refs/heads/main:refs/heads/main --force
+          git push atomgit --tags --force
+          echo "Mirror sync completed."
