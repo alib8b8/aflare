@@ -5,7 +5,7 @@
     <a href="README.en.md">English</a>
   </p>
   <p><strong>让 AI 告别聊天，开始执行</strong></p>
-  <p><em>ReAct 推理循环 · 300+ 技能模板 · 确定性工作流执行 · 10 类可插拔能力</em></p>
+  <p><em>本地优先 · 数据不出本地 · ReAct 推理循环 · 300+ 技能模板 · 确定性工作流执行 · 7 类可插拔能力</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
@@ -76,7 +76,7 @@ aflare chat
 # 或者: aflare chat -p deepseek -m deepseek-chat
 
 # 守护进程式 Agent（融合 stdin + 定时任务） + 可插拔能力
-aflare agent -c reflection,bdi,utility
+aflare agent -c reflection,planning,utility
 ```
 
 ---
@@ -103,7 +103,7 @@ ReAct Agent 思考              关键词匹配生成
 工具执行 → 反思 → 优化           DAG 调度执行
 ```
 
-**Agent 模式**：通过 `aflare chat` 或 `aflare agent` 启动。内置 ReAct 推理循环，拥有 300+ 预置技能模板（16 个领域），支持 10 类可插拔能力（反思、人机协同、BDI 目标管理、效用驱动优化等）。
+**Agent 模式**：通过 `aflare chat` 或 `aflare agent` 启动。内置 ReAct 推理循环，拥有 300+ 预置技能模板（16 个领域），支持 7 类可插拔能力（反思、人机协同、效用驱动、自适应等）。
 
 **工作流模式**：`aflare create` 通过关键词匹配将描述转为 YAML 工作流。YAML 确定了每一步做什么、依赖谁、失败怎么办。Runtime 负责 DAG 调度、WAL 崩溃恢复、Saga 事务补偿、熔断、审计——所有操作可追溯、可回放、可验证。
 
@@ -115,7 +115,7 @@ ReAct Agent 思考              关键词匹配生成
 L0: Agent        —  "帮我监控 BTC，跌 5% 通知我"
                     ├── ReAct 推理循环（思考 → 调工具 → 观察 → 回答）
                     ├── 300+ 技能模板（16 个领域）
-                    └── 10 类可插拔能力（反思/人机协同/BDI/效用驱动等）
+                    └── 7 类可插拔能力（反思/HITL/效用驱动等）
                        ↓
 L1: Workflow     —  YAML 确定性工作流（schedule → get_price → condition → telegram）
                        ↓
@@ -168,7 +168,7 @@ L2: Runtime      —  确定性执行层
 | **ReAct Agent 对话** (`aflare chat`) | ✅ | 有测试 |
 | **守护进程式 Agent** (`aflare agent`) | ✅ | 有测试 |
 | **300+ 技能模板**（16 个领域） | ✅ | 有测试 |
-| **10 类可插拔能力**（反思/人机协同/BDI/效用驱动等） | ✅ | 有测试 |
+| **7 类可插拔能力**（反思/HITL/效用驱动等） | ✅ | 有测试 |
 | **多源输入融合**（stdin + 定时任务 + 文件监听） | ✅ | 有测试 |
 | DAG 并行调度 | ✅ | 有测试 + TLA+ 形式化验证 |
 | WAL 崩溃恢复 + Session 持久化 | ✅ | 有测试 |
@@ -190,20 +190,17 @@ L2: Runtime      —  确定性执行层
 - **ReAct 推理循环** — 思考 → 调用工具 → 观察结果 → 回答，支持 native function calling 和 JSON fallback
 - **300+ 预置技能模板** — 覆盖 16 个领域（金融、医疗、供应链、DevOps 等），Agent 自动匹配并执行
 - **统一事件循环** — 对话式（`aflare chat`）和守护进程式（`aflare agent`）共用同一 `AgentLoop` 核心，支持 stdin / 定时任务 / 文件监听多源输入融合
-- **10 类可插拔能力** — 按需启用，映射完整 Agent 类型分类学：
+- **7 类可插拔能力** — 按需启用，映射完整 Agent 类型分类学：
 
 | 能力 | 类型 | 说明 |
 |------|------|------|
 | `reflection` | 反思/自我批评 | 每轮执行后自动评估输出质量，触发自我修正 |
 | `human-in-loop` | 人机协同 | 关键操作暂停，请求人类确认后继续 |
-| `bdi` | 信念-愿望-意图 | 维护目标追踪、信念提取、定期目标上下文注入 |
 | `utility` | 效用驱动 | 6 维度评分（正确性/完整性/效率/安全/清晰/可操作），优化决策 |
 | `adaptive` | 学习型/自适应 | 从反馈中学习，跨轮次改进表现 |
 | `memory` | 有状态 | 跨会话长期记忆，记住用户偏好 |
 | `planning` | 规划式 | 行动前生成计划，逐步执行 |
-| `multi-agent` | 多 Agent 协作 | 复杂任务分解，多角色协调 |
 | `workflow` | 工作流/管道式 | 优先使用已有模板，稳定可预测 |
-| `simulation` | 模拟/生成式 | 类人行为建模，场景生成 |
 
 ### Runtime 保障（确定性执行）
 - **DAG 并行调度** — 拓扑排序依赖调度，无依赖步骤并发执行
@@ -257,7 +254,7 @@ L2: Runtime      —  确定性执行层
 │  │                                                    │ │
 │  │  aflare chat / aflare agent                       │ │
 │  │  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │ │
-│  │  │ ReAct    │  │ 300+     │  │ 10 类可插拔     │  │ │
+│  │  │ ReAct    │  │ 300+     │  │ 7 类可插拔      │  │ │
 │  │  │ 推理循环  │  │ 技能模板  │  │ 能力            │  │ │
 │  │  └──────────┘  └──────────┘  └────────────────┘  │ │
 │  │                                                    │ │
@@ -294,7 +291,7 @@ L2: Runtime      —  确定性执行层
 | 版本 | 状态 | 重点 |
 |------|------|------|
 | v0.6 | 已完成 | Agent 记忆基础设施、语音 AI 工具链、WAL 持久化、TLA+ 验证 |
-| v0.7 | 已完成 | 金融场景增强（Saga / 幂等 / 审计链）、ReAct Agent 对话、300+ 技能模板、10 类可插拔能力、Agent 统一事件循环 |
+| v0.7 | 已完成 | 金融场景增强（Saga / 幂等 / 审计链）、ReAct Agent 对话、300+ 技能模板、7 类可插拔能力、Agent 统一事件循环 |
 | **v0.8** | **当前** | 信创芯片适配完善、宇树机器人实机支持、Agent 能力深化 |
 | v1.0 | 计划中 | 稳定 API、LTS |
 
