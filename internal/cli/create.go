@@ -84,6 +84,15 @@ func HandleCreate(args []string, aiMode bool) {
 	fmt.Printf("\n%s\n", i18n.T("create.run_hint"))
 	fmt.Printf("  aflare run %s\n", filename)
 
+	// 当未显式使用 --ai 但已配置 LLM 时，提示用户可用更强的生成路径，
+	// 避免用户不知道关键词匹配之外还有 LLM 生成 / 交互式 chat 可用。
+	if !aiMode && detectLLMConfig() {
+		fmt.Println()
+		fmt.Println("💡 已配置 LLM，可用更强大的生成方式：")
+		fmt.Println("   aflare --ai create \"你的需求\"   # 强制用 LLM 生成（适合复杂需求）")
+		fmt.Println("   aflare chat                       # 交互式对话生成/调整工作流")
+	}
+
 	if interactive {
 		fmt.Println("\nEntering interactive chat mode to validate your workflow...")
 		fmt.Println("Type /quit to exit.")
@@ -200,6 +209,7 @@ func searchTemplatesForSuggestion(description string) []*skillsPkg.SkillMeta {
 	if templatesDir == "" {
 		return nil
 	}
+	_ = skillsPkg.EnsureEmbeddedTemplates(templatesDir)
 	registry := skillsPkg.NewSkillRegistry(templatesDir)
 	if err := registry.Load(); err != nil {
 		return nil

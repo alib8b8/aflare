@@ -73,6 +73,7 @@ func handleTemplateList(args []string) {
 	}
 
 	templatesDir := meta.ResolveTemplatesPath()
+	_ = skillsPkg.EnsureEmbeddedTemplates(templatesDir)
 	registry := skillsPkg.NewSkillRegistry(templatesDir)
 	if err := registry.Load(); err != nil {
 		fmt.Printf("❌ 加载模板失败：%v\n", err)
@@ -303,6 +304,7 @@ func handleTemplateClone(args []string) {
 	destName := args[1]
 
 	templatesDir := meta.ResolveTemplatesPath()
+	_ = skillsPkg.EnsureEmbeddedTemplates(templatesDir)
 	registry := skillsPkg.NewSkillRegistry(templatesDir)
 	if err := registry.Load(); err != nil {
 		fmt.Printf("❌ 加载模板失败：%v\n", err)

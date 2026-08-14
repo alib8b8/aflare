@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/alib8b8/aflare/internal/cli"
@@ -110,7 +111,14 @@ func main() {
 		os.Exit(1)
 	}
 	if err := cli.ValidateCommand(command); err != nil {
-		fmt.Println(cli.PrintUsage())
+		// 断点: 未知命令不能静默回退到 usage，否则用户不知道哪里打错了
+		// （例如 `aflare node list` 之前只显示主 help）。打印错误 + did-you-mean。
+		fmt.Fprintf(os.Stderr, "❌ %v\n", err)
+		if suggestions := cli.SuggestCommand(command); len(suggestions) > 0 {
+			fmt.Fprintf(os.Stderr, "你是不是想输入：%s\n", strings.Join(suggestions, ", "))
+		}
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, cli.PrintUsage())
 		os.Exit(1)
 	}
 	// 断点17: 启动时检测新版本（非阻塞，提示一行）。仅对交互/信息类命令
@@ -200,7 +208,7 @@ func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, sa
 	case "agent":
 		cli.HandleAgent(args)
 	case "template":
-		cli.HandleTemplateSubmit(args)
+		cli.HandleTemplateSubmit(args, dryRun, safeMode)
 	case "install-pack":
 		cli.HandleInstallPack(args)
 	case "watermark":

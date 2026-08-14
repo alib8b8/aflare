@@ -28,8 +28,12 @@ import (
 )
 
 // HandleTemplateSubmit handles the "template" command.
-// Usage: aflare template <list|new|clone|submit> [args]
-func HandleTemplateSubmit(args []string) {
+// Usage: aflare template <list|new|clone|run|submit> [args]
+//
+// dryRun/safeMode are forwarded from the top-level flag parser so that
+// `aflare --dry-run template run <id>` and `aflare --safe-mode template run <id>`
+// behave like the equivalent `aflare run` invocation.
+func HandleTemplateSubmit(args []string, dryRun, safeMode bool) {
 	if len(args) == 0 {
 		PrintTemplateSubmitUsage()
 		os.Exit(1)
@@ -45,6 +49,8 @@ func HandleTemplateSubmit(args []string) {
 		handleTemplateNew(args[1:])
 	case "clone":
 		handleTemplateClone(args[1:])
+	case "run":
+		handleTemplateRun(args[1:], dryRun, safeMode)
 	case "--help", "-h", "help":
 		PrintTemplateSubmitUsage()
 	default:
@@ -52,6 +58,71 @@ func HandleTemplateSubmit(args []string) {
 		PrintTemplateSubmitUsage()
 		os.Exit(1)
 	}
+}
+
+// handleTemplateRun implements `aflare template run <template-id> [run flags]`.
+// It resolves a template by ID (with the same fuzzy fallback as clone) and
+// immediately executes its workflow.yaml via HandleRun, forwarding --set /
+// --params-file / --resume etc. This is the one-command "try a template" path:
+// no need to clone first or remember the workflow.yaml path.
+func handleTemplateRun(args []string, dryRun, safeMode bool) {
+	if len(args) == 0 {
+		fmt.Println("Error: template run requires <template-id>")
+		fmt.Println("Usage: aflare template run <template-id> [--set k=v ...] [--params-file f] [--resume]")
+		fmt.Println("提示：使用 aflare template list --all 查看所有可用模板")
+		os.Exit(1)
+	}
+
+	// 第一个非 flag 参数是 template-id，其余透传给 run 命令的参数解析器。
+	var templateID string
+	var runArgs []string
+	for _, a := range args {
+		if templateID == "" && !strings.HasPrefix(a, "-") {
+			templateID = a
+		} else {
+			runArgs = append(runArgs, a)
+		}
+	}
+	if templateID == "" {
+		fmt.Println("Error: template run requires <template-id>")
+		os.Exit(1)
+	}
+
+	templatesDir := meta.ResolveTemplatesPath()
+	_ = skillsPkg.EnsureEmbeddedTemplates(templatesDir)
+	registry := skillsPkg.NewSkillRegistry(templatesDir)
+	if err := registry.Load(); err != nil {
+		fmt.Printf("❌ 加载模板失败：%v\n", err)
+		os.Exit(1)
+	}
+
+	src, err := registry.Get(templateID)
+	if err != nil {
+		// Fuzzy match by name suffix (与 clone 一致的回退逻辑).
+		for _, s := range registry.List() {
+			if s.Name == templateID || strings.HasSuffix(s.ID, "/"+templateID) {
+				src = s
+				break
+			}
+		}
+		if src == nil {
+			fmt.Printf("❌ 未找到模板：%s\n", templateID)
+			fmt.Println("提示：使用 aflare template list --all 查看所有可用模板")
+			os.Exit(1)
+		}
+	}
+
+	wfPath := filepath.Join(src.Path, "workflow.yaml")
+	if _, err := os.Stat(wfPath); err != nil {
+		fmt.Printf("❌ 模板缺少 workflow.yaml：%s\n", wfPath)
+		os.Exit(1)
+	}
+
+	fmt.Printf("▶ 运行模板 %s\n", src.ID)
+	// 复用 run 命令的参数解析（--set / --params-file / --resume 等）：
+	// 把 workflow 路径放在最前，其余 flag 跟在后面，HandleRun 会正确分流。
+	runArgs = append([]string{wfPath}, runArgs...)
+	HandleRun(runArgs, dryRun, safeMode)
 }
 
 // handleTemplateSubmit handles the "template submit" subcommand.
@@ -174,6 +245,7 @@ func handleTemplateSubmit(args []string) {
 	_ = os.WriteFile(readmePath, []byte(readmeContent), 0644) // best-effort: README stub is non-critical
 
 	// Rebuild the registry.
+	_ = skillsPkg.EnsureEmbeddedTemplates(templatesDir)
 	registry := skillsPkg.NewSkillRegistry(templatesDir)
 	if err := registry.Load(); err != nil {
 		fmt.Printf("Warning: failed to reload registry: %v\n", err)
@@ -267,17 +339,23 @@ func parseTemplateSubmitArgs(args []string, yamlPath, category, author *string) 
 
 // PrintTemplateSubmitUsage prints usage for the template command.
 func PrintTemplateSubmitUsage() {
-	fmt.Println("Usage: aflare template <list|new|clone|submit> [args]")
+	fmt.Println("Usage: aflare template <list|new|clone|run|submit> [args]")
 	fmt.Println()
 	fmt.Println("子命令：")
 	fmt.Println("  list                        列出可用模板（默认只显示 easy，--all 显示全部）")
 	fmt.Println("  new <name>                  创建工作流骨架到 ./<name>/workflow.yaml")
 	fmt.Println("  clone <source> <dest>       复制已有模板到本地进行改造")
+	fmt.Println("  run <template-id> [flags]   直接按 ID 运行模板（无需 clone 或记路径）")
 	fmt.Println("  submit <file.yaml>          校验并准备社区模板提交")
 	fmt.Println()
 	fmt.Println("list 选项：")
 	fmt.Println("  --all                       显示全部模板（含需要 LLM/沙箱的）")
 	fmt.Println("  --category <name>           按分类筛选")
+	fmt.Println()
+	fmt.Println("run 选项（透传给 aflare run）：")
+	fmt.Println("  --set k=v                   注入参数（可重复）")
+	fmt.Println("  --params-file <file>        从文件读取参数")
+	fmt.Println("  --resume [path]             从断点恢复执行")
 	fmt.Println()
 	fmt.Println("submit 选项：")
 	fmt.Println("  --category, -c <name>       技能分类（默认自动检测）")
@@ -289,6 +367,8 @@ func PrintTemplateSubmitUsage() {
 	fmt.Println("  aflare template list --category devops-infra")
 	fmt.Println("  aflare template new my-workflow")
 	fmt.Println("  aflare template clone ssl-cert-checker my-cert-checker")
+	fmt.Println("  aflare template run devops-infra/ssl-cert-checker")
+	fmt.Println("  aflare template run ssl-cert-checker --set domain=example.com")
 	fmt.Println("  aflare template submit my-workflow.yaml --category devops-infra")
 }
 

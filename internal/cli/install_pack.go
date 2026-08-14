@@ -130,6 +130,7 @@ func HandleInstallPack(args []string) {
 
 	// Load the skills registry.
 	templatesDir := meta.ResolveTemplatesPath()
+	_ = skills.EnsureEmbeddedTemplates(templatesDir)
 	registry := skills.NewSkillRegistry(templatesDir)
 	if err := registry.Load(); err != nil {
 		fmt.Printf("Error: failed to load skills registry: %v\n", err)

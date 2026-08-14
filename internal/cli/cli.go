@@ -139,16 +139,109 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 	return
 }
 
+// knownCommands is the canonical list of top-level aflare commands. Shared by
+// ValidateCommand and SuggestCommand so the two never drift apart.
+var knownCommands = []string{
+	"create", "run", "help", "install", "uninstall", "registry", "list",
+	"validate", "review", "version", "self-update", "update", "upgrade",
+	"autoupgrade", "init", "config", "webui", "skills", "schedule", "audit",
+	"serve", "marketplace", "secrets", "resume", "chat", "agent", "template",
+	"install-pack", "watermark", "badge", "doctor",
+}
+
 // ValidateCommand checks if the command is recognized.
 func ValidateCommand(command string) error {
 	if command == "" {
 		return fmt.Errorf("no command provided")
 	}
 	switch command {
-	case "create", "run", "help", "-h", "--help", "install", "uninstall", "registry", "list", "validate", "review", "version", "--version", "-v", "self-update", "update", "upgrade", "autoupgrade", "au", "init", "config", "webui", "skills", "schedule", "audit", "serve", "marketplace", "secrets", "resume", "chat", "agent", "template", "install-pack", "watermark", "badge", "doctor":
+	case "help", "-h", "--help", "--version", "-v", "au":
 		return nil
 	}
+	for _, c := range knownCommands {
+		if c == command {
+			return nil
+		}
+	}
 	return fmt.Errorf("unknown command: %s", command)
+}
+
+// SuggestCommand returns "did-you-mean" candidates for an unknown command.
+// It matches by prefix first, then by a small edit distance, so common typos
+// like "node" → "note" / "hisotry" → "history" surface a helpful hint instead
+// of a bare usage dump. Returns at most 3 suggestions.
+func SuggestCommand(command string) []string {
+	if command == "" {
+		return nil
+	}
+	lower := strings.ToLower(command)
+
+	// 1. Exact prefix matches (e.g. "tem" → "template").
+	var prefixMatches []string
+	for _, c := range knownCommands {
+		if strings.HasPrefix(c, lower) {
+			prefixMatches = append(prefixMatches, c)
+		}
+	}
+	if len(prefixMatches) > 0 {
+		return trimSuggestions(prefixMatches, 3)
+	}
+
+	// 2. Edit-distance <= 2 (typo correction).
+	var typoMatches []string
+	for _, c := range knownCommands {
+		if levenshtein(lower, c) <= 2 {
+			typoMatches = append(typoMatches, c)
+		}
+	}
+	return trimSuggestions(typoMatches, 3)
+}
+
+func trimSuggestions(in []string, max int) []string {
+	if len(in) > max {
+		return in[:max]
+	}
+	return in
+}
+
+// levenshtein computes the edit distance between two strings. Used only for
+// command suggestion, so it favours clarity over allocation perf.
+func levenshtein(a, b string) int {
+	la, lb := len(a), len(b)
+	if la == 0 {
+		return lb
+	}
+	if lb == 0 {
+		return la
+	}
+	prev := make([]int, lb+1)
+	curr := make([]int, lb+1)
+	for j := 0; j <= lb; j++ {
+		prev[j] = j
+	}
+	for i := 1; i <= la; i++ {
+		curr[0] = i
+		for j := 1; j <= lb; j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			curr[j] = min3(prev[j]+1, curr[j-1]+1, prev[j-1]+cost)
+		}
+		prev, curr = curr, prev
+	}
+	return prev[lb]
+}
+
+func min3(a, b, c int) int {
+	m := a
+	if b < m {
+		m = b
+	}
+	if c < m {
+		m = c
+	}
+	return m
 }
 
 // PrepareWorkflow loads a workflow file and returns the parsed workflow with the registry.

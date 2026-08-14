@@ -31,6 +31,7 @@ func HandleSkills(args []string) {
 	}
 
 	templatesDir := meta.ResolveTemplatesPath()
+	_ = skills.EnsureEmbeddedTemplates(templatesDir)
 	registry := skills.NewSkillRegistry(templatesDir)
 	if err := registry.Load(); err != nil {
 		fmt.Printf("❌ Failed to load skills: %v\n", err)

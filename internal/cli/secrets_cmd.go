@@ -62,6 +62,27 @@ func HandleSecrets(args []string) {
 	}
 }
 
+// loadSecretsOrFail opens the secret manager, exiting with a friendly hint on
+// failure. The most common failure on headless Linux / CI / containers is that
+// no OS keyring (D-Bus secret service) is available and no master password is
+// configured — surface that case explicitly instead of a raw English error.
+func loadSecretsOrFail() *secrets.SecretManager {
+	sm, err := secrets.GetSecretManager()
+	if err != nil {
+		fmt.Printf("❌ 无法打开密钥库：%v\n", err)
+		// GetMasterPassword returns this exact phrase when neither keyring nor
+		// env var nor interactive terminal can supply a password.
+		if strings.Contains(err.Error(), "AFLARE_SECRETS_PASSWORD") || strings.Contains(err.Error(), "password not set") {
+			fmt.Println()
+			fmt.Println("当前环境似乎没有可用的系统密钥环（headless 服务器 / 容器 / CI 环境常见）。")
+			fmt.Println("请设置主密码环境变量后重试：")
+			fmt.Println("  export AFLARE_SECRETS_PASSWORD='你的主密码'")
+		}
+		os.Exit(1)
+	}
+	return sm
+}
+
 // handleSecretSet stores a secret. Usage: aflare secrets set <group> <key> [value]
 // If value is omitted, prompts on stderr without echo.
 func handleSecretSet(args []string) {
@@ -88,11 +109,7 @@ func handleSecretSet(args []string) {
 		os.Exit(1)
 	}
 
-	sm, err := secrets.GetSecretManager()
-	if err != nil {
-		fmt.Printf("❌ failed to open secrets store: %v\n", err)
-		os.Exit(1)
-	}
+	sm := loadSecretsOrFail()
 
 	if err := secretSet(sm, group, key, value); err != nil {
 		fmt.Printf("❌ %v\n", err)
@@ -139,11 +156,7 @@ func handleSecretGet(args []string) {
 		}
 	}
 
-	sm, err := secrets.GetSecretManager()
-	if err != nil {
-		fmt.Printf("❌ failed to open secrets store: %v\n", err)
-		os.Exit(1)
-	}
+	sm := loadSecretsOrFail()
 
 	out, err := secretGet(sm, group, key, raw)
 	if err != nil {
@@ -165,11 +178,7 @@ func secretGet(sm *secrets.SecretManager, group, key string, raw bool) (string, 
 // handleSecretList lists groups, or secrets within a group (masked).
 // Usage: aflare secrets list [group]
 func handleSecretList(args []string) {
-	sm, err := secrets.GetSecretManager()
-	if err != nil {
-		fmt.Printf("❌ failed to open secrets store: %v\n", err)
-		os.Exit(1)
-	}
+	sm := loadSecretsOrFail()
 
 	out, err := secretList(sm, args)
 	if err != nil {

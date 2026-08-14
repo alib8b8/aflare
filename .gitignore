@@ -27,3 +27,7 @@ build/
 # Maintenance reports
 maintenance_report_*.txt
 __pycache__/
+
+# Local scratch / test run artifacts
+/tmp/
+logs.zip

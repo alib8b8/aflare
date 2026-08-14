@@ -81,6 +81,13 @@ func (sr *SkillRegistry) Load() error {
 		}
 		if err := json.Unmarshal(data, &registry); err == nil {
 			for _, s := range registry.Skills {
+				// Path is tagged json:"-" so it is never persisted in the
+				// registry index. Reconstruct it from the ID (which follows
+				// the "<category>/<name>" disk layout) so that consumers
+				// (clone, run, install-pack) can locate workflow.yaml.
+				if s.Path == "" && s.ID != "" {
+					s.Path = filepath.Join(sr.baseDir, filepath.FromSlash(s.ID))
+				}
 				sr.skills[s.ID] = s
 			}
 			sr.indexed = true
