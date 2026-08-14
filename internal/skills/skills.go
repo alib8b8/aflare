@@ -70,6 +70,38 @@ func NewSkillRegistry(baseDir string) *SkillRegistry {
 	}
 }
 
+// isValidSkillID reports whether id is a safe skill identifier of the form
+// "<category>/<name>" (one or more path components, each a non-empty,
+// traversal-free segment). It rejects absolute paths, backslashes, null
+// bytes, ".." segments, leading dots, and Windows drive letters so that
+// filepath.Join(baseDir, id) can never escape baseDir.
+func isValidSkillID(id string) bool {
+	if id == "" || len(id) > 256 {
+		return false
+	}
+	if strings.ContainsRune(id, '\x00') {
+		return false
+	}
+	// Normalize to forward slashes for segmentation.
+	cleaned := strings.ReplaceAll(id, "\\", "/")
+	if strings.HasPrefix(cleaned, "/") {
+		return false
+	}
+	for _, part := range strings.Split(cleaned, "/") {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+		if strings.HasPrefix(part, ".") {
+			return false
+		}
+		// Reject Windows drive letters (e.g. "C:foo").
+		if len(part) >= 2 && part[1] == ':' {
+			return false
+		}
+	}
+	return true
+}
+
 func (sr *SkillRegistry) Load() error {
 	sr.mu.Lock()
 	defer sr.mu.Unlock()
@@ -86,6 +118,15 @@ func (sr *SkillRegistry) Load() error {
 				// the "<category>/<name>" disk layout) so that consumers
 				// (clone, run, install-pack) can locate workflow.yaml.
 				if s.Path == "" && s.ID != "" {
+					// Validate the ID before joining it into a path. The
+					// registry index is a JSON file on disk and could be
+					// tampered with; an ID like "../config/evil" would
+					// otherwise resolve to a path outside baseDir.
+					if !isValidSkillID(s.ID) {
+						// Skip malicious / malformed entries rather than
+						// aborting the whole load.
+						continue
+					}
 					s.Path = filepath.Join(sr.baseDir, filepath.FromSlash(s.ID))
 				}
 				sr.skills[s.ID] = s

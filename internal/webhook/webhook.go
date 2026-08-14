@@ -415,7 +415,16 @@ func (s *WebhookServer) runTask(task *Task, body []byte, query map[string][]stri
 
 	output, _, err := workflow.ExecuteWorkflow(ctx, wf, s.registry)
 	if err != nil {
-		s.completeTask(task.ID, TaskFailed, "", err.Error())
+		// ExecuteWorkflow errors may contain node internals, file paths,
+		// or partial output. Log the full error server-side for debugging,
+		// but return a generic message to clients to avoid information
+		// disclosure through the /webhook/status endpoint.
+		logger.Error("webhook workflow execution failed",
+			"task_id", task.ID,
+			"workflow", task.WorkflowName,
+			"err", err.Error(),
+		)
+		s.completeTask(task.ID, TaskFailed, "", "workflow execution failed")
 		return
 	}
 	s.completeTask(task.ID, TaskCompleted, output, "")

@@ -18,6 +18,7 @@ package skills
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -216,5 +217,64 @@ func TestAutoGenerateMetaWithReadme(t *testing.T) {
 	}
 	if meta.Description != "This is a custom description for testing." {
 		t.Errorf("expected description from readme, got %q", meta.Description)
+	}
+}
+
+func TestIsValidSkillID(t *testing.T) {
+	cases := []struct {
+		id   string
+		want bool
+	}{
+		{"devops/ssl-cert-checker", true},
+		{"coding/my-skill", true},
+		{"simple", true},
+		{"", false},
+		{"/abs/path", false},
+		{"../escape", false},
+		{"a/../b", false},
+		{"a/./b", false},
+		{"trailing/", false},
+		{".hidden/name", false},
+		{"C:windows/path", false},
+		// Backslash is treated as a path separator (Windows) and normalized
+		// to "/", so "with\backslash" becomes "with/backslash" — two valid
+		// segments.
+		{"with\\backslash", true},
+		{"name\x00null", false},
+		{strings.Repeat("a", 257), false},
+	}
+	for _, c := range cases {
+		got := isValidSkillID(c.id)
+		if got != c.want {
+			t.Errorf("isValidSkillID(%q) = %v, want %v", c.id, got, c.want)
+		}
+	}
+}
+
+// TestSkillRegistryLoad_RejectsTraversalID verifies that a tampered
+// skills-registry.json containing a traversal ID (e.g. "../secret") does
+// not cause the reconstructed Path to escape baseDir.
+func TestSkillRegistryLoad_RejectsTraversalID(t *testing.T) {
+	dir := t.TempDir()
+	// Write a registry index with a malicious ID.
+	registry := `{"version":"1.0.0","count":2,"skills":[
+		{"id":"../escape","name":"evil"},
+		{"id":"legit/skill","name":"legit"}
+	]}`
+	if err := os.WriteFile(filepath.Join(dir, RegistryFileName), []byte(registry), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	sr := NewSkillRegistry(dir)
+	if err := sr.Load(); err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	// The traversal entry must be skipped.
+	if _, err := sr.Get("../escape"); err == nil {
+		t.Error("expected traversal ID to be rejected, but it was loaded")
+	}
+	// The legitimate entry must still be present.
+	if _, err := sr.Get("legit/skill"); err != nil {
+		t.Error("expected legitimate ID to be loaded, but it was missing")
 	}
 }

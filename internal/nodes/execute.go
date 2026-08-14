@@ -35,7 +35,7 @@ import (
 // separators — without them an attacker could write `ls\ncurl evil` and the
 // first-word allowlist check only inspects "ls", letting the second line
 // execute an arbitrary non-whitelisted command.
-var shellMetachars = regexp.MustCompile(`[;|&$`(){}<>\\*?!~='"\n\r]`)
+var shellMetachars = regexp.MustCompile(`[;|&$` + "`" + `(){}<>\\*?!~='"\n\r]`)
 
 var allowListEnabled = true // 默认开启白名单
 var auditLogFile string

@@ -144,11 +144,20 @@ func (n *MultimodalNode) analyzeImage(ctx context.Context, imagePath, prompt, pr
 }
 
 func (n *MultimodalNode) ocrImage(ctx context.Context, imagePath, prompt, lang, provider, model, apiKey, endpoint, detail, outputFormat string) (string, error) {
+	// Sanitize the tesseract language code. lang is user-supplied and
+	// passed as an argument to tesseract -l; although it does not go
+	// through a shell, an attacker-controlled value could inject extra
+	// tesseract flags (e.g. "--psm 0" or a leading "-") since argv parsing
+	// treats any token starting with "-" as an option. Restrict to the
+	// documented format: one or more 3-letter language codes joined by
+	// '+' or '_' (e.g. "eng", "eng+chi_sim", "chi_sim"). Empty means
+	// tesseract's default (eng).
+	safeLang := sanitizeTesseractLang(lang)
 	safePath, err := validateReadPath(imagePath)
 	if err == nil {
 		if _, statErr := os.Stat(safePath); statErr == nil {
 			if tess, lookErr := exec.LookPath("tesseract"); lookErr == nil {
-				args := []string{safePath, "stdout", "-l", lang, "--oem", "1", "--psm", "6"}
+				args := []string{safePath, "stdout", "-l", safeLang, "--oem", "1", "--psm", "6"}
 				cmd := exec.CommandContext(ctx, tess, args...) // #nosec G204 -- tess from LookPath, args are standard OCR flags
 				var stdout, stderr bytes.Buffer
 				cmd.Stdout = &stdout
@@ -407,6 +416,35 @@ func fallbackVisionCall(ctx context.Context, provider, model, apiKey, endpoint s
 	}
 
 	return llmResp.Choices[0].Message.Content, nil
+}
+
+// sanitizeTesseractLang validates and normalizes a tesseract language code
+// (the -l argument). It permits one or more lowercase language codes (2-8
+// ASCII letters) joined by '+' or '_' (e.g. "eng", "eng+chi_sim",
+// "chi_sim+eng"). Any value containing path separators, whitespace,
+// leading dashes, or other shell/argv metacharacters is rejected and the
+// tesseract default ("eng") is used instead. This prevents argument
+// injection where a malicious lang value could inject extra tesseract
+// options.
+func sanitizeTesseractLang(lang string) string {
+	if lang == "" {
+		return "eng"
+	}
+	if len(lang) > 64 {
+		return "eng"
+	}
+	// Each code is 2-8 lowercase letters; separators are '+' or '_'.
+	for _, r := range lang {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '+' || r == '_' {
+			continue
+		}
+		return "eng"
+	}
+	// Reject leading separator / dash-like prefixes.
+	if lang[0] == '+' || lang[0] == '_' {
+		return "eng"
+	}
+	return lang
 }
 
 func formatMultimodalOutput(content, source, mode, outputFormat string) string {

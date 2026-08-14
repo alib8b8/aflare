@@ -114,6 +114,12 @@ func SaveRecord(record Record) error {
 	if record.ID == "" {
 		record.ID = fmt.Sprintf("%d", time.Now().UnixNano())
 	}
+	// Validate ID even though it is usually internally generated: some
+	// callers (e.g. resume/wal) pass an explicit ID, and an unchecked value
+	// like "../config/evil" would escape the history directory on write.
+	if !isValidRecordID(record.ID) {
+		return fmt.Errorf("invalid record ID: %q", record.ID)
+	}
 
 	filename := filepath.Join(dir, record.ID+".json")
 	data, err := json.MarshalIndent(record, "", "  ")
