@@ -4,6 +4,12 @@
 #  + Require status checks → set "PR Review / gate (required)" as required).
 #
 # Applies to both GitHub (origin) and GitCode (mirror) since workflows are synced.
+#
+# Allows any commit that originates from a merged PR, regardless of merge
+# strategy (regular "Merge pull request", squash merge, or rebase merge), by
+# asking GitHub's API whether the pushed commit is linked to a merged PR.
+# Direct pushes (including admin overrides that bypass branch protection) are
+# rejected unless they carry the [skip-pr-gate] emergency marker.
 name: Enforce PR Flow
 
 on:
@@ -12,18 +18,50 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   block-direct-push:
     name: Block direct push to main
     runs-on: ubuntu-latest
-    # Skip for PR merge commits (they went through review) and emergency overrides
-    # via the [skip-pr-gate] marker. Checked in the job-level `if` so no checkout
-    # is needed (the previous step-level `git log` approach failed without a
-    # checkout step, silently breaking the escape hatch).
-    if: ${{ !startsWith(github.event.head_commit.message, 'Merge pull request') && !startsWith(github.event.head_commit.message, 'Merge branch') && !contains(github.event.head_commit.message, '[skip-pr-gate]') }}
     steps:
+      - name: Determine if commit came from a merged PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ github.event.after }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          set -e
+          # Fast path 1: explicit emergency override marker.
+          if printf '%s' "$COMMIT_MSG" | grep -q '\[skip-pr-gate\]'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Commit carries [skip-pr-gate] — allowing (emergency override)."
+            exit 0
+          fi
+
+          # Fast path 2: regular merge commits produced by GitHub's merge button.
+          if printf '%s' "$COMMIT_MSG" | grep -qE '^(Merge pull request|Merge branch)'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Regular merge commit — allowing."
+            exit 0
+          fi
+
+          # Robust path: ask GitHub whether this commit is the merge commit of a
+          # merged PR. This covers squash merges (commit message = "<PR title>
+          # (#NN)") and rebase merges, since GitHub links the resulting commit
+          # to its PR. Direct pushes return an empty list → blocked below.
+          PR_NUMBER=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${COMMIT_SHA}/pulls" \
+            --jq '[.[] | select(.merged == true)] | .[0].number' 2>/dev/null || echo "")
+          if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Commit ${COMMIT_SHA} is the merge of PR #${PR_NUMBER} — allowing."
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
       - name: Reject direct push (must go through PR + CI gate + review)
+        if: steps.pr.outputs.skip != 'true'
         run: |
           echo "::error::Direct pushes to main are not allowed."
           echo "::error::Create a feature branch, open a PR, and wait for the"
