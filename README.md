@@ -139,30 +139,27 @@ L2: Runtime      —  确定性执行层
 
 ---
 
-## 和别的工具有什么区别？
+## 项目优势
 
-| 工具 | 问题 | aflare |
-|------|------|--------|
-| **AI Agent (通用)** | LLM 决定执行，不可预测，难审计 | 确定性 YAML 工作流作为执行后端，可追溯、可回放 |
-| **n8n** | 可视化工作流，但较重（Docker），无内置生成 | 单二进制，终端原生，关键词匹配生成工作流 |
-| **Bash** | 难写难维护，无错误恢复 | 描述生成，内置重试/熔断/检查点 |
-| **LangChain/AutoGPT** | 纯 Agent 无确定性执行保障 | Agent + Runtime 双重模式，Agent 可降级为确定性工作流 |
-| **Claude Code/Cursor** | 云端依赖，代码编辑场景 | 本地优先，通用自动化，300+ 技能，执行可审计 |
+aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用户与个人。核心优势：
 
-### Benchmark 对比
+**本地优先，数据不出本地** — 单二进制零运行时依赖，~5MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退、323 模板内嵌进二进制首跑自动释放）。
 
-可复现的性能对比基准测试（单次任务执行，5 次取平均）：
+**连接你自己的 LLM** — Ollama / vLLM / LM Studio / DeepSeek 本地部署 / 任何 OpenAI 兼容 endpoint，loopback 地址（127.0.0.1 / localhost）免 API Key 接入。有本地 LLM 时由 LLM 做意图理解与动态生成工作流（`--ai` / `chat`），无 LLM 时关键词匹配兜底，离线仍可用。
 
-| 指标 | aflare | n8n | LangChain |
-|------|--------|-----|-----------|
-| **启动时间** | < 0.01s | 3-8s (Docker) | 1-3s (Python import) |
-| **空闲内存** | ~5MB | ~200MB+ (容器) | ~80MB+ (Python 进程) |
-| **部署方式** | 单二进制 | Docker + PostgreSQL | pip install |
-| **运行时依赖** | 零 | Node.js + DB | Python + 多包 |
-| **工作流生成** | 关键词匹配 | 手动拖拽 | 代码编写 |
-| **崩溃恢复** | WAL + Checkpoint | 数据库 | 无内置 |
+**连接你自己的数据库与知识库** — SQL Query 节点直连你的数据库，RAG 节点 + 向量存储 + 文档解析接入你的知识库，MCP 协议连接外部服务，自定义节点用 Go 写任意集成。aflare 不回传你的数据，遥测可关闭——只干活，不窃取企业内部数据。
 
-> 运行 benchmark: `./scripts/benchmark.sh`（需要 Ollama 运行 llama3）
+**确定性执行保障** — YAML 声明式工作流：每一步做什么、依赖谁、失败怎么办全部确定。DAG 并行调度（TLA+ 形式化验证）、WAL 崩溃恢复 + Checkpoint（`--resume` 从中断处恢复）、Session 跨轮次持久化、Saga 事务补偿、幂等（Idempotency-Key + 跨进程锁）、重试 / 限流 / 熔断。所有操作可追溯、可回放、可验证。
+
+**Agent 与工作流双模式** — 对话式 Agent（`aflare chat`，ReAct 推理循环）与守护进程式 Agent（`aflare agent`，stdin + 定时任务 + 文件监听多源融合）共用同一核心；7 类可插拔能力（反思 / 人机协同 / 效用驱动 / 自适应 / 记忆 / 规划 / 工作流）；Agent 可降级为确定性工作流，灵活性与确定性兼得。300+ 预置技能模板覆盖 16 个领域。
+
+**安全合规** — HMAC 哈希链审计日志（防篡改）、AES-GCM 加密 + PBKDF2（600K 迭代）、Secret 自动脱敏（10+ 种模式：AWS/GitHub/JWT/私钥）、SSRF 防护 / Path Traversal / Command Injection 白名单、出站数据量异常监控 + 熔断器自动隔离、四级安全等级（L0-L3）按需收紧。
+
+**一键上手，离线丝滑** — `aflare doctor` 环境自检、`aflare init` 交互式配置向导、`aflare template run <id>` 一键运行模板（无需 clone 或记路径）、未知命令智能提示（did-you-mean）、零配置示例立即可跑。
+
+**可扩展生态** — 自定义节点（Go）、MCP Server / Client、插件系统（社区 `.so`）、社区模板贡献（`aflare template submit`）、场景包一键安装（`aflare install-pack`）。已有 323 Skill 覆盖 16 个领域，目标 1000+。
+
+**工程质量** — 表达式引擎（字节码 IR + 向量化批量求值）、Prometheus 指标端点、CI 双架构验证（x86-64 + ARM64）、国产芯片适配（昇腾 / 寒武纪 / 海光）。
 
 ---
 

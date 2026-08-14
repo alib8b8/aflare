@@ -140,30 +140,27 @@ L2: Runtime      —  Execution layer
 
 ---
 
-## How is this different?
+## Project Strengths
 
-| Tool | Problem | aflare |
-|------|---------|--------|
-| **AI Agent (general)** | LLM decides execution — unpredictable, hard to audit | Deterministic YAML workflows as execution backend, traceable and replayable |
-| **n8n** | Visual workflow, but heavier (Docker), no built-in generation | Single binary, terminal-native, keyword-based workflow generation |
-| **Bash** | Hard to write and maintain, no error recovery | Description-based generation, built-in retry/circuit-breaking/checkpoint |
-| **LangChain/AutoGPT** | Pure Agent without deterministic execution guarantees | Agent + Runtime dual mode, Agent can degrade to deterministic workflow |
-| **Claude Code/Cursor** | Cloud-dependent, code-editing focused | Local-first, general automation, 300+ skills, auditable execution |
+aflare is built for intranet / local-first users — enterprises and individuals who are sensitive about data privacy and security. Core strengths:
 
-### Benchmark Comparison
+**Local-first, data never leaves your machine** — Single binary with zero runtime deps, runs in ~5MB RAM; workflows, execution history, memory and secrets all stay on local disk; API keys are injected via environment variables or the OS keyring, never written in cleartext to `config.yaml`; fully offline-capable (offline install, `aflare doctor --offline`, WebUI Mermaid offline fallback, 323 templates embedded in the binary and auto-released on first run).
 
-Reproducible performance benchmark (single task execution, average of 5 runs):
+**Connect your own LLM** — Ollama / vLLM / LM Studio / local DeepSeek / any OpenAI-compatible endpoint, with loopback addresses (127.0.0.1 / localhost) requiring no API key. With a local LLM, the LLM drives intent understanding and dynamic workflow generation (`--ai` / `chat`); without one, keyword matching falls back so offline use still works.
 
-| Metric | aflare | n8n | LangChain |
-|--------|--------|-----|-----------|
-| **Startup time** | < 0.01s | 3-8s (Docker) | 1-3s (Python import) |
-| **Idle memory** | ~5MB | ~200MB+ (container) | ~80MB+ (Python process) |
-| **Deployment** | Single binary | Docker + PostgreSQL | pip install |
-| **Runtime deps** | None | Node.js + DB | Python + many packages |
-| **Workflow generation** | Keyword matching | Manual drag-and-drop | Code authoring |
-| **Crash recovery** | WAL + Checkpoint | Database | None built-in |
+**Connect your own databases and knowledge bases** — SQL Query node connects directly to your database, RAG node + vector store + document parsing hook into your knowledge base, MCP protocol bridges external services, and custom nodes let you write any integration in Go. aflare never exfiltrates your data and telemetry is opt-out — it only does the work, without leaking internal enterprise data.
 
-> Run the benchmark: `./scripts/benchmark.sh` (requires Ollama running llama3)
+**Deterministic execution guarantees** — YAML declarative workflows: every step's action, dependencies and failure handling are fully determined. DAG parallel scheduling (TLA+ formally verified), WAL crash recovery + checkpoint (`--resume` from the interruption point), cross-turn session persistence, Saga transactional compensation, idempotency (Idempotency-Key + cross-process lock), retry / rate limit / circuit breaker. Every operation is traceable, replayable, verifiable.
+
+**Dual Agent + Workflow mode** — Conversational Agent (`aflare chat`, ReAct reasoning loop) and daemon Agent (`aflare agent`, multi-source fusion of stdin + scheduled tasks + file watching) share one core; 7 pluggable capabilities (reflection / human-in-loop / utility-driven / adaptive / memory / planning / workflow); an Agent can degrade into a deterministic workflow, combining flexibility with determinism. 300+ built-in skill templates across 16 domains.
+
+**Security & compliance** — HMAC hash-chain audit log (tamper-evident), AES-GCM encryption + PBKDF2 (600K iterations), automatic secret redaction (10+ patterns: AWS/GitHub/JWT/private keys), SSRF / path-traversal / command-injection whitelisting, outbound-data anomaly monitoring + automatic circuit-breaker isolation, four security levels (L0-L3) tightened on demand.
+
+**One-command onboarding, smooth offline** — `aflare doctor` environment self-check, `aflare init` interactive setup wizard, `aflare template run <id>` one-command template execution (no clone or path lookup needed), smart unknown-command hints (did-you-mean), zero-config examples ready to run immediately.
+
+**Extensible ecosystem** — Custom nodes (Go), MCP Server / Client, plugin system (community `.so`), community template contributions (`aflare template submit`), one-command scenario packs (`aflare install-pack`). 323 skills already cover 16 domains, targeting 1000+.
+
+**Engineering quality** — Expression engine (bytecode IR + vectorized batch evaluation), Prometheus metrics endpoint, CI dual-architecture verification (x86-64 + ARM64), domestic-chip adaptation (Ascend / Cambricon / Hygon).
 
 ---
 
