@@ -366,6 +366,47 @@ func loopbackAllowed() bool {
 	return v == "1" || v == "true" || v == "yes"
 }
 
+// llmAllowNoKey reports whether the OpenAI-compatible node should skip its
+// mandatory api_key check for loopback endpoints. Local LLM servers (vLLM,
+// LM Studio, Ollama's OpenAI-compatible /v1 port, text-embeddings-inference,
+// etc.) typically do not require an API key, but the compat node used to
+// reject them outright unless the user supplied a dummy key like "sk-any".
+// With AFLARE_LLM_ALLOW_NO_KEY=1 the check is skipped for loopback
+// endpoints only; cloud endpoints still require a key. Default is OFF so
+// existing behaviour (and the TestProviderExecuteMissingAPIKey test) is
+// preserved.
+func llmAllowNoKey() bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("AFLARE_LLM_ALLOW_NO_KEY")))
+	return v == "1" || v == "true" || v == "yes"
+}
+
+// isLoopbackEndpoint reports whether the host portion of rawURL resolves
+// to a loopback address (127.0.0.0/8 or ::1). Used by the LLM compat node
+// to decide whether AFLARE_LLM_ALLOW_NO_KEY applies. The lookup is
+// best-effort: on DNS failure the endpoint is treated as non-loopback
+// (fail-closed for SSRF safety).
+func isLoopbackEndpoint(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return true
+	}
+	ips, err := net.LookupHost(host)
+	if err != nil {
+		return false
+	}
+	for _, ipStr := range ips {
+		ip := net.ParseIP(ipStr)
+		if ip != nil && ip.IsLoopback() {
+			return true
+		}
+	}
+	return false
+}
+
 // ValidateIP reports whether ip is safe to connect to (blocks loopback,
 // private, link-local, unspecified, multicast, and reserved ranges). It
 // delegates to httpclient.ValidatePublic so the IP-range policy lives in

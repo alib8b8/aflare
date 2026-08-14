@@ -61,6 +61,17 @@ var openAICompatibleConfigs = []core.LLMNodeConfig{
 		DefaultEndpoint: "https://api.anthropic.com/v1",
 		EnvAPIKey:       "ANTHROPIC_API_KEY", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "Anthropic",
+		// The native Anthropic API is NOT OpenAI-compatible: it uses
+		// POST /v1/messages with x-api-key + anthropic-version headers,
+		// not /chat/completions with Authorization: Bearer. This entry
+		// drives the request through the OpenAI-compatible code path, so
+		// calls to the default endpoint will 404. To actually use Claude,
+		// point `endpoint` at an OpenAI-compatible proxy such as
+		// LiteLLM, one-api, or LiteLLM proxy that translates the
+		// protocol. See docs/llm-providers.md (added separately) for
+		// setup instructions. The description makes this limit visible
+		// in `aflare list` so users are not surprised by 404s.
+		DescriptionOverride: "Call Anthropic Claude via an OpenAI-compatible proxy (LiteLLM/one-api). Native api.anthropic.com is NOT OpenAI-compatible and will 404; configure `endpoint` to point at a proxy that translates the protocol.",
 	},
 	{
 		Name:            "gemini",

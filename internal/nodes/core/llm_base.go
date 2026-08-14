@@ -244,6 +244,13 @@ type LLMNodeConfig struct {
 	EnvAPIKey       string
 	EnvAPIBase      string
 	ProviderName    string
+	// DescriptionOverride, when non-empty, replaces the default
+	// "Call <ProviderName> LLM API" description in Schema(). Used by
+	// providers whose default description would mislead users about
+	// actual capabilities (e.g. anthropic, which is registered as an
+	// OpenAI-compatible provider but the native Anthropic API is NOT
+	// OpenAI-compatible and requires a protocol-converting proxy).
+	DescriptionOverride string
 }
 
 // OpenAICompatibleNode is a Node that talks to any OpenAI-compatible
@@ -489,14 +496,21 @@ func (n *OpenAICompatibleNode) Name() string {
 
 // Description implements the Node interface.
 func (n *OpenAICompatibleNode) Description() string {
+	if n.config.DescriptionOverride != "" {
+		return n.config.DescriptionOverride
+	}
 	return fmt.Sprintf("Call %s LLM API", n.config.ProviderName)
 }
 
 // Schema implements the Node interface.
 func (n *OpenAICompatibleNode) Schema() NodeSchema {
+	desc := fmt.Sprintf("Call %s LLM API", n.config.ProviderName)
+	if n.config.DescriptionOverride != "" {
+		desc = n.config.DescriptionOverride
+	}
 	return NodeSchema{
 		Name:        n.config.Name,
-		Description: fmt.Sprintf("Call %s LLM API", n.config.ProviderName),
+		Description: desc,
 		Input:       "string - user message content",
 		Output:      "string - AI response content",
 		Params: []ParamSchema{
@@ -535,15 +549,12 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		model = config.GetDefaultModel(n.config.Name, n.config.EnvAPIKey+"_MODEL", n.config.DefaultModel)
 	}
 
-	apiKey, ok := params["api_key"]
-	if !ok || apiKey == "" {
-		apiKey = config.GetAPIKey(n.config.Name, n.config.EnvAPIKey)
-	}
-	if apiKey == "" {
-		return "", aferrors.Newf(aferrors.CodeLLMAPIAuthError, "%s API key required. Set %s env var, add to config file, or pass api_key param",
-			n.config.ProviderName, n.config.EnvAPIKey)
-	}
-
+	// Resolve endpoint BEFORE the api_key check so we can decide whether
+	// the mandatory-key requirement applies. Local LLM servers (vLLM,
+	// LM Studio, Ollama's OpenAI-compatible port, text-embeddings-inference)
+	// typically don't require an API key, but the compat node used to
+	// reject them outright unless the user supplied a dummy key. With
+	// AFLARE_LLM_ALLOW_NO_KEY=1 we skip the check for loopback endpoints.
 	endpoint, ok := params["endpoint"]
 	if !ok || endpoint == "" {
 		// Prefer a provider-specific base-URL env var (e.g. OPENAI_API_BASE)
@@ -563,6 +574,23 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 	// Validate endpoint URL to prevent SSRF + API key leakage
 	if err := ValidateLMLEndpoint(endpoint); err != nil {
 		return "", fmt.Errorf("endpoint URL validation failed: %w", err)
+	}
+
+	apiKey, ok := params["api_key"]
+	if !ok || apiKey == "" {
+		apiKey = config.GetAPIKey(n.config.Name, n.config.EnvAPIKey)
+	}
+	if apiKey == "" {
+		if llmAllowNoKey() && isLoopbackEndpoint(endpoint) {
+			// Local LLM server (vLLM / LM Studio / Ollama /v1 / TEI): no
+			// real key needed. Send a placeholder bearer token so the
+			// downstream HTTP request conforms to the OpenAI-compatible
+			// Authorization header shape.
+			apiKey = "aflare-local-placeholder"
+		} else {
+			return "", aferrors.Newf(aferrors.CodeLLMAPIAuthError, "%s API key required. Set %s env var, add to config file, or pass api_key param. For local LLM servers without a key, set AFLARE_LLM_ALLOW_NO_KEY=1 and point endpoint at a loopback address.",
+				n.config.ProviderName, n.config.EnvAPIKey)
+		}
 	}
 
 	generateURL := fmt.Sprintf("%s/chat/completions", endpoint)
