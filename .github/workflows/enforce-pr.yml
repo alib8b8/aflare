@@ -17,8 +17,11 @@ jobs:
   block-direct-push:
     name: Block direct push to main
     runs-on: ubuntu-latest
-    # Skip for PR merge commits (they went through review) and emergency overrides.
-    if: ${{ !startsWith(github.event.head_commit.message, 'Merge pull request') && !startsWith(github.event.head_commit.message, 'Merge branch') }}
+    # Skip for PR merge commits (they went through review) and emergency overrides
+    # via the [skip-pr-gate] marker. Checked in the job-level `if` so no checkout
+    # is needed (the previous step-level `git log` approach failed without a
+    # checkout step, silently breaking the escape hatch).
+    if: ${{ !startsWith(github.event.head_commit.message, 'Merge pull request') && !startsWith(github.event.head_commit.message, 'Merge branch') && !contains(github.event.head_commit.message, '[skip-pr-gate]') }}
     steps:
       - name: Reject direct push (must go through PR + CI gate + review)
         run: |
@@ -26,9 +29,4 @@ jobs:
           echo "::error::Create a feature branch, open a PR, and wait for the"
           echo "::error::'PR Review / gate (required)' check to pass + CODEOWNERS review."
           echo "::error::To override in an emergency, include [skip-pr-gate] in the commit message."
-          # Allow override via commit message for emergency hotfixes (documented escape hatch).
-          if git log -1 --pretty=%B | grep -q '\[skip-pr-gate\]'; then
-            echo "::warning::Emergency override detected ([skip-pr-gate]). Proceeding."
-            exit 0
-          fi
           exit 1
