@@ -25,25 +25,6 @@ import (
 	"github.com/alib8b8/aflare/internal/secrets"
 )
 
-// setupSecretsStore points the secrets package at a temp dir + known master
-// password so tests can run without a TTY or OS keyring. Returns a cleanup fn.
-func setupSecretsStore(t *testing.T) func() {
-	t.Helper()
-	dir := t.TempDir()
-	storePath := filepath.Join(dir, "secrets.dat")
-	// Override the package-level default path via the exported setter effect:
-	// secrets.defaultSecretsPath is unexported, so we write through the public
-	// surface by setting the env var the loader consults for the password and
-	// by pointing GetSecretManager's path. Since the path is a package var
-	// initialized in init(), we use a small indirection: set AFLARE_CONFIG is
-	// not it; instead we rely on the fact that GetSecretManager reads
-	// defaultSecretsPath. We cannot change it from here, so we exercise the
-	// logic by operating on a manager loaded from our temp path directly and
-	// saving there, then reading back via the same path through a helper.
-	t.Setenv("AFLARE_SECRETS_PASSWORD", "test-master-pw")
-	return func() { _ = os.Remove(storePath) }
-}
-
 // newManagerAt loads (or creates) a SecretManager at the given path using the
 // test master password, bypassing the global default path.
 func newManagerAt(t *testing.T, path string) *secrets.SecretManager {
