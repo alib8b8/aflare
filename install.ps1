@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $BINARY_NAME = "aflare"
 $REPO = "alib8b8/aflare"
-$GITCODE_REPO = "aflare/aflare"
+$GITCODE_REPO = "llm-box/llm-box"
 
 function Write-Info($msg)    { Write-Host "[INFO] " -ForegroundColor Cyan -NoNewline; Write-Host $msg }
 function Write-Success($msg) { Write-Host "[OK] "   -ForegroundColor Green -NoNewline; Write-Host $msg }
