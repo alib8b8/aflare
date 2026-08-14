@@ -317,3 +317,68 @@ func TestPrintSecretsUsage(t *testing.T) {
 		}
 	}
 }
+
+// TestHandleSecrets_HelpDispatch verifies the -h/--help/help dispatch paths
+// print usage without calling os.Exit. These are the only HandleSecrets
+// branches safe to test in-process (others os.Exit on error).
+func TestHandleSecrets_HelpDispatch(t *testing.T) {
+	capture := func(args []string) string {
+		old := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		HandleSecrets(args)
+		w.Close()
+		os.Stdout = old
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		return buf.String()
+	}
+
+	for _, flag := range []string{"-h", "--help", "help"} {
+		out := capture([]string{flag})
+		if !strings.Contains(out, "Usage: aflare secrets") {
+			t.Errorf("HandleSecrets(%q) = %q, want usage text", flag, out)
+		}
+	}
+}
+
+// TestReadSecretValueFromTerminal_NonTTY verifies the non-terminal path
+// returns an error (rather than silently accepting piped input as a secret).
+func TestReadSecretValueFromTerminal_NonTTY(t *testing.T) {
+	// In `go test`, stdin is not a terminal, so this exercises the error path.
+	_, err := readSecretValueFromTerminal("prompt: ")
+	if err == nil {
+		t.Error("readSecretValueFromTerminal should error when stdin is not a TTY")
+	}
+	if !strings.Contains(err.Error(), "not a terminal") {
+		t.Errorf("error = %q, want 'not a terminal' hint", err)
+	}
+}
+
+// TestWriteWizardConfig_NoPlaintextAPIKey verifies that the wizard does not
+// persist the api_key to config.yaml — the core of the data-sensitive fix.
+func TestWriteWizardConfig_NoPlaintextAPIKey(t *testing.T) {
+	dir := t.TempDir()
+	// Point the wizard at a temp config path by overriding the configFilePath
+	// indirectly: writeWizardConfig reads configFilePath(), which consults
+	// AFLARE_CONFIG. Set it to a temp file.
+	cfgPath := filepath.Join(dir, "config.yaml")
+	t.Setenv("AFLARE_CONFIG", cfgPath)
+
+	_, err := writeWizardConfig("openai", "gpt-4", "sk-secret-12345", "https://api.openai.com/v1")
+	if err != nil {
+		t.Fatalf("writeWizardConfig: %v", err)
+	}
+
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	body := string(data)
+	if strings.Contains(body, "sk-secret-12345") {
+		t.Errorf("config.yaml contains plaintext API key:\n%s", body)
+	}
+	if !strings.Contains(body, "openai") {
+		t.Errorf("config.yaml missing provider entry:\n%s", body)
+	}
+}
