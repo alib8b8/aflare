@@ -63,7 +63,7 @@ func getConfigPaths() []string {
 
 func getDefaultConfig() *UpgradeConfig {
 	return &UpgradeConfig{
-		Mode:                ModeMonitor,
+		Mode: ModeMonitor,
 		// AutoUpdateEnabled defaults to false to align with the local-first /
 		// data-stays-local philosophy: phone-home is off by default, so actual
 		// auto-update never fires anyway. Keeping the config flag false avoids
