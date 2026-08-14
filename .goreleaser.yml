@@ -3,8 +3,9 @@ version: 2
 project_name: aflare
 
 before:
-  hooks:
-    - go mod tidy
+  hooks: []  # go mod tidy removed: it mutates go.mod/go.sum in CI and makes the
+             # git tree dirty, which fails GoReleaser's dirty-state check.
+             # The repo is kept tidy in-commit; CI validates with `go build ./...`.
 
 builds:
   - id: aflare
