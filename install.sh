@@ -4,7 +4,7 @@ set -e
 BINARY_NAME="aflare"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 REPO="alib8b8/aflare"
-GITCODE_REPO="aflare/aflare"
+GITCODE_REPO="llm-box/llm-box"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

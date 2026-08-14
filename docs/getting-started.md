@@ -49,7 +49,7 @@ go install ./cmd/aflare
 **国内网络加速**（使用GitCode镜像）：
 
 ```bash
-git clone https://gitcode.com/aflare/aflare.git
+git clone https://gitcode.com/llm-box/llm-box.git
 cd aflare
 go install ./cmd/aflare
 ```
