@@ -2,7 +2,7 @@ name: Content Processor
 steps:
   - node: file_read
     params:
-      path: post.md
+      path: examples/post.md
   - node: transform
     params:
       operation: markdown_to_html

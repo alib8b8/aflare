@@ -64,14 +64,21 @@ brew install alib8b8/tap/aflare
 > - Fedora:       `sudo dnf install bubblewrap`
 
 ```bash
-# Generate workflow from keywords
+# 1. Environment self-check (zero-config, runs immediately)
+aflare doctor
+
+# 2. Zero-config example: read post.md → convert to HTML → write post.html
+aflare run examples/content-processor.yaml
+
+# 3. Configure an LLM (interactive wizard: local Ollama or cloud provider)
+aflare init
+
+# 4. Generate a workflow from keywords (no LLM needed, pure template match; add --ai for LLM-generated complex ones)
 aflare create "monitor BTC price every 10 minutes, alert via Telegram when > 70000"
 # Output: workflow generated → btc-monitor.yaml
-
-# Run the workflow
 aflare run btc-monitor.yaml
 
-# Interactive AI Agent chat (ReAct Agent + 300+ skills)
+# 5. Interactive AI Agent chat (ReAct Agent + 300+ skills)
 aflare chat
 # Or: aflare chat -p deepseek -m deepseek-chat
 
