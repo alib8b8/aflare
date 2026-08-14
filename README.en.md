@@ -5,7 +5,7 @@
     <strong>English</strong>
   </p>
   <p><strong>AI Beyond Chat — Get Things Done</strong></p>
-  <p><em>Local-first · Data Stays Local · ReAct Reasoning Loop · 300+ Skill Templates · Deterministic Workflow Execution · 7 Pluggable Capabilities</em></p>
+  <p><em>Local-first · Data Stays Local · Connect Your Own LLM / Database / Knowledge Base · ReAct Reasoning · 300+ Skill Templates · Deterministic Workflow Execution</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
@@ -299,7 +299,7 @@ Reproducible performance benchmark (single task execution, average of 5 runs):
 |---------|--------|-------|
 | v0.6 | Done | Agent memory infrastructure, voice AI toolchain, WAL persistence, TLA+ verification |
 | v0.7 | Done | Financial scenario enhancement (Saga / Idempotency / Audit chain), ReAct Agent chat, 300+ skill templates, 7 pluggable capabilities, Agent unified event loop |
-| **v0.8** | **Current** | Domestic chip support refinement, Agent capability deepening |
+| **v0.8** | **Current** | Domestic chip support refinement, offline/intranet-first experience, Agent capability deepening, privacy/security hardening |
 | v1.0 | Planned | Stable API, LTS |
 
 See [CHANGELOG.md](CHANGELOG.md) for details.
