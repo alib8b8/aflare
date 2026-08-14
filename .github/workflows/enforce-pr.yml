@@ -47,12 +47,31 @@ jobs:
             exit 0
           fi
 
+          # Fast path 3: squash-merge commits. GitHub formats the squash commit
+          # title as "<PR title> (#NN)". Match the trailing PR reference in the
+          # first line, then verify via the PR API that the PR exists AND is
+          # merged. NOTE: `gh api` writes the 404 error body to stdout and
+          # exits 0 for some errors, so we cannot rely on exit code or stdout
+          # non-emptiness alone — we require a valid ISO-8601 merged_at value.
+          SQUASH_PR=$(printf '%s' "$COMMIT_MSG" | head -1 | grep -oE '\(#[0-9]+\)$' | grep -oE '[0-9]+')
+          if [ -n "$SQUASH_PR" ]; then
+            MERGED_AT=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${SQUASH_PR}" \
+              --jq '.merged_at // empty' 2>/dev/null || true)
+            if printf '%s' "$MERGED_AT" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T'; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "Squash-merge commit of merged PR #${SQUASH_PR} (merged_at ${MERGED_AT}) — allowing."
+              exit 0
+            fi
+          fi
+
           # Robust path: ask GitHub whether this commit is the merge commit of a
-          # merged PR. This covers squash merges (commit message = "<PR title>
-          # (#NN)") and rebase merges, since GitHub links the resulting commit
-          # to its PR. Direct pushes return an empty list → blocked below.
+          # merged PR. Covers rebase merges and acts as a backstop for squash
+          # merges. NOTE: the `commits/{sha}/pulls` endpoint returns `merged`
+          # as null (not true) for squash merges, so match on `merge_commit_sha`
+          # equaling the pushed SHA instead — that field is set reliably for
+          # all merge strategies. Direct pushes return an empty list → blocked.
           PR_NUMBER=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${COMMIT_SHA}/pulls" \
-            --jq '[.[] | select(.merged == true)] | .[0].number' 2>/dev/null || echo "")
+            --jq "[.[] | select(.merge_commit_sha == \"${COMMIT_SHA}\")] | .[0].number" 2>/dev/null || echo "")
           if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Commit ${COMMIT_SHA} is the merge of PR #${PR_NUMBER} — allowing."
