@@ -48,8 +48,8 @@ func TestGetDefaultConfig(t *testing.T) {
 	if config.Mode != ModeMonitor {
 		t.Errorf("expected mode %s, got %s", ModeMonitor, config.Mode)
 	}
-	if !config.AutoUpdateEnabled {
-		t.Error("expected AutoUpdateEnabled to be true")
+	if config.AutoUpdateEnabled {
+		t.Error("expected AutoUpdateEnabled to be false (local-first default)")
 	}
 	if config.CheckInterval != "24h" {
 		t.Errorf("expected interval 24h, got %s", config.CheckInterval)
