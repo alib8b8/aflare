@@ -18,6 +18,7 @@ package api
 import (
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -103,26 +104,31 @@ func (rl *ipRateLimiter) cleanup() {
 	}
 }
 
-// extractClientIP extracts the client IP from the request, accounting for
-// X-Forwarded-For and X-Real-IP headers (common in reverse proxy setups).
-// Falls back to RemoteAddr if no proxy headers are present.
-// IP values are trimmed to avoid duplicate entries from whitespace variations.
+// extractClientIP extracts the client IP from the request.
+//
+// By default ONLY RemoteAddr is trusted — X-Forwarded-For / X-Real-IP are
+// client-controlled headers and trusting them unconditionally allows an
+// attacker to spoof a different IP per request and bypass per-IP rate
+// limiting. Set AFLARE_TRUST_PROXY_HEADERS=1 when aflare runs behind a
+// trusted reverse proxy that overwrites these headers.
 func extractClientIP(r *http.Request) string {
-	// X-Forwarded-For: client, proxy1, proxy2
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the first (original client) IP, trim whitespace
-		xff = strings.TrimSpace(xff)
-		for i := 0; i < len(xff); i++ {
-			if xff[i] == ',' {
-				return strings.TrimSpace(xff[:i])
+	if os.Getenv("AFLARE_TRUST_PROXY_HEADERS") == "1" {
+		// X-Forwarded-For: client, proxy1, proxy2
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			// Take the first (original client) IP, trim whitespace
+			xff = strings.TrimSpace(xff)
+			for i := 0; i < len(xff); i++ {
+				if xff[i] == ',' {
+					return strings.TrimSpace(xff[:i])
+				}
 			}
+			return xff
 		}
-		return xff
-	}
 
-	// X-Real-IP is set by some proxies
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return strings.TrimSpace(xri)
+		// X-Real-IP is set by some proxies
+		if xri := r.Header.Get("X-Real-IP"); xri != "" {
+			return strings.TrimSpace(xri)
+		}
 	}
 
 	// Fall back to RemoteAddr

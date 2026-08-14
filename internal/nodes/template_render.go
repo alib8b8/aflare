@@ -84,6 +84,12 @@ func (n *TemplateRenderNode) Execute(ctx context.Context, input string, params m
 	}
 
 	funcMap := sprig.FuncMap()
+	// Remove functions that can read host environment variables. The
+	// workflow expression engine ({{env.NAME}}) has a strict env allowlist,
+	// but Sprig's env/expandenv would bypass it — letting a malicious
+	// template exfiltrate secrets like {{ env "AWS_SECRET_ACCESS_KEY" }}.
+	delete(funcMap, "env")
+	delete(funcMap, "expandenv")
 	funcMap["now"] = func() string { return time.Now().Format(time.RFC3339) }
 
 	tmpl, err := template.New("template").Funcs(funcMap).Parse(templateStr)

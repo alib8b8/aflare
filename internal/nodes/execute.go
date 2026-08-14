@@ -30,7 +30,12 @@ import (
 // shellMetachars detects shell metacharacters that can be used for command
 // injection. Note: space is intentionally NOT included here so that commands
 // with arguments (e.g. "ls -la", "echo hello") still work under allowlist mode.
-var shellMetachars = regexp.MustCompile("[;|&$`(){}<>\\\\*?!~='\"]")
+//
+// Newlines (\n, \r) are included because in `sh -c` they act as command
+// separators — without them an attacker could write `ls\ncurl evil` and the
+// first-word allowlist check only inspects "ls", letting the second line
+// execute an arbitrary non-whitelisted command.
+var shellMetachars = regexp.MustCompile(`[;|&$`(){}<>\\*?!~='"\n\r]`)
 
 var allowListEnabled = true // 默认开启白名单
 var auditLogFile string
@@ -111,11 +116,16 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 				return "", fmt.Errorf("command %q is not in the allowed list (set AFLARE_EXECUTE_UNSAFE=1 to disable allowlist)", cmdName)
 			}
 			// sed and awk are read-only commands in the whitelist, but their
-			// -i flag enables in-place file modification. Block it explicitly.
+			// -i flag enables in-place file modification and -f loads a script
+			// file that can contain arbitrary shell escapes (e.g. awk's
+			// system("...")). Block both explicitly to prevent allowlist bypass.
 			if cmdName == "sed" || cmdName == "awk" {
 				for _, arg := range firstWord[1:] {
 					if arg == "-i" || strings.HasPrefix(arg, "-i") {
 						return "", fmt.Errorf("in-place edit (-i) is not allowed for %s under allowlist mode", cmdName)
+					}
+					if arg == "-f" || arg == "--file" || strings.HasPrefix(arg, "-f") {
+						return "", fmt.Errorf("script file loading (-f) is not allowed for %s under allowlist mode (can execute arbitrary commands)", cmdName)
 					}
 				}
 			}

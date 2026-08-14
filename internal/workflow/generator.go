@@ -31,6 +31,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/alib8b8/aflare/internal/config"
+	"github.com/alib8b8/aflare/internal/nodes/core"
 	"github.com/alib8b8/aflare/internal/watermark"
 )
 
@@ -692,6 +693,15 @@ func callLLMForGeneration(ctx context.Context, description string) (string, erro
 	}
 
 	url := endpoint + "/chat/completions"
+	// Validate the endpoint with SSRF protection before dialing. The
+	// generator endpoint is user-configured (env/config), so we use the
+	// LLM-endpoint validator which permits loopback (local Ollama / vLLM)
+	// and public cloud hosts but still blocks link-local / unspecified /
+	// multicast / reserved ranges. The dial-time re-check below closes the
+	// DNS-rebinding window.
+	if err := core.ValidateLMLEndpoint(url); err != nil {
+		return "", fmt.Errorf("invalid LLM endpoint: %w", err)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return "", fmt.Errorf("failed to create LLM request: %w", err)
@@ -699,7 +709,14 @@ func callLLMForGeneration(ctx context.Context, description string) (string, erro
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{Timeout: llmGenerateTimeout}
+	// Reuse the SSRF-safe LLM transport (dial-time IP validation) and
+	// re-validate every redirect target, matching the pattern used by the
+	// ollama / fastgpt / multimodal providers.
+	client := &http.Client{
+		Timeout:       llmGenerateTimeout,
+		Transport:     core.SafeLLMHTTPClient.Transport,
+		CheckRedirect: core.HTTPRedirectValidator(core.ValidateLMLEndpoint),
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to call LLM API: %w", err)

@@ -380,13 +380,21 @@ func (s *WebhookServer) runTask(task *Task, body []byte, query map[string][]stri
 
 	wfPath, err := s.findWorkflowPath(task.WorkflowName)
 	if err != nil {
+		// findWorkflowPath errors are already generic (no internal paths).
 		s.completeTask(task.ID, TaskFailed, "", err.Error())
 		return
 	}
 
 	wf, err := workflow.ParseWorkflow(wfPath)
 	if err != nil {
-		s.completeTask(task.ID, TaskFailed, "", err.Error())
+		// Log the detailed error server-side; expose only a generic message
+		// to clients to avoid leaking absolute file paths / parser internals.
+		logger.Error("webhook workflow parse failed",
+			"task_id", task.ID,
+			"workflow", task.WorkflowName,
+			"err", err.Error(),
+		)
+		s.completeTask(task.ID, TaskFailed, "", "workflow parse failed")
 		return
 	}
 
@@ -518,18 +526,23 @@ func isValidWorkflowName(name string) bool {
 	return true
 }
 
+// getClientIP extracts the client IP. Proxy headers (X-Forwarded-For /
+// X-Real-IP) are only trusted when AFLARE_TRUST_PROXY_HEADERS=1, since they
+// are client-controlled and can be spoofed to bypass per-IP rate limiting.
 func getClientIP(r *http.Request) string {
-	ip := r.Header.Get("X-Forwarded-For")
-	if ip != "" {
-		parts := strings.Split(ip, ",")
-		ip = strings.TrimSpace(parts[0])
+	if os.Getenv("AFLARE_TRUST_PROXY_HEADERS") == "1" {
+		ip := r.Header.Get("X-Forwarded-For")
+		if ip != "" {
+			parts := strings.Split(ip, ",")
+			ip = strings.TrimSpace(parts[0])
+			if ip != "" {
+				return ip
+			}
+		}
+		ip = r.Header.Get("X-Real-Ip")
 		if ip != "" {
 			return ip
 		}
-	}
-	ip = r.Header.Get("X-Real-Ip")
-	if ip != "" {
-		return ip
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

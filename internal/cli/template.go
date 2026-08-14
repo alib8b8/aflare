@@ -166,9 +166,25 @@ func handleTemplateSubmit(args []string) {
 		templateName = baseName
 	}
 
+	// baseName is derived from the user-supplied file path and is later
+	// joined into the templates tree (templatesDir/category/baseName).
+	// Validate it is a single safe path component to prevent traversal
+	// (e.g. a file literally named "..yaml" would otherwise let the
+	// writer escape templatesDir).
+	if err := validateTemplateNameComponent(baseName, "template name"); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Determine category.
 	if category == "" {
 		category = guessCategoryFromName(baseName)
+	}
+	// category (when user-supplied via --category) is joined into the
+	// templates path too, so it must be a single safe component.
+	if err := validateTemplateNameComponent(category, "category"); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Validate category is known.
@@ -282,6 +298,43 @@ func handleTemplateSubmit(args []string) {
 
 	// Award a virtual badge for the template contribution.
 	awardBadgeForTemplate(author, skillID)
+}
+
+// validateTemplateNameComponent validates that name is a single safe path
+// component (no directory traversal, no path separators, no null bytes, no
+// leading dot, no Windows drive letter). It is used for user-supplied
+// template names, category names, and destination names that get joined
+// into filesystem paths — without it, a value like "../evil" or "a/b"
+// could escape the intended template directory (path traversal).
+func validateTemplateNameComponent(name, field string) error {
+	if name == "" {
+		return fmt.Errorf("%s must not be empty", field)
+	}
+	if len(name) > 128 {
+		return fmt.Errorf("%s is too long (max 128 characters)", field)
+	}
+	if strings.ContainsRune(name, '\x00') {
+		return fmt.Errorf("%s must not contain null bytes", field)
+	}
+	// Reject path separators (both Unix and Windows) — a name component
+	// must never contain them.
+	if strings.ContainsAny(name, `/\`) {
+		return fmt.Errorf("%s must not contain path separators", field)
+	}
+	// Reject parent-directory references and the literal "." / "..".
+	if name == "." || name == ".." || strings.Contains(name, "..") {
+		return fmt.Errorf("%s must not contain parent-directory references", field)
+	}
+	// Reject leading dots (hidden files / traversal variants like ".bashrc").
+	if strings.HasPrefix(name, ".") {
+		return fmt.Errorf("%s must not start with a dot", field)
+	}
+	// Reject Windows drive letters (e.g. "C:foo") which filepath.Join
+	// treats as an absolute path on Windows.
+	if len(name) >= 2 && name[1] == ':' {
+		return fmt.Errorf("%s must not look like a Windows drive path", field)
+	}
+	return nil
 }
 
 // validateTemplateFile validates that the given path is an existing YAML file.

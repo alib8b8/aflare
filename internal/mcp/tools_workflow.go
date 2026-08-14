@@ -93,13 +93,14 @@ func (s *Server) toolWorkflowCreate(args map[string]interface{}) (*toolCallResul
 }
 
 func (s *Server) toolWorkflowList(args map[string]interface{}) (*toolCallResult, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
+
 	dir := optionalString(args, "directory")
 	if dir == "" {
-		var err error
-		dir, err = os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get working directory: %w", err)
-		}
+		dir = cwd
 	}
 
 	absDir, err := filepath.Abs(dir)
@@ -107,7 +108,25 @@ func (s *Server) toolWorkflowList(args map[string]interface{}) (*toolCallResult,
 		return nil, fmt.Errorf("invalid directory: %w", err)
 	}
 
-	entries, err := os.ReadDir(absDir)
+	// Restrict directory listing to the current working directory tree.
+	// Without this, an MCP client (or a compromised LLM tool call) could
+	// enumerate arbitrary directories (e.g. "/etc", "/home/user/.ssh")
+	// via the "directory" argument — a directory-listing / information
+	// disclosure issue. Reject null bytes and any path that resolves
+	// outside cwd.
+	if strings.ContainsRune(dir, '\x00') {
+		return nil, fmt.Errorf("invalid directory")
+	}
+	absCwd, err := filepath.Abs(cwd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve working directory: %w", err)
+	}
+	rel, err := filepath.Rel(absCwd, absDir)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return nil, fmt.Errorf("directory must be within the current working directory")
+	}
+
+	entries, err := os.ReadDir(absDir) // #nosec G304 -- absDir validated to be within cwd
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}

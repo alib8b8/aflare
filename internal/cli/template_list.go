@@ -241,6 +241,13 @@ func handleTemplateNew(args []string) {
 		os.Exit(1)
 	}
 	name := args[0]
+	// name is joined into a filesystem path (./<name>/workflow.yaml);
+	// validate it is a single safe component to prevent path traversal
+	// (e.g. "../evil" would write outside the current directory).
+	if err := validateTemplateNameComponent(name, "name"); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
 	dir := filepath.Join(".", name)
 	wfPath := filepath.Join(dir, "workflow.yaml")
 
@@ -302,6 +309,13 @@ func handleTemplateClone(args []string) {
 	}
 	sourceID := args[0]
 	destName := args[1]
+
+	// destName is joined into a filesystem path (./<destName>/workflow.yaml);
+	// validate it is a single safe component to prevent path traversal.
+	if err := validateTemplateNameComponent(destName, "destination name"); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
 
 	templatesDir := meta.ResolveTemplatesPath()
 	_ = skillsPkg.EnsureEmbeddedTemplates(templatesDir)

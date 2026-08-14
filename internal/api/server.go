@@ -17,6 +17,7 @@ package api
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -231,7 +232,11 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			key = strings.TrimPrefix(key, "Bearer ")
 		}
 
-		if key != s.apiKey {
+		// Use constant-time comparison to prevent timing side-channel
+		// attacks that could recover the API key byte-by-byte. This is
+		// consistent with the webhook/webui/mcp auth paths which already
+		// use subtle.ConstantTimeCompare.
+		if subtle.ConstantTimeCompare([]byte(key), []byte(s.apiKey)) != 1 {
 			s.writeJSON(w, http.StatusUnauthorized, map[string]string{
 				"error": "invalid or missing API key",
 			})

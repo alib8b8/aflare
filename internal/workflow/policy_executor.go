@@ -64,7 +64,7 @@ func (pe *PolicyExecutor) ValidateWorkflow(ctx context.Context, wf *Workflow) er
 // validateStep checks a single step against the policy.
 func (pe *PolicyExecutor) validateStep(ctx context.Context, index int, step *WorkflowStep) error {
 	switch {
-	case step.Node == "shell" || step.Node == "exec":
+	case step.Node == "shell" || step.Node == "exec" || step.Node == "execute":
 		cmd := ""
 		if step.Params != nil {
 			cmd = step.Params["command"]

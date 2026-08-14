@@ -82,9 +82,26 @@ func TestToolWorkflowCreate_WithName(t *testing.T) {
 	}
 }
 
+// chdir changes the working directory to dir for the duration of the test,
+// restoring the original directory on cleanup. Used by workflow_list tests
+// since toolWorkflowList restricts listing to the current working directory
+// tree (directory-listing / information-disclosure hardening).
+func chdir(t *testing.T, dir string) {
+	t.Helper()
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir %s: %v", dir, err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(orig) })
+}
+
 func TestToolWorkflowList_EmptyDir(t *testing.T) {
 	s := NewServer()
 	tmpDir := t.TempDir()
+	chdir(t, tmpDir)
 	result, err := s.toolWorkflowList(map[string]interface{}{"directory": tmpDir})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -103,6 +120,7 @@ func TestToolWorkflowList_WithFiles(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(tmpDir, "a.yaml"), []byte("name: a"), 0644)
 	_ = os.WriteFile(filepath.Join(tmpDir, "b.yml"), []byte("name: b"), 0644)
 	_ = os.WriteFile(filepath.Join(tmpDir, "c.txt"), []byte("not a workflow"), 0644)
+	chdir(t, tmpDir)
 
 	result, err := s.toolWorkflowList(map[string]interface{}{"directory": tmpDir})
 	if err != nil {
@@ -854,6 +872,7 @@ func TestHandleRequest_ToolsCall_WorkflowList(t *testing.T) {
 	s := NewServer()
 	tmpDir := t.TempDir()
 	_ = os.WriteFile(filepath.Join(tmpDir, "test.yaml"), []byte("name: test"), 0644)
+	chdir(t, tmpDir)
 
 	params, _ := json.Marshal(map[string]interface{}{"name": "workflow_list", "arguments": map[string]interface{}{"directory": tmpDir}})
 	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
@@ -1059,6 +1078,22 @@ func TestToolWorkflowList_InvalidDir(t *testing.T) {
 	_, err := s.toolWorkflowList(map[string]interface{}{"directory": "/nonexistent/dir/path/xyz123"})
 	if err == nil {
 		t.Fatal("expected error for invalid directory")
+	}
+}
+
+// TestToolWorkflowList_PathTraversal verifies that a directory argument
+// escaping the current working directory is rejected, preventing arbitrary
+// directory enumeration via the MCP workflow_list tool.
+func TestToolWorkflowList_PathTraversal(t *testing.T) {
+	s := NewServer()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	parent := filepath.Dir(cwd)
+	_, err = s.toolWorkflowList(map[string]interface{}{"directory": parent})
+	if err == nil {
+		t.Fatal("expected error for directory outside working directory")
 	}
 }
 
