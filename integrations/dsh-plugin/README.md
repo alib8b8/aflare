@@ -65,6 +65,18 @@ in `cordis.yml` instead of a local path.
   to every run. Set `AFLARE_SAFE_MODE=1` in the DSH process environment for
   untrusted workflows.
 
+## Development
+
+```bash
+npm install
+npm run typecheck   # strict TS check
+npm test            # compiles, then runs integration tests via node --test
+```
+
+The tests execute the real `aflare` binary, resolved from `AFLARE_BIN` or
+the repo-root build output (`make build` in the repository root). Without a
+binary, the registration checks still run and the binary tests skip.
+
 ## License
 
 AGPL-3.0-or-later (same as the aflare project).
