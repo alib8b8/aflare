@@ -1,0 +1,9 @@
+# Example cordis.yml patch overlay for the aflare DSH plugin.
+#
+# Usage (path must be absolute):
+#   pnpm dsh web --patch /absolute/path/to/integrations/dsh-plugin/cordis.example.yml
+#
+# Replace /absolute/path/to with the real checkout location.
+- insert:
+    - id: aflare-tools
+      name: /absolute/path/to/integrations/dsh-plugin/dist/index.js

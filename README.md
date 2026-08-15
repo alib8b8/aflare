@@ -233,6 +233,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 - 内置 MCP Server，可被任何 MCP 客户端（Claude、VS Code、Cursor 等）连接
 - 提供工作流运行、验证、节点查询、代码图谱等工具
 - 内置 MCP Client，工作流中可直接调用外部 MCP 服务
+- 也可通过 [DeepSeek Harness (DSH) 集成](docs/dsh.md) 将 aflare 工具暴露给 DSH 智能体（MCP 桥接零代码接入，或原生 [Cordis 插件](integrations/dsh-plugin)）
 
 ### 工程能力
 - 表达式引擎：字节码 IR + 向量化批量求值

@@ -1,0 +1,41 @@
+{
+  "name": "@alib8b8/dsh-plugin-aflare",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness (DSH) Cordis plugin exposing aflare workflow tools",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "cordis",
+    "aflare",
+    "workflow",
+    "mcp"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-tools": "*"
+  },
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alib8b8/aflare",
+    "directory": "integrations/dsh-plugin"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^5.9.3"
+  }
+}

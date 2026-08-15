@@ -31,3 +31,6 @@ __pycache__/
 # Local scratch / test run artifacts
 /tmp/
 logs.zip
+
+# Node (integrations/dsh-plugin)
+node_modules/
