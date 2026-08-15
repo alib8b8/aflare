@@ -76,6 +76,11 @@ jobs:
 
       - name: Push main and tags to GitCode
         if: steps.mirror.outputs.exists == 'true'
+        # GITCODE_TOKEN must be re-exported here: the credential helper
+        # stored in the probe step expands ${GITCODE_TOKEN} when git
+        # invokes it during this step, not when it is configured.
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
         run: |
           set -euo pipefail
           git remote add gitcode "https://gitcode.com/llm-box/aflare.git"
