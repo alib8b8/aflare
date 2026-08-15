@@ -35,7 +35,8 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Push main and tags to AtomGit
+      - name: Check mirror reachable
+        id: mirror
         env:
           ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
           # Mirror target under the project's own name. Historically this
@@ -50,8 +51,32 @@ jobs:
           fi
           # Token is passed via a per-remote credential helper so it never
           # becomes part of the remote URL (which git may print on errors).
+          # Configured here; persists in .git/config for the push step below.
           git config credential.https://atomgit.com.helper '!f() { echo "username=oauth2"; echo "password=${ATOMGIT_TOKEN}"; }; f'
-          git remote add atomgit "https://atomgit.com/${ATOMGIT_REPO}.git"
+          set +e
+          err=$(git ls-remote "https://atomgit.com/${ATOMGIT_REPO}.git" HEAD 2>&1)
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          # AtomGit reports a missing project as "could not be found" with
+          # HTTP 403 (verified against atomgit.com); GitHub-style "not found"
+          # is matched too, just in case.
+          elif echo "$err" | grep -qiE '(could not be found|not found)'; then
+            echo "::notice::Mirror https://atomgit.com/${ATOMGIT_REPO} does not exist yet. Skipping sync — create the empty repo on AtomGit and the next push will sync automatically."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            # Auth failure, network error, etc. — surface it instead of
+            # skipping silently.
+            echo "::error::Cannot reach mirror: $err"
+            exit 1
+          fi
+
+      - name: Push main and tags to AtomGit
+        if: steps.mirror.outputs.exists == 'true'
+        run: |
+          set -euo pipefail
+          git remote add atomgit "https://atomgit.com/alib8b8/aflare.git"
           # Mirror semantics: force-push so AtomGit always matches GitHub
           # exactly (the GitHub repo is the single source of truth).
           git push atomgit refs/heads/main:refs/heads/main --force
