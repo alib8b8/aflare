@@ -2,6 +2,7 @@
   "name": "@alib8b8/dsh-plugin-aflare",
   "version": "0.1.0",
   "description": "DeepSeek Harness (DSH) Cordis plugin exposing aflare workflow tools",
+  "license": "AGPL-3.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
