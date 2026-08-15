@@ -32,17 +32,18 @@ curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | ba
 aflare version   # sanity check
 ```
 
-### One-line install into DSH (once published to npm)
+### One-line install into DSH
 
 ```bash
 dsh plugin --profile web add @alib8b8/dsh-plugin-aflare
 ```
 
+Published on npm ([@alib8b8/dsh-plugin-aflare](https://www.npmjs.com/package/@alib8b8/dsh-plugin-aflare)).
 The package declares its bundle patch (`dsh.bundle.patch` in `package.json`),
 so DSH registers the plugin entry automatically — restart `dsh web` and the
 `aflare_*` tools are live. No profile editing needed.
 
-### From a local checkout (works today)
+### From a local checkout
 
 ```bash
 git clone https://github.com/alib8b8/aflare

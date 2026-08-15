@@ -146,7 +146,8 @@ The plugin package declares a **bundle patch** (`dsh.bundle.patch` in
 `package.json` → `cordis.patch.yml`), so installation self-registers:
 
 ```bash
-dsh plugin --profile web add @alib8b8/dsh-plugin-aflare   # npm (once published)
+dsh plugin --profile web add @alib8b8/dsh-plugin-aflare   # npm (published: 0.1.0)
+dsh plugin --profile web add github:alib8b8/dsh-plugin-aflare   # standalone dist repo
 dsh plugin --profile web add /path/to/aflare/integrations/dsh-plugin   # local path
 ```
 
@@ -161,13 +162,20 @@ modlens, ...) use.
 - **dsh index** (`dsh-index.xlings.org`) — browsable index of 100+ plugins
   with mirror-accelerated installs; submit a PR to `Sunrisepeak/dsh-index`.
 
-### Publishing checklist (when releasing to npm)
+### Publishing checklist (releasing future versions)
 
-1. `npm run typecheck && npm test` — the `prepublishOnly` hook enforces this.
-2. `npm publish` from `integrations/dsh-plugin` (public access).
-3. Verify: `npx -y @deepseek-ai/dsh plugin --profile web add @alib8b8/dsh-plugin-aflare`.
-4. Announce in the DSH GitHub Discussions "share your plugin" thread.
-5. Submit to the two community directories above.
+`@alib8b8/dsh-plugin-aflare@0.1.0` is live on
+[npm](https://www.npmjs.com/package/@alib8b8/dsh-plugin-aflare). For future
+releases:
+
+1. Bump `version` in `integrations/dsh-plugin/package.json` and mirror the
+   release to the standalone [dsh-plugin-aflare](https://github.com/alib8b8/dsh-plugin-aflare)
+   repo (its commit sha is what dsh-index pins).
+2. `npm run typecheck && npm test` — the `prepublishOnly` hook enforces this.
+3. `npm publish` from `integrations/dsh-plugin` (public access).
+4. Verify: `npx -y @deepseek-ai/dsh plugin --profile web add @alib8b8/dsh-plugin-aflare`.
+5. Follow up in dsh-index: bump the version pin in
+   `pkgs/d/dsh-plugin-aflare.lua` to the new standalone-repo commit.
 
 > Note: `dsh plugin add github:alib8b8/aflare` is **not** supported for this
 > repo — the GitHub/tarball formats expect a standalone plugin repo root,
