@@ -126,3 +126,50 @@ Trajectory integration) or plan to publish to npm.
 | Maintenance | None (tracks `aflare mcp`) | Plugin repo, but survives DSH MCP changes |
 
 Start with Option A; add Option B when you want a polished, shareable preset.
+
+## Joining the DSH plugin ecosystem
+
+DSH has no centralized "app store" — discovery flows through three community
+entry points, all fed by the same packaging format. aflare targets all three:
+
+### 1. GitHub `dsh-plugin` topic (the official community index)
+
+The "Community plugins" link on the official DSH page points to
+<https://github.com/topics/dsh-plugin>. Repositories tagged with the topic
+are aggregated automatically — no PR into the main DSH repo needed. The
+aflare repository carries the `dsh-plugin` topic, so the plugin is
+discoverable there.
+
+### 2. One-line installs via `dsh plugin add`
+
+The plugin package declares a **bundle patch** (`dsh.bundle.patch` in
+`package.json` → `cordis.patch.yml`), so installation self-registers:
+
+```bash
+dsh plugin --profile web add @alib8b8/dsh-plugin-aflare   # npm (once published)
+dsh plugin --profile web add /path/to/aflare/integrations/dsh-plugin   # local path
+```
+
+No manual `cordis.yml` editing; restart `dsh web` and the tools load.
+This is the same mechanism popular community plugins (dsh-at-file,
+modlens, ...) use.
+
+### 3. Community directories
+
+- **Awesome DSH Plugins** — community-maintained directory with daily
+  compatibility tracking; submit via its repository.
+- **dsh index** (`dsh-index.xlings.org`) — browsable index of 100+ plugins
+  with mirror-accelerated installs; submit a PR to `Sunrisepeak/dsh-index`.
+
+### Publishing checklist (when releasing to npm)
+
+1. `npm run typecheck && npm test` — the `prepublishOnly` hook enforces this.
+2. `npm publish` from `integrations/dsh-plugin` (public access).
+3. Verify: `npx -y @deepseek-ai/dsh plugin --profile web add @alib8b8/dsh-plugin-aflare`.
+4. Announce in the DSH GitHub Discussions "share your plugin" thread.
+5. Submit to the two community directories above.
+
+> Note: `dsh plugin add github:alib8b8/aflare` is **not** supported for this
+> repo — the GitHub/tarball formats expect a standalone plugin repo root,
+> while aflare ships the plugin from the `integrations/dsh-plugin/`
+> subdirectory. Use the npm package or a local path.

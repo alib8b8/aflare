@@ -1,0 +1,5 @@
+# Bundle patch applied by `dsh plugin --profile <p> add @alib8b8/dsh-plugin-aflare`.
+# Registers the plugin entry so its aflare_* tools load on the next start.
+- insert:
+    - id: aflare-tools
+      name: '@alib8b8/dsh-plugin-aflare'

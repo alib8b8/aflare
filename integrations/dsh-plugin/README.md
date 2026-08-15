@@ -21,16 +21,38 @@ makes.
 
 ## Install
 
-### From source (works today)
+### Prerequisite: the aflare binary
+
+The plugin drives the local `aflare` CLI, so install it first (one line; see
+the [aflare README](https://github.com/alib8b8/aflare) for Windows/source
+options):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash
+aflare version   # sanity check
+```
+
+### One-line install into DSH (once published to npm)
+
+```bash
+dsh plugin --profile web add @alib8b8/dsh-plugin-aflare
+```
+
+The package declares its bundle patch (`dsh.bundle.patch` in `package.json`),
+so DSH registers the plugin entry automatically — restart `dsh web` and the
+`aflare_*` tools are live. No profile editing needed.
+
+### From a local checkout (works today)
 
 ```bash
 git clone https://github.com/alib8b8/aflare
 cd aflare/integrations/dsh-plugin
-npm install
-npm run build
+npm install && npm run build
+dsh plugin --profile web add "$PWD"
 ```
 
-Then register it with a `cordis.yml` patch overlay (absolute path required):
+Or register the built entry manually with a `cordis.yml` patch overlay
+(absolute path required):
 
 ```yaml
 - insert:
@@ -43,11 +65,6 @@ Start DSH with the overlay:
 ```bash
 pnpm dsh web --patch ./aflare-patch.yml
 ```
-
-### npm (once published)
-
-Planned: `npm i @alib8b8/dsh-plugin-aflare`, then reference the package name
-in `cordis.yml` instead of a local path.
 
 ## Configuration
 

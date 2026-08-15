@@ -5,11 +5,17 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist/index.js", "dist/index.d.ts"],
+  "files": ["dist/index.js", "dist/index.d.ts", "cordis.patch.yml", "dsh.plugin.json"],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsc -p tsconfig.json && node --test dist/*.test.js"
+    "test": "tsc -p tsconfig.json && node --test dist/*.test.js",
+    "prepublishOnly": "npm run typecheck && npm test"
   },
   "keywords": [
     "deepseek-harness",
