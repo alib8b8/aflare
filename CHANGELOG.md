@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-08-15
+
+本版本为**发布审计修复**：面向首批测试用户修复安装与入口断点、清零安全漏洞。
+
+### Fixed
+- **国内安装 404**：一行安装脚本此前从陈旧的 pre-rename GitCode 镜像（`llm-box/llm-box`，停留在 v0.5.0）取"最新版本号"，再到 GitHub 下载对应 tag——必然 404。移除该镜像源，GitHub 为唯一版本源，国内通过 ghproxy 加速
+- **`aflare mcp` 子命令缺失**：文档记载的 MCP 入口实际是未知命令（此前仅 `--mcp-server` flag 可用），注册 `mcp` 子命令使两者等价
+- **execute 白名单报错不明**：allowlist 拦截 shell 元字符时定位违规字符及位置、列出全部禁止字符、给出 `echo hello` vs `echo "hello"` 修正示例，CLI 附中文排查建议
+- **pre-rename 残留清理**：README、docs、下载页、skills 中的 `llm-box/llm-box` 链接统一替换为规范 GitHub（或 ghproxy 加速）地址
+
+### Security
+- **govulncheck 可达漏洞清零**（10 → 0）：otel SDK/exporter 升级至 v1.45.0，Go 工具链钉至 go1.25.13
+
+### Added
+- internal/errors、internal/packs（覆盖率 100%）、internal/telemetry 首次补齐测试
+
 ## [0.8.0] - 2026-08-14
 
 本版本主题：**离线 / 内网首选项体验、隐私安全硬化、CLI 体验优化**。面向内网 / 本地优先、对数据隐私与安全敏感的企业用户与个人。

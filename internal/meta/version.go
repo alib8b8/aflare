@@ -76,8 +76,8 @@ func selfUpdateValidator() httpclient.Validator {
 }
 
 var (
-	Version   = "0.8.0"
-	BuildDate = "2026-08-14"
+	Version   = "0.8.1"
+	BuildDate = "2026-08-15"
 )
 
 const (
