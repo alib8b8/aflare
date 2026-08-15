@@ -283,6 +283,14 @@ func TestValidateCommand_ValidAdditional(t *testing.T) {
 	}
 }
 
+// TestValidateCommand_MCP guards the `aflare mcp` subcommand entry documented in
+// docs/mcp.md and docs/dsh.md (equivalent to the --mcp-server flag).
+func TestValidateCommand_MCP(t *testing.T) {
+	if err := ValidateCommand("mcp"); err != nil {
+		t.Errorf("expected command %q to be valid, got error: %v", "mcp", err)
+	}
+}
+
 func TestValidateCommand_Invalid(t *testing.T) {
 	commands := []string{"foobar", "workflow.yaml", "unknown"}
 	for _, cmd := range commands {

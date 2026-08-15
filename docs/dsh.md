@@ -70,9 +70,10 @@ The model should see `mcp__aflare__list_nodes`, `mcp__aflare__run_workflow_yaml`
 ```
 Run this aflare workflow:
 steps:
-  - node: echo
+  - node: file_write
     params:
-      message: "hello from DSH"
+      path: dsh-hello.txt
+      content: "hello from DSH"
 ```
 
 ### One-paste install prompt

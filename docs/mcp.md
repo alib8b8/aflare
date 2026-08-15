@@ -15,19 +15,16 @@ MCP allows aflare to act as a tool server that can be called by AI agents. This 
 ### Start MCP Server
 
 ```bash
-# Start MCP server
+# Start MCP server (stdio transport; the only transport currently supported)
 aflare mcp
 
-# Start on custom port
-aflare mcp --port 8082
-
-# Enable verbose logging
-aflare mcp --verbose
+# Equivalent flag form
+aflare --mcp-server
 ```
 
 ### Connect from AI Agent
 
-The MCP server follows the JSON-RPC 2.0 protocol over stdin/stdout or HTTP.
+The MCP server follows the JSON-RPC 2.0 protocol over stdin/stdout (stdio transport).
 
 ## Protocol Specification
 
@@ -242,13 +239,16 @@ assistant = client.beta.assistants.create(
 )
 ```
 
-### HTTP Mode
+### HTTP Mode (planned)
+
+> Not implemented yet. The current server is stdio-only; HTTP transport is on
+> the roadmap. The block below describes the target design.
 
 ```bash
-# Start MCP server in HTTP mode
+# Start MCP server in HTTP mode (planned)
 aflare mcp --port 8082
 
-# Call via HTTP
+# Call via HTTP (planned)
 curl -X POST http://localhost:8082/v1/call \
   -H "Content-Type: application/json" \
   -d '{

@@ -146,7 +146,7 @@ var knownCommands = []string{
 	"validate", "review", "version", "self-update", "update", "upgrade",
 	"autoupgrade", "init", "config", "webui", "skills", "schedule", "audit",
 	"serve", "marketplace", "secrets", "resume", "chat", "agent", "template",
-	"install-pack", "watermark", "badge", "doctor",
+	"install-pack", "watermark", "badge", "doctor", "mcp",
 }
 
 // ValidateCommand checks if the command is recognized.
@@ -288,6 +288,7 @@ func PrintUsage() string {
   aflare agent                           %s
   aflare watermark <decode|verify|info>  %s
   aflare badge <list|show|award>         %s
+  aflare mcp                             %s
   aflare help                            %s
 
 %s:
@@ -323,6 +324,7 @@ func PrintUsage() string {
 		i18n.T("usage.agent"),
 		i18n.T("usage.watermark"),
 		i18n.T("usage.badge"),
+		i18n.T("usage.mcp"),
 		i18n.T("usage.help"),
 		i18n.T("options"),
 		i18n.T("usage.safe_mode"),

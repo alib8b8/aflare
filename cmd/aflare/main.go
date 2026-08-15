@@ -215,6 +215,10 @@ func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, sa
 		cli.HandleWatermark(args)
 	case "badge":
 		cli.HandleBadge(args)
+	case "mcp":
+		// 子命令入口与 --mcp-server flag 等价，文档（docs/mcp.md、docs/dsh.md）
+		// 与 DSH 集成配置均使用 `aflare mcp` 形式。
+		cli.HandleMCP()
 	default:
 		cli.HandleRunFile(command, dryRun, false, "", safeMode, nil)
 	}

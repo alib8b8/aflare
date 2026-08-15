@@ -1,5 +1,8 @@
 # aflare 信创 MCP 连接器市场
 
+> **状态：规划中（planned）。** `aflare mcp install` 命令尚未实现，本文描述的是目标设计。
+> 当前可用的 MCP 能力见 [docs/mcp.md](../docs/mcp.md)。
+
 > 预置国产化系统 MCP 连接器，覆盖 OA、ERP、数据库、消息、安全等 15 个业务领域。
 > 参考淘宝闪购 MCP 模式，按业务领域分类，一键安装即用。
 

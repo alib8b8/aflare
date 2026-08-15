@@ -13,6 +13,7 @@
   "usage.self_update": "Update aflare to latest version",
   "usage.upgrade": "Upgrade aflare to latest version (friendly progress)",
   "usage.doctor": "Diagnose environment, dependencies and network",
+  "usage.mcp": "Start the MCP server (stdio) for AI agents",
   "usage.autoupgrade": "Manage automatic upgrade settings",
   "usage.help": "Show this help message",
   "usage.safe_mode": "Run in safe mode (disables execute and external nodes)",

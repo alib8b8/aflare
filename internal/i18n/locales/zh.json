@@ -13,6 +13,7 @@
   "usage.self_update": "将 aflare 更新到最新版本",
   "usage.upgrade": "一键升级 aflare 到最新版本（带进度提示）",
   "usage.doctor": "诊断环境、依赖与网络连接",
+  "usage.mcp": "启动 MCP 服务器（stdio），供 AI Agent 接入",
   "usage.autoupgrade": "管理自动升级设置",
   "usage.help": "显示此帮助信息",
   "usage.safe_mode": "以安全模式运行（禁用执行节点和外部节点）",
