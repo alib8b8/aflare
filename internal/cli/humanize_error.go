@@ -251,6 +251,9 @@ func troubleshootHint(nodeName string, err error) string {
 	case "file_read", "file_write":
 		return "排查建议：\n  1. 检查文件路径是否正确\n  2. 检查文件权限\n  3. 使用绝对路径避免歧义"
 	case "execute":
+		if strings.Contains(lower, "metacharacter") {
+			return "排查建议：\n  1. 白名单模式下 ; | & $ 引号等 shell 元字符被禁止，参数请用空格直接分隔\n     例如把 echo \"hello\" 改为 echo hello\n  2. 确认命令在白名单中：cat ~/.config/aflare/audit.log 可查看审计记录\n  3. 确需完整 shell 能力时设置 AFLARE_EXECUTE_UNSAFE=1（不安全，自担风险）"
+		}
 		if strings.Contains(lower, "not found") || strings.Contains(lower, "not in the allowed") {
 			return "排查建议：\n  1. 确认命令已安装\n  2. 检查命令是否在 PATH 中\n  3. safe mode 下部分命令被限制，尝试 --safe-mode=L1"
 		}

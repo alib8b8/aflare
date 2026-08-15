@@ -50,7 +50,7 @@ brew install alib8b8/tap/aflare
 
 # 手动下载二进制
 #   GitHub:  https://github.com/alib8b8/aflare/releases
-#   国内镜像: https://gitcode.com/llm-box/llm-box/-/releases
+#   国内加速: https://ghproxy.com/https://github.com/alib8b8/aflare/releases
 ```
 
 - `deb` / `rpm` 包见每个 Release 的附件。

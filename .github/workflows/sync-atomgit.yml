@@ -38,6 +38,10 @@ jobs:
       - name: Push main and tags to AtomGit
         env:
           ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+          # Mirror target under the project's own name. Historically this
+          # pushed to the pre-rename llm-box/llm-box repo — update this env
+          # if the mirror lives elsewhere.
+          ATOMGIT_REPO: alib8b8/aflare
         run: |
           set -euo pipefail
           if [ -z "${ATOMGIT_TOKEN}" ]; then
@@ -47,7 +51,7 @@ jobs:
           # Token is passed via a per-remote credential helper so it never
           # becomes part of the remote URL (which git may print on errors).
           git config credential.https://atomgit.com.helper '!f() { echo "username=oauth2"; echo "password=${ATOMGIT_TOKEN}"; }; f'
-          git remote add atomgit https://atomgit.com/llm-box/llm-box.git
+          git remote add atomgit "https://atomgit.com/${ATOMGIT_REPO}.git"
           # Mirror semantics: force-push so AtomGit always matches GitHub
           # exactly (the GitHub repo is the single source of truth).
           git push atomgit refs/heads/main:refs/heads/main --force

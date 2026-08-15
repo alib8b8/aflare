@@ -2,7 +2,6 @@ $ErrorActionPreference = "Stop"
 
 $BINARY_NAME = "aflare"
 $REPO = "alib8b8/aflare"
-$GITCODE_REPO = "llm-box/llm-box"
 
 function Write-Info($msg)    { Write-Host "[INFO] " -ForegroundColor Cyan -NoNewline; Write-Host $msg }
 function Write-Success($msg) { Write-Host "[OK] "   -ForegroundColor Green -NoNewline; Write-Host $msg }
@@ -18,17 +17,10 @@ function Detect-Platform {
 
 function Get-LatestRelease {
     param([string]$Region)
-    
-    if ($Region -eq "cn") {
-        try {
-            $api = "https://gitcode.com/api/v5/repos/$GITCODE_REPO/releases/latest"
-            $resp = Invoke-RestMethod -Uri $api -TimeoutSec 5 -ErrorAction Stop
-            if ($resp.tag_name -match '^v?[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9]+)?$') { return $resp.tag_name }
-        } catch {
-            Write-Warn "GitCode API failed, trying GitHub..."
-        }
-    }
-    
+
+    # GitHub is the single source of truth for releases; CN users reach it via
+    # the ghproxy mirror. (A stale GitCode mirror was removed — it served old
+    # tags that 404 on download.)
     $mirrors = @(
         "https://api.github.com/repos/$REPO/releases/latest",
         "https://ghproxy.com/https://api.github.com/repos/$REPO/releases/latest"
@@ -106,7 +98,6 @@ if (-not $version) {
     Write-Host ""
     Write-Host "手动下载地址："
     Write-Host "  GitHub:  https://github.com/$REPO/releases"
-    Write-Host "  GitCode: https://gitcode.com/$GITCODE_REPO/-/releases"
     exit 1
 }
 Write-Success "最新版本: $version"
@@ -169,7 +160,7 @@ Write-Host "  aflare init                            # 配置 LLM（交互式向
 Write-Host "  aflare create `"Summarize today's AI news`"   # 关键词匹配，无需 LLM"
 Write-Host "  aflare chat                            # 需先 aflare init"
 Write-Host ""
-Write-Host "更多文档：https://gitcode.com/$GITCODE_REPO"
+Write-Host "更多文档：https://github.com/$REPO"
 Write-Host ""
 Write-Host "提示：请重新打开终端窗口使 PATH 生效"
 Write-Host ""

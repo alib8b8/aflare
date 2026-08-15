@@ -156,7 +156,6 @@ steps:
 ## Resources
 
 - **GitHub**: https://github.com/alib8b8/aflare
-- **GitCode**: https://gitcode.com/llm-box/llm-box
-- **Documentation**: https://gitcode.com/llm-box/llm-box/blob/main/README.md
+- **Documentation**: https://github.com/alib8b8/aflare/blob/main/README.md
 - **Issues**: https://github.com/alib8b8/aflare/issues
 - **License**: AGPL-3.0

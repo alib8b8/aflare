@@ -116,9 +116,8 @@ EOF
 ## Resources
 
 - **GitHub**: https://github.com/alib8b8/aflare
-- **GitCode**: https://gitcode.com/llm-box/llm-box
 - **Releases**: https://github.com/alib8b8/aflare/releases
-- **Documentation**: https://gitcode.com/llm-box/llm-box/blob/main/README.md
+- **Documentation**: https://github.com/alib8b8/aflare/blob/main/README.md
 - **Issues**: https://github.com/alib8b8/aflare/issues
 - **Troubleshooting**:
   - Check PATH: `which aflare`

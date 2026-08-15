@@ -4,7 +4,6 @@ set -e
 BINARY_NAME="aflare"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 REPO="alib8b8/aflare"
-GITCODE_REPO="llm-box/llm-box"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -57,17 +56,10 @@ detect_region() {
 
 get_latest_release() {
     local region="$1"
-    
-    if [ "$region" = "cn" ]; then
-        local gitcode_api="https://gitcode.com/api/v5/repos/$GITCODE_REPO/releases/latest"
-        local tag=$(curl -s --connect-timeout 5 "$gitcode_api" 2>/dev/null | grep -o '"tag_name":"[^"]*"' | head -1 | sed 's/"tag_name":"//;s/"//')
-        if [ -n "$tag" ] && echo "$tag" | grep -qE '^v?[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9]+)?$'; then
-            echo "$tag"
-            return 0
-        fi
-        warn "GitCode release API failed, trying GitHub mirror..."
-    fi
-    
+
+    # GitHub is the single source of truth for releases. CN users reach it via
+    # the ghproxy mirrors below. (A GitCode mirror was tried historically but
+    # went stale — serving old tags that 404 on download — so it was removed.)
     local github_api="https://api.github.com/repos/$REPO/releases/latest"
     local mirrors=(
         ""
@@ -135,7 +127,6 @@ main() {
             echo "用法: bash install.sh --offline <aflare-linux-amd64.tar.gz>"
             echo "  请先从有网的机器下载发布包，再传输到本机："
             echo "  GitHub:  https://github.com/$REPO/releases"
-            echo "  GitCode: https://gitcode.com/$GITCODE_REPO/-/releases"
             exit 1
         fi
         if [ ! -f "$archive" ]; then
@@ -172,7 +163,6 @@ main() {
         echo ""
         echo "手动下载地址："
         echo "  GitHub:  https://github.com/$REPO/releases"
-        echo "  GitCode: https://gitcode.com/$GITCODE_REPO/-/releases"
         echo ""
         echo "离线安装：先下载发布包到本机，再运行："
         echo "  bash install.sh --offline aflare-\$OS-\$ARCH.tar.gz"
@@ -282,7 +272,7 @@ print_post_install_hints() {
     echo "  $BINARY_NAME create \"Summarize today's AI news\"   # 关键词匹配，无需 LLM"
     echo "  $BINARY_NAME chat                            # 需先 aflare init"
     echo ""
-    echo "更多文档：https://gitcode.com/$GITCODE_REPO"
+    echo "更多文档：https://github.com/$REPO"
     echo ""
 }
 

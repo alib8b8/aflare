@@ -50,7 +50,7 @@ brew install alib8b8/tap/aflare
 
 # Manual binary download
 #   GitHub:  https://github.com/alib8b8/aflare/releases
-#   Mirror:  https://gitcode.com/llm-box/llm-box/-/releases
+#   CN accelerated: https://ghproxy.com/https://github.com/alib8b8/aflare/releases
 ```
 
 - `deb` / `rpm` packages are attached to each Release.

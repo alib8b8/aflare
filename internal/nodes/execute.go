@@ -106,8 +106,8 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 
 	// When allowlist is enabled, block shell metacharacters to prevent injection
 	if allowListEnabled {
-		if shellMetachars.MatchString(command) {
-			return "", fmt.Errorf("shell metacharacters (;|&$`{} etc.) are not allowed when allowlist is enabled")
+		if loc := shellMetachars.FindStringIndex(command); loc != nil {
+			return "", fmt.Errorf("shell metacharacter %q at position %d is not allowed when allowlist is enabled (blocked: ; | & $ ` ( ) { } < > \\ * ? ! ~ ' \" and newlines). Pass arguments as plain words instead, e.g. use `echo hello` rather than `echo \"hello\"`. Set AFLARE_EXECUTE_UNSAFE=1 to disable the allowlist (unsafe)", command[loc[0]:loc[1]], loc[0])
 		}
 		firstWord := strings.Fields(command)
 		if len(firstWord) > 0 {

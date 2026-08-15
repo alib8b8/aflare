@@ -46,10 +46,10 @@ cd aflare
 go install ./cmd/aflare
 ```
 
-**国内网络加速**（使用GitCode镜像）：
+**国内网络加速**（使用 ghproxy 代理克隆）：
 
 ```bash
-git clone https://gitcode.com/llm-box/llm-box.git
+git clone https://ghproxy.com/https://github.com/alib8b8/aflare.git
 cd aflare
 go install ./cmd/aflare
 ```
