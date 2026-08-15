@@ -157,10 +157,11 @@ modlens, ...) use.
 
 ### 3. Community directories
 
-- **Awesome DSH Plugins** — community-maintained directory with daily
-  compatibility tracking; submit via its repository.
-- **dsh index** (`dsh-index.xlings.org`) — browsable index of 100+ plugins
-  with mirror-accelerated installs; submit a PR to `Sunrisepeak/dsh-index`.
+- **Awesome DSH Plugins** ([awesome-dsh-plugin/awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin),
+  ★2.4k) — submitted: [PR #581](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/581).
+  Merged entries also appear in the dsh-market in-app plugin market.
+- **dsh index** (`dsh-index.xlings.org`) — submitted:
+  [Sunrisepeak/dsh-index#35](https://github.com/Sunrisepeak/dsh-index/pull/35).
 
 ### Publishing checklist (releasing future versions)
 
