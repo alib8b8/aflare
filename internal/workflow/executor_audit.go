@@ -21,8 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
-	"sync"
 	"unicode/utf8"
 
 	"github.com/alib8b8/aflare/internal/history"
@@ -47,40 +45,23 @@ const (
 	auditActionIdempotentRejected history.AuditAction = "workflow_idempotent_rejected"
 )
 
-// Audit HMAC key environment variables, mirrored from internal/history so the
-// recorder can detect a missing key without that package exporting the names.
-const (
-	auditEnvHMACKey     = "AFLARE_AUDIT_HMAC_KEY"
-	auditEnvSecretsPass = "AFLARE_SECRETS_PASSWORD"
-)
-
 // auditMaxFieldLen bounds the size of flowing input/output strings written to
 // the audit log so a single huge step payload cannot blow up the audit file.
 const auditMaxFieldLen = 500
 
-// warnAuditNoKeyOnce ensures the "audit disabled (no HMAC key)" warning is
-// logged at most once per process.
-var warnAuditNoKeyOnce sync.Once
-
 // auditRecorder writes tamper-evident audit records for a single workflow
 // execution into the history package's HMAC hash-chain audit log.
 //
-// All methods are no-ops when audit is disabled. Write failures (including a
-// missing HMAC key) never block workflow execution: they are logged at warn
-// level and skipped. Global write ordering across concurrent Executors is
-// guaranteed by the history package's internal auditWriteMu, so concurrent
-// runs extend the same chain safely rather than corrupting it.
+// All methods are no-ops when audit is disabled. Write failures never block
+// workflow execution: they are logged at warn level and skipped. Global write
+// ordering across concurrent Executors is guaranteed by the history package's
+// internal auditWriteMu, so concurrent runs extend the same chain safely
+// rather than corrupting it.
 type auditRecorder struct {
 	enabled      bool
 	dir          string // when non-empty, overrides the history directory
 	workflowName string
 	steps        []WorkflowStep
-
-	// keyAvailable caches the env-var lookup for the lifetime of this
-	// recorder (i.e. a single execution). A fresh recorder per Execute call
-	// means env changes between runs are picked up.
-	keyAvailable bool
-	keyChecked   bool
 }
 
 // newAuditRecorder builds a recorder from the Executor's audit configuration.
@@ -109,28 +90,26 @@ func (e *Executor) newAuditRecorder(wf *Workflow) *auditRecorder {
 	return ar
 }
 
-// hasHMACKey reports whether a non-default HMAC key source is configured.
-// When false, audit writing is skipped (graceful degradation) with a single
-// warning per process; the workflow itself is never affected.
-func (ar *auditRecorder) hasHMACKey() bool {
-	if !ar.enabled {
-		return false
-	}
-	if !ar.keyChecked {
-		ar.keyChecked = true
-		ar.keyAvailable = os.Getenv(auditEnvHMACKey) != "" || os.Getenv(auditEnvSecretsPass) != ""
-		if !ar.keyAvailable {
-			warnAuditNoKeyOnce.Do(func() {
-				logger.Warn("audit log disabled: set AFLARE_AUDIT_HMAC_KEY or AFLARE_SECRETS_PASSWORD to enable tamper-evident audit logging")
-			})
-		}
-	}
-	return ar.keyAvailable
+// auditOn reports whether this recorder should write records: only the
+// executor-level enable flag remains as a gate.
+//
+// Pre-0.9.0 this method also required AFLARE_AUDIT_HMAC_KEY or
+// AFLARE_SECRETS_PASSWORD to be set, matching AppendAuditLog's refusal to sign
+// with the then-public default key. Since 0.9.0 the history package resolves a
+// signing key on its own (env key > password-derived > per-install random key
+// file, generated on first append on new chains; a legacy chain continues
+// under the public default with a one-time warning), so a key is always
+// available and the env-only gate here silently disabled workflow audit on
+// fresh installs — deadlocking the recorder against the audit verify/export
+// path, which happily used the auto-generated key file. Per-record write
+// failures are already swallowed by appendLog and never block the workflow.
+func (ar *auditRecorder) auditOn() bool {
+	return ar.enabled
 }
 
 // recordStart writes the workflow_start audit record before execution begins.
 func (ar *auditRecorder) recordStart() {
-	if !ar.hasHMACKey() {
+	if !ar.auditOn() {
 		return
 	}
 	ar.appendLog(history.AuditLog{
@@ -161,7 +140,7 @@ func (ar *auditRecorder) recordStart() {
 // built one) simply omits the cost fields — the audit record still records
 // the outcome.
 func (ar *auditRecorder) recordCompletion(results []StepResult, trace *WorkflowTrace, runErr error) {
-	if !ar.hasHMACKey() {
+	if !ar.auditOn() {
 		return
 	}
 	for _, r := range results {
@@ -192,7 +171,7 @@ func (ar *auditRecorder) recordCompletion(results []StepResult, trace *WorkflowT
 // idempotency fast path: previously a cache hit returned before any audit
 // record was written, so a "transfer served from cache" left no trail.
 func (ar *auditRecorder) recordIdempotencyHit(rec IdempotencyRecord) {
-	if !ar.hasHMACKey() {
+	if !ar.auditOn() {
 		return
 	}
 	ar.appendLog(history.AuditLog{
@@ -209,7 +188,7 @@ func (ar *auditRecorder) recordIdempotencyHit(rec IdempotencyRecord) {
 // returned); the detail carries the in-progress run_id so the operator can
 // attribute the rejection to the live run.
 func (ar *auditRecorder) recordIdempotencyRejected(rec IdempotencyRecord) {
-	if !ar.hasHMACKey() {
+	if !ar.auditOn() {
 		return
 	}
 	ar.appendLog(history.AuditLog{

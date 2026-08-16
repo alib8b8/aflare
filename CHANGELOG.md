@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **水印部署溯源（payload v2）**：水印内容哈希 8→6 字节，腾出 2 字节嵌入部署 ID（`AFLARE_DEPLOYMENT_ID`，1-4 位十六进制）。泄漏的内容现可直接定位到生成它的部署实例，无需再对照审计日志逐时间点排查；payload 总长保持 21 字节，分片/校验逻辑不变；v1 水印（8 字节哈希、无部署 ID）仍可解码，`aflare watermark decode/verify` 输出部署 ID
 
+### Fixed
+- **工作流审计在全新安装上被静默跳过**：工作流执行记录器仍按 0.8.x 逻辑要求 `AFLARE_AUDIT_HMAC_KEY` / `AFLARE_SECRETS_PASSWORD` 环境变量才写审计，而 0.9.0 的审计链已支持自动生成每安装随机密钥文件——两条路径不一致导致 `aflare run` 在未设环境变量的新安装上一条工作流审计都不写，且打印误导性警告。现移除该过时门控，密钥解析完全由 history 包负责（混沌测试实测发现）
+
 ## [0.9.0] - 2026-08-16
 
 本版本主题：**国密算法支持、审计链安全硬化、升级兼容保证、MCP server 一键安装**。默认路径与 0.8.x 字节级兼容，滚动升级可共享 home 目录。

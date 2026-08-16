@@ -972,10 +972,12 @@ func (e *Executor) WithTimeout(d time.Duration) *Executor {
 // the history package default (~/.config/aflare/history) is used. Audit is
 // off by default and must be explicitly enabled.
 //
-// If AFLARE_AUDIT_HMAC_KEY (or AFLARE_SECRETS_PASSWORD) is not set, audit
-// writing is skipped after a single warning (graceful degradation) and the
-// workflow is unaffected. Any audit write failure is logged at warn level and
-// never blocks execution. Returns the receiver for chaining.
+// The signing key is resolved entirely by the history package (env key >
+// password-derived > per-install random key file, auto-generated on first
+// append on new chains; legacy pre-0.9.0 chains continue under the public
+// default key with a one-time warning) — no environment variable is required
+// to enable audit writing. Any audit write failure is logged at warn level
+// and never blocks execution. Returns the receiver for chaining.
 //
 // IMPORTANT (H-5): auditDir is process-global state via
 // history.SetHistoryDir. Do NOT configure different auditDir values across
