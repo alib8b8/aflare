@@ -26,6 +26,11 @@
 //     using a tmp-file + atomic rename to bound replay time.
 //   - Crash recovery is performed by ReplayWAL, which yields every complete
 //     record in order; the last one holds the latest restorable state.
+//
+// Delivery semantics: the WAL provides at-least-once recovery of workflow
+// state, not exactly-once side effects — replay may re-fire a side effect
+// emitted just before a crash. Exactly-once requires combining the WAL with
+// an IdempotencyKey; see idempotency.go in this package.
 
 package workflow
 

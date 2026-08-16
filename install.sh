@@ -23,7 +23,8 @@ detect_platform() {
     case $ARCH in
         x86_64|amd64) ARCH="amd64" ;;
         aarch64|arm64) ARCH="arm64" ;;
-        *) 
+        loongarch64) ARCH="loong64" ;;
+        *)
             error "Unsupported architecture: $ARCH"
             exit 1
             ;;

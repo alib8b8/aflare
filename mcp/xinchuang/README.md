@@ -1,12 +1,32 @@
 # aflare 信创 MCP 连接器市场
 
-> **状态：规划中（planned）。** `aflare mcp install` 命令尚未实现，本文描述的是目标设计。
-> 当前可用的 MCP 能力见 [docs/mcp.md](../docs/mcp.md)。
+> **状态：部分实现。** 通用版 `aflare mcp install` / `aflare mcp list` 已实现，支持安装
+> 8 个通用社区 MCP server（见下方"当前支持清单"）。本文描述的**信创 35 连接器市场仍是
+> 目标设计（规划中）**，`aflare mcp install xinchuang/<domain>` 形式的安装暂不可用。
+> aflare 自带 MCP Server 的用法见 [docs/mcp.md](../docs/mcp.md)。
+
+## 当前支持清单（已实现）
+
+`aflare mcp install <name>` 写入项目目录 `.mcp.json`（幂等，重复安装提示已存在）；
+`aflare mcp list` 列出以下内置 server 及安装状态：
+
+| 名称 | 说明 | 启动命令 |
+|------|------|---------|
+| `fetch` | 抓取网页转 Markdown（官方 Python 实现） | `uvx mcp-server-fetch` |
+| `filesystem` | 受控读写本地目录 | `npx -y @modelcontextprotocol/server-filesystem .` |
+| `git` | 查询 Git 仓库状态 / diff / 历史 | `npx -y @modelcontextprotocol/server-git` |
+| `memory` | 知识图谱持久记忆 | `npx -y @modelcontextprotocol/server-memory` |
+| `sqlite` | SQLite 查询与修改 | `npx -y @modelcontextprotocol/server-sqlite --db-path ./data.db` |
+| `sequential-thinking` | 结构化分步推理 | `npx -y @modelcontextprotocol/server-sequential-thinking` |
+| `everything` | MCP 协议测试沙盒 | `npx -y @modelcontextprotocol/server-everything` |
+| `time` | 当前时间与时区转换 | `npx -y @modelcontextprotocol/server-time` |
+
+以下为信创连接器市场的**目标设计（规划中）**。
 
 > 预置国产化系统 MCP 连接器，覆盖 OA、ERP、数据库、消息、安全等 15 个业务领域。
 > 参考淘宝闪购 MCP 模式，按业务领域分类，一键安装即用。
 
-## 安装方式
+## 安装方式（规划中，暂不可用）
 
 ```bash
 # 安装单个领域的 MCP 连接器

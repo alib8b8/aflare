@@ -68,3 +68,14 @@ intermediate state?" — a question the audit system already answers with tamper
 **Mitigations:**
 - Compaction only triggers when the log exceeds 1MB (configurable).
 - The `history` package provides the human-readable, tamper-evident audit trail.
+
+## Delivery semantics
+
+The WAL guarantees **at-least-once** delivery of workflow steps after a crash: recovery replays
+step internals, and a side effect fired just before the crash (HTTP POST, file write, etc.) may be
+re-fired during replay. The WAL guarantees that workflow *state* is recoverable — it does **not**
+guarantee business-level idempotency of side effects.
+
+Exactly-once side effects therefore require the **WAL + IdempotencyKey** combination: the executor
+deduplicates re-triggers against the idempotency ledger before any step runs. This separation and
+its implementation live in [`internal/workflow/idempotency.go`](../../internal/workflow/idempotency.go).

@@ -90,7 +90,7 @@ aflare agent -c reflection,planning,utility
 
 ## Project Status
 
-aflare is currently at **v0.8 stage**. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. v0.8 focuses on offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding and CLI UX improvements. Domestic-chip (Ascend/Cambricon/Hygon) adaptation is at base level and continuously improving. Hardware device control (robots etc.) is not built in — users can integrate via custom nodes or MCP Server, with data staying on their intranet.
+aflare is currently at **v0.8 stage**. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. v0.8 focuses on offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding and CLI UX improvements. Local inference services running on domestic chips (Ascend/Cambricon/Hygon) are accessed through OpenAI-compatible endpoints (no native SDK integration), and support keeps improving. Hardware device control (robots etc.) is not built in — users can integrate via custom nodes or MCP Server, with data staying on their intranet.
 
 ---
 
@@ -160,7 +160,7 @@ aflare is built for intranet / local-first users — enterprises and individuals
 
 **Extensible ecosystem** — Custom nodes (Go), MCP Server / Client, plugin system (community `.so`), community template contributions (`aflare template submit`), one-command scenario packs (`aflare install-pack`). 323 skills already cover 16 domains, targeting 1000+.
 
-**Engineering quality** — Expression engine (bytecode IR + vectorized batch evaluation), Prometheus metrics endpoint, CI dual-architecture verification (x86-64 + ARM64), domestic-chip adaptation (Ascend / Cambricon / Hygon).
+**Engineering quality** — Expression engine (bytecode IR + vectorized batch evaluation), Prometheus metrics endpoint, CI dual-architecture verification (x86-64 + ARM64), domestic-chip local inference via OpenAI-compatible endpoints (Ascend / Cambricon / Hygon).
 
 ---
 
@@ -243,7 +243,7 @@ aflare is built for intranet / local-first users — enterprises and individuals
 - CI validates both architectures (x86-64 + ARM64)
 
 ### Experimental
-- Ascend / Cambricon / Hygon domestic chip support (basic functionality available, under active development)
+- Local inference services on Ascend / Cambricon / Hygon chips via OpenAI-compatible endpoints (no native SDK integration)
 
 ---
 
