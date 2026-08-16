@@ -125,9 +125,10 @@ func TestSaveLoadWithSM4GCM(t *testing.T) {
 	}
 }
 
-// TestSaveLoadWithAESHeader verifies the default (aes-gcm) path also writes
-// the versioned header and round-trips.
-func TestSaveLoadWithAESHeader(t *testing.T) {
+// TestSaveDefaultAESWritesLegacyFormat verifies the default (aes-gcm) path
+// writes the legacy headerless format, so stores saved by 0.9.0+ stay
+// byte-compatible with pre-0.9.0 binaries in mixed fleets, and round-trip.
+func TestSaveDefaultAESWritesLegacyFormat(t *testing.T) {
 	t.Setenv("AFLARE_SECRETS_CIPHER", "")
 	dir := t.TempDir()
 	path := filepath.Join(dir, "secrets.dat")
@@ -153,11 +154,11 @@ func TestSaveLoadWithAESHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read store: %v", err)
 	}
-	if !hasSecretsHeader(data) {
-		t.Fatal("expected versioned header on saved store")
+	if hasSecretsHeader(data) {
+		t.Fatal("default aes-gcm save must NOT carry the versioned header (pre-0.9.0 compatibility)")
 	}
-	if id := data[len(secretsMagic)+1]; id != cipherIDAESGCM {
-		t.Errorf("expected cipher id %d (aes), got %d", cipherIDAESGCM, id)
+	if len(data) <= pbkdf2SaltSize {
+		t.Fatalf("store too short: %d bytes", len(data))
 	}
 
 	loaded, err := LoadFromFile(path, "master-pw")
@@ -170,6 +171,61 @@ func TestSaveLoadWithAESHeader(t *testing.T) {
 	}
 	if value != "v" {
 		t.Errorf("secret value = %q, want %q", value, "v")
+	}
+}
+
+// TestSaveSM4ThenRollbackToLegacy proves the mixed-fleet rollback path: an
+// SM4-GCM store is rewritten in the legacy AES format once the environment
+// switches back to aes-gcm and the store is saved again.
+func TestSaveSM4ThenRollbackToLegacy(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "secrets.dat")
+
+	// Phase 1: opt into guomi and save — file carries the SM4 header.
+	t.Setenv("AFLARE_SECRETS_CIPHER", "sm4-gcm")
+	sm, err := NewSecretManager("master-pw")
+	if err != nil {
+		t.Fatalf("NewSecretManager failed: %v", err)
+	}
+	if err := sm.AddGroup("env"); err != nil {
+		t.Fatalf("AddGroup failed: %v", err)
+	}
+	if err := sm.AddSecret("env", "KEY", "keep-me", SecretTypeNormal, ""); err != nil {
+		t.Fatalf("AddSecret failed: %v", err)
+	}
+	if err := sm.SaveToFile(path); err != nil {
+		t.Fatalf("SaveToFile failed: %v", err)
+	}
+	data, _ := os.ReadFile(path)
+	if !hasSecretsHeader(data) || data[len(secretsMagic)+1] != cipherIDSM4GCM {
+		t.Fatal("expected SM4 header after guomi save")
+	}
+
+	// Phase 2: switch back to aes-gcm, load, save — legacy format restored.
+	t.Setenv("AFLARE_SECRETS_CIPHER", "")
+	loaded, err := LoadFromFile(path, "master-pw")
+	if err != nil {
+		t.Fatalf("LoadFromFile failed: %v", err)
+	}
+	if err := loaded.SaveToFile(path); err != nil {
+		t.Fatalf("SaveToFile failed: %v", err)
+	}
+	data, _ = os.ReadFile(path)
+	if hasSecretsHeader(data) {
+		t.Fatal("expected legacy headerless format after rollback to aes-gcm")
+	}
+
+	// Data survives the round-trip.
+	final, err := LoadFromFile(path, "master-pw")
+	if err != nil {
+		t.Fatalf("LoadFromFile failed: %v", err)
+	}
+	value, err := final.GetSecret("env", "KEY")
+	if err != nil {
+		t.Fatalf("GetSecret failed: %v", err)
+	}
+	if value != "keep-me" {
+		t.Errorf("secret value = %q, want %q", value, "keep-me")
 	}
 }
 
@@ -340,5 +396,41 @@ func TestCipherKeySize(t *testing.T) {
 	}
 	if _, err := cipherKeySize("rot13"); err == nil {
 		t.Error("cipherKeySize should reject unknown ciphers")
+	}
+}
+
+// TestInspectFile covers the doctor-facing probe: legacy files report
+// aes-gcm + legacy, versioned files report their header cipher, and a
+// missing file reports nothing without an error.
+func TestInspectFile(t *testing.T) {
+	dir := t.TempDir()
+
+	// Missing file: ("", false, nil).
+	name, legacy, err := InspectFile(filepath.Join(dir, "absent.dat"))
+	if err != nil || name != "" || legacy {
+		t.Errorf("missing file: got (%q, %v, %v), want (\"\", false, nil)", name, legacy, err)
+	}
+
+	// Legacy headerless store: aes-gcm + legacy=true.
+	legacyPath := filepath.Join(dir, "legacy.dat")
+	writeLegacyAESStore(t, legacyPath, "pw", "v")
+	name, legacy, err = InspectFile(legacyPath)
+	if err != nil || name != CipherAESGCM || !legacy {
+		t.Errorf("legacy file: got (%q, %v, %v), want (%q, true, nil)", name, legacy, err, CipherAESGCM)
+	}
+
+	// SM4 versioned store: sm4-gcm + legacy=false.
+	t.Setenv("AFLARE_SECRETS_CIPHER", "sm4-gcm")
+	sm, err := NewSecretManager("pw")
+	if err != nil {
+		t.Fatalf("NewSecretManager failed: %v", err)
+	}
+	sm4Path := filepath.Join(dir, "sm4.dat")
+	if err := sm.SaveToFile(sm4Path); err != nil {
+		t.Fatalf("SaveToFile failed: %v", err)
+	}
+	name, legacy, err = InspectFile(sm4Path)
+	if err != nil || name != CipherSM4GCM || legacy {
+		t.Errorf("sm4 file: got (%q, %v, %v), want (%q, false, nil)", name, legacy, err, CipherSM4GCM)
 	}
 }

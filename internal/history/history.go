@@ -103,6 +103,21 @@ func getHistoryDir() string {
 	return historyDir
 }
 
+// AuditLogPath returns the path of the append-only audit hash-chain log in
+// the history directory, or "" when no history directory is configured.
+// Read-only consumers (e.g. doctor) use this plus ReadAuditLogFile.
+func AuditLogPath() string {
+	dir := getHistoryDir()
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, auditLogFileName)
+}
+
+// sm3CompatWarnOnce rate-limits the pre-0.9.0 incompatibility warning to
+// one line per process, no matter how many records are appended.
+var sm3CompatWarnOnce sync.Once
+
 // SaveRecord saves a workflow execution record to the history directory
 func SaveRecord(record Record) error {
 	dir := getHistoryDir()
@@ -532,12 +547,23 @@ func AppendAuditLog(log AuditLog) error {
 	}
 
 	// The MAC algorithm for new records follows AFLARE_AUDIT_HMAC_ALGO and is
-	// stored per record; verification reads it back from each record.
+	// stored per record; verification reads it back from each record. The
+	// default sha256 clears the field so records stay byte-identical to
+	// pre-0.9.0 output (whose readers recompute with HMAC-SHA256 anyway).
 	algo, err := resolveAuditMACAlgo(os.Getenv(auditEnvHMACAlgo))
 	if err != nil {
 		return fmt.Errorf("failed to select audit MAC algorithm: %w", err)
 	}
-	log.MACAlgo = algo
+	if algo == auditMACSM3 {
+		log.MACAlgo = algo
+		sm3CompatWarnOnce.Do(func() {
+			logger.Warn("audit records are being signed with SM3; binaries before 0.9.0 cannot verify this chain",
+				"env", auditEnvHMACAlgo,
+				"note", "upgrade all binaries before enabling guomi")
+		})
+	} else {
+		log.MACAlgo = ""
+	}
 
 	auditPath := filepath.Join(dir, auditLogFileName)
 

@@ -94,7 +94,9 @@ func TestVerifyAuditChain_MixedAlgorithms(t *testing.T) {
 		t.Fatalf("expected 4 lines, got %d", len(lines))
 	}
 
-	wantAlgos := []string{auditMACSHA256, auditMACSHA256, auditMACSM3, auditMACSHA256}
+	// sha256 records omit the field entirely (pre-0.9.0 byte compatibility);
+	// only the SM3 record carries mac_algo.
+	wantAlgos := []string{"", "", auditMACSM3, ""}
 	entries := make([]AuditLog, 0, len(lines))
 	for i, line := range lines {
 		var entry AuditLog
@@ -203,7 +205,9 @@ func TestVerifyAuditChain_LegacyRecordWithoutMACAlgo(t *testing.T) {
 }
 
 // TestAppendAuditLog_DefaultMACAlgoIsSHA256 checks that with the environment
-// variable unset, new records are tagged sha256.
+// variable unset, the stored mac_algo field is empty — which both computeAuditHash
+// and VerifyAuditChain treat as sha256, and which keeps records byte-identical
+// to pre-0.9.0 output (the field is omitted from the JSON entirely).
 func TestAppendAuditLog_DefaultMACAlgoIsSHA256(t *testing.T) {
 	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
 	t.Setenv("AFLARE_AUDIT_HMAC_ALGO", "")
@@ -216,8 +220,8 @@ func TestAppendAuditLog_DefaultMACAlgoIsSHA256(t *testing.T) {
 	if err := json.Unmarshal([]byte(line), &entry); err != nil {
 		t.Fatalf("failed to parse line: %v", err)
 	}
-	if entry.MACAlgo != auditMACSHA256 {
-		t.Errorf("expected mac_algo %q, got %q", auditMACSHA256, entry.MACAlgo)
+	if entry.MACAlgo != "" {
+		t.Errorf("expected mac_algo to stay empty by default (sha256 implied), got %q", entry.MACAlgo)
 	}
 }
 
@@ -292,5 +296,33 @@ func TestComputeAuditHash_AlgorithmSelection(t *testing.T) {
 	entry.MACAlgo = "md5"
 	if _, err := computeAuditHash([]byte("k"), entry); err == nil {
 		t.Error("computeAuditHash should reject unknown algorithms")
+	}
+}
+
+// TestAppendAuditLog_DefaultOmitsMACAlgoField pins the mixed-fleet
+// compatibility contract: with the default sha256 selection (no env var),
+// appended records carry no mac_algo field at all, so the JSON lines are
+// byte-identical to what pre-0.9.0 binaries wrote and their readers (which
+// recompute HMAC-SHA256 and ignore unknown fields) verify them unchanged.
+func TestAppendAuditLog_DefaultOmitsMACAlgoField(t *testing.T) {
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
+	t.Setenv("AFLARE_AUDIT_HMAC_ALGO", "")
+	SetHistoryDir(t.TempDir())
+
+	path := appendAuditLogsForChain(t, 2)
+
+	for i, line := range readAuditLines(t, path) {
+		if strings.Contains(line, "mac_algo") {
+			t.Errorf("line %d: default sha256 record must not carry mac_algo (got %q)", i+1, line)
+		}
+	}
+
+	// The chain still verifies, and the exported path helper resolves it.
+	valid, _, err := VerifyAuditChain(path)
+	if err != nil || !valid {
+		t.Fatalf("default chain should verify: valid=%v err=%v", valid, err)
+	}
+	if AuditLogPath() != path {
+		t.Errorf("AuditLogPath() = %q, want %q", AuditLogPath(), path)
 	}
 }

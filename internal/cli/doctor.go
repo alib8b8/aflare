@@ -25,8 +25,10 @@ import (
 	"time"
 
 	"github.com/alib8b8/aflare/internal/config"
+	"github.com/alib8b8/aflare/internal/history"
 	"github.com/alib8b8/aflare/internal/meta"
 	"github.com/alib8b8/aflare/internal/registry"
+	"github.com/alib8b8/aflare/internal/secrets"
 )
 
 // HandleDoctor runs a one-shot environment diagnostic (断点16: 没有 aflare doctor
@@ -141,6 +143,9 @@ func HandleDoctor(args []string) {
 		})
 	}
 
+	// 10. Crypto & audit compatibility (mixed-version fleet safety).
+	checkCryptoCompat(&problems, secrets.DefaultPath())
+
 	// Summary.
 	fmt.Println()
 	if len(problems) == 0 {
@@ -168,6 +173,90 @@ type doctorProblem struct {
 	category string
 	desc     string
 	hint     string
+}
+
+// checkCryptoCompat reports whether the on-disk crypto material (audit hash
+// chain, secrets store) is readable by pre-0.9.0 binaries — the classic
+// mixed-version fleet hazard during rolling upgrades. Guomi (SM3/SM4) data
+// is only produced on explicit opt-in, so this usually stays green; when it
+// does not, the operator gets the exact upgrade/rollback steps.
+func checkCryptoCompat(problems *[]doctorProblem, secretsPath string) {
+	fmt.Println()
+	fmt.Println("加密与审计兼容性（混布版本检查）：")
+
+	// Audit chain algorithm mix.
+	if auditPath := history.AuditLogPath(); auditPath == "" {
+		fmt.Println("  ⊘ 审计日志未启用（无历史目录）")
+	} else if records, err := history.ReadAuditLogFile(auditPath); err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Printf("  ✗ 审计日志读取失败：%v\n", err)
+			*problems = append(*problems, doctorProblem{
+				category: "兼容性",
+				desc:     "审计日志读取失败",
+				hint:     fmt.Sprintf("检查文件权限与格式：%s", auditPath),
+			})
+		} else {
+			fmt.Println("  ⊘ 尚无审计日志（运行工作流后生成）")
+		}
+	} else {
+		sm3Count := 0
+		for _, r := range records {
+			if strings.EqualFold(r.MACAlgo, "sm3") {
+				sm3Count++
+			}
+		}
+		if sm3Count == 0 {
+			fmt.Printf("  ✓ 审计链 %d 条记录，全部为 SHA-256（0.9.0 之前版本可验证）\n", len(records))
+		} else {
+			fmt.Printf("  ✗ 审计链 %d 条记录中有 %d 条为 SM3 签名，0.9.0 之前的二进制无法验证\n", len(records), sm3Count)
+			*problems = append(*problems, doctorProblem{
+				category: "兼容性",
+				desc:     fmt.Sprintf("审计链含 %d 条 SM3 记录，旧版本二进制无法验证", sm3Count),
+				hint: "SM3 记录无法逆转（审计链只增不改），混布环境处理方式：\n" +
+					"  - 升级所有机器到 0.9.0+（aflare self-update），旧二进制仅无法验证，追加写入仍安全\n" +
+					"  - 新记录切回默认：unset AFLARE_AUDIT_HMAC_ALGO",
+			})
+		}
+	}
+
+	// Secrets store at-rest cipher.
+	cipherName, legacy, err := secrets.InspectFile(secretsPath)
+	switch {
+	case err != nil:
+		fmt.Printf("  ✗ secrets 存储检查失败：%v\n", err)
+		*problems = append(*problems, doctorProblem{
+			category: "兼容性",
+			desc:     "secrets 存储检查失败",
+			hint:     err.Error(),
+		})
+	case cipherName == "":
+		fmt.Println("  ⊘ 尚无 secrets 存储（首次保存后生成）")
+	case legacy || cipherName == secrets.CipherAESGCM:
+		legacyNote := "（v1 格式，0.9.0 之前版本无法读取）"
+		if legacy {
+			legacyNote = "（传统格式，0.9.0 之前版本可读取）"
+		}
+		fmt.Println("  ✓ secrets 存储为 AES-256-GCM" + legacyNote)
+	case cipherName == secrets.CipherSM4GCM:
+		fmt.Println("  ✗ secrets 存储为 SM4-GCM，0.9.0 之前的二进制无法读取")
+		*problems = append(*problems, doctorProblem{
+			category: "兼容性",
+			desc:     "secrets 存储为 SM4-GCM，旧版本二进制无法读取",
+			hint: "如需回滚到旧版本可读：\n" +
+				"  1. export AFLARE_SECRETS_CIPHER=aes-gcm\n" +
+				"  2. 任意触发一次保存（如 aflare secrets set 同名值）即可重写为传统格式",
+		})
+	default:
+		fmt.Printf("  ? secrets 存储使用未知算法 %q\n", cipherName)
+	}
+
+	// Explicit opt-in env vars: warn even before any data is written.
+	if v := os.Getenv("AFLARE_AUDIT_HMAC_ALGO"); strings.EqualFold(strings.TrimSpace(v), "sm3") {
+		fmt.Println("  ⚠ AFLARE_AUDIT_HMAC_ALGO=sm3 已设置：新审计记录将以 SM3 签名（先升级全部二进制再启用）")
+	}
+	if v := os.Getenv("AFLARE_SECRETS_CIPHER"); strings.EqualFold(strings.TrimSpace(v), "sm4-gcm") {
+		fmt.Println("  ⚠ AFLARE_SECRETS_CIPHER=sm4-gcm 已设置：下次保存将重加密为 SM4-GCM（旧版本二进制无法读取）")
+	}
 }
 
 // bwrapInstallHint returns a platform-specific install command for bubblewrap.

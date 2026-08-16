@@ -37,6 +37,8 @@ import (
 	"github.com/zalando/go-keyring"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/term"
+
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 // Cipher suite identifiers for the at-rest encryption of the secrets store.
@@ -68,6 +70,10 @@ const (
 )
 
 var defaultSecretsPath string
+
+// sm4CompatWarnOnce rate-limits the pre-0.9.0 incompatibility warning to
+// one line per process, no matter how often the store is saved.
+var sm4CompatWarnOnce sync.Once
 
 func init() {
 	if home, err := os.UserHomeDir(); err == nil {
@@ -166,6 +172,28 @@ func cipherNameByID(id byte) (string, error) {
 // negligible probability.
 func hasSecretsHeader(data []byte) bool {
 	return len(data) >= secretsHdrSize && bytes.Equal(data[:len(secretsMagic)], []byte(secretsMagic))
+}
+
+// InspectFile reports the at-rest cipher of a secrets store without
+// decrypting it: the header cipher for versioned files, CipherAESGCM for
+// legacy headerless files. A missing file yields ("", false, nil) so
+// callers can distinguish "no store yet" from a real read error.
+func InspectFile(path string) (cipherName string, legacy bool, err error) {
+	data, err := os.ReadFile(path) // #nosec G304 -- caller-supplied store path
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("failed to read file: %w", err)
+	}
+	if !hasSecretsHeader(data) {
+		return CipherAESGCM, true, nil
+	}
+	name, err := cipherNameByID(data[len(secretsMagic)+1])
+	if err != nil {
+		return "", false, err
+	}
+	return name, false, nil
 }
 
 func deriveKey(masterPassword string, salt []byte, keyLen int) []byte {
@@ -296,17 +324,20 @@ func LoadFromFile(path, masterPassword string) (*SecretManager, error) {
 // SaveToFile persists the store. The cipher used for writing follows the
 // current AFLARE_SECRETS_CIPHER selection, so switching the environment
 // variable re-encrypts the store on the next save (loading, in contrast,
-// always follows the file header). Every saved file carries the versioned
-// header identifying its cipher.
+// always follows the file header).
+//
+// Backward compatibility: with the default aes-gcm selection the file is
+// written in the legacy headerless format, byte-compatible with binaries
+// before 0.9.0. The versioned header is written only for non-default
+// ciphers (sm4-gcm), which old binaries cannot read anyway — so mixed
+// fleets stay compatible until guomi is explicitly opted into. Switching
+// the environment variable back to aes-gcm and saving rewrites the file
+// in the legacy format (a rollback path for shared-home fleets).
 func (sm *SecretManager) SaveToFile(path string) error {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
 	cipherName, err := configuredCipher()
-	if err != nil {
-		return err
-	}
-	cipherID, err := cipherIDByName(cipherName)
 	if err != nil {
 		return err
 	}
@@ -342,8 +373,22 @@ func (sm *SecretManager) SaveToFile(path string) error {
 	ciphertext := aead.Seal(nonce, nonce, plaintext, nil)
 
 	output := make([]byte, 0, secretsHdrSize+len(sm.salt)+len(ciphertext))
-	output = append(output, secretsMagic...)
-	output = append(output, secretsVersion, cipherID)
+	if cipherName != CipherAESGCM {
+		// Non-default cipher: tag the file so LoadFromFile (and humans)
+		// can tell which suite encrypted it. The default AES path stays
+		// headerless for pre-0.9.0 byte compatibility.
+		cipherID, cerr := cipherIDByName(cipherName)
+		if cerr != nil {
+			return cerr
+		}
+		output = append(output, secretsMagic...)
+		output = append(output, secretsVersion, cipherID)
+		sm4CompatWarnOnce.Do(func() {
+			logger.Warn("secrets store is being written with a non-default cipher; binaries before 0.9.0 cannot read this file",
+				"cipher", cipherName,
+				"rollback", "set "+secretsEnvCipher+"=aes-gcm and re-save")
+		})
+	}
 	output = append(output, sm.salt...)
 	output = append(output, ciphertext...)
 
