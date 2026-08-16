@@ -16,8 +16,11 @@
 package watermark
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestEncodeDecodeText(t *testing.T) {
@@ -53,8 +56,8 @@ func TestEncodeDecodeText(t *testing.T) {
 	if payload.Timestamp.IsZero() {
 		t.Error("timestamp should not be zero")
 	}
-	if len(payload.Hash) != 8 {
-		t.Errorf("expected 8-byte hash, got %d bytes", len(payload.Hash))
+	if len(payload.Hash) != 6 {
+		t.Errorf("expected 6-byte hash (v2), got %d bytes", len(payload.Hash))
 	}
 }
 
@@ -204,6 +207,76 @@ func TestInfo(t *testing.T) {
 	}
 	if !strings.Contains(info, "aflare") {
 		t.Error("Info should mention aflare")
+	}
+}
+
+func TestDeployIDRoundTrip(t *testing.T) {
+	t.Setenv("AFLARE_DEPLOYMENT_ID", "1a2b")
+
+	if id := ResolveDeployID(); id != 0x1a2b {
+		t.Fatalf("ResolveDeployID expected 0x1a2b, got 0x%04x", id)
+	}
+
+	content := "Content watermarked with a deployment identifier for leak tracing. " +
+		"It must be long enough to distribute shards across segments."
+	full := EncodeTextWithSuffix(content)
+	payload, ok := DecodeText(full)
+	if !ok {
+		t.Fatal("DecodeText failed for deploy-ID watermarked content")
+	}
+	if payload.Version != wmVersion {
+		t.Errorf("expected version %d, got %d", wmVersion, payload.Version)
+	}
+	if payload.DeployID != 0x1a2b {
+		t.Errorf("expected deploy ID 0x1a2b, got 0x%04x", payload.DeployID)
+	}
+}
+
+func TestResolveDeployIDInvalid(t *testing.T) {
+	t.Setenv("AFLARE_DEPLOYMENT_ID", "not-hex")
+	if id := ResolveDeployID(); id != 0 {
+		t.Errorf("invalid hex should yield 0, got 0x%04x", id)
+	}
+	t.Setenv("AFLARE_DEPLOYMENT_ID", "12345") // 5 digits > uint16
+	if id := ResolveDeployID(); id != 0 {
+		t.Errorf("out-of-range value should yield 0, got 0x%04x", id)
+	}
+}
+
+// TestParsePayloadV1BackwardCompat verifies that v1 payloads (8-byte hash,
+// no deploy ID) written by aflare ≤ 0.9.0 still decode.
+func TestParsePayloadV1BackwardCompat(t *testing.T) {
+	payload := make([]byte, payloadSize)
+	copy(payload[0:4], magicBytes)
+	payload[4] = wmVersionV1
+	binary.BigEndian.PutUint64(payload[5:13], uint64(1700000000))
+	hash := sha256.Sum256([]byte("legacy content"))
+	copy(payload[13:21], hash[:8])
+
+	p, ok := parsePayload(payload)
+	if !ok {
+		t.Fatal("v1 payload should decode")
+	}
+	if p.Version != wmVersionV1 {
+		t.Errorf("expected v1, got version %d", p.Version)
+	}
+	if len(p.Hash) != 8 {
+		t.Errorf("v1 hash should be 8 bytes, got %d", len(p.Hash))
+	}
+	if p.DeployID != 0 {
+		t.Errorf("v1 payload should have zero deploy ID, got 0x%04x", p.DeployID)
+	}
+	if !p.Timestamp.Equal(time.Unix(1700000000, 0)) {
+		t.Errorf("timestamp mismatch: %v", p.Timestamp)
+	}
+}
+
+func TestParsePayloadUnknownVersion(t *testing.T) {
+	payload := make([]byte, payloadSize)
+	copy(payload[0:4], magicBytes)
+	payload[4] = 0x7F
+	if _, ok := parsePayload(payload); ok {
+		t.Error("unknown version should be rejected")
 	}
 }
 
@@ -371,7 +444,7 @@ func TestChecksum(t *testing.T) {
 func TestLegacyDecode(t *testing.T) {
 	// Test that legacy format (single suffix block) is still decodable.
 	content := "Some short content for legacy format testing"
-	payload := buildPayload(content)
+	payload := buildPayload(content, 0)
 	legacy := content + encodeLegacySuffix(payload)
 
 	decoded, ok := decodeLegacy(legacy)

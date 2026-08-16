@@ -190,6 +190,9 @@ func handleWatermarkVerify(path string) {
 		fmt.Printf("  Version:   %d\n", payload.Version)
 		fmt.Printf("  Generated: %s\n", payload.Timestamp.UTC().Format("2006-01-02 15:04:05 UTC"))
 		fmt.Printf("  Hash:      %x\n", payload.Hash)
+		if payload.Version >= 2 {
+			fmt.Printf("  Deploy ID: %04x\n", payload.DeployID)
+		}
 		fmt.Println("  Status:    valid")
 		return
 	}
@@ -203,6 +206,9 @@ func handleWatermarkVerify(path string) {
 			fmt.Printf("  Version:   %d\n", payload.Version)
 			fmt.Printf("  Generated: %s\n", payload.Timestamp.UTC().Format("2006-01-02 15:04:05 UTC"))
 			fmt.Printf("  Hash:      %x\n", payload.Hash)
+			if payload.Version >= 2 {
+				fmt.Printf("  Deploy ID: %04x\n", payload.DeployID)
+			}
 			fmt.Println("  Status:    valid")
 			return
 		}
@@ -218,4 +224,11 @@ func printPayload(payload watermark.Payload, path, wmType string) {
 	fmt.Printf("  Version:   %d\n", payload.Version)
 	fmt.Printf("  Generated: %s\n", payload.Timestamp.UTC().Format("2006-01-02 15:04:05 UTC"))
 	fmt.Printf("  Hash:      %x\n", payload.Hash)
+	if payload.Version >= 2 {
+		if payload.DeployID != 0 {
+			fmt.Printf("  Deploy ID: %04x\n", payload.DeployID)
+		} else {
+			fmt.Printf("  Deploy ID: - (set AFLARE_DEPLOYMENT_ID to enable leak tracing)\n")
+		}
+	}
 }

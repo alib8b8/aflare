@@ -34,13 +34,15 @@
 //   - Text (zero-width): invisible Unicode characters distributed in the text.
 //   - YAML comment: a human-readable comment line: # aflare-watermark: <base64>
 //
-// The watermark payload contains:
+// The watermark payload (version 2) contains:
 //   - Magic bytes "AFLR" (4 bytes) for identification
-//   - Version byte (1 byte, currently 0x01)
+//   - Version byte (1 byte, currently 0x02)
 //   - Timestamp (8 bytes, Unix epoch seconds)
-//   - Content hash (8 bytes, first 8 bytes of SHA-256)
+//   - Content hash (6 bytes, first 6 bytes of SHA-256)
+//   - Deployment ID (2 bytes, from AFLARE_DEPLOYMENT_ID, for leak tracing)
 //
 // Total raw payload: 21 bytes → 23 bytes with checksum → 4 shards of 8 bytes each.
+// Version 1 payloads (8-byte hash, no deployment ID) remain decodable.
 package watermark
 
 import (
@@ -48,6 +50,8 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -70,10 +74,15 @@ const (
 	magicBytes = "AFLR"
 
 	// Current watermark version.
-	wmVersion = byte(0x01)
+	wmVersion = byte(0x02)
 
-	// Raw payload layout (21 bytes).
-	payloadSize = 4 + 1 + 8 + 8 // magic + version + timestamp + hash
+	// Version 1: 8-byte content hash, no deployment ID.
+	wmVersionV1 = byte(0x01)
+
+	// Raw payload layout (21 bytes, both versions):
+	//   v2: magic + version + timestamp(8) + hash(6) + deployID(2)
+	//   v1: magic + version + timestamp(8) + hash(8)
+	payloadSize = 4 + 1 + 8 + 6 + 2 // magic + version + timestamp + hash + deployID
 
 	// Sharding parameters.
 	numShards            = 4 // 3 data + 1 parity
@@ -89,7 +98,8 @@ const (
 type Payload struct {
 	Version   byte      // watermark version
 	Timestamp time.Time // when the content was generated
-	Hash      []byte    // first 8 bytes of content SHA-256
+	Hash      []byte    // v2: first 6 bytes of content SHA-256; v1: first 8
+	DeployID  uint16    // v2: deployment identifier; 0 in v1 payloads
 }
 
 // ── Primary API: distributed text watermark ──────────────────────────────
@@ -105,7 +115,7 @@ func EncodeTextWithSuffix(content string) string {
 		return content
 	}
 
-	payload := buildPayload(content)
+	payload := buildPayload(content, ResolveDeployID())
 	// Append 2-byte checksum for integrity verification.
 	chk := checksum16(payload)
 	payload = append(payload, byte(chk>>8), byte(chk&0xFF))
@@ -165,7 +175,7 @@ func EncodeYAML(content string) string {
 	if content == "" {
 		return ""
 	}
-	payload := buildPayload(content)
+	payload := buildPayload(content, ResolveDeployID())
 	b64 := base64.RawStdEncoding.EncodeToString(payload)
 	return fmt.Sprintf("# aflare-watermark: %s", b64)
 }
@@ -200,11 +210,16 @@ Output modes:
   Text  — invisible zero-width Unicode characters (U+200B/U+200C)
   YAML  — comment line: # aflare-watermark: <base64>
 
-Payload (21 bytes):
-  Magic:    AFLR (4 bytes)
-  Version:  1 byte
-  Time:     8 bytes (Unix seconds)
-  Hash:     8 bytes (SHA-256 of content)
+Payload v2 (21 bytes):
+  Magic:      AFLR (4 bytes)
+  Version:    1 byte (0x02)
+  Time:       8 bytes (Unix seconds)
+  Hash:       6 bytes (SHA-256 of content)
+  Deploy ID:  2 bytes (from AFLARE_DEPLOYMENT_ID, hex; 0 = not set)
+
+Set AFLARE_DEPLOYMENT_ID (1-4 hex digits, e.g. "1a2b") to trace leaked
+content back to the deployment that generated it. Version 1 watermarks
+(8-byte hash, no deploy ID) are still decoded.
 
 Usage:
   aflare watermark decode <file>   — extract watermark from file
@@ -643,18 +658,37 @@ func encodeZeroWidth(data []byte) string {
 
 // ── Payload construction ─────────────────────────────────────────────────
 
-// buildPayload creates the raw 21-byte watermark payload.
-func buildPayload(content string) []byte {
+// ResolveDeployID reads the deployment identifier from AFLARE_DEPLOYMENT_ID
+// (1-4 hex digits, e.g. "1a2b"). Missing or invalid values yield 0 ("not
+// set"). The value is embedded in v2 watermarks so leaked content can be
+// traced back to the deployment that generated it.
+func ResolveDeployID() uint16 {
+	v := strings.TrimSpace(os.Getenv("AFLARE_DEPLOYMENT_ID"))
+	if v == "" {
+		return 0
+	}
+	id, err := strconv.ParseUint(v, 16, 16)
+	if err != nil {
+		return 0
+	}
+	return uint16(id)
+}
+
+// buildPayload creates the raw 21-byte watermark payload (v2 layout).
+func buildPayload(content string, deployID uint16) []byte {
 	payload := make([]byte, payloadSize)
 	copy(payload[0:4], magicBytes)
 	payload[4] = wmVersion
 	binary.BigEndian.PutUint64(payload[5:13], uint64(time.Now().Unix()))
 	hash := sha256.Sum256([]byte(content))
-	copy(payload[13:21], hash[:8])
+	copy(payload[13:19], hash[:6])
+	binary.BigEndian.PutUint16(payload[19:21], deployID)
 	return payload
 }
 
-// parsePayload validates and parses the raw 21-byte payload.
+// parsePayload validates and parses the raw 21-byte payload. Both v1
+// (8-byte hash, no deploy ID) and v2 (6-byte hash + 2-byte deploy ID)
+// layouts are accepted; unknown versions are rejected.
 func parsePayload(payload []byte) (Payload, bool) {
 	if len(payload) < payloadSize {
 		return Payload{}, false
@@ -666,19 +700,25 @@ func parsePayload(payload []byte) (Payload, bool) {
 	}
 
 	version := payload[4]
-	if version != wmVersion {
+	ts := int64(binary.BigEndian.Uint64(payload[5:13]))
+
+	switch version {
+	case wmVersionV1:
+		hash := make([]byte, 8)
+		copy(hash, payload[13:21])
+		return Payload{Version: version, Timestamp: time.Unix(ts, 0), Hash: hash}, true
+	case wmVersion:
+		hash := make([]byte, 6)
+		copy(hash, payload[13:19])
+		return Payload{
+			Version:   version,
+			Timestamp: time.Unix(ts, 0),
+			Hash:      hash,
+			DeployID:  binary.BigEndian.Uint16(payload[19:21]),
+		}, true
+	default:
 		return Payload{}, false
 	}
-
-	ts := int64(binary.BigEndian.Uint64(payload[5:13]))
-	hash := make([]byte, 8)
-	copy(hash, payload[13:21])
-
-	return Payload{
-		Version:   version,
-		Timestamp: time.Unix(ts, 0),
-		Hash:      hash,
-	}, true
 }
 
 // ── Checksum ─────────────────────────────────────────────────────────────
@@ -724,7 +764,7 @@ func EncodeSource(src string) string {
 	}
 
 	// Build the watermark payload from the source content.
-	payload := buildPayload(src)
+	payload := buildPayload(src, ResolveDeployID())
 	chk := checksum16(payload)
 	payload = append(payload, byte(chk>>8), byte(chk&0xFF))
 
