@@ -8,6 +8,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/emmansun/gmsm v0.44.1
 	github.com/mattn/go-isatty v0.0.24
 	github.com/prometheus/client_golang v1.24.1
 	github.com/zalando/go-keyring v0.2.8

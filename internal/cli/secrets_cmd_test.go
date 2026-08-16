@@ -311,7 +311,10 @@ func TestPrintSecretsUsage(t *testing.T) {
 	_, _ = buf.ReadFrom(r)
 
 	out := buf.String()
-	for _, want := range []string{"set", "get", "list", "{{secret.openai.api_key}}", "AES-256-GCM"} {
+	for _, want := range []string{
+		"set", "get", "list", "{{secret.openai.api_key}}", "AES-256-GCM",
+		"sm4-gcm", "AFLARE_SECRETS_CIPHER",
+	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("usage missing %q in output:\n%s", want, out)
 		}

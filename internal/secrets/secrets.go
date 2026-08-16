@@ -16,6 +16,7 @@
 package secrets
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -32,9 +33,31 @@ import (
 	"sync"
 	"time"
 
+	"github.com/emmansun/gmsm/sm4"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/term"
+)
+
+// Cipher suite identifiers for the at-rest encryption of the secrets store.
+// The suite is selected via AFLARE_SECRETS_CIPHER (aes-gcm by default).
+const (
+	CipherAESGCM = "aes-gcm"
+	CipherSM4GCM = "sm4-gcm"
+)
+
+// On-disk format. Versioned files start with an 8-byte header
+// (magic "AFLSEC" + version byte + cipher ID byte) followed by the 16-byte
+// PBKDF2 salt and the AEAD ciphertext (nonce || ciphertext+tag). Legacy files
+// written before the header existed start directly with the salt and are
+// always decrypted as AES-256-GCM.
+const (
+	secretsEnvCipher = "AFLARE_SECRETS_CIPHER"
+	secretsMagic     = "AFLSEC"
+	secretsVersion   = 0x01
+	secretsHdrSize   = 8
+	cipherIDAESGCM   = 0x01
+	cipherIDSM4GCM   = 0x02
 )
 
 const (
@@ -42,7 +65,6 @@ const (
 	SecretTypeSecret = "secret" // #nosec G101 -- type label constant, not a credential value
 	pbkdf2Iterations = 600000
 	pbkdf2SaltSize   = 16
-	pbkdf2KeySize    = 32
 )
 
 var defaultSecretsPath string
@@ -67,15 +89,87 @@ type SecretGroup struct {
 	Secrets map[string]Secret `json:"secrets"`
 }
 
+// SecretManager keeps the in-memory secret groups plus the crypto material
+// needed to persist them. The master password and cipher name are retained so
+// SaveToFile can re-derive a key when the configured cipher differs from the
+// one the store was loaded with.
 type SecretManager struct {
-	mu     sync.RWMutex
-	groups map[string]*SecretGroup
-	aead   cipher.AEAD
-	salt   []byte
+	mu             sync.RWMutex
+	groups         map[string]*SecretGroup
+	aead           cipher.AEAD
+	salt           []byte
+	masterPassword string
+	cipherName     string
 }
 
-func deriveKey(masterPassword string, salt []byte) []byte {
-	return pbkdf2.Key([]byte(masterPassword), salt, pbkdf2Iterations, pbkdf2KeySize, sha256.New)
+// cipherKeySize returns the PBKDF2 output length required by the cipher:
+// 32 bytes for AES-256, 16 bytes for SM4 (128-bit block/key cipher).
+func cipherKeySize(cipherName string) (int, error) {
+	switch cipherName {
+	case CipherAESGCM:
+		return 32, nil
+	case CipherSM4GCM:
+		return 16, nil
+	default:
+		return 0, fmt.Errorf("unsupported secrets cipher: %s", cipherName)
+	}
+}
+
+// resolveSecretsCipher maps an AFLARE_SECRETS_CIPHER value to a cipher name.
+// Empty and "aes-gcm" map to aes-gcm; "sm4-gcm" maps to sm4-gcm. Unknown
+// values are rejected so a typo cannot silently re-encrypt the store with an
+// unintended (or default) cipher.
+func resolveSecretsCipher(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", CipherAESGCM:
+		return CipherAESGCM, nil
+	case CipherSM4GCM:
+		return CipherSM4GCM, nil
+	default:
+		return "", fmt.Errorf("invalid %s value %q (want %q or %q)",
+			secretsEnvCipher, value, CipherAESGCM, CipherSM4GCM)
+	}
+}
+
+// configuredCipher returns the cipher selected by AFLARE_SECRETS_CIPHER.
+func configuredCipher() (string, error) {
+	return resolveSecretsCipher(os.Getenv(secretsEnvCipher))
+}
+
+// cipherIDByName returns the on-disk cipher identifier byte for a cipher name.
+func cipherIDByName(cipherName string) (byte, error) {
+	switch cipherName {
+	case CipherAESGCM:
+		return cipherIDAESGCM, nil
+	case CipherSM4GCM:
+		return cipherIDSM4GCM, nil
+	default:
+		return 0, fmt.Errorf("unsupported secrets cipher: %s", cipherName)
+	}
+}
+
+// cipherNameByID maps an on-disk cipher identifier byte back to a cipher name.
+func cipherNameByID(id byte) (string, error) {
+	switch id {
+	case cipherIDAESGCM:
+		return CipherAESGCM, nil
+	case cipherIDSM4GCM:
+		return CipherSM4GCM, nil
+	default:
+		return "", fmt.Errorf("unknown cipher id %d in secrets file header", id)
+	}
+}
+
+// hasSecretsHeader reports whether data starts with the versioned secrets file
+// header. Legacy (pre-header) files begin directly with the 16-byte salt,
+// which is uniformly random and collides with the 6-byte magic with
+// negligible probability.
+func hasSecretsHeader(data []byte) bool {
+	return len(data) >= secretsHdrSize && bytes.Equal(data[:len(secretsMagic)], []byte(secretsMagic))
+}
+
+func deriveKey(masterPassword string, salt []byte, keyLen int) []byte {
+	return pbkdf2.Key([]byte(masterPassword), salt, pbkdf2Iterations, keyLen, sha256.New)
 }
 
 func generateSalt() ([]byte, error) {
@@ -86,10 +180,18 @@ func generateSalt() ([]byte, error) {
 	return salt, nil
 }
 
-func newSecretManagerWithSalt(masterPassword string, salt []byte) (*SecretManager, error) {
-	key := deriveKey(masterPassword, salt)
-
-	block, err := aes.NewCipher(key)
+// newAEAD builds the AEAD for a cipher name from an already-derived key.
+func newAEAD(cipherName string, key []byte) (cipher.AEAD, error) {
+	var block cipher.Block
+	var err error
+	switch cipherName {
+	case CipherAESGCM:
+		block, err = aes.NewCipher(key)
+	case CipherSM4GCM:
+		block, err = sm4.NewCipher(key)
+	default:
+		return nil, fmt.Errorf("unsupported secrets cipher: %s", cipherName)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
 	}
@@ -98,22 +200,46 @@ func newSecretManagerWithSalt(masterPassword string, salt []byte) (*SecretManage
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCM: %w", err)
 	}
+	return aead, nil
+}
+
+func newSecretManagerWithSalt(masterPassword string, salt []byte, cipherName string) (*SecretManager, error) {
+	keyLen, err := cipherKeySize(cipherName)
+	if err != nil {
+		return nil, err
+	}
+
+	aead, err := newAEAD(cipherName, deriveKey(masterPassword, salt, keyLen))
+	if err != nil {
+		return nil, err
+	}
 
 	return &SecretManager{
-		groups: make(map[string]*SecretGroup),
-		aead:   aead,
-		salt:   salt,
+		groups:         make(map[string]*SecretGroup),
+		aead:           aead,
+		salt:           salt,
+		masterPassword: masterPassword,
+		cipherName:     cipherName,
 	}, nil
 }
 
+// NewSecretManager creates a fresh secret manager. The at-rest cipher follows
+// the AFLARE_SECRETS_CIPHER selection (aes-gcm by default).
 func NewSecretManager(masterPassword string) (*SecretManager, error) {
+	cipherName, err := configuredCipher()
+	if err != nil {
+		return nil, err
+	}
 	salt, err := generateSalt()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate salt: %w", err)
 	}
-	return newSecretManagerWithSalt(masterPassword, salt)
+	return newSecretManagerWithSalt(masterPassword, salt, cipherName)
 }
 
+// LoadFromFile loads the encrypted secrets store. The decryption cipher is
+// determined by the file header; files without a header (legacy format) are
+// decrypted as AES-256-GCM regardless of the current cipher configuration.
 func LoadFromFile(path, masterPassword string) (*SecretManager, error) {
 	data, err := os.ReadFile(path) // #nosec G304 -- internally generated secrets path
 	if err != nil {
@@ -123,14 +249,27 @@ func LoadFromFile(path, masterPassword string) (*SecretManager, error) {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	if len(data) < pbkdf2SaltSize {
+	cipherName := CipherAESGCM
+	payload := data
+	if hasSecretsHeader(data) {
+		if version := data[len(secretsMagic)]; version != secretsVersion {
+			return nil, fmt.Errorf("unsupported secrets file version %d", version)
+		}
+		cipherName, err = cipherNameByID(data[len(secretsMagic)+1])
+		if err != nil {
+			return nil, err
+		}
+		payload = data[secretsHdrSize:]
+	}
+
+	if len(payload) < pbkdf2SaltSize {
 		return nil, fmt.Errorf("file too short: invalid format")
 	}
 
-	salt := data[:pbkdf2SaltSize]
-	ciphertext := data[pbkdf2SaltSize:]
+	salt := payload[:pbkdf2SaltSize]
+	ciphertext := payload[pbkdf2SaltSize:]
 
-	sm, err := newSecretManagerWithSalt(masterPassword, salt)
+	sm, err := newSecretManagerWithSalt(masterPassword, salt, cipherName)
 	if err != nil {
 		return nil, err
 	}
@@ -154,9 +293,36 @@ func LoadFromFile(path, masterPassword string) (*SecretManager, error) {
 	return sm, nil
 }
 
+// SaveToFile persists the store. The cipher used for writing follows the
+// current AFLARE_SECRETS_CIPHER selection, so switching the environment
+// variable re-encrypts the store on the next save (loading, in contrast,
+// always follows the file header). Every saved file carries the versioned
+// header identifying its cipher.
 func (sm *SecretManager) SaveToFile(path string) error {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
+
+	cipherName, err := configuredCipher()
+	if err != nil {
+		return err
+	}
+	cipherID, err := cipherIDByName(cipherName)
+	if err != nil {
+		return err
+	}
+
+	aead := sm.aead
+	if cipherName != sm.cipherName {
+		// Re-key for the newly selected cipher, reusing the existing salt.
+		keyLen, kerr := cipherKeySize(cipherName)
+		if kerr != nil {
+			return kerr
+		}
+		aead, kerr = newAEAD(cipherName, deriveKey(sm.masterPassword, sm.salt, keyLen))
+		if kerr != nil {
+			return kerr
+		}
+	}
 
 	stored := struct {
 		Groups map[string]*SecretGroup `json:"groups"`
@@ -169,12 +335,15 @@ func (sm *SecretManager) SaveToFile(path string) error {
 		return fmt.Errorf("failed to marshal data: %w", err)
 	}
 
-	ciphertext, err := sm.encrypt(plaintext)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt data: %w", err)
+	nonce := make([]byte, aead.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return fmt.Errorf("failed to generate nonce: %w", err)
 	}
+	ciphertext := aead.Seal(nonce, nonce, plaintext, nil)
 
-	output := make([]byte, 0, len(sm.salt)+len(ciphertext))
+	output := make([]byte, 0, secretsHdrSize+len(sm.salt)+len(ciphertext))
+	output = append(output, secretsMagic...)
+	output = append(output, secretsVersion, cipherID)
 	output = append(output, sm.salt...)
 	output = append(output, ciphertext...)
 
@@ -193,16 +362,6 @@ func (sm *SecretManager) SaveToFile(path string) error {
 	}
 
 	return nil
-}
-
-func (sm *SecretManager) encrypt(plaintext []byte) ([]byte, error) {
-	nonce := make([]byte, sm.aead.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
-	}
-
-	ciphertext := sm.aead.Seal(nonce, nonce, plaintext, nil)
-	return ciphertext, nil
 }
 
 func (sm *SecretManager) decrypt(ciphertext []byte) ([]byte, error) {

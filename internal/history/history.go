@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"io"
 	"os"
 	"path/filepath"
@@ -30,8 +31,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/emmansun/gmsm/sm3"
 	"golang.org/x/crypto/pbkdf2"
+
+	"github.com/alib8b8/aflare/internal/logger"
 )
 
 // TriggerType represents the type of trigger that started the workflow
@@ -326,8 +329,13 @@ type AuditLog struct {
 	// PrevHash is the curr_hash of the previous record in the hash chain.
 	// It is the 64-char hex zero hash for the first record.
 	PrevHash string `json:"prev_hash,omitempty"`
-	// CurrHash is the HMAC-SHA256 of (prev_hash || record_content) for this record.
+	// CurrHash is the HMAC of (prev_hash || record_content) for this record.
 	CurrHash string `json:"curr_hash,omitempty"`
+	// MACAlgo names the HMAC algorithm used to compute CurrHash:
+	// "sha256" (default; legacy records omit the field) or "sm3" for the
+	// Chinese national cryptography suite. Verification recomputes each
+	// record with its own algorithm, so mixed-algorithm chains stay valid.
+	MACAlgo string `json:"mac_algo,omitempty"`
 }
 
 const auditLogFileName = "audit.log.jsonl"
@@ -349,6 +357,33 @@ const (
 	// auditDefaultKey is an insecure fallback used only when no key is configured.
 	auditDefaultKey = "aflare-default-audit-hmac-key-v1"
 )
+
+// Audit MAC algorithm identifiers (AuditLog.MACAlgo). The algorithm for newly
+// appended records is selected via AFLARE_AUDIT_HMAC_ALGO; verification always
+// follows the mac_algo field stored in each record.
+const (
+	auditMACSHA256 = "sha256"
+	auditMACSM3    = "sm3"
+)
+
+// auditEnvHMACAlgo selects the MAC algorithm for new audit records
+// ("sha256", the default, or "sm3").
+const auditEnvHMACAlgo = "AFLARE_AUDIT_HMAC_ALGO"
+
+// resolveAuditMACAlgo maps an AFLARE_AUDIT_HMAC_ALGO value to a MAC algorithm
+// name. Empty and "sha256" map to sha256; "sm3" maps to sm3. Unknown values are
+// rejected so a typo cannot silently downgrade the chain to the default.
+func resolveAuditMACAlgo(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", auditMACSHA256:
+		return auditMACSHA256, nil
+	case auditMACSM3:
+		return auditMACSM3, nil
+	default:
+		return "", fmt.Errorf("invalid %s value %q (want %q or %q)",
+			auditEnvHMACAlgo, value, auditMACSHA256, auditMACSM3)
+	}
+}
 
 var (
 	auditWriteMu sync.Mutex
@@ -391,18 +426,30 @@ func deriveAuditKeyFromPassword(password string) []byte {
 	return key
 }
 
-// computeAuditHash returns curr_hash = hex(HMAC-SHA256(secret, prev_hash || record_content)).
-// record_content is the JSON encoding of the entry with CurrHash cleared. The caller
-// must ensure entry.CurrHash is empty before calling.
+// computeAuditHash returns curr_hash = hex(HMAC(secret, prev_hash || record_content))
+// using the algorithm named by entry.MACAlgo: HMAC-SHA256 by default (also for
+// legacy records whose mac_algo field is absent) or HMAC-SM3 for the Chinese
+// national cryptography suite. record_content is the JSON encoding of the entry
+// with CurrHash cleared. The caller must ensure entry.CurrHash is empty before
+// calling.
 func computeAuditHash(secret []byte, entry AuditLog) (string, error) {
 	if entry.CurrHash != "" {
 		return "", fmt.Errorf("entry must not have CurrHash set when computing hash")
+	}
+	var newHash func() hash.Hash
+	switch entry.MACAlgo {
+	case "", auditMACSHA256:
+		newHash = sha256.New
+	case auditMACSM3:
+		newHash = sm3.New
+	default:
+		return "", fmt.Errorf("unknown audit MAC algorithm %q", entry.MACAlgo)
 	}
 	data, err := json.Marshal(entry)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal entry for hashing: %w", err)
 	}
-	mac := hmac.New(sha256.New, secret)
+	mac := hmac.New(newHash, secret)
 	mac.Write([]byte(entry.PrevHash))
 	mac.Write(data)
 	return hex.EncodeToString(mac.Sum(nil)), nil
@@ -462,8 +509,11 @@ func readLastAuditHash(path string) (string, error) {
 }
 
 // AppendAuditLog appends an audit log entry to the audit log file. Each entry is
-// bound to the previous one via an HMAC-SHA256 hash chain so that tampering or
-// deletion can be detected by VerifyAuditChain.
+// bound to the previous one via an HMAC hash chain (SHA-256 by default, or SM3
+// when AFLARE_AUDIT_HMAC_ALGO=sm3) so that tampering or deletion can be detected
+// by VerifyAuditChain. The chaining semantics are identical for both algorithms:
+// regardless of which algorithm a record uses, its prev_hash is the previous
+// record's curr_hash, so algorithm switches never break the chain.
 func AppendAuditLog(log AuditLog) error {
 	dir := getHistoryDir()
 	if dir == "" {
@@ -480,6 +530,14 @@ func AppendAuditLog(log AuditLog) error {
 	if log.Timestamp.IsZero() {
 		log.Timestamp = time.Now()
 	}
+
+	// The MAC algorithm for new records follows AFLARE_AUDIT_HMAC_ALGO and is
+	// stored per record; verification reads it back from each record.
+	algo, err := resolveAuditMACAlgo(os.Getenv(auditEnvHMACAlgo))
+	if err != nil {
+		return fmt.Errorf("failed to select audit MAC algorithm: %w", err)
+	}
+	log.MACAlgo = algo
 
 	auditPath := filepath.Join(dir, auditLogFileName)
 
@@ -558,7 +616,9 @@ func safeFilePath(path string) (string, error) {
 
 // VerifyAuditChain validates the HMAC hash chain of the audit log at path.
 // It returns valid=true when every record's prev_hash links to the previous
-// record's curr_hash and each curr_hash matches the recomputed HMAC.
+// record's curr_hash and each curr_hash matches the recomputed HMAC. Each
+// record is verified with the algorithm named by its own mac_algo field
+// (sha256 when absent), so mixed sha256/sm3 chains verify correctly.
 // brokenAtLine is the 1-based file line number of the first broken record (0
 // when the file is empty or the whole chain is valid). err is non-nil for I/O
 // or format errors, including legacy records that lack hash fields.

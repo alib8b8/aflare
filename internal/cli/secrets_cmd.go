@@ -35,8 +35,10 @@ import (
 //	list [group]                List groups, or secrets in a group (masked)
 //	-h, --help                  Show this help message
 //
-// Secrets are AES-256-GCM encrypted at rest in ~/.config/aflare/secrets.dat,
-// keyed by a master password from the OS keyring (or AFLARE_SECRETS_PASSWORD).
+// Secrets are encrypted at rest in ~/.config/aflare/secrets.dat with AES-256-GCM
+// (default) or SM4-GCM (Chinese national standard, selected via
+// AFLARE_SECRETS_CIPHER=aes-gcm|sm4-gcm), keyed by a master password from the
+// OS keyring (or AFLARE_SECRETS_PASSWORD).
 // This is the local-first alternative to storing API keys in plaintext config.
 func HandleSecrets(args []string) {
 	if len(args) == 0 {
@@ -226,6 +228,11 @@ func PrintSecretsUsage() {
 	fmt.Println("\nManage secrets and credentials for workflows.")
 	fmt.Println("Secrets are AES-256-GCM encrypted at rest in ~/.config/aflare/secrets.dat.")
 	fmt.Println("Master password comes from the OS keyring or AFLARE_SECRETS_PASSWORD.")
+	fmt.Println("\nCipher suite (env AFLARE_SECRETS_CIPHER):")
+	fmt.Println("  aes-gcm   AES-256-GCM (default)")
+	fmt.Println("  sm4-gcm   SM4-GCM (Chinese national cryptography standard)")
+	fmt.Println("  Existing AES files are read transparently and re-encrypted")
+	fmt.Println("  with the selected cipher on the next save.")
 	fmt.Println("\nCommands:")
 	fmt.Println("  set <group> <key> [value]   Store a secret (prompts for value if omitted)")
 	fmt.Println("  get <group> <key> [--raw]   Print a secret (masked, or cleartext with --raw)")
@@ -236,6 +243,7 @@ func PrintSecretsUsage() {
 	fmt.Println("  aflare secrets set openai api_key        # secure prompt, no echo")
 	fmt.Println("  aflare secrets get openai api_key")
 	fmt.Println("  aflare secrets list openai")
+	fmt.Println("  AFLARE_SECRETS_CIPHER=sm4-gcm aflare secrets set openai api_key")
 	fmt.Println("\nIn workflows, reference as: {{secret.openai.api_key}}")
 }
 
