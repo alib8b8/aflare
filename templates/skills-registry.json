@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "count": 323,
+  "count": 332,
   "skills": [
     {
       "id": "business/business-plan",
@@ -3031,6 +3031,158 @@
       "dependencies": null
     },
     {
+      "id": "government/data-quality-check",
+      "name": "data-quality-check",
+      "version": "1.0.0",
+      "description": "Government data quality verification across completeness, accuracy, consistency, timeliness, uniqueness, and conformity dimensions.",
+      "author": "aflare community",
+      "category": "government",
+      "tags": [
+        "government",
+        "workflow"
+      ],
+      "keywords": [
+        "data-quality-check",
+        "government"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "government/dengbao-selfcheck",
+      "name": "dengbao-selfcheck",
+      "version": "1.0.0",
+      "description": "Cybersecurity MLPS Level-3 (dengbao) self-assessment checklist generator covering all 10 control areas of GB/T 22239-2019.",
+      "author": "aflare community",
+      "category": "government",
+      "tags": [
+        "government",
+        "workflow"
+      ],
+      "keywords": [
+        "dengbao-selfcheck",
+        "government"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "government/doc-preflow-review",
+      "name": "doc-preflow-review",
+      "version": "1.0.0",
+      "description": "Pre-circulation review of official documents for GB/T 9704 format compliance and drafting-rule violations with fix suggestions.",
+      "author": "aflare community",
+      "category": "government",
+      "tags": [
+        "government",
+        "workflow"
+      ],
+      "keywords": [
+        "doc-preflow-review",
+        "government"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "government/gov-disclosure-review",
+      "name": "gov-disclosure-review",
+      "version": "1.0.0",
+      "description": "Confidentiality review for government information disclosure with sensitive-data detection and itemized redaction suggestions.",
+      "author": "aflare community",
+      "category": "government",
+      "tags": [
+        "government",
+        "workflow"
+      ],
+      "keywords": [
+        "gov-disclosure-review",
+        "government"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "government/hotline-ticket-triage",
+      "name": "hotline-ticket-triage",
+      "version": "1.0.0",
+      "description": "Smart triage of 12345 hotline tickets with category classification, department routing, urgency grading, and SLA timeout risk flagging.",
+      "author": "aflare community",
+      "category": "government",
+      "tags": [
+        "government",
+        "workflow"
+      ],
+      "keywords": [
+        "hotline-ticket-triage",
+        "government"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "government/meeting-minutes-action",
+      "name": "meeting-minutes-action",
+      "version": "1.0.0",
+      "description": "Extract action items from meeting minutes and build a supervised follow-up tracker with owners, deadlines, and priority ranking.",
+      "author": "aflare community",
+      "category": "government",
+      "tags": [
+        "government",
+        "workflow"
+      ],
+      "keywords": [
+        "meeting-minutes-action",
+        "government"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "government/public-opinion-daily",
+      "name": "public-opinion-daily",
+      "version": "1.0.0",
+      "description": "Public opinion daily report generation with sentiment analysis, hot-topic ranking, trend assessment, and graded risk early-warning.",
+      "author": "aflare community",
+      "category": "government",
+      "tags": [
+        "government",
+        "workflow"
+      ],
+      "keywords": [
+        "public-opinion-daily",
+        "government"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "government/service-hall-prefill",
+      "name": "service-hall-prefill",
+      "version": "1.0.0",
+      "description": "Pre-check service-hall application materials against requirement lists and generate a one-pass notification of missing or invalid items.",
+      "author": "aflare community",
+      "category": "government",
+      "tags": [
+        "government",
+        "workflow"
+      ],
+      "keywords": [
+        "service-hall-prefill",
+        "government"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
       "id": "healthcare/clinical-trial-matcher",
       "name": "clinical-trial-matcher",
       "version": "1.0.0",
@@ -4478,6 +4630,25 @@
       ],
       "keywords": [
         "telegram-bot",
+        "integrations"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "integrations/test-notifier",
+      "name": "test-notifier",
+      "version": "1.0.0",
+      "description": "Send a test notification when a condition is met",
+      "author": "Test User",
+      "category": "integrations",
+      "tags": [
+        "integrations",
+        "workflow"
+      ],
+      "keywords": [
+        "test-notifier",
         "integrations"
       ],
       "inputs": null,

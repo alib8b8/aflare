@@ -1,0 +1,19 @@
+{
+  "id": "government/hotline-ticket-triage",
+  "name": "hotline-ticket-triage",
+  "version": "1.0.0",
+  "description": "Smart triage of 12345 hotline tickets with category classification, department routing, urgency grading, and SLA timeout risk flagging.",
+  "author": "aflare community",
+  "category": "government",
+  "tags": [
+    "government",
+    "workflow"
+  ],
+  "keywords": [
+    "hotline-ticket-triage",
+    "government"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

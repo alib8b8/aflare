@@ -1,0 +1,19 @@
+{
+  "id": "government/gov-disclosure-review",
+  "name": "gov-disclosure-review",
+  "version": "1.0.0",
+  "description": "Confidentiality review for government information disclosure with sensitive-data detection and itemized redaction suggestions.",
+  "author": "aflare community",
+  "category": "government",
+  "tags": [
+    "government",
+    "workflow"
+  ],
+  "keywords": [
+    "gov-disclosure-review",
+    "government"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

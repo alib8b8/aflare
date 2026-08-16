@@ -1,0 +1,83 @@
+name: Public Opinion Daily
+# 舆情日报生成（热点聚合、态势研判与风险预警）
+# Usage: aflare install government/public-opinion-daily
+#        aflare run public-opinion-daily/workflow.yaml
+
+steps:
+  - node: http_request
+    params:
+      url: "{{ .params.opinion_api_url }}"
+      method: GET
+      timeout: 30s
+    id: raw_feed
+
+  - node: json_parse
+    params:
+      path: items
+    input: raw_feed
+    id: opinion_items
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render,json_parse
+      max_iterations: 3
+    input: |
+      基于以下舆情监测数据，生成今日舆情日报：
+
+      舆情数据：
+      {{ .opinion_items }}
+
+      监测背景：
+      - 监测区域/领域：{{ .params.region }}
+      - 报告日期：{{ .params.report_date }}
+      - 重点关注话题：{{ .params.focus_topics }}
+
+      请输出：
+
+      1. 舆情总体态势
+         - 今日信息总量及环比变化趋势
+         - 整体情感倾向（正面/中性/负面占比）
+         - 传播平台分布（网站、微信、微博、短视频、论坛）
+      2. 热点话题排行（前 10）
+         - 话题名称、信息量、热度指数、主要传播渠道
+         - 每个话题的网民主要观点归纳
+      3. 重点舆情研判
+         - 涉及本区域/本领域的重大舆情事件详析
+         - 传播路径、关键传播节点、发展走势预判
+      4. 风险预警
+         - 高风险舆情清单（可能升级为重大舆情的事件）
+         - 预警级别（红/橙/黄/蓝）与触发原因
+         - 建议响应措施（发布权威信息、召开新闻发布会、线下处置联动）
+      5. 处置建议
+         - 需今日跟进事项与责任分工建议
+         - 建议对外回应口径要点
+    id: daily_report
+
+  - node: file_write
+    params:
+      path: public-opinion-daily.md
+    input: |
+      # 舆情日报
+
+      报告日期：{{ .params.report_date }}
+      生成时间：{{ .metadata.timestamp }}
+
+      ## 一、舆情总体态势
+
+      {{ .daily_report }}
+
+      ## 附：监测范围
+
+      - 监测区域/领域：{{ .params.region }}
+      - 重点关注话题：{{ .params.focus_topics }}
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      舆情日报已生成，保存至 public-opinion-daily.md
+      请关注红色/橙色预警事项并及时启动响应。
+    id: notify

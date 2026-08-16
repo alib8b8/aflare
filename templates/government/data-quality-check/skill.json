@@ -1,0 +1,19 @@
+{
+  "id": "government/data-quality-check",
+  "name": "data-quality-check",
+  "version": "1.0.0",
+  "description": "Government data quality verification across completeness, accuracy, consistency, timeliness, uniqueness, and conformity dimensions.",
+  "author": "aflare community",
+  "category": "government",
+  "tags": [
+    "government",
+    "workflow"
+  ],
+  "keywords": [
+    "data-quality-check",
+    "government"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

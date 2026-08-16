@@ -1,0 +1,119 @@
+name: Document Pre-Flow Review
+# 公文流转预审（格式规范与行文合规审查）
+# Usage: aflare install government/doc-preflow-review
+#        aflare run doc-preflow-review/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.document_path }}"
+    id: document
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render,json_parse
+      max_iterations: 3
+    input: |
+      对以下待流转公文进行格式与合规预审：
+
+      公文内容：
+      {{ .document }}
+
+      公文背景：
+      - 文种：{{ .params.doc_type }}
+      - 发文单位：{{ .params.issuing_dept }}
+      - 缓急程度：{{ .params.urgency }}
+
+      请依据《党政机关公文处理工作条例》和《党政机关公文格式》(GB/T 9704-2012) 逐项审查：
+
+      1. 格式要素审查（版头、主体、版记三部分）
+         - 份号、密级和保密期限（涉密公文必查）
+         - 紧急程度标注是否规范（特急/加急）
+         - 发文机关标志、发文字号（机关代字〔年份〕序号）
+         - 标题（发文机关+事由+文种，是否准确简明）
+         - 主送机关、抄送机关表述是否规范
+         - 正文结构层次序号（一、（一）、1.、（1））使用是否正确
+         - 附件说明、发文机关署名、成文日期、印章说明
+         - 附注、页码等版记要素
+      2. 行文规则审查
+         - 行文关系是否恰当（上行文/下行文/平行文）
+         - 是否越级行文、是否多头主送
+         - 请示是否一文一事、报告是否夹带请示事项
+         - 联合行文的单位层级与发文必要性
+      3. 内容规范审查
+         - 政策依据是否充分、与上位文件是否冲突
+         - 表述是否准确严谨、有无歧义
+         - 标点符号、数字用法是否符合规范
+      4. 问题清单与修改建议
+         - 每个问题标注位置、问题类型（格式/行文/内容）、严重程度（必改/建议改）
+         - 给出具体修改方案
+    id: review
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 60s
+    input: |
+      import json
+
+      review = {{ .review }}
+
+      issues = review.get('issues', []) if isinstance(review, dict) else []
+
+      # 按类型与严重程度统计
+      by_category = {}
+      by_severity = {}
+      for issue in issues:
+          cat = issue.get('category', '其他')
+          sev = issue.get('severity', '建议改')
+          by_category[cat] = by_category.get(cat, 0) + 1
+          by_severity[sev] = by_severity.get(sev, 0) + 1
+
+      blocking = [i for i in issues if i.get('severity') == '必改']
+
+      print("## 公文预审统计")
+      print(f"**发现问题总数：** {len(issues)}")
+      print()
+      print("### 按问题类型")
+      for cat, c in sorted(by_category.items(), key=lambda x: -x[1]):
+          print(f"- {cat}: {c} 处")
+      print()
+      print("### 按严重程度")
+      for sev, c in sorted(by_severity.items()):
+          print(f"- {sev}: {c} 处")
+      print()
+      print(f"**流转判定：** {'存在必改项，退回修改后再流转' if blocking else '格式合规，可进入下一流转环节'}")
+    id: statistics
+
+  - node: file_write
+    params:
+      path: doc-preflow-review.md
+    input: |
+      # 公文流转预审意见
+
+      预审时间：{{ .metadata.timestamp }}
+
+      ## 公文信息
+
+      - 文种：{{ .params.doc_type }}
+      - 发文单位：{{ .params.issuing_dept }}
+      - 缓急程度：{{ .params.urgency }}
+
+      ## 预审意见
+
+      {{ .review }}
+
+      ## 统计与流转判定
+
+      {{ .statistics }}
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      公文预审完成，预审意见已保存至 doc-preflow-review.md
+      请根据"必改"项修改后再提交流转。
+    id: notify

@@ -1,0 +1,120 @@
+name: Hotline Ticket Triage
+# 12345 政务服务热线工单智能分类与派单
+# Usage: aflare install government/hotline-ticket-triage
+#        aflare run hotline-ticket-triage/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.tickets_file }}"
+    id: tickets
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render,json_parse
+      max_iterations: 3
+    input: |
+      对以下 12345 政务服务热线工单进行智能分类与派单分析：
+
+      工单数据：
+      {{ .tickets }}
+
+      派单范围：
+      - 承办单位列表：{{ .params.dept_list }}
+      - 所属区域：{{ .params.city_name }}
+      - 办理时限要求：{{ .params.sla_hours }} 小时
+
+      请对每张工单输出：
+
+      1. 分类结果
+         - 一级分类（咨询/求助/投诉/举报/建议/表扬）
+         - 二级分类（如城市管理、市场监管、教育医疗、交通出行、住房保障、环境保护、劳动保障等）
+      2. 派单建议
+         - 首选承办单位（从承办单位列表中选择，给出理由）
+         - 协办单位（如需多部门联合办理）
+      3. 紧急程度判定
+         - 特急（危及人身安全、重大群体性事件、重大舆情风险）
+         - 紧急（影响正常生产生活、时限临近超期）
+         - 一般（常规咨询求助）
+      4. 时限风险
+         - 按 {{ .params.sla_hours }} 小时办理时限评估超期风险（高/中/低）
+         - 对高风险工单给出催办提示
+      5. 要点摘要
+         - 一句话概括诉求、关键要素（时间/地点/对象）提取
+    id: triage
+
+  - node: code_interpreter
+    params:
+      language: python
+      timeout: 60s
+    input: |
+      import json
+
+      triage = {{ .triage }}
+
+      results = triage.get('results', []) if isinstance(triage, dict) else []
+
+      # 分类分布统计
+      categories = {}
+      depts = {}
+      urgency = {}
+      for r in results:
+          cat = r.get('primary_category', '未分类')
+          dept = r.get('assigned_dept', '待定')
+          urg = r.get('urgency', '一般')
+          categories[cat] = categories.get(cat, 0) + 1
+          depts[dept] = depts.get(dept, 0) + 1
+          urgency[urg] = urgency.get(urg, 0) + 1
+
+      high_risk = sum(1 for r in results if r.get('sla_risk') == '高')
+
+      print("## 工单分类统计")
+      print(f"**工单总数：** {len(results)}")
+      print()
+      print("### 一级分类分布")
+      for cat, c in sorted(categories.items(), key=lambda x: -x[1]):
+          print(f"- {cat}: {c} 张")
+      print()
+      print("### 派单分布（前 10）")
+      for dept, c in sorted(depts.items(), key=lambda x: -x[1])[:10]:
+          print(f"- {dept}: {c} 张")
+      print()
+      print("### 紧急程度分布")
+      for urg, c in sorted(urgency.items()):
+          print(f"- {urg}: {c} 张")
+      print()
+      print(f"**超期高风险工单：** {high_risk} 张，需优先催办")
+    id: statistics
+
+  - node: file_write
+    params:
+      path: hotline-triage-report.md
+    input: |
+      # 12345 热线工单智能分类报告
+
+      生成时间：{{ .metadata.timestamp }}
+
+      ## 基本信息
+
+      - 所属区域：{{ .params.city_name }}
+      - 办理时限：{{ .params.sla_hours }} 小时
+      - 工单数量：见统计
+
+      ## 分类与派单明细
+
+      {{ .triage }}
+
+      ## 统计摘要
+
+      {{ .statistics }}
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      工单分类完成，报告已保存至 hotline-triage-report.md
+      请及时处理特急工单与超期高风险工单。
+    id: notify

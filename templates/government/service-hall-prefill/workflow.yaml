@@ -1,0 +1,75 @@
+name: Service Hall Pre-Fill
+# 办事大厅申请材料预审与一次性告知
+# Usage: aflare install government/service-hall-prefill
+#        aflare run service-hall-prefill/workflow.yaml
+
+steps:
+  - node: file_read
+    params:
+      path: "{{ .params.application_file }}"
+    id: application
+
+  - node: agent
+    params:
+      provider: ollama
+      model: llama3
+      tools: template_render,json_parse
+      max_iterations: 3
+    input: |
+      对以下办事大厅提交的申请材料进行预审：
+
+      申请材料内容：
+      {{ .application }}
+
+      预审背景：
+      - 办理事项：{{ .params.service_item }}
+      - 申请人类型：{{ .params.applicant_type }}
+      - 材料要求清单：{{ .params.required_materials }}
+
+      请逐项核查并输出：
+
+      1. 材料齐全性核查
+         - 对照材料要求清单，逐项标注：已提交 / 未提交 / 部分提交
+         - 缺失材料清单（标注是否为核心要件）
+      2. 填写规范核查
+         - 申请表必填项是否填写完整
+         - 填写内容是否与所附证明材料一致
+         - 签字、盖章、日期是否完备
+      3. 形式有效性核查
+         - 复印件是否清晰、是否注明"与原件一致"
+         - 证件是否在有效期内
+         - 授权委托手续是否完备（委托办理时）
+      4. 预审结论
+         - 受理（材料齐全合规）
+         - 补正后受理（列出补正清单）
+         - 不予受理（说明理由与依据）
+      5. 一次性告知单
+         - 生成规范的补正告知内容：需补材料名称、份数、格式要求、补正期限
+         - 避免群众"来回跑""多次补"
+    id: precheck
+
+  - node: file_write
+    params:
+      path: service-hall-precheck.md
+    input: |
+      # 办事大厅材料预审结果与一次性告知单
+
+      预审时间：{{ .metadata.timestamp }}
+
+      ## 基本信息
+
+      - 办理事项：{{ .params.service_item }}
+      - 申请人类型：{{ .params.applicant_type }}
+
+      ## 预审结果
+
+      {{ .precheck }}
+    id: save
+
+  - node: notify
+    params:
+      channel: stdout
+    input: |
+      材料预审完成，结果与一次性告知单已保存至 service-hall-precheck.md
+      如需补正，请按告知单一次性告知申请人。
+    id: notify

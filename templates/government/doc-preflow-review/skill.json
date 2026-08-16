@@ -1,0 +1,19 @@
+{
+  "id": "government/doc-preflow-review",
+  "name": "doc-preflow-review",
+  "version": "1.0.0",
+  "description": "Pre-circulation review of official documents for GB/T 9704 format compliance and drafting-rule violations with fix suggestions.",
+  "author": "aflare community",
+  "category": "government",
+  "tags": [
+    "government",
+    "workflow"
+  ],
+  "keywords": [
+    "doc-preflow-review",
+    "government"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}

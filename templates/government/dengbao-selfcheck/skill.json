@@ -1,0 +1,19 @@
+{
+  "id": "government/dengbao-selfcheck",
+  "name": "dengbao-selfcheck",
+  "version": "1.0.0",
+  "description": "Cybersecurity MLPS Level-3 (dengbao) self-assessment checklist generator covering all 10 control areas of GB/T 22239-2019.",
+  "author": "aflare community",
+  "category": "government",
+  "tags": [
+    "government",
+    "workflow"
+  ],
+  "keywords": [
+    "dengbao-selfcheck",
+    "government"
+  ],
+  "inputs": null,
+  "outputs": null,
+  "dependencies": null
+}
