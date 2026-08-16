@@ -88,6 +88,15 @@ func handleMCPInstall(args []string) {
 	fmt.Printf("   说明：%s\n", entry.Description)
 	fmt.Printf("   启动命令：%s %s\n", entry.Command, strings.Join(entry.Args, " "))
 	fmt.Printf("   配置文件：%s\n", defaultMCPConfigPath())
+	// The config is written regardless; warn that the runtime the entry needs
+	// is missing so the failure surfaces at install time, not at first launch.
+	if _, ok := detectCommand(entry.Command); !ok {
+		if entry.Command == "npx" {
+			fmt.Fprintf(os.Stderr, "⚠️  未检测到 npx（Node.js），MCP client 实际启动该 server 时会失败。安装：https://nodejs.org\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "⚠️  未检测到 %s，MCP client 实际启动该 server 时会失败。请先安装 %s\n", entry.Command, entry.Command)
+		}
+	}
 }
 
 // installMCPServer resolves a catalog name and upserts it into the config.

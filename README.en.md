@@ -90,7 +90,7 @@ aflare agent -c reflection,planning,utility
 
 ## Project Status
 
-aflare is currently at **v0.8 stage**. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. v0.8 focuses on offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding and CLI UX improvements. Local inference services running on domestic chips (Ascend/Cambricon/Hygon) are accessed through OpenAI-compatible endpoints (no native SDK integration), and support keeps improving. Hardware device control (robots etc.) is not built in — users can integrate via custom nodes or MCP Server, with data staying on their intranet.
+aflare is currently at **v0.9.0 stage**. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. v0.8 focused on offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding and CLI UX improvements; v0.8.1 was a release-audit fix release; v0.9.0 delivers Chinese national cryptography support (SM3 audit chain / SM4 secrets, opt-in), audit-chain security hardening (per-install random HMAC key, cross-process log lock, bundle truncation-forgery defense), one-command MCP server install (`aflare mcp install`), and byte-identical 0.8.x upgrade compatibility. Local inference services running on domestic chips (Ascend/Cambricon/Hygon) are accessed through OpenAI-compatible endpoints (no native SDK integration), and support keeps improving. Hardware device control (robots etc.) is not built in — users can integrate via custom nodes or MCP Server, with data staying on their intranet.
 
 ---
 
@@ -144,7 +144,7 @@ L2: Runtime      —  Execution layer
 
 aflare is built for intranet / local-first users — enterprises and individuals who are sensitive about data privacy and security. Core strengths:
 
-**Local-first, data never leaves your machine** — Single binary with zero runtime deps, runs in ~5MB RAM; workflows, execution history, memory and secrets all stay on local disk; API keys are injected via environment variables or the OS keyring, never written in cleartext to `config.yaml`; fully offline-capable (offline install, `aflare doctor --offline`, WebUI Mermaid offline fallback, 323 templates embedded in the binary and auto-released on first run).
+**Local-first, data never leaves your machine** — Single binary with zero runtime deps, runs in ~5MB RAM; workflows, execution history, memory and secrets all stay on local disk; API keys are injected via environment variables or the OS keyring, never written in cleartext to `config.yaml`; fully offline-capable (offline install, `aflare doctor --offline`, WebUI Mermaid offline fallback, 332 templates embedded in the binary and auto-released on first run).
 
 **Connect your own LLM** — Ollama / vLLM / LM Studio / local DeepSeek / any OpenAI-compatible endpoint, with loopback addresses (127.0.0.1 / localhost) requiring no API key. With a local LLM, the LLM drives intent understanding and dynamic workflow generation (`--ai` / `chat`); without one, keyword matching falls back so offline use still works.
 
@@ -158,7 +158,7 @@ aflare is built for intranet / local-first users — enterprises and individuals
 
 **One-command onboarding, smooth offline** — `aflare doctor` environment self-check, `aflare init` interactive setup wizard, `aflare template run <id>` one-command template execution (no clone or path lookup needed), smart unknown-command hints (did-you-mean), zero-config examples ready to run immediately.
 
-**Extensible ecosystem** — Custom nodes (Go), MCP Server / Client, plugin system (community `.so`), community template contributions (`aflare template submit`), one-command scenario packs (`aflare install-pack`). 323 skills already cover 16 domains, targeting 1000+.
+**Extensible ecosystem** — Custom nodes (Go), MCP Server / Client (`aflare mcp install` for built-in community servers), plugin system (community `.so`), community template contributions (`aflare template submit`), one-command scenario packs (`aflare install-pack`). 332 skills already cover 17 domains, targeting 1000+.
 
 **Engineering quality** — Expression engine (bytecode IR + vectorized batch evaluation), Prometheus metrics endpoint, CI dual-architecture verification (x86-64 + ARM64), domestic-chip local inference via OpenAI-compatible endpoints (Ascend / Cambricon / Hygon).
 
@@ -297,7 +297,8 @@ aflare is built for intranet / local-first users — enterprises and individuals
 | v0.6 | Done | Agent memory infrastructure, voice AI toolchain, WAL persistence, TLA+ verification |
 | v0.7 | Done | Financial scenario enhancement (Saga / Idempotency / Audit chain), ReAct Agent chat, 300+ skill templates, 7 pluggable capabilities, Agent unified event loop |
 | **v0.8** | **Done** | Offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding, CLI UX improvements (template run / smart command hints), CI speedup |
-| v0.9 | Planned | Domestic chip support refinement, Agent capability deepening |
+| **v0.9** | **Done** | National cryptography support (SM3/SM4, opt-in), audit-chain security hardening (random HMAC key, cross-process lock, bundle truncation-forgery defense), `aflare mcp install`, supply-chain scenario pack, loong64 |
+| v0.10 | Planned | Domestic chip support refinement, Agent capability deepening |
 | v1.0 | Planned | Stable API, LTS |
 
 See [CHANGELOG.md](CHANGELOG.md) for details.

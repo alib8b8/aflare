@@ -17,7 +17,9 @@ package history
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -359,10 +361,13 @@ const auditLogFileName = "audit.log.jsonl"
 // prev_hash of the first record in the chain.
 const auditZeroHash = "0000000000000000000000000000000000000000000000000000000000000000"
 
-// Audit HMAC key configuration. Priority:
+// Audit HMAC key configuration. Resolution order:
 //  1. AFLARE_AUDIT_HMAC_KEY environment variable (raw bytes)
 //  2. PBKDF2 derivation from AFLARE_SECRETS_PASSWORD
-//  3. Insecure built-in default (logged once at warn level)
+//  3. Auto-generated random key file <historyDir>/audit-hmac.key (0600),
+//     created lazily for NEW chains only (see auditKeyForAppend)
+//  4. Insecure built-in default — only to keep pre-0.9.0 default-key chains
+//     appending/verifying; flagged by doctor and warned once per process
 const (
 	auditEnvHMACKey       = "AFLARE_AUDIT_HMAC_KEY"
 	auditEnvSecretsPasswd = "AFLARE_SECRETS_PASSWORD"
@@ -371,6 +376,18 @@ const (
 	auditPBKDF2KeyLen     = 32
 	// auditDefaultKey is an insecure fallback used only when no key is configured.
 	auditDefaultKey = "aflare-default-audit-hmac-key-v1"
+	// auditKeyFileName holds the auto-generated per-install random key that
+	// new chains sign with when no explicit key is configured. Its value is
+	// never the public default, so fresh deployments are secure by default.
+	auditKeyFileName = "audit-hmac.key"
+	// auditLockFileName is the cross-process append lock (sentinel file).
+	auditLockFileName = "audit.log.lock"
+	// auditLockStale bounds how long an orphaned lock (crashed holder) blocks
+	// appends before being reclaimed.
+	auditLockStale = 30 * time.Second
+	// auditLockWait is how long an append waits to acquire the lock before
+	// failing loudly rather than risking a chain fork.
+	auditLockWait = 5 * time.Second
 )
 
 // Audit MAC algorithm identifiers (AuditLog.MACAlgo). The algorithm for newly
@@ -411,20 +428,150 @@ var (
 	warnDefaultKeyOnce sync.Once
 )
 
-// getAuditHMACKey returns the HMAC key used to bind audit records into a chain.
-// The key is resolved on every call so environment changes are picked up; the
-// PBKDF2 derivation result is cached per password.
-func getAuditHMACKey() []byte {
+// auditKeyFilePath returns the path of the auto-generated random key file in
+// the history directory, or "" when no history directory is configured.
+func auditKeyFilePath() string {
+	dir := getHistoryDir()
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, auditKeyFileName)
+}
+
+// readAuditKeyFile loads the auto-generated key file. A missing file yields
+// (nil, nil); anything else (unreadable, wrong size) is an error because
+// silently regenerating the key would fork the chain's verifiability.
+func readAuditKeyFile() ([]byte, error) {
+	path := auditKeyFilePath()
+	if path == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path) // #nosec G304 -- internally generated history path
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read audit key file: %w", err)
+	}
+	key := bytes.TrimSpace(data)
+	if len(key) == 0 {
+		return nil, fmt.Errorf("audit key file %s is empty", path)
+	}
+	return key, nil
+}
+
+// ensureAuditKeyFile returns the auto-generated key, creating the key file on
+// first use with a fresh 32-byte random key (hex encoded, 0600, atomic write).
+func ensureAuditKeyFile() ([]byte, error) {
+	if key, err := readAuditKeyFile(); err != nil || key != nil {
+		return key, err
+	}
+	path := auditKeyFilePath()
+	if path == "" {
+		return nil, fmt.Errorf("history directory not available")
+	}
+	raw := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, raw); err != nil {
+		return nil, fmt.Errorf("failed to generate audit key: %w", err)
+	}
+	key := []byte(hex.EncodeToString(raw))
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, key, 0600); err != nil {
+		return nil, fmt.Errorf("failed to write audit key file: %w", err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		return nil, fmt.Errorf("failed to finalize audit key file: %w", err)
+	}
+	logger.Info("generated per-install audit HMAC key", "path", path)
+	return key, nil
+}
+
+// auditKeyCandidates returns the HMAC keys a chain may have been signed with,
+// in priority order: explicit env key, password-derived key, the per-install
+// key file, and finally the public default (legacy pre-0.9.0 chains only).
+// Duplicates are removed so verification never tries the same key twice.
+func auditKeyCandidates() [][]byte {
+	var candidates [][]byte
+	seen := map[string]bool{}
+	add := func(key []byte) {
+		if len(key) == 0 {
+			return
+		}
+		s := string(key)
+		if seen[s] {
+			return
+		}
+		seen[s] = true
+		candidates = append(candidates, key)
+	}
 	if key := os.Getenv(auditEnvHMACKey); key != "" {
-		return []byte(key)
+		add([]byte(key))
 	}
 	if password := os.Getenv(auditEnvSecretsPasswd); password != "" {
-		return deriveAuditKeyFromPassword(password)
+		add(deriveAuditKeyFromPassword(password))
+	}
+	if key, err := readAuditKeyFile(); err == nil {
+		add(key)
+	} else {
+		logger.Warn("failed to read audit key file; continuing with other key candidates", "error", err.Error())
+	}
+	add([]byte(auditDefaultKey))
+	return candidates
+}
+
+// auditKeyForAppend resolves the signing key for a new record appended to the
+// audit log at auditPath:
+//   - env key / password-derived key win when configured (explicit operator
+//     intent, same as every version before 0.9.0);
+//   - otherwise, if the log is missing or empty (a NEW chain), the per-install
+//     random key file is generated and used — fresh deployments never sign
+//     with the public default;
+//   - otherwise (an existing legacy chain with records and no key file), the
+//     chain must continue under the key it was started with, so the public
+//     default is used with a warning; doctor explains how to migrate.
+func auditKeyForAppend(auditPath string) ([]byte, error) {
+	if key := os.Getenv(auditEnvHMACKey); key != "" {
+		return []byte(key), nil
+	}
+	if password := os.Getenv(auditEnvSecretsPasswd); password != "" {
+		return deriveAuditKeyFromPassword(password), nil
+	}
+	if key, err := readAuditKeyFile(); err != nil {
+		return nil, err
+	} else if key != nil {
+		return key, nil
+	}
+	if fi, err := os.Stat(auditPath); err != nil || fi.Size() == 0 {
+		// Missing or empty log: a new chain — generate and use a random key.
+		return ensureAuditKeyFile()
 	}
 	warnDefaultKeyOnce.Do(func() {
-		logger.Warn("audit HMAC key not configured; using insecure default. Set AFLARE_AUDIT_HMAC_KEY for production use.")
+		logger.Warn("audit chain was started with the public default HMAC key (pre-0.9.0 behavior); continuing with it to keep the chain verifiable. Set AFLARE_AUDIT_HMAC_KEY and export+rotate the chain to migrate.",
+			"migration", "AFLARE_AUDIT_HMAC_KEY=$(openssl rand -hex 32) aflare audit export --out archive.json && <move audit.log aside>")
 	})
-	return []byte(auditDefaultKey)
+	return []byte(auditDefaultKey), nil
+}
+
+// AuditKeyStatus reports how the audit HMAC key is (or will be) resolved, for
+// doctor. usingDefaultKey is true when the ACTIVE chain key is the public
+// default (forgeable by anyone reading the source).
+func AuditKeyStatus() (configured bool, keyFileExists bool, usingDefaultKey bool) {
+	if os.Getenv(auditEnvHMACKey) != "" || os.Getenv(auditEnvSecretsPasswd) != "" {
+		return true, false, false
+	}
+	key, err := readAuditKeyFile()
+	keyFileExists = err == nil && key != nil
+	if keyFileExists {
+		return true, true, false
+	}
+	// No explicit key and no key file: a new chain would generate one, but an
+	// existing chain continues on the public default.
+	if dir := getHistoryDir(); dir != "" {
+		if fi, err := os.Stat(filepath.Join(dir, auditLogFileName)); err == nil && fi.Size() > 0 {
+			return false, false, true
+		}
+	}
+	return false, false, false
 }
 
 // deriveAuditKeyFromPassword derives a 32-byte HMAC key from the secrets master
@@ -472,7 +619,11 @@ func computeAuditHash(secret []byte, entry AuditLog) (string, error) {
 
 // readLastAuditHash returns the curr_hash of the last non-empty line in the audit
 // log file. It seeks near the end of the file rather than reading the whole file.
-// Returns auditZeroHash when the file is missing or empty.
+// Returns auditZeroHash when the file is missing or empty. When the 8 KiB tail
+// window fails to parse (a record larger than the window, or a torn final line
+// from a crashed writer), it falls back to scanning the full file: oversized
+// records must not block future appends, while a genuinely torn line still
+// fails loudly instead of silently forking the chain.
 func readLastAuditHash(path string) (string, error) {
 	f, err := os.Open(path) // #nosec G304 -- internally generated history path
 	if err != nil {
@@ -504,7 +655,30 @@ func readLastAuditHash(path string) (string, error) {
 	}
 
 	// Walk the trailing lines backwards to find the last non-empty record.
-	lines := strings.Split(string(buf), "\n")
+	lastHash, tailErr := lastHashFromTail(string(buf))
+	if tailErr == nil {
+		return lastHash, nil
+	}
+
+	// Fallback: rescan the whole file. The first line of the tail window may
+	// be a record's middle, so only the full scan can distinguish "oversized
+	// record" (recovers, continues the chain) from "torn last line" (error).
+	data, err := os.ReadFile(path) // #nosec G304 -- internally generated history path
+	if err != nil {
+		return "", fmt.Errorf("failed to reread audit log: %w", err)
+	}
+	fullHash, fullErr := lastHashFromTail(string(data))
+	if fullErr != nil {
+		return "", fmt.Errorf("failed to parse last audit log line (torn tail? back up the file and truncate to the last complete record): %w", fullErr)
+	}
+	return fullHash, nil
+}
+
+// lastHashFromTail walks lines backwards and returns the curr_hash of the last
+// parseable non-empty record, or an error when the last non-empty line cannot
+// be parsed.
+func lastHashFromTail(content string) (string, error) {
+	lines := strings.Split(content, "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
@@ -568,9 +742,16 @@ func AppendAuditLog(log AuditLog) error {
 	auditPath := filepath.Join(dir, auditLogFileName)
 
 	// Serialize the read-then-write append under a mutex so concurrent callers
-	// within this process extend the chain rather than corrupting it.
+	// within this process extend the chain rather than corrupting it, and
+	// under a cross-process sentinel lock so parallel aflare processes do too.
 	auditWriteMu.Lock()
 	defer auditWriteMu.Unlock()
+
+	unlock, err := lockAuditLog(dir)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 
 	prevHash, err := readLastAuditHash(auditPath)
 	if err != nil {
@@ -578,9 +759,14 @@ func AppendAuditLog(log AuditLog) error {
 	}
 	log.PrevHash = prevHash
 
+	key, err := auditKeyForAppend(auditPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve audit HMAC key: %w", err)
+	}
+
 	// CurrHash must be empty while computing the hash; it is set afterwards.
 	log.CurrHash = ""
-	currHash, err := computeAuditHash(getAuditHMACKey(), log)
+	currHash, err := computeAuditHash(key, log)
 	if err != nil {
 		return fmt.Errorf("failed to compute audit hash: %w", err)
 	}
@@ -597,11 +783,59 @@ func AppendAuditLog(log AuditLog) error {
 	}
 	defer f.Close()
 
+	// The 0600 mode only applies to newly created files; tighten pre-existing
+	// files too (audit records carry user/action detail and must stay
+	// owner-only). Best effort: a failure to chmod is not worth failing the
+	// audit write for.
+	if err := f.Chmod(0600); err != nil {
+		logger.Warn("failed to tighten audit log permissions", "error", err.Error())
+	}
+
 	if _, err := f.Write(append(data, '\n')); err != nil {
 		return fmt.Errorf("failed to write audit log: %w", err)
 	}
 
 	return nil
+}
+
+// lockAuditLog acquires a cross-process sentinel lock around the audit
+// read-hash-append critical section, using the same O_CREATE|O_EXCL pattern
+// as the idempotency store. A lock older than auditLockStale (crashed holder)
+// is reclaimed. The returned func releases the lock and must be called.
+func lockAuditLog(dir string) (func(), error) {
+	lockPath := filepath.Join(dir, auditLockFileName)
+	deadline := time.Now().Add(auditLockWait)
+	for {
+		f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600) // #nosec G304 -- internally generated history path
+		if err == nil {
+			_, werr := f.WriteString(time.Now().UTC().Format(time.RFC3339))
+			cerr := f.Close()
+			if werr != nil {
+				return nil, fmt.Errorf("failed to write audit lock: %w", werr)
+			}
+			if cerr != nil {
+				return nil, fmt.Errorf("failed to write audit lock: %w", cerr)
+			}
+			return func() {
+				if rerr := os.Remove(lockPath); rerr != nil && !os.IsNotExist(rerr) {
+					logger.Warn("failed to release audit lock", "error", rerr.Error())
+				}
+			}, nil
+		}
+		if !os.IsExist(err) {
+			return nil, fmt.Errorf("failed to acquire audit lock: %w", err)
+		}
+		// Lock exists: reclaim it if stale, otherwise retry until the deadline.
+		if fi, serr := os.Stat(lockPath); serr == nil && time.Since(fi.ModTime()) > auditLockStale {
+			if rerr := os.Remove(lockPath); rerr == nil || os.IsNotExist(rerr) {
+				continue
+			}
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("audit log is locked by another process (lock %s); retry shortly", lockPath)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 // GetAuditLogPath returns the path to the audit log file in the current history
@@ -664,7 +898,46 @@ func VerifyAuditChain(path string) (valid bool, brokenAtLine int, err error) {
 	}
 	defer f.Close()
 
-	secret := getAuditHMACKey()
+	// A chain is signed with exactly one key, but WHICH key depends on how the
+	// deployment was configured over time (env, password, per-install key
+	// file, or the legacy public default). Replay under every candidate and
+	// accept the first fully valid pass; parse errors are key-independent and
+	// fail immediately.
+	candidates := auditKeyCandidates()
+	type verifyResult struct {
+		valid     bool
+		brokenAt  int
+		err       error
+		scanError bool
+	}
+	results := make([]verifyResult, 0, len(candidates))
+	for _, secret := range candidates {
+		valid, brokenAt, err, scanErr := verifyAuditLines(f, secret)
+		results = append(results, verifyResult{valid, brokenAt, err, scanErr})
+		if valid || scanErr {
+			if valid {
+				return true, 0, nil
+			}
+			return false, brokenAt, err
+		}
+		// Chain mismatch under this key: rewind and try the next candidate.
+		if _, serr := f.Seek(0, io.SeekStart); serr != nil {
+			return false, 0, fmt.Errorf("failed to rewind audit log: %w", serr)
+		}
+	}
+	// No candidate verified the whole chain: report the first candidate's
+	// mismatch position (the highest-priority key), which is the most useful
+	// diagnostic for the operator.
+	if len(results) > 0 {
+		return false, results[0].brokenAt, results[0].err
+	}
+	return false, 0, fmt.Errorf("no audit HMAC key candidates available")
+}
+
+// verifyAuditLines replays the hash chain in f under one key. scanErr marks
+// key-independent failures (parse/IO errors) that must abort the candidate
+// loop; a pure mismatch returns scanErr=false so other keys can be tried.
+func verifyAuditLines(f *os.File, secret []byte) (valid bool, brokenAt int, err error, scanErr bool) {
 	expectedPrev := auditZeroHash
 	lineNum := 0
 	scanner := bufio.NewScanner(f)
@@ -677,31 +950,31 @@ func VerifyAuditChain(path string) (valid bool, brokenAtLine int, err error) {
 		}
 		var entry AuditLog
 		if err := json.Unmarshal([]byte(line), &entry); err != nil {
-			return false, lineNum, fmt.Errorf("line %d: failed to parse record: %w", lineNum, err)
+			return false, lineNum, fmt.Errorf("line %d: failed to parse record: %w", lineNum, err), true
 		}
 		// Backwards compatibility: legacy records without hash fields cannot be
 		// verified and must be reported explicitly rather than crashing.
 		if entry.PrevHash == "" && entry.CurrHash == "" {
-			return false, lineNum, fmt.Errorf("line %d: incompatible format (missing prev_hash/curr_hash fields)", lineNum)
+			return false, lineNum, fmt.Errorf("line %d: incompatible format (missing prev_hash/curr_hash fields)", lineNum), true
 		}
 		if entry.PrevHash != expectedPrev {
-			return false, lineNum, nil
+			return false, lineNum, nil, false
 		}
 		savedHash := entry.CurrHash
 		entry.CurrHash = ""
 		computedHash, err := computeAuditHash(secret, entry)
 		if err != nil {
-			return false, lineNum, fmt.Errorf("line %d: %w", lineNum, err)
+			return false, lineNum, fmt.Errorf("line %d: %w", lineNum, err), true
 		}
 		if !hmac.Equal([]byte(computedHash), []byte(savedHash)) {
-			return false, lineNum, nil
+			return false, lineNum, nil, false
 		}
 		expectedPrev = savedHash
 	}
 	if err := scanner.Err(); err != nil {
-		return false, lineNum, fmt.Errorf("failed to read audit log: %w", err)
+		return false, lineNum, fmt.Errorf("failed to read audit log: %w", err), true
 	}
-	return true, 0, nil
+	return true, 0, nil, false
 }
 
 // RecordFilter defines filters for listing records

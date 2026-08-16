@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-16
+
+本版本主题：**国密算法支持、审计链安全硬化、升级兼容保证、MCP server 一键安装**。默认路径与 0.8.x 字节级兼容，滚动升级可共享 home 目录。
+
+### Added
+- **国密算法支持（opt-in）**：审计链 HMAC 可选 SM3（`AFLARE_AUDIT_MAC_ALGO=sm3`），secrets 静态加密可选 SM4（`AFLARE_SECRETS_CIPHER=sm4`）；默认仍为 SHA-256 / AES-GCM，两者均不改变默认 on-disk 格式
+- **审计 HMAC 密钥管理**：新链首次写入自动生成每安装随机密钥文件（`audit-hmac.key`，0600）；支持 `AFLARE_AUDIT_HMAC_KEY` 环境密钥与 `AFLARE_SECRETS_PASSWORD` 密码派生密钥（PBKDF2）；验证时按多密钥候选重试，密钥轮换后历史记录仍可验证
+- **MCP server 一键安装**：`aflare mcp install <name>` / `aflare mcp list`，内置 8 个社区 server（fetch、filesystem、git、memory、sqlite、sequential-thinking、everything、time），写入项目级 `.mcp.json`（Claude Code / Cursor / opencode 同一 schema），幂等不覆盖本地修改；检测到 npx/uvx 缺失时安装即警告
+- **跨进程审计日志锁**：审计追加使用 `O_CREATE|O_EXCL` 锁文件串行化多进程写入，带超时与陈锁回收，杜绝并发追加导致的链断裂
+- **供应链场景包**：新增 18 个 supply-chain 模板（需求预测、库存补货、路线优化、清关、冷链监控等），内置模板 323 → 332
+- **doctor 加密兼容性体检**：报告审计链算法混合情况与 secrets 静态加密套件（不解密），识别 SM3/SM4 数据时给出精确升降级步骤；检测审计链使用公开默认密钥并给出迁移指引
+- **loong64 构建目标**：GoReleaser 矩阵新增 Linux loong64
+
+### Security
+- **审计默认 HMAC 密钥可伪造**：旧版使用源码内公开默认密钥，任何读过源码的人都能伪造审计记录。现新链自动生成随机密钥；已有旧链为保持可验证继续用原密钥（一次性警告 + doctor 迁移指引：导出归档 → 移走旧链 → 新链自动换随机密钥）
+- **未过滤 bundle 截断伪造**：导出 bundle 声明"全量"时强制首条记录 `prev_hash` 为零哈希，删除前缀记录冒充完整链的伪造直接拒绝
+- **secrets 临时文件符号链接攻击**：`SaveToFile` 写临时文件前移除已存在的符号链接/目录占位，防止原子替换路径被劫持；密钥文件与密钥库权限收紧
+- **InspectFile 版本校验**：doctor 诊断 secrets 格式前先校验版本字节，不再把未来格式文件按字节误读误诊
+
+### Fixed
+- **滚动升级兼容（0.9.0 最关键修复）**：国密开发曾在默认路径引入两个静默断点——secrets 每次保存写版本化 header（0.8.x 无法读取）、审计记录携带 `mac_algo` 字段。现默认 AES-GCM 仍写 legacy headerless 格式、默认 SHA-256 记录不携带 `mac_algo`，与 0.8.x 输出字节一致；切回 aes-gcm 重存即恢复 legacy 格式（回滚路径）
+- **Ollama 模型不存在 404**：透传 Ollama 错误信息并给出 `ollama pull <model>` 修复命令（模板用户首跑第一断点）
+- **超大审计记录读取失败**：末 8KiB 解析失败时回退全文件扫描，区分超大记录（可恢复）与截断行（报错）；末行截断（写入崩溃的半行 JSON）给出"备份后截断到最后完整记录"的修复指引
+
+### Changed
+- 版本化 secrets header 与 `mac_algo` 字段仅在显式选择非默认算法时写入，并附一次性进程警告（提示 pre-0.9.0 校验方兼容性）
+
 ## [0.8.1] - 2026-08-15
 
 本版本为**发布审计修复**：面向首批测试用户修复安装与入口断点、清零安全漏洞。
@@ -229,7 +256,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ollama integration
 - History tracking
 
-[Unreleased]: https://github.com/alib8b8/aflare/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/alib8b8/aflare/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/alib8b8/aflare/compare/v0.8.1...v0.9.0
+[0.8.1]: https://github.com/alib8b8/aflare/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/alib8b8/aflare/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/alib8b8/aflare/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/alib8b8/aflare/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/alib8b8/aflare/compare/v0.5.1...v0.5.2

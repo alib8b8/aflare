@@ -90,7 +90,7 @@ aflare agent -c reflection,planning,utility
 
 ## 项目状态
 
-aflare 目前处于 **v0.8.1 阶段**。核心 Runtime 能力（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断）已实现并通过 CI 验证。v0.8 重点交付离线/内网首选项体验、隐私安全硬化、本地 LLM 丝滑接入与 CLI 体验优化；v0.8.1 为发布审计修复（国内安装 404、`aflare mcp` 入口、安全漏洞清零）。国产芯片（昇腾/寒武纪/海光）场景通过 OpenAI 兼容接口接入本地推理服务（非原生 SDK 集成），持续完善中。硬件设备控制（机器人等）不在内置范围——用户可通过自定义节点或 MCP Server 自行接入，数据不出内网。
+aflare 目前处于 **v0.9.0 阶段**。核心 Runtime 能力（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断）已实现并通过 CI 验证。v0.8 重点交付离线/内网首选项体验、隐私安全硬化、本地 LLM 丝滑接入与 CLI 体验优化；v0.8.1 为发布审计修复；v0.9.0 交付国密算法支持（SM3 审计链 / SM4 密钥存储，opt-in）、审计链安全硬化（每安装随机 HMAC 密钥、跨进程日志锁、bundle 截断伪造防护）、MCP server 一键安装（`aflare mcp install`）与 0.8.x 字节级升级兼容。国产芯片（昇腾/寒武纪/海光）场景通过 OpenAI 兼容接口接入本地推理服务（非原生 SDK 集成），持续完善中。硬件设备控制（机器人等）不在内置范围——用户可通过自定义节点或 MCP Server 自行接入，数据不出内网。
 
 ---
 
@@ -143,7 +143,7 @@ L2: Runtime      —  确定性执行层
 
 aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用户与个人。核心优势：
 
-**本地优先，数据不出本地** — 单二进制零运行时依赖，~5MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退、323 模板内嵌进二进制首跑自动释放）。
+**本地优先，数据不出本地** — 单二进制零运行时依赖，~5MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退、332 模板内嵌进二进制首跑自动释放）。
 
 **连接你自己的 LLM** — Ollama / vLLM / LM Studio / DeepSeek 本地部署 / 任何 OpenAI 兼容 endpoint，loopback 地址（127.0.0.1 / localhost）免 API Key 接入。有本地 LLM 时由 LLM 做意图理解与动态生成工作流（`--ai` / `chat`），无 LLM 时关键词匹配兜底，离线仍可用。
 
@@ -157,7 +157,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 
 **一键上手，离线丝滑** — `aflare doctor` 环境自检、`aflare init` 交互式配置向导、`aflare template run <id>` 一键运行模板（无需 clone 或记路径）、未知命令智能提示（did-you-mean）、零配置示例立即可跑。
 
-**可扩展生态** — 自定义节点（Go）、MCP Server / Client、插件系统（社区 `.so`）、社区模板贡献（`aflare template submit`）、场景包一键安装（`aflare install-pack`）。已有 323 Skill 覆盖 16 个领域，目标 1000+。
+**可扩展生态** — 自定义节点（Go）、MCP Server / Client（`aflare mcp install` 一键安装内置社区 server）、插件系统（社区 `.so`）、社区模板贡献（`aflare template submit`）、场景包一键安装（`aflare install-pack`）。已有 332 Skill 覆盖 17 个领域，目标 1000+。
 
 **工程质量** — 表达式引擎（字节码 IR + 向量化批量求值）、Prometheus 指标端点、CI 双架构验证（x86-64 + ARM64）、国产芯片本地推理接入（昇腾 / 寒武纪 / 海光，经 OpenAI 兼容接口）。
 
@@ -299,7 +299,8 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 | v0.7 | 已完成 | 金融场景增强（Saga / 幂等 / 审计链）、ReAct Agent 对话、300+ 技能模板、7 类可插拔能力、Agent 统一事件循环 |
 | v0.8 | 已完成 | 离线/内网首选项体验、隐私安全硬化、本地 LLM 丝滑接入、CLI 体验优化（template run / 智能命令提示）、CI 提速 |
 | **v0.8.1** | **已完成** | 发布审计修复：国内安装 404、`aflare mcp` 子命令、execute 白名单错误定位、govulncheck 漏洞清零 |
-| v0.9 | 计划中 | 国产芯片适配完善、Agent 能力深化 |
+| **v0.9** | **已完成** | 国密算法支持（SM3/SM4，opt-in）、审计链安全硬化（随机 HMAC 密钥、跨进程锁、bundle 防截断伪造）、`aflare mcp install` 一键安装、供应链场景包、loong64 |
+| v0.10 | 计划中 | 国产芯片适配完善、Agent 能力深化 |
 | v1.0 | 计划中 | 稳定 API、LTS |
 
 详情见 [CHANGELOG.md](CHANGELOG.md)
@@ -354,7 +355,7 @@ aflare install-pack devops    # 安装 DevOps 全套模板 + 推荐能力配置
 aflare install-pack --list    # 查看所有可用场景包
 ```
 
-已有 323 Skill 覆盖 16 个领域，目标 1000+。你的模板可以补上缺失的一环。
+已有 332 Skill 覆盖 17 个领域，目标 1000+。你的模板可以补上缺失的一环。
 
 [贡献指南 →](CONTRIBUTING.md)
 

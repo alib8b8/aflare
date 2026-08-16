@@ -164,8 +164,9 @@ func auditChainRepairHints(line int) string {
 	return fmt.Sprintf(`修复建议：
   1. 运行 aflare audit verify --file <审计日志路径> 复核损坏位置（当前定位到第 %d 行）
   2. 检查该行附近的记录是否被篡改、删除或截断（对比可信备份）
-  3. 从可信备份恢复审计日志后重新导出；恢复前请停止追加写入
-  4. 如无备份，请保留现场并联系合规/安全负责人评估处置方案`, line)
+  3. 若为末行截断（写入时崩溃导致的半行 JSON）：备份整个文件后，将文件截断到最后一条完整记录（保留结尾换行符）即可恢复追加
+  4. 从可信备份恢复审计日志后重新导出；恢复前请停止追加写入
+  5. 如无备份，请保留现场并联系合规/安全负责人评估处置方案`, line)
 }
 
 // parseAuditTimeArg parses a --since/--until value. It returns the parsed time
@@ -238,9 +239,13 @@ func runAuditExport(opts auditExportOptions) (*history.AuditBundle, string, erro
 	}
 
 	// Refuse to export a broken chain: a compliance bundle must be built from
-	// a verifiable, intact log.
+	// a verifiable, intact log. Parse errors (e.g. a torn final line from a
+	// crashed writer) surface the same repair hints as link breaks.
 	valid, brokenAt, err := history.VerifyAuditChain(auditPath)
 	if err != nil {
+		if strings.Contains(err.Error(), "failed to parse record") {
+			return nil, "", &auditChainBrokenError{line: brokenAt, path: auditPath}
+		}
 		return nil, "", fmt.Errorf("审计日志校验出错（%s）：%w", auditPath, err)
 	}
 	if !valid {

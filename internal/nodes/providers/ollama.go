@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -131,6 +132,24 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		// Surface Ollama's own error (e.g. "model 'llama3' not found, try
+		// pulling it first") plus a concrete fix, instead of a bare status
+		// code — this is the #1 first-run stumble for template users.
+		apiErr := ""
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(body, &errResp) == nil && errResp.Error != "" {
+			apiErr = errResp.Error
+		}
+		if strings.Contains(apiErr, "not found") {
+			return "", fmt.Errorf("ollama 模型 %q 不存在（HTTP %d）。%s\n  修复：ollama pull %s，或在 workflow.yaml 中改用已有模型（aflare doctor 可查看本地 Ollama）",
+				model, resp.StatusCode, apiErr, model)
+		}
+		if apiErr != "" {
+			return "", fmt.Errorf("ollama returned status %d: %s", resp.StatusCode, apiErr)
+		}
 		return "", fmt.Errorf("ollama returned status %d", resp.StatusCode)
 	}
 

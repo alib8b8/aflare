@@ -88,12 +88,23 @@ type AuditBundle struct {
 	Signature   string                `json:"signature"`
 }
 
-// AuditHMACKey returns the audit HMAC key resolved with the same priority as
-// the audit log writer itself (AFLARE_AUDIT_HMAC_KEY > PBKDF2 of
-// AFLARE_SECRETS_PASSWORD > insecure default). Exported so the CLI bundle
-// signer/verifier shares a single key source with the chain writer.
+// AuditHMACKey returns the audit HMAC key used to SIGN new material (bundle
+// signatures), resolved with the same priority as the audit log writer
+// itself (AFLARE_AUDIT_HMAC_KEY > PBKDF2 of AFLARE_SECRETS_PASSWORD >
+// per-install key file > legacy default). Verification uses
+// auditKeyCandidates instead, because a bundle may have been signed when a
+// different key configuration was active.
 func AuditHMACKey() []byte {
-	return getAuditHMACKey()
+	if key := os.Getenv(auditEnvHMACKey); key != "" {
+		return []byte(key)
+	}
+	if password := os.Getenv(auditEnvSecretsPasswd); password != "" {
+		return deriveAuditKeyFromPassword(password)
+	}
+	if key, err := readAuditKeyFile(); err == nil && key != nil {
+		return key
+	}
+	return []byte(auditDefaultKey)
 }
 
 // ReadAuditLogFile reads all audit log entries from path in file (chain)
@@ -142,27 +153,46 @@ func VerifyAuditRecordChain(records []AuditLog) (valid bool, brokenIndex int, er
 // verifyAuditRecordChainFrom replays the hash chain with a caller-supplied
 // expected prev_hash for the first record; every later link uses the standard
 // rules. Bundle verification uses it to replay contiguous chain slices whose
-// first prev_hash legitimately points at a record outside the bundle.
+// first prev_hash legitimately points at a record outside the bundle. The
+// replay tries every audit key candidate, so bundles signed under a since-
+// rotated key configuration still verify.
 func verifyAuditRecordChainFrom(records []AuditLog, firstExpectedPrev string) (valid bool, brokenIndex int, err error) {
-	secret := getAuditHMACKey()
-	expectedPrev := firstExpectedPrev
-	for i, entry := range records {
-		if entry.PrevHash == "" && entry.CurrHash == "" {
-			return false, i + 1, fmt.Errorf("record %d: incompatible format (missing prev_hash/curr_hash fields)", i+1)
+	var firstMismatch struct {
+		brokenIndex int
+		hasResult   bool
+	}
+	for _, secret := range auditKeyCandidates() {
+		expectedPrev := firstExpectedPrev
+		broken := 0
+		for i, entry := range records {
+			if entry.PrevHash == "" && entry.CurrHash == "" {
+				return false, i + 1, fmt.Errorf("record %d: incompatible format (missing prev_hash/curr_hash fields)", i+1)
+			}
+			if entry.PrevHash != expectedPrev {
+				broken = i + 1
+				break
+			}
+			savedHash := entry.CurrHash
+			entry.CurrHash = ""
+			computedHash, cerr := computeAuditHash(secret, entry)
+			if cerr != nil {
+				return false, i + 1, fmt.Errorf("record %d: %w", i+1, cerr)
+			}
+			if !hmac.Equal([]byte(computedHash), []byte(savedHash)) {
+				broken = i + 1
+				break
+			}
+			expectedPrev = savedHash
 		}
-		if entry.PrevHash != expectedPrev {
-			return false, i + 1, nil
+		if broken == 0 {
+			return true, 0, nil
 		}
-		savedHash := entry.CurrHash
-		entry.CurrHash = ""
-		computedHash, err := computeAuditHash(secret, entry)
-		if err != nil {
-			return false, i + 1, fmt.Errorf("record %d: %w", i+1, err)
+		if !firstMismatch.hasResult {
+			firstMismatch.brokenIndex, firstMismatch.hasResult = broken, true
 		}
-		if !hmac.Equal([]byte(computedHash), []byte(savedHash)) {
-			return false, i + 1, nil
-		}
-		expectedPrev = savedHash
+	}
+	if firstMismatch.hasResult {
+		return false, firstMismatch.brokenIndex, nil
 	}
 	return true, 0, nil
 }
@@ -243,7 +273,7 @@ func signAuditBundle(bundle *AuditBundle) error {
 	if err != nil {
 		return err
 	}
-	mac := hmac.New(sha256.New, getAuditHMACKey())
+	mac := hmac.New(sha256.New, AuditHMACKey())
 	mac.Write(payload)
 	bundle.Signature = hex.EncodeToString(mac.Sum(nil))
 	return nil
@@ -306,16 +336,25 @@ func LoadAuditBundle(path string) (*AuditBundle, error) {
 // ErrAuditBundleRecordsHash or ErrAuditBundleChain so callers can report
 // exactly which check failed.
 func VerifyAuditBundle(bundle *AuditBundle) error {
-	// 1. Signature over the signed container fields.
+	// 1. Signature over the signed container fields. Tried under every audit
+	// key candidate: a bundle may have been signed while a different key
+	// configuration (env/password/key-file rotation) was active.
 	payload, err := auditBundleSigningPayload(bundle.Version, bundle.GeneratedAt, bundle.HeadHash, bundle.Manifest)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrAuditBundleSignature, err)
 	}
-	mac := hmac.New(sha256.New, getAuditHMACKey())
-	mac.Write(payload)
-	expectedSig := hex.EncodeToString(mac.Sum(nil))
-	if !hmac.Equal([]byte(expectedSig), []byte(bundle.Signature)) {
-		return fmt.Errorf("%w: recomputed HMAC over (manifest+version+generated_at+head_hash) does not match the stored signature", ErrAuditBundleSignature)
+	sigOK := false
+	for _, secret := range auditKeyCandidates() {
+		mac := hmac.New(sha256.New, secret)
+		mac.Write(payload)
+		expectedSig := hex.EncodeToString(mac.Sum(nil))
+		if hmac.Equal([]byte(expectedSig), []byte(bundle.Signature)) {
+			sigOK = true
+			break
+		}
+	}
+	if !sigOK {
+		return fmt.Errorf("%w: recomputed HMAC over (manifest+version+generated_at+head_hash) does not match the stored signature under any configured audit key", ErrAuditBundleSignature)
 	}
 
 	// 2. Records digest.
@@ -329,12 +368,22 @@ func VerifyAuditBundle(bundle *AuditBundle) error {
 		return fmt.Errorf("%w: expected %s, got %s", ErrAuditBundleRecordsHash, bundle.Manifest.RecordsSHA256, actualSHA)
 	}
 
-	// 3. Chain replay plus head_hash agreement. Unfiltered bundles start at
-	// the chain head (zero-hash convention); filtered bundles start from
-	// their first record's authenticated prev_hash.
+	// 3. Chain replay plus head_hash agreement. Unfiltered bundles MUST start
+	// at the chain head: a non-zero first prev_hash on an unfiltered bundle
+	// means someone dropped leading records while claiming completeness
+	// (truncation forgery) and must be rejected outright rather than replayed.
+	// Filtered bundles are contiguous slices: their first record's prev_hash
+	// points at the excluded predecessor and is itself HMAC-authenticated.
 	firstExpected := auditZeroHash
-	if len(bundle.Records) > 0 && bundle.Records[0].PrevHash != "" {
-		firstExpected = bundle.Records[0].PrevHash
+	if len(bundle.Records) > 0 {
+		if bundle.Manifest.Filter == nil {
+			if bundle.Records[0].PrevHash != auditZeroHash {
+				return fmt.Errorf("%w: unfiltered bundle does not start at the chain head (first prev_hash %s != zero hash); leading records may have been removed",
+					ErrAuditBundleChain, bundle.Records[0].PrevHash)
+			}
+		} else if bundle.Records[0].PrevHash != "" {
+			firstExpected = bundle.Records[0].PrevHash
+		}
 	}
 	valid, brokenAt, err := verifyAuditRecordChainFrom(bundle.Records, firstExpected)
 	if err != nil {

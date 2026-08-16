@@ -189,6 +189,11 @@ func InspectFile(path string) (cipherName string, legacy bool, err error) {
 	if !hasSecretsHeader(data) {
 		return CipherAESGCM, true, nil
 	}
+	// Validate the version byte exactly like LoadFromFile so doctor never
+	// misdiagnoses a future-format file by reading its bytes out of context.
+	if version := data[len(secretsMagic)]; version != secretsVersion {
+		return "", false, fmt.Errorf("unsupported secrets file version %d", version)
+	}
 	name, err := cipherNameByID(data[len(secretsMagic)+1])
 	if err != nil {
 		return "", false, err
@@ -399,6 +404,18 @@ func (sm *SecretManager) SaveToFile(path string) error {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 	tmpPath := path + ".tmp"
+	// Clear any pre-existing tmp path before writing: in a writable shared
+	// directory an attacker could plant secrets.dat.tmp -> /etc/... and have
+	// the atomic write clobber the target. os.Remove never follows symlinks,
+	// so removing it keeps the write inside the directory we control.
+	if fi, err := os.Lstat(tmpPath); err == nil {
+		if fi.IsDir() {
+			return fmt.Errorf("refusing to write temporary file %s: a directory already exists there", tmpPath)
+		}
+		if err := os.Remove(tmpPath); err != nil {
+			return fmt.Errorf("failed to clear stale temporary file: %w", err)
+		}
+	}
 	if err := os.WriteFile(tmpPath, output, 0600); err != nil {
 		return fmt.Errorf("failed to write temporary file: %w", err)
 	}

@@ -184,6 +184,28 @@ func checkCryptoCompat(problems *[]doctorProblem, secretsPath string) {
 	fmt.Println()
 	fmt.Println("加密与审计兼容性（混布版本检查）：")
 
+	// Audit HMAC key strength: the public default key is forgeable by anyone
+	// who reads the source, which voids the tamper-evidence guarantee.
+	configured, keyFileExists, usingDefault := history.AuditKeyStatus()
+	if usingDefault {
+		fmt.Println("  ✗ 审计链正在使用公开的默认 HMAC 密钥（任何读过源码的人都能伪造审计记录）")
+		*problems = append(*problems, doctorProblem{
+			category: "安全",
+			desc:     "审计链使用公开默认 HMAC 密钥，可被伪造",
+			hint: "迁移到独立随机密钥（会开启新链，先归档现有链）：\n" +
+				"  1. aflare audit export --out archive.json（在密钥变更前导出并妥善保存旧链）\n" +
+				"  2. 备份并移走现有审计日志文件\n" +
+				"  3. 新链首次写入时会自动生成随机密钥文件（audit-hmac.key）\n" +
+				"  或统一配置环境密钥：export AFLARE_AUDIT_HMAC_KEY=$(openssl rand -hex 32)",
+		})
+	} else if configured {
+		if keyFileExists {
+			fmt.Println("  ✓ 审计 HMAC 密钥：每安装随机密钥文件（audit-hmac.key）")
+		} else {
+			fmt.Println("  ✓ 审计 HMAC 密钥：已通过环境变量配置")
+		}
+	}
+
 	// Audit chain algorithm mix.
 	if auditPath := history.AuditLogPath(); auditPath == "" {
 		fmt.Println("  ⊘ 审计日志未启用（无历史目录）")
