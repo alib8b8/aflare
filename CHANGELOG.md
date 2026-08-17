@@ -8,7 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Agent Plugins 1.0.0 宿主支持（双向生态互通）**：新增 `internal/agentplugins` 包与 `aflare marketplace install <plugin-dir>`——加载任意符合 Agent Plugins 1.0 开放标准（OpenAI/Google/AWS/Microsoft/Cursor/Vercel 联合支持）的插件目录：`skills/*/SKILL.md` 解析 frontmatter 后物化为可运行的 aflare 技能（SKILL.md 指令嵌入单步 openai 包装 workflow 的 system prompt），`mcp.json` 声明的 stdio server 幂等注册进 `.mcp.json`（不覆盖用户已有配置）。安全规则对齐规范：manifest 双布局（`.plugin/plugin.json` 优先、根 `plugin.json` 回退）、技能目录名与插件名拒绝路径穿越、非 stdio transport 跳过、`cwd` 必须为插件根内 `./` 相对路径、`${PLUGIN_ROOT}` 展开。配合既有 `marketplace export` 实现 export → install 生态往返（已实测：aflare 导出的插件装回 aflare 直接可 `aflare run plugin/<plugin>-<skill>`）
+- **MemHarness 记忆批判-重构模式**（arXiv:2607.28272 思想）：① memory 节点新增 `harness_search` 操作——检索候选记忆时携带完整来源状态（type/level/tags/source/confidence/created_at/score），并生成自包含的批判 prompt（逐条 keep/rewrite/discard + 无适用记忆输出 `<EMPTY>`），LLM 批判作为显式可重试的工作流步骤执行而非隐藏调用，默认跨层级检索；② agent 会话记忆注入加确定性批判：超过 30 天且从未被复用的记忆直接丢弃，幸存记忆带来源状态标注（记录日期/类别）注入并指示模型先判断适用性再使用——"记忆是重构的线索，不是当前任务的事实"
+- **步骤级类型化输出契约（NOOA 思想吸收）**：WorkflowStep 新增 `output_schema`（JSON Schema draft-07 子集，复用 structured_output 校验器）——任意节点的输出在每次尝试后强制校验，违规按步骤失败处理并报出首个违规的 JSON pointer 位置，自然流入既有 retry/backoff/on_error/capture_error 机制；LLM 输出的 ```json 围栏自动容忍
+- **有界预览输入（NOOA pass-by-reference 思想吸收）**：WorkflowStep 新增 `preview_input: true`——超过 16KiB 的输入替换为"类型+总长+头尾样本+省略字节数"的有界预览（UTF-8 与行边界安全），完整值保留在工作流状态、原样传给所有其他步骤；LLM 步骤看样本、确定性节点操作完整数据，长上下文工作流的 prompt 成本可控
+- **MemHarness 模式示例**：`examples/real-world/memharness-critique/`——harness_search → LLM 批判（output_schema 契约 + preview_input）→ 行动 三阶段完整可运行示例
 - **水印部署溯源（payload v2）**：水印内容哈希 8→6 字节，腾出 2 字节嵌入部署 ID（`AFLARE_DEPLOYMENT_ID`，1-4 位十六进制）。泄漏的内容现可直接定位到生成它的部署实例，无需再对照审计日志逐时间点排查；payload 总长保持 21 字节，分片/校验逻辑不变；v1 水印（8 字节哈希、无部署 ID）仍可解码，`aflare watermark decode/verify` 输出部署 ID
+
+### Changed
+- `mcp.ServerEntry` 新增可选 `cwd` 字段（Agent Plugins 1.0 传递插件相对 cwd；主流 MCP 客户端同一 schema，向后兼容）
 
 ### Fixed
 - **工作流审计在全新安装上被静默跳过**：工作流执行记录器仍按 0.8.x 逻辑要求 `AFLARE_AUDIT_HMAC_KEY` / `AFLARE_SECRETS_PASSWORD` 环境变量才写审计，而 0.9.0 的审计链已支持自动生成每安装随机密钥文件——两条路径不一致导致 `aflare run` 在未设环境变量的新安装上一条工作流审计都不写，且打印误导性警告。现移除该过时门控，密钥解析完全由 history 包负责（混沌测试实测发现）

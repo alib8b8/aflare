@@ -19,7 +19,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/alib8b8/aflare/internal/agentplugins"
 	"github.com/alib8b8/aflare/internal/marketplace"
+	"github.com/alib8b8/aflare/internal/meta"
 )
 
 // HandleMarketplace handles the "marketplace" command.
@@ -35,6 +37,8 @@ func HandleMarketplace(args []string) {
 		HandleMarketplaceExport(args[1:])
 	case "import":
 		HandleMarketplaceImport(args[1:])
+	case "install":
+		HandleMarketplaceInstall(args[1:])
 	case "-h", "--help", "help":
 		PrintMarketplaceUsage()
 	default:
@@ -115,6 +119,44 @@ func HandleMarketplaceImport(args []string) {
 	}
 }
 
+// HandleMarketplaceInstall handles the "marketplace install" subcommand: it
+// installs an Agent Plugins 1.0.0 directory into aflare — skills become
+// runnable workflows, stdio MCP servers are registered into .mcp.json.
+func HandleMarketplaceInstall(args []string) {
+	if len(args) < 1 || args[0] == "--help" || args[0] == "-h" {
+		fmt.Println("Usage: aflare marketplace install <plugin-dir>")
+		fmt.Println("\nInstall an Agent Plugins 1.0.0 plugin into aflare.")
+		fmt.Println("  - skills/*/SKILL.md become runnable skills under the 'plugin' category")
+		fmt.Println("  - stdio servers from mcp.json are registered into .mcp.json")
+		fmt.Println("  - nothing from the plugin is executed during installation")
+		return
+	}
+	pluginDir := args[0]
+
+	res, err := agentplugins.InstallPlugin(pluginDir, agentplugins.InstallOptions{
+		SkillsBaseDir: meta.ResolveTemplatesPath(),
+		MCPConfigPath: ".mcp.json",
+	})
+	if err != nil {
+		fmt.Printf("❌ Install failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✅ Installed Agent Plugin: %s\n", res.Manifest.Name)
+	if res.Manifest.Version != "" {
+		fmt.Printf("   Version: %s\n", res.Manifest.Version)
+	}
+	for _, id := range res.SkillsInstalled {
+		fmt.Printf("   Skill:    %s (run: aflare run %s)\n", id, id)
+	}
+	for _, name := range res.MCPServers {
+		fmt.Printf("   MCP:      %s (stdio)\n", name)
+	}
+	if len(res.SkillsInstalled) == 0 && len(res.MCPServers) == 0 {
+		fmt.Println("   (plugin shipped no installable components)")
+	}
+}
+
 // PrintMarketplaceUsage prints usage information for the marketplace command.
 func PrintMarketplaceUsage() {
 	fmt.Println("Usage: aflare marketplace <command> [options]")
@@ -122,11 +164,13 @@ func PrintMarketplaceUsage() {
 	fmt.Println("\nCommands:")
 	fmt.Println("  export <name> [--dir <dir>]   Export a workflow as an Agent Plugin")
 	fmt.Println("  import <plugin-dir>           Import an Agent Plugin and show metadata")
+	fmt.Println("  install <plugin-dir>          Install an Agent Plugin (skills + MCP servers)")
 	fmt.Println("  -h, --help                    Show this help message")
 	fmt.Println("\nExamples:")
 	fmt.Println("  aflare marketplace export btc-monitor")
 	fmt.Println("  aflare marketplace export btc-monitor --dir ./plugins")
 	fmt.Println("  aflare marketplace import ./my-plugin")
+	fmt.Println("  aflare marketplace install ./my-plugin")
 	fmt.Println()
 	fmt.Println("Agent Plugins 1.0.0 is an open standard backed by OpenAI, Google,")
 	fmt.Println("Amazon, Microsoft, Cursor, and Vercel. Export once, use everywhere.")

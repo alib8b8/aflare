@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alib8b8/aflare/internal/memory"
 )
@@ -79,6 +80,45 @@ func TestMemoryCapability_PreProcess_WithEntries(t *testing.T) {
 	}
 	if !strings.Contains(result, "Python") {
 		t.Error("expected memory content in result")
+	}
+}
+
+func TestMemoryCapability_PreProcess_CritiqueDropsStaleUnused(t *testing.T) {
+	m := NewMemoryCapability()
+	_ = m.Init(&AgentLoop{})
+
+	// Fresh memory: must be injected (with source-state annotation).
+	freshTS := time.Now().UTC().Format(time.RFC3339)
+	m.entries["fresh_pref"] = &memory.PersistentMemoryEntry{
+		Key:       "fresh_pref",
+		Value:     "I prefer Python",
+		Category:  "preference",
+		Timestamp: freshTS,
+	}
+	// Stale and never reused: the deterministic critique must drop it.
+	staleTS := time.Now().UTC().Add(-60 * 24 * time.Hour).Format(time.RFC3339)
+	m.entries["stale_fact"] = &memory.PersistentMemoryEntry{
+		Key:       "stale_fact",
+		Value:     "the build uses Python 3.8",
+		Category:  "fact",
+		Timestamp: staleTS,
+	}
+
+	result, err := m.PreProcess(context.Background(), "write me a Python script")
+	if err != nil {
+		t.Fatalf("PreProcess failed: %v", err)
+	}
+	if !strings.Contains(result, "fresh_pref") {
+		t.Error("fresh memory must survive critique")
+	}
+	if !strings.Contains(result, "recorded ") {
+		t.Error("survivors must be annotated with their source state (recorded date)")
+	}
+	if !strings.Contains(result, "Judge each one") {
+		t.Error("injection must instruct the model to critique applicability")
+	}
+	if strings.Contains(result, "stale_fact") {
+		t.Error("stale unused memory must be discarded by the critique pass")
 	}
 }
 

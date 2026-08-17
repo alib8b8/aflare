@@ -1,0 +1,73 @@
+name: memharness-critique
+description: "MemHarness 记忆批判-重构模式：检索带来源状态的候选记忆，LLM 批判适用性后重构为任务定制指导（或 <EMPTY> 纯推理），再执行任务。"
+input:
+  - name: task
+    type: string
+    required: true
+  - name: memory_query
+    type: string
+    required: true
+
+steps:
+  # 阶段 1（确定性）：检索候选记忆 + 打包来源状态 + 生成批判 prompt。
+  # harness_search 默认跨层级检索，每条候选带 type/level/confidence/
+  # created_at/score，供批判阶段判断"过期/错语境/已被取代"。
+  - name: retrieve
+    node: memory
+    params:
+      operation: harness_search
+      query: "{{var.memory_query}}"
+      top_k: "8"
+      threshold: "0.05"
+      session_id: memharness-demo
+
+  # 阶段 2（LLM 批判-重构）：harness_search 的输出 JSON（candidates +
+  # source_state + critique_prompt）整体作为 input 进入批判步骤。
+  # 指令在 system：逐条 keep/rewrite/discard，输出重构后的 guidance
+  # 或 <EMPTY>。output_schema 强制 verdicts/guidance 契约。
+  - name: critique
+    node: openai
+    preview_input: true
+    output_schema: |
+      {"type":"object","required":["verdicts","guidance"],"properties":{"verdicts":{"type":"array","items":{"type":"object","required":["key","verdict"],"properties":{"key":{"type":"string"},"verdict":{"type":"string","enum":["keep","rewrite","discard"]},"reason":{"type":"string"}}}},"guidance":{"type":"string"}},"additionalProperties":false}
+    retry: 2
+    params:
+      system: |
+        你是记忆批判阶段。输入 JSON 中的 candidates 是检索到的历史记忆，
+        每条带 source_state（类型/层级/置信度/记录时间/相关度）。
+        对照当前任务判断每条记忆：过期或语境不符 → discard；信号仍有
+        用但表述绑定旧语境 → rewrite（只保留仍适用的部分）；完全适用
+        → keep。然后仅用幸存内容重构出针对当前任务的指导；若全部
+        被丢弃，guidance 输出 <EMPTY>——这是合法结果，不要编造填充。
+        只输出 JSON：
+        {"verdicts":[{"key":"...","verdict":"keep|rewrite|discard","reason":"一句话"}],
+         "guidance":"任务定制指导或 <EMPTY>"}
+
+  # 阶段 3（行动）：批判输出（verdicts + guidance JSON）作为条件上下文。
+  # <EMPTY> 时纯推理执行——MemHarness 论文的核心结论：无适用的记忆时，
+  # 空手推理优于逐字回放过期上下文。
+  - name: act
+    node: openai
+    params:
+      system: |
+        执行任务。下方是记忆批判阶段的 JSON 输出：guidance 字段是从
+        可信历史记忆重构出的、与当前任务对齐的指导（verdicts 是各条
+        记忆的取舍依据）——guidance 不是 <EMPTY> 时优先遵循，为
+        <EMPTY> 时表示历史记忆均不适用，直接独立推理完成。
+        {{steps.critique.output}}
+      temperature: "0.2"
+
+  # 落盘最终结果（guidance + 任务产出）。
+  - name: save
+    node: file_write
+    params:
+      path: memharness-output.md
+      content: |
+        # MemHarness 结果
+
+        ## 任务
+        {{var.task}}
+
+        ## 重构后的指导
+        {{steps.act.output}}
+

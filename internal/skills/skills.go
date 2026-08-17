@@ -251,6 +251,27 @@ func (sr *SkillRegistry) SaveRegistry() error {
 	return os.WriteFile(registryPath, data, 0644)
 }
 
+// AddSkill registers a skill in the in-memory registry, overwriting any
+// existing entry with the same ID. Callers typically follow up with
+// SaveRegistry to persist the addition into the on-disk index. The ID is
+// validated with the same traversal rules as Load so a malicious ID can
+// never poison subsequent Path reconstruction.
+func (sr *SkillRegistry) AddSkill(meta *SkillMeta) error {
+	if meta == nil {
+		return fmt.Errorf("meta is nil")
+	}
+	if !isValidSkillID(meta.ID) {
+		return fmt.Errorf("invalid skill ID %q", meta.ID)
+	}
+	if meta.Path == "" {
+		meta.Path = filepath.Join(sr.baseDir, filepath.FromSlash(meta.ID))
+	}
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	sr.skills[meta.ID] = meta
+	return nil
+}
+
 func (sr *SkillRegistry) GenerateMissingMetas() int {
 	sr.mu.Lock()
 	defer sr.mu.Unlock()

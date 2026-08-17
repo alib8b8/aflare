@@ -157,12 +157,16 @@ func equalFoldASCII(a, b string) bool {
 
 // ServerEntry is one `mcpServers` entry in a .mcp.json file, following the
 // schema used by mainstream MCP clients (Claude Code / Cursor / opencode):
-// {"type":"stdio","command":...,"args":[...],"env":{...}}.
+// {"type":"stdio","command":...,"args":[...],"env":{...},"cwd":...}.
 type ServerEntry struct {
 	Type    string            `json:"type,omitempty"`
 	Command string            `json:"command"`
 	Args    []string          `json:"args,omitempty"`
 	Env     map[string]string `json:"env,omitempty"`
+	// Cwd is the working directory for the spawned stdio server process
+	// (Agent Plugins 1.0 passes plugin-relative cwd values here). Optional;
+	// empty inherits the client's working directory.
+	Cwd string `json:"cwd,omitempty"`
 }
 
 // MCPServersFile mirrors the .mcp.json document shape.

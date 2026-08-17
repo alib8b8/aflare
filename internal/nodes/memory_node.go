@@ -54,6 +54,7 @@ var (
 		"link_kg":          true, // C-3: link a memory entry to KG entity names
 		"expand_kg":        true, // C-3: expand KG subgraph for retrieved memory keys
 		"compress":         true, // C-4: compress long-term memory under a token budget
+		"harness_search":   true, // MemHarness: retrieve with source state + critique prompt
 	}
 	validMemoryTypes = map[string]bool{
 		"fact":         true,
@@ -102,7 +103,7 @@ func (n *MemoryNode) Schema() NodeSchema {
 		Input:       "string - memory content to store or query for retrieval",
 		Output:      "string - JSON with memory operations result, entries, or statistics",
 		Params: []ParamSchema{
-			{Name: "operation", Type: "string", Description: "Operation: store/retrieve/delete/search/summary/forget/transfer/merge/inkling_retrieve/list_sessions/session_stats/global_stats/link_kg/expand_kg/compress (default: store)", Required: false, Default: "store"},
+			{Name: "operation", Type: "string", Description: "Operation: store/retrieve/delete/search/harness_search/summary/forget/transfer/merge/inkling_retrieve/list_sessions/session_stats/global_stats/link_kg/expand_kg/compress (default: store)", Required: false, Default: "store"},
 			{Name: "session_id", Type: "string", Description: "Session ID for isolated memory (default: default)", Required: false, Default: "default"},
 			{Name: "key", Type: "string", Description: "Memory key for storage/retrieval/link_kg", Required: false},
 			{Name: "value", Type: "string", Description: "Memory value/content", Required: false},
@@ -111,7 +112,7 @@ func (n *MemoryNode) Schema() NodeSchema {
 			{Name: "tags", Type: "string", Description: "Comma-separated tags for categorization", Required: false},
 			{Name: "ttl_hours", Type: "int", Description: "Time to live in hours (default: 72)", Required: false, Default: "72"},
 			{Name: "confidence", Type: "float", Description: "Confidence level 0.0-1.0 (default: 0.8)", Required: false, Default: "0.8"},
-			{Name: "query", Type: "string", Description: "Search query for retrieval/search/expand_kg operations", Required: false},
+			{Name: "query", Type: "string", Description: "Search query for retrieval/search/harness_search/expand_kg operations", Required: false},
 			{Name: "top_k", Type: "int", Description: "Number of results to return (1-100, default: 10)", Required: false, Default: "10"},
 			{Name: "threshold", Type: "float", Description: "Similarity threshold 0.0-1.0 (default: 0.5)", Required: false, Default: "0.5"},
 			{Name: "source", Type: "string", Description: "Source identifier for the memory", Required: false},
@@ -125,7 +126,7 @@ func (n *MemoryNode) Schema() NodeSchema {
 func (n *MemoryNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	operation := getParam(params, "operation", "store")
 	if !validMemoryOperations[operation] {
-		return "", fmt.Errorf("invalid operation: %s (supported: store, retrieve, delete, search, summary, forget, transfer, merge, visualize, inkling_retrieve, list_sessions, session_stats, global_stats, link_kg, expand_kg, compress)", operation)
+		return "", fmt.Errorf("invalid operation: %s (supported: store, retrieve, delete, search, harness_search, summary, forget, transfer, merge, visualize, inkling_retrieve, list_sessions, session_stats, global_stats, link_kg, expand_kg, compress)", operation)
 	}
 
 	sessionID := getParam(params, "session_id", "default")
@@ -156,6 +157,15 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 		result, err = n.deleteMemory(session, execParams.key)
 	case "search":
 		result, err = n.searchMemory(session, execParams.query, execParams.level, execParams.topK, execParams.threshold)
+	case "harness_search":
+		// Like expand_kg, harness_search is a retrieval-time operation that
+		// defaults to searching all levels: the critique stage should see
+		// candidates from every tier and judge applicability itself.
+		harnessLevel := execParams.level
+		if _, ok := params["level"]; !ok {
+			harnessLevel = ""
+		}
+		result, err = n.harnessSearch(session, execParams.query, harnessLevel, execParams.topK, execParams.threshold)
 	case "summary":
 		result, err = n.getMemorySummary(session, sessionID)
 	case "forget":

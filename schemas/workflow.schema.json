@@ -208,6 +208,14 @@
         "webhook_token": {
           "type": "string",
           "description": "Secret token required to resume via webhook. Auto-generated if empty."
+        },
+        "output_schema": {
+          "type": "string",
+          "description": "Typed output contract: JSON Schema (draft-07 subset) the step output must conform to. Violations are step failures that flow through retry/on_error."
+        },
+        "preview_input": {
+          "type": "boolean",
+          "description": "Pass-by-reference input for LLM steps: payloads over 16 KiB are replaced by a head/tail preview; the full value stays in workflow state."
         }
       },
       "additionalProperties": false

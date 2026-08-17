@@ -594,6 +594,15 @@ func (s *seqExecState) executeRegularStep(i int, wStep WorkflowStep, stepStart t
 	stepBaseCtx, llmCollector := withLLMCollector(s.timeoutCtx)
 	_, stepSpan := telemetry.StartStepSpan(s.otelCtx, wStep.Name, wStep.Node, i)
 
+	// Bounded preview (pass-by-reference for LLM steps): when the step opts
+	// in via preview_input and the incoming payload exceeds PreviewMaxBytes,
+	// the node sees a head/tail sample while the full value stays in
+	// workflow state for every other step.
+	stepInput := s.data
+	if wStep.PreviewInput {
+		stepInput = BoundedPreview(s.data, PreviewMaxBytes)
+	}
+
 	// Retry loop.
 	var output string
 	var execErr error
@@ -606,9 +615,19 @@ func (s *seqExecState) executeRegularStep(i int, wStep WorkflowStep, stepStart t
 		attemptStart := time.Now()
 
 		stepCtx, stepCancel := s.newStepContext(stepBaseCtx, stepTimeout)
-		output, execErr = s.executeNode(stepCtx, i, wStep, node, evaluatedParams)
+		output, execErr = s.executeNode(stepCtx, i, wStep, node, evaluatedParams, stepInput)
 		duration = time.Since(attemptStart)
 		stepCancel()
+
+		// Typed output contract: validate against the step's declared
+		// output_schema (same JSON Schema subset as structured_output). A
+		// violation counts as a step failure so it flows through the
+		// regular retry/backoff/on_error/capture_error machinery.
+		if execErr == nil && wStep.OutputSchema != "" {
+			if verr := nodes.ValidateJSONAgainstSchema(output, wStep.OutputSchema); verr != nil {
+				execErr = fmt.Errorf("output contract violated: %w", verr)
+			}
+		}
 
 		if execErr == nil {
 			break
@@ -695,15 +714,15 @@ func (s *seqExecState) newStepContext(parent context.Context, timeout time.Durat
 
 // executeNode dispatches node execution, handling streaming nodes when a TUI
 // program is attached.
-func (s *seqExecState) executeNode(ctx context.Context, i int, wStep WorkflowStep, node nodes.Node, evaluatedParams map[string]string) (string, error) {
+func (s *seqExecState) executeNode(ctx context.Context, i int, wStep WorkflowStep, node nodes.Node, evaluatedParams map[string]string, stepInput string) (string, error) {
 	if s.program != nil {
 		if streamingNode, ok := node.(nodes.StreamingNode); ok {
 			sink := newStreamSink(s.program, i, wStep.Node)
 			defer sink.flush()
-			return streamingNode.ExecuteStream(ctx, s.data, evaluatedParams, sink.onChunk)
+			return streamingNode.ExecuteStream(ctx, stepInput, evaluatedParams, sink.onChunk)
 		}
 	}
-	return node.Execute(ctx, s.data, evaluatedParams)
+	return node.Execute(ctx, stepInput, evaluatedParams)
 }
 
 // waitRetryDelay blocks for the retry backoff delay or until the workflow

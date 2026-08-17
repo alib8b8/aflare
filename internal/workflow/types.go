@@ -118,6 +118,25 @@ type WorkflowStep struct {
 	// WebhookToken is a secret token required to resume via webhook. When
 	// ResumeOn is "webhook" and this is empty, a random token is generated.
 	WebhookToken string `yaml:"webhook_token,omitempty"`
+	// OutputSchema is a typed output contract for this step: a JSON Schema
+	// (draft-07 subset, same validator as the structured_output node) that
+	// the step's output must conform to. When set, the executor validates
+	// the node output after every attempt; a violation is treated as a step
+	// failure with the JSON-pointer location of the first violation, so it
+	// flows through the regular retry/backoff/on_error/capture_error paths.
+	// This brings NOOA-style enforced type contracts to any node without
+	// wrapping it in a structured_output call. Sequential steps only;
+	// DAG-mode steps (depends_on) currently ignore it.
+	OutputSchema string `yaml:"output_schema,omitempty"`
+	// PreviewInput replaces this step's input with a bounded preview when
+	// the incoming payload exceeds PreviewMaxBytes (default 16 KiB):
+	// type + total length + head/tail samples, with the middle elided. The
+	// full payload is preserved in workflow state and passed untouched to
+	// every other step — this is pass-by-reference for LLM steps: the model
+	// sees a bounded preview, deterministic nodes still operate on the
+	// complete value. Sequential steps only; DAG-mode steps (depends_on)
+	// currently ignore it.
+	PreviewInput bool `yaml:"preview_input,omitempty"`
 }
 
 // MapConfig configures iteration over a list of items where each item is

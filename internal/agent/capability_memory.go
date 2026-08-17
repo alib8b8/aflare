@@ -71,6 +71,38 @@ func (m *MemoryCapability) Init(loop *AgentLoop) error {
 	return nil
 }
 
+// critique filters and annotates retrieved memories for prompt injection,
+// following the MemHarness principle ("memory is reconstructed, not
+// replayed"): instead of dumping raw recalls into the prompt, each memory is
+// (a) discarded when it is both stale and weakly relevant, and (b) otherwise
+// injected WITH its source state (age, category) plus an explicit instruction
+// for the model to judge applicability against the current input before
+// using it. This keeps the deterministic recall path honest without paying
+// for an extra LLM critique call — the consuming model performs the critique.
+func (m *MemoryCapability) critique(input string, relevant []*memory.PersistentMemoryEntry) []*memory.PersistentMemoryEntry {
+	now := time.Now()
+	kept := make([]*memory.PersistentMemoryEntry, 0, len(relevant))
+	for _, e := range relevant {
+		age := time.Duration(0)
+		if ts, err := time.Parse(time.RFC3339, e.Timestamp); err == nil {
+			age = now.Sub(ts)
+		}
+		// Deterministic discard rule: memories that are both old enough to
+		// plausibly be superseded AND weakly matched contribute more noise
+		// than signal. Strong matches survive regardless of age (a user's
+		// stated preference from months ago is still their preference).
+		// Unparseable timestamps (age 0) are treated as fresh.
+		if age > maxStaleMemoryAge && e.AccessCount == 0 {
+			continue
+		}
+		kept = append(kept, e)
+	}
+	return kept
+}
+
+// maxStaleMemoryAge bounds how long a never-reused memory stays injectable.
+const maxStaleMemoryAge = 30 * 24 * time.Hour
+
 func (m *MemoryCapability) PreProcess(ctx context.Context, input string) (string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -85,13 +117,24 @@ func (m *MemoryCapability) PreProcess(ctx context.Context, input string) (string
 		return "", nil
 	}
 
+	// Deterministic critique pass: drop stale-and-unused recalls (MemHarness
+	// discard stage); survivors are injected with source-state annotations.
+	relevant = m.critique(input, relevant)
+	if len(relevant) == 0 {
+		return "", nil
+	}
+
 	var sb strings.Builder
-	sb.WriteString("\n[Long-Term Memory — relevant past context]\n")
+	sb.WriteString("\n[Long-Term Memory — recalled from past sessions]\n")
+	sb.WriteString("These are cues recorded earlier, not facts about the current task. Judge each one against the task below: use it only if it still applies, ignore it otherwise.\n")
 	for _, e := range relevant {
-		sb.WriteString(fmt.Sprintf("- [%s] %s: %s\n", e.Category, e.Key, e.Value))
+		recorded := e.Timestamp
+		if t, err := time.Parse(time.RFC3339, e.Timestamp); err == nil {
+			recorded = t.Format("2006-01-02")
+		}
+		sb.WriteString(fmt.Sprintf("- (recorded %s, %s) %s: %s\n", recorded, e.Category, e.Key, e.Value))
 		e.AccessCount++
 	}
-	sb.WriteString("Use this context when responding.\n")
 	return input + sb.String(), nil
 }
 

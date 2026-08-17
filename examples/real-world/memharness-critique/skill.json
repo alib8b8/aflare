@@ -1,0 +1,6 @@
+{
+  "name": "memharness-critique",
+  "description": "MemHarness 记忆批判-重构模式：检索带来源状态的候选记忆，LLM 批判适用性（keep/rewrite/discard）后重构为任务定制指导，无适用记忆时 <EMPTY> 纯推理。演示 harness_search + output_schema 契约 + preview_input 有界预览的组合。",
+  "category": "real-world",
+  "tags": ["memory", "memharness", "critique", "llm", "output-schema", "preview"]
+}

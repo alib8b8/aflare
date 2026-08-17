@@ -585,3 +585,34 @@ func valuesEqual(a, b interface{}) bool {
 	}
 	return false
 }
+
+// ValidateJSONAgainstSchema validates a node output against a JSON Schema
+// (draft-07 subset, same rules as the structured_output node) and reports
+// the first violation with a JSON-pointer-style location. It is the
+// executor-side enforcement point for step-level output contracts: a
+// workflow step may declare output_schema, and the executor validates the
+// node's output with this function, feeding violations back through the
+// regular step retry/error-recovery paths.
+//
+// Tolerated input format matches structured_output: a fenced or prose-wrapped
+// JSON object is extracted before validation, since LLM outputs routinely
+// wrap JSON in ```json fences.
+func ValidateJSONAgainstSchema(output, schemaJSON string) error {
+	var schema map[string]interface{}
+	if err := json.Unmarshal([]byte(schemaJSON), &schema); err != nil {
+		return fmt.Errorf("invalid output_schema (must be a JSON Schema object): %w", err)
+	}
+	if err := validateRootSchema(schema); err != nil {
+		return fmt.Errorf("invalid output_schema: %w", err)
+	}
+
+	extracted, err := extractJSON(output)
+	if err != nil {
+		return fmt.Errorf("output is not a JSON object: %w", err)
+	}
+	var value interface{}
+	if err := json.Unmarshal([]byte(extracted), &value); err != nil {
+		return fmt.Errorf("output is not valid JSON: %w", err)
+	}
+	return validateAgainstSchema(value, schema, "")
+}
