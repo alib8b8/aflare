@@ -100,7 +100,7 @@ func LoadManifest(pluginDir string) (*Manifest, error) {
 	var manifestPath string
 	var data []byte
 	for _, c := range candidates {
-		if d, err := os.ReadFile(c); err == nil {
+		if d, err := os.ReadFile(c); err == nil { // #nosec G304 -- candidates are fixed names joined to the resolved plugin dir
 			manifestPath, data = c, d
 			break
 		}
@@ -523,7 +523,7 @@ func materializeSkill(targetDir, skillID string, manifest *Manifest, doc SkillDo
 	if err != nil {
 		return nil, fmt.Errorf("marshal skill.json: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(targetDir, skills.SkillMetaFile), metaBytes, 0o640); err != nil {
+	if err := os.WriteFile(filepath.Join(targetDir, skills.SkillMetaFile), metaBytes, 0o640); err != nil { // #nosec G306 -- skill metadata is not a secret; 0640 matches the skill dir's group-readable 0750
 		return nil, fmt.Errorf("write skill.json: %w", err)
 	}
 
@@ -545,13 +545,13 @@ steps:
 %s
 `, doc.Name, description, manifest.Name, doc.Name, indentBlock(system, 8))
 
-	if err := os.WriteFile(filepath.Join(targetDir, "workflow.yaml"), []byte(wf), 0o640); err != nil {
+	if err := os.WriteFile(filepath.Join(targetDir, "workflow.yaml"), []byte(wf), 0o640); err != nil { // #nosec G306 -- runnable workflow definition is not a secret; 0640 matches the skill dir's group-readable 0750
 		return nil, fmt.Errorf("write workflow.yaml: %w", err)
 	}
 
 	// Keep the original SKILL.md next to the wrapper for provenance and
 	// re-export by other Agent Plugins compatible clients.
-	if err := os.WriteFile(filepath.Join(targetDir, "SKILL.md"), []byte(renderSourceSKILL(doc)), 0o640); err != nil {
+	if err := os.WriteFile(filepath.Join(targetDir, "SKILL.md"), []byte(renderSourceSKILL(doc)), 0o640); err != nil { // #nosec G306 -- provenance copy for re-export is not a secret; 0640 matches the skill dir's group-readable 0750
 		return nil, fmt.Errorf("write SKILL.md: %w", err)
 	}
 	return &meta, nil
