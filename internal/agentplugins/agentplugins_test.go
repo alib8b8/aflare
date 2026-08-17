@@ -293,3 +293,104 @@ func TestInstallPlugin_UserMCPEntryNotOverwritten(t *testing.T) {
 		t.Fatalf("user entry was clobbered: %+v", cfg.MCPServers["demo-server"])
 	}
 }
+
+// TestLoadSkills_TraversalFrontmatterNameRejected guards against the H1 path
+// traversal: a compliant skill directory name must not smuggle an escaping
+// frontmatter name into the materialized install path.
+func TestLoadSkills_TraversalFrontmatterNameRejected(t *testing.T) {
+	pdir := writePlugin(t, "root")
+	malicious := "---\nname: ../../../../tmp/evil\ndescription: looks legit\n---\n\ninstructions\n"
+	if err := os.WriteFile(filepath.Join(pdir, "skills", "greet", "SKILL.md"), []byte(malicious), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadSkills(pdir); err == nil {
+		t.Fatal("frontmatter name with traversal must be rejected")
+	}
+}
+
+func TestInstallPlugin_TraversalNameWritesNothingOutside(t *testing.T) {
+	dir := t.TempDir()
+	pdir := filepath.Join(dir, "plugin")
+	if err := os.MkdirAll(filepath.Join(pdir, "skills", "legit"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{"name":"demo"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	malicious := "---\nname: ../../escape\ndescription: x\n---\n\nbody\n"
+	if err := os.WriteFile(filepath.Join(pdir, "skills", "legit", "SKILL.md"), []byte(malicious), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	base := filepath.Join(dir, "skills-base")
+	if _, err := InstallPlugin(pdir, InstallOptions{SkillsBaseDir: base}); err == nil {
+		t.Fatal("install with escaping frontmatter name must fail")
+	}
+	// Nothing may have been written outside the skills base dir.
+	if _, err := os.Stat(filepath.Join(dir, "escape")); !os.IsNotExist(err) {
+		t.Fatal("escaping path must not be created")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "workflow.yaml")); !os.IsNotExist(err) {
+		t.Fatal("no file may land next to the skills base dir")
+	}
+}
+
+// TestLoadMCP_CwdSymlinkEscapeRejected guards against the M1 symlink bypass:
+// string prefix containment passes while the symlink actually points outside
+// the plugin root.
+func TestLoadMCP_CwdSymlinkEscapeRejected(t *testing.T) {
+	dir := t.TempDir()
+	pdir := filepath.Join(dir, "plugin")
+	if err := os.MkdirAll(pdir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(dir, "outside")
+	if err := os.MkdirAll(outside, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(pdir, "data")); err != nil {
+		t.Skipf("symlink not supported: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{"name":"demo"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mcpJSON := `{"mcpServers":{"s":{"type":"stdio","command":"bin/server","cwd":"./data"}}}`
+	if err := os.WriteFile(filepath.Join(pdir, "mcp.json"), []byte(mcpJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := LoadMCP(pdir); err == nil {
+		t.Fatal("cwd pointing through a symlink outside the plugin root must be rejected")
+	}
+}
+
+func TestLoadMCP_CwdInsideSymlinkedPluginRootStillWorks(t *testing.T) {
+	// A plugin root referenced through a symlink alias must not break the
+	// containment check: EvalSymlinks is applied to both sides, so ./data
+	// under the alias still resolves inside the real root.
+	dir := t.TempDir()
+	pdir := filepath.Join(dir, "plugin")
+	if err := os.MkdirAll(filepath.Join(pdir, "data"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{"name":"demo"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mcpJSON := `{"mcpServers":{"s":{"type":"stdio","command":"bin/server","cwd":"./data"}}}`
+	if err := os.WriteFile(filepath.Join(pdir, "mcp.json"), []byte(mcpJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	alias := filepath.Join(dir, "alias")
+	if err := os.Symlink(pdir, alias); err != nil {
+		t.Skipf("symlink not supported: %v", err)
+	}
+
+	servers, err := LoadMCP(alias)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(servers) != 1 || servers[0].Entry.Cwd == "" {
+		t.Fatalf("legitimate ./data cwd must pass: %+v", servers)
+	}
+}

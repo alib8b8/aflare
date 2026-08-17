@@ -83,7 +83,10 @@ func (m *MemoryCapability) critique(input string, relevant []*memory.PersistentM
 	now := time.Now()
 	kept := make([]*memory.PersistentMemoryEntry, 0, len(relevant))
 	for _, e := range relevant {
-		age := time.Duration(0)
+		// An unparseable timestamp means corrupted or tampered data (the
+		// field is a plain string on disk) — treat it as stale rather than
+		// fresh so the discard rule below still applies.
+		age := maxStaleMemoryAge + time.Hour
 		if ts, err := time.Parse(time.RFC3339, e.Timestamp); err == nil {
 			age = now.Sub(ts)
 		}
@@ -91,7 +94,6 @@ func (m *MemoryCapability) critique(input string, relevant []*memory.PersistentM
 		// plausibly be superseded AND weakly matched contribute more noise
 		// than signal. Strong matches survive regardless of age (a user's
 		// stated preference from months ago is still their preference).
-		// Unparseable timestamps (age 0) are treated as fresh.
 		if age > maxStaleMemoryAge && e.AccessCount == 0 {
 			continue
 		}
@@ -105,15 +107,15 @@ const maxStaleMemoryAge = 30 * 24 * time.Hour
 
 func (m *MemoryCapability) PreProcess(ctx context.Context, input string) (string, error) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	if len(m.entries) == 0 {
+		m.mu.RUnlock()
 		return "", nil
 	}
 
 	// Find relevant memories for this input.
 	relevant := m.searchRelevant(input, 5)
 	if len(relevant) == 0 {
+		m.mu.RUnlock()
 		return "", nil
 	}
 
@@ -121,6 +123,7 @@ func (m *MemoryCapability) PreProcess(ctx context.Context, input string) (string
 	// discard stage); survivors are injected with source-state annotations.
 	relevant = m.critique(input, relevant)
 	if len(relevant) == 0 {
+		m.mu.RUnlock()
 		return "", nil
 	}
 
@@ -132,9 +135,18 @@ func (m *MemoryCapability) PreProcess(ctx context.Context, input string) (string
 		if t, err := time.Parse(time.RFC3339, e.Timestamp); err == nil {
 			recorded = t.Format("2006-01-02")
 		}
-		sb.WriteString(fmt.Sprintf("- (recorded %s, %s) %s: %s\n", recorded, e.Category, e.Key, e.Value))
+		sb.WriteString(fmt.Sprintf("- (recorded %s, %s) %s: %s\n", recorded, memory.FenceValue(e.Category), memory.FenceValue(e.Key), memory.FenceValue(e.Value)))
+	}
+	m.mu.RUnlock()
+
+	// Bump access counters under the write lock: the entries are shared
+	// pointers, so mutating them under the read lock above would race with
+	// concurrent PreProcess calls.
+	m.mu.Lock()
+	for _, e := range relevant {
 		e.AccessCount++
 	}
+	m.mu.Unlock()
 	return input + sb.String(), nil
 }
 

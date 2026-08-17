@@ -130,8 +130,10 @@ func (s *PersistentMemoryStore) Store(key, value, category string) error {
 
 // Retrieve gets a persisted memory entry by key.
 func (s *PersistentMemoryStore) Retrieve(key string) (*PersistentMemoryEntry, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	// Write lock: Retrieve bumps AccessCount, and a read lock would let
+	// concurrent Retrieves race on the shared entry pointer.
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	entry, ok := s.entries[key]
 	if !ok {
@@ -139,6 +141,23 @@ func (s *PersistentMemoryStore) Retrieve(key string) (*PersistentMemoryEntry, er
 	}
 	entry.AccessCount++
 	return entry, nil
+}
+
+// FenceValue renders a recalled memory value for prompt injection so stored
+// content cannot forge the surrounding prompt structure: whitespace that
+// could break line boundaries collapses to spaces, backticks are neutralized,
+// and the value is wrapped in a backtick fence. Memories derive from user
+// input persisted across sessions — treat them as untrusted at re-injection
+// time.
+func FenceValue(v string) string {
+	v = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' || r == '\t' {
+			return ' '
+		}
+		return r
+	}, v)
+	v = strings.ReplaceAll(v, "`", "'")
+	return "`" + v + "`"
 }
 
 // Delete removes a persisted memory entry.

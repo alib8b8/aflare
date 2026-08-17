@@ -90,7 +90,7 @@ aflare agent -c reflection,planning,utility
 
 ## Project Status
 
-aflare is currently at **v0.9.0 stage**. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. v0.8 focused on offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding and CLI UX improvements; v0.8.1 was a release-audit fix release; v0.9.0 delivers Chinese national cryptography support (SM3 audit chain / SM4 secrets, opt-in), audit-chain security hardening (per-install random HMAC key, cross-process log lock, bundle truncation-forgery defense), one-command MCP server install (`aflare mcp install`), and byte-identical 0.8.x upgrade compatibility. Local inference services running on domestic chips (Ascend/Cambricon/Hygon) are accessed through OpenAI-compatible endpoints (no native SDK integration), and support keeps improving. Hardware device control (robots etc.) is not built in — users can integrate via custom nodes or MCP Server, with data staying on their intranet.
+aflare is currently at **v0.9.0 stage** (v0.10 in development). Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. v0.9.0 delivers Chinese national cryptography support (SM3 audit chain / SM4 secrets, opt-in), audit-chain security hardening (per-install random HMAC key, cross-process log lock, bundle truncation-forgery defense), one-command MCP server install (`aflare mcp install`), and byte-identical 0.8.x upgrade compatibility. The current dev build adds: **Agent Plugins 1.0.0 host support** (bidirectional plugin ecosystem with VS Code / Cursor / Copilot and other clients), **MemHarness memory critique-reconstruction mode** (memory is a cue to reconstruct, not a fact of the current task), **step-level typed output contracts and bounded preview inputs**, **watermark deployment tracing**, plus a security self-audit round that fixed plugin path traversal, symlink bypass and memory data races (see [CHANGELOG](CHANGELOG.md)). Local inference services running on domestic chips (Ascend/Cambricon/Hygon) are accessed through OpenAI-compatible endpoints (no native SDK integration), and support keeps improving. Hardware device control (robots etc.) is not built in — users can integrate via custom nodes or MCP Server, with data staying on their intranet.
 
 ---
 
@@ -158,7 +158,7 @@ aflare is built for intranet / local-first users — enterprises and individuals
 
 **One-command onboarding, smooth offline** — `aflare doctor` environment self-check, `aflare init` interactive setup wizard, `aflare template run <id>` one-command template execution (no clone or path lookup needed), smart unknown-command hints (did-you-mean), zero-config examples ready to run immediately.
 
-**Extensible ecosystem** — Custom nodes (Go), MCP Server / Client (`aflare mcp install` for built-in community servers), plugin system (community `.so`), community template contributions (`aflare template submit`), one-command scenario packs (`aflare install-pack`). 332 skills already cover 17 domains, targeting 1000+.
+**Extensible ecosystem** — Custom nodes (Go), MCP Server / Client (`aflare mcp install` for built-in community servers), **Agent Plugins 1.0.0 bidirectional interop** (`aflare marketplace install <dir>` installs any plugin conforming to the open standard; `aflare marketplace export` exports aflare skills to VS Code / Cursor / Copilot and other clients), plugin system (community `.so`), community template contributions (`aflare template submit`), one-command scenario packs (`aflare install-pack`). 332 skills already cover 17 domains, targeting 1000+.
 
 **Engineering quality** — Expression engine (bytecode IR + vectorized batch evaluation), Prometheus metrics endpoint, CI dual-architecture verification (x86-64 + ARM64), domestic-chip local inference via OpenAI-compatible endpoints (Ascend / Cambricon / Hygon).
 
@@ -234,6 +234,20 @@ aflare is built for intranet / local-first users — enterprises and individuals
 - Built-in MCP Server, connectable by any MCP client (Claude, VS Code, Cursor, etc.)
 - Provides workflow execution, validation, node query, code graph, and other tools
 - Built-in MCP Client, workflows can call external MCP services directly
+- `aflare mcp install <name>` one-command install of 8 built-in community servers; stdio servers declared by plugins register idempotently via `marketplace install`
+
+### Agent Plugins 1.0.0 Interop
+- **Install** (`aflare marketplace install <plugin-dir>`): loads any Agent Plugins 1.0 conformant plugin — `skills/*/SKILL.md` materializes into skills runnable via `aflare run`, stdio servers from `mcp.json` register into `.mcp.json`; nothing from the plugin executes at install time, and directory names / frontmatter names / cwd are all checked against traversal and symlink escapes
+- **Export** (`aflare marketplace export`): exports aflare skills in the same standard format for VS Code / Cursor / Copilot / ChatGPT — the export → install round trip is verified
+
+### Memory Critique-Reconstruction (MemHarness mode)
+- memory node `harness_search` operation: retrieves candidates with full source state (type/level/confidence/recorded-at/score) and emits a self-contained critique prompt; the LLM critique (keep/rewrite/discard) runs as an explicit, retryable workflow step, outputting `<EMPTY>` instead of inventing when nothing applies
+- Agent session injection runs a deterministic critique: stale never-reused memories are dropped, survivors injected with source-state annotations
+- Full example at `examples/real-world/memharness-critique/`
+
+### Step-level Typed Output Contracts & Bounded Preview
+- `output_schema`: any node's output is validated against a JSON Schema (draft-07 subset); violations fail the step with the first violation location and flow into retry / on_error / capture_error
+- `preview_input: true`: inputs over 16KiB are replaced by a bounded head/tail preview while the full value stays in workflow state and is passed untouched to other steps — LLMs see samples, deterministic nodes operate on complete data
 
 ### Engineering
 - Expression engine: bytecode IR + vectorized batch evaluation
@@ -298,7 +312,7 @@ aflare is built for intranet / local-first users — enterprises and individuals
 | v0.7 | Done | Financial scenario enhancement (Saga / Idempotency / Audit chain), ReAct Agent chat, 300+ skill templates, 7 pluggable capabilities, Agent unified event loop |
 | **v0.8** | **Done** | Offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding, CLI UX improvements (template run / smart command hints), CI speedup |
 | **v0.9** | **Done** | National cryptography support (SM3/SM4, opt-in), audit-chain security hardening (random HMAC key, cross-process lock, bundle truncation-forgery defense), `aflare mcp install`, supply-chain scenario pack, loong64 |
-| v0.10 | Planned | Domestic chip support refinement, Agent capability deepening |
+| v0.10 | In development | Agent Plugins 1.0.0 interop, MemHarness memory critique-reconstruction, step-level output contracts & bounded preview, watermark deployment tracing, security self-audit fixes; next: domestic chip support refinement, Agent capability deepening |
 | v1.0 | Planned | Stable API, LTS |
 
 See [CHANGELOG.md](CHANGELOG.md) for details.

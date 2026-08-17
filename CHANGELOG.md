@@ -18,8 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `mcp.ServerEntry` 新增可选 `cwd` 字段（Agent Plugins 1.0 传递插件相对 cwd；主流 MCP 客户端同一 schema，向后兼容）
 
+### Security
+- **插件技能 frontmatter name 路径穿越（高危）**：SKILL.md frontmatter 的 `name` 字段此前未做与目录名相同的段校验——恶意插件可用合规目录名 + 穿越 frontmatter name 把 skill.json/workflow.yaml/SKILL.md 写到技能根目录外任意可写路径（含持久化 prompt 注入）。现 LoadSkills 拒绝非安全段的 frontmatter name，InstallPlugin 另加最终路径必须在技能根内的纵深防御检查（安全自检发现）
+- **插件 MCP cwd 符号链接绕过（中危）**：cwd 的字符串前缀包含检查可被插件目录内的符号链接绕过（`./data` 链接到插件外）。现对存在路径追加 `EvalSymlinks` 双侧解析复核（安全自检发现）
+- **记忆值注入围栏（中危）**：持久化记忆值此前原文拼回 prompt，构成跨会话 prompt 注入持久化向量。现新增 `memory.FenceValue`（换行/制表折叠 + 反引号中和 + 围栏包裹），PreProcess 与 harness_search 批判 prompt 的注入路径全部收口
+- **记忆 AccessCount 数据竞争（中危）**：`PersistentMemoryStore.Retrieve` 与 `MemoryCapability.PreProcess` 此前在读锁下自增共享条目的 AccessCount，并发调用构成 data race（`go test -race` 可复现）。现分别改为写锁与读写锁分段（安全自检发现）
+
 ### Fixed
 - **工作流审计在全新安装上被静默跳过**：工作流执行记录器仍按 0.8.x 逻辑要求 `AFLARE_AUDIT_HMAC_KEY` / `AFLARE_SECRETS_PASSWORD` 环境变量才写审计，而 0.9.0 的审计链已支持自动生成每安装随机密钥文件——两条路径不一致导致 `aflare run` 在未设环境变量的新安装上一条工作流审计都不写，且打印误导性警告。现移除该过时门控，密钥解析完全由 history 包负责（混沌测试实测发现）
+- **MemHarness 批判对损坏时间戳失效**：记忆 Timestamp 为空或不可解析时此前按"新鲜"处理（永不进入丢弃通道）。现按"陈旧"处理——损坏/被篡改的记录不再是批判盲区；`InstallPlugin` 不再忽略 `filepath.Abs` 错误；物化技能文件权限 0644 → 0640
 
 ## [0.9.0] - 2026-08-16
 

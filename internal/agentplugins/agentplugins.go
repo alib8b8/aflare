@@ -201,6 +201,12 @@ func LoadSkills(pluginDir string) ([]SkillDoc, error) {
 		if doc.Name == "" {
 			doc.Name = dirName
 		}
+		// The frontmatter name flows into the target install path, so it gets
+		// the same traversal check as directory names — a compliant directory
+		// name must not be able to smuggle an escaping frontmatter name.
+		if !validSkillSegment(doc.Name) {
+			return nil, fmt.Errorf("%s: unsafe skill name %q (must be a simple path segment without traversal)", skillPath, doc.Name)
+		}
 		doc.SKILLPath = skillPath
 		docs = append(docs, doc)
 	}
@@ -327,8 +333,18 @@ func LoadMCP(pluginDir string) ([]MCPServer, error) {
 				return nil, fmt.Errorf("mcp server %q: cwd must be a \"./\"-relative path inside the plugin root, got %q", name, raw.Cwd)
 			}
 			resolved := filepath.Clean(filepath.Join(absDir, cwd))
-			if !strings.HasPrefix(resolved, absDir+string(filepath.Separator)) && resolved != absDir {
+			if !withinDir(absDir, resolved) {
 				return nil, fmt.Errorf("mcp server %q: cwd escapes the plugin root", name)
+			}
+			// String containment is not enough: a symlink inside the plugin
+			// root can point anywhere on disk. When the path exists, verify
+			// the symlink-resolved location is still inside the (resolved)
+			// plugin root.
+			if realResolved, err := filepath.EvalSymlinks(resolved); err == nil {
+				realRoot, rerr := filepath.EvalSymlinks(absDir)
+				if rerr == nil && !withinDir(realRoot, realResolved) {
+					return nil, fmt.Errorf("mcp server %q: cwd resolves (symlink) outside the plugin root", name)
+				}
 			}
 			entry.Cwd = resolved
 		}
@@ -340,6 +356,15 @@ func LoadMCP(pluginDir string) ([]MCPServer, error) {
 // expandPluginRoot replaces ${PLUGIN_ROOT} occurrences with the plugin root.
 func expandPluginRoot(s, pluginRoot string) string {
 	return strings.ReplaceAll(s, PluginRootPlaceholder, pluginRoot)
+}
+
+// withinDir reports whether path is root itself or located underneath it.
+// Both must already be cleaned/absolute.
+func withinDir(root, path string) bool {
+	if path == root {
+		return true
+	}
+	return strings.HasPrefix(path, root+string(filepath.Separator))
 }
 
 // InstallOptions configures InstallPlugin.
@@ -357,10 +382,10 @@ type InstallOptions struct {
 
 // InstallResult summarizes what InstallPlugin did.
 type InstallResult struct {
-	Manifest       *Manifest
+	Manifest        *Manifest
 	SkillsInstalled []string // skill IDs
-	MCPServers     []string // server names upserted
-	PluginDir      string   // absolute source plugin dir
+	MCPServers      []string // server names upserted
+	PluginDir       string   // absolute source plugin dir
 }
 
 // InstallPlugin loads an Agent Plugins 1.0.0 directory and installs its
@@ -380,7 +405,10 @@ func InstallPlugin(pluginDir string, opts InstallOptions) (*InstallResult, error
 	if err != nil {
 		return nil, err
 	}
-	absDir, _ := filepath.Abs(pluginDir)
+	absDir, err := filepath.Abs(pluginDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve plugin dir: %w", err)
+	}
 
 	category := opts.Category
 	if category == "" {
@@ -401,12 +429,21 @@ func InstallPlugin(pluginDir string, opts InstallOptions) (*InstallResult, error
 		if opts.SkillsBaseDir == "" {
 			return nil, fmt.Errorf("plugin ships %d skills but InstallOptions.SkillsBaseDir is empty", len(docs))
 		}
+		skillsBase, err := filepath.Abs(opts.SkillsBaseDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve skills base dir: %w", err)
+		}
 		pluginSeg := strings.ReplaceAll(manifest.Name, "/", "-")
 		pluginSeg = strings.ReplaceAll(pluginSeg, "@", "")
 		var metas []*skills.SkillMeta
 		for _, doc := range docs {
 			skillID := fmt.Sprintf("%s/%s-%s", category, pluginSeg, doc.Name)
-			targetDir := filepath.Join(opts.SkillsBaseDir, filepath.FromSlash(skillID))
+			targetDir := filepath.Join(skillsBase, filepath.FromSlash(skillID))
+			// Defense in depth: no matter what slipped through the segment
+			// validation, the materialized path must stay under the skills root.
+			if !withinDir(skillsBase, targetDir) {
+				return nil, fmt.Errorf("install skill %s: target path escapes the skills base dir", skillID)
+			}
 			meta, err := materializeSkill(targetDir, skillID, manifest, doc)
 			if err != nil {
 				return nil, fmt.Errorf("install skill %s: %w", skillID, err)
@@ -486,7 +523,7 @@ func materializeSkill(targetDir, skillID string, manifest *Manifest, doc SkillDo
 	if err != nil {
 		return nil, fmt.Errorf("marshal skill.json: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(targetDir, skills.SkillMetaFile), metaBytes, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(targetDir, skills.SkillMetaFile), metaBytes, 0o640); err != nil {
 		return nil, fmt.Errorf("write skill.json: %w", err)
 	}
 
@@ -508,13 +545,13 @@ steps:
 %s
 `, doc.Name, description, manifest.Name, doc.Name, indentBlock(system, 8))
 
-	if err := os.WriteFile(filepath.Join(targetDir, "workflow.yaml"), []byte(wf), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(targetDir, "workflow.yaml"), []byte(wf), 0o640); err != nil {
 		return nil, fmt.Errorf("write workflow.yaml: %w", err)
 	}
 
 	// Keep the original SKILL.md next to the wrapper for provenance and
 	// re-export by other Agent Plugins compatible clients.
-	if err := os.WriteFile(filepath.Join(targetDir, "SKILL.md"), []byte(renderSourceSKILL(doc)), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(targetDir, "SKILL.md"), []byte(renderSourceSKILL(doc)), 0o640); err != nil {
 		return nil, fmt.Errorf("write SKILL.md: %w", err)
 	}
 	return &meta, nil

@@ -60,6 +60,7 @@ Then produce guidance for the task: a concise reconstruction built exclusively f
 
 Return ONLY a JSON object:
 {"verdicts":[{"key":"<candidate key>","verdict":"keep|rewrite|discard","reason":"<one line>"}],"guidance":"<task-grounded guidance, or <EMPTY>"}`
+
 // Note: the literal <EMPTY> marker inside the JSON example must survive
 // templating; do not wrap this constant in fmt.Sprintf-style processing.
 
@@ -124,7 +125,7 @@ func (n *MemoryNode) harnessSearch(session *memory.SessionMemory, query, level s
 			},
 		})
 		fmt.Fprintf(&candLines, "candidate[%d] key=%s\n  value: %s\n  source_state: type=%s level=%s confidence=%.2f created_at=%s score=%.2f\n",
-			i, r.Key, r.Value, r.Type, r.Level, r.Confidence, r.CreatedAt.Format("2006-01-02"), r.Score)
+			i, memory.FenceValue(r.Key), memory.FenceValue(r.Value), memory.FenceValue(r.Type), r.Level, r.Confidence, r.CreatedAt.Format("2006-01-02"), r.Score)
 	}
 
 	critiquePrompt := fmt.Sprintf("%s\n\n# Retrieved memory candidates\n\n%s\n\n# Current task\n\n%s",

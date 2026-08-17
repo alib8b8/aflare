@@ -90,7 +90,7 @@ aflare agent -c reflection,planning,utility
 
 ## 项目状态
 
-aflare 目前处于 **v0.9.0 阶段**。核心 Runtime 能力（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断）已实现并通过 CI 验证。v0.8 重点交付离线/内网首选项体验、隐私安全硬化、本地 LLM 丝滑接入与 CLI 体验优化；v0.8.1 为发布审计修复；v0.9.0 交付国密算法支持（SM3 审计链 / SM4 密钥存储，opt-in）、审计链安全硬化（每安装随机 HMAC 密钥、跨进程日志锁、bundle 截断伪造防护）、MCP server 一键安装（`aflare mcp install`）与 0.8.x 字节级升级兼容。国产芯片（昇腾/寒武纪/海光）场景通过 OpenAI 兼容接口接入本地推理服务（非原生 SDK 集成），持续完善中。硬件设备控制（机器人等）不在内置范围——用户可通过自定义节点或 MCP Server 自行接入，数据不出内网。
+aflare 目前处于 **v0.9.0 阶段**（v0.10 开发中）。核心 Runtime 能力（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断）已实现并通过 CI 验证。v0.9.0 交付国密算法支持（SM3 审计链 / SM4 密钥存储，opt-in）、审计链安全硬化（每安装随机 HMAC 密钥、跨进程日志锁、bundle 截断伪造防护）、MCP server 一键安装（`aflare mcp install`）与 0.8.x 字节级升级兼容。当前开发版新增：**Agent Plugins 1.0.0 宿主支持**（与 VS Code / Cursor / Copilot 等客户端的插件生态双向互通）、**MemHarness 记忆批判-重构模式**（记忆是重构的线索，不是当前任务的事实）、**步骤级类型化输出契约与有界预览输入**、**水印部署溯源**，并经一轮安全自检修复插件路径穿越、symlink 绕过与记忆数据竞争等问题（见 [CHANGELOG](CHANGELOG.md)）。国产芯片（昇腾/寒武纪/海光）场景通过 OpenAI 兼容接口接入本地推理服务（非原生 SDK 集成），持续完善中。硬件设备控制（机器人等）不在内置范围——用户可通过自定义节点或 MCP Server 自行接入，数据不出内网。
 
 ---
 
@@ -157,7 +157,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 
 **一键上手，离线丝滑** — `aflare doctor` 环境自检、`aflare init` 交互式配置向导、`aflare template run <id>` 一键运行模板（无需 clone 或记路径）、未知命令智能提示（did-you-mean）、零配置示例立即可跑。
 
-**可扩展生态** — 自定义节点（Go）、MCP Server / Client（`aflare mcp install` 一键安装内置社区 server）、插件系统（社区 `.so`）、社区模板贡献（`aflare template submit`）、场景包一键安装（`aflare install-pack`）。已有 332 Skill 覆盖 17 个领域，目标 1000+。
+**可扩展生态** — 自定义节点（Go）、MCP Server / Client（`aflare mcp install` 一键安装内置社区 server）、**Agent Plugins 1.0.0 双向互通**（`aflare marketplace install <dir>` 安装任意符合开放标准的插件，`aflare marketplace export` 把 aflare 技能导出给 VS Code / Cursor / Copilot 等客户端）、插件系统（社区 `.so`）、社区模板贡献（`aflare template submit`）、场景包一键安装（`aflare install-pack`）。已有 332 Skill 覆盖 17 个领域，目标 1000+。
 
 **工程质量** — 表达式引擎（字节码 IR + 向量化批量求值）、Prometheus 指标端点、CI 双架构验证（x86-64 + ARM64）、国产芯片本地推理接入（昇腾 / 寒武纪 / 海光，经 OpenAI 兼容接口）。
 
@@ -184,6 +184,10 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 | 表达式引擎（字节码 IR + 向量化） | ✅ | 有测试 |
 | 关键词匹配生成工作流 | ✅ | 有测试 |
 | MCP 协议支持（Server/Client） | ✅ | 有测试 |
+| **Agent Plugins 1.0.0 双向互通**（`marketplace install/export`） | ✅ | 有测试 |
+| **MemHarness 记忆批判-重构**（`harness_search` + 会话批判注入） | ✅ | 有测试 |
+| **步骤级输出契约 `output_schema`** | ✅ | 有测试 |
+| **有界预览输入 `preview_input`**（16KiB） | ✅ | 有测试 |
 | LLM 节点（22+ 模型） | ✅ | 有测试 |
 | 安全等级（L0-L3） | ✅ | 有测试 |
 
@@ -202,7 +206,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 | `human-in-loop` | 人机协同 | 关键操作暂停，请求人类确认后继续 |
 | `utility` | 效用驱动 | 6 维度评分（正确性/完整性/效率/安全/清晰/可操作），优化决策 |
 | `adaptive` | 学习型/自适应 | 从反馈中学习，跨轮次改进表现 |
-| `memory` | 有状态 | 跨会话长期记忆，记住用户偏好 |
+| `memory` | 有状态 | 跨会话长期记忆 + MemHarness 批判注入：记忆带来源状态标注（记录日期/类别）注入，超 30 天未复用自动丢弃，模型先判断适用性再使用 |
 | `planning` | 规划式 | 行动前生成计划，逐步执行 |
 | `workflow` | 工作流/管道式 | 优先使用已有模板，稳定可预测 |
 
@@ -233,7 +237,21 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 - 内置 MCP Server，可被任何 MCP 客户端（Claude、VS Code、Cursor 等）连接
 - 提供工作流运行、验证、节点查询、代码图谱等工具
 - 内置 MCP Client，工作流中可直接调用外部 MCP 服务
+- `aflare mcp install <name>` 一键安装 8 个内置社区 server；插件声明的 stdio server 经 `marketplace install` 幂等注册
 - 也可通过 [DeepSeek Harness (DSH) 集成](docs/dsh.md) 将 aflare 工具暴露给 DSH 智能体（MCP 桥接零代码接入，或原生 [Cordis 插件](integrations/dsh-plugin)）
+
+### Agent Plugins 1.0.0 双向生态互通
+- **安装**（`aflare marketplace install <plugin-dir>`）：加载任意符合 Agent Plugins 1.0 开放标准的插件——`skills/*/SKILL.md` 物化为可直接 `aflare run` 的技能，`mcp.json` 声明的 stdio server 注册进 `.mcp.json`；安装全程不执行插件任何代码，目录名/frontmatter name/cwd 全部做穿越与 symlink 校验
+- **导出**（`aflare marketplace export`）：把 aflare 技能导出为同一标准格式，VS Code / Cursor / Copilot / ChatGPT 等客户端直接可用——export → install 生态往返已实测
+
+### 记忆批判-重构（MemHarness 模式）
+- memory 节点 `harness_search` 操作：检索候选记忆时携带完整来源状态（类型/层级/置信度/记录时间/相关度），生成自包含批判 prompt；LLM 批判（keep/rewrite/discard）作为显式可重试的工作流步骤执行，无适用记忆输出 `<EMPTY>` 而非编造
+- Agent 会话注入走确定性批判：陈旧且从未复用的记忆直接丢弃，幸存记忆带来源标注注入
+- 完整示例见 `examples/real-world/memharness-critique/`
+
+### 步骤级类型化输出契约与有界预览
+- `output_schema`：任意节点输出按 JSON Schema（draft-07 子集）强制校验，违规按步骤失败处理并报出首个违规位置，自然流入 retry / on_error / capture_error
+- `preview_input: true`：超 16KiB 的输入替换为头尾样本有界预览，完整值保留在工作流状态、原样传给其他步骤——LLM 看样本，确定性节点操作完整数据
 
 ### 工程能力
 - 表达式引擎：字节码 IR + 向量化批量求值
@@ -300,7 +318,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 | v0.8 | 已完成 | 离线/内网首选项体验、隐私安全硬化、本地 LLM 丝滑接入、CLI 体验优化（template run / 智能命令提示）、CI 提速 |
 | **v0.8.1** | **已完成** | 发布审计修复：国内安装 404、`aflare mcp` 子命令、execute 白名单错误定位、govulncheck 漏洞清零 |
 | **v0.9** | **已完成** | 国密算法支持（SM3/SM4，opt-in）、审计链安全硬化（随机 HMAC 密钥、跨进程锁、bundle 防截断伪造）、`aflare mcp install` 一键安装、供应链场景包、loong64 |
-| v0.10 | 计划中 | 国产芯片适配完善、Agent 能力深化 |
+| v0.10 | 开发中 | Agent Plugins 1.0.0 双向生态互通、MemHarness 记忆批判-重构、步骤级输出契约与有界预览、水印部署溯源、安全自检修复；后续：国产芯片适配完善、Agent 能力深化 |
 | v1.0 | 计划中 | 稳定 API、LTS |
 
 详情见 [CHANGELOG.md](CHANGELOG.md)

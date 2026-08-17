@@ -59,16 +59,20 @@ func TestMemoryCapability_PreProcess_WithEntries(t *testing.T) {
 	m := NewMemoryCapability()
 	_ = m.Init(&AgentLoop{})
 
-	// Add some entries
+	// Add some entries (production paths always stamp entries; missing or
+	// corrupted timestamps are treated as stale by the critique pass).
+	now := time.Now().UTC().Format(time.RFC3339)
 	m.entries["pref_1"] = &memory.PersistentMemoryEntry{
-		Key:      "pref_1",
-		Value:    "I prefer Python over JavaScript",
-		Category: "preference",
+		Key:       "pref_1",
+		Value:     "I prefer Python over JavaScript",
+		Category:  "preference",
+		Timestamp: now,
 	}
 	m.entries["fact_1"] = &memory.PersistentMemoryEntry{
-		Key:      "fact_1",
-		Value:    "My name is Alice",
-		Category: "fact",
+		Key:       "fact_1",
+		Value:     "My name is Alice",
+		Category:  "fact",
+		Timestamp: now,
 	}
 
 	result, err := m.PreProcess(context.Background(), "What Python language should I use?")
@@ -80,6 +84,43 @@ func TestMemoryCapability_PreProcess_WithEntries(t *testing.T) {
 	}
 	if !strings.Contains(result, "Python") {
 		t.Error("expected memory content in result")
+	}
+}
+
+func TestMemoryCapability_CritiqueDropsCorruptedTimestamp(t *testing.T) {
+	m := NewMemoryCapability()
+	_ = m.Init(&AgentLoop{})
+
+	// Corrupted/unparseable timestamp on a never-reused memory: the critique
+	// pass must treat it as stale (not fresh) so tampered records cannot
+	// dodge the discard channel forever.
+	m.entries["corrupt"] = &memory.PersistentMemoryEntry{
+		Key:       "corrupt",
+		Value:     "the build uses Python 3.8",
+		Category:  "fact",
+		Timestamp: "not-a-timestamp",
+	}
+
+	result, err := m.PreProcess(context.Background(), "write me a Python script about the build")
+	if err != nil {
+		t.Fatalf("PreProcess failed: %v", err)
+	}
+	if strings.Contains(result, "corrupt") {
+		t.Error("memory with corrupted timestamp must be treated as stale and dropped")
+	}
+}
+
+func TestFenceValue_NeutralizesInjection(t *testing.T) {
+	in := "line1\nline2\twith`backticks`"
+	out := memory.FenceValue(in)
+	if strings.ContainsAny(out, "\n\r\t") {
+		t.Errorf("fenced value must be single-line: %q", out)
+	}
+	if strings.Contains(out, "`backticks`") {
+		t.Errorf("backticks must be neutralized: %q", out)
+	}
+	if !strings.HasPrefix(out, "`") || !strings.HasSuffix(out, "`") {
+		t.Errorf("fenced value must be wrapped in backticks: %q", out)
 	}
 }
 
