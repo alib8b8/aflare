@@ -1,0 +1,60 @@
+name: A-Share Price Alert
+# Monitors an A-share stock price and alerts when the threshold is crossed.
+# Usage: aflare install finance/stock-alert
+#        aflare run stock-alert/workflow.yaml
+# Config: pass --var symbol=sh600519 --var threshold=1400 (or edit defaults below)
+# Data source: Tencent quote API (web.ifzq.gtimg.cn) — UTF-8 JSON, no auth,
+# returns the live price as a decimal string the gt/lt operators can compare.
+# symbol: sh600519 (Shanghai) / sz000001 (Shenzhen) — 6xx→sh, 0xx/3xx→sz
+
+input:
+  - name: symbol
+    type: string
+    required: false
+    default: sh600519
+    description: "Tencent quote symbol, e.g. sh600519 / sz000001"
+  - name: threshold
+    type: string
+    required: false
+    default: "1400"
+    description: "Alert threshold in CNY"
+
+steps:
+  - node: http_request
+    params:
+      url: "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={{var.symbol}},day,,,1,qfq"
+      method: GET
+      timeout: 30s
+    id: fetch_quote
+
+  # data.<symbol>.qt.<symbol>.[3] is the live price field of the Tencent qt
+  # snapshot (decimal string, e.g. "1307.88").
+  - node: json_parse
+    params:
+      path: "data.{{var.symbol}}.qt.{{var.symbol}}.[3]"
+    id: current_price
+
+  # Step-level if: the gt operator compares the previous step's output (the
+  # parsed price) against the threshold.
+  - if:
+      condition: "gt:{{var.threshold}}"
+      then:
+        - node: template_render
+          params:
+            template: |
+              A-Share Price Alert
+              Symbol: {{var.symbol}}
+              Current: ¥{{ .price }} CNY
+              Threshold: ¥{{var.threshold}} CNY
+            price: "{{ .input }}"
+          id: alert_message
+        - node: notify
+          params:
+            channel: stdout
+          input: alert_message
+          id: notify
+        - node: file_write
+          params:
+            path: stock-alert.log
+          input: alert_message
+          id: log

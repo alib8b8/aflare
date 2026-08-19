@@ -770,6 +770,80 @@ func TestGenerateWorkflow_ScheduleEveryHour(t *testing.T) {
 	}
 }
 
+func TestGenerateWorkflow_FullAShareExample(t *testing.T) {
+	// The A-share counterpart of the BTC example:
+	// "每 10 分钟检查贵州茅台 600519 股价，超过 1400 发 Telegram 通知"
+	wf, err := GenerateWorkflow("每 10 分钟检查贵州茅台 600519 股价，超过 1400 发 Telegram 通知")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !HasMeaningfulSteps(wf) {
+		t.Fatal("expected a meaningful workflow for the A-share example")
+	}
+	// 1. schedule set
+	if wf.Schedule == nil || wf.Schedule.Cron != "*/10 * * * *" {
+		t.Errorf("expected schedule cron */10 * * * *, got: %+v", wf.Schedule)
+	}
+	// 2. http_request hits the Tencent quote API, json_parse extracts the qt live price
+	var foundHTTP, foundJSON, foundIf bool
+	for i := range wf.Steps {
+		s := &wf.Steps[i]
+		if s.Node == "http_request" {
+			foundHTTP = true
+			if !strings.Contains(s.Params["url"], "web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sh600519,") {
+				t.Errorf("expected Tencent quote API url with sh600519, got %s", s.Params["url"])
+			}
+		}
+		if s.Node == "json_parse" {
+			foundJSON = true
+			if s.Params["path"] != "data.sh600519.qt.sh600519.[3]" {
+				t.Errorf("expected qt live-price path, got %s", s.Params["path"])
+			}
+		}
+		if s.If != nil {
+			foundIf = true
+			if s.If.Condition != "gt:1400" {
+				t.Errorf("expected if condition gt:1400, got %s", s.If.Condition)
+			}
+			if len(s.If.Then) != 1 || s.If.Then[0].Node != "notify" || s.If.Then[0].Params["channel"] != "telegram" {
+				t.Errorf("expected telegram notify in then-branch, got: %+v", s.If.Then)
+			}
+		}
+	}
+	if !foundHTTP {
+		t.Error("expected http_request step for A-share price fetch")
+	}
+	if !foundJSON {
+		t.Error("expected json_parse step for A-share price")
+	}
+	if !foundIf {
+		t.Error("expected if-step for threshold condition")
+	}
+}
+
+func TestExtractAShareSymbol(t *testing.T) {
+	cases := []struct {
+		desc string
+		want string
+		ok   bool
+	}{
+		{"贵州茅台 600519 股价", "sh600519", true},                // 6xx → Shanghai
+		{"平安银行 000001 行情", "sz000001", true},                 // 0xx → Shenzhen
+		{"宁德时代 300750 股票", "sz300750", true},                 // 3xx ChiNext → Shenzhen
+		{"检查 sh600519 股价", "sh600519", true},                  // explicit prefix
+		{"检查 SZ000001 股价", "sz000001", true},                  // explicit prefix, case-insensitive
+		{"每 10 分钟检查 BTC 价格，超过 100000 通知", "", false}, // crypto hint wins over 6-digit number
+		{"比特币价格超过 600000", "", false},                     // crypto hint in Chinese
+		{"总结这篇文章", "", false},                              // no code at all
+	}
+	for _, c := range cases {
+		got, ok := extractAShareSymbol(c.desc)
+		if ok != c.ok || got != c.want {
+			t.Errorf("extractAShareSymbol(%q) = (%q,%v), want (%q,%v)", c.desc, got, ok, c.want, c.ok)
+		}
+	}
+}
+
 func TestGenerateWorkflow_FullBTCExample(t *testing.T) {
 	// The exact example from the user's original complaint:
 	// "每 10 分钟检查 BTC 价格，超过 70000 发 Telegram 通知"

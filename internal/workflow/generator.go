@@ -199,22 +199,43 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	// 遗留修复: price — recognize BTC/价格/crypto and emit a CoinGecko
 	// http_request + json_parse pair so "检查 BTC 价格" produces real fetch
 	// steps instead of only matching the notify keyword.
+	// A-share descriptions (股票/股价/A股/沪深/行情 + a 6-digit code like
+	// 600519) route to the Tencent quote API instead: its qt snapshot returns
+	// the live price as a plain decimal string (e.g. "1307.88"), which the
+	// gt/lt condition operators can compare directly — unlike eastmoney's
+	// f43 (price×100 integer) or sina's GBK text format.
 	if containsActionKeyword(desc, "price") {
-		coin := "bitcoin"
-		if strings.Contains(desc, "eth") || strings.Contains(desc, "以太坊") {
-			coin = "ethereum"
+		if symbol, ok := extractAShareSymbol(desc); ok {
+			wf.Steps = append(wf.Steps, WorkflowStep{
+				Node: "http_request",
+				Params: map[string]string{
+					"url":    "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=" + symbol + ",day,,,1,qfq",
+					"method": "GET",
+				},
+			})
+			// data.<symbol>.qt.<symbol>.[3] is the live price field of the
+			// Tencent qt snapshot (index 3 = current price, decimal string).
+			wf.Steps = append(wf.Steps, WorkflowStep{
+				Node:   "json_parse",
+				Params: map[string]string{"path": "data." + symbol + ".qt." + symbol + ".[3]"},
+			})
+		} else {
+			coin := "bitcoin"
+			if strings.Contains(desc, "eth") || strings.Contains(desc, "以太坊") {
+				coin = "ethereum"
+			}
+			wf.Steps = append(wf.Steps, WorkflowStep{
+				Node: "http_request",
+				Params: map[string]string{
+					"url":    "https://api.coingecko.com/api/v3/simple/price?ids=" + coin + "&vs_currencies=usd",
+					"method": "GET",
+				},
+			})
+			wf.Steps = append(wf.Steps, WorkflowStep{
+				Node:   "json_parse",
+				Params: map[string]string{"path": coin + ".usd"},
+			})
 		}
-		wf.Steps = append(wf.Steps, WorkflowStep{
-			Node: "http_request",
-			Params: map[string]string{
-				"url":    "https://api.coingecko.com/api/v3/simple/price?ids=" + coin + "&vs_currencies=usd",
-				"method": "GET",
-			},
-		})
-		wf.Steps = append(wf.Steps, WorkflowStep{
-			Node:   "json_parse",
-			Params: map[string]string{"path": coin + ".usd"},
-		})
 	}
 
 	// 断点C + 遗留修复: notify — recognize 通知/telegram/slack/webhook and
@@ -310,6 +331,38 @@ func extractCondition(desc string) (string, bool) {
 	}
 	if m := belowRegex.FindStringSubmatch(desc); len(m) > 1 {
 		return "lt:" + m[1], true
+	}
+	return "", false
+}
+
+// A-share symbol extraction: an explicit "sh600519"/"SZ000001" prefix wins;
+// otherwise a bare 6-digit code is mapped by its leading digit (6xx→sh for
+// the Shanghai main board / STAR market, 0xx/3xx→sz for the Shenzhen main
+// board / ChiNext). Codes outside those ranges are not A-share symbols
+// (e.g. "100000" as a crypto threshold) and are rejected.
+var (
+	prefixedAShareRegex = regexp.MustCompile(`(?i)\b(sh|sz)(\d{6})\b`)
+	bareAShareRegex     = regexp.MustCompile(`\b([063]\d{5})\b`)
+	cryptoHintRegex     = regexp.MustCompile(`(?i)\b(btc|bitcoin|crypto|ethereum|eth)\b|比特币|以太坊`)
+)
+
+// extractAShareSymbol returns the Tencent quote symbol ("sh600519" style) when
+// the description names an A-share stock. Descriptions that mention crypto
+// are never treated as A-share queries even if they contain 6-digit numbers.
+func extractAShareSymbol(desc string) (string, bool) {
+	if cryptoHintRegex.MatchString(desc) {
+		return "", false
+	}
+	if m := prefixedAShareRegex.FindStringSubmatch(desc); len(m) > 2 {
+		return strings.ToLower(m[1]) + m[2], true
+	}
+	if m := bareAShareRegex.FindStringSubmatch(desc); len(m) > 1 {
+		switch m[1][0] {
+		case '6':
+			return "sh" + m[1], true
+		case '0', '3':
+			return "sz" + m[1], true
+		}
 	}
 	return "", false
 }

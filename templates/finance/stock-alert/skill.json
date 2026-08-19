@@ -1,0 +1,33 @@
+{
+  "id": "finance/stock-alert",
+  "name": "stock-alert",
+  "version": "1.0.0",
+  "description": "Monitor an A-share stock price (Tencent quote API) and get alerted when it crosses your threshold.",
+  "author": "aflare community",
+  "category": "finance",
+  "tags": [
+    "finance",
+    "workflow",
+    "a-share"
+  ],
+  "keywords": [
+    "stock-alert",
+    "finance",
+    "a-share",
+    "股票"
+  ],
+  "inputs": [
+    {
+      "name": "symbol",
+      "type": "string",
+      "description": "Tencent quote symbol, e.g. sh600519 / sz000001"
+    },
+    {
+      "name": "threshold",
+      "type": "string",
+      "description": "Alert threshold in CNY"
+    }
+  ],
+  "outputs": null,
+  "dependencies": null
+}

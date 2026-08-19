@@ -74,9 +74,9 @@ aflare run examples/content-processor.yaml
 aflare init
 
 # 4. 关键词生成工作流（无需 LLM，纯模板匹配；加 --ai 用 LLM 生成更复杂的）
-aflare create "每 10 分钟检查 BTC 价格，超过 70000 发 Telegram 通知"
-# 输出: 工作流已生成 → btc-monitor.yaml
-aflare run btc-monitor.yaml
+aflare create "每 10 分钟检查贵州茅台 600519 股价，超过 1400 发 Telegram 通知"
+# 输出: 工作流已生成 → 股价监控工作流（腾讯行情接口取价，同样支持 BTC：描述里写 BTC 即走 CoinGecko）
+aflare run stock-monitor.yaml
 
 # 5. 交互式 AI Agent 对话（ReAct Agent + 300+ 技能）
 aflare chat
