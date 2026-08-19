@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "count": 332,
+  "count": 333,
   "skills": [
     {
       "id": "business/business-plan",
@@ -2664,6 +2664,28 @@
       "keywords": [
         "btc-alert",
         "finance"
+      ],
+      "inputs": null,
+      "outputs": null,
+      "dependencies": null
+    },
+    {
+      "id": "finance/stock-alert",
+      "name": "stock-alert",
+      "version": "1.0.0",
+      "description": "Monitor an A-share stock price (Tencent quote API) and get alerted when it crosses your threshold.",
+      "author": "aflare community",
+      "category": "finance",
+      "tags": [
+        "finance",
+        "workflow",
+        "a-share"
+      ],
+      "keywords": [
+        "stock-alert",
+        "finance",
+        "a-share",
+        "\u80a1\u7968"
       ],
       "inputs": null,
       "outputs": null,

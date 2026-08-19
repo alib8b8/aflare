@@ -60,9 +60,10 @@ var actionKeywords = map[string][]string{
 	// 遗留修复: price/schedule/condition keywords so the keyword generator
 	// recognizes the full "每 10 分钟检查 BTC 价格，超过 70000 发 Telegram 通知"
 	// example instead of only matching the notify keyword.
-	// A-share keywords (股票/股价/A股/沪深/行情) route to the Tencent quote
-	// API when a 6-digit stock code is present in the description.
-	"price":     {"price", "价格", "btc", "bitcoin", "crypto", "比特币", "以太坊", "eth", "股票", "股价", "A股", "a股", "沪深", "行情", "stock"},
+	// Stock keywords (股票/股价/A股/沪深/行情/港股/美股) route to the Tencent
+	// quote API when a recognizable stock code is present in the description
+	// (A股 6 位代码 / 港股 hk 前缀或 5 位代码 / 美股 us+大写代码).
+	"price":     {"price", "价格", "btc", "bitcoin", "crypto", "比特币", "以太坊", "eth", "股票", "股价", "A股", "a股", "沪深", "行情", "港股", "美股", "stock"},
 	"schedule":  {"schedule", "cron", "定时", "定期", "周期", "every", "每", "每天", "每小时", "每分钟"},
 	"condition": {"condition", "threshold", "超过", "大于", "高于", "低于", "小于", "if", "when", "如果"},
 }

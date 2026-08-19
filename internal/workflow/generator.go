@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -54,6 +55,10 @@ var (
 	belowRegex     = regexp.MustCompile(`(?:低于|小于|below|under|less\s*than|<)\s*(\d+(?:\.\d+)?)`)
 	everyMinRegex  = regexp.MustCompile(`(?:每|每隔)\s*(\d+)\s*分钟`)
 	everyHourRegex = regexp.MustCompile(`(?:每|每隔)\s*(\d+)\s*小时`)
+	// English schedule phrases: "every 10 minutes" / "every 2 hours". desc is
+	// lowercased by GenerateWorkflow before parseScheduleCron is called.
+	everyMinRegexEn  = regexp.MustCompile(`every\s+(\d+)\s+min(?:ute)?s?`)
+	everyHourRegexEn = regexp.MustCompile(`every\s+(\d+)\s+hours?`)
 )
 
 // GenerateWorkflow creates a workflow from a description using rule-based
@@ -205,7 +210,10 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	// gt/lt condition operators can compare directly — unlike eastmoney's
 	// f43 (price×100 integer) or sina's GBK text format.
 	if containsActionKeyword(desc, "price") {
-		if symbol, ok := extractAShareSymbol(desc); ok {
+		// Pass the ORIGINAL description: US ticker symbols are case-sensitive
+		// (the Tencent API needs "usAAPL", lowercase "usaapl" returns a null
+		// qt snapshot), so the lowercased desc would destroy them.
+		if symbol, ok := extractStockSymbol(description); ok {
 			wf.Steps = append(wf.Steps, WorkflowStep{
 				Node: "http_request",
 				Params: map[string]string{
@@ -219,7 +227,13 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 				Node:   "json_parse",
 				Params: map[string]string{"path": "data." + symbol + ".qt." + symbol + ".[3]"},
 			})
-		} else {
+		} else if cryptoHintRegex.MatchString(description) {
+			// CoinGecko route only for descriptions that actually name a
+			// crypto asset. 安全自检: the previous unconditional else made
+			// every symbol-less price query ("check gold price", "监控油价")
+			// silently generate a BITCOIN monitor — wrong market, wrong
+			// asset, misleading output. Now such queries generate no price
+			// steps at all.
 			coin := "bitcoin"
 			if strings.Contains(desc, "eth") || strings.Contains(desc, "以太坊") {
 				coin = "ethereum"
@@ -335,27 +349,78 @@ func extractCondition(desc string) (string, bool) {
 	return "", false
 }
 
-// A-share symbol extraction: an explicit "sh600519"/"SZ000001" prefix wins;
-// otherwise a bare 6-digit code is mapped by its leading digit (6xx→sh for
-// the Shanghai main board / STAR market, 0xx/3xx→sz for the Shenzhen main
-// board / ChiNext). Codes outside those ranges are not A-share symbols
-// (e.g. "100000" as a crypto threshold) and are rejected.
+// Stock symbol extraction for the Tencent quote API. Supported markets:
+//
+//   - A-share: explicit "sh600519"/"SZ000001" prefix, or a bare 6-digit code
+//     mapped by its leading digit (6xx→sh Shanghai main board / STAR market,
+//     0xx/3xx→sz Shenzhen main board / ChiNext).
+//   - HK stock: explicit "hk00700"/"hk0700" prefix (zero-padded to 5 digits),
+//     or a bare 5-digit leading-zero code ("00700"). Bare 4-digit codes are
+//     rejected — they collide with plain numbers like prices.
+//   - US stock: "usAAPL" / "US:AAPL" / "US AAPL" — the ticker part must be
+//     UPPERCASE (2-6 letters) to avoid matching ordinary English words; the
+//     API requires the uppercase form (lowercase "usaapl" returns a null qt
+//     snapshot). Common non-ticker words after "us" are blacklisted.
+//
+// Descriptions mentioning crypto (BTC/ETH/比特币…) are never treated as
+// stock queries even when they contain 6-digit numbers (e.g. thresholds).
 var (
 	prefixedAShareRegex = regexp.MustCompile(`(?i)\b(sh|sz)(\d{6})\b`)
 	bareAShareRegex     = regexp.MustCompile(`\b([063]\d{5})\b`)
-	cryptoHintRegex     = regexp.MustCompile(`(?i)\b(btc|bitcoin|crypto|ethereum|eth)\b|比特币|以太坊`)
+	prefixedHKRegex     = regexp.MustCompile(`(?i)\bhk:?\s*(\d{3,5})\b`)
+	bareHKRegex         = regexp.MustCompile(`\b(0\d{4})\b`)
+	prefixedUSRegex     = regexp.MustCompile(`\b(?i:us):?\s*([A-Z]{2,6})\b`)
+	cryptoHintRegex     = regexp.MustCompile(`(?i)\b(btc|bitcoin|crypto|ethereum|eth|usdt|usdc)\b|比特币|以太坊`)
 )
 
-// extractAShareSymbol returns the Tencent quote symbol ("sh600519" style) when
-// the description names an A-share stock. Descriptions that mention crypto
-// are never treated as A-share queries even if they contain 6-digit numbers.
-func extractAShareSymbol(desc string) (string, bool) {
+// usTickerBlacklist rejects uppercase words that legitimately follow "us" in
+// price-monitoring descriptions but are not stock tickers ("US MARKET price",
+// "USDT", ...). Prevents the generator from emitting garbage symbols like
+// usMARKET from "check US MARKET price every 10 minutes".
+var usTickerBlacklist = map[string]bool{
+	"USD": true, "USA": true, "USB": true, "USR": true, "UST": true,
+	"USE": true, "USDT": true, "USDC": true,
+	"IS": true, "IT": true, "IN": true, "ON": true, "TO": true, "OF": true,
+	"AT": true, "BY": true, "DO": true, "GO": true, "NO": true, "SO": true,
+	"UP": true, "WE": true, "HE": true,
+	"MARKET": true, "MARKETS": true, "STOCK": true, "STOCKS": true,
+	"PRICE": true, "PRICES": true, "ALERT": true, "ALERTS": true,
+	"EVERY": true, "CHECK": true, "CHECKS": true, "DAILY": true,
+	"WEEKLY": true, "ABOVE": true, "BELOW": true, "OVER": true,
+	"UNDER": true, "WHEN": true, "THEN": true, "THAN": true,
+	"THIS": true, "THAT": true, "WITH": true, "FROM": true,
+	"SEND": true, "NOTIFY": true, "EMAIL": true, "TELEGRAM": true,
+	"SLACK": true, "WEBHOOK": true,
+}
+
+// extractStockSymbol returns the Tencent quote symbol ("sh600519" / "hk00700"
+// / "usAAPL" style) when the description names a stock. Descriptions that
+// mention crypto are never treated as stock queries even if they contain
+// 6-digit numbers.
+func extractStockSymbol(desc string) (string, bool) {
 	if cryptoHintRegex.MatchString(desc) {
 		return "", false
 	}
+	// Explicit prefixed forms win over bare numeric codes.
 	if m := prefixedAShareRegex.FindStringSubmatch(desc); len(m) > 2 {
 		return strings.ToLower(m[1]) + m[2], true
 	}
+	if m := prefixedHKRegex.FindStringSubmatch(desc); len(m) > 1 {
+		// HK codes are 5 digits: hk700 → hk00700. The API returns an empty
+		// qt snapshot for the unpadded form.
+		code := m[1]
+		for len(code) < 5 {
+			code = "0" + code
+		}
+		return "hk" + code, true
+	}
+	if m := prefixedUSRegex.FindStringSubmatch(desc); len(m) > 1 {
+		ticker := strings.ToUpper(m[1])
+		if !usTickerBlacklist[ticker] {
+			return "us" + ticker, true
+		}
+	}
+	// Bare codes (no exchange prefix).
 	if m := bareAShareRegex.FindStringSubmatch(desc); len(m) > 1 {
 		switch m[1][0] {
 		case '6':
@@ -364,19 +429,37 @@ func extractAShareSymbol(desc string) (string, bool) {
 			return "sz" + m[1], true
 		}
 	}
+	if m := bareHKRegex.FindStringSubmatch(desc); len(m) > 1 {
+		return "hk" + m[1], true
+	}
 	return "", false
 }
 
 // parseScheduleCron extracts a cron expression from a (lowercased) description
-// containing a schedule phrase. Supported forms: "每N分钟" → "*/N * * * *",
-// "每N小时" → "0 */N * * *", "每小时" → "0 * * * *", "每分钟" → "* * * * *".
+// containing a schedule phrase. Supported forms: "每N分钟" / "every N minutes"
+// → "*/N * * * *", "每N小时" / "every N hours" → "0 */N * * *", "每小时" →
+// "0 * * * *", "每分钟" / "every minute" → "* * * * *", "每天" → "0 9 * * *".
 // Returns "" if no recognizable schedule phrase is found.
 func parseScheduleCron(desc string) string {
 	if m := everyMinRegex.FindStringSubmatch(desc); len(m) > 1 {
-		return "*/" + m[1] + " * * * *"
+		if n, ok := validCronStep(m[1], 59); ok {
+			return "*/" + n + " * * * *"
+		}
+	}
+	if m := everyMinRegexEn.FindStringSubmatch(desc); len(m) > 1 {
+		if n, ok := validCronStep(m[1], 59); ok {
+			return "*/" + n + " * * * *"
+		}
 	}
 	if m := everyHourRegex.FindStringSubmatch(desc); len(m) > 1 {
-		return "0 */" + m[1] + " * * *"
+		if n, ok := validCronStep(m[1], 23); ok {
+			return "0 */" + n + " * * *"
+		}
+	}
+	if m := everyHourRegexEn.FindStringSubmatch(desc); len(m) > 1 {
+		if n, ok := validCronStep(m[1], 23); ok {
+			return "0 */" + n + " * * *"
+		}
 	}
 	if strings.Contains(desc, "每小时") {
 		return "0 * * * *"
@@ -388,6 +471,19 @@ func parseScheduleCron(desc string) string {
 		return "0 9 * * *"
 	}
 	return ""
+}
+
+// validCronStep rejects degenerate interval phrases ("每 0 分钟" / "every 0
+// minutes" → "*/0", or intervals beyond the cron field range like "*/99")
+// that would produce an invalid or never-firing cron expression. The caller
+// then falls through to the next schedule form or leaves the workflow
+// unscheduled instead of emitting a broken cron.
+func validCronStep(nStr string, max int) (string, bool) {
+	n, err := strconv.Atoi(nStr)
+	if err != nil || n < 1 || n > max {
+		return "", false
+	}
+	return nStr, true
 }
 
 func addLLMStep(wf *Workflow, llmNode, llmModel, action string) {

@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **有界预览输入（NOOA pass-by-reference 思想吸收）**：WorkflowStep 新增 `preview_input: true`——超过 16KiB 的输入替换为"类型+总长+头尾样本+省略字节数"的有界预览（UTF-8 与行边界安全），完整值保留在工作流状态、原样传给所有其他步骤；LLM 步骤看样本、确定性节点操作完整数据，长上下文工作流的 prompt 成本可控
 - **MemHarness 模式示例**：`examples/real-world/memharness-critique/`——harness_search → LLM 批判（output_schema 契约 + preview_input）→ 行动 三阶段完整可运行示例
 - **水印部署溯源（payload v2）**：水印内容哈希 8→6 字节，腾出 2 字节嵌入部署 ID（`AFLARE_DEPLOYMENT_ID`，1-4 位十六进制）。泄漏的内容现可直接定位到生成它的部署实例，无需再对照审计日志逐时间点排查；payload 总长保持 21 字节，分片/校验逻辑不变；v1 水印（8 字节哈希、无部署 ID）仍可解码，`aflare watermark decode/verify` 输出部署 ID
+- **A 股股价监控生成器**：`aflare create` 识别 A 股 6 位代码（6xx→沪 sh、0xx/3xx→深 sz，或 sh/sz 显式前缀），经腾讯行情接口（`web.ifzq.gtimg.cn`）生成取价工作流——qt 快照现价为十进制字符串，`gt/lt` 数值比较直接可用；含加密货币提示词（BTC/比特币等）时保持 CoinGecko 路由不误判
+- **港股 / 美股股价监控生成器**：港股 `hk00700`（3-5 位自动补零至 5 位，或裸 5 位前导零代码）、美股 `usAAPL` / `US:AAPL` / `US AAPL`（代码须大写 2-6 字母，API 小写返回空 qt；常见非代码词黑名单防误报）；英文调度短语 `every N minutes/hours` 同步支持；美股识别使用原始大小写描述（小写化会破坏代码）
+- **A 股监控模板**：`templates/finance/stock-alert/`（workflow.yaml + skill.json + README），`aflare install finance/stock-alert` 一键安装，symbol/threshold 变量化
+- **README 中英文市场分线**：中文版走合规路线——A 股示例 + 金融场景与合规说明章节（数据来源、量化/复盘/投顾定位边界表、免责声明，不出现 BTC/美股/港股）；英文版新增 Market Data & Financial Use Cases 章节（BTC/美股/港股/A 股四市场速查表 + 妙想 API 接入说明 + 定位边界 + Disclaimer）；含东方财富妙想大模型调研结论（闭源模型，官方 API 平台可选接入）
 
 ### Changed
 - `mcp.ServerEntry` 新增可选 `cwd` 字段（Agent Plugins 1.0 传递插件相对 cwd；主流 MCP 客户端同一 schema，向后兼容）
@@ -25,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **记忆 AccessCount 数据竞争（中危）**：`PersistentMemoryStore.Retrieve` 与 `MemoryCapability.PreProcess` 此前在读锁下自增共享条目的 AccessCount，并发调用构成 data race（`go test -race` 可复现）。现分别改为写锁与读写锁分段（安全自检发现）
 
 ### Fixed
+- **stock-alert 模板字段契约修复（代码审查发现）**：模板初版使用了 Workflow/WorkflowStep 不存在的字段——`input:` 块（默认值被 yaml.Unmarshal 静默丢弃，symbol/threshold 从未有默认值）、步骤级 `id:`/`input:`（同样被丢弃）、`timeout: 30s`（http_request 节点要求整型秒数）、以及 `price: "{{ .input }}"` 参数（向 Go 模板传递字面量字符串 `{{ .input }}`，告警消息渲染为未解析表达式）。现改用 `vars:` 默认值 + `name:` 步骤名 + `timeout: "30"` + 模板内直接 `{{ .input }}`；新增 `embed_templates_test.go` 契约测试锁定字段正确性并离线验证告警渲染链路
+- **带 vars 默认值的模板被参数提示阻断（断点E）**：`aflare run` 对无 input_schema 但引用 `{{var.*}}` 的工作流会强制弹出参数提示退出——即使变量已在工作流自身 `vars:` 中声明默认值。现已在提示前过滤掉有默认值的变量，带默认值的模板（如 finance/stock-alert）开箱即跑，`--set` 仍可覆盖
+- **无标的的价格查询静默生成比特币监控（安全自检发现）**：price 关键词命中但既无股票代码也无加密货币提示时（如 "check gold price" / "监控黄金价格"），生成器此前无条件落入 CoinGecko 分支生成比特币监控工作流——错误的市场、错误的标的。现 CoinGecko 路由仅在实际提及加密资产时触发，其余无标的价格查询不生成任何取价步骤（新增回归测试）
 - **工作流审计在全新安装上被静默跳过**：工作流执行记录器仍按 0.8.x 逻辑要求 `AFLARE_AUDIT_HMAC_KEY` / `AFLARE_SECRETS_PASSWORD` 环境变量才写审计，而 0.9.0 的审计链已支持自动生成每安装随机密钥文件——两条路径不一致导致 `aflare run` 在未设环境变量的新安装上一条工作流审计都不写，且打印误导性警告。现移除该过时门控，密钥解析完全由 history 包负责（混沌测试实测发现）
 - **MemHarness 批判对损坏时间戳失效**：记忆 Timestamp 为空或不可解析时此前按"新鲜"处理（永不进入丢弃通道）。现按"陈旧"处理——损坏/被篡改的记录不再是批判盲区；`InstallPlugin` 不再忽略 `filepath.Abs` 错误；物化技能文件权限 0644 → 0640
 

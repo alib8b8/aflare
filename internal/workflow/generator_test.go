@@ -821,25 +821,136 @@ func TestGenerateWorkflow_FullAShareExample(t *testing.T) {
 	}
 }
 
-func TestExtractAShareSymbol(t *testing.T) {
+func TestGenerateWorkflow_FullHKStockExample(t *testing.T) {
+	// HK counterpart of the A-share example:
+	// "每 10 分钟检查港股腾讯 hk00700 股价，低于 440 发 Telegram 通知"
+	wf, err := GenerateWorkflow("每 10 分钟检查港股腾讯 hk00700 股价，低于 440 发 Telegram 通知")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !HasMeaningfulSteps(wf) {
+		t.Fatal("expected a meaningful workflow for the HK stock example")
+	}
+	if wf.Schedule == nil || wf.Schedule.Cron != "*/10 * * * *" {
+		t.Errorf("expected schedule cron */10 * * * *, got: %+v", wf.Schedule)
+	}
+	var foundHTTP, foundJSON bool
+	for i := range wf.Steps {
+		s := &wf.Steps[i]
+		if s.Node == "http_request" {
+			foundHTTP = true
+			if !strings.Contains(s.Params["url"], "get?param=hk00700,") {
+				t.Errorf("expected Tencent quote API url with hk00700, got %s", s.Params["url"])
+			}
+		}
+		if s.Node == "json_parse" {
+			foundJSON = true
+			if s.Params["path"] != "data.hk00700.qt.hk00700.[3]" {
+				t.Errorf("expected qt live-price path, got %s", s.Params["path"])
+			}
+		}
+	}
+	if !foundHTTP || !foundJSON {
+		t.Errorf("expected http_request+json_parse for HK stock, got http=%v json=%v", foundHTTP, foundJSON)
+	}
+}
+
+func TestGenerateWorkflow_FullUSStockExample(t *testing.T) {
+	// US counterpart of the BTC example:
+	// "check usAAPL stock price every 10 minutes, alert via Telegram when > 320"
+	wf, err := GenerateWorkflow("check usAAPL stock price every 10 minutes, alert via Telegram when > 320")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !HasMeaningfulSteps(wf) {
+		t.Fatal("expected a meaningful workflow for the US stock example")
+	}
+	if wf.Schedule == nil || wf.Schedule.Cron != "*/10 * * * *" {
+		t.Errorf("expected schedule cron */10 * * * *, got: %+v", wf.Schedule)
+	}
+	var foundHTTP, foundJSON bool
+	for i := range wf.Steps {
+		s := &wf.Steps[i]
+		if s.Node == "http_request" {
+			foundHTTP = true
+			if !strings.Contains(s.Params["url"], "get?param=usAAPL,") {
+				t.Errorf("expected Tencent quote API url with usAAPL, got %s", s.Params["url"])
+			}
+		}
+		if s.Node == "json_parse" {
+			foundJSON = true
+			if s.Params["path"] != "data.usAAPL.qt.usAAPL.[3]" {
+				t.Errorf("expected qt live-price path, got %s", s.Params["path"])
+			}
+		}
+	}
+	if !foundHTTP || !foundJSON {
+		t.Errorf("expected http_request+json_parse for US stock, got http=%v json=%v", foundHTTP, foundJSON)
+	}
+}
+
+func TestExtractStockSymbol(t *testing.T) {
 	cases := []struct {
 		desc string
 		want string
 		ok   bool
 	}{
-		{"贵州茅台 600519 股价", "sh600519", true},                // 6xx → Shanghai
-		{"平安银行 000001 行情", "sz000001", true},                 // 0xx → Shenzhen
-		{"宁德时代 300750 股票", "sz300750", true},                 // 3xx ChiNext → Shenzhen
-		{"检查 sh600519 股价", "sh600519", true},                  // explicit prefix
-		{"检查 SZ000001 股价", "sz000001", true},                  // explicit prefix, case-insensitive
+		// A-share
+		{"贵州茅台 600519 股价", "sh600519", true}, // 6xx → Shanghai
+		{"平安银行 000001 行情", "sz000001", true}, // 0xx → Shenzhen
+		{"宁德时代 300750 股票", "sz300750", true}, // 3xx ChiNext → Shenzhen
+		{"检查 sh600519 股价", "sh600519", true}, // explicit prefix
+		{"检查 SZ000001 股价", "sz000001", true}, // explicit prefix, case-insensitive
+		// HK stock
+		{"检查港股 hk00700 股价", "hk00700", true}, // explicit 5-digit prefix
+		{"检查港股 hk700 股价", "hk00700", true},   // 4-digit prefix → zero-padded
+		{"检查 HK:0700 股价", "hk00700", true},   // colon form
+		{"港股 00700 股价", "hk00700", true},     // bare 5-digit leading-zero code
+		{"监控 00700 价格", "hk00700", true},     // bare HK code in price context
+		// US stock
+		{"check usAAPL price", "usAAPL", true},         // adjacent form
+		{"check US:AAPL price", "usAAPL", true},        // colon form
+		{"check US AAPL price", "usAAPL", true},        // space form
+		{"monitor usTSLA stock price", "usTSLA", true}, // another ticker
+		// rejected / not stocks
+		{"check US MARKET price", "", false},         // blacklisted non-ticker word
+		{"monitor USDT price", "", false},            // stablecoin, not a US stock
+		{"useful tool for price checks", "", false},  // "useful" is not us+UPPERCASE
 		{"每 10 分钟检查 BTC 价格，超过 100000 通知", "", false}, // crypto hint wins over 6-digit number
-		{"比特币价格超过 600000", "", false},                     // crypto hint in Chinese
-		{"总结这篇文章", "", false},                              // no code at all
+		{"比特币价格超过 600000", "", false},                // crypto hint in Chinese
+		{"总结这篇文章", "", false},                        // no code at all
 	}
 	for _, c := range cases {
-		got, ok := extractAShareSymbol(c.desc)
+		got, ok := extractStockSymbol(c.desc)
 		if ok != c.ok || got != c.want {
-			t.Errorf("extractAShareSymbol(%q) = (%q,%v), want (%q,%v)", c.desc, got, ok, c.want, c.ok)
+			t.Errorf("extractStockSymbol(%q) = (%q,%v), want (%q,%v)", c.desc, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+func TestGenerateWorkflow_PriceKeywordNoCryptoNoStock(t *testing.T) {
+	// 安全自检回归: a price query that names neither a stock symbol nor a
+	// crypto asset ("check gold price" / "监控油价") used to fall through to
+	// the CoinGecko branch and silently generate a BITCOIN monitor. The
+	// CoinGecko route must only fire for descriptions that actually name a
+	// crypto asset; other symbol-less price queries generate no price steps.
+	for _, desc := range []string{
+		"check gold price",
+		"监控黄金价格",
+		"check the price and notify me",
+	} {
+		wf, err := GenerateWorkflow(desc)
+		if err != nil {
+			t.Fatalf("GenerateWorkflow(%q): %v", desc, err)
+		}
+		for i := range wf.Steps {
+			s := &wf.Steps[i]
+			if s.Node == "http_request" {
+				t.Errorf("GenerateWorkflow(%q): unexpected http_request step %v — symbol-less non-crypto price queries must not fetch any price feed", desc, s.Params["url"])
+			}
+			if s.Node == "json_parse" {
+				t.Errorf("GenerateWorkflow(%q): unexpected json_parse step — symbol-less non-crypto price queries must not fetch any price feed", desc)
+			}
 		}
 	}
 }
@@ -927,6 +1038,18 @@ func TestParseScheduleCron(t *testing.T) {
 		{"每分钟", "* * * * *"},
 		{"每天", "0 9 * * *"},
 		{"检查价格", ""},
+		// English forms
+		{"every 10 minutes", "*/10 * * * *"},
+		{"every 15 min", "*/15 * * * *"},
+		{"every 2 hours", "0 */2 * * *"},
+		{"every minute", "* * * * *"},
+		// degenerate intervals are rejected instead of emitting a broken cron
+		{"每 0 分钟", ""},
+		{"every 0 minutes", ""},
+		{"每 99 分钟", ""},
+		{"every 99 minutes", ""},
+		{"每 0 小时", ""},
+		{"every 100 hours", ""},
 	}
 	for _, c := range cases {
 		got := parseScheduleCron(c.desc)

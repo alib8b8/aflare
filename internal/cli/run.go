@@ -315,10 +315,20 @@ func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath st
 	// 断点E: 对没有 input_schema 但 YAML 里引用了 {{var.xxx}} / {{ .params.xxx }}
 	// 的模板，自动提取参数列表并提示，避免拿到空值后在 http_request / execute
 	// 等节点报晦涩的 "variable not found" 错误。
+	// 已在 workflow 自身 vars: 里声明默认值的变量不算缺失——带默认值的模板
+	// （如 finance/stock-alert）应当开箱即跑，而不是被参数提示拦住。
 	if len(wf.InputSchema) == 0 && len(params) == 0 {
 		if refs := workflow.ExtractReferencedVars(wf); len(refs) > 0 {
-			printExtractedParamsHelp(wfPath, refs)
-			os.Exit(1)
+			var missing []string
+			for _, name := range refs {
+				if v, ok := wf.Vars[name]; !ok || v == "" {
+					missing = append(missing, name)
+				}
+			}
+			if len(missing) > 0 {
+				printExtractedParamsHelp(wfPath, missing)
+				os.Exit(1)
+			}
 		}
 	}
 
