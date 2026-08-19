@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **国内合规通知渠道（飞书/钉钉/企业微信）**：`notify` 节点新增 `feishu` / `dingtalk` / `wecom` 三个 channel——对应三平台**官方群机器人 webhook**（个人微信与 QQ 无官方机器人推送接口，微信生态以企业微信群机器人为唯一合规路径），共享一个群机器人传输层：HTTPS+SSRF URL 校验、100KB 请求体上限、1MB 响应读取上限，且解析响应体中的错误码（三平台 token 无效时仍返回 HTTP 200，`errcode`/`code`/`StatusCode` 非零、响应非 JSON、HTTP ≥400 均判为失败，杜绝静默假成功）。`aflare create` 识别描述中的"飞书/钉钉/微信/企业微信"（含 feishu/lark/dingtalk/wecom 英文词）生成对应渠道步骤与 `<channel>_webhook_url` 变量；中文 README 股价监控示例与三层模型图同步由 Telegram 改为飞书，并在金融合规章节新增通知渠道表（QQ/个人微信无官方接口的诚实说明）
 - **Agent Plugins 1.0.0 宿主支持（双向生态互通）**：新增 `internal/agentplugins` 包与 `aflare marketplace install <plugin-dir>`——加载任意符合 Agent Plugins 1.0 开放标准（OpenAI/Google/AWS/Microsoft/Cursor/Vercel 联合支持）的插件目录：`skills/*/SKILL.md` 解析 frontmatter 后物化为可运行的 aflare 技能（SKILL.md 指令嵌入单步 openai 包装 workflow 的 system prompt），`mcp.json` 声明的 stdio server 幂等注册进 `.mcp.json`（不覆盖用户已有配置）。安全规则对齐规范：manifest 双布局（`.plugin/plugin.json` 优先、根 `plugin.json` 回退）、技能目录名与插件名拒绝路径穿越、非 stdio transport 跳过、`cwd` 必须为插件根内 `./` 相对路径、`${PLUGIN_ROOT}` 展开。配合既有 `marketplace export` 实现 export → install 生态往返（已实测：aflare 导出的插件装回 aflare 直接可 `aflare run plugin/<plugin>-<skill>`）
 - **MemHarness 记忆批判-重构模式**（arXiv:2607.28272 思想）：① memory 节点新增 `harness_search` 操作——检索候选记忆时携带完整来源状态（type/level/tags/source/confidence/created_at/score），并生成自包含的批判 prompt（逐条 keep/rewrite/discard + 无适用记忆输出 `<EMPTY>`），LLM 批判作为显式可重试的工作流步骤执行而非隐藏调用，默认跨层级检索；② agent 会话记忆注入加确定性批判：超过 30 天且从未被复用的记忆直接丢弃，幸存记忆带来源状态标注（记录日期/类别）注入并指示模型先判断适用性再使用——"记忆是重构的线索，不是当前任务的事实"
 - **步骤级类型化输出契约（NOOA 思想吸收）**：WorkflowStep 新增 `output_schema`（JSON Schema draft-07 子集，复用 structured_output 校验器）——任意节点的输出在每次尝试后强制校验，违规按步骤失败处理并报出首个违规的 JSON pointer 位置，自然流入既有 retry/backoff/on_error/capture_error 机制；LLM 输出的 ```json 围栏自动容忍
@@ -29,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **记忆 AccessCount 数据竞争（中危）**：`PersistentMemoryStore.Retrieve` 与 `MemoryCapability.PreProcess` 此前在读锁下自增共享条目的 AccessCount，并发调用构成 data race（`go test -race` 可复现）。现分别改为写锁与读写锁分段（安全自检发现）
 
 ### Fixed
+- **slack 通知步骤生成后必然运行失败（遗留 bug，本轮顺手修复）**：`aflare create` 对含 slack 的描述生成的 notify 步骤只有 `channel: slack` 而没有 `url` 参数——而 slack 渠道运行时强制要求 url，生成的工作流一跑就报 "url parameter is required"。现所有 webhook 型渠道（slack/feishu/dingtalk/wecom/webhook）统一生成 `<channel>_webhook_url` 变量引用
 - **stock-alert 模板字段契约修复（代码审查发现）**：模板初版使用了 Workflow/WorkflowStep 不存在的字段——`input:` 块（默认值被 yaml.Unmarshal 静默丢弃，symbol/threshold 从未有默认值）、步骤级 `id:`/`input:`（同样被丢弃）、`timeout: 30s`（http_request 节点要求整型秒数）、以及 `price: "{{ .input }}"` 参数（向 Go 模板传递字面量字符串 `{{ .input }}`，告警消息渲染为未解析表达式）。现改用 `vars:` 默认值 + `name:` 步骤名 + `timeout: "30"` + 模板内直接 `{{ .input }}`；新增 `embed_templates_test.go` 契约测试锁定字段正确性并离线验证告警渲染链路
 - **带 vars 默认值的模板被参数提示阻断（断点E）**：`aflare run` 对无 input_schema 但引用 `{{var.*}}` 的工作流会强制弹出参数提示退出——即使变量已在工作流自身 `vars:` 中声明默认值。现已在提示前过滤掉有默认值的变量，带默认值的模板（如 finance/stock-alert）开箱即跑，`--set` 仍可覆盖
 - **无标的的价格查询静默生成比特币监控（安全自检发现）**：price 关键词命中但既无股票代码也无加密货币提示时（如 "check gold price" / "监控黄金价格"），生成器此前无条件落入 CoinGecko 分支生成比特币监控工作流——错误的市场、错误的标的。现 CoinGecko 路由仅在实际提及加密资产时触发，其余无标的价格查询不生成任何取价步骤（新增回归测试）

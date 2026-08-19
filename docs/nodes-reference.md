@@ -5,7 +5,7 @@
 | Node | Description | Params |
 |------|-------------|--------|
 | [`agent`](#agent) | Autonomous agent node with ReAct reasoning loop and tool use capabilities | 9 |
-| [`anthropic`](#anthropic) | Call Anthropic LLM API | 15 |
+| [`anthropic`](#anthropic) | Call Anthropic Claude via an OpenAI-compatible proxy (LiteLLM/one-api). Native api.anthropic.com is NOT OpenAI-compat... | 15 |
 | [`ascend`](#ascend) | Call Ascend LLM API | 15 |
 | [`baichuan`](#baichuan) | Call Baichuan LLM API | 15 |
 | [`call`](#call) | Call another workflow file | 2 |
@@ -48,7 +48,7 @@
 | [`minimax`](#minimax) | Call MiniMax LLM API | 15 |
 | [`mistral`](#mistral) | Call Mistral LLM API | 15 |
 | [`multimodal`](#multimodal) | Multimodal node for image analysis, OCR, and audio transcription using vision-capable LLMs | 10 |
-| [`notify`](#notify) | Send notifications (stdout, stderr, slack, discord, telegram, webhook) | 10 |
+| [`notify`](#notify) | Send notifications (stdout, stderr, slack, discord, telegram, feishu, dingtalk, wecom, webhook) | 10 |
 | [`office`](#office) | Read .docx/.xlsx/.pptx documents (text, tables, slides) using pure-Go OOXML parsing | 5 |
 | [`ollama`](#ollama) | Call Ollama local LLM server | 3 |
 | [`openai`](#openai) | Call OpenAI LLM API | 15 |
@@ -98,7 +98,7 @@ Autonomous agent node with ReAct reasoning loop and tool use capabilities
 
 ## anthropic
 
-Call Anthropic LLM API
+Call Anthropic Claude via an OpenAI-compatible proxy (LiteLLM/one-api). Native api.anthropic.com is NOT OpenAI-compatible and will 404; configure `endpoint` to point at a proxy that translates the protocol.
 
 - **Input**: string - user message content
 - **Output**: string - AI response content
@@ -983,7 +983,7 @@ AI Agent memory infrastructure with session-isolated persistent knowledge graph 
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `operation` | string | No | store | Operation: store/retrieve/delete/search/summary/forget/transfer/merge/inkling_retrieve/list_sessions/session_stats/global_stats/link_kg/expand_kg/compress (default: store) |
+| `operation` | string | No | store | Operation: store/retrieve/delete/search/harness_search/summary/forget/transfer/merge/inkling_retrieve/list_sessions/session_stats/global_stats/link_kg/expand_kg/compress (default: store) |
 | `session_id` | string | No | default | Session ID for isolated memory (default: default) |
 | `key` | string | No |  | Memory key for storage/retrieval/link_kg |
 | `value` | string | No |  | Memory value/content |
@@ -992,7 +992,7 @@ AI Agent memory infrastructure with session-isolated persistent knowledge graph 
 | `tags` | string | No |  | Comma-separated tags for categorization |
 | `ttl_hours` | int | No | 72 | Time to live in hours (default: 72) |
 | `confidence` | float | No | 0.8 | Confidence level 0.0-1.0 (default: 0.8) |
-| `query` | string | No |  | Search query for retrieval/search/expand_kg operations |
+| `query` | string | No |  | Search query for retrieval/search/harness_search/expand_kg operations |
 | `top_k` | int | No | 10 | Number of results to return (1-100, default: 10) |
 | `threshold` | float | No | 0.5 | Similarity threshold 0.0-1.0 (default: 0.5) |
 | `source` | string | No |  | Source identifier for the memory |
@@ -1115,7 +1115,7 @@ Multimodal node for image analysis, OCR, and audio transcription using vision-ca
 
 ## notify
 
-Send notifications (stdout, stderr, slack, discord, telegram, webhook)
+Send notifications (stdout, stderr, slack, discord, telegram, feishu, dingtalk, wecom, webhook)
 
 - **Input**: string - message to notify (used if message param is empty)
 - **Output**: string - the notification message
@@ -1124,9 +1124,9 @@ Send notifications (stdout, stderr, slack, discord, telegram, webhook)
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `channel` | string | No | stdout | Notification channel: stdout, stderr, slack, discord, telegram, webhook (default: stdout) |
+| `channel` | string | No | stdout | Notification channel: stdout, stderr, slack, discord, telegram, feishu, dingtalk, wecom, webhook (default: stdout) |
 | `message` | string | No |  | Notification message (overrides input) |
-| `url` | string | No |  | Webhook URL for slack/discord/webhook, or Telegram API base (required for external channels) |
+| `url` | string | No |  | Webhook URL for slack/discord/webhook/feishu/dingtalk/wecom, or Telegram API base (required for external channels) |
 | `webhook_url` | string | No |  | Deprecated: use url instead |
 | `token` | string | No |  | Bot token (required when channel=telegram) |
 | `chat_id` | string | No |  | Telegram chat ID (required when channel=telegram) |

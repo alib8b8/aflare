@@ -74,8 +74,9 @@ aflare run examples/content-processor.yaml
 aflare init
 
 # 4. 关键词生成工作流（无需 LLM，纯模板匹配；加 --ai 用 LLM 生成更复杂的）
-aflare create "每 10 分钟检查贵州茅台 600519 股价，超过 1400 发 Telegram 通知"
+aflare create "每 10 分钟检查贵州茅台 600519 股价，超过 1400 发飞书通知"
 # 输出: 工作流已生成 → 股价监控工作流（腾讯行情接口取价，A 股 6 位代码自动识别沪/深交易所）
+# 通知渠道支持：飞书 / 钉钉 / 企业微信群机器人（官方 webhook，见「金融场景与合规说明」）
 aflare run stock-monitor.yaml
 
 # 5. 交互式 AI Agent 对话（ReAct Agent + 300+ 技能）
@@ -124,7 +125,7 @@ L0: Agent        —  "帮我监控贵州茅台 600519，跌 5% 通知我"
                     ├── 300+ 技能模板（16 个领域）
                     └── 7 类可插拔能力（反思/HITL/效用驱动等）
                        ↓
-L1: Workflow     —  YAML 确定性工作流（schedule → get_price → condition → telegram）
+L1: Workflow     —  YAML 确定性工作流（schedule → get_price → condition → feishu）
                        ↓
 L2: Runtime      —  确定性执行层
                     ├── DAG 并行调度
@@ -351,6 +352,20 @@ aflare 提供的是**数据处理与自动化执行能力**，金融场景（股
 - 内置股价模板使用**腾讯行情公开接口**（`web.ifzq.gtimg.cn`）获取 A 股行情，数据可能有延迟，仅供个人学习与研究参考，不保证实时性与准确性。
 - 东方财富「妙想」金融大模型**不开源**（自研闭源模型，备案号 Shanghai-Miaoxiang-20231207），但其官方开放了妙想 API 平台（含免费额度，覆盖 A 股 / 港股 / 美股 / 基金 / 债券等品种，需申请 `EM_API_KEY`）。如需接入，可通过 `http_request` 节点直接调用，并请自行遵守其服务条款与配额限制。
 - 任何第三方数据源（腾讯、东方财富、Tushare 等）的合规使用责任由使用者承担，商用前请确认数据授权。
+
+### 通知渠道
+
+行情提醒等通知通过 `notify` 节点发送，国内合规渠道均为各平台**官方群机器人 webhook**：
+
+| 渠道 | channel | 说明 |
+|------|---------|------|
+| 飞书 | `feishu` | 群设置 → 群机器人 → 自定义机器人，复制 webhook 地址 |
+| 钉钉 | `dingtalk` | 群设置 → 智能群助手 → 自定义机器人，复制 webhook 地址 |
+| 企业微信 | `wecom` | 群右键 → 添加群机器人，复制 webhook 地址 |
+| 终端 / 自定义 | `stdout` / `webhook` | 本地输出或任意 HTTPS webhook |
+
+- 个人微信与 QQ **没有官方机器人推送接口**，为实现合规推送，微信生态请使用企业微信群机器人（`wecom`）。
+- 生成工作流时在描述中写明渠道即可，如 `aflare create "每 10 分钟检查贵州茅台 600519 股价，超过 1400 发飞书通知"`，运行前用 `--set feishu_webhook_url=<你的 webhook 地址>` 传入。
 
 ### 定位边界
 

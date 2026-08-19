@@ -680,6 +680,54 @@ func TestGenerateWorkflow_PriceKeywordETH(t *testing.T) {
 	}
 }
 
+func TestGenerateWorkflow_NotifyCNChannels(t *testing.T) {
+	// CN group-bot channels are detected from Chinese (or English) channel
+	// words in the description and carry a webhook URL var named after the
+	// channel, so the generated step is runnable after --set <channel>_webhook_url.
+	cases := []struct {
+		desc          string
+		wantChannel   string
+		wantURLVar    string
+	}{
+		{"每 10 分钟检查贵州茅台 600519 股价，超过 1400 发飞书通知", "feishu", "{{var.feishu_webhook_url}}"},
+		{"监控 600519 股价，超过 1400 发钉钉通知", "dingtalk", "{{var.dingtalk_webhook_url}}"},
+		{"监控 600519 股价，超过 1400 发企业微信通知", "wecom", "{{var.wecom_webhook_url}}"},
+		{"监控 600519 股价，超过 1400 发微信通知", "wecom", "{{var.wecom_webhook_url}}"},
+		{"notify me via feishu", "feishu", "{{var.feishu_webhook_url}}"},
+		{"notify via dingtalk", "dingtalk", "{{var.dingtalk_webhook_url}}"},
+		{"notify via wecom", "wecom", "{{var.wecom_webhook_url}}"},
+		{"notify via slack", "slack", "{{var.slack_webhook_url}}"},
+	}
+	for _, tc := range cases {
+		wf, err := GenerateWorkflow(tc.desc)
+		if err != nil {
+			t.Fatalf("GenerateWorkflow(%q): %v", tc.desc, err)
+		}
+		var notify *WorkflowStep
+		for i := range wf.Steps {
+			if wf.Steps[i].Node == "notify" {
+				notify = &wf.Steps[i]
+			}
+			if wf.Steps[i].If != nil {
+				for j := range wf.Steps[i].If.Then {
+					if wf.Steps[i].If.Then[j].Node == "notify" {
+						notify = &wf.Steps[i].If.Then[j]
+					}
+				}
+			}
+		}
+		if notify == nil {
+			t.Fatalf("GenerateWorkflow(%q): no notify step found", tc.desc)
+		}
+		if got := notify.Params["channel"]; got != tc.wantChannel {
+			t.Errorf("GenerateWorkflow(%q): channel = %q, want %q", tc.desc, got, tc.wantChannel)
+		}
+		if got := notify.Params["url"]; got != tc.wantURLVar {
+			t.Errorf("GenerateWorkflow(%q): url = %q, want %q", tc.desc, got, tc.wantURLVar)
+		}
+	}
+}
+
 func TestGenerateWorkflow_ConditionWrapsNotify(t *testing.T) {
 	wf, err := GenerateWorkflow("超过 70000 发 telegram 通知")
 	if err != nil {

@@ -259,18 +259,31 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	// notify.
 	var notifyStep *WorkflowStep
 	if containsActionKeyword(desc, "notify") {
+		// Channel detection. CN group-bot webhooks (飞书/钉钉/企业微信) are
+		// the compliant push path for CN users; desc is already lowercased,
+		// so only lowercase English keywords appear here.
 		channel := "webhook"
-		if strings.Contains(desc, "telegram") {
+		switch {
+		case strings.Contains(desc, "telegram"):
 			channel = "telegram"
-		} else if strings.Contains(desc, "slack") {
+		case strings.Contains(desc, "slack"):
 			channel = "slack"
+		case strings.Contains(desc, "飞书") || strings.Contains(desc, "feishu") || strings.Contains(desc, "lark"):
+			channel = "feishu"
+		case strings.Contains(desc, "钉钉") || strings.Contains(desc, "dingtalk"):
+			channel = "dingtalk"
+		case strings.Contains(desc, "企业微信") || strings.Contains(desc, "微信") || strings.Contains(desc, "wecom"):
+			channel = "wecom"
 		}
 		params := map[string]string{"channel": channel}
 		if channel == "telegram" {
 			params["token"] = "{{var.telegram_token}}"
 			params["chat_id"] = "{{var.telegram_chat_id}}"
-		} else if channel == "webhook" {
-			params["url"] = "{{var.webhook_url}}"
+		} else {
+			// All webhook-style channels take the group-bot webhook URL.
+			// slack previously emitted no url at all (a real bug: the node
+			// requires it), so every non-telegram channel now carries one.
+			params["url"] = "{{var." + channel + "_webhook_url}}"
 		}
 		notifyStep = &WorkflowStep{Node: "notify", Params: params}
 	}

@@ -64,19 +64,19 @@ func (n *NotifyNode) Name() string {
 }
 
 func (n *NotifyNode) Description() string {
-	return "Send notifications (stdout, stderr, slack, discord, telegram, webhook)"
+	return "Send notifications (stdout, stderr, slack, discord, telegram, feishu, dingtalk, wecom, webhook)"
 }
 
 func (n *NotifyNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "notify",
-		Description: "Send notifications (stdout, stderr, slack, discord, telegram, webhook)",
+		Description: "Send notifications (stdout, stderr, slack, discord, telegram, feishu, dingtalk, wecom, webhook)",
 		Input:       "string - message to notify (used if message param is empty)",
 		Output:      "string - the notification message",
 		Params: []ParamSchema{
-			{Name: "channel", Type: "string", Description: "Notification channel: stdout, stderr, slack, discord, telegram, webhook (default: stdout)", Required: false, Default: "stdout"},
+			{Name: "channel", Type: "string", Description: "Notification channel: stdout, stderr, slack, discord, telegram, feishu, dingtalk, wecom, webhook (default: stdout)", Required: false, Default: "stdout"},
 			{Name: "message", Type: "string", Description: "Notification message (overrides input)", Required: false},
-			{Name: "url", Type: "string", Description: "Webhook URL for slack/discord/webhook, or Telegram API base (required for external channels)", Required: false},
+			{Name: "url", Type: "string", Description: "Webhook URL for slack/discord/webhook/feishu/dingtalk/wecom, or Telegram API base (required for external channels)", Required: false},
 			{Name: "webhook_url", Type: "string", Description: "Deprecated: use url instead", Required: false},
 			{Name: "token", Type: "string", Description: "Bot token (required when channel=telegram)", Required: false},
 			{Name: "chat_id", Type: "string", Description: "Telegram chat ID (required when channel=telegram)", Required: false},
@@ -112,10 +112,16 @@ func (n *NotifyNode) Execute(ctx context.Context, input string, params map[strin
 		return n.sendDiscord(ctx, message, params)
 	case "telegram":
 		return n.sendTelegram(ctx, message, params)
+	case "feishu":
+		return n.sendFeishu(ctx, message, params)
+	case "dingtalk":
+		return n.sendDingtalk(ctx, message, params)
+	case "wecom":
+		return n.sendWecom(ctx, message, params)
 	case "webhook":
 		return n.sendWebhook(ctx, message, params)
 	default:
-		return "", fmt.Errorf("invalid notification channel: %s (supported: stdout, stderr, slack, discord, telegram, webhook)", channel)
+		return "", fmt.Errorf("invalid notification channel: %s (supported: stdout, stderr, slack, discord, telegram, feishu, dingtalk, wecom, webhook)", channel)
 	}
 }
 
@@ -245,6 +251,129 @@ func (n *NotifyNode) sendTelegram(ctx context.Context, message string, params ma
 
 	safeToken := redactAPIKey(token)
 	fmt.Printf("[notify] telegram sent to chat %s via bot %s (status %d)\n", chatID, safeToken, resp.StatusCode)
+	return message, nil
+}
+
+// groupBotResp tolerates the three CN group-bot webhook response shapes:
+// dingtalk/wecom answer {"errcode":0,"errmsg":"ok"} while feishu answers
+// {"code":0,"msg":"success"} (or the legacy {"StatusCode":0,...}). All three
+// return HTTP 200 even for an invalid token, so the error code in the body is
+// the only success signal — an un-parsed body must fail loudly.
+type groupBotResp struct {
+	ErrCode       int    `json:"errcode"`
+	ErrMsg        string `json:"errmsg"`
+	Code          int    `json:"code"`
+	Msg           string `json:"msg"`
+	StatusCode    int    `json:"StatusCode"`
+	StatusMessage string `json:"StatusMessage"`
+}
+
+// postGroupBotWebhook is the shared transport for the CN group-bot channels
+// (feishu/dingtalk/wecom): validate the webhook URL (HTTPS + SSRF checks),
+// marshal the payload under the size cap, POST it, and surface the API error
+// code when the platform rejected the message (e.g. bad token, rate limit).
+func (n *NotifyNode) postGroupBotWebhook(ctx context.Context, channel string, webhookURL string, payload interface{}) error {
+	if err := notifyURLValidator(webhookURL); err != nil {
+		return fmt.Errorf("%s URL validation failed: %w", channel, err)
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal %s payload: %w", channel, err)
+	}
+	if len(payloadBytes) > maxNotifyBodySize {
+		return fmt.Errorf("%s payload exceeds maximum size of %d bytes", channel, maxNotifyBodySize)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(payloadBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create %s request: %w", channel, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := notifyHTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("%s request failed: %w", channel, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1MB max
+	if err != nil {
+		return fmt.Errorf("failed to read %s response: %w", channel, err)
+	}
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("%s returned status %d", channel, resp.StatusCode)
+	}
+
+	var r groupBotResp
+	if err := json.Unmarshal(body, &r); err != nil {
+		return fmt.Errorf("%s returned non-JSON response: %w", channel, err)
+	}
+	switch {
+	case r.ErrCode != 0:
+		return fmt.Errorf("%s API error %d: %s", channel, r.ErrCode, r.ErrMsg)
+	case r.Code != 0:
+		return fmt.Errorf("%s API error %d: %s", channel, r.Code, r.Msg)
+	case r.StatusCode != 0:
+		return fmt.Errorf("%s API error %d: %s", channel, r.StatusCode, r.StatusMessage)
+	}
+	return nil
+}
+
+// sendFeishu posts a text message via a Feishu (Lark) group custom-bot
+// webhook: the user creates the bot in a group and pastes the hook URL
+// (https://open.feishu.cn/open-apis/bot/v2/hook/<token>).
+func (n *NotifyNode) sendFeishu(ctx context.Context, message string, params map[string]string) (string, error) {
+	webhookURL := params["url"]
+	if webhookURL == "" {
+		return "", fmt.Errorf("url parameter is required when channel=feishu")
+	}
+	payload := map[string]interface{}{
+		"msg_type": "text",
+		"content":  map[string]string{"text": message},
+	}
+	if err := n.postGroupBotWebhook(ctx, "feishu", webhookURL, payload); err != nil {
+		return "", err
+	}
+	fmt.Printf("[notify] feishu sent (status ok)\n")
+	return message, nil
+}
+
+// sendDingtalk posts a text message via a DingTalk group custom-bot webhook
+// (https://oapi.dingtalk.com/robot/send?access_token=<token>).
+func (n *NotifyNode) sendDingtalk(ctx context.Context, message string, params map[string]string) (string, error) {
+	webhookURL := params["url"]
+	if webhookURL == "" {
+		return "", fmt.Errorf("url parameter is required when channel=dingtalk")
+	}
+	payload := map[string]interface{}{
+		"msgtype": "text",
+		"text":    map[string]string{"content": message},
+	}
+	if err := n.postGroupBotWebhook(ctx, "dingtalk", webhookURL, payload); err != nil {
+		return "", err
+	}
+	fmt.Printf("[notify] dingtalk sent (status ok)\n")
+	return message, nil
+}
+
+// sendWecom posts a text message via a WeCom (企业微信) group-bot webhook
+// (https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=<token>). Personal
+// WeChat and QQ have no official bot API — WeCom group bots are the only
+// compliant WeChat-ecosystem push path.
+func (n *NotifyNode) sendWecom(ctx context.Context, message string, params map[string]string) (string, error) {
+	webhookURL := params["url"]
+	if webhookURL == "" {
+		return "", fmt.Errorf("url parameter is required when channel=wecom")
+	}
+	payload := map[string]interface{}{
+		"msgtype": "text",
+		"text":    map[string]string{"content": message},
+	}
+	if err := n.postGroupBotWebhook(ctx, "wecom", webhookURL, payload); err != nil {
+		return "", err
+	}
+	fmt.Printf("[notify] wecom sent (status ok)\n")
 	return message, nil
 }
 
