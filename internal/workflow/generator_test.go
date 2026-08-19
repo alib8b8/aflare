@@ -685,9 +685,9 @@ func TestGenerateWorkflow_NotifyCNChannels(t *testing.T) {
 	// words in the description and carry a webhook URL var named after the
 	// channel, so the generated step is runnable after --set <channel>_webhook_url.
 	cases := []struct {
-		desc          string
-		wantChannel   string
-		wantURLVar    string
+		desc        string
+		wantChannel string
+		wantURLVar  string
 	}{
 		{"每 10 分钟检查贵州茅台 600519 股价，超过 1400 发飞书通知", "feishu", "{{var.feishu_webhook_url}}"},
 		{"监控 600519 股价，超过 1400 发钉钉通知", "dingtalk", "{{var.dingtalk_webhook_url}}"},

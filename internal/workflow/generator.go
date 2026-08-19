@@ -259,33 +259,7 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 	// notify.
 	var notifyStep *WorkflowStep
 	if containsActionKeyword(desc, "notify") {
-		// Channel detection. CN group-bot webhooks (飞书/钉钉/企业微信) are
-		// the compliant push path for CN users; desc is already lowercased,
-		// so only lowercase English keywords appear here.
-		channel := "webhook"
-		switch {
-		case strings.Contains(desc, "telegram"):
-			channel = "telegram"
-		case strings.Contains(desc, "slack"):
-			channel = "slack"
-		case strings.Contains(desc, "飞书") || strings.Contains(desc, "feishu") || strings.Contains(desc, "lark"):
-			channel = "feishu"
-		case strings.Contains(desc, "钉钉") || strings.Contains(desc, "dingtalk"):
-			channel = "dingtalk"
-		case strings.Contains(desc, "企业微信") || strings.Contains(desc, "微信") || strings.Contains(desc, "wecom"):
-			channel = "wecom"
-		}
-		params := map[string]string{"channel": channel}
-		if channel == "telegram" {
-			params["token"] = "{{var.telegram_token}}"
-			params["chat_id"] = "{{var.telegram_chat_id}}"
-		} else {
-			// All webhook-style channels take the group-bot webhook URL.
-			// slack previously emitted no url at all (a real bug: the node
-			// requires it), so every non-telegram channel now carries one.
-			params["url"] = "{{var." + channel + "_webhook_url}}"
-		}
-		notifyStep = &WorkflowStep{Node: "notify", Params: params}
+		notifyStep = buildNotifyStep(desc)
 	}
 
 	// 遗留修复: condition — "超过 70000" / "低于 70000" wraps the notify step
@@ -346,6 +320,38 @@ func HasMeaningfulSteps(wf *Workflow) bool {
 		return false
 	}
 	return true
+}
+
+// buildNotifyStep constructs the notify step for a (lowercased) description
+// that already matched a notify action keyword. Channel detection prefers
+// the CN group-bot webhooks (飞书/钉钉/企业微信 — the compliant push path
+// for CN users) over the generic webhook default; telegram keeps its
+// token/chat_id pair. Every webhook-style channel carries a
+// <channel>_webhook_url var reference so the generated step is runnable
+// after `--set <channel>_webhook_url=<hook>` (slack previously emitted no
+// url at all — a real bug, the node requires it).
+func buildNotifyStep(desc string) *WorkflowStep {
+	channel := "webhook"
+	switch {
+	case strings.Contains(desc, "telegram"):
+		channel = "telegram"
+	case strings.Contains(desc, "slack"):
+		channel = "slack"
+	case strings.Contains(desc, "飞书") || strings.Contains(desc, "feishu") || strings.Contains(desc, "lark"):
+		channel = "feishu"
+	case strings.Contains(desc, "钉钉") || strings.Contains(desc, "dingtalk"):
+		channel = "dingtalk"
+	case strings.Contains(desc, "企业微信") || strings.Contains(desc, "微信") || strings.Contains(desc, "wecom"):
+		channel = "wecom"
+	}
+	params := map[string]string{"channel": channel}
+	if channel == "telegram" {
+		params["token"] = "{{var.telegram_token}}"
+		params["chat_id"] = "{{var.telegram_chat_id}}"
+	} else {
+		params["url"] = "{{var." + channel + "_webhook_url}}"
+	}
+	return &WorkflowStep{Node: "notify", Params: params}
 }
 
 // extractCondition scans a (lowercased) description for a threshold phrase
