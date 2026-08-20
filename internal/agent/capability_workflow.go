@@ -235,25 +235,47 @@ func (w *WorkflowCapability) parseTemplateMeta(path string) *TemplateMeta {
 		return nil
 	}
 
-	var meta TemplateMeta
-	if err := yaml.Unmarshal(data, &meta); err != nil {
+	// Decode only the top-level metadata fields. Real workflow files carry
+	// steps as a list of maps, so unmarshalling the whole document into
+	// TemplateMeta (whose Steps is []string) would fail with a type error
+	// and reject every template — decode the fields separately instead.
+	var head struct {
+		Name        string `yaml:"name"`
+		Description string `yaml:"description"`
+		Category    string `yaml:"category"`
+	}
+	if err := yaml.Unmarshal(data, &head); err != nil {
 		return nil
 	}
-
-	if meta.Name == "" {
+	if head.Name == "" {
 		return nil
 	}
+	meta := TemplateMeta{
+		Name:        head.Name,
+		Description: head.Description,
+		Category:    head.Category,
+	}
 
-	// Extract step names from the workflow
+	// Extract step labels for informational purposes. Steps are identified
+	// by their "id" when present, falling back to the node name.
 	var workflow struct {
 		Steps []struct {
 			Name string `yaml:"name"`
+			Node string `yaml:"node"`
+			ID   string `yaml:"id"`
 		} `yaml:"steps"`
 	}
 	if err := yaml.Unmarshal(data, &workflow); err == nil {
 		for _, s := range workflow.Steps {
-			if s.Name != "" {
-				meta.Steps = append(meta.Steps, s.Name)
+			label := s.ID
+			if label == "" {
+				label = s.Node
+			}
+			if label == "" {
+				label = s.Name
+			}
+			if label != "" {
+				meta.Steps = append(meta.Steps, label)
 			}
 		}
 	}

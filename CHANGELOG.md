@@ -24,10 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mcp.ServerEntry` 新增可选 `cwd` 字段（Agent Plugins 1.0 传递插件相对 cwd；主流 MCP 客户端同一 schema，向后兼容）
 - **GitCode 镜像加 CI 门禁**：sync-gitcode.yml 由"push 到 main 即镜像"改为 workflow_run（CI 成功后触发）+ 推送前经 Actions API 复核 main HEAD 的 CI 运行确为 success——CI 红色或未完成的构建永远不会到达 GitCode；手动/定时触发同样受门禁约束（不绿即跳过并留 notice）。为查询运行状态新增 `actions: read` 权限
 - **PR Review 的 golangci-lint 改为阻断性**：pr-review.yml 此前 `continue-on-error: true`——lint 失败照样绿灯，PR 门禁形同虚设（与 ci.yml 主干行为及 docs/code-review.md 声明的 Blocking: Yes 相悖）。现移除，lint 失败即红叉
-- **govulncheck 改为阻断性（ci.yml + pr-review.yml）**：此前两处均 `continue-on-error: true`，与 docs/code-review.md 声明的 "Vulnerability scan — Blocking: Yes" 相悖——PR gate job 名义上检查 security-scan 结果，但 job 级 continue-on-error 使其恒为 success，可达漏洞从不阻断。现移除 job 级与步骤级 continue-on-error：govulncheck 为符号级可达性分析，报出的都是依赖链中真实可达的漏洞，必须阻断；gosec 保持告警（误报多，security-auto-fix.yml 独立建 issue 跟踪）
+- **govulncheck 改为阻断性（ci.yml + pr-review.yml + supply-chain.yml）**：此前三处均 `continue-on-error: true`，与 docs/code-review.md 声明的 "Vulnerability scan — Blocking: Yes" 相悖——PR gate job 名义上检查 security-scan 结果，但 job 级 continue-on-error 使其恒为 success，可达漏洞从不阻断。现移除 job 级与步骤级 continue-on-error：govulncheck 为符号级可达性分析，报出的都是依赖链中真实可达的漏洞，必须阻断；gosec 保持告警（误报多，security-auto-fix.yml 独立建 issue 跟踪）
 - **AGENTS.md 修正为真实工具链与提交规则**：原文件写的是 `npm test` / `npm run lint`（本项目为纯 Go 仓库，无 package.json，命令无效）。现写明 Go 1.25 工具链、golangci-lint v2.12.2 版本对齐要求、提交前本地 CI gate 命令集、GitHub/GitCode 提交策略（PR + CI 绿 + code review checklist）
 
 ### Security
+- **CI 工具链升级 go1.25.12 → go1.25.13（修复 7 个可达标准库漏洞）**：govulncheck 改为阻断性后立刻暴露 CI 长期掩盖的真实问题——CI 钉死的 go1.25.12 存在 7 个符号级可达的标准库漏洞（encoding/xml、encoding/asn1、net/http 等，全部在 go1.25.13 修复），此前 `continue-on-error` 使其从未被看见。全部 workflow（ci/pr-review/supply-chain/security-auto-fix/auto-fix/release/benchmark）与 mise.toml 统一升至 1.25.13；本地工具链经 go.mod 的 toolchain 指令本就用 1.25.13，故本地扫描为 0 漏洞
 - **插件技能 frontmatter name 路径穿越（高危）**：SKILL.md frontmatter 的 `name` 字段此前未做与目录名相同的段校验——恶意插件可用合规目录名 + 穿越 frontmatter name 把 skill.json/workflow.yaml/SKILL.md 写到技能根目录外任意可写路径（含持久化 prompt 注入）。现 LoadSkills 拒绝非安全段的 frontmatter name，InstallPlugin 另加最终路径必须在技能根内的纵深防御检查（安全自检发现）
 - **插件 MCP cwd 符号链接绕过（中危）**：cwd 的字符串前缀包含检查可被插件目录内的符号链接绕过（`./data` 链接到插件外）。现对存在路径追加 `EvalSymlinks` 双侧解析复核（安全自检发现）
 - **记忆值注入围栏（中危）**：持久化记忆值此前原文拼回 prompt，构成跨会话 prompt 注入持久化向量。现新增 `memory.FenceValue`（换行/制表折叠 + 反引号中和 + 围栏包裹），PreProcess 与 harness_search 批判 prompt 的注入路径全部收口
@@ -41,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **工作流审计在全新安装上被静默跳过**：工作流执行记录器仍按 0.8.x 逻辑要求 `AFLARE_AUDIT_HMAC_KEY` / `AFLARE_SECRETS_PASSWORD` 环境变量才写审计，而 0.9.0 的审计链已支持自动生成每安装随机密钥文件——两条路径不一致导致 `aflare run` 在未设环境变量的新安装上一条工作流审计都不写，且打印误导性警告。现移除该过时门控，密钥解析完全由 history 包负责（混沌测试实测发现）
 - **MemHarness 批判对损坏时间戳失效**：记忆 Timestamp 为空或不可解析时此前按"新鲜"处理（永不进入丢弃通道）。现按"陈旧"处理——损坏/被篡改的记录不再是批判盲区；`InstallPlugin` 不再忽略 `filepath.Abs` 错误；物化技能文件权限 0644 → 0640
 - **文档与数据口径修正**：skills-registry.json 的 `count` 字段在删除 3 条注册后未同步（仍为 333，实际 330，现修正为 330）；README 中英文及系统提示词/工具描述中的"16 个领域/16 domains"统一修正为实际值 17 个领域（供应链场景包加入后未同步）
+- **WorkflowCapability 模板缓存恒为空（CI 阻断性覆盖率门禁暴露）**：`parseTemplateMeta` 把整个 workflow 文档 unmarshal 进 `TemplateMeta{Steps []string}`，而真实模板的 steps 是 map 列表（`node:`/`id:` 键），类型必然不匹配报错返回 nil——`w.templates` 缓存永远为空，PreProcess 提示词恒报 "0 templates available"，extractTemplateName 的最长匹配分支永不命中（无任何测试覆盖此函数，故从未被发现）。现元数据与 steps 分离解码（steps 标签优先取 id、回退 node/name），并用真实模板格式补齐测试；internal/agent 覆盖率 60.1% → 63.5%（删除 adaptive 能力及其测试后曾贴到 arm64 60% 阈值之下，导致 main CI 红叉）
 
 ### Removed
 - **`internal/protocol` 死代码包**：intent 协议（DID 身份认证、跨域消息路由）共 605 行代码无任何调用方——宣称的跨域身份能力从未接线到 CLI / Agent / Runtime，属于纯宣称功能。整包删除（含测试），对二进制行为零影响
