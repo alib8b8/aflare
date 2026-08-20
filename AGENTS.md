@@ -11,6 +11,7 @@ gofmt -l .            # must output nothing
 go vet ./...
 golangci-lint run --timeout 5m
 go test ./... -race -short
+govulncheck ./...     # blocking in CI — reachable dependency vulns fail the build
 ```
 Coverage must stay ≥ 60% overall and per-package (agent / workflow / memory at
 60%, nodes at 50% — thresholds are enforced in .github/workflows/ci.yml).

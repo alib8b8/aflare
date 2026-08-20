@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `mcp.ServerEntry` 新增可选 `cwd` 字段（Agent Plugins 1.0 传递插件相对 cwd；主流 MCP 客户端同一 schema，向后兼容）
 - **GitCode 镜像加 CI 门禁**：sync-gitcode.yml 由"push 到 main 即镜像"改为 workflow_run（CI 成功后触发）+ 推送前经 Actions API 复核 main HEAD 的 CI 运行确为 success——CI 红色或未完成的构建永远不会到达 GitCode；手动/定时触发同样受门禁约束（不绿即跳过并留 notice）。为查询运行状态新增 `actions: read` 权限
 - **PR Review 的 golangci-lint 改为阻断性**：pr-review.yml 此前 `continue-on-error: true`——lint 失败照样绿灯，PR 门禁形同虚设（与 ci.yml 主干行为及 docs/code-review.md 声明的 Blocking: Yes 相悖）。现移除，lint 失败即红叉
+- **govulncheck 改为阻断性（ci.yml + pr-review.yml）**：此前两处均 `continue-on-error: true`，与 docs/code-review.md 声明的 "Vulnerability scan — Blocking: Yes" 相悖——PR gate job 名义上检查 security-scan 结果，但 job 级 continue-on-error 使其恒为 success，可达漏洞从不阻断。现移除 job 级与步骤级 continue-on-error：govulncheck 为符号级可达性分析，报出的都是依赖链中真实可达的漏洞，必须阻断；gosec 保持告警（误报多，security-auto-fix.yml 独立建 issue 跟踪）
 - **AGENTS.md 修正为真实工具链与提交规则**：原文件写的是 `npm test` / `npm run lint`（本项目为纯 Go 仓库，无 package.json，命令无效）。现写明 Go 1.25 工具链、golangci-lint v2.12.2 版本对齐要求、提交前本地 CI gate 命令集、GitHub/GitCode 提交策略（PR + CI 绿 + code review checklist）
 
 ### Security
