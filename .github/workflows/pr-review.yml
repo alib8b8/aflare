@@ -18,7 +18,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.12'
+          go-version: '1.25.13'
 
       - name: Run go mod tidy
         run: go mod tidy
@@ -60,7 +60,6 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -68,8 +67,10 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.12'
+          go-version: '1.25.13'
 
+      # gosec stays advisory (false-positive prone); the dedicated
+      # security-auto-fix.yml workflow tracks its findings via issues.
       - name: Run gosec security scan
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
@@ -79,9 +80,11 @@ jobs:
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
+      # Blocking: govulncheck reports only symbol-level reachable
+      # vulnerabilities — must red-cross the PR (and thus the gate job),
+      # matching docs/code-review.md "Blocking: Yes".
       - name: Run govulncheck
         run: govulncheck ./...
-        continue-on-error: true
 
   multi-platform-build:
     name: Multi-Platform Build
@@ -113,7 +116,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.12'
+          go-version: '1.25.13'
 
       - name: Build binary
         env:

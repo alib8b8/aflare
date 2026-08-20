@@ -1,7 +1,8 @@
 # AGENTS.md
 
 ## Toolchain
-- Go 1.25 (go.mod pins `go 1.25.x`; CI uses go-version 1.25.12). Never downgrade to 1.24.
+- Go 1.25 (go.mod pins `go 1.25.x`; CI uses go-version 1.25.13). Never downgrade to 1.24
+  or 1.25.12 — 1.25.12 has 7 reachable standard-library vulnerabilities (govulncheck).
 - golangci-lint v2.12.2 — must match CI. Binaries built with go1.24 (e.g. v2.1.6) cannot lint this repo.
 
 ## CI gate — must pass locally before any commit
@@ -11,6 +12,7 @@ gofmt -l .            # must output nothing
 go vet ./...
 golangci-lint run --timeout 5m
 go test ./... -race -short
+govulncheck ./...     # blocking in CI — reachable dependency vulns fail the build
 ```
 Coverage must stay ≥ 60% overall and per-package (agent / workflow / memory at
 60%, nodes at 50% — thresholds are enforced in .github/workflows/ci.yml).
