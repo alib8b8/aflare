@@ -466,24 +466,6 @@ func TestJaccardSimilarity(t *testing.T) {
 	}
 }
 
-func TestNormalizeIssue(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"output is too short or empty", "output is too short or empty"},
-		{"response lacks concrete actions or tool calls", "response lacks concrete actions or tool"},
-		{"agent is refusing or unable to help", "agent is refusing or unable to"},
-	}
-
-	for _, tt := range tests {
-		result := normalizeIssue(tt.input)
-		if result != tt.expected {
-			t.Errorf("normalizeIssue(%q) = %q, want %q", tt.input, result, tt.expected)
-		}
-	}
-}
-
 // ── Capability Registry Tests ─────────────────────────────────────────────
 
 func TestCapabilityRegistry_RegisterAndGet(t *testing.T) {
@@ -536,7 +518,7 @@ func TestParseCapabilities(t *testing.T) {
 		input    string
 		expected int
 	}{
-		{"all", 7},
+		{"all", 6},
 		{"", 0},
 		{"memory,planning", 2},
 		{"memory,invalid,planning", 2},
@@ -553,7 +535,7 @@ func TestParseCapabilities(t *testing.T) {
 func TestCreateCapability(t *testing.T) {
 	tests := []string{
 		"reflection", "human-in-loop", "utility",
-		"adaptive", "memory", "planning", "workflow",
+		"memory", "planning", "workflow",
 	}
 
 	for _, name := range tests {

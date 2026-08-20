@@ -111,7 +111,7 @@ ReAct Agent 思考              关键词匹配生成
 工具执行 → 反思 → 优化           DAG 调度执行
 ```
 
-**Agent 模式**：通过 `aflare chat` 或 `aflare agent` 启动。内置 ReAct 推理循环，拥有 300+ 预置技能模板（16 个领域），支持 7 类可插拔能力（反思、人机协同、效用驱动、自适应等）。
+**Agent 模式**：通过 `aflare chat` 或 `aflare agent` 启动。内置 ReAct 推理循环，拥有 300+ 预置技能模板（17 个领域），支持 6 类可插拔能力（反思、人机协同、效用驱动、记忆等）。
 
 **工作流模式**：`aflare create` 通过关键词匹配将描述转为 YAML 工作流。YAML 确定了每一步做什么、依赖谁、失败怎么办。Runtime 负责 DAG 调度、WAL 崩溃恢复、Saga 事务补偿、熔断、审计——所有操作可追溯、可回放、可验证。
 
@@ -122,8 +122,8 @@ ReAct Agent 思考              关键词匹配生成
 ```
 L0: Agent        —  "帮我监控贵州茅台 600519，跌 5% 通知我"
                     ├── ReAct 推理循环（思考 → 调工具 → 观察 → 回答）
-                    ├── 300+ 技能模板（16 个领域）
-                    └── 7 类可插拔能力（反思/HITL/效用驱动等）
+                    ├── 300+ 技能模板（17 个领域）
+                    └── 6 类可插拔能力（反思/HITL/效用驱动等）
                        ↓
 L1: Workflow     —  YAML 确定性工作流（schedule → get_price → condition → feishu）
                        ↓
@@ -144,7 +144,7 @@ L2: Runtime      —  确定性执行层
 
 aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用户与个人。核心优势：
 
-**本地优先，数据不出本地** — 单二进制零运行时依赖，~5MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退、332 模板内嵌进二进制首跑自动释放）。
+**本地优先，数据不出本地** — 单二进制零运行时依赖，~5MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退、330 模板内嵌进二进制首跑自动释放）。
 
 **连接你自己的 LLM** — Ollama / vLLM / LM Studio / DeepSeek 本地部署 / 任何 OpenAI 兼容 endpoint，loopback 地址（127.0.0.1 / localhost）免 API Key 接入。有本地 LLM 时由 LLM 做意图理解与动态生成工作流（`--ai` / `chat`），无 LLM 时关键词匹配兜底，离线仍可用。
 
@@ -152,13 +152,13 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 
 **确定性执行保障** — YAML 声明式工作流：每一步做什么、依赖谁、失败怎么办全部确定。DAG 并行调度（TLA+ 形式化验证）、WAL 崩溃恢复 + Checkpoint（`--resume` 从中断处恢复）、Session 跨轮次持久化、Saga 事务补偿、幂等（Idempotency-Key + 跨进程锁）、重试 / 限流 / 熔断。所有操作可追溯、可回放、可验证。
 
-**Agent 与工作流双模式** — 对话式 Agent（`aflare chat`，ReAct 推理循环）与守护进程式 Agent（`aflare agent`，stdin + 定时任务 + 文件监听多源融合）共用同一核心；7 类可插拔能力（反思 / 人机协同 / 效用驱动 / 自适应 / 记忆 / 规划 / 工作流）；Agent 可降级为确定性工作流，灵活性与确定性兼得。300+ 预置技能模板覆盖 16 个领域。
+**Agent 与工作流双模式** — 对话式 Agent（`aflare chat`，ReAct 推理循环）与守护进程式 Agent（`aflare agent`，stdin + 定时任务 + 文件监听多源融合）共用同一核心；6 类可插拔能力（反思 / 人机协同 / 效用驱动 / 记忆 / 规划 / 工作流）；Agent 可降级为确定性工作流，灵活性与确定性兼得。300+ 预置技能模板覆盖 17 个领域。
 
 **安全合规** — HMAC 哈希链审计日志（防篡改）、AES-GCM 加密 + PBKDF2（600K 迭代）、Secret 自动脱敏（10+ 种模式：AWS/GitHub/JWT/私钥）、SSRF 防护 / Path Traversal / Command Injection 白名单、出站数据量异常监控 + 熔断器自动隔离、四级安全等级（L0-L3）按需收紧。
 
 **一键上手，离线丝滑** — `aflare doctor` 环境自检、`aflare init` 交互式配置向导、`aflare template run <id>` 一键运行模板（无需 clone 或记路径）、未知命令智能提示（did-you-mean）、零配置示例立即可跑。
 
-**可扩展生态** — 自定义节点（Go）、MCP Server / Client（`aflare mcp install` 一键安装内置社区 server）、**Agent Plugins 1.0.0 双向互通**（`aflare marketplace install <dir>` 安装任意符合开放标准的插件，`aflare marketplace export` 把 aflare 技能导出给 VS Code / Cursor / Copilot 等客户端）、插件系统（社区 `.so`）、社区模板贡献（`aflare template submit`）、场景包一键安装（`aflare install-pack`）。已有 332 Skill 覆盖 17 个领域，目标 1000+。
+**可扩展生态** — 自定义节点（Go）、MCP Server / Client（`aflare mcp install` 一键安装内置社区 server）、**Agent Plugins 1.0.0 双向互通**（`aflare marketplace install <dir>` 安装任意符合开放标准的插件，`aflare marketplace export` 把 aflare 技能导出给 VS Code / Cursor / Copilot 等客户端）、插件系统（社区 `.so`）、社区模板贡献（`aflare template submit`）、场景包一键安装（`aflare install-pack`）。已有 330 Skill 覆盖 17 个领域，目标 1000+。
 
 **工程质量** — 表达式引擎（字节码 IR + 向量化批量求值）、Prometheus 指标端点、CI 双架构验证（x86-64 + ARM64）、国产芯片本地推理接入（昇腾 / 寒武纪 / 海光，经 OpenAI 兼容接口）。
 
@@ -172,8 +172,8 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 |------|------|----------|
 | **ReAct Agent 对话** (`aflare chat`) | ✅ | 有测试 |
 | **守护进程式 Agent** (`aflare agent`) | ✅ | 有测试 |
-| **300+ 技能模板**（16 个领域） | ✅ | 有测试 |
-| **7 类可插拔能力**（反思/HITL/效用驱动等） | ✅ | 有测试 |
+| **300+ 技能模板**（17 个领域） | ✅ | 有测试 |
+| **6 类可插拔能力**（反思/HITL/效用驱动等） | ✅ | 有测试 |
 | **多源输入融合**（stdin + 定时任务 + 文件监听） | ✅ | 有测试 |
 | DAG 并行调度 | ✅ | 有测试 + TLA+ 形式化验证 |
 | WAL 崩溃恢复 + Session 持久化 | ✅ | 有测试 |
@@ -197,16 +197,15 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 ### Agent 能力（对话式 + 守护进程式）
 
 - **ReAct 推理循环** — 思考 → 调用工具 → 观察结果 → 回答，支持 native function calling 和 JSON fallback
-- **300+ 预置技能模板** — 覆盖 16 个领域（金融、医疗、供应链、DevOps 等），Agent 自动匹配并执行
+- **300+ 预置技能模板** — 覆盖 17 个领域（金融、医疗、供应链、DevOps 等），Agent 自动匹配并执行
 - **统一事件循环** — 对话式（`aflare chat`）和守护进程式（`aflare agent`）共用同一 `AgentLoop` 核心，支持 stdin / 定时任务 / 文件监听多源输入融合
-- **7 类可插拔能力** — 按需启用，映射完整 Agent 类型分类学：
+- **6 类可插拔能力** — 按需启用，映射完整 Agent 类型分类学：
 
 | 能力 | 类型 | 说明 |
 |------|------|------|
 | `reflection` | 反思/自我批评 | 每轮执行后自动评估输出质量，触发自我修正 |
 | `human-in-loop` | 人机协同 | 关键操作暂停，请求人类确认后继续 |
 | `utility` | 效用驱动 | 6 维度评分（正确性/完整性/效率/安全/清晰/可操作），优化决策 |
-| `adaptive` | 学习型/自适应 | 从反馈中学习，跨轮次改进表现 |
 | `memory` | 有状态 | 跨会话长期记忆 + MemHarness 批判注入：记忆带来源状态标注（记录日期/类别）注入，超 30 天未复用自动丢弃，模型先判断适用性再使用 |
 | `planning` | 规划式 | 行动前生成计划，逐步执行 |
 | `workflow` | 工作流/管道式 | 优先使用已有模板，稳定可预测 |
@@ -278,7 +277,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 │  │                                                    │ │
 │  │  aflare chat / aflare agent                       │ │
 │  │  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │ │
-│  │  │ ReAct    │  │ 300+     │  │ 7 类可插拔      │  │ │
+│  │  │ ReAct    │  │ 300+     │  │ 6 类可插拔      │  │ │
 │  │  │ 推理循环  │  │ 技能模板  │  │ 能力            │  │ │
 │  │  └──────────┘  └──────────┘  └────────────────┘  │ │
 │  │                                                    │ │
@@ -315,7 +314,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 | 版本 | 状态 | 重点 |
 |------|------|------|
 | v0.6 | 已完成 | Agent 记忆基础设施、语音 AI 工具链、WAL 持久化、TLA+ 验证 |
-| v0.7 | 已完成 | 金融场景增强（Saga / 幂等 / 审计链）、ReAct Agent 对话、300+ 技能模板、7 类可插拔能力、Agent 统一事件循环 |
+| v0.7 | 已完成 | 金融场景增强（Saga / 幂等 / 审计链）、ReAct Agent 对话、300+ 技能模板、6 类可插拔能力、Agent 统一事件循环 |
 | v0.8 | 已完成 | 离线/内网首选项体验、隐私安全硬化、本地 LLM 丝滑接入、CLI 体验优化（template run / 智能命令提示）、CI 提速 |
 | **v0.8.1** | **已完成** | 发布审计修复：国内安装 404、`aflare mcp` 子命令、execute 白名单错误定位、govulncheck 漏洞清零 |
 | **v0.9** | **已完成** | 国密算法支持（SM3/SM4，opt-in）、审计链安全硬化（随机 HMAC 密钥、跨进程锁、bundle 防截断伪造）、`aflare mcp install` 一键安装、供应链场景包、loong64 |
@@ -413,7 +412,7 @@ aflare install-pack devops    # 安装 DevOps 全套模板 + 推荐能力配置
 aflare install-pack --list    # 查看所有可用场景包
 ```
 
-已有 332 Skill 覆盖 17 个领域，目标 1000+。你的模板可以补上缺失的一环。
+已有 330 Skill 覆盖 17 个领域，目标 1000+。你的模板可以补上缺失的一环。
 
 [贡献指南 →](CONTRIBUTING.md)
 

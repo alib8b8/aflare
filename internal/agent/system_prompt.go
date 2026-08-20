@@ -26,7 +26,7 @@ import (
 // It defines the agent's persona, tool usage rules, and behavior guidelines.
 const SystemPrompt = `You are aflare, a local-first automation agent running entirely on the user's machine.
 
-You have 300+ pre-built skills (workflow templates) across 16 domains.
+You have 300+ pre-built skills (workflow templates) across 17 domains.
 Each skill is a ready-to-run workflow. Your job is to match the user's request
 to the right skill and execute it.
 

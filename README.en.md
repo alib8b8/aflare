@@ -116,7 +116,7 @@ Tool execution → Reflect →      DAG scheduled execution
   Optimize
 ```
 
-**Agent Mode**: Launch via `aflare chat` or `aflare agent`. Built-in ReAct reasoning loop, 300+ pre-built skill templates (16 domains), 7 pluggable capability types (reflection, human-in-the-loop, utility-driven optimization, adaptive, etc.).
+**Agent Mode**: Launch via `aflare chat` or `aflare agent`. Built-in ReAct reasoning loop, 300+ pre-built skill templates (17 domains), 6 pluggable capability types (reflection, human-in-the-loop, utility-driven optimization, memory, etc.).
 
 **Workflow Mode**: `aflare create` converts descriptions into YAML workflows via keyword matching. The YAML defines exactly what each step does, its dependencies, and failure handling. The Runtime handles DAG scheduling, WAL crash recovery, Saga transaction compensation, circuit breaking, and auditing — every operation is traceable, replayable, and verifiable.
 
@@ -127,8 +127,8 @@ Tool execution → Reflect →      DAG scheduled execution
 ```
 L0: Agent        —  "Monitor BTC / US stocks / HK stocks, notify me on threshold"
                     ├── ReAct reasoning loop (think → call tool → observe → answer)
-                    ├── 300+ skill templates (16 domains)
-                    └── 7 pluggable capabilities (reflection/HITL/utility etc.)
+                    ├── 300+ skill templates (17 domains)
+                    └── 6 pluggable capabilities (reflection/HITL/utility etc.)
                        ↓
 L1: Workflow     —  YAML deterministic workflow (schedule → get_price → condition → telegram)
                        ↓
@@ -149,7 +149,7 @@ L2: Runtime      —  Execution layer
 
 aflare is built for intranet / local-first users — enterprises and individuals who are sensitive about data privacy and security. Core strengths:
 
-**Local-first, data never leaves your machine** — Single binary with zero runtime deps, runs in ~5MB RAM; workflows, execution history, memory and secrets all stay on local disk; API keys are injected via environment variables or the OS keyring, never written in cleartext to `config.yaml`; fully offline-capable (offline install, `aflare doctor --offline`, WebUI Mermaid offline fallback, 332 templates embedded in the binary and auto-released on first run).
+**Local-first, data never leaves your machine** — Single binary with zero runtime deps, runs in ~5MB RAM; workflows, execution history, memory and secrets all stay on local disk; API keys are injected via environment variables or the OS keyring, never written in cleartext to `config.yaml`; fully offline-capable (offline install, `aflare doctor --offline`, WebUI Mermaid offline fallback, 330 templates embedded in the binary and auto-released on first run).
 
 **Connect your own LLM** — Ollama / vLLM / LM Studio / local DeepSeek / any OpenAI-compatible endpoint, with loopback addresses (127.0.0.1 / localhost) requiring no API key. With a local LLM, the LLM drives intent understanding and dynamic workflow generation (`--ai` / `chat`); without one, keyword matching falls back so offline use still works.
 
@@ -157,13 +157,13 @@ aflare is built for intranet / local-first users — enterprises and individuals
 
 **Deterministic execution guarantees** — YAML declarative workflows: every step's action, dependencies and failure handling are fully determined. DAG parallel scheduling (TLA+ formally verified), WAL crash recovery + checkpoint (`--resume` from the interruption point), cross-turn session persistence, Saga transactional compensation, idempotency (Idempotency-Key + cross-process lock), retry / rate limit / circuit breaker. Every operation is traceable, replayable, verifiable.
 
-**Dual Agent + Workflow mode** — Conversational Agent (`aflare chat`, ReAct reasoning loop) and daemon Agent (`aflare agent`, multi-source fusion of stdin + scheduled tasks + file watching) share one core; 7 pluggable capabilities (reflection / human-in-loop / utility-driven / adaptive / memory / planning / workflow); an Agent can degrade into a deterministic workflow, combining flexibility with determinism. 300+ built-in skill templates across 16 domains.
+**Dual Agent + Workflow mode** — Conversational Agent (`aflare chat`, ReAct reasoning loop) and daemon Agent (`aflare agent`, multi-source fusion of stdin + scheduled tasks + file watching) share one core; 6 pluggable capabilities (reflection / human-in-loop / utility-driven / memory / planning / workflow); an Agent can degrade into a deterministic workflow, combining flexibility with determinism. 300+ built-in skill templates across 17 domains.
 
 **Security & compliance** — HMAC hash-chain audit log (tamper-evident), AES-GCM encryption + PBKDF2 (600K iterations), automatic secret redaction (10+ patterns: AWS/GitHub/JWT/private keys), SSRF / path-traversal / command-injection whitelisting, outbound-data anomaly monitoring + automatic circuit-breaker isolation, four security levels (L0-L3) tightened on demand.
 
 **One-command onboarding, smooth offline** — `aflare doctor` environment self-check, `aflare init` interactive setup wizard, `aflare template run <id>` one-command template execution (no clone or path lookup needed), smart unknown-command hints (did-you-mean), zero-config examples ready to run immediately.
 
-**Extensible ecosystem** — Custom nodes (Go), MCP Server / Client (`aflare mcp install` for built-in community servers), **Agent Plugins 1.0.0 bidirectional interop** (`aflare marketplace install <dir>` installs any plugin conforming to the open standard; `aflare marketplace export` exports aflare skills to VS Code / Cursor / Copilot and other clients), plugin system (community `.so`), community template contributions (`aflare template submit`), one-command scenario packs (`aflare install-pack`). 332 skills already cover 17 domains, targeting 1000+.
+**Extensible ecosystem** — Custom nodes (Go), MCP Server / Client (`aflare mcp install` for built-in community servers), **Agent Plugins 1.0.0 bidirectional interop** (`aflare marketplace install <dir>` installs any plugin conforming to the open standard; `aflare marketplace export` exports aflare skills to VS Code / Cursor / Copilot and other clients), plugin system (community `.so`), community template contributions (`aflare template submit`), one-command scenario packs (`aflare install-pack`). 330 skills already cover 17 domains, targeting 1000+.
 
 **Engineering quality** — Expression engine (bytecode IR + vectorized batch evaluation), Prometheus metrics endpoint, CI dual-architecture verification (x86-64 + ARM64), domestic-chip local inference via OpenAI-compatible endpoints (Ascend / Cambricon / Hygon).
 
@@ -177,8 +177,8 @@ aflare is built for intranet / local-first users — enterprises and individuals
 |---------|--------|-------------|
 | **ReAct Agent Chat** (`aflare chat`) | ✅ | Tested |
 | **Daemon-mode Agent** (`aflare agent`) | ✅ | Tested |
-| **300+ Skill Templates** (16 domains) | ✅ | Tested |
-| **7 Pluggable Capabilities** (reflection/HITL/utility etc.) | ✅ | Tested |
+| **300+ Skill Templates** (17 domains) | ✅ | Tested |
+| **6 Pluggable Capabilities** (reflection/HITL/utility etc.) | ✅ | Tested |
 | **Multi-source Input Fusion** (stdin + scheduler + filewatch) | ✅ | Tested |
 | DAG Parallel Scheduling | ✅ | Tested + TLA+ formal verification |
 | WAL Crash Recovery + Session Persistence | ✅ | Tested |
@@ -198,16 +198,15 @@ aflare is built for intranet / local-first users — enterprises and individuals
 ### Agent Capabilities (Conversational + Daemon)
 
 - **ReAct Reasoning Loop** — Think → Call Tool → Observe → Answer, with native function calling and JSON fallback
-- **300+ Pre-built Skill Templates** — Covering 16 domains (Finance, Healthcare, Supply Chain, DevOps, etc.), auto-matched and executed by Agent
+- **300+ Pre-built Skill Templates** — Covering 17 domains (Finance, Healthcare, Supply Chain, DevOps, etc.), auto-matched and executed by Agent
 - **Unified Event Loop** — Conversational (`aflare chat`) and daemon (`aflare agent`) share the same `AgentLoop` core, supporting stdin / scheduler / filewatch multi-source input fusion
-- **7 Pluggable Capabilities** — Enable on demand, mapping the complete Agent type taxonomy:
+- **6 Pluggable Capabilities** — Enable on demand, mapping the complete Agent type taxonomy:
 
 | Capability | Type | Description |
 |------------|------|-------------|
 | `reflection` | Self-Critique | Auto-evaluate output quality after each turn, trigger self-correction |
 | `human-in-loop` | Human-in-the-Loop | Pause at critical decisions, request human confirmation |
 | `utility` | Utility-Driven | 6-dimension scoring (correctness/completeness/efficiency/safety/clarity/actionability), optimize decisions |
-| `adaptive` | Learning/Adaptive | Learn from feedback, improve across turns |
 | `memory` | Stateful | Cross-session long-term memory, remember user preferences |
 | `planning` | Planning | Generate plans before acting, execute step by step |
 | `workflow` | Workflow/Pipeline | Prioritize existing templates, stable and predictable |
@@ -277,7 +276,7 @@ aflare is built for intranet / local-first users — enterprises and individuals
 │  │                                                    │ │
 │  │  aflare chat / aflare agent                       │ │
 │  │  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │ │
-│  │  │ ReAct    │  │ 300+     │  │ 7 Pluggable    │  │ │
+│  │  │ ReAct    │  │ 300+     │  │ 6 Pluggable    │  │ │
 │  │  │ Reasoning│  │ Skills   │  │ Capabilities   │  │ │
 │  │  └──────────┘  └──────────┘  └────────────────┘  │ │
 │  │                                                    │ │
@@ -314,7 +313,7 @@ aflare is built for intranet / local-first users — enterprises and individuals
 | Version | Status | Focus |
 |---------|--------|-------|
 | v0.6 | Done | Agent memory infrastructure, voice AI toolchain, WAL persistence, TLA+ verification |
-| v0.7 | Done | Financial scenario enhancement (Saga / Idempotency / Audit chain), ReAct Agent chat, 300+ skill templates, 7 pluggable capabilities, Agent unified event loop |
+| v0.7 | Done | Financial scenario enhancement (Saga / Idempotency / Audit chain), ReAct Agent chat, 300+ skill templates, 6 pluggable capabilities, Agent unified event loop |
 | **v0.8** | **Done** | Offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding, CLI UX improvements (template run / smart command hints), CI speedup |
 | **v0.9** | **Done** | National cryptography support (SM3/SM4, opt-in), audit-chain security hardening (random HMAC key, cross-process lock, bundle truncation-forgery defense), `aflare mcp install`, supply-chain scenario pack, loong64 |
 | v0.10 | In development | Agent Plugins 1.0.0 interop, MemHarness memory critique-reconstruction, step-level output contracts & bounded preview, watermark deployment tracing, security self-audit fixes; next: domestic chip support refinement, Agent capability deepening |
@@ -387,7 +386,7 @@ We welcome contributions! Beyond code, you can also **submit Skill templates**:
 3. Run `go test ./...` to verify
 4. Submit a PR with a description of what the template does
 
-300+ Skills already cover 16 domains — your template can fill the missing piece.
+300+ Skills already cover 17 domains — your template can fill the missing piece.
 
 [Contributing →](CONTRIBUTING.md)
 

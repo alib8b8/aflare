@@ -24,7 +24,6 @@
 //   4. Decision & Reasoning — utility-driven, planning
 //   5. Internal Architecture — reflection/self-criticism, hybrid
 //   9. Human-Machine Collaboration — human-in-the-loop
-//   6. Learning & Adaptation — adaptive learning from feedback
 
 package agent
 
@@ -180,7 +179,6 @@ var AvailableCapabilities = map[string]string{
 	"reflection":    "Self-reflection and self-correction after each turn (反思/自我批评 Agent)",
 	"human-in-loop": "Pause at critical decisions for human approval (Human-in-the-loop Agent)",
 	"utility":       "Utility-driven optimization of decisions (效用驱动 Agent)",
-	"adaptive":      "Learning and adaptation from feedback (学习型/自适应 Agent)",
 	"memory":        "Cross-session long-term memory and state (有状态 Agent)",
 	"planning":      "Goal-driven planning and action sequencing (规划式 Agent)",
 	"workflow":      "Predefined workflow/pipeline execution (工作流/管道式 Agent)",
@@ -222,8 +220,6 @@ func CreateCapability(name string) AgentCapability {
 		return NewHumanInLoopCapability()
 	case "utility":
 		return NewUtilityCapability()
-	case "adaptive":
-		return NewAdaptiveCapability()
 	case "memory":
 		return NewMemoryCapability()
 	case "planning":

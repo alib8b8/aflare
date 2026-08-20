@@ -24,8 +24,8 @@ package agent
 var CapabilityPresets = map[string]CapabilityPreset{
 	"smart": {
 		Name:         "smart",
-		Description:  "智能模式：反思 + 自适应 + 长期记忆，适合复杂推理任务",
-		Capabilities: []string{"reflection", "adaptive", "memory"},
+		Description:  "智能模式：反思 + 长期记忆，适合复杂推理任务",
+		Capabilities: []string{"reflection", "memory"},
 	},
 	"careful": {
 		Name:         "careful",

@@ -180,7 +180,7 @@ type templateListNode struct{}
 
 func (n *templateListNode) Name() string { return "template_list" }
 func (n *templateListNode) Description() string {
-	return "Search available workflow templates (skills) by keyword or category. Returns 300+ pre-built skills across 16 domains."
+	return "Search available workflow templates (skills) by keyword or category. Returns 300+ pre-built skills across 17 domains."
 }
 
 func (n *templateListNode) Schema() core.NodeSchema {

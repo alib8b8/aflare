@@ -23,13 +23,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 )
 
 // TestLearningConcurrent_Append verifies that concurrent calls to
-// appendReflection and appendAdaptiveFeedback do not race.
+// appendReflection do not race.
 func TestLearningConcurrent_Append(t *testing.T) {
 	// Use a temp learning store to avoid polluting the real one
 	tmpDir := t.TempDir()
@@ -69,7 +68,7 @@ func TestLearningConcurrent_Append(t *testing.T) {
 }
 
 // TestLearningConcurrent_MixedCapabilities verifies concurrent writes
-// from both reflection and adaptive capabilities.
+// of reflection entries from multiple goroutines with varied content.
 func TestLearningConcurrent_MixedCapabilities(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := &learningStore{
@@ -81,26 +80,16 @@ func TestLearningConcurrent_MixedCapabilities(t *testing.T) {
 	var wg sync.WaitGroup
 	numGoroutines := 10
 
-	// Half write reflection, half write adaptive
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			capType := "reflection"
-			if id%2 == 0 {
-				capType = "adaptive"
-			}
-
 			for j := 0; j < 10; j++ {
 				entry := LearningEntry{
 					Timestamp:  "2026-01-01T00:00:00Z",
-					Capability: capType,
+					Capability: "reflection",
 					Input:      fmt.Sprintf("input-%d-%d", id, j),
-				}
-				if capType == "reflection" {
-					entry.Issues = []string{fmt.Sprintf("issue-%d-%d", id, j)}
-				} else {
-					entry.Feedback = fmt.Sprintf("feedback-%d-%d", id, j)
+					Issues:     []string{fmt.Sprintf("issue-%d-%d", id, j)},
 				}
 				store.append(entry)
 			}
@@ -143,8 +132,9 @@ func TestLearningConcurrent_CompactDuringWrites(t *testing.T) {
 			for j := 0; j < 10; j++ {
 				entry := LearningEntry{
 					Timestamp:  "2026-01-01T00:00:00Z",
-					Capability: "adaptive",
-					Feedback:   fmt.Sprintf("post-compact-%d-%d", id, j),
+					Capability: "reflection",
+					Input:      fmt.Sprintf("post-compact-%d-%d", id, j),
+					Issues:     []string{fmt.Sprintf("post-compact-issue-%d-%d", id, j)},
 				}
 				store.append(entry)
 			}
@@ -205,7 +195,7 @@ func TestLearningConcurrent_ReadDuringWrite(t *testing.T) {
 				return
 			default:
 			}
-			_ = store.recognizePatterns()
+			_ = store.readAllEntries()
 		}
 	}()
 
@@ -258,51 +248,6 @@ func TestLearningDedup_Concurrent(t *testing.T) {
 	}
 }
 
-// TestLearningPatterns_Concurrent verifies that pattern recognition
-// doesn't cause races.
-func TestLearningPatterns_Concurrent(t *testing.T) {
-	tmpDir := t.TempDir()
-	store := &learningStore{
-		maxRecentKeys: 50,
-		appendCount:   0,
-		path:          filepath.Join(tmpDir, "learning.json"),
-	}
-
-	// Populate with enough entries for pattern recognition
-	for i := 0; i < 20; i++ {
-		entry := LearningEntry{
-			Timestamp:  "2026-01-01T00:00:00Z",
-			Capability: "reflection",
-			Input:      fmt.Sprintf("pattern input %d", i%3),
-			Issues:     []string{fmt.Sprintf("recurring issue type %d", i%3)},
-		}
-		store.append(entry)
-	}
-
-	// Concurrent pattern recognition
-	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			patterns := store.recognizePatterns()
-			_ = patterns
-		}()
-	}
-
-	wg.Wait()
-
-	// Verify patterns are cached
-	patterns := store.recognizePatterns()
-	if len(patterns) > 0 {
-		for _, p := range patterns {
-			if p.Count < patternMinOccurrences {
-				t.Errorf("pattern %s has count %d, expected >= %d", p.Pattern, p.Count, patternMinOccurrences)
-			}
-		}
-	}
-}
-
 // TestLearningConcurrent_ReadAllEntries verifies readAllEntries is safe
 // under concurrent writes.
 func TestLearningConcurrent_ReadAllEntries(t *testing.T) {
@@ -334,8 +279,9 @@ func TestLearningConcurrent_ReadAllEntries(t *testing.T) {
 			for j := 0; j < 20; j++ {
 				store.append(LearningEntry{
 					Timestamp:  "2026-01-01T00:00:00Z",
-					Capability: "adaptive",
-					Feedback:   fmt.Sprintf("readall-fb-%d-%d", id, j),
+					Capability: "reflection",
+					Input:      fmt.Sprintf("readall-fb-%d-%d", id, j),
+					Issues:     []string{fmt.Sprintf("readall-issue-%d-%d", id, j)},
 				})
 			}
 		}(i)
@@ -377,24 +323,5 @@ func TestLearningStore_DedupWindow(t *testing.T) {
 
 	if len(store.recentKeys) > dedupWindowSize {
 		t.Errorf("recent keys exceeded window: %d > %d", len(store.recentKeys), dedupWindowSize)
-	}
-}
-
-// TestLearningStore_NormalizeIssue verifies issue normalization for patterns.
-func TestLearningStore_NormalizeIssue(t *testing.T) {
-	tests := []struct {
-		input    string
-		contains string
-	}{
-		{"output is too short or empty", "output is too short"},
-		{"response lacks concrete actions", "response lacks concrete actions"},
-		{"agent is refusing to help", "agent is refusing to help"},
-	}
-
-	for _, tt := range tests {
-		result := normalizeIssue(tt.input)
-		if !strings.Contains(strings.ToLower(result), tt.contains) {
-			t.Errorf("normalizeIssue(%q) = %q, expected to contain %q", tt.input, result, tt.contains)
-		}
 	}
 }

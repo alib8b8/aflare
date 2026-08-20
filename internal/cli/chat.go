@@ -32,7 +32,7 @@ import (
 // 断点14: 支持 --smart / --careful 预设场景，替代手动 capability 组合。
 //
 //	aflare chat             # 默认模式（无 capability）
-//	aflare chat --smart     # 智能模式（reflection + adaptive + memory）
+//	aflare chat --smart     # 智能模式（reflection + memory）
 //	aflare chat --careful   # 谨慎模式（human-in-loop + planning + reflection）
 //	aflare chat --custom -c reflection,bdi  # 自定义组合（高级用户）
 func HandleChat(args []string) {
@@ -130,7 +130,7 @@ func PrintChatUsage() {
 	fmt.Println("Usage: aflare chat [options]")
 	fmt.Println()
 	fmt.Println("预设模式（推荐，无需理解每个 capability）：")
-	fmt.Println("  --smart                   智能模式（reflection + adaptive + memory）")
+	fmt.Println("  --smart                   智能模式（reflection + memory）")
 	fmt.Println("  --careful                 谨慎模式（human-in-loop + planning + reflection）")
 	fmt.Println("  --custom -c <list>        自定义组合（高级用户）")
 	fmt.Println()
@@ -149,7 +149,7 @@ func PrintChatUsage() {
 	fmt.Println("  reflection     Self-reflection and self-correction")
 	fmt.Println("  human-in-loop  Pause at critical decisions for human approval")
 	fmt.Println("  utility        Utility-driven optimization of decisions")
-	fmt.Println("  adaptive, memory, planning, workflow")
+	fmt.Println("  memory, planning, workflow")
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  aflare chat                                    # 默认模式（无 capability）")

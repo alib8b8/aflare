@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "count": 333,
+  "count": 330,
   "skills": [
     {
       "id": "business/business-plan",
@@ -6863,25 +6863,6 @@
       "dependencies": null
     },
     {
-      "id": "software-engineering/end-to-end-adapt",
-      "name": "end-to-end-adapt",
-      "version": "1.0.0",
-      "description": "昇腾 Model-Agent 模型适配大赛 · 赛道一主力模板",
-      "author": "aflare community",
-      "category": "software-engineering",
-      "tags": [
-        "software-engineering",
-        "workflow"
-      ],
-      "keywords": [
-        "end-to-end-adapt",
-        "software-engineering"
-      ],
-      "inputs": null,
-      "outputs": null,
-      "dependencies": null
-    },
-    {
       "id": "software-engineering/frontend-architecture",
       "name": "frontend-architecture",
       "version": "1.0.0",
@@ -6932,44 +6913,6 @@
       ],
       "keywords": [
         "microservices-design",
-        "software-engineering"
-      ],
-      "inputs": null,
-      "outputs": null,
-      "dependencies": null
-    },
-    {
-      "id": "software-engineering/performance-tune",
-      "name": "performance-tune",
-      "version": "1.0.0",
-      "description": "昇腾 Model-Agent 模型适配大赛 · 赛道二主力模板",
-      "author": "aflare community",
-      "category": "software-engineering",
-      "tags": [
-        "software-engineering",
-        "workflow"
-      ],
-      "keywords": [
-        "performance-tune",
-        "software-engineering"
-      ],
-      "inputs": null,
-      "outputs": null,
-      "dependencies": null
-    },
-    {
-      "id": "software-engineering/quick-adapt",
-      "name": "quick-adapt",
-      "version": "1.0.0",
-      "description": "quick-adapt workflow template",
-      "author": "aflare community",
-      "category": "software-engineering",
-      "tags": [
-        "software-engineering",
-        "workflow"
-      ],
-      "keywords": [
-        "quick-adapt",
         "software-engineering"
       ],
       "inputs": null,

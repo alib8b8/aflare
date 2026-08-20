@@ -88,7 +88,7 @@ func PrintWebUIUsage() {
 	fmt.Println("  --dir, -d <dir>                - Workflows directory")
 	fmt.Println("  --capabilities, -c <caps>      - Comma-separated capabilities (e.g. reflection,bdi,memory)")
 	fmt.Println("  --help, -h                     - Show this help")
-	fmt.Println("\nAvailable capabilities: reflection, bdi, utility, adaptive, memory, planning, human-in-loop, multi-agent, workflow, simulation")
+	fmt.Println("\nAvailable capabilities: reflection, bdi, utility, memory, planning, human-in-loop, multi-agent, workflow, simulation")
 	fmt.Println("\nExamples:")
 	fmt.Println("  aflare webui")
 	fmt.Println("  aflare webui --port 8080")
