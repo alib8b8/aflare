@@ -289,6 +289,7 @@ func PrintAgentUsage() {
 	fmt.Println("  --tools, -t <list>        Comma-separated tool names, or 'all'")
 	fmt.Println("  --capabilities, -c <list> Comma-separated capability names, or 'all'")
 	fmt.Println("  --max-iterations, -n <n>  Max agent iterations per turn (default: 10)")
+	fmt.Println("  --context-budget <n>      Context budget in tokens (default: per provider, e.g. 8000 for ollama)")
 	fmt.Println("  --safe-mode, -s            Block execute and destructive tools")
 	fmt.Println("  --watch <dir>             Watch directory for file changes, feed to agent")
 	fmt.Println("  --help, -h                 Show this help")
@@ -359,6 +360,13 @@ func parseAgentArgs(args []string, cfg *agent.Config, watchDir *string) {
 			if i+1 < len(args) {
 				if n, err := strconv.Atoi(args[i+1]); err == nil && n > 0 {
 					cfg.MaxIterations = n
+				}
+				i++
+			}
+		case "--context-budget":
+			if i+1 < len(args) {
+				if n, err := strconv.Atoi(args[i+1]); err == nil && n > 0 {
+					cfg.ContextBudget = n
 				}
 				i++
 			}

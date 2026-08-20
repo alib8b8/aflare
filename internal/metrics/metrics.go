@@ -58,6 +58,28 @@ const (
 	NodeCallsGaugeName       = "aflare_node_calls"
 	NodeErrorsGaugeName      = "aflare_node_errors"
 	SecurityBlocksGaugeName  = "aflare_security_blocks"
+
+	// P2-8: WAL durability / volume observability.
+	WALAppendsName        = "aflare_wal_appends_total"        // {record_type: delta|snapshot}
+	WALAppendDurationName = "aflare_wal_append_duration_seconds"
+	WALCompactionsName    = "aflare_wal_compactions_total"
+	WALSyncsName          = "aflare_wal_syncs_total"
+
+	// P2-8: DAG dynamic scheduling observability — time a dispatched step
+	// waits in the reorder buffer before its in-order processing turn.
+	DAGStepReorderWaitName = "aflare_dag_step_reorder_wait_seconds"
+
+	// P2-8: memory hybrid retrieval observability.
+	MemorySearchesName       = "aflare_memory_searches_total" // {mode: keyword|hybrid}
+	MemorySearchDurationName = "aflare_memory_search_duration_seconds"
+	MemorySearchResultsName  = "aflare_memory_search_results"
+
+	// P2-8: LLM request dedup (singleflight) savings.
+	LLMSingleflightSharedName = "aflare_llm_singleflight_shared_total"
+
+	// P2-8: ReAct parallel tool-call batches.
+	AgentToolBatchSizeName     = "aflare_agent_tool_batch_size"
+	AgentToolBatchDurationName = "aflare_agent_tool_batch_duration_seconds"
 )
 
 var (
@@ -131,6 +153,72 @@ var (
 		Help: "Snapshot of security blocks by type from SecurityStats (pull-based).",
 	}, []string{"block_type"})
 
+	// P2-8: WAL durability / volume metrics.
+	walAppends = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: WALAppendsName,
+		Help: "Total WAL records appended, by record type (delta | snapshot).",
+	}, []string{"record_type"})
+
+	walAppendDuration = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    WALAppendDurationName,
+		Help:    "Duration of a WAL append, including fsync when SyncEveryWrite is on, in seconds.",
+		Buckets: prometheus.DefBuckets,
+	})
+
+	walCompactions = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: WALCompactionsName,
+		Help: "Total WAL compactions performed.",
+	})
+
+	walSyncs = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: WALSyncsName,
+		Help: "Total WAL fsync operations (explicit Sync, SyncEveryWrite appends, periodic syncer ticks).",
+	})
+
+	// P2-8: DAG dynamic scheduling metrics.
+	dagStepReorderWait = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    DAGStepReorderWaitName,
+		Help:    "Time a dispatched DAG step waits in the reorder buffer before its in-order processing turn, in seconds.",
+		Buckets: prometheus.DefBuckets,
+	})
+
+	// P2-8: memory hybrid retrieval metrics.
+	memorySearches = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: MemorySearchesName,
+		Help: "Total memory searches, by mode (keyword = scoring only, hybrid = keyword + vector).",
+	}, []string{"mode"})
+
+	memorySearchDuration = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    MemorySearchDurationName,
+		Help:    "Duration of a memory search, in seconds.",
+		Buckets: prometheus.DefBuckets,
+	})
+
+	memorySearchResults = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    MemorySearchResultsName,
+		Help:    "Number of entries returned by a memory search.",
+		Buckets: prometheus.LinearBuckets(0, 1, 11), // 0..10
+	})
+
+	// P2-8: LLM request dedup savings.
+	llmSingleflightShared = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: LLMSingleflightSharedName,
+		Help: "Total LLM requests satisfied by an in-flight identical request (singleflight followers).",
+	})
+
+	// P2-8: ReAct parallel tool-call batches.
+	agentToolBatchSize = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    AgentToolBatchSizeName,
+		Help:    "Number of tool calls in one ReAct tool-call batch (recorded only for batches > 1).",
+		Buckets: prometheus.LinearBuckets(2, 1, 9), // 2..10
+	})
+
+	agentToolBatchDuration = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    AgentToolBatchDurationName,
+		Help:    "Wall-clock duration of one parallel ReAct tool-call batch, in seconds.",
+		Buckets: prometheus.DefBuckets,
+	})
+
 	registerOnce sync.Once
 )
 
@@ -152,6 +240,17 @@ func Register() {
 			nodeCallsGauge,
 			nodeErrorsGauge,
 			securityBlocksGauge,
+			walAppends,
+			walAppendDuration,
+			walCompactions,
+			walSyncs,
+			dagStepReorderWait,
+			memorySearches,
+			memorySearchDuration,
+			memorySearchResults,
+			llmSingleflightShared,
+			agentToolBatchSize,
+			agentToolBatchDuration,
 		)
 	})
 }
@@ -206,6 +305,61 @@ func RecordLLMCall(provider, model string, err error, promptTokens, completionTo
 	if costUSD > 0 {
 		llmCost.WithLabelValues(provider, model).Add(costUSD)
 	}
+}
+
+// --- P2-8: WAL / DAG / memory / dedup / tool-batch metrics ---------------
+
+// RecordWALAppend records one WAL append: the record type (delta/snapshot)
+// and the append duration, which includes the fsync when SyncEveryWrite is
+// enabled.
+func RecordWALAppend(isDelta bool, duration time.Duration) {
+	recordType := "snapshot"
+	if isDelta {
+		recordType = "delta"
+	}
+	walAppends.WithLabelValues(recordType).Inc()
+	walAppendDuration.Observe(duration.Seconds())
+}
+
+// IncWALCompaction increments the WAL compaction counter.
+func IncWALCompaction() {
+	walCompactions.Inc()
+}
+
+// IncWALSync increments the WAL fsync counter.
+func IncWALSync() {
+	walSyncs.Inc()
+}
+
+// RecordDAGStepReorderWait observes how long a dispatched DAG step waited
+// in the reorder buffer before its in-order processing turn. Sustained high
+// values indicate the processing order (not the dependency graph) is the
+// scheduling bottleneck.
+func RecordDAGStepReorderWait(duration time.Duration) {
+	dagStepReorderWait.Observe(duration.Seconds())
+}
+
+// RecordMemorySearch records one memory search: mode (keyword = scoring
+// only, hybrid = keyword + vector), duration and number of returned
+// entries.
+func RecordMemorySearch(mode string, duration time.Duration, results int) {
+	memorySearches.WithLabelValues(mode).Inc()
+	memorySearchDuration.Observe(duration.Seconds())
+	memorySearchResults.Observe(float64(results))
+}
+
+// IncLLMSingleflightShared increments the counter of LLM requests satisfied
+// by an in-flight identical request (singleflight follower).
+func IncLLMSingleflightShared() {
+	llmSingleflightShared.Inc()
+}
+
+// RecordAgentToolBatch records one parallel ReAct tool-call batch (only
+// batches with more than one call): the number of calls and the wall-clock
+// duration of the whole batch.
+func RecordAgentToolBatch(count int, duration time.Duration) {
+	agentToolBatchSize.Observe(float64(count))
+	agentToolBatchDuration.Observe(duration.Seconds())
 }
 
 // --- Snapshot collection -------------------------------------------------

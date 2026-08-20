@@ -40,6 +40,7 @@
 package nodes
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -82,8 +83,11 @@ Return ONLY a JSON object:
 //
 // The critique_prompt bundles the system prompt above with the candidates
 // and the current query, so a workflow can feed it directly to any LLM node.
-func (n *MemoryNode) harnessSearch(session *memory.SessionMemory, query, level string, topK int, threshold float64) (map[string]interface{}, error) {
-	results := session.Search(query, level, topK, threshold)
+func (n *MemoryNode) harnessSearch(ctx context.Context, session *memory.SessionMemory, query, level string, topK int, threshold float64) (map[string]interface{}, error) {
+	// Use the Ctx variants so the workflow's deadline/cancellation
+	// reaches the embedder calls inside both searches (vector retrieval
+	// may issue a network request to compute embeddings).
+	results := session.SearchCtx(ctx, query, level, topK, threshold)
 
 	// Merge the persistent store (MemoryCapability's cross-session data),
 	// same as searchMemory, so the critique stage sees everything the
@@ -93,7 +97,7 @@ func (n *MemoryNode) harnessSearch(session *memory.SessionMemory, query, level s
 	for _, r := range results {
 		seenKeys[r.Key] = true
 	}
-	for _, pe := range persistentStore.Search(query, topK) {
+	for _, pe := range persistentStore.SearchCtx(ctx, query, topK) {
 		if seenKeys[pe.Key] {
 			continue
 		}

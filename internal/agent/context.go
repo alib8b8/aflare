@@ -27,9 +27,11 @@ import (
 )
 
 const (
-	// MaxContextChars is the character budget for the full conversation context.
-	// When exceeded, older messages are compressed into a summary.
-	// With token estimation, this is ~2000 tokens for English, ~4000 for Chinese.
+	// MaxContextChars is the default token budget for the full conversation
+	// context. When exceeded, older messages are compressed into a summary.
+	// It is the fallback for providers without an entry in
+	// providerContextBudgets and the historical default (P1-4 made the
+	// budget provider-aware; behaviour for unknown providers is unchanged).
 	MaxContextChars = 8000
 
 	// KeepRecentN is the number of most recent messages preserved during compression.
@@ -37,7 +39,35 @@ const (
 
 	// MaxSummaryChars caps the compressed summary to prevent unbounded growth.
 	MaxSummaryChars = 2000
+
+	// minContextBudget is the floor applied to explicit budget overrides
+	// (SetBudget). Below this, every turn would trigger compression into a
+	// summary that itself approaches the budget — churn without benefit.
+	minContextBudget = 1000
 )
+
+// providerContextBudgets maps each supported provider to its default
+// conversation-history budget in estimated tokens (P1-4). Values are
+// deliberately conservative fractions (~25%) of the provider's typical
+// context window: the budget covers only the conversation history, while
+// the model's window must also hold the system prompt, tool schemas, the
+// current user message, and the response.
+//
+// Providers not listed here (including custom OpenAI-compatible endpoints
+// routed through generic names) fall back to MaxContextChars, preserving
+// the pre-P1-4 behaviour. An explicit SetBudget call overrides the table.
+var providerContextBudgets = map[string]int{
+	// ollama keeps the legacy budget: local models range from 2K to 128K
+	// and the default must fit the smallest common window (llama3: 8K).
+	"ollama":   MaxContextChars,
+	"openai":   32000, // gpt-4o/gpt-5 class: 128K window
+	"deepseek": 32000, // V3/R1: 128K window
+	"glm":      32000, // glm-4.x: 128K window
+	"kimi":     48000, // moonshot long-context: 200K window
+	"qwen":     32000, // qwen-max/plus: 128K window
+	"mistral":  16000, // 32K (small) to 128K (large): conservative
+	"yi":       16000, // Yi-34B: 32K window
+}
 
 // estimateTokens estimates the number of tokens in text using a provider-aware
 // heuristic. For ollama (English-first), it uses 4 chars ≈ 1 token. For other
@@ -66,14 +96,15 @@ func countCJK(text string) int {
 }
 
 // ContextManager manages multi-turn conversation history with automatic
-// compression when the context exceeds the character budget.
+// compression when the context exceeds the token budget.
 // Safe for concurrent use via the HTTP API.
 type ContextManager struct {
-	mu           sync.RWMutex
-	messages     []core.LLMMessage
-	systemPrompt string
-	compressNode *nodes.CompressNode
-	provider     string // LLM provider for token estimation
+	mu             sync.RWMutex
+	messages       []core.LLMMessage
+	systemPrompt   string
+	compressNode   *nodes.CompressNode
+	provider       string // LLM provider for token estimation + default budget
+	budgetOverride int    // explicit budget (P1-4); 0 = use provider default
 }
 
 // NewContextManager creates a new context manager.
@@ -91,11 +122,50 @@ func (cm *ContextManager) SetSystemPrompt(prompt string) {
 	cm.systemPrompt = prompt
 }
 
-// SetProvider sets the LLM provider for token estimation.
+// SetProvider sets the LLM provider, which selects both the token
+// estimation heuristic and the default context budget from
+// providerContextBudgets.
 func (cm *ContextManager) SetProvider(provider string) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	cm.provider = provider
+}
+
+// SetBudget overrides the context budget with an explicit value (P1-4).
+// It takes precedence over the provider default, regardless of the order
+// in which SetProvider / SetBudget are called. n <= 0 clears the override
+// (falling back to the provider default); values below minContextBudget
+// are clamped up to it.
+func (cm *ContextManager) SetBudget(n int) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if n <= 0 {
+		cm.budgetOverride = 0
+		return
+	}
+	if n < minContextBudget {
+		n = minContextBudget
+	}
+	cm.budgetOverride = n
+}
+
+// Budget returns the effective context budget: the explicit override if
+// set, otherwise the provider default, otherwise MaxContextChars.
+func (cm *ContextManager) Budget() int {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	return cm.effectiveBudget()
+}
+
+// effectiveBudget computes the effective budget. Caller must hold cm.mu.
+func (cm *ContextManager) effectiveBudget() int {
+	if cm.budgetOverride > 0 {
+		return cm.budgetOverride
+	}
+	if b, ok := providerContextBudgets[cm.provider]; ok {
+		return b
+	}
+	return MaxContextChars
 }
 
 // AddUser appends a user message to the history.
@@ -130,14 +200,14 @@ func (cm *ContextManager) BuildPrefix() string {
 	return sb.String()
 }
 
-// CompressIfNeeded checks the character budget and compresses older messages
-// if the total exceeds MaxContextChars. Recent messages are always preserved.
+// CompressIfNeeded checks the token budget and compresses older messages
+// if the total exceeds it. Recent messages are always preserved.
 // Returns (before, after) message counts when compression occurred, or (0,0) otherwise.
 func (cm *ContextManager) CompressIfNeeded() (int, int) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	if cm.totalTokens() <= MaxContextChars {
+	if cm.totalTokens() <= cm.effectiveBudget() {
 		return 0, 0
 	}
 	before := len(cm.messages)
@@ -235,13 +305,14 @@ func (cm *ContextManager) Summary() string {
 
 	chars := cm.totalChars()
 	tokens := cm.totalTokens()
+	budget := cm.effectiveBudget()
 	msgs := len(cm.messages)
 	status := "ok"
-	if tokens > MaxContextChars {
+	if tokens > budget {
 		status = "compressed"
 	}
 	return fmt.Sprintf("Messages: %d | Characters: %d | Tokens: %d (limit: %d) | Status: %s",
-		msgs, chars, tokens, MaxContextChars, status)
+		msgs, chars, tokens, budget, status)
 }
 
 // ContextUsage returns the current context usage as a fraction of the limit,
@@ -250,7 +321,7 @@ func (cm *ContextManager) ContextUsage() (chars int, limit int, compressed bool)
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 	chars = cm.totalTokens()
-	limit = MaxContextChars
+	limit = cm.effectiveBudget()
 	// Check if any message is a compression summary
 	for _, m := range cm.messages {
 		if m.Role == "system" && strings.Contains(m.Content, "[Previous conversation summary]") {

@@ -100,6 +100,11 @@ func NewAgentLoop(cfg Config) *AgentLoop {
 
 	cm := NewContextManager()
 	cm.SetProvider(cfg.Provider)
+	// P1-4: explicit budget override (Config.ContextBudget > 0) wins over
+	// the provider default selected by SetProvider.
+	if cfg.ContextBudget > 0 {
+		cm.SetBudget(cfg.ContextBudget)
+	}
 	systemMsg := BuildSystemPrompt(tools, "0.0.0")
 	cm.SetSystemPrompt(systemMsg)
 

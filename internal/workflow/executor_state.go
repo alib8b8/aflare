@@ -263,41 +263,116 @@ func RestoreState(state *WorkflowState, engine *ExpressionEngine) string {
 	return state.Data
 }
 
-// SaveStateWAL appends the current workflow state to a WAL. This replaces
-// the non-atomic os.WriteFile in saveCheckpoint with a durable append-only
-// log that survives crashes. After appending it opportunistically compacts
-// the log if it has grown past the configured threshold.
-func SaveStateWAL(wal *WAL, wf *Workflow, stepIndex int, data string, engine *ExpressionEngine) error {
-	state := SaveCurrentState(wf, stepIndex, data, engine)
+// WALStateManager drives a WAL with incremental (delta) records: it tracks
+// the last persisted state and appends only what changed since, cutting the
+// log volume of an N-step workflow from O(N²) (one cumulative snapshot per
+// step) to O(N).
+//
+// Record layout: the first record is a full snapshot; every later record is
+// a delta. LoadStateWAL folds deltas back into the latest snapshot on
+// recovery, and Compact (via WAL.Compact) rewrites the merged state as a
+// single full snapshot. Legacy logs without is_delta markers replay exactly
+// as before.
+type WALStateManager struct {
+	wal       *WAL
+	wf        *Workflow
+	persisted *WorkflowState // last state known to be in the log; nil = none yet
+}
+
+// NewWALStateManager creates a manager around an opened WAL. resumed is the
+// state recovered from the log (nil when starting fresh); it seeds the delta
+// baseline so records written after a resume stay incremental.
+func NewWALStateManager(wal *WAL, wf *Workflow, resumed *WorkflowState) *WALStateManager {
+	return &WALStateManager{wal: wal, wf: wf, persisted: resumed}
+}
+
+// Save appends the state after step stepIndex: a full snapshot when the log
+// has no baseline yet, otherwise a delta against the last persisted state.
+// After appending it opportunistically compacts the log if it has grown past
+// the configured threshold.
+func (m *WALStateManager) Save(stepIndex int, data string, engine *ExpressionEngine) error {
+	state := SaveCurrentState(m.wf, stepIndex, data, engine)
 	rec := WALRecord{
-		StepIndex:   state.StepIndex,
-		Data:        state.Data,
-		StepOutputs: state.StepOutputs,
-		Variables:   state.Variables,
-		Timestamp:   time.Now().UTC(),
+		StepIndex: state.StepIndex,
+		Data:      state.Data,
+		Timestamp: time.Now().UTC(),
 	}
-	if stepIndex >= 0 && stepIndex < len(wf.Steps) {
-		rec.StepName = wf.Steps[stepIndex].Name
-		rec.NodeName = wf.Steps[stepIndex].Node
+	if stepIndex >= 0 && stepIndex < len(m.wf.Steps) {
+		rec.StepName = m.wf.Steps[stepIndex].Name
+		rec.NodeName = m.wf.Steps[stepIndex].Node
 	}
-	if err := wal.Append(rec); err != nil {
+
+	if m.persisted == nil {
+		// First record: full snapshot.
+		rec.StepOutputs = state.StepOutputs
+		rec.Variables = state.Variables
+	} else {
+		// Delta: only the outputs/variables added or changed since the
+		// last persisted state. Data (flowing value) is small and always
+		// current, so it rides along on every record.
+		rec.IsDelta = true
+		rec.StepOutputs = diffStepOutputs(m.persisted.StepOutputs, state.StepOutputs)
+		rec.Variables = diffVariables(m.persisted.Variables, state.Variables)
+	}
+	m.persisted = state
+
+	if err := m.wal.Append(rec); err != nil {
 		return err
 	}
-	return wal.MaybeCompact()
+	return m.wal.MaybeCompact()
+}
+
+// diffStepOutputs returns the entries of cur that are absent from prev or
+// carry a different value.
+func diffStepOutputs(prev, cur map[int]string) map[int]string {
+	delta := make(map[int]string, len(cur))
+	for k, v := range cur {
+		if pv, ok := prev[k]; !ok || pv != v {
+			delta[k] = v
+		}
+	}
+	return delta
+}
+
+// diffVariables returns the entries of cur that are absent from prev or
+// carry a different value.
+func diffVariables(prev, cur map[string]string) map[string]string {
+	delta := make(map[string]string, len(cur))
+	for k, v := range cur {
+		if pv, ok := prev[k]; !ok || pv != v {
+			delta[k] = v
+		}
+	}
+	return delta
 }
 
 // LoadStateWAL replays a WAL and returns the latest state (for crash
-// recovery). It returns (nil, nil) when the log contains no records.
+// recovery), folding delta records into the latest full snapshot.
+// It returns (nil, nil) when the log contains no records.
 func LoadStateWAL(walPath string) (*WorkflowState, error) {
 	var latest *WorkflowState
 	err := ReplayWAL(walPath, func(r WALRecord) error {
-		latest = &WorkflowState{
-			WorkflowName: "",
-			StepIndex:    r.StepIndex,
-			Data:         r.Data,
-			StepOutputs:  r.StepOutputs,
-			Variables:    r.Variables,
-			SavedAt:      r.Timestamp,
+		if latest == nil || !r.IsDelta {
+			// Full snapshot: replace wholesale.
+			latest = &WorkflowState{
+				WorkflowName: "",
+				StepIndex:    r.StepIndex,
+				Data:         r.Data,
+				StepOutputs:  r.StepOutputs,
+				Variables:    r.Variables,
+				SavedAt:      r.Timestamp,
+			}
+		} else {
+			// Delta: merge on top of the running state.
+			for k, v := range r.StepOutputs {
+				latest.StepOutputs[k] = v
+			}
+			for k, v := range r.Variables {
+				latest.Variables[k] = v
+			}
+			latest.StepIndex = r.StepIndex
+			latest.Data = r.Data
+			latest.SavedAt = r.Timestamp
 		}
 		return nil
 	})

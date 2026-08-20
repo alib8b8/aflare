@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -207,6 +208,7 @@ type seqExecState struct {
 	results       []StepResult
 	data          string
 	wal           *WAL
+	walState      *WALStateManager // delta-record driver around wal (nil when wal is nil)
 	saveCP        func(int)        // saveCheckpointIfEnabled closure
 	progressCB    StepProgressFunc // 断点13: CLI 实时进度回调
 }
@@ -284,7 +286,7 @@ func (s *seqExecState) initResumeState(walPath, statePath string) int {
 	resumeFromStep := 0
 
 	if walPath != "" {
-		w, err := NewWAL(walPath, WALOptions{})
+		w, err := NewWAL(walPath, walOptionsFromEnv())
 		if err != nil {
 			logger.Warn("failed to open WAL for writes, starting fresh", "path", walPath, "error", err)
 		} else {
@@ -298,8 +300,12 @@ func (s *seqExecState) initResumeState(walPath, statePath string) int {
 			resumeFromStep = state.StepIndex + 1
 			resumeFromStep = clampStep(resumeFromStep, len(s.wf.Steps))
 			logger.Info("Resuming workflow from step (WAL)", "name", s.wf.Name, "step", resumeFromStep, "wal", walPath)
-		} else if err != nil {
-			logger.Warn("failed to replay WAL, starting fresh", "path", walPath, "error", err)
+			s.walState = NewWALStateManager(s.wal, s.wf, state)
+		} else {
+			if err != nil {
+				logger.Warn("failed to replay WAL, starting fresh", "path", walPath, "error", err)
+			}
+			s.walState = NewWALStateManager(s.wal, s.wf, nil)
 		}
 	} else if statePath != "" {
 		if state, err := loadCheckpoint(statePath); err == nil && state != nil {
@@ -313,8 +319,8 @@ func (s *seqExecState) initResumeState(walPath, statePath string) int {
 	}
 
 	s.saveCP = func(stepIndex int) {
-		if s.wal != nil {
-			if err := SaveStateWAL(s.wal, s.wf, stepIndex, s.data, s.engine); err != nil {
+		if s.walState != nil {
+			if err := s.walState.Save(stepIndex, s.data, s.engine); err != nil {
 				logger.Warn("failed to append WAL, continuing without", "path", walPath, "step", stepIndex, "error", err)
 			}
 			return
@@ -329,6 +335,28 @@ func (s *seqExecState) initResumeState(walPath, statePath string) int {
 	}
 
 	return resumeFromStep
+}
+
+// walOptionsFromEnv builds the WAL durability options from environment
+// variables (see WALOptions for the level semantics):
+//
+//	AFLARE_WAL_SYNC_EVERY_WRITE=1|true  fsync every append (most durable)
+//	AFLARE_WAL_SYNC_INTERVAL=<duration>  background fsync loop (e.g. 100ms)
+//	neither set                          page cache only + fsync on Close
+func walOptionsFromEnv() WALOptions {
+	var opts WALOptions
+	switch strings.ToLower(os.Getenv("AFLARE_WAL_SYNC_EVERY_WRITE")) {
+	case "1", "true", "yes":
+		opts.SyncEveryWrite = true
+	}
+	if v := os.Getenv("AFLARE_WAL_SYNC_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			opts.SyncInterval = d
+		} else {
+			logger.Warn("invalid AFLARE_WAL_SYNC_INTERVAL, ignoring", "value", v)
+		}
+	}
+	return opts
 }
 
 // clampStep bounds a step index to [0, totalSteps].
@@ -795,6 +823,7 @@ func (s *seqExecState) handleStepFailure(i int, wStep WorkflowStep, execErr erro
 				logger.Error("failed to close WAL during step failure", "err", err)
 			}
 			s.wal = nil
+			s.walState = nil
 		}
 		if i > 0 {
 			s.saveCP(i - 1)

@@ -150,13 +150,13 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 
 	switch operation {
 	case "store":
-		result, err = n.storeMemory(session, execParams.key, execParams.value, execParams.level, execParams.memType, execParams.tags, execParams.ttlHours, execParams.confidence, execParams.source)
+		result, err = n.storeMemory(ctx, session, execParams.key, execParams.value, execParams.level, execParams.memType, execParams.tags, execParams.ttlHours, execParams.confidence, execParams.source)
 	case "retrieve":
 		result, err = n.retrieveMemory(session, execParams.key)
 	case "delete":
 		result, err = n.deleteMemory(session, execParams.key)
 	case "search":
-		result, err = n.searchMemory(session, execParams.query, execParams.level, execParams.topK, execParams.threshold)
+		result, err = n.searchMemory(ctx, session, execParams.query, execParams.level, execParams.topK, execParams.threshold)
 	case "harness_search":
 		// Like expand_kg, harness_search is a retrieval-time operation that
 		// defaults to searching all levels: the critique stage should see
@@ -165,7 +165,7 @@ func (n *MemoryNode) Execute(ctx context.Context, input string, params map[strin
 		if _, ok := params["level"]; !ok {
 			harnessLevel = ""
 		}
-		result, err = n.harnessSearch(session, execParams.query, harnessLevel, execParams.topK, execParams.threshold)
+		result, err = n.harnessSearch(ctx, session, execParams.query, harnessLevel, execParams.topK, execParams.threshold)
 	case "summary":
 		result, err = n.getMemorySummary(session, sessionID)
 	case "forget":
@@ -301,7 +301,7 @@ func (n *MemoryNode) parseMemoryExecParams(params map[string]string, input, oper
 	return p, nil
 }
 
-func (n *MemoryNode) storeMemory(session *memory.SessionMemory, key, value, level, memType string, tags []string, ttlHours int, confidence float64, source string) (map[string]interface{}, error) {
+func (n *MemoryNode) storeMemory(ctx context.Context, session *memory.SessionMemory, key, value, level, memType string, tags []string, ttlHours int, confidence float64, source string) (map[string]interface{}, error) {
 	if key == "" {
 		memoryRandMu.Lock()
 		key = fmt.Sprintf("mem_%d_%d", time.Now().UnixNano(), memoryRand.Intn(10000))
@@ -314,10 +314,11 @@ func (n *MemoryNode) storeMemory(session *memory.SessionMemory, key, value, leve
 	}
 
 	// Sync to persistent store so MemoryCapability can see the data.
-	// Map memory type to persistent store category.
+	// Map memory type to persistent store category. StoreCtx propagates
+	// the workflow context into the (hybrid) embedding step.
 	persistentStore := memory.GetPersistentStore()
 	category := mapMemoryTypeToCategory(memType)
-	if err := persistentStore.Store(key, value, category); err != nil {
+	if err := persistentStore.StoreCtx(ctx, key, value, category); err != nil {
 		log.Printf("[memory_node] failed to sync to persistent store: key=%s err=%v", key, err)
 	}
 
@@ -394,12 +395,16 @@ func (n *MemoryNode) deleteMemory(session *memory.SessionMemory, key string) (ma
 	}, nil
 }
 
-func (n *MemoryNode) searchMemory(session *memory.SessionMemory, query, level string, topK int, threshold float64) (map[string]interface{}, error) {
-	results := session.Search(query, level, topK, threshold)
+func (n *MemoryNode) searchMemory(ctx context.Context, session *memory.SessionMemory, query, level string, topK int, threshold float64) (map[string]interface{}, error) {
+	// Use the Ctx variants so the workflow's deadline/cancellation
+	// reaches the embedder calls inside both searches (vector retrieval
+	// may issue a network request to compute embeddings).
+	results := session.SearchCtx(ctx, query, level, topK, threshold)
 
-	// Also search the persistent store (MemoryCapability's data).
+	// Also search the persistent store (MemoryCapability's data) with
+	// hybrid keyword+vector retrieval.
 	persistentStore := memory.GetPersistentStore()
-	persistentResults := persistentStore.Search(query, topK)
+	persistentResults := persistentStore.SearchCtx(ctx, query, topK)
 
 	// Merge persistent results into the results list.
 	seenKeys := make(map[string]bool)

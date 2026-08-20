@@ -19,10 +19,11 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
-	"sync"
+	"sort"
 	"time"
 
 	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/metrics"
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/secrets"
 	"github.com/alib8b8/aflare/internal/telemetry"
@@ -53,119 +54,102 @@ type dagExecResult struct {
 	routerDecisions []nodes.RouterDecision
 }
 
-// prepareDAGBatch pre-evaluates conditions and params for all steps in a batch
-// on the main goroutine. ExpressionEngine is NOT thread-safe (it holds
-// mutable stepOutputs/variables/loopVars), so this must happen BEFORE
-// dispatching node.Execute to worker goroutines.
-func prepareDAGBatch(batch []int, wf *Workflow, graph *depGraph, resolver *stepInputResolver, initialInput string, engine *ExpressionEngine) []dagPreparedStep {
-	prepared := make([]dagPreparedStep, len(batch))
-	for j, stepIdx := range batch {
-		wStep := wf.Steps[stepIdx]
-		input := graph.resolveInput(stepIdx, resolver, initialInput)
-		ps := dagPreparedStep{idx: stepIdx, wStep: wStep, input: input}
+// prepareDAGStep pre-evaluates ONE step's condition and params on the main
+// goroutine. ExpressionEngine is NOT thread-safe (it holds mutable
+// stepOutputs/variables/loopVars), so this must happen BEFORE dispatching
+// node.Execute to a worker goroutine.
+func prepareDAGStep(stepIdx int, wf *Workflow, graph *depGraph, resolver *stepInputResolver, initialInput string, engine *ExpressionEngine) dagPreparedStep {
+	wStep := wf.Steps[stepIdx]
+	input := graph.resolveInput(stepIdx, resolver, initialInput)
+	ps := dagPreparedStep{idx: stepIdx, wStep: wStep, input: input}
 
-		evalStart := time.Now()
-		if wStep.Condition != "" {
-			pass, err := evaluateCondition(wStep.Condition, input, engine)
-			if err != nil {
-				ps.evalErr = fmt.Errorf("condition evaluation failed: %w", err)
-				ps.evalDuration = time.Since(evalStart)
-				prepared[j] = ps
-				continue
-			}
-			if !pass {
-				ps.skipped = true
-				ps.evalDuration = time.Since(evalStart)
-				prepared[j] = ps
-				continue
-			}
+	evalStart := time.Now()
+	if wStep.Condition != "" {
+		pass, err := evaluateCondition(wStep.Condition, input, engine)
+		if err != nil {
+			ps.evalErr = fmt.Errorf("condition evaluation failed: %w", err)
+			ps.evalDuration = time.Since(evalStart)
+			return ps
 		}
-
-		// 参数求值（复合步骤的 params 不在此求值，由子执行器处理）
-		if !wStep.IsIf() && !wStep.IsLoop() && !wStep.IsParallel() && !wStep.IsMap() && !wStep.IsReduce() && !wStep.IsSaga() {
-			params, err := engine.EvaluateParams(wStep.Params, input)
-			if err != nil {
-				ps.evalErr = err
-				ps.evalDuration = time.Since(evalStart)
-				prepared[j] = ps
-				continue
-			}
-			ps.evaluatedParams = params
+		if !pass {
+			ps.skipped = true
+			ps.evalDuration = time.Since(evalStart)
+			return ps
 		}
-		ps.evalDuration = time.Since(evalStart)
-		prepared[j] = ps
 	}
-	return prepared
+
+	// 参数求值（复合步骤的 params 不在此求值，由子执行器处理）
+	if !wStep.IsIf() && !wStep.IsLoop() && !wStep.IsParallel() && !wStep.IsMap() && !wStep.IsReduce() && !wStep.IsSaga() {
+		params, err := engine.EvaluateParams(wStep.Params, input)
+		if err != nil {
+			ps.evalErr = err
+			ps.evalDuration = time.Since(evalStart)
+			return ps
+		}
+		ps.evaluatedParams = params
+	}
+	ps.evalDuration = time.Since(evalStart)
+	return ps
 }
 
-// dispatchDAGBatch spawns worker goroutines for all non-skipped, non-errored
-// prepared steps and returns a channel of results (closed when all complete).
-func dispatchDAGBatch(otelCtx, timeoutCtx context.Context, prepared []dagPreparedStep, reg *nodes.Registry, program *tea.Program, globalLimiter *ConcurrencyLimiter) <-chan dagExecResult {
-	resultChan := make(chan dagExecResult, len(prepared))
-	var wg sync.WaitGroup
-	for _, ps := range prepared {
-		if ps.skipped || ps.evalErr != nil {
-			continue
+// dispatchDAGStep spawns ONE worker goroutine for a prepared step and sends
+// its dagExecResult into resultChan. The channel is owned by the scheduler
+// and must be buffered with enough capacity for every dispatched step, so
+// workers never block on send. Skipped / eval-errored steps are NOT
+// dispatched — their outcome is consumed directly from dagPreparedStep.
+func dispatchDAGStep(otelCtx, timeoutCtx context.Context, ps dagPreparedStep, reg *nodes.Registry, program *tea.Program, globalLimiter *ConcurrencyLimiter, resultChan chan<- dagExecResult) {
+	go func(ps dagPreparedStep) {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("DAG step panicked",
+					"index", ps.idx,
+					"node", ps.wStep.Node,
+					"panic", r,
+					"stack", string(debug.Stack()),
+				)
+				resultChan <- dagExecResult{
+					idx:      ps.idx,
+					nodeName: ps.wStep.Node,
+					err:      fmt.Errorf("step panicked: %v", r),
+					attempts: 1,
+				}
+			}
+		}()
+
+		if globalLimiter != nil {
+			if err := globalLimiter.Acquire(timeoutCtx); err != nil {
+				resultChan <- dagExecResult{idx: ps.idx, nodeName: ps.wStep.Node, err: err, attempts: 1}
+				return
+			}
+			defer globalLimiter.Release()
 		}
-		wg.Add(1)
-		go func(ps dagPreparedStep) {
-			defer wg.Done()
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error("DAG step panicked",
-						"index", ps.idx,
-						"node", ps.wStep.Node,
-						"panic", r,
-						"stack", string(debug.Stack()),
-					)
-					resultChan <- dagExecResult{
-						idx:      ps.idx,
-						nodeName: ps.wStep.Node,
-						err:      fmt.Errorf("step panicked: %v", r),
-						attempts: 1,
-					}
-				}
-			}()
 
-			if globalLimiter != nil {
-				if err := globalLimiter.Acquire(timeoutCtx); err != nil {
-					resultChan <- dagExecResult{idx: ps.idx, nodeName: ps.wStep.Node, err: err, attempts: 1}
-					return
-				}
-				defer globalLimiter.Release()
-			}
+		start := time.Now()
+		if program != nil {
+			program.Send(tui.StepStartMsg{Index: ps.idx, Name: ps.wStep.Node})
+		}
 
-			start := time.Now()
-			if program != nil {
-				program.Send(tui.StepStartMsg{Index: ps.idx, Name: ps.wStep.Node})
-			}
-
-			output, attempts, llmCalls, routerDecisions, err := executeDAGStep(otelCtx, ps.wStep, ps.input, ps.evaluatedParams, reg)
-			resultChan <- dagExecResult{
-				idx:             ps.idx,
-				nodeName:        ps.wStep.Node,
-				output:          output,
-				err:             err,
-				duration:        time.Since(start),
-				attempts:        attempts,
-				llmCalls:        llmCalls,
-				routerDecisions: routerDecisions,
-			}
-		}(ps)
-	}
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-	return resultChan
+		output, attempts, llmCalls, routerDecisions, err := executeDAGStep(otelCtx, ps.wStep, ps.input, ps.evaluatedParams, reg)
+		resultChan <- dagExecResult{
+			idx:             ps.idx,
+			nodeName:        ps.wStep.Node,
+			output:          output,
+			err:             err,
+			duration:        time.Since(start),
+			attempts:        attempts,
+			llmCalls:        llmCalls,
+			routerDecisions: routerDecisions,
+		}
+	}(ps)
 }
 
 // processDAGStepResult processes a single step's result: applies error
 // recovery, writes output to engine/resolver, records trace, and appends to
-// allResults. Returns updated allResults, lastOutput, and abortErr (non-nil
-// only when no recovery applied and the workflow must stop).
+// allResults. levelIdx is the step's static topological level (used as the
+// trace BatchIndex). Returns updated allResults, lastOutput, and abortErr
+// (non-nil only when no recovery applied and the workflow must stop).
 func processDAGStepResult(
-	stepIdx, batchIdx int,
+	stepIdx, levelIdx int,
 	ps dagPreparedStep,
 	wStep WorkflowStep,
 	batchOutputs map[int]dagExecResult,
@@ -261,7 +245,7 @@ func processDAGStepResult(
 		Index:           stepIdx,
 		NodeName:        wStep.Node,
 		StepName:        wStep.Name,
-		BatchIndex:      batchIdx,
+		BatchIndex:      levelIdx,
 		Dependencies:    deps,
 		Skipped:         skipped,
 		ConditionExpr:   wStep.Condition,
@@ -303,11 +287,30 @@ func processDAGStepResult(
 
 // executeWorkflowDAG 在有步骤声明 depends_on 时启用 DAG 调度。
 //
-// 设计要点：
+// 设计要点（P1-6：动态就绪队列调度）：
 //   - 主调度 goroutine 独占访问 ExpressionEngine（无锁，与 parallel 实现一致），
-//     在派发每批步骤前预求值 condition 和 params。
+//     在派发每个步骤前预求值 condition 和 params。
 //   - worker goroutine 只执行 node.Execute，不触碰 engine，避免数据竞争。
-//   - 每批内的步骤互不依赖，可安全并发；批次间严格顺序。
+//   - 调度采用动态就绪队列而非静态分批：步骤在其全部依赖完成后立即派发，
+//     无需等待同"层"的慢步骤完成（消除批间队头阻塞，缩短 makespan 至
+//     接近关键路径）。
+//   - 派发/处理两层机制：
+//       派发层（时序敏感）：成功 worker 结果（或 skipped 步骤）到达时立即
+//       写回 engine/resolver 并传播就绪状态（"轻量完成"），下游步骤随之
+//       派发——这是消除队头阻塞的关键。失败结果不提前：错误恢复
+//       （fallback/on_error 等）需按序求值后才知最终输出与是否继续。
+//       处理层（顺序敏感）：错误恢复、trace 记录、lastOutput 严格按派发
+//       顺序处理（重排序缓冲）。派发序列是依赖图与各依赖完成时序的
+//       函数；对固定工作流与节点时序，trace 顺序、lastOutput 与首个中止
+//       错误均确定。处理本身仅做 map 写入与 trace 追加（微秒级），重排序
+//       屏障对调度的影响可忽略。
+//   - 轻量完成的 engine 写入按完成时序发生（非派发序）。engine 是按
+//     stepIdx/name 索引的 map，写入顺序不影响值；唯一可见性差异是
+//     "引用未声明依赖（depends_on）的步骤输出"的表达式（condition/
+//     params/恢复表达式）——其结果受完成时序影响，属未定义行为，DAG
+//     模式下数据依赖应通过 depends_on 声明（与复合步骤的限制一致）。
+//   - 任一步骤失败（且无恢复）即停止派发新步骤，但已派发步骤会被收集并
+//     记入 trace，随后整个工作流中止（与原批模式语义一致）。
 //   - 复合步骤（if/loop/parallel）作为整体单元参与调度，执行时调用现有实现。
 //   - 100% 向后兼容：无 depends_on 声明的工作流走原顺序 for 循环路径。
 //
@@ -333,15 +336,23 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 		return "", nil, nil, fmt.Errorf("DAG build failed: %w", err)
 	}
 
-	// 拓扑分批：每批内的步骤互不依赖，可并发执行
-	batches, err := graph.topoBatches()
+	// 静态拓扑层级：仅用于 trace 元数据（BatchIndex / Batches 时间线）与
+	// 防御性环校验。实际调度使用动态就绪队列。
+	levels, err := graph.topoBatches()
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("DAG scheduling failed: %w", err)
 	}
+	n := len(wf.Steps)
+	levelOf := make([]int, n)
+	for lv, batch := range levels {
+		for _, idx := range batch {
+			levelOf[idx] = lv
+		}
+	}
 
-	logger.Info("DAG workflow started", "name", wf.Name, "steps", len(wf.Steps), "batches", len(batches))
+	logger.Info("DAG workflow started", "name", wf.Name, "steps", n, "levels", len(levels))
 
-	trace := newTrace(wf.Name, "dag", time.Now(), len(wf.Steps))
+	trace := newTrace(wf.Name, "dag", time.Now(), n)
 	defer func() { trace.finish(time.Now()) }()
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -385,80 +396,195 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 		program.Send(tui.WorkflowStartMsg{
 			Name:  wf.Name,
 			Path:  "",
-			Steps: len(wf.Steps),
+			Steps: n,
 		})
 	}
 
 	// lastOutput 跟踪"最后一个完成的步骤输出"，用于无 wf.Output 时的兜底。
 	lastOutput := ""
 
-	for batchIdx, batch := range batches {
-		// Graceful shutdown: if a shutdown has been requested, stop starting
-		// new batches. Steps in the current batch will complete or be
-		// cancelled by their context.
-		if IsShuttingDown() {
-			logger.Info("shutdown requested, stopping DAG workflow execution", "name", wf.Name, "completed_batches", batchIdx, "total_batches", len(batches))
+	// ── P1-6 动态就绪队列调度状态 ──
+	//
+	//   pending[i]     步骤 i 尚未完成的依赖数；降为 0 时入就绪队列
+	//   readyQueue     依赖全部就绪、待派发的步骤（FIFO；索引序入队）
+	//   dispatchSeq    派发顺序（见函数头注释）
+	//   results        结果重排序缓冲：按完成顺序暂存，按派发顺序消费
+	//   finalized      已"轻量完成"（提前写回并传播就绪）的步骤集合
+	//   levelStart/End 各拓扑层级的首次派发与最后处理时间（trace 时间线）
+	pending := make([]int, n)
+	for i := 0; i < n; i++ {
+		pending[i] = len(graph.deps[i])
+	}
+	readyQueue := make([]int, 0, n)
+	for i := 0; i < n; i++ {
+		if pending[i] == 0 {
+			readyQueue = append(readyQueue, i)
+		}
+	}
+
+	resultChan := make(chan dagExecResult, n)
+	dispatchSeq := make([]int, 0, n)
+	results := make(map[int]dagExecResult, n)
+	preparedByStep := make(map[int]dagPreparedStep, n)
+	finalized := make(map[int]bool, n)
+	dispatchAt := make(map[int]time.Time, n)
+	levelStart := make([]time.Time, len(levels))
+	levelEnd := make([]time.Time, len(levels))
+
+	// propagateDeps 将步骤 idx 的完成通知其依赖方：pending 减一，降为
+	// 0 者按索引序入就绪队列（确定性）。新就绪步骤在回到主循环阶段 1
+	// 时立即派发。
+	propagateDeps := func(idx int) {
+		dependents := make([]int, 0, len(graph.dependents[idx]))
+		for d := range graph.dependents[idx] {
+			dependents = append(dependents, d)
+		}
+		sort.Ints(dependents)
+		for _, d := range dependents {
+			pending[d]--
+			if pending[d] == 0 {
+				readyQueue = append(readyQueue, d)
+			}
+		}
+	}
+
+	processPos := 0 // dispatchSeq 中下一个待处理的步骤
+	aborted := false
+	var firstAbortErr error
+
+	for processPos < len(dispatchSeq) || len(readyQueue) > 0 {
+		// 阶段 1：派发所有就绪步骤（主 goroutine 预求值 → worker 执行）。
+		// 中止或 graceful shutdown 后不再启动新步骤。
+		for len(readyQueue) > 0 && !aborted && !IsShuttingDown() {
+			idx := readyQueue[0]
+			readyQueue = readyQueue[1:]
+
+			ps := prepareDAGStep(idx, wf, graph, resolver, initialInput, engine)
+			preparedByStep[idx] = ps
+
+			lv := levelOf[idx]
+			if levelStart[lv].IsZero() {
+				levelStart[lv] = time.Now()
+			}
+			dispatchSeq = append(dispatchSeq, idx)
+			dispatchAt[idx] = time.Now()
+
+			if ps.evalErr != nil {
+				// abort 源：不提前完成，按序处理触发中止。
+				continue
+			}
+			if ps.skipped {
+				// skipped：output 恒为空且无恢复路径，立即轻量完成
+				// （写回 + 传播），避免其下游被处理序上的慢步骤阻塞。
+				engine.SetStepOutput(idx, ps.wStep.Name, "")
+				resolver.set(idx, "")
+				finalized[idx] = true
+				propagateDeps(idx)
+				continue
+			}
+			dispatchDAGStep(otelCtx, timeoutCtx, ps, reg, program, globalLimiter, resultChan)
+		}
+
+		if processPos >= len(dispatchSeq) {
+			// 已派发步骤全部处理完毕且（中止/停机后）不再派发新步骤。
 			break
 		}
 
-		batchStart := time.Now()
-		logger.Info("DAG batch started", "batch", batchIdx, "steps", len(batch))
-
-		// 阶段 1：主 goroutine 预求值（独占 engine，线程安全）
-		prepared := prepareDAGBatch(batch, wf, graph, resolver, initialInput, engine)
-
-		// 阶段 2：worker pool 并发执行通过 condition 的步骤
-		resultChan := dispatchDAGBatch(otelCtx, timeoutCtx, prepared, reg, program, globalLimiter)
-
-		// 阶段 3：主 goroutine 收集结果并写回 engine（独占，线程安全）
-		batchOutputs := make(map[int]dagExecResult, len(prepared))
-		for res := range resultChan {
-			batchOutputs[res.idx] = res
-		}
-
-		preparedByIdx := make(map[int]dagPreparedStep, len(prepared))
-		for _, ps := range prepared {
-			preparedByIdx[ps.idx] = ps
-		}
-
-		var batchFirstErr error
-		for _, stepIdx := range batch {
-			ps := preparedByIdx[stepIdx]
-			wStep := wf.Steps[stepIdx]
-			var abortErr error
-			allResults, lastOutput, abortErr = processDAGStepResult(
-				stepIdx, batchIdx, ps, wStep, batchOutputs,
-				timeoutCtx, engine, resolver, reg, graph, trace, program,
-				allResults, lastOutput,
-			)
-			if abortErr != nil && batchFirstErr == nil {
-				batchFirstErr = abortErr
+		// 阶段 2：确保"下一个待处理步骤"的结果可用。结果按完成顺序到达：
+		// 先完成的其他步骤暂存 results，此处阻塞等待任一 worker 完成。
+		// 跳过/求值失败的步骤没有 worker，无需等待。
+		want := dispatchSeq[processPos]
+		wantPs := preparedByStep[want]
+		if !wantPs.skipped && wantPs.evalErr == nil {
+			if _, ok := results[want]; !ok {
+				res := <-resultChan
+				results[res.idx] = res
+				// 成功结果到达即轻量完成：立即写回 engine/resolver 并
+				// 传播就绪，下游步骤无需等待本步骤轮到按序处理（消除
+				// 处理序队头阻塞的关键）。失败结果不提前——错误恢复
+				// 按序求值后才知最终输出与是否继续传播。中止后不再
+				// 传播（语义：失败即停止派发新步骤）。
+				if res.err == nil && !aborted {
+					engine.SetStepOutput(res.idx, wf.Steps[res.idx].Name, res.output)
+					resolver.set(res.idx, res.output)
+					finalized[res.idx] = true
+					propagateDeps(res.idx)
+				}
+				continue
 			}
 		}
 
-		// 记录本批次 trace
+		// 阶段 3：按派发顺序处理结果（错误恢复、写回 engine/resolver、
+		// 记录 trace、更新 lastOutput）。未提前完成的步骤（失败后经恢复
+		// 才成功的）在此传播就绪，用的是恢复后的最终输出。
+		var abortErr error
+		if at, ok := dispatchAt[want]; ok {
+			metrics.RecordDAGStepReorderWait(time.Since(at))
+		}
+		allResults, lastOutput, abortErr = processDAGStepResult(
+			want, levelOf[want], wantPs, wf.Steps[want], results,
+			timeoutCtx, engine, resolver, reg, graph, trace, program,
+			allResults, lastOutput,
+		)
+		levelEnd[levelOf[want]] = time.Now()
+		processPos++
+		delete(results, want)
+
+		if abortErr != nil && firstAbortErr == nil {
+			firstAbortErr = abortErr
+			aborted = true
+			// 丢弃未派发步骤；已派发步骤继续收集并处理（保持 trace 完整）。
+			readyQueue = readyQueue[:0]
+			continue
+		}
+		if aborted {
+			continue
+		}
+
+		if !finalized[want] {
+			// 失败但恢复成功的步骤：以恢复后输出传播就绪
+			// （engine/resolver 已在 processDAGStepResult 中写入）。
+			propagateDeps(want)
+		}
+	}
+
+	if IsShuttingDown() {
+		logger.Info("shutdown requested, DAG workflow stopped early", "name", wf.Name,
+			"dispatched", len(dispatchSeq), "steps", n)
+	}
+
+	// 记录各拓扑层级的 trace 时间线（层级内全部步骤被跳过或未派发时该层
+	// 不出现——与中止语义一致）。
+	for lv := range levels {
+		if levelStart[lv].IsZero() {
+			continue
+		}
+		end := levelEnd[lv]
+		if end.IsZero() {
+			end = time.Now()
+		}
 		trace.Batches = append(trace.Batches, BatchTrace{
-			Index:       batchIdx,
-			StepIndices: append([]int(nil), batch...),
-			StartedAt:   batchStart,
-			Duration:    time.Since(batchStart),
+			Index:       lv,
+			StepIndices: append([]int(nil), levels[lv]...),
+			StartedAt:   levelStart[lv],
+			Duration:    end.Sub(levelStart[lv]),
 		})
+	}
 
-		// 批次内任一步骤失败则终止整个工作流（与顺序模式语义一致）。
-		// continue_on_error 已在 applyErrorRecovery 中处理（abortErr 被清零）。
-		if batchFirstErr != nil {
-			if program != nil {
-				program.Send(tui.WorkflowEndMsg{Success: false})
-			}
-			return "", allResults, trace, fmt.Errorf("DAG batch %d failed: %w", batchIdx, batchFirstErr)
+	// 任一步骤失败（且无恢复）则整个工作流中止（与顺序模式语义一致）。
+	// continue_on_error 已在 applyErrorRecovery 中处理（abortErr 被清零）。
+	if firstAbortErr != nil {
+		if program != nil {
+			program.Send(tui.WorkflowEndMsg{Success: false})
 		}
+		return "", allResults, trace, fmt.Errorf("DAG step %d failed: %w", processPos-1, firstAbortErr)
 	}
 
 	if program != nil {
 		program.Send(tui.WorkflowEndMsg{Success: true})
 	}
 
-	logger.Info("DAG workflow completed", "name", wf.Name, "steps", len(wf.Steps))
+	logger.Info("DAG workflow completed", "name", wf.Name, "steps", n)
 
 	// 最终输出
 	finalOutput := lastOutput

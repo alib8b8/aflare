@@ -48,20 +48,30 @@ import (
 	"time"
 
 	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/metrics"
 )
 
 // WALRecord is a single append-only entry in the write-ahead log.
-// Each record captures the state delta (cumulative snapshot) after a step
-// completes.
+//
+// Records come in two flavours:
+//   - Full snapshot (IsDelta=false): StepOutputs/Variables hold the complete
+//     state after the step. This is the legacy format and what compaction
+//     writes.
+//   - Delta (IsDelta=true): StepOutputs/Variables hold only the entries added
+//     or changed relative to the previous record. WALStateManager writes
+//     these to keep an N-step workflow's log volume at O(N) instead of the
+//     O(N²) of one cumulative snapshot per step. Recovery folds deltas back
+//     into the latest full snapshot (see LoadStateWAL / Compact).
 type WALRecord struct {
-	Seq         int64             `json:"seq"`          // monotonically increasing sequence number
-	StepIndex   int               `json:"step_index"`   // 0-based step index
-	StepName    string            `json:"step_name"`    // step name (may be empty)
-	NodeName    string            `json:"node_name"`    // node type
-	Data        string            `json:"data"`         // flowing data after this step
-	StepOutputs map[int]string    `json:"step_outputs"` // all step outputs (cumulative snapshot)
-	Variables   map[string]string `json:"variables"`    // all variables (cumulative snapshot)
+	Seq         int64             `json:"seq"`            // monotonically increasing sequence number
+	StepIndex   int               `json:"step_index"`     // 0-based step index
+	StepName    string            `json:"step_name"`      // step name (may be empty)
+	NodeName    string            `json:"node_name"`      // node type
+	Data        string            `json:"data"`           // flowing data after this step
+	StepOutputs map[int]string    `json:"step_outputs"`   // all (snapshot) or changed (delta) step outputs
+	Variables   map[string]string `json:"variables"`      // all (snapshot) or changed (delta) variables
 	Timestamp   time.Time         `json:"timestamp"`
+	IsDelta     bool              `json:"is_delta,omitempty"` // true when outputs/variables are a delta
 }
 
 // WAL is an append-only write-ahead log for workflow checkpoint state.
@@ -84,10 +94,20 @@ type WAL struct {
 	writer               *bufio.Writer // buffered writer for appends
 	seq                  int64         // last assigned sequence number
 	bytesSinceCompaction int64         // bytes appended since the last compaction
+	stopSyncer           chan struct{} // closed to stop the periodic syncer (nil when disabled)
+	syncerOnce           sync.Once
 	opts                 WALOptions
 }
 
-// WALOptions configures WAL behaviour.
+// WALOptions configures WAL behaviour, including its durability level.
+//
+// Durability levels (like SQLite's synchronous modes):
+//   - SyncEveryWrite=true: fsync after every append. Most durable, slowest.
+//   - SyncEveryWrite=false && SyncInterval>0: a background goroutine fsyncs
+//     at the given interval. Bounds the loss window to ~SyncInterval while
+//     keeping appends off the fsync critical path.
+//   - Neither set: relies on the OS page cache + fsync on Close. Fastest;
+//     a crash may lose everything buffered since the last flush.
 type WALOptions struct {
 	// CompactionThreshold is the log size in bytes that triggers compaction.
 	// 0 means use default (1 MB).
@@ -95,6 +115,9 @@ type WALOptions struct {
 	// SyncEveryWrite calls file.Sync() after every append (durable but slow).
 	// When false, relies on the OS page cache + SyncOnClose.
 	SyncEveryWrite bool
+	// SyncInterval starts a background fsync loop with the given period
+	// (ignored when SyncEveryWrite is set). Values <= 0 disable the loop.
+	SyncInterval time.Duration
 }
 
 const (
@@ -124,6 +147,11 @@ func NewWAL(path string, opts WALOptions) (*WAL, error) {
 		writer: bufio.NewWriterSize(f, 64*1024),
 		opts:   opts,
 	}
+	// Periodic syncer for the interval durability level.
+	if opts.SyncInterval > 0 && !opts.SyncEveryWrite {
+		w.stopSyncer = make(chan struct{})
+		go w.syncLoop(opts.SyncInterval)
+	}
 	// Recover the high-water seq and bytes-since-compaction from existing
 	// records (if any).
 	if err := w.recoverSeq(); err != nil {
@@ -135,12 +163,40 @@ func NewWAL(path string, opts WALOptions) (*WAL, error) {
 	return w, nil
 }
 
+// syncLoop periodically fsyncs the log. It exits when stopSyncer is closed
+// (from Close). A Sync racing with a concurrent Close may observe a closed
+// file; that is logged and the loop exits on the next tick.
+func (w *WAL) syncLoop(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if err := w.Sync(); err != nil {
+				logger.Warn("wal: periodic sync failed", "path", w.path, "error", err)
+			}
+		case <-w.stopSyncer:
+			return
+		}
+	}
+}
+
+// stopSyncLoop terminates the periodic syncer (no-op when disabled). It is
+// safe to call more than once.
+func (w *WAL) stopSyncLoop() {
+	if w.stopSyncer == nil {
+		return
+	}
+	w.syncerOnce.Do(func() { close(w.stopSyncer) })
+}
+
 // Append writes a single record to the WAL. The record's Seq is assigned
 // automatically (incremented from the last known seq). The write is buffered
 // and flushed to the OS on the next Flush/Sync or when the buffer fills.
 func (w *WAL) Append(rec WALRecord) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	start := time.Now()
 
 	w.seq++
 	rec.Seq = w.seq
@@ -178,8 +234,10 @@ func (w *WAL) Append(rec WALRecord) error {
 		if err := w.file.Sync(); err != nil {
 			return fmt.Errorf("wal: sync: %w", err)
 		}
+		metrics.IncWALSync()
 	}
 
+	metrics.RecordWALAppend(rec.IsDelta, time.Since(start))
 	return nil
 }
 
@@ -205,11 +263,15 @@ func (w *WAL) Sync() error {
 	if err := w.file.Sync(); err != nil {
 		return fmt.Errorf("wal: sync: %w", err)
 	}
+	metrics.IncWALSync()
 	return nil
 }
 
-// Close flushes, syncs, and closes the WAL.
+// Close stops the periodic syncer (if any), flushes, syncs, and closes the WAL.
 func (w *WAL) Close() error {
+	// Stop the syncer BEFORE taking the lock: syncLoop's Sync() needs the
+	// same lock, so stopping under it would deadlock.
+	w.stopSyncLoop()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if err := w.writer.Flush(); err != nil {
@@ -291,8 +353,9 @@ func ReplayWAL(path string, fn func(WALRecord) error) error {
 }
 
 // Compact collapses the WAL into a single snapshot record. It:
-//  1. Replays the log to find the last record (latest state).
-//  2. Writes the latest state as a new snapshot to a tmp file.
+//  1. Replays the log and folds delta records into the latest cumulative
+//     state (the last raw record may itself be a delta).
+//  2. Writes the merged state as a new full snapshot to a tmp file.
 //  3. Atomically renames the tmp file over the WAL file.
 //  4. Resets the WAL for fresh appends.
 //
@@ -300,20 +363,45 @@ func ReplayWAL(path string, fn func(WALRecord) error) error {
 func (w *WAL) Compact() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	metrics.IncWALCompaction()
 
 	// Flush current buffer first so on-disk state is current.
 	if err := w.writer.Flush(); err != nil {
 		return fmt.Errorf("wal: compact flush: %w", err)
 	}
 
-	// Replay to find the last complete record.
-	var lastRec *WALRecord
+	// Replay and merge: fold delta records into the latest full snapshot.
+	var merged *WALRecord
 	if err := ReplayWAL(w.path, func(r WALRecord) error {
-		lastRec = &r
+		if merged == nil || !r.IsDelta {
+			m := r
+			merged = &m
+			merged.IsDelta = false // the snapshot we write is always full
+		} else {
+			if merged.StepOutputs == nil {
+				merged.StepOutputs = make(map[int]string, len(r.StepOutputs))
+			}
+			for k, v := range r.StepOutputs {
+				merged.StepOutputs[k] = v
+			}
+			if merged.Variables == nil {
+				merged.Variables = make(map[string]string, len(r.Variables))
+			}
+			for k, v := range r.Variables {
+				merged.Variables[k] = v
+			}
+			merged.StepIndex = r.StepIndex
+			merged.StepName = r.StepName
+			merged.NodeName = r.NodeName
+			merged.Data = r.Data
+			merged.Timestamp = r.Timestamp
+			merged.Seq = r.Seq
+		}
 		return nil
 	}); err != nil {
 		return fmt.Errorf("wal: compact replay: %w", err)
 	}
+	lastRec := merged
 
 	// Close current write handle before replacing the file.
 	if err := w.file.Close(); err != nil {

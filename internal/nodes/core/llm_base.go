@@ -37,6 +37,7 @@ import (
 	"github.com/alib8b8/aflare/internal/config"
 	aferrors "github.com/alib8b8/aflare/internal/errors"
 	"github.com/alib8b8/aflare/internal/logger"
+	"golang.org/x/sync/singleflight"
 )
 
 const maxStreamResponseSize = 10 * 1024 * 1024 // 10MB max stream content
@@ -278,6 +279,13 @@ type OpenAICompatibleNode struct {
 	// concurrently with Execute — a concurrent Execute observes either the
 	// old or the new cache, never a torn pointer.
 	cachePtr atomic.Pointer[cache.Cache]
+
+	// sf deduplicates concurrent identical non-streaming requests (P0-3).
+	// It is keyed by the LLM cache key, so dedup is active exactly when the
+	// response cache is; see doUpstreamCallDeduped for the semantics. The
+	// node is only ever used through a pointer and never copied, so the
+	// no-copy discipline of the embedded mutex is preserved.
+	sf singleflight.Group
 }
 
 // NewOpenAICompatibleNode constructs an OpenAICompatibleNode from config.
@@ -634,19 +642,6 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, generateURL, bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-
-	client := &http.Client{
-		Timeout:       DefaultLLMTimeout,
-		Transport:     SafeLLMHTTPClient.Transport,
-		CheckRedirect: HTTPRedirectValidator(ValidateLMLEndpoint),
-	}
-
 	// B-2: telemetry capture. We stamp the call start now (after all
 	// validation / marshalling) so Latency reflects actual server round
 	// trip. tel accumulates status / usage / error on each path; the
@@ -654,6 +649,8 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 	// ctx (no-op if none). Repeated Execute calls within one retry loop
 	// each publish their own record with Attempt = 0 — the executor or
 	// router is responsible for stamping the retry index if it cares.
+	// Every caller publishes its own record, including singleflight
+	// followers, whose record reflects the shared flight's outcome.
 	callStart := time.Now()
 	sink := LLMCallSinkFrom(ctx)
 	tel := LLMCallTelemetry{
@@ -668,6 +665,34 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		tel.Latency = time.Since(callStart)
 		sink.RecordLLMCall(tel)
 	}()
+
+	// P0-3 (singleflight): non-streaming requests go through
+	// doUpstreamCallDeduped, which collapses concurrent identical requests
+	// into a single upstream call. Streaming requests cannot be shared —
+	// each caller owns its SSE body and onChunk callback — so they keep
+	// the direct path below.
+	if !stream {
+		res := n.doUpstreamCallDeduped(ctx, generateURL, jsonBody, apiKey, cacheKey, llmCache, model)
+		tel.StatusCode = res.statusCode
+		tel.Response = res.content
+		tel.Usage = res.usage
+		tel.ErrText = res.errText
+		return res.content, res.err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, generateURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		tel.ErrText = err.Error()
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{
+		Timeout:       DefaultLLMTimeout,
+		Transport:     SafeLLMHTTPClient.Transport,
+		CheckRedirect: HTTPRedirectValidator(ValidateLMLEndpoint),
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -688,44 +713,150 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		return "", aferrors.Newf(aferrors.CodeLLMProviderFailed, "%s API returned status %d", n.config.ProviderName, resp.StatusCode)
 	}
 
-	if stream {
-		out, usage, err := n.readStreamResponse(resp, onChunk)
-		if err != nil {
-			tel.ErrText = err.Error()
-		} else {
-			// 成功返回 response 前上报出站字节（best-effort，监控器为 nil 时 no-op）
-			RecordOutbound(len(out))
-		}
-		tel.Response = out
-		// Streaming usage is only populated when the provider emits a
-		// usage chunk (requires stream_options.include_usage). Tolerant:
-		// providers that omit usage leave tel.Usage nil, mirroring the
-		// non-streaming path where Usage is nil if the provider omits it.
-		if usage != nil {
-			tel.Usage = usage
-		}
-		return out, err
+	out, usage, err := n.readStreamResponse(resp, onChunk)
+	if err != nil {
+		tel.ErrText = err.Error()
+	} else {
+		// 成功返回 response 前上报出站字节（best-effort，监控器为 nil 时 no-op）
+		RecordOutbound(len(out))
 	}
-
-	return n.processNonStreamingResponse(resp, &tel, cacheKey, llmCache, model)
+	tel.Response = out
+	// Streaming usage is only populated when the provider emits a
+	// usage chunk (requires stream_options.include_usage). Tolerant:
+	// providers that omit usage leave tel.Usage nil, mirroring the
+	// non-streaming path where Usage is nil if the provider omits it.
+	if usage != nil {
+		tel.Usage = usage
+	}
+	return out, err
 }
 
-func (n *OpenAICompatibleNode) processNonStreamingResponse(resp *http.Response, tel *LLMCallTelemetry, cacheKey string, llmCache *cache.Cache, model string) (string, error) {
+// llmUpstreamResult is the outcome of one non-streaming upstream round
+// trip. It is what a singleflight flight produces: the leader runs the
+// round trip once and every follower of the same key receives a copy of
+// this struct, from which each caller fills its own telemetry record.
+type llmUpstreamResult struct {
+	content    string
+	err        error
+	errText    string // telemetry short text: provider message or "status N"
+	statusCode int    // HTTP status, 0 if the request never got a response
+	usage      *LLMUsage
+}
+
+// doUpstreamCallDeduped performs the non-streaming upstream round trip for
+// one Execute call, deduplicating concurrent identical requests via
+// singleflight (P0-3): while one request for a given cache key is in
+// flight, later identical requests wait for it instead of issuing their
+// own upstream call, closing the thundering-herd window between a cache
+// miss and the cache write.
+//
+// Dedup is active only when the LLM response cache is active
+// (llmCache != nil, i.e. AFLARE_LLM_CACHE=1 or an injected SetCache
+// instance): the cache key already identifies the exact request (model +
+// messages + params + hashed API key), and cache users have already opted
+// into "identical request → shared response" semantics. With the cache
+// off the round trip is executed directly, byte-for-byte matching the
+// pre-singleflight behaviour — a best-of-N fan-out sending the same
+// prompt N times for independent samples keeps working.
+//
+// Follower cancellation: a caller whose ctx is cancelled while waiting
+// for the shared flight returns ctx.Err() immediately — the same result a
+// direct, un-deduped call would have produced — and the flight keeps
+// running for its remaining callers. If the leader's request fails, every
+// concurrent waiter receives the error; a later retry starts a fresh
+// flight (errors are never cached).
+func (n *OpenAICompatibleNode) doUpstreamCallDeduped(ctx context.Context, generateURL string, jsonBody []byte, apiKey string, cacheKey string, llmCache *cache.Cache, model string) llmUpstreamResult {
+	if llmCache == nil || cacheKey == "" {
+		return n.doUpstreamCall(ctx, generateURL, jsonBody, apiKey, cacheKey, llmCache, model)
+	}
+	ch := n.sf.DoChan(cacheKey, func() (interface{}, error) {
+		res := n.doUpstreamCall(ctx, generateURL, jsonBody, apiKey, cacheKey, llmCache, model)
+		return res, res.err
+	})
+	select {
+	case r := <-ch:
+		res, ok := r.Val.(llmUpstreamResult)
+		if !ok {
+			// Only reachable when the flight function panicked
+			// (r.Val == nil, r.Err carries the recovered panic).
+			res = llmUpstreamResult{err: r.Err}
+			if r.Err != nil {
+				res.errText = r.Err.Error()
+			}
+		}
+		if r.Shared {
+			logger.Debug("[dedup] concurrent identical LLM requests shared one upstream call",
+				"node", n.config.Name,
+				"provider", n.config.ProviderName,
+				"model", model,
+			)
+		}
+		return res
+	case <-ctx.Done():
+		return llmUpstreamResult{err: ctx.Err(), errText: ctx.Err().Error()}
+	}
+}
+
+// doUpstreamCall performs exactly one non-streaming HTTP round trip to the
+// provider: request construction, status validation, response parsing and
+// the LLM cache write (M-4/M-5 semantics preserved). It is the
+// singleflight flight body — the leader of a deduplicated request runs
+// it and its result is shared with all followers — but it is also called
+// directly when dedup is inactive.
+func (n *OpenAICompatibleNode) doUpstreamCall(ctx context.Context, generateURL string, jsonBody []byte, apiKey string, cacheKey string, llmCache *cache.Cache, model string) llmUpstreamResult {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, generateURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		err = fmt.Errorf("failed to create request: %w", err)
+		return llmUpstreamResult{err: err, errText: err.Error()}
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{
+		Timeout:       DefaultLLMTimeout,
+		Transport:     SafeLLMHTTPClient.Transport,
+		CheckRedirect: HTTPRedirectValidator(ValidateLMLEndpoint),
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		err = aferrors.Wrapf(err, aferrors.CodeLLMProviderFailed, "failed to call %s API", n.config.ProviderName)
+		return llmUpstreamResult{err: err, errText: err.Error()}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp LLMResponse
+		_ = json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&errResp) // best-effort: parse error body if present
+		if errResp.Error != nil && errResp.Error.Message != "" {
+			return llmUpstreamResult{
+				statusCode: resp.StatusCode,
+				err:        aferrors.Newf(aferrors.CodeLLMProviderFailed, "%s API error (%d): %s", n.config.ProviderName, resp.StatusCode, errResp.Error.Message),
+				errText:    errResp.Error.Message,
+			}
+		}
+		return llmUpstreamResult{
+			statusCode: resp.StatusCode,
+			err:        aferrors.Newf(aferrors.CodeLLMProviderFailed, "%s API returned status %d", n.config.ProviderName, resp.StatusCode),
+			errText:    fmt.Sprintf("status %d", resp.StatusCode),
+		}
+	}
+
 	var llmResp LLMResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, MaxHTTPResponseSize)).Decode(&llmResp); err != nil {
-		tel.ErrText = err.Error()
-		return "", aferrors.Wrapf(err, aferrors.CodeLLMProviderFailed, "failed to parse %s response", n.config.ProviderName)
+		err = aferrors.Wrapf(err, aferrors.CodeLLMProviderFailed, "failed to parse %s response", n.config.ProviderName)
+		return llmUpstreamResult{statusCode: resp.StatusCode, err: err, errText: err.Error()}
 	}
-	tel.Usage = llmResp.Usage
 
 	if len(llmResp.Choices) == 0 {
-		tel.ErrText = "no choices in response"
-		return "", aferrors.Newf(aferrors.CodeLLMProviderFailed, "no choices in %s response", n.config.ProviderName)
+		err := aferrors.Newf(aferrors.CodeLLMProviderFailed, "no choices in %s response", n.config.ProviderName)
+		return llmUpstreamResult{statusCode: resp.StatusCode, err: err, errText: err.Error(), usage: llmResp.Usage}
 	}
 
 	content := llmResp.Choices[0].Message.Content
-	tel.Response = content
 
+	// M-5: responses larger than maxCacheableResponseBytes are not cached —
+	// the cache write is skipped, but the response is still returned.
 	if cacheKey != "" && llmCache != nil && llmResp.Error == nil {
 		if len(content) > maxCacheableResponseBytes {
 			logger.Debug("[cache skip] LLM response exceeds per-entry size cap, not cached",
@@ -739,9 +870,10 @@ func (n *OpenAICompatibleNode) processNonStreamingResponse(resp *http.Response, 
 			llmCache.Set(cacheKey, content)
 		}
 	}
-	// 成功返回 response 前上报出站字节（best-effort，监控器为 nil 时 no-op）
+	// 成功返回 response 前上报出站字节（best-effort，监控器为 nil 时 no-op）。
+	// 对于被去重的请求这恰好只计一次：真实的上游出站确实只有一份响应。
 	RecordOutbound(len(content))
-	return content, nil
+	return llmUpstreamResult{content: content, statusCode: resp.StatusCode, usage: llmResp.Usage}
 }
 
 // checkLLMCache checks the LLM response cache for a non-streaming request.

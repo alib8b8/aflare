@@ -17,6 +17,7 @@ package workflow
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -428,3 +429,235 @@ var errDAGTestFailure = &dagTestError{}
 type dagTestError struct{}
 
 func (e *dagTestError) Error() string { return "intentional DAG test failure" }
+
+// ── P1-6：动态就绪队列调度专项测试 ──
+//
+// 验证点：
+//   1. 关键路径加速：快分支的跨层后续步骤无需等待同层慢步骤（消除批间
+//      队头阻塞），makespan 接近关键路径而非静态批次总和。
+//   2. 调度确定性：结果按派发顺序（依赖图拓扑序的纯函数）处理，
+//      trace/engine 写入顺序与完成时序无关。
+//   3. 中止语义：失败后停止派发新步骤，但已派发步骤被收集并记入
+//      trace；依赖失败步骤的后续步骤永不执行。
+//   4. 大规模：接近 MaxSteps 的步骤数下调度正确（无缺失/重复）。
+
+// dagFailAfterNode 延迟后返回错误，用于中止场景时序控制。
+type dagFailAfterNode struct {
+	name      string
+	delay     time.Duration
+	callCount *int32
+}
+
+func (n *dagFailAfterNode) Name() string        { return n.name }
+func (n *dagFailAfterNode) Description() string { return "delayed failure node" }
+func (n *dagFailAfterNode) Schema() nodes.NodeSchema {
+	return nodes.NodeSchema{Name: n.name, Input: "string", Output: "string"}
+}
+func (n *dagFailAfterNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	atomic.AddInt32(n.callCount, 1)
+	select {
+	case <-time.After(n.delay):
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+	return "", errDAGTestFailure
+}
+
+// TestDAG_DynamicReadyQueue_CriticalPathSpeedup 构造跨层加速场景：
+//
+//	静态层级  L0: slow(500ms) | fast(10ms)
+//	         L1: after_slow(20ms) | after_fast(200ms)
+//
+// 静态分批需 500+200=700ms（L1 整批等 after_fast）；动态调度下
+// after_fast 在 fast 完成后立即派发（t=10→210 完成），与 slow 并行，
+// makespan ≈ 520ms（slow→after_slow 关键路径）。阈值 620ms 区分两者。
+func TestDAG_DynamicReadyQueue_CriticalPathSpeedup(t *testing.T) {
+	var calls int32
+	reg := nodes.NewRegistry()
+	reg.Register(&dagSlowNode{name: "slow", delay: 500 * time.Millisecond, callCount: &calls})
+	reg.Register(&dagSlowNode{name: "fast", delay: 10 * time.Millisecond, callCount: &calls})
+	reg.Register(&dagSlowNode{name: "after_slow", delay: 20 * time.Millisecond, callCount: &calls})
+	reg.Register(&dagSlowNode{name: "after_fast", delay: 200 * time.Millisecond, callCount: &calls})
+
+	wf := &Workflow{
+		Name: "dag-dynamic-critical-path",
+		Steps: []WorkflowStep{
+			{Node: "slow", Name: "s_slow"},
+			{Node: "fast", Name: "s_fast"},
+			{Node: "after_slow", Name: "s_as", DependsOn: []string{"s_slow"}},
+			{Node: "after_fast", Name: "s_af", DependsOn: []string{"s_fast"}},
+		},
+	}
+
+	start := time.Now()
+	_, results, err := ExecuteWorkflow(context.Background(), wf, reg)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("DAG execution failed: %v", err)
+	}
+	if len(results) != 4 {
+		t.Fatalf("expected 4 results, got %d", len(results))
+	}
+	if calls != 4 {
+		t.Errorf("expected 4 node calls, got %d", calls)
+	}
+	// 静态分批 ≈700ms；动态调度 ≈520ms。620ms 阈值排除调度开销波动。
+	if elapsed > 620*time.Millisecond {
+		t.Errorf("DAG too slow (%v): after_fast likely waited for the slow sibling (batch head-of-line blocking)", elapsed)
+	}
+}
+
+// TestDAG_DynamicReadyQueue_DispatchOrderDeterministic 完成顺序与派发
+// 顺序不同（slow 最晚完成，但其依赖链 fast→s2→s3 早已全部完成），
+// 验证 trace 与 results 仍严格按派发顺序记录，且 lastOutput 取派发序
+// 最后一个成功步骤（而非最后完成的步骤）。
+func TestDAG_DynamicReadyQueue_DispatchOrderDeterministic(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&dagSlowNode{name: "dyn_slow", delay: 200 * time.Millisecond, callCount: new(int32)})
+	reg.Register(&dagSlowNode{name: "dyn1", delay: 10 * time.Millisecond, callCount: new(int32)})
+	reg.Register(&dagSlowNode{name: "dyn2", delay: 10 * time.Millisecond, callCount: new(int32)})
+	reg.Register(&dagSlowNode{name: "dyn3", delay: 10 * time.Millisecond, callCount: new(int32)})
+
+	wf := &Workflow{
+		Name: "dag-dynamic-order",
+		Steps: []WorkflowStep{
+			{Node: "dyn_slow", Name: "s0"},                       // 最慢，最后完成
+			{Node: "dyn1", Name: "s1"},                           // 快
+			{Node: "dyn2", Name: "s2", DependsOn: []string{"s1"}},
+			{Node: "dyn3", Name: "s3", DependsOn: []string{"s2"}},
+		},
+	}
+
+	out, results, trace, err := ExecuteWorkflowWithTrace(context.Background(), wf, reg, nil)
+	if err != nil {
+		t.Fatalf("DAG execution failed: %v", err)
+	}
+	if len(results) != 4 {
+		t.Fatalf("expected 4 results, got %d", len(results))
+	}
+
+	// 派发序（拓扑序纯函数）：[0, 1, 2, 3]。完成序是 [1, 2, 3, 0]
+	// （dyn_slow 最慢），若按完成序处理则顺序会不同——此处验证重排序
+	// 缓冲生效。
+	wantOrder := []int{0, 1, 2, 3}
+	for i, want := range wantOrder {
+		if got := results[i].StepIndex; got != want {
+			t.Errorf("results[%d].StepIndex = %d, want %d (dispatch order)", i, got, want)
+		}
+	}
+	if len(trace.Steps) != 4 {
+		t.Fatalf("expected 4 trace steps, got %d", len(trace.Steps))
+	}
+	for i, want := range wantOrder {
+		if got := trace.Steps[i].Index; got != want {
+			t.Errorf("trace.Steps[%d].Index = %d, want %d (dispatch order)", i, got, want)
+		}
+		if got := trace.Steps[i].NodeName; got == "" {
+			t.Errorf("trace.Steps[%d].NodeName empty", i)
+		}
+	}
+
+	// lastOutput 按处理顺序（= 派发序）取最后成功步骤：s3/dyn3。
+	if out != "dyn3-result" {
+		t.Errorf("final output = %q, want %q (last dispatched successful step)", out, "dyn3-result")
+	}
+}
+
+// TestDAG_DynamicReadyQueue_AbortedDispatchedStepsCollected 失败中止场景：
+// fastfail(10ms) 失败时 slowok(100ms) 仍在飞行中——已派发步骤必须被
+// 收集并记入 trace（保持 trace 完整），依赖失败步骤的 never 步骤
+// 永不执行。
+func TestDAG_DynamicReadyQueue_AbortedDispatchedStepsCollected(t *testing.T) {
+	neverCalls := int32(0)
+	reg := nodes.NewRegistry()
+	reg.Register(&dagSlowNode{name: "slowok", delay: 100 * time.Millisecond, callCount: new(int32)})
+	reg.Register(&dagFailAfterNode{name: "fastfail", delay: 10 * time.Millisecond, callCount: new(int32)})
+	reg.Register(&dagSlowNode{name: "never", delay: 1 * time.Millisecond, callCount: &neverCalls})
+
+	wf := &Workflow{
+		Name: "dag-dynamic-abort",
+		Steps: []WorkflowStep{
+			{Node: "slowok", Name: "s0"},
+			{Node: "fastfail", Name: "s1"},
+			{Node: "never", Name: "s2", DependsOn: []string{"s1"}},
+		},
+	}
+
+	out, results, trace, err := ExecuteWorkflowWithTrace(context.Background(), wf, reg, nil)
+	if err == nil {
+		t.Fatal("expected workflow error from failing step")
+	}
+	if !strings.Contains(err.Error(), "DAG step 1 failed") {
+		t.Errorf("error should identify failing step 1, got: %v", err)
+	}
+	if out != "" {
+		t.Errorf("aborted workflow output = %q, want empty", out)
+	}
+
+	// slowok 已派发：必须完成并记入 trace（处理序在 fastfail 之前，
+	// 因为派发序 [0, 1]）。
+	if len(results) != 2 {
+		t.Fatalf("expected 2 collected results (slowok + fastfail), got %d", len(results))
+	}
+	if len(trace.Steps) != 2 {
+		t.Fatalf("expected 2 trace steps, got %d", len(trace.Steps))
+	}
+	if trace.Steps[0].NodeName != "slowok" || trace.Steps[0].ErrorText != "" {
+		t.Errorf("trace.Steps[0] should be successful slowok, got %+v", trace.Steps[0])
+	}
+	if trace.Steps[1].NodeName != "fastfail" || trace.Steps[1].ErrorText == "" {
+		t.Errorf("trace.Steps[1] should be failed fastfail with error text, got %+v", trace.Steps[1])
+	}
+	if neverCalls != 0 {
+		t.Errorf("step depending on failed step executed %d times, want 0", neverCalls)
+	}
+}
+
+// TestDAG_DynamicReadyQueue_ManySteps 接近 MaxSteps 的调度正确性：
+// 10 条独立链 × 100 步 = 1000 步（= MaxSteps 上限）。瞬时节点，
+// 验证全部步骤恰好执行一次、结果索引无缺失无重复、整体无错误。
+func TestDAG_DynamicReadyQueue_ManySteps(t *testing.T) {
+	const chains = 10
+	const chainLen = 100 // chains * chainLen == MaxSteps
+	n := chains * chainLen
+
+	reg := nodes.NewRegistry()
+	reg.Register(&dagEchoNode{name: "tick"})
+	reg.Register(&dagEchoNode{name: "tock"})
+
+	steps := make([]WorkflowStep, 0, n)
+	for c := 0; c < chains; c++ {
+		for p := 0; p < chainLen; p++ {
+			step := WorkflowStep{Node: "tick", Name: fmt.Sprintf("c%dp%d", c, p)}
+			if p > 0 {
+				step.DependsOn = []string{fmt.Sprintf("c%dp%d", c, p-1)}
+			}
+			steps = append(steps, step)
+		}
+	}
+
+	wf := &Workflow{Name: "dag-dynamic-many-steps", Steps: steps}
+	_, results, err := ExecuteWorkflow(context.Background(), wf, reg)
+	if err != nil {
+		t.Fatalf("large DAG execution failed: %v", err)
+	}
+	if len(results) != n {
+		t.Fatalf("expected %d results, got %d", n, len(results))
+	}
+	seen := make(map[int]bool, n)
+	for _, r := range results {
+		if r.Error != nil {
+			t.Fatalf("unexpected step error: %v", r.Error)
+		}
+		if seen[r.StepIndex] {
+			t.Fatalf("step %d appears twice in results", r.StepIndex)
+		}
+		seen[r.StepIndex] = true
+	}
+	for i := 0; i < n; i++ {
+		if !seen[i] {
+			t.Fatalf("step %d missing from results", i)
+		}
+	}
+}

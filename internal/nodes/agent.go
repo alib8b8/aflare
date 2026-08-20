@@ -20,11 +20,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
 const defaultMaxAgentIterations = 10
+
+// maxParallelToolCalls bounds how many tool calls returned in a single
+// native-function-calling round may execute concurrently. Node execution is
+// already safe for concurrent use (the DAG executor runs node.Execute from
+// worker goroutines); the cap only keeps fan-out polite for rate-limited
+// endpoints.
+const maxParallelToolCalls = 4
 
 // AgentTool is now an alias for core.AgentTool (defined in
 // internal/nodes/core/params.go and re-exported via agent_node.go).
@@ -210,18 +218,21 @@ func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
 			}
 			conversation = append(conversation, assistantMsg)
 
-			// Execute all tool calls in parallel
-			for _, call := range toolCalls {
-				obs, toolErr := a.executeTool(ctx, call.Function.Name, call.Function.Arguments)
-				if toolErr != nil {
-					obs = fmt.Sprintf("Error: %v", toolErr)
-				}
+			// Execute tool calls. A single call runs inline (zero behavior
+			// change); multiple calls — the parallel-function-calling
+			// convention — run with bounded concurrency so one slow tool
+			// does not serialize the whole round. Observations are returned
+			// in call order, so the conversation stays deterministic
+			// regardless of completion order.
+			observations := a.executeToolCalls(ctx, toolCalls)
+
+			for idx, obs := range observations {
 				if a.enableThinking {
-					thoughtChain = append(thoughtChain, fmt.Sprintf("[Step %d Tool: %s] %s", i+1, call.Function.Name, truncate(obs, 200)))
+					thoughtChain = append(thoughtChain, fmt.Sprintf("[Step %d Tool: %s] %s", i+1, toolCalls[idx].Function.Name, truncate(obs, 200)))
 				}
 				// Append tool result as a tool-role message
 				conversation = append(conversation, LLMMessage{
-					Role:    "tool",
+					Role: "tool",
 					Content: obs,
 				})
 			}
@@ -395,6 +406,46 @@ func parseReActResponse(response string) (AgentThought, error) {
 	}
 
 	return thought, nil
+}
+
+// executeToolCalls executes the tool calls of one native-function-calling
+// round and returns one observation per call, in the same order as the calls:
+// the conversation is appended deterministically regardless of the order in
+// which tools finish. A single call executes inline with immediate callbacks
+// (identical to the legacy behavior); multiple calls execute concurrently,
+// bounded by maxParallelToolCalls.
+func (a *ReActAgent) executeToolCalls(ctx context.Context, calls []core.LLMToolCall) []string {
+	if len(calls) <= 1 {
+		var name, args string
+		if len(calls) == 1 {
+			name = calls[0].Function.Name
+			args = calls[0].Function.Arguments
+		}
+		obs, err := a.executeTool(ctx, name, args)
+		if err != nil {
+			obs = fmt.Sprintf("Error: %v", err)
+		}
+		return []string{obs}
+	}
+
+	observations := make([]string, len(calls))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxParallelToolCalls)
+	for i := range calls {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, name, args string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			obs, err := a.executeTool(ctx, name, args)
+			if err != nil {
+				obs = fmt.Sprintf("Error: %v", err)
+			}
+			observations[i] = obs
+		}(i, calls[i].Function.Name, calls[i].Function.Arguments)
+	}
+	wg.Wait()
+	return observations
 }
 
 func (a *ReActAgent) executeTool(ctx context.Context, toolName, toolInput string) (string, error) {

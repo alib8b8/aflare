@@ -52,6 +52,7 @@ type Config struct {
 	MaxIterations int      // Max agent iterations per turn (default: 10)
 	SafeMode      bool     // Block execute and destructive tools
 	Capabilities  []string // Capability names to enable (e.g. "reflection", "utility")
+	ContextBudget int      // Context budget override in tokens (P1-4); 0 = provider default
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -442,7 +443,10 @@ func (s *ChatSession) handleResume() {
 	}
 
 	fmt.Printf("Restored %d messages from %s.\n", restored, session.SavedAt.Format("2006-01-02 15:04"))
-	fmt.Printf("Context: %d/%d chars\n", s.loop.Context().TotalChars(), MaxContextChars)
+	// P1-4: report against the effective budget (provider default or the
+	// explicit override), not the hardcoded legacy constant.
+	tokens, limit, _ := s.loop.Context().ContextUsage()
+	fmt.Printf("Context: %d/%d tokens\n", tokens, limit)
 }
 
 // handleExport exports the conversation to a markdown file.

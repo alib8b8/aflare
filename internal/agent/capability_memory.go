@@ -163,10 +163,11 @@ func (m *MemoryCapability) PostProcess(ctx context.Context, input, output string
 	// Extract decisions: "let's use X", "we'll go with Y"
 	m.extractDecision(input, output)
 
-	// Sync new entries to the shared persistent store.
+	// Sync new entries to the shared persistent store. StoreCtx propagates
+	// the loop context into the (hybrid) embedding step.
 	store := memory.GetPersistentStore()
 	for _, e := range m.entries {
-		if err := store.Store(e.Key, e.Value, e.Category); err != nil {
+		if err := store.StoreCtx(ctx, e.Key, e.Value, e.Category); err != nil {
 			log.Printf("[memory] failed to sync entry to persistent store: key=%s err=%v", e.Key, err)
 		}
 	}
