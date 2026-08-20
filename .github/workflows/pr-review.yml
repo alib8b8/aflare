@@ -33,9 +33,11 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
+      # Blocking: a lint failure must red-cross the PR — this is part of
+      # the pre-merge CI gate (matches docs/code-review.md and the
+      # main-branch CI workflow, where lint is also blocking).
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
-        continue-on-error: true
         with:
           version: v2.12.2
           args: --timeout=5m

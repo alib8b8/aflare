@@ -1,6 +1,12 @@
 # Mirror main branch and tags from GitHub to GitCode (CN mirror).
 #
-# Triggered on every push to main (and manually / weekly as a fallback).
+# CI-GATED: the mirror only runs after the CI workflow succeeds on the
+# pushed commit (workflow_run), and the push step itself re-verifies that
+# the CI run for the exact main HEAD being mirrored is green. A red or
+# still-running build never reaches GitCode — GitHub is the source of
+# truth, GitCode only receives CI-validated code.
+#
+# Also available manually / weekly as a fallback (same CI gate applies).
 # Requires the GITCODE_TOKEN repository secret (GitCode personal access
 # token with repository write permission). GitHub automatically masks
 # secret values in logs, so the token never appears in output.
@@ -12,16 +18,23 @@
 name: Sync to GitCode
 
 on:
-  push:
+  workflow_run:
+    # Fires when the CI workflow completes on main; the job-level `if`
+    # below skips everything unless it concluded successfully.
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
   schedule:
-    # Weekly fallback re-sync (Sundays 02:17 UTC) in case a push-triggered
-    # run failed silently.
+    # Weekly fallback re-sync (Sundays 02:17 UTC) in case a
+    # workflow_run-triggered run failed silently.
     - cron: "17 2 * * 0"
 
 permissions:
   contents: read
+  # Read access to the Actions API so the gate step can query the CI run
+  # status for the commit being mirrored.
+  actions: read
 
 concurrency:
   group: sync-gitcode
@@ -29,16 +42,44 @@ concurrency:
 
 jobs:
   mirror:
-    # Never run on forks of this repository.
-    if: github.repository == 'alib8b8/aflare'
+    # Never run on forks; only mirror when the triggering CI run succeeded.
+    if: >-
+      github.repository == 'alib8b8/aflare' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # Always check out the CURRENT main HEAD (not the workflow_run head
+      # SHA): if main moved ahead while CI was running, the gate step below
+      # notices the new HEAD is not CI-green yet and skips — the next
+      # workflow_run will sync it once its CI passes.
       - name: Checkout (full history)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
+          ref: refs/heads/main
           fetch-depth: 0
           fetch-tags: true
+
+      - name: CI gate — main HEAD must be green
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          echo "Mirroring main @ ${sha} (trigger: ${GITHUB_EVENT_NAME})"
+          # Single API call: green iff ANY completed CI run for this exact
+          # commit concluded success (push or manual dispatch both count);
+          # an in-progress re-run never un-greens an already-validated SHA.
+          green=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${sha}&per_page=100" \
+            --jq '[.workflow_runs[] | select(.name == "CI")] | any(.status == "completed" and .conclusion == "success")')
+          echo "CI green for ${sha}: ${green}"
+          if [ "${green}" = "true" ]; then
+            echo "ci_green=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::CI gate not green for ${sha}. Mirror skipped — code must pass CI before it reaches GitCode."
+            echo "ci_green=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Check mirror reachable
         id: mirror
@@ -75,7 +116,7 @@ jobs:
           fi
 
       - name: Push main and tags to GitCode
-        if: steps.mirror.outputs.exists == 'true'
+        if: steps.mirror.outputs.exists == 'true' && steps.gate.outputs.ci_green == 'true'
         # GITCODE_TOKEN must be re-exported here: the credential helper
         # stored in the probe step expands ${GITCODE_TOKEN} when git
         # invokes it during this step, not when it is configured.

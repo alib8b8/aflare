@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `mcp.ServerEntry` 新增可选 `cwd` 字段（Agent Plugins 1.0 传递插件相对 cwd；主流 MCP 客户端同一 schema，向后兼容）
+- **GitCode 镜像加 CI 门禁**：sync-gitcode.yml 由"push 到 main 即镜像"改为 workflow_run（CI 成功后触发）+ 推送前经 Actions API 复核 main HEAD 的 CI 运行确为 success——CI 红色或未完成的构建永远不会到达 GitCode；手动/定时触发同样受门禁约束（不绿即跳过并留 notice）。为查询运行状态新增 `actions: read` 权限
+- **PR Review 的 golangci-lint 改为阻断性**：pr-review.yml 此前 `continue-on-error: true`——lint 失败照样绿灯，PR 门禁形同虚设（与 ci.yml 主干行为及 docs/code-review.md 声明的 Blocking: Yes 相悖）。现移除，lint 失败即红叉
+- **AGENTS.md 修正为真实工具链与提交规则**：原文件写的是 `npm test` / `npm run lint`（本项目为纯 Go 仓库，无 package.json，命令无效）。现写明 Go 1.25 工具链、golangci-lint v2.12.2 版本对齐要求、提交前本地 CI gate 命令集、GitHub/GitCode 提交策略（PR + CI 绿 + code review checklist）
 
 ### Security
 - **插件技能 frontmatter name 路径穿越（高危）**：SKILL.md frontmatter 的 `name` 字段此前未做与目录名相同的段校验——恶意插件可用合规目录名 + 穿越 frontmatter name 把 skill.json/workflow.yaml/SKILL.md 写到技能根目录外任意可写路径（含持久化 prompt 注入）。现 LoadSkills 拒绝非安全段的 frontmatter name，InstallPlugin 另加最终路径必须在技能根内的纵深防御检查（安全自检发现）
@@ -36,13 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **无标的的价格查询静默生成比特币监控（安全自检发现）**：price 关键词命中但既无股票代码也无加密货币提示时（如 "check gold price" / "监控黄金价格"），生成器此前无条件落入 CoinGecko 分支生成比特币监控工作流——错误的市场、错误的标的。现 CoinGecko 路由仅在实际提及加密资产时触发，其余无标的价格查询不生成任何取价步骤（新增回归测试）
 - **工作流审计在全新安装上被静默跳过**：工作流执行记录器仍按 0.8.x 逻辑要求 `AFLARE_AUDIT_HMAC_KEY` / `AFLARE_SECRETS_PASSWORD` 环境变量才写审计，而 0.9.0 的审计链已支持自动生成每安装随机密钥文件——两条路径不一致导致 `aflare run` 在未设环境变量的新安装上一条工作流审计都不写，且打印误导性警告。现移除该过时门控，密钥解析完全由 history 包负责（混沌测试实测发现）
 - **MemHarness 批判对损坏时间戳失效**：记忆 Timestamp 为空或不可解析时此前按"新鲜"处理（永不进入丢弃通道）。现按"陈旧"处理——损坏/被篡改的记录不再是批判盲区；`InstallPlugin` 不再忽略 `filepath.Abs` 错误；物化技能文件权限 0644 → 0640
-- **文档与数据口径修正**：skills-registry.json 的 `count` 字段在删除条目后与实际条目数不符（333 vs 330，现同步为 330）；README 中英文及系统提示词/工具描述中的"16 个领域/16 domains"统一修正为实际值 17 个领域（供应链场景包加入后未同步）
+- **文档与数据口径修正**：skills-registry.json 的 `count` 字段在删除 3 条注册后未同步（仍为 333，实际 330，现修正为 330）；README 中英文及系统提示词/工具描述中的"16 个领域/16 domains"统一修正为实际值 17 个领域（供应链场景包加入后未同步）
 
 ### Removed
 - **`internal/protocol` 死代码包**：intent 协议（DID 身份认证、跨域消息路由）共 605 行代码无任何调用方——宣称的跨域身份能力从未接线到 CLI / Agent / Runtime，属于纯宣称功能。整包删除（含测试），对二进制行为零影响
 - **`adaptive` 能力（伪学习）**：`AdaptiveCapability` 仅将反馈文本追加到 learning.json，`PreProcess` 只注入一段固定提示词，不存在任何实际学习/自适应决策逻辑——文档却宣称"从反馈中学习、跨轮次改进"。删除该能力及全部接线：`CreateCapability`/`AvailableCapabilities` 注册、`smart` 预设（现为 reflection + memory）、chat/agent/serve/webui CLI 帮助文本、学习日志 Feedback 字段与 adaptive 分组统计、相关测试用例；`ParseCapabilities("all")` 由 7 项变为 6 项
 - **学习日志 pattern 识别死代码**：`recognizePatterns`/`LearningPattern`/`normalizeIssue`、learningStore 的 pattern 缓存字段及 `LearningEntry` 从未被写入的 `Output` 字段均无生产调用方（仅测试自测），文件头注释却把 pattern 识别列为"关键特性"。一并删除，学习存储收敛为生产实际使用的追加/去重/压缩/读取链路（并发与竞争测试保留）
-- **3 个昇腾空壳模板**：`software-engineering/end-to-end-adapt`、`performance-tune`、`quick-adapt`——模板中的 `code_interpreter` 节点返回硬编码占位 JSON（`{"status":"not_available"}`），依赖的 `ascend_*` 执行节点不存在，装出来即失败。删除模板目录与 skills-registry.json 注册条目，内置模板 332 → 330
+- **3 个昇腾空壳模板**：`software-engineering/end-to-end-adapt`、`performance-tune`、`quick-adapt`——模板中的 `code_interpreter` 节点返回硬编码占位 JSON（`{"status":"not_available"}`），依赖的 `ascend_*` 执行节点不存在，装出来即失败。删除模板目录与 skills-registry.json 注册条目（注册表实际 333 → 330；README 此前宣称的 332 本身即为过时口径）；serve/webui 帮助文本顺带修正——删除 `bdi` / `multi-agent` / `simulation` 等 `CreateCapability` 从不认识的伪能力名（传入会被静默丢弃），对齐真实 6 能力
 
 ## [0.9.0] - 2026-08-16
 

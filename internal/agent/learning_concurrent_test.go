@@ -67,9 +67,9 @@ func TestLearningConcurrent_Append(t *testing.T) {
 	}
 }
 
-// TestLearningConcurrent_MixedCapabilities verifies concurrent writes
+// TestLearningConcurrent_ReflectionWrites verifies concurrent writes
 // of reflection entries from multiple goroutines with varied content.
-func TestLearningConcurrent_MixedCapabilities(t *testing.T) {
+func TestLearningConcurrent_ReflectionWrites(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := &learningStore{
 		maxRecentKeys: 50,
