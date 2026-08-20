@@ -18,7 +18,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.12'
+          go-version: '1.25.13'
 
       - name: Run go mod tidy
         run: go mod tidy
@@ -67,7 +67,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.12'
+          go-version: '1.25.13'
 
       # gosec stays advisory (false-positive prone); the dedicated
       # security-auto-fix.yml workflow tracks its findings via issues.
@@ -116,7 +116,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.12'
+          go-version: '1.25.13'
 
       - name: Build binary
         env:
