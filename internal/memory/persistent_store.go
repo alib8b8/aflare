@@ -31,6 +31,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/aflare/internal/metrics"
 )
 
 // PersistentMemoryEntry is a lightweight memory record persisted to disk.
@@ -462,6 +464,7 @@ func (s *PersistentMemoryStore) SearchCtx(ctx context.Context, query string, max
 	for i, c := range candidates {
 		result[i] = c.entry
 	}
+	metrics.RecordMemorySearch(mode, time.Since(searchStart), len(result))
 	return result
 }
 

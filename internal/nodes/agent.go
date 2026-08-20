@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/alib8b8/aflare/internal/metrics"
 	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
@@ -232,7 +234,7 @@ func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
 				}
 				// Append tool result as a tool-role message
 				conversation = append(conversation, LLMMessage{
-					Role: "tool",
+					Role:    "tool",
 					Content: obs,
 				})
 			}
@@ -431,6 +433,7 @@ func (a *ReActAgent) executeToolCalls(ctx context.Context, calls []core.LLMToolC
 	observations := make([]string, len(calls))
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, maxParallelToolCalls)
+	batchStart := time.Now()
 	for i := range calls {
 		wg.Add(1)
 		sem <- struct{}{}
@@ -445,6 +448,7 @@ func (a *ReActAgent) executeToolCalls(ctx context.Context, calls []core.LLMToolC
 		}(i, calls[i].Function.Name, calls[i].Function.Arguments)
 	}
 	wg.Wait()
+	metrics.RecordAgentToolBatch(len(calls), time.Since(batchStart))
 	return observations
 }
 

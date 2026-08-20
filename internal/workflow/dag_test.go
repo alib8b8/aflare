@@ -522,8 +522,8 @@ func TestDAG_DynamicReadyQueue_DispatchOrderDeterministic(t *testing.T) {
 	wf := &Workflow{
 		Name: "dag-dynamic-order",
 		Steps: []WorkflowStep{
-			{Node: "dyn_slow", Name: "s0"},                       // 最慢，最后完成
-			{Node: "dyn1", Name: "s1"},                           // 快
+			{Node: "dyn_slow", Name: "s0"}, // 最慢，最后完成
+			{Node: "dyn1", Name: "s1"},     // 快
 			{Node: "dyn2", Name: "s2", DependsOn: []string{"s1"}},
 			{Node: "dyn3", Name: "s3", DependsOn: []string{"s2"}},
 		},

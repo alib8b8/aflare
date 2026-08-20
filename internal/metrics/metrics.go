@@ -60,7 +60,7 @@ const (
 	SecurityBlocksGaugeName  = "aflare_security_blocks"
 
 	// P2-8: WAL durability / volume observability.
-	WALAppendsName        = "aflare_wal_appends_total"        // {record_type: delta|snapshot}
+	WALAppendsName        = "aflare_wal_appends_total" // {record_type: delta|snapshot}
 	WALAppendDurationName = "aflare_wal_append_duration_seconds"
 	WALCompactionsName    = "aflare_wal_compactions_total"
 	WALSyncsName          = "aflare_wal_syncs_total"

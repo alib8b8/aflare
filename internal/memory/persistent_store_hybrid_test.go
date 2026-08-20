@@ -137,10 +137,10 @@ func TestPersistentStore_HybridAgreementBonus(t *testing.T) {
 	//   b_vec:  no keyword overlap, vec 1.0 → combined = 1.0
 	//   d_kw:   keyword score 5, vec 0 (orthogonal) → combined = 5/11 ≈ 0.45
 	s.SetEmbedder(&craftedEmbedder{dim: 2, vecs: map[string]Vector{
-		"a_key cpp lint":         {1, 0},
-		"b_key unrelated words":  {1, 0},
-		"d_key cpp lint strict":  {0, 1},
-		"cpp lint":               {1, 0},
+		"a_key cpp lint":        {1, 0},
+		"b_key unrelated words": {1, 0},
+		"d_key cpp lint strict": {0, 1},
+		"cpp lint":              {1, 0},
 	}})
 	ctx := context.Background()
 	for _, e := range []struct{ key, value string }{

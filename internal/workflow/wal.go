@@ -63,13 +63,13 @@ import (
 //     O(N²) of one cumulative snapshot per step. Recovery folds deltas back
 //     into the latest full snapshot (see LoadStateWAL / Compact).
 type WALRecord struct {
-	Seq         int64             `json:"seq"`            // monotonically increasing sequence number
-	StepIndex   int               `json:"step_index"`     // 0-based step index
-	StepName    string            `json:"step_name"`      // step name (may be empty)
-	NodeName    string            `json:"node_name"`      // node type
-	Data        string            `json:"data"`           // flowing data after this step
-	StepOutputs map[int]string    `json:"step_outputs"`   // all (snapshot) or changed (delta) step outputs
-	Variables   map[string]string `json:"variables"`      // all (snapshot) or changed (delta) variables
+	Seq         int64             `json:"seq"`          // monotonically increasing sequence number
+	StepIndex   int               `json:"step_index"`   // 0-based step index
+	StepName    string            `json:"step_name"`    // step name (may be empty)
+	NodeName    string            `json:"node_name"`    // node type
+	Data        string            `json:"data"`         // flowing data after this step
+	StepOutputs map[int]string    `json:"step_outputs"` // all (snapshot) or changed (delta) step outputs
+	Variables   map[string]string `json:"variables"`    // all (snapshot) or changed (delta) variables
 	Timestamp   time.Time         `json:"timestamp"`
 	IsDelta     bool              `json:"is_delta,omitempty"` // true when outputs/variables are a delta
 }

@@ -20,8 +20,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	dto "github.com/prometheus/client_model/go"
 )
+
+// histogramSampleCount collects one sample from a non-Vec histogram and
+// returns its observation count. testutil.CollectAndCount cannot be used for
+// plain histograms: it counts series (always 1), not observations.
+func histogramSampleCount(c prometheus.Collector) uint64 {
+	ch := make(chan prometheus.Metric, 1)
+	c.Collect(ch)
+	m := <-ch
+	var dm dto.Metric
+	if err := m.Write(&dm); err != nil {
+		return 0
+	}
+	return dm.GetHistogram().GetSampleCount()
+}
 
 func TestRecordNodeExecution_IncrementsCounters(t *testing.T) {
 	const node = "test_node_record"
@@ -177,4 +193,127 @@ func TestCollectSnapshot_NoProvidersIsNoOp(t *testing.T) {
 	SetSecurityStatsProvider(nil)
 	SetCacheStatsProvider(nil)
 	CollectSnapshot() // should not panic
+}
+
+// ── P2-8: WAL / DAG / memory / dedup / tool-batch metrics ──
+
+func TestRecordWALAppend_DeltaVsSnapshot(t *testing.T) {
+	beforeDelta := testutil.ToFloat64(walAppends.WithLabelValues("delta"))
+	beforeSnapshot := testutil.ToFloat64(walAppends.WithLabelValues("snapshot"))
+
+	RecordWALAppend(true, time.Millisecond)
+	RecordWALAppend(false, 2*time.Millisecond)
+
+	if got := testutil.ToFloat64(walAppends.WithLabelValues("delta")); got != beforeDelta+1 {
+		t.Errorf("wal delta appends: expected %v, got %v", beforeDelta+1, got)
+	}
+	if got := testutil.ToFloat64(walAppends.WithLabelValues("snapshot")); got != beforeSnapshot+1 {
+		t.Errorf("wal snapshot appends: expected %v, got %v", beforeSnapshot+1, got)
+	}
+}
+
+func TestRecordWALAppend_ObservesDuration(t *testing.T) {
+	before := histogramSampleCount(walAppendDuration)
+	RecordWALAppend(true, 5*time.Millisecond)
+	if after := histogramSampleCount(walAppendDuration); after <= before {
+		t.Errorf("expected append-duration sample count to increase, got %d -> %d", before, after)
+	}
+}
+
+func TestIncWALCompactionAndSync(t *testing.T) {
+	beforeCompact := testutil.ToFloat64(walCompactions)
+	beforeSync := testutil.ToFloat64(walSyncs)
+	IncWALCompaction()
+	IncWALSync()
+	IncWALSync()
+	if got := testutil.ToFloat64(walCompactions); got != beforeCompact+1 {
+		t.Errorf("wal compactions: expected %v, got %v", beforeCompact+1, got)
+	}
+	if got := testutil.ToFloat64(walSyncs); got != beforeSync+2 {
+		t.Errorf("wal syncs: expected %v, got %v", beforeSync+2, got)
+	}
+}
+
+func TestRecordDAGStepReorderWait(t *testing.T) {
+	before := histogramSampleCount(dagStepReorderWait)
+	RecordDAGStepReorderWait(10 * time.Millisecond)
+	if after := histogramSampleCount(dagStepReorderWait); after <= before {
+		t.Errorf("expected reorder-wait sample count to increase, got %d -> %d", before, after)
+	}
+}
+
+func TestRecordMemorySearch_Modes(t *testing.T) {
+	beforeKw := testutil.ToFloat64(memorySearches.WithLabelValues("keyword"))
+	beforeHybrid := testutil.ToFloat64(memorySearches.WithLabelValues("hybrid"))
+
+	RecordMemorySearch("keyword", time.Millisecond, 2)
+	RecordMemorySearch("hybrid", 10*time.Millisecond, 5)
+
+	if got := testutil.ToFloat64(memorySearches.WithLabelValues("keyword")); got != beforeKw+1 {
+		t.Errorf("keyword searches: expected %v, got %v", beforeKw+1, got)
+	}
+	if got := testutil.ToFloat64(memorySearches.WithLabelValues("hybrid")); got != beforeHybrid+1 {
+		t.Errorf("hybrid searches: expected %v, got %v", beforeHybrid+1, got)
+	}
+}
+
+func TestRecordMemorySearch_ObservesDurationAndResults(t *testing.T) {
+	beforeDur := histogramSampleCount(memorySearchDuration)
+	beforeRes := histogramSampleCount(memorySearchResults)
+	RecordMemorySearch("hybrid", 7*time.Millisecond, 3)
+	if after := histogramSampleCount(memorySearchDuration); after <= beforeDur {
+		t.Errorf("expected search-duration sample count to increase, got %d -> %d", beforeDur, after)
+	}
+	if after := histogramSampleCount(memorySearchResults); after <= beforeRes {
+		t.Errorf("expected search-results sample count to increase, got %d -> %d", beforeRes, after)
+	}
+}
+
+func TestIncLLMSingleflightShared(t *testing.T) {
+	before := testutil.ToFloat64(llmSingleflightShared)
+	IncLLMSingleflightShared()
+	if got := testutil.ToFloat64(llmSingleflightShared); got != before+1 {
+		t.Errorf("singleflight shared: expected %v, got %v", before+1, got)
+	}
+}
+
+func TestRecordAgentToolBatch(t *testing.T) {
+	beforeDur := histogramSampleCount(agentToolBatchDuration)
+	RecordAgentToolBatch(4, 25*time.Millisecond)
+	if after := histogramSampleCount(agentToolBatchDuration); after <= beforeDur {
+		t.Errorf("expected batch-duration sample count to increase, got %d -> %d", beforeDur, after)
+	}
+}
+
+func TestRegister_IncludesP28Metrics(t *testing.T) {
+	Register()
+	// After registration every P2-8 collector must be registered with the
+	// default registry (Gather must find the metric families).
+	families, err := prometheus.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Gather: %v", err)
+	}
+	want := map[string]bool{
+		WALAppendsName:             false,
+		WALAppendDurationName:      false,
+		WALCompactionsName:         false,
+		WALSyncsName:               false,
+		DAGStepReorderWaitName:     false,
+		MemorySearchesName:         false,
+		MemorySearchDurationName:   false,
+		MemorySearchResultsName:    false,
+		LLMSingleflightSharedName:  false,
+		AgentToolBatchSizeName:     false,
+		AgentToolBatchDurationName: false,
+	}
+	for _, f := range families {
+		if _, ok := want[f.GetName()]; ok {
+			want[f.GetName()] = true
+		}
+	}
+	for name, found := range want {
+		if !found {
+			t.Errorf("metric %s not registered", name)
+		}
+	}
 }

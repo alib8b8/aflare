@@ -37,6 +37,7 @@ import (
 	"github.com/alib8b8/aflare/internal/config"
 	aferrors "github.com/alib8b8/aflare/internal/errors"
 	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/metrics"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -785,6 +786,7 @@ func (n *OpenAICompatibleNode) doUpstreamCallDeduped(ctx context.Context, genera
 			}
 		}
 		if r.Shared {
+			metrics.IncLLMSingleflightShared()
 			logger.Debug("[dedup] concurrent identical LLM requests shared one upstream call",
 				"node", n.config.Name,
 				"provider", n.config.ProviderName,

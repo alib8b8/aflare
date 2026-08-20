@@ -200,7 +200,6 @@ func (n *orderedEchoNode) Execute(ctx context.Context, input string, params map[
 // records every tool-role message it receives on the final call.
 type orderProvider struct {
 	calls         int
-	mu            *sync.Mutex
 	conversations *sync.Mutex
 	toolMessages  *[]string
 }
@@ -304,17 +303,6 @@ func TestReActAgent_ParallelToolCallsError(t *testing.T) {
 			t.Errorf("observation = %q, want %q", obs, "echo:ok")
 		}
 	}
-}
-
-type okEchoNode struct{}
-
-func (n *okEchoNode) Name() string        { return "ok_echo" }
-func (n *okEchoNode) Description() string { return "ok echo" }
-func (n *okEchoNode) Schema() core.NodeSchema {
-	return core.NodeSchema{Name: "ok_echo", Description: "ok", Input: "text", Output: "echoed"}
-}
-func (n *okEchoNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
-	return "echo:" + strings.TrimSpace(input), nil
 }
 
 type failEchoNode struct{}
