@@ -29,6 +29,13 @@ build/
 maintenance_report_*.txt
 __pycache__/
 
+# AI dev-loop internal state (maintained locally, never committed)
+/LOOP.md
+/STATE.md
+/loop-budget.md
+/loop-constraints.md
+/loop-run-log.md
+
 # Local scratch / test run artifacts
 /tmp/
 logs.zip

@@ -5,7 +5,7 @@
     <a href="README.en.md">English</a>
   </p>
   <p><strong>让 AI 告别聊天，开始执行</strong></p>
-  <p><em>本地优先 · 数据不出本地 · 连接你自己的 LLM / 数据库 / 知识库 · ReAct 推理 · 300+ 技能模板 · 确定性工作流执行</em></p>
+  <p><em>本地优先 · 数据不出本地 · 连接你自己的 LLM / 数据库 / 知识库 · ReAct 推理 · 330+ 技能模板 · 确定性工作流执行</em></p>
 
   <p>
     <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
@@ -79,7 +79,7 @@ aflare create "每 10 分钟检查贵州茅台 600519 股价，超过 1400 发�
 # 通知渠道支持：飞书 / 钉钉 / 企业微信群机器人（官方 webhook，见「金融场景与合规说明」）
 aflare run stock-monitor.yaml
 
-# 5. 交互式 AI Agent 对话（ReAct Agent + 300+ 技能）
+# 5. 交互式 AI Agent 对话（ReAct Agent + 330+ 技能）
 aflare chat
 # 或者: aflare chat -p deepseek -m deepseek-chat
 
@@ -106,12 +106,12 @@ aflare chat                    aflare create
   ↓                              ↓
 ReAct Agent 思考              关键词匹配生成
   ↓                              ↓
-调用 300+ 技能模板               YAML 工作流
+调用 330+ 技能模板               YAML 工作流
   ↓                              ↓
 工具执行 → 反思 → 优化           DAG 调度执行
 ```
 
-**Agent 模式**：通过 `aflare chat` 或 `aflare agent` 启动。内置 ReAct 推理循环，拥有 300+ 预置技能模板（17 个领域），支持 6 类可插拔能力（反思、人机协同、效用驱动、记忆等）。
+**Agent 模式**：通过 `aflare chat` 或 `aflare agent` 启动。内置 ReAct 推理循环，拥有 330+ 预置技能模板（17 个领域），支持 6 类可插拔能力（反思、人机协同、效用驱动、记忆等）。
 
 **工作流模式**：`aflare create` 通过关键词匹配将描述转为 YAML 工作流。YAML 确定了每一步做什么、依赖谁、失败怎么办。Runtime 负责 DAG 调度、WAL 崩溃恢复、Saga 事务补偿、熔断、审计——所有操作可追溯、可回放、可验证。
 
@@ -122,7 +122,7 @@ ReAct Agent 思考              关键词匹配生成
 ```
 L0: Agent        —  "帮我监控贵州茅台 600519，跌 5% 通知我"
                     ├── ReAct 推理循环（思考 → 调工具 → 观察 → 回答）
-                    ├── 300+ 技能模板（17 个领域）
+                    ├── 330+ 技能模板（17 个领域）
                     └── 6 类可插拔能力（反思/HITL/效用驱动等）
                        ↓
 L1: Workflow     —  YAML 确定性工作流（schedule → get_price → condition → feishu）
@@ -144,7 +144,7 @@ L2: Runtime      —  确定性执行层
 
 aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用户与个人。核心优势：
 
-**本地优先，数据不出本地** — 单二进制零运行时依赖，~5MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退、330 模板内嵌进二进制首跑自动释放）。
+**本地优先，数据不出本地** — 单二进制零运行时依赖，~5MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退、330+ 模板内嵌进二进制首跑自动释放）。
 
 **连接你自己的 LLM** — Ollama / vLLM / LM Studio / DeepSeek 本地部署 / 任何 OpenAI 兼容 endpoint，loopback 地址（127.0.0.1 / localhost）免 API Key 接入。有本地 LLM 时由 LLM 做意图理解与动态生成工作流（`--ai` / `chat`），无 LLM 时关键词匹配兜底，离线仍可用。
 
@@ -152,7 +152,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 
 **确定性执行保障** — YAML 声明式工作流：每一步做什么、依赖谁、失败怎么办全部确定。DAG 并行调度（TLA+ 形式化验证）、WAL 崩溃恢复 + Checkpoint（`--resume` 从中断处恢复）、Session 跨轮次持久化、Saga 事务补偿、幂等（Idempotency-Key + 跨进程锁）、重试 / 限流 / 熔断。所有操作可追溯、可回放、可验证。
 
-**Agent 与工作流双模式** — 对话式 Agent（`aflare chat`，ReAct 推理循环）与守护进程式 Agent（`aflare agent`，stdin + 定时任务 + 文件监听多源融合）共用同一核心；6 类可插拔能力（反思 / 人机协同 / 效用驱动 / 记忆 / 规划 / 工作流）；Agent 可降级为确定性工作流，灵活性与确定性兼得。300+ 预置技能模板覆盖 17 个领域。
+**Agent 与工作流双模式** — 对话式 Agent（`aflare chat`，ReAct 推理循环）与守护进程式 Agent（`aflare agent`，stdin + 定时任务 + 文件监听多源融合）共用同一核心；6 类可插拔能力（反思 / 人机协同 / 效用驱动 / 记忆 / 规划 / 工作流）；Agent 可降级为确定性工作流，灵活性与确定性兼得。330+ 预置技能模板覆盖 17 个领域。
 
 **安全合规** — HMAC 哈希链审计日志（防篡改）、AES-GCM 加密 + PBKDF2（600K 迭代）、Secret 自动脱敏（10+ 种模式：AWS/GitHub/JWT/私钥）、SSRF 防护 / Path Traversal / Command Injection 白名单、出站数据量异常监控 + 熔断器自动隔离、四级安全等级（L0-L3）按需收紧。
 
@@ -172,7 +172,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 |------|------|----------|
 | **ReAct Agent 对话** (`aflare chat`) | ✅ | 有测试 |
 | **守护进程式 Agent** (`aflare agent`) | ✅ | 有测试 |
-| **300+ 技能模板**（17 个领域） | ✅ | 有测试 |
+| **330+ 技能模板**（17 个领域） | ✅ | 有测试 |
 | **6 类可插拔能力**（反思/HITL/效用驱动等） | ✅ | 有测试 |
 | **多源输入融合**（stdin + 定时任务 + 文件监听） | ✅ | 有测试 |
 | DAG 并行调度 | ✅ | 有测试 + TLA+ 形式化验证 |
@@ -185,11 +185,11 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 | 表达式引擎（字节码 IR + 向量化） | ✅ | 有测试 |
 | 关键词匹配生成工作流 | ✅ | 有测试 |
 | MCP 协议支持（Server/Client） | ✅ | 有测试 |
-| **Agent Plugins 1.0.0 双向互通**（`marketplace install/export`） | ✅ | 有测试 |
-| **MemHarness 记忆批判-重构**（`harness_search` + 会话批判注入） | ✅ | 有测试 |
-| **步骤级输出契约 `output_schema`** | ✅ | 有测试 |
-| **有界预览输入 `preview_input`**（16KiB） | ✅ | 有测试 |
-| LLM 节点（22+ 模型） | ✅ | 有测试 |
+| **Agent Plugins 1.0.0 双向互通**（`marketplace install/export`，v0.10 dev） | ✅ | 有测试 |
+| **MemHarness 记忆批判-重构**（`harness_search` + 会话批判注入，v0.10 dev） | ✅ | 有测试 |
+| **步骤级输出契约 `output_schema`**（v0.10 dev） | ✅ | 有测试 |
+| **有界预览输入 `preview_input`**（16KiB，v0.10 dev） | ✅ | 有测试 |
+| LLM 节点（18 家内置提供商，任意 OpenAI 兼容模型可用） | ✅ | 有测试 |
 | 安全等级（L0-L3） | ✅ | 有测试 |
 
 > 实验性功能见下方 [实验性支持](#实验性支持) 章节。
@@ -197,7 +197,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 ### Agent 能力（对话式 + 守护进程式）
 
 - **ReAct 推理循环** — 思考 → 调用工具 → 观察结果 → 回答，支持 native function calling 和 JSON fallback
-- **300+ 预置技能模板** — 覆盖 17 个领域（金融、医疗、供应链、DevOps 等），Agent 自动匹配并执行
+- **330+ 预置技能模板** — 覆盖 17 个领域（金融、医疗、供应链、DevOps 等），Agent 自动匹配并执行
 - **统一事件循环** — 对话式（`aflare chat`）和守护进程式（`aflare agent`）共用同一 `AgentLoop` 核心，支持 stdin / 定时任务 / 文件监听多源输入融合
 - **6 类可插拔能力** — 按需启用，映射完整 Agent 类型分类学：
 
@@ -229,7 +229,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 - 100+ 内置模板
 
 ### LLM 节点（工作流中调用 LLM API）
-- 22+ 模型支持（OpenAI / DeepSeek / Qwen / GLM / Kimi 等）
+- 18 家内置提供商（OpenAI / DeepSeek / Qwen / GLM / Kimi / Anthropic / Gemini / Mistral / Ollama 等），任意 OpenAI 兼容模型可用
 - 完全离线运行（Ollama 本地 LLM）
 - LLM 智能路由（EWMA 延迟预测 + 帕累托成本排序）
 
@@ -277,7 +277,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 │  │                                                    │ │
 │  │  aflare chat / aflare agent                       │ │
 │  │  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │ │
-│  │  │ ReAct    │  │ 300+     │  │ 6 类可插拔      │  │ │
+│  │  │ ReAct    │  │ 330+     │  │ 6 类可插拔      │  │ │
 │  │  │ 推理循环  │  │ 技能模板  │  │ 能力            │  │ │
 │  │  └──────────┘  └──────────┘  └────────────────┘  │ │
 │  │                                                    │ │
@@ -301,8 +301,8 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 │                                                       │
 │  ┌──────────────────────────────────────────────────┐ │
 │  │ 执行目标                                          │ │
-│  │ Software (API/Web/DB) • Devices (Phone/HarmonyOS) │ │
-│  │ Robots (Drone, extensible) • IoT                  │ │
+│  │ Software (API/Web/DB/文件)                         │ │
+│  │ 外部设备（经自定义节点/MCP 接入，实验性）             │ │
 │  └──────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────┘
 ```
