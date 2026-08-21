@@ -106,7 +106,7 @@ func dispatchDAGStep(otelCtx, timeoutCtx context.Context, ps dagPreparedStep, re
 					"node", ps.wStep.Node,
 					"panic", r,
 					"stack", string(debug.Stack()),
-					)
+				)
 				resultChan <- dagExecResult{
 					idx:      ps.idx,
 					nodeName: ps.wStep.Node,
@@ -362,15 +362,15 @@ func newDAGScheduler(
 		initialInput: initialInput,
 		levelOf:      levelOf,
 		resultChan:   make(chan dagExecResult, n),
-		pending:     make([]int, n),
-		readyQueue:  make([]int, 0, n),
-		results:     make(map[int]dagExecResult, n),
-		prepared:    make(map[int]dagPreparedStep, n),
-		finalized:   make(map[int]bool, n),
-		dispatchAt:  make(map[int]time.Time, n),
-		levelStart:  make([]time.Time, numLevels),
-		levelEnd:    make([]time.Time, numLevels),
-		allResults:  make([]StepResult, 0, n),
+		pending:      make([]int, n),
+		readyQueue:   make([]int, 0, n),
+		results:      make(map[int]dagExecResult, n),
+		prepared:     make(map[int]dagPreparedStep, n),
+		finalized:    make(map[int]bool, n),
+		dispatchAt:   make(map[int]time.Time, n),
+		levelStart:   make([]time.Time, numLevels),
+		levelEnd:     make([]time.Time, numLevels),
+		allResults:   make([]StepResult, 0, n),
 	}
 	for i := 0; i < n; i++ {
 		s.pending[i] = len(graph.deps[i])
