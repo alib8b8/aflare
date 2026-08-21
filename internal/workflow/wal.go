@@ -42,6 +42,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -72,6 +73,16 @@ type WALRecord struct {
 	Variables   map[string]string `json:"variables"`    // all (snapshot) or changed (delta) variables
 	Timestamp   time.Time         `json:"timestamp"`
 	IsDelta     bool              `json:"is_delta,omitempty"` // true when outputs/variables are a delta
+}
+
+// walFrameLen converts a marshaled record length into the uint32 frame
+// length prefix, rejecting sizes that would silently truncate (and so
+// corrupt the frame) — gosec G115.
+func walFrameLen(dataLen int) (uint32, error) {
+	if uint64(dataLen) > math.MaxUint32 {
+		return 0, fmt.Errorf("wal: record too large (%d bytes, max %d)", dataLen, math.MaxUint32)
+	}
+	return uint32(dataLen), nil
 }
 
 // WAL is an append-only write-ahead log for workflow checkpoint state.
@@ -209,10 +220,15 @@ func (w *WAL) Append(rec WALRecord) error {
 		w.seq-- // roll back seq on marshal failure
 		return fmt.Errorf("wal: marshal: %w", err)
 	}
+	frameLen, err := walFrameLen(len(data))
+	if err != nil {
+		w.seq-- // roll back seq: the record never reached the log
+		return err
+	}
 
 	// Write: [length][json][crc32]
 	var lenBuf [walLenFieldLen]byte
-	binary.LittleEndian.PutUint32(lenBuf[:], uint32(len(data)))
+	binary.LittleEndian.PutUint32(lenBuf[:], frameLen)
 	if _, err := w.writer.Write(lenBuf[:]); err != nil {
 		return fmt.Errorf("wal: write len: %w", err)
 	}
@@ -425,8 +441,15 @@ func (w *WAL) Compact() error {
 			}
 			return fmt.Errorf("wal: compact marshal: %w", err)
 		}
+		frameLen, err := walFrameLen(len(data))
+		if err != nil {
+			if cerr := snapFile.Close(); cerr != nil {
+				logger.Warn("wal: compact snap close error", "stage", "too_large", "path", tmpPath, "error", cerr)
+			}
+			return fmt.Errorf("wal: compact: %w", err)
+		}
 		var lenBuf [walLenFieldLen]byte
-		binary.LittleEndian.PutUint32(lenBuf[:], uint32(len(data)))
+		binary.LittleEndian.PutUint32(lenBuf[:], frameLen)
 		if _, err := snapWriter.Write(lenBuf[:]); err != nil {
 			if cerr := snapFile.Close(); cerr != nil {
 				logger.Warn("wal: compact snap close error", "stage", "write_len", "path", tmpPath, "error", cerr)

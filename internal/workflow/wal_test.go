@@ -17,6 +17,7 @@ package workflow
 
 import (
 	"encoding/binary"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -34,6 +35,23 @@ func collectReplay(t *testing.T, path string) []WALRecord {
 		t.Fatalf("ReplayWAL failed: %v", err)
 	}
 	return got
+}
+
+func TestWALFrameLen_Boundary(t *testing.T) {
+	// The frame length prefix is uint32; sizes above it must be rejected
+	// instead of silently truncating (gosec G115 hardening).
+	if n, err := walFrameLen(0); err != nil || n != 0 {
+		t.Errorf("walFrameLen(0) = %d, %v; want 0, nil", n, err)
+	}
+	if n, err := walFrameLen(1024); err != nil || n != 1024 {
+		t.Errorf("walFrameLen(1024) = %d, %v; want 1024, nil", n, err)
+	}
+	if n, err := walFrameLen(int(math.MaxUint32)); err != nil || n != math.MaxUint32 {
+		t.Errorf("walFrameLen(MaxUint32) = %d, %v; want %d, nil", n, err, uint32(math.MaxUint32))
+	}
+	if _, err := walFrameLen(int(math.MaxUint32) + 1); err == nil {
+		t.Error("walFrameLen(MaxUint32+1) = nil error; want overflow rejection")
+	}
 }
 
 func TestWAL_AppendAndReplay(t *testing.T) {
