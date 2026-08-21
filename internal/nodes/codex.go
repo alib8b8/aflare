@@ -262,11 +262,20 @@ func isValidCodexModel(s string) bool {
 }
 
 // resolveCodexWorkdir validates a user-supplied working directory for the
-// codex subprocess. It canonicalizes the path (symlinks resolved) and
-// requires it to be an existing directory, so the value forwarded as
+// codex subprocess. It makes the path absolute, canonicalizes it (folding
+// any ".." traversal segments under the root, then resolving symlinks)
+// and requires it to be an existing directory, so the value forwarded as
 // --cwd is fully normalized before any subprocess is spawned.
 func resolveCodexWorkdir(dir string) (string, error) {
-	resolved, err := filepath.EvalSymlinks(dir)
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return "", fmt.Errorf("cwd %q cannot be made absolute: %w", dir, err)
+	}
+	// Folding the absolute path under a leading "/" collapses any
+	// remaining ".." segments (there is nothing above the root), which
+	// both neutralizes traversal sequences and canonicalizes the path.
+	canonical := filepath.Clean("/" + abs)
+	resolved, err := filepath.EvalSymlinks(canonical)
 	if err != nil {
 		return "", fmt.Errorf("cwd %q is not accessible: %w", dir, err)
 	}
