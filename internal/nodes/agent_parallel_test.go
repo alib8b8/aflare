@@ -274,6 +274,7 @@ func (p *singleToolProvider) Call(ctx context.Context, messages []LLMMessage, to
 // round becomes an "Error: ..." observation without failing the whole run.
 func TestReActAgent_ParallelToolCallsError(t *testing.T) {
 	reg := NewRegistry()
+	reg.Register(&okEchoNode{})
 	reg.Register(&failEchoNode{})
 
 	provider := &mixedProvider{}
@@ -303,6 +304,17 @@ func TestReActAgent_ParallelToolCallsError(t *testing.T) {
 			t.Errorf("observation = %q, want %q", obs, "echo:ok")
 		}
 	}
+}
+
+type okEchoNode struct{}
+
+func (n *okEchoNode) Name() string        { return "ok_echo" }
+func (n *okEchoNode) Description() string { return "ok echo" }
+func (n *okEchoNode) Schema() core.NodeSchema {
+	return core.NodeSchema{Name: "ok_echo", Description: "ok", Input: "text", Output: "echoed"}
+}
+func (n *okEchoNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
+	return "echo:" + strings.TrimSpace(input), nil
 }
 
 type failEchoNode struct{}
