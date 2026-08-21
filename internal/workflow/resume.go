@@ -193,6 +193,19 @@ func ResumeWorkflow(ctx context.Context, runID string) (string, []StepResult, er
 	exec := NewExecutor().WithWAL(WALPath(runID))
 	// Use a very long timeout for resumed workflows (7 days)
 	exec = exec.WithTimeout(7 * 24 * time.Hour)
+	// Record the workflow path so a second pause during this resume still
+	// copies the workflow into the new run dir. Prefer the recorded source
+	// path; fall back to the copy saved at pause time for runs whose meta
+	// lacks it.
+	resumeWfPath := meta.WorkflowPath
+	if resumeWfPath == "" {
+		if _, err := os.Stat(WorkflowPath(runID)); err == nil {
+			resumeWfPath = WorkflowPath(runID)
+		}
+	}
+	if resumeWfPath != "" {
+		exec = exec.WithWorkflowPath(resumeWfPath)
+	}
 
 	out, results, trace, err := exec.ExecuteWithTrace(ctx, wf, reg, nil)
 	if err != nil {

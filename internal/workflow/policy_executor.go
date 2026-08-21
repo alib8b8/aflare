@@ -167,6 +167,21 @@ func (pe *PolicyExecutor) WithCheckpoint(path string) *PolicyExecutor {
 	return pe
 }
 
+// WithWAL enables WAL-based resume on the underlying executor, returning the
+// PolicyExecutor so the policy wrapper is preserved. See Executor.WithWAL.
+func (pe *PolicyExecutor) WithWAL(path string) *PolicyExecutor {
+	pe.Executor = pe.Executor.WithWAL(path)
+	return pe
+}
+
+// WithWorkflowPath records the source workflow file path on the underlying
+// executor for pause-resume metadata, returning the PolicyExecutor so the
+// policy wrapper is preserved. See Executor.WithWorkflowPath.
+func (pe *PolicyExecutor) WithWorkflowPath(path string) *PolicyExecutor {
+	pe.Executor = pe.Executor.WithWorkflowPath(path)
+	return pe
+}
+
 // WithProgress registers a CLI progress callback on the underlying executor
 // (断点13). See Executor.WithProgress for details.
 func (pe *PolicyExecutor) WithProgress(cb StepProgressFunc) *PolicyExecutor {
