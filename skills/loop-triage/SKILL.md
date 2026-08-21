@@ -13,8 +13,8 @@ Run the daily triage loop for the aflare repository. Scan CI failures, open issu
 ## Prerequisites
 
 - Read access to the repository
-- `STATE.md` exists in repo root
-- `loop-run-log.md` exists in repo root
+- `STATE.md` exists in the local repo root (gitignored — loop state is not committed)
+- `loop-run-log.md` exists in the local repo root (gitignored)
 - GitHub API access or local git repo
 
 ## Instructions
@@ -97,8 +97,10 @@ Run loop-triage. CI red on main — build failure in gofmt check. 2 open issues.
 
 ## Resources
 
-- [STATE.md](./STATE.md) — State file to update
-- [LOOP.md](./LOOP.md) — Loop configuration
-- [loop-run-log.md](./loop-run-log.md) — Run log
-- [loop-budget.md](./loop-budget.md) — Budget limits
+Loop state files are maintained **locally** by the loop operator (gitignored, not committed):
+
+- `STATE.md` — State file to update
+- `LOOP.md` — Loop configuration
+- `loop-run-log.md` — Run log
+- `loop-budget.md` — Budget limits
 - [Loop Engineering — Daily Triage Pattern](https://github.com/cobusgreyling/loop-engineering/blob/main/patterns/daily-triage.md)

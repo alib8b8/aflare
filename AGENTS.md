@@ -30,4 +30,6 @@ Coverage must stay ≥ 60% overall and per-package (agent / workflow / memory at
 
 ## Loop conventions
 - Report-only week one (L1) before enabling auto-fix (L2)
-- See LOOP.md for cadence and human gates
+- Loop state files (LOOP.md / STATE.md / loop-budget.md / loop-constraints.md /
+  loop-run-log.md) are gitignored and maintained locally by the loop operator;
+  do not commit them
