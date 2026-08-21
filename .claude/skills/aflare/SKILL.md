@@ -114,7 +114,7 @@ aflare run workflow.yaml -var url="https://news.example.com"
 
 ## Resources
 
-- [Workflow Examples](.trae/skills/aflare-workflow/examples.md)
+- [Workflow Examples](skills/aflare/examples.md)
 - [Node Reference](docs/nodes-reference.md)
 - [Custom Nodes Guide](docs/custom-nodes.md)
 - [Batch URL Processor Example](examples/real-world/batch-url-processor/README.md)

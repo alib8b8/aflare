@@ -15,7 +15,7 @@ set -euo pipefail
 
 SKILL_NAME="aflare-workflow"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_SRC="$SCRIPT_DIR/.traecli/skills/$SKILL_NAME"
+SKILL_SRC="$SCRIPT_DIR/skills/aflare"
 
 CLI_DEST="$HOME/.traecli/skills/$SKILL_NAME"
 IDE_DEST="$HOME/.trae-cn/skills/$SKILL_NAME"
@@ -60,7 +60,7 @@ Options:
   --help       Show this help
 
 The skill files are located at:
-  .traecli/skills/aflare-workflow/
+  skills/aflare/
 EOF
       exit 0
       ;;
