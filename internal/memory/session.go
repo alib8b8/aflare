@@ -671,16 +671,27 @@ func NewSessionMemoryManager(storageDir string, maxSessions, maxPerSession int) 
 
 var sessionIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
 
+// sanitizeSessionID maps an arbitrary session identifier onto a
+// filesystem-safe one. IDs that already match the strict pattern pass
+// through unchanged; anything else (path separators, ".." traversal,
+// over-long or exotic identifiers) is replaced by a stable short hash.
+// Every code path that derives a storage path from a session ID MUST go
+// through this, so a hostile ID such as "x/../../victim" can never steer
+// file operations outside the session storage directory.
+func sanitizeSessionID(sessionID string) string {
+	if sessionIDPattern.MatchString(sessionID) {
+		return sessionID
+	}
+	h := sha256.Sum256([]byte(sessionID))
+	return "s_" + hex.EncodeToString(h[:16])
+}
+
 // GetSession retrieves or creates a memory session.
 func (mgr *SessionMemoryManager) GetSession(sessionID string) *SessionMemory {
 	if sessionID == "" {
 		sessionID = "default"
 	}
-	if !sessionIDPattern.MatchString(sessionID) {
-		// Sanitize invalid session IDs
-		h := sha256.Sum256([]byte(sessionID))
-		sessionID = "s_" + hex.EncodeToString(h[:16])
-	}
+	sessionID = sanitizeSessionID(sessionID)
 
 	mgr.mu.RLock()
 	session, exists := mgr.sessions[sessionID]
@@ -745,12 +756,22 @@ func (mgr *SessionMemoryManager) evictOldestLocked() {
 
 // DeleteSession removes a memory session.
 func (mgr *SessionMemoryManager) DeleteSession(sessionID string) {
+	if sessionID == "" {
+		sessionID = "default"
+	}
+	// Map the caller-supplied ID onto the same filesystem-safe ID that
+	// GetSession derives, so the delete hits the same map entry and the
+	// same storage file that reads/writes use — and so a hostile ID
+	// (e.g. "x/../../victim") can never steer os.Remove outside the
+	// session storage directory (path traversal via delete).
+	safeID := sanitizeSessionID(sessionID)
+
 	mgr.mu.Lock()
 	defer mgr.mu.Unlock()
-	delete(mgr.sessions, sessionID)
+	delete(mgr.sessions, safeID)
 
 	if mgr.storageDir != "" {
-		path := mgr.sessionFilePath(sessionID)
+		path := mgr.sessionFilePath(safeID)
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			logger.Warn("failed to remove session file", "path", path, "err", err)
 		}

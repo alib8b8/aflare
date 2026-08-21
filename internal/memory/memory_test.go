@@ -242,6 +242,61 @@ func TestSessionManagerDeleteSession(t *testing.T) {
 	}
 }
 
+// TestSessionManagerDeleteSessionTraversal verifies that a hostile session
+// ID containing path-traversal sequences cannot steer DeleteSession's
+// os.Remove outside the session storage directory, and that a session
+// created under a hostile ID is still deletable via the same hostile ID
+// (the sanitized storage key is used consistently on both sides).
+func TestSessionManagerDeleteSessionTraversal(t *testing.T) {
+	base := t.TempDir()
+	storageDir := filepath.Join(base, "sessions")
+	mgr := NewSessionMemoryManager(storageDir, 10, 100)
+
+	// A victim file OUTSIDE the storage directory that a traversal ID
+	// would try to reach: storageDir/session-x/../../victim.json
+	// resolves to base/victim.json.
+	victim := filepath.Join(base, "victim.json")
+	if err := os.WriteFile(victim, []byte(`{"keep": true}`), 0600); err != nil {
+		t.Fatalf("write victim: %v", err)
+	}
+
+	// Create a session under the hostile ID — GetSession sanitizes it to
+	// a hashed ID, so both the map entry and (after SaveAll) the storage
+	// file live under the sanitized name.
+	hostile := "x/../../victim"
+	s := mgr.GetSession(hostile)
+	if s.SessionID == hostile {
+		t.Fatal("GetSession should sanitize hostile session IDs")
+	}
+
+	// Deleting via the hostile ID must not touch the victim file.
+	mgr.DeleteSession(hostile)
+	if _, err := os.Stat(victim); err != nil {
+		t.Fatalf("victim file outside storageDir was removed: %v", err)
+	}
+
+	// The in-memory session created under the sanitized key must be gone.
+	for _, id := range mgr.ListSessions() {
+		if id == s.SessionID {
+			t.Fatalf("session %q still listed after DeleteSession(hostile)", id)
+		}
+	}
+
+	// A well-formed ID round-trips: create → persist → delete removes the
+	// storage file inside storageDir.
+	ok := mgr.GetSession("normal")
+	ok.Store("k", "v", "short", "text", nil, 24, 0.9, "test")
+	mgr.SaveAll()
+	wantPath := filepath.Join(storageDir, "session-normal.json")
+	if _, err := os.Stat(wantPath); err != nil {
+		t.Fatalf("expected persisted session file: %v", err)
+	}
+	mgr.DeleteSession("normal")
+	if _, err := os.Stat(wantPath); !os.IsNotExist(err) {
+		t.Fatalf("expected session file removed, stat err = %v", err)
+	}
+}
+
 func TestSessionManagerGetGlobalStats(t *testing.T) {
 	mgr := NewSessionMemoryManager(t.TempDir(), 10, 100)
 
