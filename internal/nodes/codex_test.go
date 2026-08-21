@@ -78,6 +78,7 @@ func TestCodexAgentNode_FlagConstruction(t *testing.T) {
 		"arg:gpt-5.6",
 		"arg:--max-turns",
 		"arg:20",
+		"arg:--",
 		"arg:fix the failing tests",
 	}
 	got := strings.Split(strings.TrimSpace(out), "\n")
@@ -163,8 +164,10 @@ func TestCodexAgentNode_MissingBinary(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing binary")
 	}
-	if !strings.Contains(err.Error(), "codex exec failed") {
-		t.Errorf("error = %v, want exec failure", err)
+	// LookPath resolves the binary before spawning, so a missing binary is
+	// reported directly instead of as a spawn-time exec failure.
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error = %v, want lookup failure", err)
 	}
 }
 
@@ -227,6 +230,9 @@ func TestCodexAgentNode_Validation(t *testing.T) {
 		{"bad approval", "x", map[string]string{"approval_policy": "always"}, "invalid approval_policy"},
 		{"max_turns negative", "x", map[string]string{"max_turns": "-1"}, "max_turns out of range"},
 		{"max_turns huge", "x", map[string]string{"max_turns": "100000"}, "max_turns out of range"},
+		{"bad model chars", "x", map[string]string{"model": "gpt; rm -rf /"}, "invalid model"},
+		{"model flag smuggling", "x", map[string]string{"model": "--dangerous-flag"}, "invalid model"},
+		{"binary relative path", "x", map[string]string{"binary": "./codex"}, "bare command name or an absolute path"},
 		{"cwd missing", "x", map[string]string{"cwd": "/nonexistent-dir-xyz"}, "not accessible"},
 	}
 	for _, tc := range cases {
@@ -259,6 +265,49 @@ func TestCodexBinaryPath_Override(t *testing.T) {
 	got := CodexBinaryPath("")
 	if got == "" {
 		t.Error("CodexBinaryPath default should not be empty")
+	}
+}
+
+func TestCodexAgentNode_PromptStartingWithDashIsPositional(t *testing.T) {
+	// A prompt that starts with "-" must arrive after the "--" separator
+	// so the CLI treats it as the task text, not as an unknown flag.
+	bin := writeMockCodex(t, 0, "", "")
+	node := &CodexAgentNode{}
+
+	out, err := node.Execute(context.Background(), "--version", map[string]string{"binary": bin})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	last := lines[len(lines)-1]
+	if last != "arg:--version" {
+		t.Errorf("last argv = %q, want prompt verbatim after --", last)
+	}
+	foundSep := false
+	for _, l := range lines {
+		if l == "arg:--" {
+			foundSep = true
+		}
+	}
+	if !foundSep {
+		t.Errorf("argv missing the -- separator: %q", lines)
+	}
+}
+
+func TestCodexAgentNode_CwdNotADirectory(t *testing.T) {
+	bin := writeMockCodex(t, 0, "", "")
+	filePath := filepath.Join(t.TempDir(), "plain-file")
+	if err := os.WriteFile(filePath, []byte("x"), 0600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	node := &CodexAgentNode{}
+	_, err := node.Execute(context.Background(), "task", map[string]string{
+		"binary": bin,
+		"cwd":    filePath,
+	})
+	if err == nil || !strings.Contains(err.Error(), "not a directory") {
+		t.Errorf("error = %v, want 'not a directory'", err)
 	}
 }
 

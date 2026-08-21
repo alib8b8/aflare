@@ -97,7 +97,7 @@ func (n *CodexAgentNode) Execute(ctx context.Context, input string, params map[s
 		return "", fmt.Errorf("prompt too long (%d chars, max 100000)", len(prompt))
 	}
 
-	binary := getParam(params, "binary", "codex")
+	binary := strings.TrimSpace(getParam(params, "binary", "codex"))
 	if binary == "" {
 		binary = "codex"
 	}
@@ -105,7 +105,7 @@ func (n *CodexAgentNode) Execute(ctx context.Context, input string, params map[s
 	sandbox := getParam(params, "sandbox", "strict")
 	approvalPolicy := getParam(params, "approval_policy", "never")
 	maxTurnsStr := getParam(params, "max_turns", "0")
-	cwd := getParam(params, "cwd", "")
+	cwd := strings.TrimSpace(getParam(params, "cwd", ""))
 	timeoutStr := getParam(params, "timeout", "10m")
 
 	if !validCodexSandboxes[sandbox] {
@@ -113,6 +113,20 @@ func (n *CodexAgentNode) Execute(ctx context.Context, input string, params map[s
 	}
 	if !validCodexApprovalPolicies[approvalPolicy] {
 		return "", fmt.Errorf("invalid approval_policy %q (valid: never, on-failure, on-request, untrusted)", approvalPolicy)
+	}
+	// The model string is forwarded as a flag value, so restrict it to the
+	// identifier charset real model names use (gpt-5.6, o4-mini,
+	// openai/gpt-5.6): this blocks argv-level tricks such as a model value
+	// that starts with "--" being re-parsed as another flag by the CLI.
+	if model != "" && !isValidCodexModel(model) {
+		return "", fmt.Errorf("invalid model %q: allowed characters are letters, digits, '.', '-', '_' and '/'", model)
+	}
+	// The binary must be either a bare command name (resolved via PATH) or
+	// an absolute path — a relative path would depend on the caller's
+	// working directory. Resolving through exec.LookPath verifies the file
+	// exists and is executable before anything is spawned.
+	if strings.ContainsAny(binary, `/\`) && !filepath.IsAbs(binary) {
+		return "", fmt.Errorf("binary must be a bare command name or an absolute path: %q", binary)
 	}
 
 	maxTurns := 0
@@ -132,13 +146,19 @@ func (n *CodexAgentNode) Execute(ctx context.Context, input string, params map[s
 	}
 
 	if cwd != "" {
-		info, err := os.Stat(cwd)
+		resolvedCwd, err := resolveCodexWorkdir(cwd)
 		if err != nil {
-			return "", fmt.Errorf("cwd %q is not accessible: %w", cwd, err)
+			return "", err
 		}
-		if !info.IsDir() {
-			return "", fmt.Errorf("cwd %q is not a directory", cwd)
-		}
+		cwd = resolvedCwd
+	}
+
+	// Resolve the binary now (not at spawn time) so a missing or
+	// non-executable binary fails before any subprocess side effects and
+	// the spawn below only ever receives the resolved absolute path.
+	resolvedBinary, err := exec.LookPath(binary)
+	if err != nil {
+		return "", fmt.Errorf("codex binary %q not found: %w", binary, err)
 	}
 
 	// Fail-closed audit trail, mirroring the execute node.
@@ -147,7 +167,9 @@ func (n *CodexAgentNode) Execute(ctx context.Context, input string, params map[s
 	}
 
 	// Build the fixed argv. The prompt is one argv element — no shell is
-	// involved, so prompt content cannot alter the command line.
+	// involved, so prompt content cannot alter the command line. The "--"
+	// separator guarantees a prompt that happens to start with "-" is
+	// treated as a positional argument, never as a flag.
 	args := []string{"exec", "--sandbox", sandbox, "--approval-policy", approvalPolicy}
 	if model != "" {
 		args = append(args, "--model", model)
@@ -158,7 +180,7 @@ func (n *CodexAgentNode) Execute(ctx context.Context, input string, params map[s
 	if cwd != "" {
 		args = append(args, "--cwd", cwd)
 	}
-	args = append(args, prompt)
+	args = append(args, "--", prompt)
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -185,7 +207,7 @@ func (n *CodexAgentNode) Execute(ctx context.Context, input string, params map[s
 		_ = os.Remove(errFile.Name()) // best-effort temp cleanup
 	}()
 
-	cmd := exec.CommandContext(ctx, binary, args...) // #nosec G204 -- fixed flag set from validated enums; prompt is a single argv element
+	cmd := exec.CommandContext(ctx, resolvedBinary, args...) // #nosec G204 -- fixed flag set from validated enums; binary resolved via LookPath; prompt follows "--" as a single argv element
 	cmd.Stdout = outFile
 	cmd.Stderr = errFile
 	// Inherit the environment: codex needs OPENAI_API_KEY / CODEX_HOME etc.
@@ -213,6 +235,49 @@ func (n *CodexAgentNode) Execute(ctx context.Context, input string, params map[s
 		return "", fmt.Errorf("codex exec produced no output")
 	}
 	return out, nil
+}
+
+// isValidCodexModel reports whether s is a plausible model identifier:
+// only the characters that appear in real model names (gpt-5.6,
+// openai/o4-mini) are accepted, so the value cannot smuggle extra argv
+// flags (e.g. a leading "--") into the codex command line.
+func isValidCodexModel(s string) bool {
+	if len(s) == 0 || len(s) > 128 {
+		return false
+	}
+	// A leading "-" would make the CLI parse the model value as another
+	// flag; real model names never start with one.
+	if s[0] == '-' {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '.' || r == '-' || r == '_' || r == '/':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// resolveCodexWorkdir validates a user-supplied working directory for the
+// codex subprocess. It canonicalizes the path (symlinks resolved) and
+// requires it to be an existing directory, so the value forwarded as
+// --cwd is fully normalized before any subprocess is spawned.
+func resolveCodexWorkdir(dir string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return "", fmt.Errorf("cwd %q is not accessible: %w", dir, err)
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return "", fmt.Errorf("cwd %q is not accessible: %w", dir, err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("cwd %q is not a directory", dir)
+	}
+	return resolved, nil
 }
 
 // CodexBinaryPath resolves the codex binary that the node would invoke,
