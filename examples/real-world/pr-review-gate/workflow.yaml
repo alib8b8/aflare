@@ -1,0 +1,109 @@
+name: PR Review Gate
+description: |
+  Approval-gated Codex review for a pull request: Codex reviews the diff in
+  a read-only sandbox, the workflow pauses at a human approval gate
+  (resumable), and only after a human approves do a second Codex run apply
+  the approved fixes.
+
+vars:
+  base_branch: main
+  review_sandbox: strict
+  fix_sandbox: permissive
+  codex_timeout: 20m
+  approval_file: aflare-pr-review-approve
+  report_path: pr-review-fix-summary.md
+
+steps:
+  - node: execute
+    name: get_diff
+    params:
+      command: "git diff {{var.base_branch}}...HEAD | head -n 3000"
+
+  - node: template_render
+    name: build_review_prompt
+    params:
+      template: |
+        Review the following pull-request diff against {{var.base_branch}}.
+
+        Your task:
+        1. Identify real defects only: bugs, security issues, race conditions,
+           breaking API changes. Do not comment on style.
+        2. For each finding give: file:line, severity (low/medium/high),
+           one-paragraph explanation, and a concrete suggested fix.
+        3. If the diff is clean, say so explicitly.
+
+        --- DIFF ---
+        {{.input}}
+        --- END DIFF ---
+
+  - node: codex_agent
+    name: review
+    params:
+      sandbox: "{{var.review_sandbox}}"
+      approval_policy: never
+      max_turns: "20"
+      timeout: "{{var.codex_timeout}}"
+
+  - node: human_in_loop
+    name: approval_gate
+    resumable: true
+    resume_on: manual
+    params:
+      mode: file
+      approval_file: "{{var.approval_file}}"
+      prompt: |
+        Codex review findings are below. To let the fix step run, create the
+        approval flag file and resume the workflow (see README).
+      on_approve: passthrough
+
+  - node: template_render
+    name: build_fix_prompt
+    params:
+      template: |
+        The review findings below were produced for the current pull request
+        and have been approved by a human reviewer. Apply them now.
+
+        Your task:
+        1. Apply only the approved findings — no extra refactoring.
+        2. Keep changes minimal and focused.
+        3. Do not weaken, skip or delete tests.
+        4. Summarize what you changed.
+
+        --- APPROVED FINDINGS ---
+        {{.input}}
+        --- END APPROVED FINDINGS ---
+
+  - node: codex_agent
+    name: apply_fix
+    params:
+      sandbox: "{{var.fix_sandbox}}"
+      approval_policy: never
+      max_turns: "40"
+      timeout: "{{var.codex_timeout}}"
+
+  - node: template_render
+    name: fix_summary
+    params:
+      template: |
+        # PR Review Gate — Fix Summary
+
+        Generated: {{ now }}
+
+        ## Approved findings (applied by Codex)
+
+        {{step.approval_gate}}
+
+        ## What Codex changed
+
+        {{step.apply_fix}}
+
+  - node: file_write
+    name: save
+    params:
+      path: "{{var.report_path}}"
+
+  - node: notify
+    name: notify
+    params:
+      channel: stdout
+      message: "PR review gate finished: findings applied after human approval. Summary: {{var.report_path}}. Review the working tree before committing."

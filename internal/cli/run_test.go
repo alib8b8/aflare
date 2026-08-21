@@ -21,6 +21,61 @@ import (
 	"testing"
 )
 
+// TestParseSetParams verifies the --set token parser: each token is exactly
+// one key=value pair and values keep their spaces (unlike the legacy
+// --params form, which splits a token on whitespace into multiple pairs).
+// This is what makes `--set test_command=go test ./...` work instead of
+// silently truncating the value to "go".
+func TestParseSetParams(t *testing.T) {
+	tests := []struct {
+		name   string
+		tokens []string
+		want   map[string]string
+	}{
+		{
+			name:   "empty",
+			tokens: nil,
+			want:   nil,
+		},
+		{
+			name:   "token without equals ignored",
+			tokens: []string{"noequals"},
+			want:   nil,
+		},
+		{
+			name:   "value with spaces kept verbatim",
+			tokens: []string{"test_command=go test ./... -short"},
+			want:   map[string]string{"test_command": "go test ./... -short"},
+		},
+		{
+			name:   "multiple tokens are separate pairs",
+			tokens: []string{"cmd=echo hello world", "path=out dir/file.md"},
+			want: map[string]string{
+				"cmd":  "echo hello world",
+				"path": "out dir/file.md",
+			},
+		},
+		{
+			name:   "value containing equals sign",
+			tokens: []string{"expr=a=b c"},
+			want:   map[string]string{"expr": "a=b c"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseSetParams(tc.tokens)
+			if len(got) != len(tc.want) {
+				t.Fatalf("parseSetParams got %d entries, want %d (%v)", len(got), len(tc.want), got)
+			}
+			for k, v := range tc.want {
+				if got[k] != v {
+					t.Errorf("parseSetParams[%q] = %q, want %q", k, got[k], v)
+				}
+			}
+		})
+	}
+}
+
 // TestAuditLock_SecondProcessRejected verifies the H-6 cross-process audit
 // lock: once a lock is held on an audit directory, a second acquireAuditLock
 // (simulating a concurrent aflare process) must fail. Without this lock, two

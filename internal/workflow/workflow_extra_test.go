@@ -633,7 +633,10 @@ func TestSaveCurrentStateAndRestoreState(t *testing.T) {
 	engine.SetStepOutput(0, "fetch", "fetched")
 	engine.SetVariable("api_key", "secret")
 
-	wf := &Workflow{Name: "test"}
+	wf := &Workflow{Name: "test", Steps: []WorkflowStep{
+		{Name: "fetch", Node: "http_request"},
+		{Name: "transform", Node: "template_render"},
+	}}
 	state := SaveCurrentState(wf, 1, "data", engine)
 	if state == nil {
 		t.Fatal("expected non-nil state")
@@ -646,13 +649,22 @@ func TestSaveCurrentStateAndRestoreState(t *testing.T) {
 	}
 
 	newEngine := NewExpressionEngine()
-	data := RestoreState(state, newEngine)
+	data := RestoreState(state, wf, newEngine)
 	if data != "data" {
 		t.Errorf("expected data 'data', got %s", data)
 	}
 	val, ok := newEngine.GetVariable("api_key")
 	if !ok || val != "secret" {
 		t.Error("expected restored variable")
+	}
+	// Restored outputs must be reachable by name ({{step.fetch}}), not just
+	// by index: a fresh engine's stepNames map is empty, so RestoreState
+	// resolves names from the workflow definition instead.
+	if got := newEngine.stepOutputs["name:fetch"]; got != "fetched" {
+		t.Errorf("expected name-keyed step output 'fetched', got %q", got)
+	}
+	if got := newEngine.stepOutputs["idx:0"]; got != "fetched" {
+		t.Errorf("expected index-keyed step output 'fetched', got %q", got)
 	}
 }
 

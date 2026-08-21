@@ -252,9 +252,16 @@ func SaveCurrentState(wf *Workflow, stepIndex int, data string, engine *Expressi
 }
 
 // RestoreState restores a previously saved workflow state into the engine.
-func RestoreState(state *WorkflowState, engine *ExpressionEngine) string {
+// The workflow supplies step names by index: a freshly constructed engine has
+// an empty stepNames map (it is only populated as steps execute), so without
+// this lookup a resumed workflow could reference restored outputs by index
+// ({{step.0}}) but not by name ({{step.fetch}}).
+func RestoreState(state *WorkflowState, wf *Workflow, engine *ExpressionEngine) string {
 	for idx, output := range state.StepOutputs {
-		name := engine.stepNames[idx]
+		name := ""
+		if wf != nil && idx >= 0 && idx < len(wf.Steps) {
+			name = wf.Steps[idx].Name
+		}
 		engine.SetStepOutput(idx, name, output)
 	}
 	for k, v := range state.Variables {

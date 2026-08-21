@@ -1,0 +1,49 @@
+{
+  "id": "real-world/pr-review-gate",
+  "name": "pr-review-gate",
+  "version": "1.0.0",
+  "description": "Approval-gated Codex PR review: read-only Codex review, human approval gate with pause/resume, then Codex applies the approved fixes.",
+  "author": "aflare community",
+  "category": "developer-tools",
+  "tags": [
+    "developer-tools",
+    "codex",
+    "pr-review",
+    "human-in-the-loop",
+    "real-world"
+  ],
+  "keywords": [
+    "codex",
+    "pr-review",
+    "approval-gate",
+    "human-in-the-loop",
+    "pause-resume"
+  ],
+  "inputs": [
+    {
+      "name": "base_branch",
+      "type": "string",
+      "required": false,
+      "default": "main"
+    },
+    {
+      "name": "review_sandbox",
+      "type": "string",
+      "required": false,
+      "default": "strict"
+    },
+    {
+      "name": "fix_sandbox",
+      "type": "string",
+      "required": false,
+      "default": "permissive"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "fix_summary",
+      "type": "string"
+    }
+  ],
+  "dependencies": null
+}

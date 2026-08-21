@@ -118,6 +118,25 @@ func stepRequiresLLM(s *WorkflowStep) bool {
 	return false
 }
 
+// HasResumableSteps reports whether any top-level step is marked
+// `resumable: true`. Only top-level regular steps can pause the workflow
+// (compound steps such as parallel/if/loop fail without pausing), so nested
+// resumable flags are intentionally not consulted. The CLI uses this to
+// auto-enable a WAL on fresh runs so a pause at a resumable step persists
+// completed-step state — without it, `aflare resume <run-id>` would restart
+// from step 0 and re-run side-effecting steps.
+func HasResumableSteps(wf *Workflow) bool {
+	if wf == nil {
+		return false
+	}
+	for i := range wf.Steps {
+		if wf.Steps[i].IsResumable() {
+			return true
+		}
+	}
+	return false
+}
+
 // paramRefRegex matches template variable references that resolve to
 // workflow parameters supplied via `--set` / `--params` at run time. It covers
 // both the runtime syntax `{{var.NAME}}` and the Go-template-style

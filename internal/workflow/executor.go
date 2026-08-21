@@ -296,7 +296,7 @@ func (s *seqExecState) initResumeState(walPath, statePath string) int {
 
 	if s.wal != nil {
 		if state, err := LoadStateWAL(walPath); err == nil && state != nil {
-			s.data = RestoreState(state, s.engine)
+			s.data = RestoreState(state, s.wf, s.engine)
 			resumeFromStep = state.StepIndex + 1
 			resumeFromStep = clampStep(resumeFromStep, len(s.wf.Steps))
 			logger.Info("Resuming workflow from step (WAL)", "name", s.wf.Name, "step", resumeFromStep, "wal", walPath)
@@ -309,7 +309,7 @@ func (s *seqExecState) initResumeState(walPath, statePath string) int {
 		}
 	} else if statePath != "" {
 		if state, err := loadCheckpoint(statePath); err == nil && state != nil {
-			s.data = RestoreState(state, s.engine)
+			s.data = RestoreState(state, s.wf, s.engine)
 			resumeFromStep = state.StepIndex + 1
 			resumeFromStep = clampStep(resumeFromStep, len(s.wf.Steps))
 			logger.Info("Resuming workflow from step", "name", s.wf.Name, "step", resumeFromStep, "checkpoint", statePath)

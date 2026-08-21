@@ -18,6 +18,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -152,7 +153,7 @@ func HandleRun(args []string, dryRun bool, safeMode bool) {
 	for k, v := range parseParams(legacyParams) {
 		merged[k] = v
 	}
-	for k, v := range parseParams(setParams) {
+	for k, v := range parseSetParams(setParams) {
 		merged[k] = v
 	}
 	if paramsFile != "" {
@@ -240,6 +241,29 @@ func parseParams(tokens []string) map[string]string {
 			if idx := strings.IndexByte(pair, '='); idx > 0 {
 				m[pair[:idx]] = pair[idx+1:]
 			}
+		}
+	}
+	if len(m) == 0 {
+		return nil
+	}
+	return m
+}
+
+// parseSetParams parses --set tokens. Unlike the legacy --params form, each
+// token is exactly one key=value pair and the value keeps its spaces (and
+// may itself contain '='), so commands like
+//
+//	--set test_command=go test ./... -short
+//
+// pass through verbatim instead of being truncated at the first space.
+func parseSetParams(tokens []string) map[string]string {
+	if len(tokens) == 0 {
+		return nil
+	}
+	m := make(map[string]string)
+	for _, t := range tokens {
+		if idx := strings.IndexByte(t, '='); idx > 0 {
+			m[t[:idx]] = t[idx+1:]
 		}
 	}
 	if len(m) == 0 {
@@ -386,10 +410,29 @@ func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath st
 		}
 	}
 
+	// Workflows with resumable steps: auto-enable a WAL on fresh runs so a
+	// pause at a resumable step persists completed-step state. Without it the
+	// pause metadata is saved but `aflare resume <run-id>` replays an empty
+	// WAL and re-runs every step from 0 — including side-effecting ones.
+	// Explicit --resume keeps the JSON checkpoint semantics, so the two
+	// mechanisms stay mutually exclusive. Any stale WAL left by an earlier
+	// fresh run is discarded here so each fresh run starts from step 0.
+	walPath := ""
+	if !resumeEnabled && workflow.HasResumableSteps(wf) {
+		name := wf.Name
+		if name == "" {
+			name = strings.TrimSuffix(filepath.Base(wfPath), filepath.Ext(wfPath))
+		}
+		walPath = filepath.Join(meta.DataDir(), "checkpoints", name+".wal")
+		if err := os.Remove(walPath); err != nil && !os.IsNotExist(err) {
+			logger.Warn("failed to discard stale WAL, this run may resume from it", "path", walPath, "error", err)
+		}
+	}
+
 	if isatty.IsTerminal(os.Stdout.Fd()) {
-		RunTUI(wfPath, wf, reg, statePath, safeMode)
+		RunTUI(wfPath, wf, reg, statePath, walPath, safeMode)
 	} else {
-		RunCLI(wf, reg, statePath, safeMode)
+		RunCLI(wfPath, wf, reg, statePath, walPath, safeMode)
 	}
 }
 
@@ -491,7 +534,7 @@ func newPolicyEngine(safeMode bool) *policy.Engine {
 }
 
 // RunTUI runs a workflow in interactive TUI mode.
-func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, safeMode bool) {
+func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, walPath string, safeMode bool) {
 	model := tui.NewModel(wf.Name, wfPath, len(wf.Steps))
 	program := tea.NewProgram(model, tea.WithAltScreen())
 
@@ -504,6 +547,12 @@ func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 		if statePath != "" {
 			exec = exec.WithCheckpoint(statePath)
 		}
+		if walPath != "" {
+			exec = exec.WithWAL(walPath)
+		}
+		// Record the source workflow path so a pause at a resumable step
+		// can copy the workflow into the run dir for later resume.
+		exec = exec.WithWorkflowPath(wfPath)
 		if err := exec.ValidateWorkflow(ctx, wf); err != nil {
 			log.Printf("Policy validation failed: %v", err)
 			return
@@ -531,7 +580,7 @@ func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 //
 // Errors are translated to user-friendly messages via humanizeError (断点11),
 // while the raw error is logged at debug level for troubleshooting.
-func RunCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string, safeMode bool) {
+func RunCLI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, walPath string, safeMode bool) {
 	if wf.Name != "" {
 		fmt.Printf("%s\n", i18n.T("workflow.name", wf.Name))
 	}
@@ -580,6 +629,12 @@ func RunCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string, safeMo
 	if statePath != "" {
 		exec = exec.WithCheckpoint(statePath)
 	}
+	if walPath != "" {
+		exec = exec.WithWAL(walPath)
+	}
+	// Record the source workflow path so a pause at a resumable step can
+	// copy the workflow into the run dir for later resume.
+	exec = exec.WithWorkflowPath(wfPath)
 	exec = exec.WithProgress(progressCB)
 	if err := exec.ValidateWorkflow(context.Background(), wf); err != nil {
 		fmt.Printf("Policy validation failed: %v\n", err)
@@ -588,6 +643,15 @@ func RunCLI(wf *workflow.Workflow, reg *nodes.Registry, statePath string, safeMo
 	finalOutput, _, execErr = exec.Execute(context.Background(), wf, reg)
 
 	if execErr != nil {
+		// 暂停而非失败：给出 run-id 和恢复命令，而不是把暂停当成普通
+		// 错误报给用户。
+		var paused *workflow.ErrWorkflowPaused
+		if errors.As(execErr, &paused) {
+			fmt.Printf("\n⏸ 工作流已暂停于步骤 %d（%s）：%s\n", paused.StepIndex+1, paused.StepName, paused.Message)
+			fmt.Printf("   恢复执行：aflare resume %s\n", paused.RunID)
+			logger.Info("workflow paused", "run_id", paused.RunID, "step", paused.StepName)
+			os.Exit(1)
+		}
 		// 工作流级错误也走翻译层 (断点11).
 		human, debug := humanizeError(execErr, "")
 		fmt.Printf("\n%s\n", i18n.T("workflow.failed", human))
