@@ -1,0 +1,48 @@
+{
+  "id": "real-world/nightly-ci-fix",
+  "name": "nightly-ci-fix",
+  "version": "1.0.0",
+  "description": "Nightly autonomous CI repair loop: run tests, let a Codex agent fix failures, verify, and write a report.",
+  "author": "aflare community",
+  "category": "developer-tools",
+  "tags": [
+    "developer-tools",
+    "codex",
+    "ci",
+    "scheduled",
+    "real-world"
+  ],
+  "keywords": [
+    "codex",
+    "ci-fix",
+    "nightly",
+    "automation"
+  ],
+  "inputs": [
+    {
+      "name": "test_command",
+      "type": "string",
+      "required": false,
+      "default": "go test ./... -count=1 -short 2>&1 | tail -n 200"
+    },
+    {
+      "name": "codex_sandbox",
+      "type": "string",
+      "required": false,
+      "default": "permissive"
+    },
+    {
+      "name": "codex_timeout",
+      "type": "string",
+      "required": false,
+      "default": "30m"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "report",
+      "type": "string"
+    }
+  ],
+  "dependencies": null
+}

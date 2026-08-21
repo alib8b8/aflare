@@ -1,0 +1,80 @@
+name: Nightly CI Fix
+description: |
+  Nightly autonomous CI repair loop: run the test suite, hand the failure
+  output to a Codex agent (codex exec) to diagnose and fix, re-run the
+  suite to verify, then write a timestamped report. Pair with
+  `aflare schedule add --cron "0 2 * * *" workflow.yaml` for unattended
+  nightly runs.
+
+vars:
+  # The pipe through tail matters: it makes the step exit 0 even when tests
+  # fail (the pipeline's exit status is tail's), so the failure output can
+  # flow on to the codex_agent step instead of aborting the workflow.
+  test_command: go test ./... -count=1 -short 2>&1 | tail -n 200
+  codex_sandbox: permissive
+  codex_timeout: 30m
+  report_path: nightly-ci-fix-report.md
+
+steps:
+  - node: execute
+    name: run_tests
+    params:
+      command: "{{var.test_command}}"
+
+  - node: template_render
+    name: build_prompt
+    params:
+      template: |
+        The nightly CI test run produced the output below (possibly failing).
+
+        Your task:
+        1. Diagnose why tests fail (if they pass, briefly confirm health).
+        2. Fix the root cause in this repository with minimal, focused changes.
+        3. Do not weaken, skip or delete tests to make them pass.
+        4. Summarize what you changed and why.
+
+        --- TEST OUTPUT ---
+        {{.input}}
+        --- END TEST OUTPUT ---
+
+  - node: codex_agent
+    name: fix
+    params:
+      sandbox: "{{var.codex_sandbox}}"
+      approval_policy: never
+      max_turns: "40"
+      timeout: "{{var.codex_timeout}}"
+
+  - node: execute
+    name: verify
+    params:
+      command: "{{var.test_command}}"
+
+  - node: template_render
+    name: report
+    params:
+      template: |
+        # Nightly CI Fix Report
+
+        Generated: {{ now }}
+
+        ## Codex fix summary
+
+        {{step.fix}}
+
+        ## Verification run (after fix)
+
+        ```
+        {{step.verify}}
+        ```
+
+  - node: file_write
+    name: save
+    params:
+      path: "{{var.report_path}}"
+
+  - node: notify
+    name: notify
+    params:
+      channel: stdout
+      message: "Nightly CI fix finished. Report written to {{var.report_path}}."
