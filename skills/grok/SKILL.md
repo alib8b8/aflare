@@ -1,6 +1,6 @@
 ---
 name: aflare
-description: 终端工作流自动化引擎，通过自然语言生成并执行 YAML 工作流。支持 20+ 内置节点、15+ LLM 提供商。
+description: 终端工作流自动化引擎，通过自然语言生成并执行 YAML 工作流。支持 45+ 内置节点、15+ LLM 提供商。
 invocation: both
 ---
 
