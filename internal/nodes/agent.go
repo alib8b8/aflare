@@ -68,6 +68,9 @@ type ReActAgent struct {
 	onChunk      func(chunk string)
 	onToolCall   func(toolName, input string)
 	onToolResult func(toolName, result string)
+	// Conversation character budget; when exceeded the middle of the
+	// conversation is compacted (see agent_compact.go). 0 disables.
+	contextBudget int
 	// Optional: inject a mock LLM provider for testing
 	llmProvider LLMProvider
 }
@@ -87,6 +90,7 @@ func NewReActAgent(provider, model, apiKey, endpoint, systemPrompt string, maxIt
 		registry:       reg,
 		enableThinking: enableThinking,
 		showThinking:   showThinking,
+		contextBudget:  defaultAgentContextBudgetResolved(),
 	}
 }
 
@@ -200,6 +204,11 @@ func (a *ReActAgent) Run(ctx context.Context, input string) (string, error) {
 	var lastAnswer string
 
 	for i := 0; i < a.maxIters; i++ {
+		// Compact the conversation before each LLM call so a long tool
+		// chain cannot blow the model's context window (see
+		// agent_compact.go). No-op while within budget.
+		conversation = compactConversation(conversation, a.contextBudget)
+
 		// Try native function calling first (when tools are available and provider supports it).
 		// Falls back to JSON parsing if the model doesn't return tool_calls.
 		response, toolCalls, err := a.callLLMWithTools(ctx, conversation, toolDefs)

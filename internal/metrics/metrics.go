@@ -80,6 +80,9 @@ const (
 	// P2-8: ReAct parallel tool-call batches.
 	AgentToolBatchSizeName     = "aflare_agent_tool_batch_size"
 	AgentToolBatchDurationName = "aflare_agent_tool_batch_duration_seconds"
+
+	// ReAct agent conversation compaction (context budget exceeded).
+	AgentContextCompactionsName = "aflare_agent_context_compactions_total"
 )
 
 var (
@@ -219,6 +222,12 @@ var (
 		Buckets: prometheus.DefBuckets,
 	})
 
+	// ReAct agent conversation compaction.
+	agentContextCompactions = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: AgentContextCompactionsName,
+		Help: "Total number of times the ReAct agent conversation was compacted due to the context budget being exceeded.",
+	})
+
 	registerOnce sync.Once
 )
 
@@ -251,6 +260,7 @@ func Register() {
 			llmSingleflightShared,
 			agentToolBatchSize,
 			agentToolBatchDuration,
+			agentContextCompactions,
 		)
 	})
 }
@@ -360,6 +370,12 @@ func IncLLMSingleflightShared() {
 func RecordAgentToolBatch(count int, duration time.Duration) {
 	agentToolBatchSize.Observe(float64(count))
 	agentToolBatchDuration.Observe(duration.Seconds())
+}
+
+// IncAgentContextCompactions increments the counter of ReAct agent
+// conversation compactions (context budget exceeded).
+func IncAgentContextCompactions() {
+	agentContextCompactions.Inc()
 }
 
 // --- Snapshot collection -------------------------------------------------
