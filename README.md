@@ -91,7 +91,7 @@ aflare agent -c reflection,planning,utility
 
 ## 项目状态
 
-aflare 目前处于 **v0.9.0 阶段**（v0.10 开发中）。核心 Runtime 能力（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断）已实现并通过 CI 验证。v0.9.0 交付国密算法支持（SM3 审计链 / SM4 密钥存储，opt-in）、审计链安全硬化（每安装随机 HMAC 密钥、跨进程日志锁、bundle 截断伪造防护）、MCP server 一键安装（`aflare mcp install`）与 0.8.x 字节级升级兼容。当前开发版新增：**Agent Plugins 1.0.0 宿主支持**（与 VS Code / Cursor / Copilot 等客户端的插件生态双向互通）、**MemHarness 记忆批判-重构模式**（记忆是重构的线索，不是当前任务的事实）、**步骤级类型化输出契约与有界预览输入**、**水印部署溯源**，并经一轮安全自检修复插件路径穿越、symlink 绕过与记忆数据竞争等问题（见 [CHANGELOG](CHANGELOG.md)）。国产芯片（昇腾/寒武纪/海光）场景通过 OpenAI 兼容接口接入本地推理服务（非原生 SDK 集成），持续完善中。硬件设备控制（机器人等）不在内置范围——用户可通过自定义节点或 MCP Server 自行接入，数据不出内网。
+aflare 目前处于 **v0.10.0 阶段**。核心 Runtime 能力（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断）已实现并通过 CI 验证。v0.9.0 交付国密算法支持（SM3 审计链 / SM4 密钥存储，opt-in）、审计链安全硬化（每安装随机 HMAC 密钥、跨进程日志锁、bundle 截断伪造防护）、MCP server 一键安装（`aflare mcp install`）与 0.8.x 字节级升级兼容。v0.10.0 新增交付：**Agent Plugins 1.0.0 宿主支持**（与 VS Code / Cursor / Copilot 等客户端的插件生态双向互通）、**MemHarness 记忆批判-重构模式**（记忆是重构的线索，不是当前任务的事实）、**步骤级类型化输出契约与有界预览输入**、**水印部署溯源**，并经一轮安全自检修复插件路径穿越、symlink 绕过与记忆数据竞争等问题（见 [CHANGELOG](CHANGELOG.md)）。国产芯片（昇腾/寒武纪/海光）场景通过 OpenAI 兼容接口接入本地推理服务（非原生 SDK 集成），持续完善中。硬件设备控制（机器人等）不在内置范围——用户可通过自定义节点或 MCP Server 自行接入，数据不出内网。
 
 ---
 
@@ -185,10 +185,10 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 | 表达式引擎（字节码 IR + 向量化） | ✅ | 有测试 |
 | 关键词匹配生成工作流 | ✅ | 有测试 |
 | MCP 协议支持（Server/Client） | ✅ | 有测试 |
-| **Agent Plugins 1.0.0 双向互通**（`marketplace install/export`，v0.10 dev） | ✅ | 有测试 |
-| **MemHarness 记忆批判-重构**（`harness_search` + 会话批判注入，v0.10 dev） | ✅ | 有测试 |
-| **步骤级输出契约 `output_schema`**（v0.10 dev） | ✅ | 有测试 |
-| **有界预览输入 `preview_input`**（16KiB，v0.10 dev） | ✅ | 有测试 |
+| **Agent Plugins 1.0.0 双向互通**（`marketplace install/export`） | ✅ | 有测试 |
+| **MemHarness 记忆批判-重构**（`harness_search` + 会话批判注入） | ✅ | 有测试 |
+| **步骤级输出契约 `output_schema`** | ✅ | 有测试 |
+| **有界预览输入 `preview_input`**（16KiB） | ✅ | 有测试 |
 | LLM 节点（18 家内置提供商，任意 OpenAI 兼容模型可用） | ✅ | 有测试 |
 | 安全等级（L0-L3） | ✅ | 有测试 |
 
@@ -318,7 +318,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 | v0.8 | 已完成 | 离线/内网首选项体验、隐私安全硬化、本地 LLM 丝滑接入、CLI 体验优化（template run / 智能命令提示）、CI 提速 |
 | **v0.8.1** | **已完成** | 发布审计修复：国内安装 404、`aflare mcp` 子命令、execute 白名单错误定位、govulncheck 漏洞清零 |
 | **v0.9** | **已完成** | 国密算法支持（SM3/SM4，opt-in）、审计链安全硬化（随机 HMAC 密钥、跨进程锁、bundle 防截断伪造）、`aflare mcp install` 一键安装、供应链场景包、loong64 |
-| v0.10 | 开发中 | Agent Plugins 1.0.0 双向生态互通、MemHarness 记忆批判-重构、步骤级输出契约与有界预览、水印部署溯源、安全自检修复；后续：国产芯片适配完善、Agent 能力深化 |
+| **v0.10** | **已完成** | Agent Plugins 1.0.0 双向生态互通、MemHarness 记忆批判-重构、步骤级输出契约与有界预览、水印部署溯源、安全自检修复；后续：国产芯片适配完善、Agent 能力深化 |
 | v1.0 | 计划中 | 稳定 API、LTS |
 
 详情见 [CHANGELOG.md](CHANGELOG.md)

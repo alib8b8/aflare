@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.10.0] - 2026-08-22
 
 ### Added
 - **国内合规通知渠道（飞书/钉钉/企业微信）**：`notify` 节点新增 `feishu` / `dingtalk` / `wecom` 三个 channel——对应三平台**官方群机器人 webhook**（个人微信与 QQ 无官方机器人推送接口，微信生态以企业微信群机器人为唯一合规路径），共享一个群机器人传输层：HTTPS+SSRF URL 校验、100KB 请求体上限、1MB 响应读取上限，且解析响应体中的错误码（三平台 token 无效时仍返回 HTTP 200，`errcode`/`code`/`StatusCode` 非零、响应非 JSON、HTTP ≥400 均判为失败，杜绝静默假成功）。`aflare create` 识别描述中的"飞书/钉钉/微信/企业微信"（含 feishu/lark/dingtalk/wecom 英文词）生成对应渠道步骤与 `<channel>_webhook_url` 变量；中文 README 股价监控示例与三层模型图同步由 Telegram 改为飞书，并在金融合规章节新增通知渠道表（QQ/个人微信无官方接口的诚实说明）

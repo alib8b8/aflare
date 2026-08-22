@@ -3,7 +3,7 @@ name: aflare
 description: Generate and execute terminal workflows using aflare. Use when the user wants to automate multi-step terminal tasks, chain commands, fetch URLs, process data, create reusable pipelines, or build CI/CD-like automation locally.
 invocation: both
 allowed-tools: Read, Edit, Write, Bash, Glob, Grep, WebFetch
-version: 0.9.0
+version: 0.10.0
 author: aflare
 license: AGPL-3.0
 compatibility: claude-code >= 0.7.0
