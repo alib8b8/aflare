@@ -107,12 +107,10 @@ Help us reach our 85% coverage goal! These packages need the most love:
 
 | Package | Current Coverage | Difficulty |
 |---------|-----------------|------------|
-| `internal/distributed` | ~12% | Medium — HTTP handlers, mock servers |
-| `internal/nodes` | ~56% | Easy-Medium — unit tests for utility nodes |
-| `internal/version` | ~56% | Easy — version string parsing |
-| `internal/webui` | 0% | Medium — HTTP handler tests |
+| `internal/telemetry` | ~20% | Medium — OpenTelemetry wiring |
+| `internal/cli` | ~21% | Medium — command handlers (many call `os.Exit`; refactoring them to return errors is tracked separately) |
 
-**Pro tip**: Start with `internal/version` — it's small and has no external dependencies!
+**Pro tip**: Start with `internal/telemetry` — small surface, no external dependencies.
 
 ## 📋 Getting Started
 

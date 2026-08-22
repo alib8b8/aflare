@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/alib8b8/aflare/internal/agent"
+	"github.com/alib8b8/aflare/internal/meta"
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/workflow"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -48,6 +49,7 @@ type Server struct {
 	workflowsDir string
 	sessions     *agent.SessionManager
 	rateLimiter  *ipRateLimiter
+	handler      http.Handler
 
 	// Metrics
 	requestsTotal   uint64
@@ -86,12 +88,11 @@ func (s *Server) SetMaxSessions(n int) {
 	s.sessions.SetMaxSessions(n)
 }
 
-// Start begins listening and serving HTTP requests. It blocks until the
-// server is stopped or an error occurs.
-func (s *Server) Start() error {
+// routes builds the ServeMux with all API routes registered. It is
+// separated from Start so tests can exercise the real routing table
+// (including middleware) without duplicating route definitions.
+func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
-
-	// Register routes
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/api/v1/metrics", s.handleMetrics)
 	mux.HandleFunc("/api/v1/workflows/run", s.handleRunWorkflow)
@@ -100,17 +101,24 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/v1/workflows/", s.handleGetWorkflow)
 	mux.HandleFunc("/api/v1/chat", s.handleChat)
 	mux.HandleFunc("/api/v1/chat/", s.handleChat)
+	return mux
+}
+
+// Start begins listening and serving HTTP requests. It blocks until the
+// server is stopped or an error occurs.
+func (s *Server) Start() error {
+	mux := s.routes()
 
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
 	if s.host == "" {
 		addr = fmt.Sprintf(":%s", s.port)
 	}
 
-	handler := s.middlewareStack(mux)
+	s.handler = s.middlewareStack(mux)
 
 	srv := &http.Server{
 		Addr:         addr,
-		Handler:      handler,
+		Handler:      s.handler,
 		ReadTimeout:  s.readTimeout,
 		WriteTimeout: s.writeTimeout,
 		IdleTimeout:  120 * time.Second,
@@ -271,7 +279,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	s.writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "ok",
-		"version": "1.0.0",
+		"version": meta.Version,
 		"uptime":  time.Now().Format(time.RFC3339),
 	})
 }
