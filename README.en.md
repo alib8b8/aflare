@@ -95,7 +95,7 @@ aflare agent -c reflection,planning,utility
 
 ## Project Status
 
-aflare is currently at **v0.9.0 stage** (v0.10 in development). Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. v0.9.0 delivers Chinese national cryptography support (SM3 audit chain / SM4 secrets, opt-in), audit-chain security hardening (per-install random HMAC key, cross-process log lock, bundle truncation-forgery defense), one-command MCP server install (`aflare mcp install`), and byte-identical 0.8.x upgrade compatibility. The current dev build adds: **Agent Plugins 1.0.0 host support** (bidirectional plugin ecosystem with VS Code / Cursor / Copilot and other clients), **MemHarness memory critique-reconstruction mode** (memory is a cue to reconstruct, not a fact of the current task), **step-level typed output contracts and bounded preview inputs**, **watermark deployment tracing**, plus a security self-audit round that fixed plugin path traversal, symlink bypass and memory data races (see [CHANGELOG](CHANGELOG.md)). Local inference services running on domestic chips (Ascend/Cambricon/Hygon) are accessed through OpenAI-compatible endpoints (no native SDK integration), and support keeps improving. Hardware device control (robots etc.) is not built in — users can integrate via custom nodes or MCP Server, with data staying on their intranet.
+aflare is currently at **v0.10.0 stage**. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. v0.9.0 delivers Chinese national cryptography support (SM3 audit chain / SM4 secrets, opt-in), audit-chain security hardening (per-install random HMAC key, cross-process log lock, bundle truncation-forgery defense), one-command MCP server install (`aflare mcp install`), and byte-identical 0.8.x upgrade compatibility. v0.10.0 adds: **Agent Plugins 1.0.0 host support** (bidirectional plugin ecosystem with VS Code / Cursor / Copilot and other clients), **MemHarness memory critique-reconstruction mode** (memory is a cue to reconstruct, not a fact of the current task), **step-level typed output contracts and bounded preview inputs**, **watermark deployment tracing**, plus a security self-audit round that fixed plugin path traversal, symlink bypass and memory data races (see [CHANGELOG](CHANGELOG.md)). Local inference services running on domestic chips (Ascend/Cambricon/Hygon) are accessed through OpenAI-compatible endpoints (no native SDK integration), and support keeps improving. Hardware device control (robots etc.) is not built in — users can integrate via custom nodes or MCP Server, with data staying on their intranet.
 
 ---
 
@@ -190,10 +190,10 @@ aflare is built for intranet / local-first users — enterprises and individuals
 | Expression Engine (bytecode IR + vectorized) | ✅ | Tested |
 | Keyword-based Workflow Generation | ✅ | Tested |
 | MCP Protocol Support (Server/Client) | ✅ | Tested |
-| **Agent Plugins 1.0.0 Bidirectional Interop** (`marketplace install/export`, v0.10 dev) | ✅ | Tested |
-| **MemHarness Memory Critique-Reconstruction** (`harness_search` + session critique injection, v0.10 dev) | ✅ | Tested |
-| **Step-level Output Contracts** (`output_schema`, v0.10 dev) | ✅ | Tested |
-| **Bounded Preview Inputs** (`preview_input`, 16KiB, v0.10 dev) | ✅ | Tested |
+| **Agent Plugins 1.0.0 Bidirectional Interop** (`marketplace install/export`) | ✅ | Tested |
+| **MemHarness Memory Critique-Reconstruction** (`harness_search` + session critique injection) | ✅ | Tested |
+| **Step-level Output Contracts** (`output_schema`) | ✅ | Tested |
+| **Bounded Preview Inputs** (`preview_input`, 16KiB) | ✅ | Tested |
 | LLM Nodes (18 built-in providers, any OpenAI-compatible model usable) | ✅ | Tested |
 | Security Levels (L0-L3) | ✅ | Tested |
 
@@ -320,7 +320,7 @@ aflare is built for intranet / local-first users — enterprises and individuals
 | v0.7 | Done | Financial scenario enhancement (Saga / Idempotency / Audit chain), ReAct Agent chat, 300+ skill templates, 6 pluggable capabilities, Agent unified event loop |
 | **v0.8** | **Done** | Offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding, CLI UX improvements (template run / smart command hints), CI speedup |
 | **v0.9** | **Done** | National cryptography support (SM3/SM4, opt-in), audit-chain security hardening (random HMAC key, cross-process lock, bundle truncation-forgery defense), `aflare mcp install`, supply-chain scenario pack, loong64 |
-| v0.10 | In development | Agent Plugins 1.0.0 interop, MemHarness memory critique-reconstruction, step-level output contracts & bounded preview, watermark deployment tracing, security self-audit fixes; next: domestic chip support refinement, Agent capability deepening |
+| **v0.10** | **Done** | Agent Plugins 1.0.0 interop, MemHarness memory critique-reconstruction, step-level output contracts & bounded preview, watermark deployment tracing, security self-audit fixes; next: domestic chip support refinement, Agent capability deepening |
 | v1.0 | Planned | Stable API, LTS |
 
 See [CHANGELOG.md](CHANGELOG.md) for details.
