@@ -53,7 +53,7 @@ func NewMemoryCapability() *MemoryCapability {
 	}
 }
 
-func (m *MemoryCapability) Name() string { return "memory" }
+func (m *MemoryCapability) Name() string { return CapabilityMemory }
 func (m *MemoryCapability) Description() string {
 	return "Cross-session memory: remembers preferences and history across sessions (有状态 Agent)"
 }

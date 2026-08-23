@@ -262,7 +262,7 @@ func jaccardSimilarity(a, b map[string]struct{}) float64 {
 func appendReflection(input string, issues []string) {
 	sharedLearning.append(LearningEntry{
 		Timestamp:  time.Now().UTC().Format(time.RFC3339),
-		Capability: "reflection",
+		Capability: CapabilityReflection,
 		Input:      truncateStr(input, 200),
 		Issues:     issues,
 	})
@@ -293,7 +293,7 @@ func loadEntries() (reflection []LearningEntry) {
 		if err := json.Unmarshal([]byte(line), &entry); err != nil {
 			continue
 		}
-		if entry.Capability == "reflection" {
+		if entry.Capability == CapabilityReflection {
 			reflection = append(reflection, entry)
 		}
 	}

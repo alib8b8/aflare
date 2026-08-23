@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/alib8b8/aflare/internal/nodes/core"
@@ -164,5 +165,149 @@ func TestOllamaPromptParamPriority(t *testing.T) {
 	_, err := node.Execute(ctx, input, params)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
+	}
+}
+
+func TestOllamaExecuteStream(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req ollamaRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if !req.Stream {
+			t.Error("ExecuteStream must send stream=true")
+		}
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.Write([]byte("{\"response\":\"Hel\",\"done\":false}\n"))
+		w.Write([]byte("{\"response\":\"lo!\",\"done\":false}\n"))
+		w.Write([]byte("not-json\n")) // skipped
+		w.Write([]byte("{\"response\":\"\",\"done\":true}\n"))
+	}))
+	defer mockServer.Close()
+
+	node := &OllamaNode{}
+
+	var chunks []string
+	out, err := node.ExecuteStream(context.Background(), "hi", map[string]string{
+		"endpoint": mockServer.URL,
+	}, func(chunk string) { chunks = append(chunks, chunk) })
+	if err != nil {
+		t.Fatalf("ExecuteStream failed: %v", err)
+	}
+	if out != "Hello!" {
+		t.Errorf("streamed output = %q, want %q", out, "Hello!")
+	}
+	if len(chunks) != 2 || chunks[0] != "Hel" || chunks[1] != "lo!" {
+		t.Errorf("chunks = %v, want [Hel lo!]", chunks)
+	}
+}
+
+func TestOllamaExecuteStream_NilOnChunk(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("{\"response\":\"ok\",\"done\":true}\n"))
+	}))
+	defer mockServer.Close()
+
+	node := &OllamaNode{}
+
+	out, err := node.ExecuteStream(context.Background(), "hi", map[string]string{
+		"endpoint": mockServer.URL,
+	}, nil)
+	if err != nil {
+		t.Fatalf("ExecuteStream with nil onChunk failed: %v", err)
+	}
+	if out != "ok" {
+		t.Errorf("streamed output = %q, want ok", out)
+	}
+}
+
+func TestOllamaExecute_ModelNotFound(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":"model 'llama3' not found, try pulling it first"}`))
+	}))
+	defer mockServer.Close()
+
+	node, _ := core.Get("ollama")
+	_, err := node.Execute(context.Background(), "hi", map[string]string{
+		"endpoint": mockServer.URL,
+	})
+	if err == nil {
+		t.Fatal("model-not-found should return an error")
+	}
+	if !strings.Contains(err.Error(), "ollama pull") {
+		t.Errorf("error should suggest 'ollama pull', got: %v", err)
+	}
+}
+
+func TestOllamaExecute_APIError(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error":"invalid request"}`))
+	}))
+	defer mockServer.Close()
+
+	node, _ := core.Get("ollama")
+	_, err := node.Execute(context.Background(), "hi", map[string]string{
+		"endpoint": mockServer.URL,
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid request") {
+		t.Fatalf("expected API error surfaced, got %v", err)
+	}
+}
+
+func TestOllamaExecute_StatusErrorNoBody(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer mockServer.Close()
+
+	node, _ := core.Get("ollama")
+	_, err := node.Execute(context.Background(), "hi", map[string]string{
+		"endpoint": mockServer.URL,
+	})
+	if err == nil || !strings.Contains(err.Error(), "500") {
+		t.Fatalf("expected status 500 error, got %v", err)
+	}
+}
+
+func TestOllamaExecute_InvalidEndpoint(t *testing.T) {
+	node, _ := core.Get("ollama")
+	for _, endpoint := range []string{
+		"ftp://example.com",            // scheme
+		"http://user:pass@localhost:9", // userinfo
+		"http://192.168.1.1:9",         // private IP
+	} {
+		_, err := node.Execute(context.Background(), "hi", map[string]string{"endpoint": endpoint})
+		if err == nil {
+			t.Errorf("endpoint %q should be rejected", endpoint)
+		}
+	}
+}
+
+func TestOllamaExecute_BadJSONResponse(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("not json"))
+	}))
+	defer mockServer.Close()
+
+	node, _ := core.Get("ollama")
+	_, err := node.Execute(context.Background(), "hi", map[string]string{
+		"endpoint": mockServer.URL,
+	})
+	if err == nil || !strings.Contains(err.Error(), "parse") {
+		t.Fatalf("expected parse error, got %v", err)
+	}
+}
+
+func TestOllamaExecute_UnreachableEndpoint(t *testing.T) {
+	node, _ := core.Get("ollama")
+	_, err := node.Execute(context.Background(), "hi", map[string]string{
+		"endpoint": "http://localhost:1", // nothing listens on port 1
+	})
+	if err == nil || !strings.Contains(err.Error(), "ollama not running") {
+		t.Fatalf("expected connection error with hint, got %v", err)
 	}
 }

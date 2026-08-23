@@ -72,7 +72,7 @@ func NewPlanningCapability() *PlanningCapability {
 	}
 }
 
-func (p *PlanningCapability) Name() string { return "planning" }
+func (p *PlanningCapability) Name() string { return CapabilityPlanning }
 func (p *PlanningCapability) Description() string {
 	return "Goal-driven planning: generates action sequences and tracks progress (规划式 Agent)"
 }

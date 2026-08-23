@@ -74,7 +74,7 @@ func (h *HumanInLoopCapability) SetPolicy(policy ApprovalPolicy) {
 	h.policy = policy
 }
 
-func (h *HumanInLoopCapability) Name() string { return "human-in-loop" }
+func (h *HumanInLoopCapability) Name() string { return CapabilityHumanInLoop }
 func (h *HumanInLoopCapability) Description() string {
 	return "Human-in-the-loop: pauses at critical decisions for human approval (人机协同)"
 }

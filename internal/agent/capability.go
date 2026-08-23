@@ -173,15 +173,26 @@ func (cr *CapabilityRegistry) Names() []string {
 	return names
 }
 
+// Capability name constants. Use these instead of string literals so a
+// typo in one call site cannot silently disable a capability.
+const (
+	CapabilityReflection  = "reflection"
+	CapabilityHumanInLoop = "human-in-loop"
+	CapabilityUtility     = "utility"
+	CapabilityMemory      = "memory"
+	CapabilityPlanning    = "planning"
+	CapabilityWorkflow    = "workflow"
+)
+
 // AvailableCapabilities is the list of all recognized capability names.
 // These map to the Agent type taxonomy dimensions.
 var AvailableCapabilities = map[string]string{
-	"reflection":    "Self-reflection and self-correction after each turn (反思/自我批评 Agent)",
-	"human-in-loop": "Pause at critical decisions for human approval (Human-in-the-loop Agent)",
-	"utility":       "Utility-driven optimization of decisions (效用驱动 Agent)",
-	"memory":        "Cross-session long-term memory and state (有状态 Agent)",
-	"planning":      "Goal-driven planning and action sequencing (规划式 Agent)",
-	"workflow":      "Predefined workflow/pipeline execution (工作流/管道式 Agent)",
+	CapabilityReflection:  "Self-reflection and self-correction after each turn (反思/自我批评 Agent)",
+	CapabilityHumanInLoop: "Pause at critical decisions for human approval (Human-in-the-loop Agent)",
+	CapabilityUtility:     "Utility-driven optimization of decisions (效用驱动 Agent)",
+	CapabilityMemory:      "Cross-session long-term memory and state (有状态 Agent)",
+	CapabilityPlanning:    "Goal-driven planning and action sequencing (规划式 Agent)",
+	CapabilityWorkflow:    "Predefined workflow/pipeline execution (工作流/管道式 Agent)",
 }
 
 // ParseCapabilities parses a comma-separated capability string into a list.
@@ -214,17 +225,17 @@ func ParseCapabilities(input string) []string {
 // CreateCapability creates a capability instance by name.
 func CreateCapability(name string) AgentCapability {
 	switch name {
-	case "reflection":
+	case CapabilityReflection:
 		return NewReflectionCapability()
-	case "human-in-loop":
+	case CapabilityHumanInLoop:
 		return NewHumanInLoopCapability()
-	case "utility":
+	case CapabilityUtility:
 		return NewUtilityCapability()
-	case "memory":
+	case CapabilityMemory:
 		return NewMemoryCapability()
-	case "planning":
+	case CapabilityPlanning:
 		return NewPlanningCapability()
-	case "workflow":
+	case CapabilityWorkflow:
 		return NewWorkflowCapability()
 	default:
 		return nil

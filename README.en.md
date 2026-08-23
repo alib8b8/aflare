@@ -376,7 +376,7 @@ What aflare can and cannot do in finance:
 - [Dataflow](docs/dataflow.md) · [Scheduling](docs/scheduling.md) · [MCP](docs/mcp.md) · [Plugins](docs/plugins.md)
 - [Web UI](docs/webui.md) · [Visualizer](docs/visualizer.md) · [Custom Nodes](docs/custom-nodes.md)
 - [API Reference](docs/api.md) · [Nodes Reference](docs/nodes-reference.md)
-- [Deployment](docs/deployment.md) · [Docker](docs/docker.md) · [Distributed](docs/distributed.md) · [Multi-Tenancy](docs/tenants.md)
+- [Deployment](docs/deployment.md) · [Docker](docs/docker.md) · [Multi-Tenancy](docs/tenants.md)
 - [Troubleshooting](docs/troubleshooting.md)
 
 ---

@@ -29,8 +29,8 @@ import (
 // allProviderNames lists every LLM provider node that the providers
 // subpackage is expected to register via init().
 var allProviderNames = []string{
-	"anthropic", "baichuan", "coze",
-	"deepseek", "fastgpt", "gemini", "glm", "ima", "internlm",
+	"anthropic", "ascend", "baichuan", "cambricon", "coze",
+	"deepseek", "fastgpt", "gemini", "glm", "hygon", "ima", "internlm",
 	"kimi", "mimo", "minimax", "mistral", "ollama",
 	"openai", "qwen", "xverse", "yi",
 }
