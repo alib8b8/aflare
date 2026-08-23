@@ -387,7 +387,7 @@ aflare 提供的是**数据处理与自动化执行能力**，金融场景（股
 - [数据流](docs/dataflow.md) · [调度](docs/scheduling.md) · [MCP](docs/mcp.md) · [插件](docs/plugins.md)
 - [Web UI](docs/webui.md) · [可视化](docs/visualizer.md) · [自定义节点](docs/custom-nodes.md)
 - [API 文档](docs/api.md) · [节点参考](docs/nodes-reference.md)
-- [部署指南](docs/deployment.md) · [Docker](docs/docker.md) · [分布式](docs/distributed.md) · [多租户](docs/tenants.md)
+- [部署指南](docs/deployment.md) · [Docker](docs/docker.md) · [多租户](docs/tenants.md)
 - [故障排除](docs/troubleshooting.md)
 
 ---

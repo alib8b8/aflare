@@ -664,9 +664,8 @@ steps:
 
 ## 下一步
 
-- 📖 阅读 [API 参考](./api-reference.md)
+- 📖 阅读 [API 参考](./api.md)
 - 🔧 学习 [自定义节点开发](./custom-nodes.md)
-- 🌐 了解 [分布式执行](./distributed.md)
 - 🤝 加入 [社区讨论](https://github.com/alib8b8/aflare/discussions)
 
 ---
