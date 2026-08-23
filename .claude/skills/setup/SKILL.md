@@ -25,7 +25,7 @@ The setup skill walks you through installing aflare and getting your first workf
 
 ## Prerequisites
 
-- **Go 1.25.12+** — required only if building from source
+- **Go 1.26.0+** — required only if building from source
 - **Node.js >=22.0.0** — required for OpenClaw plugin development
 - **Git** — for cloning the repository and version control
 - **Ollama** (optional) — needed for local LLM inference in workflow nodes

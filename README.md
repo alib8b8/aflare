@@ -15,7 +15,7 @@
       <img src="https://img.shields.io/github/v/release/alib8b8/aflare?display_name=tag&include_prereleases&style=flat-square" alt="发布版本" />
     </a>
     <a href="https://golang.org/">
-      <img src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat-square" alt="Go" />
+      <img src="https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat-square" alt="Go" />
     </a>
     <a href="LICENSE">
       <img src="https://img.shields.io/badge/License-AGPL%20v3.0-blue.svg?style=flat-square" alt="许可证" />

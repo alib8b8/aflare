@@ -18,7 +18,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.13'
+          go-version: '1.26.7'
 
       - name: Run go mod tidy
         run: go mod tidy
@@ -39,7 +39,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.12.2
+          version: v2.13.1
           args: --timeout=5m
 
       - name: Run tests with coverage
@@ -67,7 +67,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.13'
+          go-version: '1.26.7'
 
       # gosec stays advisory (false-positive prone); the dedicated
       # security-auto-fix.yml workflow tracks its findings via issues.
@@ -116,7 +116,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.13'
+          go-version: '1.26.7'
 
       - name: Build binary
         env:

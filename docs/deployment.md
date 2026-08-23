@@ -6,7 +6,7 @@
 
 ## 前置要求
 
-- Go 1.25+（仅源码构建需要）
+- Go 1.26+（仅源码构建需要）
 - Docker（容器部署）
 - 至少一个 LLM 提供商的 API Key（OpenAI、Anthropic、Ollama 等）
 

@@ -18,7 +18,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v7
       with:
-        go-version: '1.25.13'
+        go-version: '1.26.7'
 
     - name: Generate SBOM
       uses: anchore/sbom-action@v0
@@ -63,7 +63,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v7
       with:
-        go-version: '1.25.13'
+        go-version: '1.26.7'
 
     # Blocking: reachable dependency vulnerabilities must fail the scan
     # (matches ci.yml / pr-review.yml and docs/code-review.md "Blocking: Yes").
