@@ -21,6 +21,20 @@ import (
 	"testing"
 )
 
+// TestMain redirects AFLARE_DATA to a throwaway directory before any test
+// runs, so Install/Uninstall/ListInstalled never touch the developer's real
+// ~/.aflare (meta.DataDir caches the value via sync.Once on first use).
+func TestMain(m *testing.M) {
+	tmpDir, err := os.MkdirTemp("", "aflare-marketplace-test-")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("AFLARE_DATA", tmpDir)
+	code := m.Run()
+	os.RemoveAll(tmpDir)
+	os.Exit(code)
+}
+
 func TestBuiltinRegistry(t *testing.T) {
 	reg := NewRegistry()
 
