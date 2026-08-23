@@ -43,6 +43,10 @@ type SessionManager struct {
 	maxSessions  int
 	ttl          time.Duration
 	capabilities []string
+	// now supplies the current time for LRU/TTL bookkeeping. Tests override
+	// it with a fake clock so ordering and expiry are deterministic instead
+	// of relying on real time.Sleep (see issue #85).
+	now func() time.Time
 }
 
 // NewSessionManager creates a new SessionManager with the given limits.
@@ -59,6 +63,7 @@ func NewSessionManager(maxSessions int, ttl time.Duration) *SessionManager {
 		sessions:    make(map[string]*sessionEntry),
 		maxSessions: maxSessions,
 		ttl:         ttl,
+		now:         time.Now,
 	}
 }
 
@@ -85,7 +90,7 @@ func (sm *SessionManager) GetOrCreate(sessionID string) *ChatSession {
 
 	// Return existing session if found
 	if entry, ok := sm.sessions[sessionID]; ok {
-		entry.lastUsed = time.Now()
+		entry.lastUsed = sm.now()
 		return entry.session
 	}
 
@@ -104,7 +109,7 @@ func (sm *SessionManager) GetOrCreate(sessionID string) *ChatSession {
 
 	sm.sessions[sessionID] = &sessionEntry{
 		session:  session,
-		lastUsed: time.Now(),
+		lastUsed: sm.now(),
 	}
 
 	log.Printf("[session] created session %s (total: %d/%d)", sessionID, len(sm.sessions), sm.maxSessions)
@@ -118,7 +123,7 @@ func (sm *SessionManager) Reset(sessionID string) {
 
 	if entry, ok := sm.sessions[sessionID]; ok {
 		entry.session.ResetSession()
-		entry.lastUsed = time.Now()
+		entry.lastUsed = sm.now()
 	}
 }
 
@@ -155,7 +160,7 @@ func (sm *SessionManager) Count() int {
 // evictExpiredLocked removes sessions that have exceeded the TTL.
 // Caller must hold sm.mu.
 func (sm *SessionManager) evictExpiredLocked() {
-	now := time.Now()
+	now := sm.now()
 	for id, entry := range sm.sessions {
 		if now.Sub(entry.lastUsed) > sm.ttl {
 			log.Printf("[session] evicting expired session %s (idle: %v)", id, now.Sub(entry.lastUsed))
@@ -178,7 +183,7 @@ func (sm *SessionManager) evictLRULocked() {
 	}
 
 	if oldestID != "" {
-		log.Printf("[session] evicting LRU session %s (last used: %v)", oldestID, time.Since(oldestTime))
+		log.Printf("[session] evicting LRU session %s (last used: %v)", oldestID, sm.now().Sub(oldestTime))
 		delete(sm.sessions, oldestID)
 	}
 }
