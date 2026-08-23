@@ -39,7 +39,8 @@ linters:
       # memory vs preference; call param vs supervisor phase vs distill
       # type) — a shared constant would create false coupling. Real
       # domain constants live in internal/agent/capability.go.
-      ignore-string-values: '^(--help|error|description|object|default|1\.0\.0|string|operation|workflow|critic)$'
+      ignore-string-values:
+        - '^(--help|error|description|object|default|1\.0\.0|string|operation|workflow|critic)$'
     errcheck:
       check-type-assertions: false
       check-blank: false
