@@ -18,7 +18,10 @@ package telemetry
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 )
 
 // TestInitTracer_NoEndpointIsNoOp verifies the local-first guarantee: with no
@@ -131,5 +134,139 @@ func TestPropagationCarrier(t *testing.T) {
 func TestDefaultEndpointEnv(t *testing.T) {
 	if DefaultEndpointEnv != "OTEL_EXPORTER_OTLP_ENDPOINT" {
 		t.Errorf("DefaultEndpointEnv = %q, want OTEL_EXPORTER_OTLP_ENDPOINT", DefaultEndpointEnv)
+	}
+}
+
+// newOTLPCollector starts a local HTTP server that counts OTLP trace export
+// POSTs, mimicking a minimal OTLP receiver.
+func newOTLPCollector(t *testing.T) (*httptest.Server, *int) {
+	t.Helper()
+	var mu sync.Mutex
+	var posts int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			mu.Lock()
+			posts++
+			mu.Unlock()
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &posts
+}
+
+// TestInitTracer_EnabledLifecycle covers the full enabled path: exporter and
+// provider creation, span recording, the already-initialised fast path, and
+// shutdown flushing batched spans to the OTLP endpoint.
+func TestInitTracer_EnabledLifecycle(t *testing.T) {
+	t.Setenv(DefaultEndpointEnv, "")
+	srv, posts := newOTLPCollector(t)
+
+	shutdown, err := InitTracer(context.Background(), Config{
+		Endpoint:     srv.URL,
+		ServiceName:  "aflare-test",
+		BatchTimeout: 5 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("InitTracer with endpoint returned error: %v", err)
+	}
+	if shutdown == nil {
+		t.Fatal("shutdown must be non-nil")
+	}
+	if !IsEnabled() {
+		t.Fatal("IsEnabled should be true after successful init")
+	}
+
+	// Create a real span so the batcher has something to flush.
+	_, span := StartWorkflowSpan(context.Background(), "wf")
+	if !span.IsRecording() {
+		t.Fatal("workflow span should be recording after init")
+	}
+	span.End()
+
+	// Second call while initialised: no-op that returns a working shutdown.
+	shutdown2, err := InitTracer(context.Background(), Config{Endpoint: srv.URL})
+	if err != nil {
+		t.Fatalf("second InitTracer returned error: %v", err)
+	}
+	if shutdown2 == nil {
+		t.Fatal("second shutdown must be non-nil")
+	}
+	if !IsEnabled() {
+		t.Fatal("IsEnabled should stay true after repeated init")
+	}
+
+	// Shutting down flushes the recorded span to the collector.
+	if err := shutdown(context.Background()); err != nil {
+		t.Fatalf("shutdown returned error: %v", err)
+	}
+	if IsEnabled() {
+		t.Error("IsEnabled should be false after shutdown")
+	}
+	if *posts == 0 {
+		t.Error("shutdown should flush batched spans to the OTLP endpoint")
+	}
+
+	// After shutdown the package can be re-initialised (provider reset).
+	shutdown3, err := InitTracer(context.Background(), Config{Endpoint: srv.URL, BatchTimeout: 5 * time.Millisecond})
+	if err != nil {
+		t.Fatalf("re-init after shutdown returned error: %v", err)
+	}
+	if !IsEnabled() {
+		t.Error("IsEnabled should be true after re-init")
+	}
+	if err := shutdown3(context.Background()); err != nil {
+		t.Fatalf("re-init shutdown returned error: %v", err)
+	}
+	if IsEnabled() {
+		t.Error("IsEnabled should be false after re-init shutdown")
+	}
+}
+
+// TestInitTracer_EndpointFromEnv verifies the env fallback: an empty Config
+// endpoint falls back to OTEL_EXPORTER_OTLP_ENDPOINT.
+func TestInitTracer_EndpointFromEnv(t *testing.T) {
+	srv, _ := newOTLPCollector(t)
+	t.Setenv(DefaultEndpointEnv, srv.URL)
+
+	shutdown, err := InitTracer(context.Background(), Config{BatchTimeout: 5 * time.Millisecond})
+	if err != nil {
+		t.Fatalf("InitTracer with env endpoint returned error: %v", err)
+	}
+	if !IsEnabled() {
+		t.Fatal("IsEnabled should be true when endpoint comes from env")
+	}
+	if err := shutdown(context.Background()); err != nil {
+		t.Fatalf("shutdown returned error: %v", err)
+	}
+	if IsEnabled() {
+		t.Error("IsEnabled should be false after shutdown")
+	}
+}
+
+// TestInitTracer_InvalidEndpointIsLoggedNotFatal verifies the documented
+// contract for malformed endpoints: the OTLP HTTP exporter defers URL parsing
+// to first export, so init succeeds and the failure surfaces at shutdown.
+func TestInitTracer_InvalidEndpointIsLoggedNotFatal(t *testing.T) {
+	t.Setenv(DefaultEndpointEnv, "")
+	if provider != nil {
+		t.Skip("tracer already initialised by another test in this package")
+	}
+
+	shutdown, err := InitTracer(context.Background(), Config{
+		Endpoint:     "://not-a-url",
+		BatchTimeout: 5 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("InitTracer defers endpoint parsing to export time, got error: %v", err)
+	}
+	if !IsEnabled() {
+		t.Fatal("IsEnabled should be true even with a malformed endpoint")
+	}
+	// Shutdown flushes to the bad endpoint; the export error is reported
+	// through the returned error.
+	_ = shutdown(context.Background())
+	if IsEnabled() {
+		t.Error("IsEnabled should be false after shutdown")
 	}
 }
