@@ -148,11 +148,12 @@ func (s *Server) toolTemplateList(args map[string]interface{}) (*toolCallResult,
 	keyword := optionalString(args, "keyword")
 
 	var list []*templates.Template
-	if keyword != "" {
+	switch {
+	case keyword != "":
 		list = tm.Search(keyword)
-	} else if category != "" {
+	case category != "":
 		list = tm.ListByCategory(category)
-	} else {
+	default:
 		list = tm.List()
 	}
 

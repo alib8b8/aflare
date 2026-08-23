@@ -405,10 +405,8 @@ func TestExecuteNode_UnsafeMode(t *testing.T) {
 	output, err := node.Execute(ctx, "", map[string]string{"command": "echo hello"})
 	if err != nil {
 		t.Logf("Execute error (may be OS-specific): %v", err)
-	} else {
-		if !strings.Contains(output, "hello") {
-			t.Errorf("expected hello in output, got %q", output)
-		}
+	} else if !strings.Contains(output, "hello") {
+		t.Errorf("expected hello in output, got %q", output)
 	}
 }
 

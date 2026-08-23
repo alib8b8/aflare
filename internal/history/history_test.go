@@ -783,7 +783,8 @@ func TestVerifyAuditChain_Deleted(t *testing.T) {
 
 	// Delete line 2 (index 1). The following record's prev_hash will no longer
 	// link to line 1's curr_hash.
-	remaining := append(lines[:1], lines[2:]...)
+	remaining := lines[:1:1]
+	remaining = append(remaining, lines[2:]...)
 	writeAuditLines(t, path, remaining)
 
 	valid, brokenAt, err := VerifyAuditChain(path)

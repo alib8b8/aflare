@@ -167,12 +167,13 @@ func (s *Server) toolWorkflowValidate(args map[string]interface{}) (*toolCallRes
 	var wf *workflow.Workflow
 	var err error
 
-	if file != "" {
+	switch {
+	case file != "":
 		wf, err = workflow.ParseWorkflow(file)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse workflow file: %w", err)
 		}
-	} else if yamlStr != "" {
+	case yamlStr != "":
 		if len(yamlStr) > workflow.MaxFileSize {
 			return nil, fmt.Errorf("workflow YAML too large (max %d bytes)", workflow.MaxFileSize)
 		}
@@ -180,7 +181,7 @@ func (s *Server) toolWorkflowValidate(args map[string]interface{}) (*toolCallRes
 		if err := yaml.Unmarshal([]byte(yamlStr), wf); err != nil {
 			return nil, fmt.Errorf("failed to parse YAML: %w", err)
 		}
-	} else {
+	default:
 		return nil, fmt.Errorf("either 'file' or 'yaml' parameter is required")
 	}
 

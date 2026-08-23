@@ -235,11 +235,12 @@ func isHorizontalRule(s string) bool {
 	}
 	count := 0
 	for i := 0; i < len(s); i++ {
-		if s[i] == c {
+		switch {
+		case s[i] == c:
 			count++
-		} else if s[i] == ' ' || s[i] == '\t' {
+		case s[i] == ' ' || s[i] == '\t':
 			continue
-		} else {
+		default:
 			return false
 		}
 	}

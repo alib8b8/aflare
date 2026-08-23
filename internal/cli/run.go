@@ -98,17 +98,18 @@ func HandleRun(args []string, dryRun bool, safeMode bool) {
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
-		if arg == "--resume" {
+		switch {
+		case arg == "--resume":
 			resumeEnabled = true
 			remaining := len(args) - i - 1
 			if remaining >= 2 {
 				resumePath = args[i+1]
 				i++
 			}
-		} else if strings.HasPrefix(arg, "--resume=") {
+		case strings.HasPrefix(arg, "--resume="):
 			resumeEnabled = true
 			resumePath = strings.TrimPrefix(arg, "--resume=")
-		} else if arg == "--set" {
+		case arg == "--set":
 			// Consume following key=value tokens until the next flag or end.
 			for j := i + 1; j < len(args); j++ {
 				if strings.HasPrefix(args[j], "-") {
@@ -117,16 +118,16 @@ func HandleRun(args []string, dryRun bool, safeMode bool) {
 				setParams = append(setParams, args[j])
 				i = j
 			}
-		} else if strings.HasPrefix(arg, "--set=") {
+		case strings.HasPrefix(arg, "--set="):
 			setParams = append(setParams, strings.TrimPrefix(arg, "--set="))
-		} else if arg == "--params-file" {
+		case arg == "--params-file":
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				paramsFile = args[i+1]
 				i++
 			}
-		} else if strings.HasPrefix(arg, "--params-file=") {
+		case strings.HasPrefix(arg, "--params-file="):
 			paramsFile = strings.TrimPrefix(arg, "--params-file=")
-		} else if arg == "--params" {
+		case arg == "--params":
 			// Deprecated: warn but keep working.
 			fmt.Fprintln(os.Stderr, "⚠️  --params 已弃用，请改用 --set key=value（可重复）或 --params-file")
 			for j := i + 1; j < len(args); j++ {
@@ -136,10 +137,10 @@ func HandleRun(args []string, dryRun bool, safeMode bool) {
 				legacyParams = append(legacyParams, args[j])
 				i = j
 			}
-		} else if strings.HasPrefix(arg, "--params=") {
+		case strings.HasPrefix(arg, "--params="):
 			fmt.Fprintln(os.Stderr, "⚠️  --params 已弃用，请改用 --set key=value（可重复）或 --params-file")
 			legacyParams = append(legacyParams, strings.TrimPrefix(arg, "--params="))
-		} else {
+		default:
 			filtered = append(filtered, arg)
 		}
 	}
@@ -535,6 +536,12 @@ func newPolicyEngine(safeMode bool) *policy.Engine {
 
 // RunTUI runs a workflow in interactive TUI mode.
 func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, walPath string, safeMode bool) {
+	if code := runTUI(wfPath, wf, reg, statePath, walPath, safeMode); code != 0 {
+		os.Exit(code)
+	}
+}
+
+func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, walPath string, safeMode bool) int {
 	model := tui.NewModel(wf.Name, wfPath, len(wf.Steps))
 	program := tea.NewProgram(model, tea.WithAltScreen())
 
@@ -564,8 +571,9 @@ func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 
 	if _, err := program.Run(); err != nil {
 		fmt.Printf("Error running TUI: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 // RunCLI runs a workflow in CLI (non-interactive) mode with real-time progress
@@ -581,6 +589,12 @@ func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 // Errors are translated to user-friendly messages via humanizeError (断点11),
 // while the raw error is logged at debug level for troubleshooting.
 func RunCLI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, walPath string, safeMode bool) {
+	if code := runCLI(wfPath, wf, reg, statePath, walPath, safeMode); code != 0 {
+		os.Exit(code)
+	}
+}
+
+func runCLI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, walPath string, safeMode bool) int {
 	if wf.Name != "" {
 		fmt.Printf("%s\n", i18n.T("workflow.name", wf.Name))
 	}
@@ -638,7 +652,7 @@ func RunCLI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 	exec = exec.WithProgress(progressCB)
 	if err := exec.ValidateWorkflow(context.Background(), wf); err != nil {
 		fmt.Printf("Policy validation failed: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	finalOutput, _, execErr = exec.Execute(context.Background(), wf, reg)
 
@@ -650,16 +664,17 @@ func RunCLI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 			fmt.Printf("\n⏸ 工作流已暂停于步骤 %d（%s）：%s\n", paused.StepIndex+1, paused.StepName, paused.Message)
 			fmt.Printf("   恢复执行：aflare resume %s\n", paused.RunID)
 			logger.Info("workflow paused", "run_id", paused.RunID, "step", paused.StepName)
-			os.Exit(1)
+			return 1
 		}
 		// 工作流级错误也走翻译层 (断点11).
 		human, debug := humanizeError(execErr, "")
 		fmt.Printf("\n%s\n", i18n.T("workflow.failed", human))
 		logger.Error("workflow failed", "raw_error", debug)
-		os.Exit(1)
+		return 1
 	}
 
 	fmt.Printf("\n=== %s ===\n", i18n.T("workflow.final_output"))
 	fmt.Println(finalOutput)
 	fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Render("✅ "+i18n.T("workflow.completed")))
+	return 0
 }

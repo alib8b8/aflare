@@ -300,5 +300,5 @@ func CodexBinaryPath(paramOverride string) string {
 	if p, err := exec.LookPath("codex"); err == nil {
 		return p
 	}
-	return filepath.Join("codex")
+	return "codex"
 }

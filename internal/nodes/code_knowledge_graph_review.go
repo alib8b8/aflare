@@ -50,19 +50,21 @@ func (n *CodeKnowledgeGraphNode) executePRAnalysis(ctx context.Context, input st
 	prAnalysis.ReviewResult = reviewResult
 
 	totalLines := prAnalysis.LinesAdded + prAnalysis.LinesRemoved
-	if totalLines > 1000 {
+	switch {
+	case totalLines > 1000:
 		prAnalysis.Impact = "high"
-	} else if totalLines > 200 {
+	case totalLines > 200:
 		prAnalysis.Impact = "medium"
-	} else {
+	default:
 		prAnalysis.Impact = "low"
 	}
 
-	if reviewResult.OverallScore < 60 {
+	switch {
+	case reviewResult.OverallScore < 60:
 		prAnalysis.RiskLevel = "high"
-	} else if reviewResult.OverallScore < 80 {
+	case reviewResult.OverallScore < 80:
 		prAnalysis.RiskLevel = "medium"
-	} else {
+	default:
 		prAnalysis.RiskLevel = "low"
 	}
 
@@ -155,11 +157,12 @@ func (n *CodeKnowledgeGraphNode) performCodeReview(files []string) ckgReviewResu
 	overallScore := (totalScore / totalMax) * 100
 
 	summary := fmt.Sprintf("Code review completed for %d files. ", len(files))
-	if overallScore >= 80 {
+	switch {
+	case overallScore >= 80:
 		summary += "Excellent quality! Ready for merge."
-	} else if overallScore >= 60 {
+	case overallScore >= 60:
 		summary += "Good quality with some improvements needed."
-	} else {
+	default:
 		summary += "Requires significant improvements before merging."
 	}
 
@@ -224,11 +227,12 @@ func (n *CodeKnowledgeGraphNode) executeInklingReview(files []string) ckgReviewR
 
 	summary := fmt.Sprintf("Inkling-powered code review completed for %d files. ", len(files))
 	summary += "Analysis performed using Thinking Machines Inkling MoE architecture (975B params, 41B active). "
-	if overallScore >= 85 {
+	switch {
+	case overallScore >= 85:
 		summary += "Outstanding quality! Inkling confirms production readiness."
-	} else if overallScore >= 70 {
+	case overallScore >= 70:
 		summary += "Good quality with Inkling-recommended improvements."
-	} else {
+	default:
 		summary += "Inkling recommends significant refactoring before deployment."
 	}
 

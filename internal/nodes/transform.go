@@ -362,21 +362,22 @@ func groupByCommitType(input string) string {
 
 		commitType := "other"
 		lower := strings.ToLower(line)
-		if strings.Contains(lower, "feat") || strings.Contains(lower, "feature") {
+		switch {
+		case strings.Contains(lower, "feat") || strings.Contains(lower, "feature"):
 			commitType = "features"
-		} else if strings.Contains(lower, "fix") || strings.Contains(lower, "bug") {
+		case strings.Contains(lower, "fix") || strings.Contains(lower, "bug"):
 			commitType = "bugfixes"
-		} else if strings.Contains(lower, "docs") || strings.Contains(lower, "documentation") || strings.Contains(lower, "readme") {
+		case strings.Contains(lower, "docs") || strings.Contains(lower, "documentation") || strings.Contains(lower, "readme"):
 			commitType = "documentation"
-		} else if strings.Contains(lower, "refactor") {
+		case strings.Contains(lower, "refactor"):
 			commitType = "refactoring"
-		} else if strings.Contains(lower, "test") {
+		case strings.Contains(lower, "test"):
 			commitType = "tests"
-		} else if strings.Contains(lower, "chore") || strings.Contains(lower, "build") || strings.Contains(lower, "ci") {
+		case strings.Contains(lower, "chore") || strings.Contains(lower, "build") || strings.Contains(lower, "ci"):
 			commitType = "chores"
-		} else if strings.Contains(lower, "perf") || strings.Contains(lower, "performance") {
+		case strings.Contains(lower, "perf") || strings.Contains(lower, "performance"):
 			commitType = "performance"
-		} else if strings.Contains(lower, "style") {
+		case strings.Contains(lower, "style"):
 			commitType = "style"
 		}
 

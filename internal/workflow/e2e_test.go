@@ -143,17 +143,13 @@ func TestE2E_WorkflowParse(t *testing.T) {
 	// Verify compensations
 	if saga.Steps[0].Compensate == nil {
 		t.Error("debit should have a compensate step")
-	} else {
-		if saga.Steps[0].Compensate.Name != "refund-debit" {
-			t.Errorf("debit compensate name: expected 'refund-debit', got %q", saga.Steps[0].Compensate.Name)
-		}
+	} else if saga.Steps[0].Compensate.Name != "refund-debit" {
+		t.Errorf("debit compensate name: expected 'refund-debit', got %q", saga.Steps[0].Compensate.Name)
 	}
 	if saga.Steps[1].Compensate == nil {
 		t.Error("credit should have a compensate step")
-	} else {
-		if saga.Steps[1].Compensate.Name != "reverse-credit" {
-			t.Errorf("credit compensate name: expected 'reverse-credit', got %q", saga.Steps[1].Compensate.Name)
-		}
+	} else if saga.Steps[1].Compensate.Name != "reverse-credit" {
+		t.Errorf("credit compensate name: expected 'reverse-credit', got %q", saga.Steps[1].Compensate.Name)
 	}
 	if saga.Steps[2].Compensate != nil {
 		t.Error("notify should NOT have a compensate step")

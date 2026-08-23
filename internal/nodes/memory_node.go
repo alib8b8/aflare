@@ -22,6 +22,7 @@ import (
 	"log"
 	"math/rand"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -467,11 +468,12 @@ func (n *MemoryNode) transferMemory(session *memory.SessionMemory, key, newLevel
 	oldLevel := entry.Level
 
 	var expiresAt time.Time
-	if newLevel == "long" {
+	switch {
+	case newLevel == "long":
 		expiresAt = time.Now().Add(365 * 24 * time.Hour)
-	} else if newLevel == "short" {
+	case newLevel == "short":
 		expiresAt = time.Now().Add(1 * time.Hour)
-	} else {
+	default:
 		expiresAt = time.Now().Add(72 * time.Hour)
 	}
 
@@ -505,7 +507,7 @@ func (n *MemoryNode) mergeMemory(session *memory.SessionMemory, params map[strin
 	}
 
 	mergedValue := entry1.Value + "\n\n---\n\n" + entry2.Value
-	mergedTags := append(entry1.Tags, entry2.Tags...)
+	mergedTags := slices.Concat(entry1.Tags, entry2.Tags)
 	mergedConfidence := (entry1.Confidence + entry2.Confidence) / 2
 
 	newKey := key1 + "_merged_" + key2

@@ -149,16 +149,14 @@ func (p *PlanningCapability) PreProcess(ctx context.Context, input string) (stri
 		} else {
 			sb.WriteString("All steps complete! Provide a summary and mark the plan as finished.\n")
 		}
-	} else {
+	} else if len(input) > 80 || containsActionVerb(input) {
 		// No active plan — encourage planning for complex tasks
-		if len(input) > 80 || containsActionVerb(input) {
-			sb.WriteString("\n[Planning Mode] This looks like a complex task. Before acting:\n")
-			sb.WriteString("1) Identify the goal\n")
-			sb.WriteString("2) Break it into concrete steps\n")
-			sb.WriteString("3) Choose the right tool for each step\n")
-			sb.WriteString("4) Execute step by step, tracking progress\n")
-			sb.WriteString("Start your response with 'Plan:' followed by numbered steps, then execute each step.\n")
-		}
+		sb.WriteString("\n[Planning Mode] This looks like a complex task. Before acting:\n")
+		sb.WriteString("1) Identify the goal\n")
+		sb.WriteString("2) Break it into concrete steps\n")
+		sb.WriteString("3) Choose the right tool for each step\n")
+		sb.WriteString("4) Execute step by step, tracking progress\n")
+		sb.WriteString("Start your response with 'Plan:' followed by numbered steps, then execute each step.\n")
 	}
 
 	if sb.Len() == 0 {
