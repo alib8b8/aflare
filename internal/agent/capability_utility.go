@@ -90,7 +90,7 @@ func (u *UtilityCapability) SetDimensions(dims []UtilityDimension) {
 	u.dimensions = dims
 }
 
-func (u *UtilityCapability) Name() string { return "utility" }
+func (u *UtilityCapability) Name() string { return CapabilityUtility }
 func (u *UtilityCapability) Description() string {
 	return "Utility-driven optimization: evaluates trade-offs to find optimal solutions (效用驱动 Agent)"
 }

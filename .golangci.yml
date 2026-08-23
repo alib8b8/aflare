@@ -19,21 +19,27 @@ linters:
     - usestdlibvars  # use net/http constants instead of string literals
     # Code hygiene linters (blocking).
     - funlen        # enforce function length limits
+    - goconst       # repeated strings -> constants (see settings for ignore policy)
     # gocritic      # TODO(#57): re-enable after fixing rangeValCopy,
     #               # hugeParam, ifElseChain, elseif, appendAssign by 2026-09-13
   settings:
     funlen:
       lines: 250
       statements: 120
-    # goconst:
-      #   min-len: 5
-      #   # TODO(#58): re-enable after extracting repeated capability/model
-      #   # name strings into constants across the agent package.
-      #   min-occurrences: 22
-    #   gocritic:
-    #     enabled-checks:
-    #       - rangeValCopy
-    #       - hugeParam
+    goconst:
+      min-len: 5
+      min-occurrences: 22
+      # Test files are full of fixture strings ("prefix", "failer", ...) that
+      # are local to one test; extracting them adds no value.
+      ignore-tests: true
+      # Generic strings whose extraction would hurt readability — CLI flag
+      # names, JSON schema type/field names, response type tags, version
+      # strings. Also "operation"/"workflow"/"critic": coincidental repeats
+      # of same-named params/roles across unrelated nodes (transform vs
+      # memory vs preference; call param vs supervisor phase vs distill
+      # type) — a shared constant would create false coupling. Real
+      # domain constants live in internal/agent/capability.go.
+      ignore-string-values: '^(--help|error|description|object|default|1\.0\.0|string|operation|workflow|critic)$'
     errcheck:
       check-type-assertions: false
       check-blank: false

@@ -57,7 +57,7 @@ func NewReflectionCapability() *ReflectionCapability {
 	}
 }
 
-func (r *ReflectionCapability) Name() string { return "reflection" }
+func (r *ReflectionCapability) Name() string { return CapabilityReflection }
 func (r *ReflectionCapability) Description() string {
 	return "Self-reflection and self-correction: evaluates output quality and triggers improvement when needed"
 }

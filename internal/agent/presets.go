@@ -25,12 +25,12 @@ var CapabilityPresets = map[string]CapabilityPreset{
 	"smart": {
 		Name:         "smart",
 		Description:  "智能模式：反思 + 长期记忆，适合复杂推理任务",
-		Capabilities: []string{"reflection", "memory"},
+		Capabilities: []string{CapabilityReflection, CapabilityMemory},
 	},
 	"careful": {
 		Name:         "careful",
 		Description:  "谨慎模式：人工介入 + 规划 + 反思，适合有风险的操作",
-		Capabilities: []string{"human-in-loop", "planning", "reflection"},
+		Capabilities: []string{CapabilityHumanInLoop, CapabilityPlanning, CapabilityReflection},
 	},
 }
 
