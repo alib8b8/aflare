@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -398,7 +399,7 @@ func (r *Registry) ListInstalled() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list workflows: %w", err)
 	}
-	files := append(yamlFiles, ymlFiles...)
+	files := slices.Concat(yamlFiles, ymlFiles)
 
 	var names []string
 	for _, f := range files {

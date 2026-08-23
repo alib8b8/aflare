@@ -52,65 +52,66 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 			skipNext = false
 			continue
 		}
-		if arg == "--safe-mode" {
+		switch {
+		case arg == "--safe-mode":
 			safeMode = true
-		} else if arg == "--dry-run" || arg == "--dry" {
+		case arg == "--dry-run", arg == "--dry":
 			dryRun = true
-		} else if arg == "--mcp-server" {
+		case arg == "--mcp-server":
 			mcpServer = true
-		} else if arg == "--concise" || arg == "-q" || arg == "--quiet" {
+		case arg == "--concise", arg == "-q", arg == "--quiet":
 			concise = true
-		} else if arg == "--lang" {
+		case arg == "--lang":
 			if i+1 < len(args) {
 				lang = args[i+1]
 				skipNext = true
 			}
-		} else if strings.HasPrefix(arg, "--lang=") {
+		case strings.HasPrefix(arg, "--lang="):
 			lang = strings.TrimPrefix(arg, "--lang=")
-		} else if arg == "--mcp" {
+		case arg == "--mcp":
 			if i+1 < len(args) {
 				initMCP = args[i+1]
 				skipNext = true
 			} else {
 				initMCP = "all"
 			}
-		} else if strings.HasPrefix(arg, "--mcp=") {
+		case strings.HasPrefix(arg, "--mcp="):
 			initMCP = strings.TrimPrefix(arg, "--mcp=")
-		} else if arg == "--agent" {
+		case arg == "--agent":
 			if i+1 < len(args) {
 				initAgent = args[i+1]
 				skipNext = true
 			} else {
 				initAgent = "all"
 			}
-		} else if strings.HasPrefix(arg, "--agent=") {
+		case strings.HasPrefix(arg, "--agent="):
 			initAgent = strings.TrimPrefix(arg, "--agent=")
-		} else if arg == "--channel" {
+		case arg == "--channel":
 			if i+1 < len(args) {
 				updateChannel = args[i+1]
 				skipNext = true
 			}
-		} else if strings.HasPrefix(arg, "--channel=") {
+		case strings.HasPrefix(arg, "--channel="):
 			updateChannel = strings.TrimPrefix(arg, "--channel=")
-		} else if arg == "--serve" {
+		case arg == "--serve":
 			serveMode = true
-		} else if arg == "--ai" {
+		case arg == "--ai":
 			aiMode = true
-		} else if arg == "--otel-endpoint" {
+		case arg == "--otel-endpoint":
 			if i+1 < len(args) {
 				otelEndpoint = args[i+1]
 				skipNext = true
 			}
-		} else if strings.HasPrefix(arg, "--otel-endpoint=") {
+		case strings.HasPrefix(arg, "--otel-endpoint="):
 			otelEndpoint = strings.TrimPrefix(arg, "--otel-endpoint=")
-		} else if arg == "--otel-service-name" {
+		case arg == "--otel-service-name":
 			if i+1 < len(args) {
 				otelServiceName = args[i+1]
 				skipNext = true
 			}
-		} else if strings.HasPrefix(arg, "--otel-service-name=") {
+		case strings.HasPrefix(arg, "--otel-service-name="):
 			otelServiceName = strings.TrimPrefix(arg, "--otel-service-name=")
-		} else {
+		default:
 			filtered = append(filtered, arg)
 		}
 	}

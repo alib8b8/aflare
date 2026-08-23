@@ -110,7 +110,8 @@ func TestVerifyAuditRecordChain_ValidAndBroken(t *testing.T) {
 
 	// A middle record removal breaks the link at the following record.
 	logs, _ = ReadAuditLogFile(GetAuditLogPath())
-	removed := append(logs[:1], logs[2:]...)
+	removed := logs[:1:1]
+	removed = append(removed, logs[2:]...)
 	valid, brokenAt, err = VerifyAuditRecordChain(removed)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

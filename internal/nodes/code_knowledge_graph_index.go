@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 )
@@ -208,7 +209,7 @@ func (n *CodeKnowledgeGraphNode) buildIndexIncremental(root string, idx *ckgInde
 	}
 
 	// 计算 Token 节省
-	changedFiles := append(added, modified...)
+	changedFiles := slices.Concat(added, modified)
 	tokensForChanged := estimateTokensForFiles(changedFiles)
 	tokensForAll := estimateTokensForFiles(files)
 

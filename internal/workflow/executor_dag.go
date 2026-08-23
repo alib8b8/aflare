@@ -182,16 +182,17 @@ func processDAGStepResult(
 	var llmCalls []nodes.LLMCallTelemetry
 	var routerDecisions []nodes.RouterDecision
 
-	if ps.evalErr != nil {
+	switch {
+	case ps.evalErr != nil:
 		resultErr = ps.evalErr
 		abortErr = ps.evalErr
 		errText = resultErr.Error()
-	} else if ps.skipped {
+	case ps.skipped:
 		output = ""
 		skipped = true
 		condPassed = false
 		logger.Info("DAG step skipped by condition", "index", stepIdx, "node", wStep.Node)
-	} else {
+	default:
 		res := batchOutputs[stepIdx]
 		output = res.output
 		resultErr = res.err

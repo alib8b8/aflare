@@ -454,15 +454,16 @@ func TestClient_CallTool_Validation(t *testing.T) {
 		var req rpcRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
-		if req.Method == "initialize" {
+		switch req.Method {
+		case "initialize":
 			resp.Result = initializeResult{
 				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
 				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
 			}
-		} else if req.Method == "notifications/initialized" {
+		case "notifications/initialized":
 			w.WriteHeader(http.StatusAccepted)
 			return
-		} else if req.Method == "tools/call" {
+		case "tools/call":
 			resp.Result = toolCallResult{Content: []content{{Type: "text", Text: "done"}}}
 		}
 		_ = json.NewEncoder(w).Encode(resp)
@@ -486,15 +487,16 @@ func TestClient_CallTool_ServerError(t *testing.T) {
 		var req rpcRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
-		if req.Method == "initialize" {
+		switch req.Method {
+		case "initialize":
 			resp.Result = initializeResult{
 				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
 				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
 			}
-		} else if req.Method == "notifications/initialized" {
+		case "notifications/initialized":
 			w.WriteHeader(http.StatusAccepted)
 			return
-		} else if req.Method == "tools/call" {
+		case "tools/call":
 			resp.Error = &rpcError{Code: -32603, Message: "internal error containing secret token"}
 		}
 		_ = json.NewEncoder(w).Encode(resp)
@@ -786,15 +788,16 @@ func TestClient_SendRequest_Timeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req rpcRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
-		if req.Method == "initialize" {
+		switch req.Method {
+		case "initialize":
 			resp := rpcResponse{JSONRPC: "2.0", ID: req.ID, Result: initializeResult{
 				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
 				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
 			}}
 			_ = json.NewEncoder(w).Encode(resp)
-		} else if req.Method == "notifications/initialized" {
+		case "notifications/initialized":
 			w.WriteHeader(http.StatusAccepted)
-		} else {
+		default:
 			// Stall longer than the client's 1s timeout (below) but short
 			// enough that the deferred server.Close() doesn't hang the test.
 			time.Sleep(3 * time.Second)
@@ -1900,15 +1903,16 @@ func TestClient_ListTools_Error(t *testing.T) {
 		var req rpcRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
-		if req.Method == "initialize" {
+		switch req.Method {
+		case "initialize":
 			resp.Result = initializeResult{
 				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
 				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
 			}
-		} else if req.Method == "notifications/initialized" {
+		case "notifications/initialized":
 			w.WriteHeader(http.StatusAccepted)
 			return
-		} else if req.Method == "tools/list" {
+		case "tools/list":
 			resp.Error = &rpcError{Code: -32603, Message: "server error"}
 		}
 		_ = json.NewEncoder(w).Encode(resp)
@@ -1932,15 +1936,16 @@ func TestClient_ListTools_InvalidResult(t *testing.T) {
 		var req rpcRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
-		if req.Method == "initialize" {
+		switch req.Method {
+		case "initialize":
 			resp.Result = initializeResult{
 				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
 				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
 			}
-		} else if req.Method == "notifications/initialized" {
+		case "notifications/initialized":
 			w.WriteHeader(http.StatusAccepted)
 			return
-		} else if req.Method == "tools/list" {
+		case "tools/list":
 			resp.Result = "invalid result type"
 		}
 		_ = json.NewEncoder(w).Encode(resp)
@@ -1964,15 +1969,16 @@ func TestClient_CallTool_NilArgs(t *testing.T) {
 		var req rpcRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
-		if req.Method == "initialize" {
+		switch req.Method {
+		case "initialize":
 			resp.Result = initializeResult{
 				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
 				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
 			}
-		} else if req.Method == "notifications/initialized" {
+		case "notifications/initialized":
 			w.WriteHeader(http.StatusAccepted)
 			return
-		} else if req.Method == "tools/call" {
+		case "tools/call":
 			resp.Result = toolCallResult{Content: []content{{Type: "text", Text: "ok"}}}
 		}
 		_ = json.NewEncoder(w).Encode(resp)
@@ -2000,15 +2006,16 @@ func TestClient_CallTool_InvalidResult(t *testing.T) {
 		var req rpcRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
-		if req.Method == "initialize" {
+		switch req.Method {
+		case "initialize":
 			resp.Result = initializeResult{
 				Capabilities: serverCapabilities{Tools: toolsCapability{ListChanged: false}},
 				ServerInfo:   serverInfo{Name: "test", Version: "1.0.0"},
 			}
-		} else if req.Method == "notifications/initialized" {
+		case "notifications/initialized":
 			w.WriteHeader(http.StatusAccepted)
 			return
-		} else if req.Method == "tools/call" {
+		case "tools/call":
 			resp.Result = "not a tool result"
 		}
 		_ = json.NewEncoder(w).Encode(resp)

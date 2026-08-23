@@ -174,11 +174,12 @@ func (e *ExternalNode) Execute(ctx context.Context, input string, params map[str
 
 	var cmd *exec.Cmd
 
-	if strings.HasSuffix(entryPath, ".py") {
+	switch {
+	case strings.HasSuffix(entryPath, ".py"):
 		cmd = exec.CommandContext(ctx, "python3", entryPath) // #nosec G204 -- entryPath validated against path traversal and symlink
-	} else if strings.HasSuffix(entryPath, ".sh") {
+	case strings.HasSuffix(entryPath, ".sh"):
 		cmd = exec.CommandContext(ctx, "bash", entryPath) // #nosec G204 -- entryPath validated against path traversal and symlink
-	} else {
+	default:
 		return "", fmt.Errorf("only .py and .sh entry files are allowed")
 	}
 

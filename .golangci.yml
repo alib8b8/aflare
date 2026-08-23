@@ -20,8 +20,7 @@ linters:
     # Code hygiene linters (blocking).
     - funlen        # enforce function length limits
     - goconst       # repeated strings -> constants (see settings for ignore policy)
-    # gocritic      # TODO(#57): re-enable after fixing rangeValCopy,
-    #               # hugeParam, ifElseChain, elseif, appendAssign by 2026-09-13
+    - gocritic      # style/correctness checks: ifElseChain, elseif, appendAssign, ...
   settings:
     funlen:
       lines: 250

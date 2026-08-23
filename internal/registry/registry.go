@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -379,7 +380,7 @@ func ListInstalledNodes() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list nodes: %w", err)
 	}
-	files := append(yamlFiles, ymlFiles...)
+	files := slices.Concat(yamlFiles, ymlFiles)
 
 	var nodeNames []string
 	for _, file := range files {

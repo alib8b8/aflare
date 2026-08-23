@@ -18,6 +18,7 @@ package watermark
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -429,7 +430,7 @@ func TestChecksum(t *testing.T) {
 	chk := checksum16(data)
 
 	// Verify checksum round-trip.
-	full := append(data, byte(chk>>8), byte(chk&0xFF))
+	full := append(slices.Clone(data), byte(chk>>8), byte(chk&0xFF))
 	if !verifyChecksum(full) {
 		t.Error("checksum verification should pass")
 	}

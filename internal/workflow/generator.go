@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -566,7 +567,7 @@ func GetSuggestedFilename(description string) string {
 	var keywords []string
 	for _, word := range words {
 		// Skip common words
-		if strings.Contains("the a an to and or fetch save write run from", word) {
+		if slices.Contains([]string{"the", "a", "an", "to", "and", "or", "fetch", "save", "write", "run", "from"}, word) {
 			continue
 		}
 		// Clean word - keep alphanumeric, dots, hyphens, underscores
@@ -597,7 +598,7 @@ func generateWorkflowName(description string) string {
 	for _, word := range words {
 		// Remove all non-alphanumeric characters except spaces and dots
 		word = cleanNameRegex.ReplaceAllString(word, "")
-		if len(word) > 3 && !strings.Contains("the a an to and or fetch save write run from with", word) {
+		if len(word) > 3 && !slices.Contains([]string{"the", "a", "an", "to", "and", "or", "fetch", "save", "write", "run", "from", "with"}, word) {
 			// Simple title case: capitalize first letter
 			if len(word) > 0 {
 				word = strings.ToUpper(word[:1]) + word[1:]

@@ -327,9 +327,9 @@ func (n *templateInfoNode) Execute(ctx context.Context, input string, params map
 
 	// Handle "category/name" format
 	category := ""
-	if idx := strings.Index(name, "/"); idx != -1 {
-		category = name[:idx]
-		name = name[idx+1:]
+	if cat, rest, ok := strings.Cut(name, "/"); ok {
+		category = cat
+		name = rest
 	}
 
 	// Try external templates first
@@ -443,17 +443,18 @@ func (n *runWorkflowNode) Execute(ctx context.Context, input string, params map[
 		}
 	}
 
-	if file != "" {
+	switch {
+	case file != "":
 		wf, err = workflow.ParseWorkflow(file)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse workflow file: %w", err)
 		}
-	} else if yamlStr != "" {
+	case yamlStr != "":
 		wf, err = workflow.ParseWorkflowFromContent(yamlStr)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse workflow YAML: %w", err)
 		}
-	} else if input != "" {
+	case input != "":
 		// Try resolving input as template name first
 		if resolved := resolveTemplatePath(input); resolved != "" {
 			wf, err = workflow.ParseWorkflow(resolved)
@@ -471,7 +472,7 @@ func (n *runWorkflowNode) Execute(ctx context.Context, input string, params map[
 		if err != nil {
 			return "", fmt.Errorf("failed to parse workflow: %w", err)
 		}
-	} else {
+	default:
 		return "", fmt.Errorf("template name, file, yaml, or input is required to run a workflow")
 	}
 

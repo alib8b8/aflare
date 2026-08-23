@@ -105,15 +105,16 @@ func parseAuditExportArgs(args []string) (auditExportOptions, error) {
 		case "--help", "-h":
 			opts.help = true
 		default:
-			if strings.HasPrefix(args[i], "--out=") {
+			switch {
+			case strings.HasPrefix(args[i], "--out="):
 				opts.outPath = strings.TrimPrefix(args[i], "--out=")
-			} else if strings.HasPrefix(args[i], "--since=") {
+			case strings.HasPrefix(args[i], "--since="):
 				opts.since = strings.TrimPrefix(args[i], "--since=")
-			} else if strings.HasPrefix(args[i], "--until=") {
+			case strings.HasPrefix(args[i], "--until="):
 				opts.until = strings.TrimPrefix(args[i], "--until=")
-			} else if strings.HasPrefix(args[i], "--file=") {
+			case strings.HasPrefix(args[i], "--file="):
 				opts.auditPath = strings.TrimPrefix(args[i], "--file=")
-			} else {
+			default:
 				return opts, fmt.Errorf("未知参数：%s", args[i])
 			}
 		}
@@ -327,11 +328,12 @@ func HandleAuditVerify(args []string) {
 			fmt.Println("  --bundle, -b <path>   Verify the given audit export bundle instead of the live log")
 			return
 		default:
-			if strings.HasPrefix(args[i], "--file=") {
+			switch {
+			case strings.HasPrefix(args[i], "--file="):
 				auditPath = strings.TrimPrefix(args[i], "--file=")
-			} else if strings.HasPrefix(args[i], "--bundle=") {
+			case strings.HasPrefix(args[i], "--bundle="):
 				bundlePath = strings.TrimPrefix(args[i], "--bundle=")
-			} else {
+			default:
 				fmt.Printf("❌ Unknown argument: %s\n", args[i])
 				os.Exit(1)
 			}

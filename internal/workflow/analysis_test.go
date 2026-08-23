@@ -31,7 +31,7 @@ func TestIsLLMNode(t *testing.T) {
 		"llm_router": true,
 		// case-insensitive / whitespace tolerant
 		"Ollama":   true,
-		" OpenAI ": true,
+		" OpenAI ": true, //nolint:gocritic // intentional: key with surrounding whitespace
 		// non-LLM nodes
 		"http_request": false,
 		"execute":      false,

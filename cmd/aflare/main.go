@@ -32,11 +32,15 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	if len(os.Args) < 2 {
 		i18n.Init("")
 		fmt.Println(cli.PrintUsage())
 		fmt.Println(cli.FirstRunHint())
-		os.Exit(1)
+		return 1
 	}
 	command, args, safeMode, dryRun, mcpServer, lang, concise, initMCP, initAgent, updateChannel, serveMode, aiMode, otelEndpoint, otelServiceName := cli.ParseArgs(os.Args[1:])
 	if concise {
@@ -81,23 +85,23 @@ func main() {
 
 	if mcpServer {
 		cli.HandleMCP()
-		return
+		return 0
 	}
 	if serveMode {
 		cli.HandleServe(args)
-		return
+		return 0
 	}
 	if initMCP != "" {
 		cli.HandleInitMCPQuick(initMCP)
-		return
+		return 0
 	}
 	if initAgent != "" {
 		cli.HandleInitAgentQuick(initAgent)
-		return
+		return 0
 	}
 	if updateChannel != "" {
 		cli.HandleChannelQuick(updateChannel)
-		return
+		return 0
 	}
 	if safeMode {
 		nodes.SetSafeMode(true)
@@ -108,7 +112,7 @@ func main() {
 	}
 	if command == "" {
 		fmt.Println(cli.PrintUsage())
-		os.Exit(1)
+		return 1
 	}
 	if err := cli.ValidateCommand(command); err != nil {
 		// 断点: 未知命令不能静默回退到 usage，否则用户不知道哪里打错了
@@ -119,7 +123,7 @@ func main() {
 		}
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, cli.PrintUsage())
-		os.Exit(1)
+		return 1
 	}
 	// 断点17: 启动时检测新版本（非阻塞，提示一行）。仅对交互/信息类命令
 	// 生效，避免延迟工作流执行或与输出交错。交互类命令在进入主流程前提示，
@@ -131,6 +135,7 @@ func main() {
 	if wantsUpdateNoticeAfter(command) {
 		cli.PrintUpdateNoticeAsync(os.Stderr, 1500*time.Millisecond)
 	}
+	return 0
 }
 
 // wantsUpdateNoticeBefore returns true for interactive commands that should

@@ -86,15 +86,16 @@ func formatRouterStats(router *LLMRouter) string {
 	for _, p := range router.GetProviders() {
 		s, ok := stats[p.Name]
 		status := "idle"
-		if !p.Enabled {
+		switch {
+		case !p.Enabled:
 			status = "disabled"
-		} else if ok && s.TotalCalls > 0 {
+		case ok && s.TotalCalls > 0:
 			// Use observed success rate (SuccessCalls/TotalCalls), not the
 			// static config SuccessRate, so stats reflect real behavior.
 			successPct := float64(s.SuccessCalls) / float64(s.TotalCalls) * 100
 			status = fmt.Sprintf("%d calls, %.0f%% success", s.TotalCalls, successPct)
 			status += fmt.Sprintf(", avg %dms", s.TotalLatency/s.TotalCalls)
-		} else if ok {
+		case ok:
 			status = fmt.Sprintf("%d calls", s.TotalCalls)
 		}
 		sb.WriteString(fmt.Sprintf("  - %s (%s): %s\n", p.Name, p.Model, status))

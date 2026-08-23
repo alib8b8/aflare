@@ -199,17 +199,18 @@ func parseScheduleAddArgs(args []string, cronExpr, taskID, wfPath, desc, autoPar
 			PrintScheduleUsage()
 			return
 		default:
-			if strings.HasPrefix(args[i], "--cron=") {
+			switch {
+			case strings.HasPrefix(args[i], "--cron="):
 				*cronExpr = strings.TrimPrefix(args[i], "--cron=")
-			} else if strings.HasPrefix(args[i], "--id=") {
+			case strings.HasPrefix(args[i], "--id="):
 				*taskID = strings.TrimPrefix(args[i], "--id=")
-			} else if strings.HasPrefix(args[i], "--desc=") {
+			case strings.HasPrefix(args[i], "--desc="):
 				*desc = strings.TrimPrefix(args[i], "--desc=")
-			} else if strings.HasPrefix(args[i], "--add=") {
+			case strings.HasPrefix(args[i], "--add="):
 				*autoParse = strings.TrimPrefix(args[i], "--add=")
-			} else if !strings.HasPrefix(args[i], "-") && *wfPath == "" {
+			case !strings.HasPrefix(args[i], "-") && *wfPath == "":
 				*wfPath = args[i]
-			} else {
+			default:
 				fmt.Printf("❌ Unknown argument: %s\n", args[i])
 				os.Exit(1)
 			}

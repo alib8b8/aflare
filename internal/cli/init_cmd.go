@@ -54,11 +54,12 @@ func HandleInit(args []string) {
 			PrintInitUsage()
 			return
 		default:
-			if strings.HasPrefix(args[i], "--mcp=") {
+			switch {
+			case strings.HasPrefix(args[i], "--mcp="):
 				mcpTarget = strings.TrimPrefix(args[i], "--mcp=")
-			} else if strings.HasPrefix(args[i], "--agent=") {
+			case strings.HasPrefix(args[i], "--agent="):
 				agentTarget = strings.TrimPrefix(args[i], "--agent=")
-			} else if strings.HasPrefix(args[i], "--channel=") {
+			case strings.HasPrefix(args[i], "--channel="):
 				channel = strings.TrimPrefix(args[i], "--channel=")
 			}
 		}

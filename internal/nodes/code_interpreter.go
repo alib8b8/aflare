@@ -283,11 +283,12 @@ urllib.request.urlopen = _block_urlopen
 	}
 
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
+		switch {
+		case ctx.Err() == context.DeadlineExceeded:
 			result += fmt.Sprintf("\n[Error] Execution timed out after %s", timeout)
-		} else if result == "" {
+		case result == "":
 			return "", fmt.Errorf("code execution failed: %w", err)
-		} else {
+		default:
 			result += fmt.Sprintf("\n[Error] %v", err)
 		}
 	}
@@ -369,11 +370,12 @@ require('https').get = _blockNet;
 	}
 
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
+		switch {
+		case ctx.Err() == context.DeadlineExceeded:
 			result += fmt.Sprintf("\n[Error] Execution timed out after %s", timeout)
-		} else if result == "" {
+		case result == "":
 			return "", fmt.Errorf("code execution failed: %w", err)
-		} else {
+		default:
 			result += fmt.Sprintf("\n[Error] %v", err)
 		}
 	}
@@ -499,11 +501,12 @@ mod net_block {
 	}
 
 	if err != nil {
-		if runCtx.Err() == context.DeadlineExceeded {
+		switch {
+		case runCtx.Err() == context.DeadlineExceeded:
 			result += fmt.Sprintf("\n[Error] Execution timed out after %s", timeout)
-		} else if result == "" {
+		case result == "":
 			return "", fmt.Errorf("code execution failed: %w", err)
-		} else {
+		default:
 			result += fmt.Sprintf("\n[Error] %v", err)
 		}
 	}

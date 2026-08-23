@@ -316,10 +316,11 @@ func parsePart(part string, min, max int) ([]int, error) {
 		}
 	}
 
-	if part == "*" {
+	switch {
+	case part == "*":
 		start = min
 		end = max
-	} else if strings.Contains(part, "-") {
+	case strings.Contains(part, "-"):
 		rangeParts := strings.SplitN(part, "-", 2)
 		var err error
 		start, err = strconv.Atoi(rangeParts[0])
@@ -330,7 +331,7 @@ func parsePart(part string, min, max int) ([]int, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid range end %q", rangeParts[1])
 		}
-	} else {
+	default:
 		val, err := strconv.Atoi(part)
 		if err != nil {
 			return nil, fmt.Errorf("invalid value %q", part)

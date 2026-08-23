@@ -205,11 +205,12 @@ func (o *OutputManager) ProgressDone(msg string) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 
-	if o.mode == ModeConcise {
+	switch {
+	case o.mode == ModeConcise:
 		fmt.Fprintf(o.out, "\r✅ %s\n", msg)
-	} else if o.mode == ModeNormal {
+	case o.mode == ModeNormal:
 		fmt.Fprintf(o.out, "✅ %s\n", msg)
-	} else if o.mode == ModeADHD {
+	case o.mode == ModeADHD:
 		fmt.Fprintf(o.out, "✅ %s\n", msg)
 	}
 }
