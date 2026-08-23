@@ -1,9 +1,9 @@
 # AGENTS.md
 
 ## Toolchain
-- Go 1.25 (go.mod pins `go 1.25.x`; CI uses go-version 1.25.13). Never downgrade to 1.24
-  or 1.25.12 — 1.25.12 has 7 reachable standard-library vulnerabilities (govulncheck).
-- golangci-lint v2.12.2 — must match CI. Binaries built with go1.24 (e.g. v2.1.6) cannot lint this repo.
+- Go 1.26 (go.mod pins `go 1.26.0` + `toolchain go1.26.7`; CI uses go-version 1.26.7). Never
+  downgrade below the pinned patch — stdlib vulnerabilities are surfaced by govulncheck.
+- golangci-lint v2.13.1 — must match CI. Binaries built with older Go (e.g. v2.12.2 built with go1.25) cannot lint this repo.
 
 ## CI gate — must pass locally before any commit
 Run all of these; all must be green:

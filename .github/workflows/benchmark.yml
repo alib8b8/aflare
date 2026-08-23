@@ -23,11 +23,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.13'
+          go-version: '1.26.7'
           cache: true
 
       - name: Install benchstat
-        run: go install golang.org/x/perf/cmd/benchstat@latest
+        # Pinned: benchstat@latest now requires go >= 1.26 — with CI on 1.26.7
+        # @latest would work, but a pin keeps future x/perf bumps from
+        # silently breaking the weekly benchmark job again.
+        run: go install golang.org/x/perf/cmd/benchstat@v0.0.0-20260819171926-ebcb4798430d
 
       - name: Download previous baseline (if any)
         uses: actions/download-artifact@v8
