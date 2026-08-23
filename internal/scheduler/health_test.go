@@ -16,21 +16,20 @@
 package scheduler
 
 import (
-	"sync"
 	"testing"
 	"time"
 )
 
+// The HealthMonitor state machine is tick-driven: checkHealth(now) takes the
+// current time as an argument, so tests step it deterministically with
+// synthetic timestamps instead of sleeping on real timers (issue #85).
+
 func TestHealthMonitor_RegisterAndHeartbeat(t *testing.T) {
 	mon := NewHealthMonitor(100 * time.Millisecond)
 
-	heartbeatReceived := make(chan struct{}, 1)
 	mon.Register("worker-1", 500*time.Millisecond, func(id string) {
 		t.Errorf("unexpected death for %s", id)
 	}, nil, 0)
-
-	mon.Start()
-	defer mon.Stop()
 
 	status, ok := mon.GetStatus("worker-1")
 	if !ok {
@@ -40,48 +39,35 @@ func TestHealthMonitor_RegisterAndHeartbeat(t *testing.T) {
 		t.Errorf("expected healthy, got %s", status)
 	}
 
-	// Send heartbeat before timeout
+	// Send heartbeat, then check health at a point well within the timeout.
 	mon.Heartbeat("worker-1")
-	time.Sleep(150 * time.Millisecond)
+	afterBeat := time.Now()
+	mon.checkHealth(afterBeat.Add(150 * time.Millisecond))
 
 	status, _ = mon.GetStatus("worker-1")
 	if status != WorkerHealthy {
 		t.Errorf("expected healthy after heartbeat, got %s", status)
-	}
-
-	// Ensure no false death
-	select {
-	case <-heartbeatReceived:
-		t.Error("unexpected heartbeat received")
-	case <-time.After(100 * time.Millisecond):
 	}
 }
 
 func TestHealthMonitor_TimeoutTriggersOnDead(t *testing.T) {
 	mon := NewHealthMonitor(50 * time.Millisecond)
 
-	var mu sync.Mutex
 	var deadIDs []string
 	mon.Register("worker-1", 100*time.Millisecond, func(id string) {
-		mu.Lock()
 		deadIDs = append(deadIDs, id)
-		mu.Unlock()
 	}, nil, 0)
 
-	mon.Start()
-	defer mon.Stop()
+	base := time.Now()
+	// checkHealth invokes onDead synchronously, so no waiting is needed.
+	mon.checkHealth(base.Add(300 * time.Millisecond))
 
-	// Wait for timeout to expire
-	time.Sleep(300 * time.Millisecond)
-
-	mu.Lock()
 	if len(deadIDs) == 0 {
 		t.Error("expected worker-1 to be declared dead")
 	}
 	if len(deadIDs) > 0 && deadIDs[0] != "worker-1" {
 		t.Errorf("expected dead worker-1, got %s", deadIDs[0])
 	}
-	mu.Unlock()
 
 	status, _ := mon.GetStatus("worker-1")
 	if status != WorkerDead {
@@ -92,40 +78,62 @@ func TestHealthMonitor_TimeoutTriggersOnDead(t *testing.T) {
 func TestHealthMonitor_AutoRestart(t *testing.T) {
 	mon := NewHealthMonitor(50 * time.Millisecond)
 
-	var mu sync.Mutex
-	restartCount := 0
+	// restarts signals each restart; the callback heartbeats first so that
+	// receiving from the channel guarantees the heartbeat is recorded.
+	restarts := make(chan string, 4)
 	deadCount := 0
 
 	mon.Register("worker-1", 100*time.Millisecond,
 		func(id string) {
-			mu.Lock()
 			deadCount++
-			mu.Unlock()
 		},
 		func(id string) {
-			mu.Lock()
-			restartCount++
-			mu.Unlock()
-			// Simulate recovery: send heartbeat
 			mon.Heartbeat(id)
+			restarts <- id
 		},
 		2, // max 2 restarts
 	)
 
-	mon.Start()
-	defer mon.Stop()
+	base := time.Now()
 
-	// Wait for timeout + restart
-	time.Sleep(500 * time.Millisecond)
+	// First timeout: dead + restart #1.
+	mon.checkHealth(base.Add(200 * time.Millisecond))
+	select {
+	case id := <-restarts:
+		if id != "worker-1" {
+			t.Errorf("expected restart of worker-1, got %s", id)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("restart #1 did not happen")
+	}
 
-	mu.Lock()
-	if restartCount == 0 {
-		t.Error("expected at least 1 restart")
+	// Second timeout: dead again + restart #2.
+	mon.checkHealth(base.Add(400 * time.Millisecond))
+	select {
+	case <-restarts:
+	case <-time.After(5 * time.Second):
+		t.Fatal("restart #2 did not happen")
 	}
-	if restartCount > 2 {
-		t.Errorf("expected at most 2 restarts, got %d", restartCount)
+
+	// Third timeout: restart budget exhausted — no more restarts.
+	mon.checkHealth(base.Add(600 * time.Millisecond))
+	select {
+	case id := <-restarts:
+		t.Errorf("unexpected restart %s beyond max", id)
+	case <-time.After(100 * time.Millisecond):
 	}
-	mu.Unlock()
+
+	if deadCount != 3 {
+		t.Errorf("expected 3 deaths, got %d", deadCount)
+	}
+	if got := len(restarts); got != 0 {
+		t.Errorf("expected exactly 2 restarts, got %d extra", got)
+	}
+
+	status, _ := mon.GetStatus("worker-1")
+	if status != WorkerDead {
+		t.Errorf("expected dead after restart budget exhausted, got %s", status)
+	}
 }
 
 func TestHealthMonitor_UnhealthyThenRecover(t *testing.T) {
@@ -133,12 +141,10 @@ func TestHealthMonitor_UnhealthyThenRecover(t *testing.T) {
 
 	mon.Register("worker-1", 200*time.Millisecond, nil, nil, 0)
 
-	mon.Start()
-	defer mon.Stop()
+	base := time.Now()
 
-	// Wait for unhealthy state (half timeout)
-	time.Sleep(150 * time.Millisecond)
-
+	// Past half the timeout but not timed out yet: unhealthy.
+	mon.checkHealth(base.Add(150 * time.Millisecond))
 	status, _ := mon.GetStatus("worker-1")
 	if status != WorkerUnhealthy {
 		t.Errorf("expected unhealthy, got %s", status)

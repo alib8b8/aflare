@@ -20,6 +20,22 @@ import (
 	"time"
 )
 
+// fakeClock makes LRU ordering and TTL expiry deterministic: tests advance
+// it explicitly instead of sleeping (issue #85 — real sleeps let LRU order
+// flip under parallel load).
+type fakeClock struct{ t time.Time }
+
+func (c *fakeClock) Now() time.Time          { return c.t }
+func (c *fakeClock) Advance(d time.Duration) { c.t = c.t.Add(d) }
+
+// newSessionManagerWithClock wires a fake clock into a SessionManager.
+func newSessionManagerWithClock(maxSessions int, ttl time.Duration) (*SessionManager, *fakeClock) {
+	sm := NewSessionManager(maxSessions, ttl)
+	clock := &fakeClock{t: time.Now()}
+	sm.now = clock.Now
+	return sm, clock
+}
+
 // ── SessionManager: Basic Operations ────────────────────────────────────────
 
 func TestSessionManager_GetOrCreate(t *testing.T) {
@@ -74,13 +90,13 @@ func TestSessionManager_Reset(t *testing.T) {
 // ── SessionManager: LRU Eviction ───────────────────────────────────────────
 
 func TestSessionManager_LRUEviction(t *testing.T) {
-	sm := NewSessionManager(3, 1*time.Hour) // max 3 sessions
+	sm, clock := newSessionManagerWithClock(3, 1*time.Hour) // max 3 sessions
 
-	// Create 3 sessions
+	// Create 3 sessions with distinct timestamps
 	sm.GetOrCreate("session-1")
-	time.Sleep(1 * time.Millisecond)
+	clock.Advance(time.Millisecond)
 	sm.GetOrCreate("session-2")
-	time.Sleep(1 * time.Millisecond)
+	clock.Advance(time.Millisecond)
 	sm.GetOrCreate("session-3")
 
 	if sm.Count() != 3 {
@@ -88,9 +104,11 @@ func TestSessionManager_LRUEviction(t *testing.T) {
 	}
 
 	// Access session-1 to make it recently used
+	clock.Advance(time.Millisecond)
 	sm.GetOrCreate("session-1")
 
 	// Create session-4 — should evict session-2 (the LRU, never re-accessed)
+	clock.Advance(time.Millisecond)
 	sm.GetOrCreate("session-4")
 
 	if sm.Count() != 3 {
@@ -107,16 +125,18 @@ func TestSessionManager_LRUEviction(t *testing.T) {
 }
 
 func TestSessionManager_LRUEviction_AccessUpdatesLRU(t *testing.T) {
-	sm := NewSessionManager(2, 1*time.Hour)
+	sm, clock := newSessionManagerWithClock(2, 1*time.Hour)
 
 	sm.GetOrCreate("session-1")
-	time.Sleep(1 * time.Millisecond)
+	clock.Advance(time.Millisecond)
 	sm.GetOrCreate("session-2")
 
 	// Access session-1 (now it's most recent)
+	clock.Advance(time.Millisecond)
 	sm.GetOrCreate("session-1")
 
 	// Create session-3 — should evict session-2 (LRU since session-1 was accessed)
+	clock.Advance(time.Millisecond)
 	sm.GetOrCreate("session-3")
 
 	if sm.Count() != 2 {
@@ -141,15 +161,15 @@ func TestSessionManager_LRUEvictionMultiple(t *testing.T) {
 // ── SessionManager: TTL Eviction ───────────────────────────────────────────
 
 func TestSessionManager_TTLEviction(t *testing.T) {
-	sm := NewSessionManager(10, 50*time.Millisecond)
+	sm, clock := newSessionManagerWithClock(10, 50*time.Millisecond)
 
 	sm.GetOrCreate("session-1")
 	if sm.Count() != 1 {
 		t.Fatalf("expected 1 session, got %d", sm.Count())
 	}
 
-	// Wait for TTL to expire
-	time.Sleep(100 * time.Millisecond)
+	// Advance past the TTL
+	clock.Advance(100 * time.Millisecond)
 
 	// Creating a new session triggers evictExpiredLocked
 	sm.GetOrCreate("session-2")
@@ -161,14 +181,14 @@ func TestSessionManager_TTLEviction(t *testing.T) {
 }
 
 func TestSessionManager_TTLRefreshOnAccess(t *testing.T) {
-	sm := NewSessionManager(10, 100*time.Millisecond)
+	sm, clock := newSessionManagerWithClock(10, 100*time.Millisecond)
 
 	sm.GetOrCreate("session-1")
-	time.Sleep(60 * time.Millisecond)
+	clock.Advance(60 * time.Millisecond)
 
 	// Access session-1 to refresh its TTL
 	sm.GetOrCreate("session-1")
-	time.Sleep(60 * time.Millisecond)
+	clock.Advance(60 * time.Millisecond)
 
 	// Create a new session — session-1 should still be alive (TTL refreshed)
 	sm.GetOrCreate("session-2")

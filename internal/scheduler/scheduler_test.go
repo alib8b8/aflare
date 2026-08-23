@@ -259,8 +259,9 @@ func TestScheduler_StartStop(t *testing.T) {
 		atomic.AddInt64(&count, 1)
 	})
 
+	// Smoke test: Stop() waits for the run loop to exit, so no sleep is
+	// needed to prove the start/stop lifecycle works (issue #85).
 	s.Start()
-	time.Sleep(100 * time.Millisecond)
 	s.Stop()
 }
 
