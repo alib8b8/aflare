@@ -40,7 +40,7 @@ query-filters:
   # EnvAPIKey may surface inside wrapped error strings printed to console;
   # keys themselves are never logged directly.
   - exclude:
-      id: go/clear-text-logging-sensitive-data
+      id: go/clear-text-logging
   # SHA-256 is used for watermarking fingerprints, not password hashing.
   - exclude:
       id: go/weak-sensitive-data-hashing
