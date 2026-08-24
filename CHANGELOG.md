@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **README 中英文更新为「个人优先」定位**：头部定位改为「AI 与你的数据之间确定且安全的控制层」，新增 Connector API 优势条目、功能矩阵行、核心能力专节（五类连接器 / 凭据隔离 / 权限天花板 / 根目录遏制示例）与路线图 main 行，文档索引补 connector-api.md 链接
+
+### Fixed
+- **`aflare connector` 子命令完全不可达（断点，本轮自检发现）**：`HandleConnector` 已实现且 main.go 分发器有 `case "connector"`，但 `cli.knownCommands` 漏列 `"connector"`——`ValidateCommand` 在分发前直接以 unknown command 拒绝，`aflare connector add/list/show/remove` 一律不可用。现补入命令表，并在主 usage（PrintUsage，中/英/俄三语 locale）加 connector 一行
+
 ## [0.10.0] - 2026-08-22
 
 ### Added

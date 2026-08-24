@@ -147,7 +147,7 @@ var knownCommands = []string{
 	"create", "run", "help", "install", "uninstall", "registry", "list",
 	"validate", "review", "version", "self-update", "update", "upgrade",
 	"autoupgrade", "init", "config", "webui", "schedule", "audit",
-	"serve", "secrets", "resume", "chat", "agent",
+	"serve", "secrets", "connector", "resume", "chat", "agent",
 	"watermark", "doctor", "mcp",
 }
 
@@ -289,6 +289,7 @@ func PrintUsage() string {
   aflare chat                            %s
   aflare agent                           %s
   aflare watermark <decode|verify|info>  %s
+  aflare connector <cmd>                 %s
   aflare mcp                             %s
   aflare help                            %s
 
@@ -324,6 +325,7 @@ func PrintUsage() string {
 		i18n.T("usage.chat"),
 		i18n.T("usage.agent"),
 		i18n.T("usage.watermark"),
+		i18n.T("usage.connector"),
 		i18n.T("usage.mcp"),
 		i18n.T("usage.help"),
 		i18n.T("options"),

@@ -5,7 +5,8 @@
     <a href="README.en.md">English</a>
   </p>
   <p><strong>让 AI 告别聊天，开始执行</strong></p>
-  <p><em>本地优先 · 数据不出本地 · 连接你自己的 LLM / 数据库 / 知识库 · ReAct 推理 · 确定性工作流执行</em></p>
+  <p><em>个人优先 · 本地运行 · 数据不出本地 · 连接你自己的 LLM / 文件 / 笔记 / 数据库 · ReAct 推理 · 确定性工作流执行</em></p>
+  <p>AI 与你的数据之间「确定且安全」的控制层</p>
 
   <p>
     <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
@@ -91,13 +92,13 @@ aflare agent -c reflection,planning,utility
 
 ## 项目状态
 
-aflare 目前处于 **v0.10.0 阶段**。核心 Runtime 能力（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断）已实现并通过 CI 验证。v0.9.0 交付国密算法支持（SM3 审计链 / SM4 密钥存储，opt-in）、审计链安全硬化（每安装随机 HMAC 密钥、跨进程日志锁、bundle 截断伪造防护）、MCP server 一键安装（`aflare mcp install`）与 0.8.x 字节级升级兼容。v0.10.0 新增交付：**MemHarness 记忆批判-重构模式**（记忆是重构的线索，不是当前任务的事实）、**步骤级类型化输出契约与有界预览输入**、**水印部署溯源**，并经一轮安全自检修复插件路径穿越、symlink 绕过与记忆数据竞争等问题（见 [CHANGELOG](CHANGELOG.md)）。国产芯片（昇腾/寒武纪/海光）场景通过 OpenAI 兼容接口接入本地推理服务（非原生 SDK 集成），持续完善中。硬件设备控制（机器人等）不在内置范围——用户可通过自定义节点或 MCP Server 自行接入，数据不出内网。
+aflare 目前处于 **v0.10.0 阶段**，目标用户**先做个人**：个人用户的数据在本机（文件、笔记库、个人 SQLite 库），aflare 做 AI 与这些数据之间「确定且安全」的控制层。核心 Runtime 能力（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断）已实现并通过 CI 验证。v0.9.0 交付国密算法支持（SM3 审计链 / SM4 密钥存储，opt-in）、审计链安全硬化、MCP server 一键安装（`aflare mcp install`）。v0.10.0 新增交付：**MemHarness 记忆批判-重构模式**、**步骤级类型化输出契约与有界预览输入**、**水印部署溯源**，并经一轮安全自检修复插件路径穿越、symlink 绕过与记忆数据竞争等问题。v0.10.0 后 main 分支已合入 **Connector API**（个人优先主线）：`files` / `notes` / `sqlite` / `mysql` / `postgres` 五类命名连接器——工作流只引用连接器名，凭据只存 secrets store / 环境变量；连接器声明天花板（只读、行数、字节数、扩展名白名单），节点参数只能收紧、不能放宽；目录授权把 workdir 沙箱的同一套遏制规则（禁绝对路径、禁穿越、symlink 逃逸无条件拒绝）应用到用户授权的目录根，SQLite 只读模式纵深防御（DSN 强制 `mode=ro`）（见 [docs/connector-api.md](docs/connector-api.md) 与 [CHANGELOG](CHANGELOG.md)）。国产芯片（昇腾/寒武纪/海光）场景通过 OpenAI 兼容接口接入本地推理服务（非原生 SDK 集成），持续完善中。硬件设备控制（机器人等）不在内置范围——用户可通过自定义节点或 MCP Server 自行接入，数据不出内网。
 
 ---
 
 ## 这是什么？
 
-aflare 是一个**本地优先的自动化 Agent**，也是**确定性工作流执行引擎**。两种模式共用同一核心：
+aflare 是一个**本地优先的自动化 Agent**，也是**确定性工作流执行引擎**，更是 **AI 与你的数据之间「确定且安全」的控制层**——你显式授权哪些数据（目录、笔记库、个人数据库），AI 在权限天花板内确定性地干活。两种模式共用同一核心：
 
 ```
 对话式 Agent                    声明式工作流
@@ -141,7 +142,9 @@ L2: Runtime      —  确定性执行层
 
 ## 项目优势
 
-aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用户与个人。核心优势：
+aflare 面向个人用户优先（企业内网 / 本地优先场景同样适用），服务对数据隐私与安全敏感的你。核心优势：
+
+**个人数据连接器（Connector API）** — 用 `aflare connector register` 显式授权本地目录、笔记库、个人数据库，工作流只引用连接器名：`files` / `notes` 目录连接器把 workdir 沙箱的遏制规则（禁绝对路径、禁穿越、symlink 逃逸无条件拒绝、扩展名白名单、字节数上限）应用到 `~/notes`、`~/Documents` 等你授权的根；`sqlite` / `mysql` / `postgres` 数据库连接器凭据只存 secrets store / 环境变量，SQLite 只读模式纵深防御（DSN 强制 `mode=ro`）。连接器声明的权限天花板（只读、行数、字节）节点只能收紧、不能放宽——AI 的能力边界由你定义。
 
 **本地优先，数据不出本地** — 单二进制零运行时依赖，~5MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退）。
 
@@ -184,6 +187,7 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 | 关键词匹配生成工作流 | ✅ | 有测试 |
 | MCP 协议支持（Server/Client） | ✅ | 有测试 |
 | **MemHarness 记忆批判-重构**（`harness_search` + 会话批判注入） | ✅ | 有测试 |
+| **Connector API**（`files`/`notes`/`sqlite`/`mysql`/`postgres` 命名连接器，凭据隔离 + 权限天花板 + 根目录遏制） | ✅ | 有测试 |
 | **步骤级输出契约 `output_schema`** | ✅ | 有测试 |
 | **有界预览输入 `preview_input`**（16KiB） | ✅ | 有测试 |
 | LLM 节点（18 家内置提供商，任意 OpenAI 兼容模型可用） | ✅ | 有测试 |
@@ -234,6 +238,31 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 - 内置 MCP Client，工作流中可直接调用外部 MCP 服务
 - `aflare mcp install <name>` 一键安装 8 个内置社区 server
 - 也可通过 [DeepSeek Harness (DSH) 集成](docs/dsh.md) 将 aflare 工具暴露给 DSH 智能体（MCP 桥接零代码接入，或原生 [Cordis 插件](integrations/dsh-plugin)）
+
+### Connector API（个人数据接入主线）
+
+命名连接器 = 你显式授权的数据源 + 策略天花板。工作流只写连接器名，凭据永不进 YAML：
+
+```bash
+# 授权笔记目录（默认只读，symlink 逃逸无条件拒绝）
+aflare connector add my-notes --type notes --root ~/notes
+
+# 授权文档目录（只允许 md/txt，显式开启写入）
+aflare connector add my-docs --type files --root ~/Documents --include '*.md' --include '*.txt' --writable
+
+# 个人 SQLite 库（DSN 强制 mode=ro 只读）
+aflare connector add my-library --type sqlite --database ~/calibre/metadata.db
+
+# 远程数据库（凭据存 secrets store，spec 只有引用）
+aflare connector add my-pg --type postgres --host db.example.com --database analytics \
+  --username readonly --credential-group connectors
+```
+
+- **五类连接器**：`files` / `notes`（目录，`file_read`/`file_write`/`files_list` 节点）+ `sqlite` / `mysql` / `postgres`（数据库，`sql_query` 节点）
+- **凭据隔离**：workflow 只引用连接器名；凭据只存 secrets store（`aflare secrets set`）或环境变量
+- **权限天花板**：连接器声明只读 / max_rows / max_bytes / 扩展名白名单 / 超时——节点参数只能收紧、不能放宽
+- **根目录遏制**：workdir 沙箱的同一套规则（禁绝对路径、禁穿越）应用到授权根，符号链接逃逸**无条件拒绝**；SQLite 只读模式纵深防御
+- 详细设计见 [docs/connector-api.md](docs/connector-api.md)
 
 ### 记忆批判-重构（MemHarness 模式）
 - memory 节点 `harness_search` 操作：检索候选记忆时携带完整来源状态（类型/层级/置信度/记录时间/相关度），生成自包含批判 prompt；LLM 批判（keep/rewrite/discard）作为显式可重试的工作流步骤执行，无适用记忆输出 `<EMPTY>` 而非编造
@@ -309,7 +338,8 @@ aflare 面向内网 / 本地优先、对数据隐私与安全敏感的企业用�
 | v0.8 | 已完成 | 离线/内网首选项体验、隐私安全硬化、本地 LLM 丝滑接入、CLI 体验优化（智能命令提示）、CI 提速 |
 | **v0.8.1** | **已完成** | 发布审计修复：国内安装 404、`aflare mcp` 子命令、execute 白名单错误定位、govulncheck 漏洞清零 |
 | **v0.9** | **已完成** | 国密算法支持（SM3/SM4，opt-in）、审计链安全硬化（随机 HMAC 密钥、跨进程锁、bundle 防截断伪造）、`aflare mcp install` 一键安装、供应链场景包、loong64 |
-| **v0.10** | **已完成** | MemHarness 记忆批判-重构、步骤级输出契约与有界预览、水印部署溯源、安全自检修复；后续：国产芯片适配完善、Agent 能力深化 |
+| **v0.10** | **已完成** | MemHarness 记忆批判-重构、步骤级输出契约与有界预览、水印部署溯源、安全自检修复 |
+| **main** | **进行中** | **Connector API（个人优先主线）**：files/notes/sqlite/mysql/postgres 命名连接器、凭据隔离、权限天花板、根目录遏制；后续：个人笔记软件连接器、Agent 能力深化、国产芯片适配完善 |
 | v1.0 | 计划中 | 稳定 API、LTS |
 
 详情见 [CHANGELOG.md](CHANGELOG.md)
@@ -375,7 +405,7 @@ aflare 提供的是**数据处理与自动化执行能力**，金融场景（股
 ## 文档
 
 - [入门指南](docs/getting-started.md) · [教程](docs/tutorial.md) · [YAML 语法](docs/getting-started.md#workflow-configuration)
-- [数据流](docs/dataflow.md) · [调度](docs/scheduling.md) · [MCP](docs/mcp.md) · [插件](docs/plugins.md)
+- [数据流](docs/dataflow.md) · [调度](docs/scheduling.md) · [MCP](docs/mcp.md) · [插件](docs/plugins.md) · [连接器](docs/connector-api.md)
 - [Web UI](docs/webui.md) · [可视化](docs/visualizer.md) · [自定义节点](docs/custom-nodes.md)
 - [API 文档](docs/api.md) · [节点参考](docs/nodes-reference.md)
 - [部署指南](docs/deployment.md) · [Docker](docs/docker.md) · [多租户](docs/tenants.md)
