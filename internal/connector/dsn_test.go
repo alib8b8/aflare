@@ -115,6 +115,8 @@ func TestBuildDSN_MySQLDefaultPortNoUser(t *testing.T) {
 }
 
 func TestBuildDSN_SQLite(t *testing.T) {
+	// Read-only (the default) opens with mode=ro: the driver itself
+	// rejects writes — defense in depth on top of the node gate.
 	spec := Spec{Name: "db", Type: TypeSQLite, Database: "/data/app.db"}
 	driver, dsn, err := BuildDSN(spec, "ignored")
 	if err != nil {
@@ -123,8 +125,37 @@ func TestBuildDSN_SQLite(t *testing.T) {
 	if driver != "sqlite3" {
 		t.Errorf("driver = %q, want sqlite3", driver)
 	}
+	if want := "file:/data/app.db?mode=ro"; dsn != want {
+		t.Errorf("dsn = %q, want %q", dsn, want)
+	}
+}
+
+func TestBuildDSN_SQLiteWritable(t *testing.T) {
+	spec := Spec{Name: "db", Type: TypeSQLite, Database: "/data/app.db", ReadOnly: boolPtr(false)}
+	_, dsn, err := BuildDSN(spec, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if dsn != "/data/app.db" {
 		t.Errorf("dsn = %q, want /data/app.db", dsn)
+	}
+}
+
+func TestBuildDSN_SQLiteRejectsURIDatabase(t *testing.T) {
+	// Database values that look like URIs or carry a query string could
+	// inject their own mode= parameter and silently defeat the driver
+	// level read-only enforcement — validation must reject them so the
+	// DSN is always built deterministically as file:<path>?mode=ro.
+	for _, db := range []string{
+		"file:/data/app.db",
+		"file:/data/app.db?mode=rw",
+		"/data/app.db?cache=shared",
+		"/data/app.db#frag",
+	} {
+		spec := Spec{Name: "db", Type: TypeSQLite, Database: db}
+		if _, _, err := BuildDSN(spec, ""); err == nil {
+			t.Errorf("database %q should be rejected by spec validation", db)
+		}
 	}
 }
 

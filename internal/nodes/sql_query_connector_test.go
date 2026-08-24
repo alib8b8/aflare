@@ -115,10 +115,11 @@ func TestSQLQueryNode_Execute_ConnectorResolvesDSN(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "stub") {
 		t.Fatalf("expected stub driver sentinel error, got %v", err)
 	}
-	// The DSN that reached the driver must be the spec's database path —
+	// The DSN that reached the driver must be the spec's database path
+	// in read-only mode (sqlite connectors are read-only by default) —
 	// proving driver+dsn came from the connector, not inline params.
-	if got := stubSQLite.recordedDSN(); got != "/tmp/connector-test.db" {
-		t.Errorf("driver opened DSN %q, want /tmp/connector-test.db", got)
+	if got, want := stubSQLite.recordedDSN(), "file:/tmp/connector-test.db?mode=ro"; got != want {
+		t.Errorf("driver opened DSN %q, want %q", got, want)
 	}
 	if got := stubSQLite.recordedQuery(); got != "SELECT 1" {
 		t.Errorf("driver saw query %q, want SELECT 1", got)

@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/alib8b8/aflare/internal/connector"
@@ -31,18 +32,19 @@ import (
 //
 // Commands:
 //
-//	add <name> --type <postgres|mysql|sqlite> [options]   Register a connector
-//	list                                                   List connectors
-//	show <name>                                            Show one connector
-//	remove <name>                                          Remove a connector
-//	-h, --help                                             Show this help
+//	add <name> --type <postgres|mysql|sqlite|files|notes> [options]   Register a connector
+//	list                                                              List connectors
+//	show <name>                                                       Show one connector
+//	remove <name>                                                     Remove a connector
+//	-h, --help                                                        Show this help
 //
-// Connectors are named connections to user-owned data sources. Specs are
-// stored in ~/.aflare/config/connectors.yaml (or $AFLARE_CONNECTORS_FILE);
+// Connectors are named connections to user-owned data sources: databases
+// (sql_query node) or local directories — files/notes (file_read/
+// file_write/files_list nodes). Specs are stored in
+// ~/.aflare/config/connectors.yaml (or $AFLARE_CONNECTORS_FILE);
 // credentials are never stored in the spec — they live in the secrets
 // store (aflare secrets set <group> <key>) or an environment variable and
-// are referenced by kind/group/key. Workflows then use `connector: <name>`
-// in sql_query nodes instead of inline driver/dsn.
+// are referenced by kind/group/key.
 func HandleConnector(args []string) error {
 	if len(args) == 0 {
 		PrintConnectorUsage()
@@ -86,21 +88,43 @@ func PrintConnectorUsage() {
 	fmt.Println("  add <name> --type <postgres|mysql|sqlite> [--host H] [--port P] [--database D]")
 	fmt.Println("      [--username U] [--credential-group G [--credential-key K] | --credential-env VAR]")
 	fmt.Println("      [--writable] [--max-rows N] [--timeout S]")
+	fmt.Println("  add <name> --type files  --root DIR [--include GLOB ...] [--max-bytes N] [--writable]")
+	fmt.Println("  add <name> --type notes  --root DIR [--include GLOB ...] [--max-bytes N] [--writable]")
 	fmt.Println("      Register a connector (read-only by default)")
 	fmt.Println("  list          List registered connectors")
 	fmt.Println("  show <name>   Show one connector's spec (credentials are never printed)")
 	fmt.Println("  remove <name> Remove a connector")
 	fmt.Println()
+	fmt.Println("Types:")
+	fmt.Println("  postgres/mysql/sqlite  databases, used by the sql_query node")
+	fmt.Println("  files                  a directory on this machine, used by file_read/file_write/files_list")
+	fmt.Println("  notes                  a markdown vault (defaults to *.md), same nodes as files")
+	fmt.Println()
 	fmt.Println("Examples:")
+	fmt.Println("  # 个人笔记库（默认只读，只允许 *.md）")
+	fmt.Println("  aflare connector add my-notes --type notes --root ~/notes")
+	fmt.Println("  # 个人文档目录（可写 + 扩展名白名单）")
+	fmt.Println("  aflare connector add my-docs --type files --root ~/Documents --writable --include '*.md' --include '*.txt'")
+	fmt.Println("  # 数据库")
 	fmt.Println("  aflare secrets set connectors my-pg-pass        # store the password first")
 	fmt.Println("  aflare connector add my-pg --type postgres --host db.internal --database app \\")
 	fmt.Println("      --username ro --credential-group connectors")
 	fmt.Println("  aflare connector list")
 	fmt.Println()
-	fmt.Println("Workflow usage (sql_query node):")
+	fmt.Println("Workflow usage:")
 	fmt.Println("  params:")
-	fmt.Println("    connector: my-pg")
-	fmt.Println("    sql: \"SELECT count(*) FROM orders\"")
+	fmt.Println("    connector: my-notes")
+	fmt.Println("    path: \"journal/2026-08-24.md\"   # file_read / file_write / files_list")
+	fmt.Println("    sql: \"SELECT count(*) FROM orders\"  # sql_query (database connectors)")
+}
+
+// includeList is a repeatable --include flag (glob allowlist).
+type includeList []string
+
+func (i *includeList) String() string { return strings.Join(*i, ",") }
+func (i *includeList) Set(v string) error {
+	*i = append(*i, v)
+	return nil
 }
 
 // handleConnectorAdd registers a connector spec. Flags:
@@ -110,6 +134,9 @@ type connectorAddFlags struct {
 	port       int
 	database   string
 	username   string
+	root       string
+	maxBytes   int
+	include    includeList
 	credGroup  string
 	credKey    string
 	credEnv    string
@@ -144,11 +171,14 @@ func handleConnectorAdd(args []string) error {
 	fs := flag.NewFlagSet("connector add", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var f connectorAddFlags
-	fs.StringVar(&f.connType, "type", "", "connector type: postgres | mysql | sqlite")
+	fs.StringVar(&f.connType, "type", "", "connector type: postgres | mysql | sqlite | files | notes")
 	fs.StringVar(&f.host, "host", "", "database host")
 	fs.IntVar(&f.port, "port", 0, "database port (type default when 0)")
 	fs.StringVar(&f.database, "database", "", "database name (sqlite: file path)")
 	fs.StringVar(&f.username, "username", "", "database username")
+	fs.StringVar(&f.root, "root", "", "root directory for files/notes connectors (~ expanded)")
+	fs.IntVar(&f.maxBytes, "max-bytes", 0, "max bytes per file read (files/notes; default 10MB)")
+	fs.Var(&f.include, "include", "glob allowlist for files/notes, repeatable (notes defaults to '*.md')")
 	fs.StringVar(&f.credGroup, "credential-group", "", "secrets store group holding the credential")
 	fs.StringVar(&f.credKey, "credential-key", "", "secrets store key (defaults to <name> when --credential-group is set)")
 	fs.StringVar(&f.credEnv, "credential-env", "", "environment variable holding the credential")
@@ -160,13 +190,22 @@ func handleConnectorAdd(args []string) error {
 		return exitErr(1)
 	}
 	if name == "" || len(fs.Args()) != 0 {
-		fmt.Fprintln(os.Stderr, "Usage: aflare connector add <name> --type <postgres|mysql|sqlite> [options]")
+		fmt.Fprintln(os.Stderr, "Usage: aflare connector add <name> --type <postgres|mysql|sqlite|files|notes> [options]")
 		return exitErr(1)
 	}
 
 	if f.credGroup != "" && f.credEnv != "" {
 		fmt.Println("❌ --credential-group 与 --credential-env 互斥，只能选一种凭据来源")
 		return exitErr(1)
+	}
+
+	// Expand a leading ~ in --root to the user's home directory so the
+	// common personal case (--root ~/notes) just works.
+	root := f.root
+	if root == "~" || strings.HasPrefix(root, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			root = filepath.Join(home, strings.TrimPrefix(root, "~"))
+		}
 	}
 
 	spec := connector.Spec{
@@ -176,12 +215,43 @@ func handleConnectorAdd(args []string) error {
 		Port:       f.port,
 		Database:   f.database,
 		Username:   f.username,
+		Root:       root,
+		MaxBytes:   f.maxBytes,
+		Include:    f.include,
 		MaxRows:    f.maxRows,
 		TimeoutSec: f.timeoutSec,
 	}
 	// Spec field is read_only; the flag is writable (opt-in for writes).
 	readOnly := !f.writable
 	spec.ReadOnly = &readOnly
+
+	// For file connectors the root must exist and be a directory now —
+	// registering a typo'd path would silently fail every later read.
+	// Symlinks are resolved before storing so the spec holds the real
+	// boundary: a symlink root (e.g. ~/vault → /) would silently widen
+	// the connector's effective scope, and the file nodes reject
+	// symlink roots anyway. (An empty root is left to spec.Validate
+	// for the proper message.)
+	if spec.IsFileConnector() && spec.Root != "" {
+		resolved, err := filepath.EvalSymlinks(spec.Root)
+		if err != nil {
+			fmt.Printf("❌ 无法访问根目录 %s：%v\n", spec.Root, err)
+			return exitErr(1)
+		}
+		fi, err := os.Stat(resolved)
+		if err != nil {
+			fmt.Printf("❌ 无法访问根目录 %s：%v\n", resolved, err)
+			return exitErr(1)
+		}
+		if !fi.IsDir() {
+			fmt.Printf("❌ root %s 不是目录\n", resolved)
+			return exitErr(1)
+		}
+		if resolved != spec.Root {
+			fmt.Printf("ℹ️ 根目录已解析符号链接：%s → %s\n", spec.Root, resolved)
+		}
+		spec.Root = resolved
+	}
 
 	switch {
 	case f.credGroup != "":
@@ -226,7 +296,15 @@ func handleConnectorAdd(args []string) error {
 
 	fmt.Printf("✅ 已注册连接器 %q（%s）\n", name, spec.Type)
 	fmt.Printf("   文件：%s\n", reg.Path())
-	if spec.Credential != nil {
+	if spec.IsFileConnector() {
+		fmt.Printf("   根目录：%s\n", spec.Root)
+		if inc := spec.EffectiveInclude(); len(inc) > 0 {
+			fmt.Printf("   允许：%s\n", strings.Join(inc, ", "))
+		} else {
+			fmt.Println("   允许：所有文件类型")
+		}
+		fmt.Printf("   单文件上限：%d 字节\n", spec.EffectiveMaxBytes())
+	} else if spec.Credential != nil {
 		if spec.Credential.Kind == connector.CredentialKindSecret {
 			fmt.Printf("   凭据：secrets %s/%s（若未设置：aflare secrets set %s %s）\n",
 				spec.Credential.Group, spec.Credential.Key, spec.Credential.Group, spec.Credential.Key)
@@ -235,9 +313,9 @@ func handleConnectorAdd(args []string) error {
 		}
 	}
 	if spec.IsReadOnly() {
-		fmt.Println("   权限：只读（默认）。写库需 --writable 重新注册。")
+		fmt.Println("   权限：只读（默认）。开启写入需 --writable 重新注册。")
 	} else {
-		fmt.Println("   权限：可写（已显式开启，工作流仍需 read_only=false 才会执行写语句）")
+		fmt.Println("   权限：可写（已显式开启；数据库工作流仍需 read_only=false 才会执行写语句）")
 	}
 	return nil
 }
@@ -251,8 +329,8 @@ func handleConnectorList() error {
 	specs := reg.List()
 	if len(specs) == 0 {
 		fmt.Println("尚未注册任何连接器。")
-		fmt.Println("先存凭据：aflare secrets set connectors <key>")
-		fmt.Println("再注册：  aflare connector add <name> --type postgres --host H --database D --username U --credential-group connectors")
+		fmt.Println("个人文件/笔记：aflare connector add my-notes --type notes --root ~/notes")
+		fmt.Println("数据库：      aflare connector add my-pg --type postgres --host H --database D --username U --credential-group connectors")
 		return nil
 	}
 	fmt.Printf("%-24s %-9s %-34s %-10s %s\n", "NAME", "TYPE", "ENDPOINT", "READ_ONLY", "CREDENTIAL")
@@ -261,7 +339,10 @@ func handleConnectorList() error {
 		if s.Port != 0 {
 			endpoint = fmt.Sprintf("%s:%d", s.Host, s.Port)
 		}
-		if s.Type == connector.TypeSQLite {
+		switch {
+		case s.IsFileConnector():
+			endpoint = s.Root
+		case s.Type == connector.TypeSQLite:
 			endpoint = s.Database
 		}
 		cred := "-"
@@ -291,6 +372,15 @@ func handleConnectorShow(args []string) error {
 	}
 	fmt.Printf("name:       %s\n", spec.Name)
 	fmt.Printf("type:       %s\n", spec.Type)
+	if spec.IsFileConnector() {
+		fmt.Printf("root:       %s\n", spec.Root)
+		if inc := spec.EffectiveInclude(); len(inc) > 0 {
+			fmt.Printf("include:    %s\n", strings.Join(inc, ", "))
+		}
+		fmt.Printf("read_only:  %t\n", spec.IsReadOnly())
+		fmt.Printf("max_bytes:  %d\n", spec.EffectiveMaxBytes())
+		return nil
+	}
 	if spec.Type != connector.TypeSQLite {
 		fmt.Printf("host:       %s\n", spec.Host)
 		fmt.Printf("port:       %d\n", spec.Port)
