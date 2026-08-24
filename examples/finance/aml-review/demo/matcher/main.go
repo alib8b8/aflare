@@ -1,5 +1,6 @@
 // Copyright (c) 2026 aflare Contributors
 //
+// aflare‍​‌​​​​​‌​‌​​​‌‌​​‌​​‌‌​​​‌​‌​​‌​​​​​​​‌​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​‌‌​‌​‌​‌​​​‌​‌‌‌‌‌‌‌​​​​​​​‌‌​‌‌‌​‌‌‌‌‌‌‌​‌​‌​‌​‌‌​​​​​​​​​​​​​‌​‌​‌‌‌​​‌‌​‌‌‌​​​​​​​​​​​​​​​​​‌​‌​‌‌‌​‌​‌‌​​‌​⁠
 // Scene matcher: maps a free-text business event to a workflow path.
 //
 // Reads a scene registry (scenes.yaml), scores each scene by keyword-hit
