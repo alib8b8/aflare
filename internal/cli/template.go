@@ -34,31 +34,42 @@ import (
 // dryRun/safeMode are forwarded from the top-level flag parser so that
 // `aflare --dry-run template run <id>` and `aflare --safe-mode template run <id>`
 // behave like the equivalent `aflare run` invocation.
-func HandleTemplateSubmit(args []string, dryRun, safeMode bool) {
+func HandleTemplateSubmit(args []string, dryRun, safeMode bool) error {
 	if len(args) == 0 {
 		PrintTemplateSubmitUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	subCmd := args[0]
 	switch subCmd {
 	case "submit":
-		handleTemplateSubmit(args[1:])
+		if err := handleTemplateSubmit(args[1:]); err != nil {
+			return err
+		}
 	case "list":
-		handleTemplateList(args[1:])
+		if err := handleTemplateList(args[1:]); err != nil {
+			return err
+		}
 	case "new":
-		handleTemplateNew(args[1:])
+		if err := handleTemplateNew(args[1:]); err != nil {
+			return err
+		}
 	case "clone":
-		handleTemplateClone(args[1:])
+		if err := handleTemplateClone(args[1:]); err != nil {
+			return err
+		}
 	case "run":
-		handleTemplateRun(args[1:], dryRun, safeMode)
+		if err := handleTemplateRun(args[1:], dryRun, safeMode); err != nil {
+			return err
+		}
 	case "--help", "-h", "help":
 		PrintTemplateSubmitUsage()
 	default:
 		fmt.Printf("Unknown template subcommand: %s\n\n", subCmd)
 		PrintTemplateSubmitUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 // handleTemplateRun implements `aflare template run <template-id> [run flags]`.
@@ -66,12 +77,12 @@ func HandleTemplateSubmit(args []string, dryRun, safeMode bool) {
 // immediately executes its workflow.yaml via HandleRun, forwarding --set /
 // --params-file / --resume etc. This is the one-command "try a template" path:
 // no need to clone first or remember the workflow.yaml path.
-func handleTemplateRun(args []string, dryRun, safeMode bool) {
+func handleTemplateRun(args []string, dryRun, safeMode bool) error {
 	if len(args) == 0 {
 		fmt.Println("Error: template run requires <template-id>")
 		fmt.Println("Usage: aflare template run <template-id> [--set k=v ...] [--params-file f] [--resume]")
 		fmt.Println("提示：使用 aflare template list --all 查看所有可用模板")
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// 第一个非 flag 参数是 template-id，其余透传给 run 命令的参数解析器。
@@ -86,7 +97,7 @@ func handleTemplateRun(args []string, dryRun, safeMode bool) {
 	}
 	if templateID == "" {
 		fmt.Println("Error: template run requires <template-id>")
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	templatesDir := meta.ResolveTemplatesPath()
@@ -94,7 +105,7 @@ func handleTemplateRun(args []string, dryRun, safeMode bool) {
 	registry := skillsPkg.NewSkillRegistry(templatesDir)
 	if err := registry.Load(); err != nil {
 		fmt.Printf("❌ 加载模板失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	src, err := registry.Get(templateID)
@@ -109,41 +120,43 @@ func handleTemplateRun(args []string, dryRun, safeMode bool) {
 		if src == nil {
 			fmt.Printf("❌ 未找到模板：%s\n", templateID)
 			fmt.Println("提示：使用 aflare template list --all 查看所有可用模板")
-			os.Exit(1)
+			return exitErr(1)
 		}
 	}
 
 	wfPath := filepath.Join(src.Path, "workflow.yaml")
 	if _, err := os.Stat(wfPath); err != nil {
 		fmt.Printf("❌ 模板缺少 workflow.yaml：%s\n", wfPath)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("▶ 运行模板 %s\n", src.ID)
 	// 复用 run 命令的参数解析（--set / --params-file / --resume 等）：
 	// 把 workflow 路径放在最前，其余 flag 跟在后面，HandleRun 会正确分流。
 	runArgs = append([]string{wfPath}, runArgs...)
-	HandleRun(runArgs, dryRun, safeMode)
+	return HandleRun(runArgs, dryRun, safeMode)
 }
 
 // handleTemplateSubmit handles the "template submit" subcommand.
 // It validates a community-contributed template and prepares it for PR submission.
-func handleTemplateSubmit(args []string) {
+func handleTemplateSubmit(args []string) error {
 	var yamlPath, category, author string
 
-	parseTemplateSubmitArgs(args, &yamlPath, &category, &author)
+	if err := parseTemplateSubmitArgs(args, &yamlPath, &category, &author); err != nil {
+		return err
+	}
 
 	if yamlPath == "" {
 		fmt.Println("Error: workflow YAML file path is required")
 		PrintTemplateSubmitUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Validate the file exists and is a YAML file.
 	absPath, err := validateTemplateFile(yamlPath)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	ext := strings.ToLower(filepath.Ext(absPath))
 
@@ -151,13 +164,13 @@ func handleTemplateSubmit(args []string) {
 	data, err := os.ReadFile(absPath)
 	if err != nil {
 		fmt.Printf("Error: failed to read file: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	content := string(data)
 	if strings.TrimSpace(content) == "" {
 		fmt.Println("Error: workflow file is empty")
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Extract workflow name from the YAML.
@@ -174,7 +187,7 @@ func handleTemplateSubmit(args []string) {
 	// writer escape templatesDir).
 	if err := validateTemplateNameComponent(baseName, "template name"); err != nil {
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Determine category.
@@ -185,7 +198,7 @@ func handleTemplateSubmit(args []string) {
 	// templates path too, so it must be a single safe component.
 	if err := validateTemplateNameComponent(category, "category"); err != nil {
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Validate category is known.
@@ -233,26 +246,26 @@ func handleTemplateSubmit(args []string) {
 	// Create the target directory.
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		fmt.Printf("Error: failed to create template directory: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Copy the workflow YAML.
 	workflowDest := filepath.Join(targetDir, "workflow.yaml")
 	if err := os.WriteFile(workflowDest, data, 0644); err != nil {
 		fmt.Printf("Error: failed to write workflow file: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Write skill.json metadata.
 	metaData, err := json.MarshalIndent(skillMeta, "", "  ")
 	if err != nil {
 		fmt.Printf("Error: failed to marshal metadata: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	metaPath := filepath.Join(targetDir, skillsPkg.SkillMetaFile)
 	if err := os.WriteFile(metaPath, metaData, 0644); err != nil {
 		fmt.Printf("Error: failed to write metadata: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Write a README stub.
@@ -299,6 +312,7 @@ func handleTemplateSubmit(args []string) {
 
 	// Award a virtual badge for the template contribution.
 	awardBadgeForTemplate(author, skillID)
+	return nil
 }
 
 // validateTemplateNameComponent validates that name is a single safe path
@@ -363,7 +377,7 @@ func validateTemplateFile(yamlPath string) (string, error) {
 }
 
 // parseTemplateSubmitArgs parses the command-line arguments for template submit.
-func parseTemplateSubmitArgs(args []string, yamlPath, category, author *string) {
+func parseTemplateSubmitArgs(args []string, yamlPath, category, author *string) error {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--category", "-c":
@@ -378,17 +392,18 @@ func parseTemplateSubmitArgs(args []string, yamlPath, category, author *string) 
 			}
 		case "--help", "-h":
 			PrintTemplateSubmitUsage()
-			return
+			return nil
 		default:
 			if !strings.HasPrefix(args[i], "-") && *yamlPath == "" {
 				*yamlPath = args[i]
 			} else {
 				fmt.Printf("Unknown argument: %s\n", args[i])
 				PrintTemplateSubmitUsage()
-				os.Exit(1)
+				return exitErr(1)
 			}
 		}
 	}
+	return nil
 }
 
 // PrintTemplateSubmitUsage prints usage for the template command.

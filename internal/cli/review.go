@@ -25,31 +25,31 @@ import (
 )
 
 // HandleReview handles the "review" command.
-func HandleReview(args []string) {
+func HandleReview(args []string) error {
 	if len(args) < 1 {
 		fmt.Println("Usage: aflare review <workflow.yaml>")
 		fmt.Println("\nAI-powered workflow review — analyzes your workflow YAML and provides")
 		fmt.Println("optimization suggestions, security checks, and a natural-language summary.")
 		fmt.Println("\nInspired by agno v2.8.7 AdvisorTools: the advisor model reviews the")
 		fmt.Println("generated workflow before execution, catching issues early.")
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	const maxFileSize = 10 * 1024 * 1024 // 10 MB
 	fi, err := os.Stat(args[0])
 	if err != nil {
 		fmt.Printf("❌ Failed to stat workflow file: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if fi.Size() > maxFileSize {
 		fmt.Printf("❌ Workflow file too large (%d bytes). Max allowed: %d bytes (10 MB).\n", fi.Size(), maxFileSize)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	data, err := os.ReadFile(args[0])
 	if err != nil {
 		fmt.Printf("❌ Failed to read workflow file: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	workflowYAML := string(data)
@@ -129,4 +129,5 @@ func HandleReview(args []string) {
 	fmt.Println(strings.Repeat("─", 60))
 	fmt.Println("💡 Tip: Run 'aflare review' before 'aflare run' to catch issues early.")
 	fmt.Println("   The advisor model checks for security, performance, and reliability.")
+	return nil
 }

@@ -55,7 +55,7 @@ var sandboxNodes = map[string]bool{
 // handleTemplateList implements `aflare template list`.
 // By default only "easy" templates (no LLM/sandbox) are shown; --all shows
 // everything, --category filters by category.
-func handleTemplateList(args []string) {
+func handleTemplateList(args []string) error {
 	showAll := false
 	category := ""
 	for _, a := range args {
@@ -78,7 +78,7 @@ func handleTemplateList(args []string) {
 	registry := skillsPkg.NewSkillRegistry(templatesDir)
 	if err := registry.Load(); err != nil {
 		fmt.Printf("❌ 加载模板失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	skills := registry.List()
@@ -110,7 +110,7 @@ func handleTemplateList(args []string) {
 		} else {
 			fmt.Println("未找到无需额外配置的模板（easy）。使用 --all 查看全部模板。")
 		}
-		return
+		return nil
 	}
 
 	if showAll {
@@ -131,6 +131,7 @@ func handleTemplateList(args []string) {
 		fmt.Println("显示全部模板：aflare template list --all")
 	}
 	fmt.Println("按分类筛选：aflare template list --category <name>")
+	return nil
 }
 
 // resolveDifficulty returns the difficulty of a skill, auto-inferencing from
@@ -235,11 +236,11 @@ func formatTemplateRow(s *skillsPkg.SkillMeta, diff string) string {
 
 // handleTemplateNew implements `aflare template new <name>`.
 // It creates a minimal workflow skeleton in the current directory.
-func handleTemplateNew(args []string) {
+func handleTemplateNew(args []string) error {
 	if len(args) == 0 {
 		fmt.Println("Error: template new requires a <name>")
 		fmt.Println("Usage: aflare template new <name>")
-		os.Exit(1)
+		return exitErr(1)
 	}
 	name := args[0]
 	// name is joined into a filesystem path (./<name>/workflow.yaml);
@@ -247,18 +248,18 @@ func handleTemplateNew(args []string) {
 	// (e.g. "../evil" would write outside the current directory).
 	if err := validateTemplateNameComponent(name, "name"); err != nil {
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	dir := filepath.Join(".", name)
 	wfPath := filepath.Join(dir, "workflow.yaml")
 
 	if _, err := os.Stat(dir); err == nil {
 		fmt.Printf("❌ 目录已存在：%s\n", dir)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		fmt.Printf("❌ 创建目录失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	skeleton := fmt.Sprintf(`name: %s
@@ -287,7 +288,7 @@ steps:
 
 	if err := os.WriteFile(wfPath, []byte(skeleton), 0644); err != nil {
 		fmt.Printf("❌ 写入失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Println("已创建模板骨架：./" + filepath.Join(name, "workflow.yaml"))
@@ -298,15 +299,16 @@ steps:
 	fmt.Println("  3. aflare run " + wfPath)
 	fmt.Println()
 	fmt.Println("文档：https://github.com/alib8b8/aflare/blob/main/docs/getting-started.md")
+	return nil
 }
 
 // handleTemplateClone implements `aflare template clone <source> <dest>`.
 // It copies an existing template's workflow.yaml to a new local directory.
-func handleTemplateClone(args []string) {
+func handleTemplateClone(args []string) error {
 	if len(args) < 2 {
 		fmt.Println("Error: template clone requires <source> <dest>")
 		fmt.Println("Usage: aflare template clone <source-id> <dest-name>")
-		os.Exit(1)
+		return exitErr(1)
 	}
 	sourceID := args[0]
 	destName := args[1]
@@ -315,7 +317,7 @@ func handleTemplateClone(args []string) {
 	// validate it is a single safe component to prevent path traversal.
 	if err := validateTemplateNameComponent(destName, "destination name"); err != nil {
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	templatesDir := meta.ResolveTemplatesPath()
@@ -323,7 +325,7 @@ func handleTemplateClone(args []string) {
 	registry := skillsPkg.NewSkillRegistry(templatesDir)
 	if err := registry.Load(); err != nil {
 		fmt.Printf("❌ 加载模板失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	src, err := registry.Get(sourceID)
@@ -339,7 +341,7 @@ func handleTemplateClone(args []string) {
 		if src == nil {
 			fmt.Printf("❌ 未找到模板：%s\n", sourceID)
 			fmt.Println("提示：使用 aflare template list --all 查看所有可用模板")
-			os.Exit(1)
+			return exitErr(1)
 		}
 	}
 
@@ -347,25 +349,26 @@ func handleTemplateClone(args []string) {
 	data, err := os.ReadFile(srcWf) // #nosec G304 -- internally resolved template path
 	if err != nil {
 		fmt.Printf("❌ 读取源模板失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	destDir := filepath.Join(".", destName)
 	if _, err := os.Stat(destDir); err == nil {
 		fmt.Printf("❌ 目标目录已存在：%s\n", destDir)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		fmt.Printf("❌ 创建目录失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	destWf := filepath.Join(destDir, "workflow.yaml")
 	if err := os.WriteFile(destWf, data, 0644); err != nil {
 		fmt.Printf("❌ 写入失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("已复制 %s → ./%s/workflow.yaml\n", sourceID, destName)
 	fmt.Println("修改后运行：aflare run " + destWf)
+	return nil
 }

@@ -48,7 +48,7 @@ var providerDefaultsMap = map[string]providerDefaults{
 // runInitWizard runs the interactive first-run setup wizard.
 // It detects the environment (Go, bubblewrap, ollama, existing LLM config),
 // guides the user through LLM provider selection, and writes the config file.
-func runInitWizard() {
+func runInitWizard() error {
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Println()
@@ -122,7 +122,7 @@ func runInitWizard() {
 	cfgPath, err := writeWizardConfig(provider, model, apiKey, endpoint)
 	if err != nil {
 		fmt.Printf("\n❌ 保存配置失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	fmt.Printf("\n配置已保存到 %s ✓\n", cfgPath)
 	printAPIKeyHint(provider, apiKey)
@@ -134,6 +134,7 @@ func runInitWizard() {
 	fmt.Println("或者启动 Agent 对话：")
 	fmt.Println("  aflare chat")
 	fmt.Println()
+	return nil
 }
 
 // cloudProviderByChoice maps the wizard menu choice (2-6) to the provider key

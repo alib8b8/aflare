@@ -25,7 +25,7 @@ import (
 )
 
 // HandleServe handles the "serve" command (HTTP API server mode).
-func HandleServe(args []string) {
+func HandleServe(args []string) error {
 	host := "127.0.0.1" // 默认只绑定本地，防止未授权外部访问
 	port := "8080"
 	apiKey := ""
@@ -61,11 +61,11 @@ func HandleServe(args []string) {
 			}
 		case "--help", "-h":
 			PrintServeUsage()
-			return
+			return nil
 		default:
 			fmt.Printf("Unknown argument: %s\n", args[i])
 			PrintServeUsage()
-			os.Exit(1)
+			return exitErr(1)
 		}
 	}
 
@@ -84,7 +84,7 @@ func HandleServe(args []string) {
 			fmt.Fprintln(os.Stderr,
 				"Refusing to start: API server would bind to all interfaces "+
 					"with no authentication. Use --api-key <key> or --host 127.0.0.1.")
-			os.Exit(1)
+			return exitErr(1)
 		}
 	}
 
@@ -100,8 +100,9 @@ func HandleServe(args []string) {
 
 	if err := server.Start(); err != nil {
 		fmt.Printf("API server error: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 // PrintServeUsage prints usage information for the serve command.

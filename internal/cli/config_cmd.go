@@ -28,10 +28,10 @@ import (
 )
 
 // HandleConfig handles the "config" command with show/set subcommands.
-func HandleConfig(args []string) {
+func HandleConfig(args []string) error {
 	if len(args) == 0 {
 		PrintConfigUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	subCmd := args[0]
@@ -49,16 +49,19 @@ func HandleConfig(args []string) {
 			fmt.Println("  llm.endpoint <url>      Set endpoint for the default provider")
 			fmt.Println("  security_level <L>      Set security level (L0/L1/L2/L3)")
 			fmt.Println("  safe_mode <bool>        Enable/disable safe mode (true/false)")
-			os.Exit(1)
+			return exitErr(1)
 		}
-		handleConfigSet(args[1], args[2])
+		if err := handleConfigSet(args[1], args[2]); err != nil {
+			return err
+		}
 	case "--help", "-h", "help":
 		PrintConfigUsage()
 	default:
 		fmt.Printf("Unknown config subcommand: %s\n\n", subCmd)
 		PrintConfigUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 // handleConfigShow prints the current configuration with API keys redacted.
@@ -119,7 +122,7 @@ func handleConfigShow() {
 }
 
 // handleConfigSet updates a single configuration key and persists the config.
-func handleConfigSet(key, value string) {
+func handleConfigSet(key, value string) error {
 	cfgPath := configFilePath()
 
 	// Load existing config from file (bypassing the cached singleton so we
@@ -130,7 +133,7 @@ func handleConfigSet(key, value string) {
 	if data, err := os.ReadFile(cfgPath); err == nil {
 		if err := yaml.Unmarshal(data, cfg); err != nil {
 			fmt.Printf("❌ 解析配置文件失败：%v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 	}
 	if cfg.Providers == nil {
@@ -183,7 +186,7 @@ func handleConfigSet(key, value string) {
 			cfg.SecurityLevel = upper
 		default:
 			fmt.Printf("❌ 无效的安全等级：%s（可选 L0/L1/L2/L3）\n", value)
-			os.Exit(1)
+			return exitErr(1)
 		}
 	case keyLower == "safe_mode":
 		switch strings.ToLower(strings.TrimSpace(value)) {
@@ -193,38 +196,39 @@ func handleConfigSet(key, value string) {
 			cfg.SafeMode = false
 		default:
 			fmt.Printf("❌ 无效的布尔值：%s（可选 true/false）\n", value)
-			os.Exit(1)
+			return exitErr(1)
 		}
 	default:
 		fmt.Printf("❌ 未知的配置项：%s\n", key)
 		fmt.Println("支持的配置项：llm.provider, llm.model, llm.api_key, llm.endpoint, security_level, safe_mode")
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	if err := cfg.Validate(); err != nil {
 		fmt.Printf("❌ 配置校验失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(cfgPath), 0755); err != nil {
 		fmt.Printf("❌ 创建配置目录失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		fmt.Printf("❌ 序列化配置失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	header := "# aflare 配置文件\n# 文档：https://github.com/alib8b8/aflare/blob/main/docs/getting-started.md\n\n"
 	if err := os.WriteFile(cfgPath, []byte(header+string(data)), 0600); err != nil {
 		fmt.Printf("❌ 写入配置失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("✅ 已设置 %s = %s\n", key, redactConfigValue(key, value))
 	fmt.Printf("   配置文件：%s\n", cfgPath)
+	return nil
 }
 
 // redactAPIKey masks all but the first and last 4 characters of an API key.

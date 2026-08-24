@@ -18,42 +18,43 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/alib8b8/aflare/internal/i18n"
 )
 
 // HandleInstall handles the "install" command.
-func HandleInstall(args []string) {
+func HandleInstall(args []string) error {
 	if len(args) < 1 {
 		fmt.Println(i18n.T("install.usage"))
 		fmt.Printf("\n%s\n", i18n.T("install.use_list"))
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	nodeName := args[0]
 	if err := InstallNode(nodeName); err != nil {
 		fmt.Printf("❌ %s\n", i18n.T("install.failed", nodeName, err))
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("✅ %s\n", i18n.T("install.success", nodeName))
 	fmt.Printf("\n%s\n", i18n.T("install.usage_hint"))
 	fmt.Printf("  steps:\n    - node: %s\n", nodeName)
+	return nil
 }
 
 // HandleUninstall handles the "uninstall" command.
-func HandleUninstall(args []string) {
+func HandleUninstall(args []string) error {
 	if len(args) < 1 {
 		fmt.Println(i18n.T("uninstall.usage"))
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	nodeName := args[0]
 	if err := UninstallNode(nodeName); err != nil {
 		fmt.Printf("❌ %s\n", i18n.T("uninstall.failed", nodeName, err))
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("✅ %s\n", i18n.T("uninstall.success", nodeName))
+	return nil
 }

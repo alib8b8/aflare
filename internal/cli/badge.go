@@ -18,33 +18,33 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/alib8b8/aflare/internal/badge"
 )
 
-// osExit is a package-level variable for testing os.Exit calls.
-var osExit = os.Exit
-
 // HandleBadge handles the "badge" command.
 // Subcommands: list, show, award
-func HandleBadge(args []string) {
+func HandleBadge(args []string) error {
 	if len(args) == 0 {
 		printBadgeUsage()
-		return
+		return nil
 	}
 
 	subCmd := args[0]
 	switch subCmd {
 	case "list":
-		handleBadgeList()
+		if err := handleBadgeList(); err != nil {
+			return err
+		}
 	case "show":
 		if len(args) < 2 {
 			fmt.Println("Usage: aflare badge show <contributor-id>")
-			osExit(1)
+			return exitErr(1)
 		}
-		handleBadgeShow(args[1])
+		if err := handleBadgeShow(args[1]); err != nil {
+			return err
+		}
 	case "award":
 		contType := badge.ContributionTemplate
 		// Filter out --type flag and its value, then extract positional args.
@@ -60,16 +60,19 @@ func HandleBadge(args []string) {
 		// First positional is "award", then name, email, reason.
 		if len(positional) < 4 {
 			fmt.Println("Usage: aflare badge award <name> <email> <reason> [--type template|code|docs|bugfix]")
-			osExit(1)
+			return exitErr(1)
 		}
-		handleBadgeAward(positional[1], positional[2], positional[3], contType)
+		if err := handleBadgeAward(positional[1], positional[2], positional[3], contType); err != nil {
+			return err
+		}
 	case "--help", "-h", "help":
 		printBadgeUsage()
 	default:
 		fmt.Printf("Unknown badge subcommand: %s\n\n", subCmd)
 		printBadgeUsage()
-		osExit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 func printBadgeUsage() {
@@ -93,11 +96,11 @@ func printBadgeUsage() {
 	fmt.Println("  aflare badge award \"Bob\" \"bob@example.com\" \"Fixed critical bug\" --type bugfix")
 }
 
-func handleBadgeList() {
+func handleBadgeList() error {
 	store, err := badge.LoadStore(badge.DefaultStorePath())
 	if err != nil {
 		fmt.Printf("Error loading badge store: %v\n", err)
-		osExit(1)
+		return exitErr(1)
 	}
 
 	contributors := store.ListContributors()
@@ -106,7 +109,7 @@ func handleBadgeList() {
 		fmt.Println()
 		fmt.Println("Submit a template or code contribution to earn badges:")
 		fmt.Println("  aflare template submit <workflow.yaml>")
-		return
+		return nil
 	}
 
 	fmt.Println("aflare Community Contributors")
@@ -128,14 +131,14 @@ func handleBadgeList() {
 	fmt.Println(strings.Repeat("─", 60))
 	fmt.Println()
 	fmt.Printf("Total: %d contributors\n", len(contributors))
+	return nil
 }
 
-//nolint:staticcheck // osExit is os.Exit wrapper; staticcheck can't track termination
-func handleBadgeShow(id string) {
+func handleBadgeShow(id string) error {
 	store, err := badge.LoadStore(badge.DefaultStorePath())
 	if err != nil {
 		fmt.Printf("Error loading badge store: %v\n", err)
-		osExit(1)
+		return exitErr(1)
 	}
 
 	rec := store.GetContributor(id)
@@ -152,7 +155,7 @@ func handleBadgeShow(id string) {
 	if rec == nil {
 		fmt.Printf("No contributor found with ID prefix: %s\n", id)
 		fmt.Println("Use 'aflare badge list' to see all contributors.")
-		osExit(1)
+		return exitErr(1)
 	}
 
 	tier := rec.CurrentTier()
@@ -169,13 +172,14 @@ func handleBadgeShow(id string) {
 	for _, b := range rec.Badges {
 		fmt.Printf("  %s\n", badge.FormatBadge(b))
 	}
+	return nil
 }
 
-func handleBadgeAward(name, email, reason string, contType badge.ContributionType) {
+func handleBadgeAward(name, email, reason string, contType badge.ContributionType) error {
 	store, err := badge.LoadStore(badge.DefaultStorePath())
 	if err != nil {
 		fmt.Printf("Error loading badge store: %v\n", err)
-		osExit(1)
+		return exitErr(1)
 	}
 
 	cid := badge.ContributorID(name, email)
@@ -183,7 +187,7 @@ func handleBadgeAward(name, email, reason string, contType badge.ContributionTyp
 
 	if err := store.Save(); err != nil {
 		fmt.Printf("Error saving badge store: %v\n", err)
-		osExit(1)
+		return exitErr(1)
 	}
 
 	if awarded {
@@ -196,4 +200,5 @@ func handleBadgeAward(name, email, reason string, contType badge.ContributionTyp
 	rec := store.GetContributor(cid)
 	fmt.Printf("  Total contributions: %d  |  Current tier: %s%s\n",
 		rec.ContributionCount, badge.TierEmoji[rec.CurrentTier()], rec.CurrentTier())
+	return nil
 }

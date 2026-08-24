@@ -18,14 +18,13 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/alib8b8/aflare/internal/agent"
 	"github.com/alib8b8/aflare/internal/webui"
 )
 
 // HandleWebUI handles the "webui" command.
-func HandleWebUI(args []string) {
+func HandleWebUI(args []string) error {
 	host := ""
 	port := ""
 	workflowsDir := ""
@@ -55,11 +54,11 @@ func HandleWebUI(args []string) {
 			}
 		case "--help", "-h":
 			PrintWebUIUsage()
-			return
+			return nil
 		default:
 			fmt.Printf("Unknown argument: %s\n", args[i])
 			PrintWebUIUsage()
-			os.Exit(1)
+			return exitErr(1)
 		}
 	}
 
@@ -77,8 +76,9 @@ func HandleWebUI(args []string) {
 
 	if err := server.Start(); err != nil {
 		fmt.Printf("WebUI server error: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 // PrintWebUIUsage prints usage information for the webui command.

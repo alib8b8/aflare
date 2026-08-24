@@ -36,7 +36,7 @@ import (
 //	aflare chat --smart     # 智能模式（reflection + memory）
 //	aflare chat --careful   # 谨慎模式（human-in-loop + planning + reflection）
 //	aflare chat --custom -c reflection,bdi  # 自定义组合（高级用户）
-func HandleChat(args []string) {
+func HandleChat(args []string) error {
 	cfg := agent.DefaultConfig()
 
 	for i := 0; i < len(args); i++ {
@@ -99,11 +99,11 @@ func HandleChat(args []string) {
 			cfg.SafeMode = true
 		case "--help", "-h":
 			PrintChatUsage()
-			return
+			return nil
 		default:
 			fmt.Printf("Unknown argument: %s\n", args[i])
 			PrintChatUsage()
-			os.Exit(1)
+			return exitErr(1)
 		}
 	}
 
@@ -111,11 +111,12 @@ func HandleChat(args []string) {
 	if err := checkLLMReady(cfg.Provider, cfg.Endpoint, cfg.APIKey); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		printLLMStartupGuide(cfg.Provider)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	session := agent.NewChatSession(cfg)
 	session.Run()
+	return nil
 }
 
 // parseToolsArg parses a comma-separated tool list, adding the chat default

@@ -28,10 +28,10 @@ import (
 
 // HandleWatermark handles the "watermark" command.
 // Subcommands: decode, verify, info, encode-source, check-source, decode-source, strip-source
-func HandleWatermark(args []string) {
+func HandleWatermark(args []string) error {
 	if len(args) == 0 {
 		fmt.Println(watermark.Info())
-		return
+		return nil
 	}
 
 	subCmd := args[0]
@@ -39,16 +39,20 @@ func HandleWatermark(args []string) {
 	case "decode":
 		if len(args) < 2 {
 			fmt.Println("Usage: aflare watermark decode <file>")
-			os.Exit(1)
+			return exitErr(1)
 		}
-		handleWatermarkDecode(args[1])
+		if err := handleWatermarkDecode(args[1]); err != nil {
+			return err
+		}
 
 	case "verify":
 		if len(args) < 2 {
 			fmt.Println("Usage: aflare watermark verify <file>")
-			os.Exit(1)
+			return exitErr(1)
 		}
-		handleWatermarkVerify(args[1])
+		if err := handleWatermarkVerify(args[1]); err != nil {
+			return err
+		}
 
 	case "info":
 		fmt.Println(watermark.Info())
@@ -56,40 +60,50 @@ func HandleWatermark(args []string) {
 	case "encode-source":
 		switch {
 		case len(args) >= 2 && args[1] == "--all":
-			handleWatermarkEncodeSourceAll(".")
+			if err := handleWatermarkEncodeSourceAll("."); err != nil {
+				return err
+			}
 		case len(args) >= 2:
-			handleWatermarkEncodeSource(args[1])
+			if err := handleWatermarkEncodeSource(args[1]); err != nil {
+				return err
+			}
 		default:
 			fmt.Println("Usage: aflare watermark encode-source <file>")
 			fmt.Println("       aflare watermark encode-source --all")
 			fmt.Println("       Embeds an invisible source-code watermark in a Go file,")
 			fmt.Println("       or in every .go file of the repository when --all is given.")
-			os.Exit(1)
+			return exitErr(1)
 		}
 
 	case "check-source":
 		if len(args) >= 2 && args[1] == "--all" {
-			handleWatermarkCheckSourceAll(".")
+			if err := handleWatermarkCheckSourceAll("."); err != nil {
+				return err
+			}
 		} else {
 			fmt.Println("Usage: aflare watermark check-source --all")
 			fmt.Println("       Verifies every .go file of the repository carries a source")
 			fmt.Println("       watermark. Exits non-zero listing files that lack one.")
-			os.Exit(1)
+			return exitErr(1)
 		}
 
 	case "decode-source":
 		if len(args) < 2 {
 			fmt.Println("Usage: aflare watermark decode-source <file>")
-			os.Exit(1)
+			return exitErr(1)
 		}
-		handleWatermarkDecodeSource(args[1])
+		if err := handleWatermarkDecodeSource(args[1]); err != nil {
+			return err
+		}
 
 	case "strip-source":
 		if len(args) < 2 {
 			fmt.Println("Usage: aflare watermark strip-source <file>")
-			os.Exit(1)
+			return exitErr(1)
 		}
-		handleWatermarkStripSource(args[1])
+		if err := handleWatermarkStripSource(args[1]); err != nil {
+			return err
+		}
 
 	default:
 		fmt.Printf("Unknown watermark subcommand: %s\n", subCmd)
@@ -102,8 +116,9 @@ func HandleWatermark(args []string) {
 		fmt.Println("  check-source --all   — verify every .go file carries a watermark")
 		fmt.Println("  decode-source <file> — extract source-code watermark")
 		fmt.Println("  strip-source <file>  — remove source-code watermark")
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 // encodeSourceAllResult reports the outcome of a batch source-watermark run.
@@ -190,11 +205,11 @@ func checkSourceAll(root string) ([]string, error) {
 
 // handleWatermarkCheckSourceAll fails (exit 1) when any eligible .go file
 // under root lacks a source watermark, listing the offenders.
-func handleWatermarkCheckSourceAll(root string) {
+func handleWatermarkCheckSourceAll(root string) error {
 	missing, err := checkSourceAll(root)
 	if err != nil {
 		fmt.Printf("Error checking source watermarks: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if len(missing) > 0 {
 		fmt.Printf("✗ %d Go file(s) missing a source watermark:\n", len(missing))
@@ -202,87 +217,92 @@ func handleWatermarkCheckSourceAll(root string) {
 			fmt.Printf("  %s\n", p)
 		}
 		fmt.Println("Run: aflare watermark encode-source --all")
-		os.Exit(1)
+		return exitErr(1)
 	}
 	fmt.Println("✓ All Go files carry a source watermark")
+	return nil
 }
 
 // handleWatermarkEncodeSourceAll watermarks every eligible .go file under root.
-func handleWatermarkEncodeSourceAll(root string) {
+func handleWatermarkEncodeSourceAll(root string) error {
 	res, err := encodeSourceAll(root)
 	if err != nil {
 		fmt.Printf("Error embedding source watermarks: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	fmt.Printf("Source watermarks embedded in %d files (%d already watermarked, skipped)\n",
 		res.Watermarked, res.Skipped)
+	return nil
 }
 
-func handleWatermarkEncodeSource(path string) {
+func handleWatermarkEncodeSource(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Printf("Error reading file: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	src := string(data)
 	if watermark.HasSourceWatermark(src) {
 		fmt.Printf("Source file %s already has a watermark\n", path)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	encoded := watermark.EncodeSource(src)
 	if err := os.WriteFile(path, []byte(encoded), 0o644); err != nil {
 		fmt.Printf("Error writing file: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("Source-code watermark embedded in %s\n", path)
+	return nil
 }
 
-func handleWatermarkDecodeSource(path string) {
+func handleWatermarkDecodeSource(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Printf("Error reading file: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	payload, ok := watermark.DecodeSource(string(data))
 	if !ok {
 		fmt.Printf("No source-code watermark found in %s\n", path)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	printPayload(payload, path, "source-code")
+	return nil
 }
 
-func handleWatermarkStripSource(path string) {
+func handleWatermarkStripSource(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Printf("Error reading file: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	src := string(data)
 	if !watermark.HasSourceWatermark(src) {
 		fmt.Printf("No source-code watermark found in %s\n", path)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	stripped := watermark.StripSourceWatermark(src)
 	if err := os.WriteFile(path, []byte(stripped), 0o644); err != nil {
 		fmt.Printf("Error writing file: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("Source-code watermark removed from %s\n", path)
+	return nil
 }
 
-func handleWatermarkDecode(path string) {
+func handleWatermarkDecode(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Printf("Error reading file: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	content := string(data)
@@ -291,7 +311,7 @@ func handleWatermarkDecode(path string) {
 	payload, ok := watermark.DecodeText(content)
 	if ok {
 		printPayload(payload, path, "text (zero-width)")
-		return
+		return nil
 	}
 
 	// Try YAML watermark
@@ -299,18 +319,19 @@ func handleWatermarkDecode(path string) {
 		payload, ok := watermark.DecodeYAML(line)
 		if ok {
 			printPayload(payload, path, "YAML comment")
-			return
+			return nil
 		}
 	}
 
 	fmt.Printf("No aflare watermark found in %s\n", path)
+	return nil
 }
 
-func handleWatermarkVerify(path string) {
+func handleWatermarkVerify(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Printf("Error reading file: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	content := string(data)
@@ -327,7 +348,7 @@ func handleWatermarkVerify(path string) {
 			fmt.Printf("  Deploy ID: %04x\n", payload.DeployID)
 		}
 		fmt.Println("  Status:    valid")
-		return
+		return nil
 	}
 
 	// Try YAML watermark
@@ -343,12 +364,12 @@ func handleWatermarkVerify(path string) {
 				fmt.Printf("  Deploy ID: %04x\n", payload.DeployID)
 			}
 			fmt.Println("  Status:    valid")
-			return
+			return nil
 		}
 	}
 
 	fmt.Printf("✗ No aflare watermark found in %s\n", path)
-	os.Exit(1)
+	return exitErr(1)
 }
 
 func printPayload(payload watermark.Payload, path, wmType string) {

@@ -18,21 +18,20 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/alib8b8/aflare/internal/i18n"
 )
 
 // HandleRegistry handles the "registry" command.
-func HandleRegistry(args []string) {
+func HandleRegistry(args []string) error {
 	if len(args) < 1 {
 		fmt.Println(i18n.T("registry.usage"))
 		fmt.Println("\nCommands:")
 		fmt.Println("  sync     - aflare registry sync")
 		fmt.Println("  list     - aflare registry list")
 		fmt.Println("  search   - aflare registry search <query>")
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	subCmd := args[0]
@@ -40,7 +39,7 @@ func HandleRegistry(args []string) {
 	case "sync":
 		if err := SyncRegistry(); err != nil {
 			fmt.Printf("❌ %s\n", i18n.T("registry.sync_failed", err))
-			os.Exit(1)
+			return exitErr(1)
 		}
 		fmt.Printf("✅ %s\n", i18n.T("registry.sync_success"))
 
@@ -49,12 +48,12 @@ func HandleRegistry(args []string) {
 		if err != nil {
 			fmt.Printf("❌ %s\n", i18n.T("registry.list_failed", err))
 			fmt.Printf("\n%s\n", i18n.T("registry.sync_hint"))
-			os.Exit(1)
+			return exitErr(1)
 		}
 
 		if len(nodes) == 0 {
 			fmt.Println(i18n.T("registry.empty"))
-			return
+			return nil
 		}
 
 		fmt.Println(i18n.T("registry.list_title"))
@@ -68,19 +67,19 @@ func HandleRegistry(args []string) {
 	case "search":
 		if len(args) < 2 {
 			fmt.Println(i18n.T("registry.search_usage"))
-			os.Exit(1)
+			return exitErr(1)
 		}
 
 		query := strings.Join(args[1:], " ")
 		nodes, err := SearchRegistryNodes(query)
 		if err != nil {
 			fmt.Printf("❌ %s\n", i18n.T("registry.list_failed", err))
-			os.Exit(1)
+			return exitErr(1)
 		}
 
 		if len(nodes) == 0 {
 			fmt.Printf("%s\n", i18n.T("registry.no_match", query))
-			return
+			return nil
 		}
 
 		fmt.Println(i18n.T("registry.search_result", len(nodes), query))
@@ -93,8 +92,9 @@ func HandleRegistry(args []string) {
 
 	default:
 		fmt.Printf("%s\n", i18n.T("registry.unknown_cmd", subCmd))
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 func truncate(s string, maxLen int) string {

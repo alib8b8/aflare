@@ -64,40 +64,23 @@ func TestHandleBadge_Help(t *testing.T) {
 }
 
 func TestHandleBadge_UnknownSubcommand(t *testing.T) {
-	// HandleBadge calls os.Exit(1) for unknown subcommands.
-	// We use a recover-based approach to catch the exit.
-	exited := false
-	origExit := osExit
-	osExit = func(code int) {
-		exited = true
-		panic("exit")
-	}
-	defer func() { osExit = origExit }()
-
-	func() {
-		defer func() { recover() }()
-		HandleBadge([]string{"unknown"})
-	}()
-
-	if !exited {
-		t.Error("expected os.Exit(1) for unknown subcommand")
+	err := HandleBadge([]string{"unknown"})
+	if code := exitCodeForErr(err); code != 1 {
+		t.Errorf("expected exit code 1 for unknown subcommand, got %d (err=%v)", code, err)
 	}
 }
 
 func TestHandleBadge_ShowMissingID(t *testing.T) {
-	exited := false
-	origExit := osExit
-	osExit = func(code int) { exited = true; panic("exit") }
-	defer func() { osExit = origExit }()
-
-	func() {
-		defer func() { recover() }()
-		HandleBadge([]string{"show"})
-	}()
-
-	if !exited {
-		t.Error("expected os.Exit(1) for 'show' without ID")
+	err := HandleBadge([]string{"show"})
+	if code := exitCodeForErr(err); code != 1 {
+		t.Errorf("expected exit code 1 for 'show' without ID, got %d (err=%v)", code, err)
 	}
+}
+
+// exitCodeForErr maps a handler error to its process exit code, mirroring
+// what cmd/aflare does at the single dispatch site.
+func exitCodeForErr(err error) int {
+	return ExitCode(err)
 }
 
 func TestHandleBadge_ListEmptyStore(t *testing.T) {
@@ -187,18 +170,9 @@ func TestHandleBadge_ShowNotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 
-	exited := false
-	origExit := osExit
-	osExit = func(code int) { exited = true; panic("exit") }
-	defer func() { osExit = origExit }()
-
-	func() {
-		defer func() { recover() }()
-		handleBadgeShow("nonexistent")
-	}()
-
-	if !exited {
-		t.Error("expected os.Exit(1) for nonexistent contributor")
+	err := handleBadgeShow("nonexistent")
+	if code := exitCodeForErr(err); code != 1 {
+		t.Errorf("expected exit code 1 for nonexistent contributor, got %d (err=%v)", code, err)
 	}
 }
 
@@ -320,18 +294,9 @@ func TestHandleBadge_ShowFullOutput(t *testing.T) {
 }
 
 func TestHandleBadge_AwardInsufficientArgs(t *testing.T) {
-	exited := false
-	origExit := osExit
-	osExit = func(code int) { exited = true; panic("exit") }
-	defer func() { osExit = origExit }()
-
-	func() {
-		defer func() { recover() }()
-		HandleBadge([]string{"award", "name"})
-	}()
-
-	if !exited {
-		t.Error("expected os.Exit(1) for insufficient award args")
+	err := HandleBadge([]string{"award", "name"})
+	if code := exitCodeForErr(err); code != 1 {
+		t.Errorf("expected exit code 1 for insufficient award args, got %d (err=%v)", code, err)
 	}
 }
 
@@ -348,17 +313,8 @@ func TestHandleBadge_ErrorLoadingStore(t *testing.T) {
 	}
 	t.Setenv("HOME", tmpDir)
 
-	exited := false
-	origExit := osExit
-	osExit = func(code int) { exited = true; panic("exit") }
-	defer func() { osExit = origExit }()
-
-	func() {
-		defer func() { recover() }()
-		handleBadgeList()
-	}()
-
-	if !exited {
-		t.Error("expected os.Exit(1) when badge store cannot be loaded")
+	err := handleBadgeList()
+	if code := exitCodeForErr(err); code != 1 {
+		t.Errorf("expected exit code 1 when badge store cannot be loaded, got %d (err=%v)", code, err)
 	}
 }
