@@ -30,21 +30,31 @@ func TestSQLQueryNode_Metadata(t *testing.T) {
 	if s.Name != "sql_query" {
 		t.Errorf("Schema().Name = %q, want sql_query", s.Name)
 	}
-	// Ensure required params are declared.
-	var hasDriver, hasDSN bool
+	// Ensure the connector param is declared and driver/dsn are no longer
+	// hard-required (they are required only when `connector` is absent,
+	// enforced at Execute time).
+	var hasConnector, hasDriver, hasDSN bool
+	var driverRequired, dsnRequired bool
 	for _, p := range s.Params {
-		if p.Name == "driver" && p.Required {
+		switch p.Name {
+		case "connector":
+			hasConnector = true
+		case "driver":
 			hasDriver = true
-		}
-		if p.Name == "dsn" && p.Required {
+			driverRequired = p.Required
+		case "dsn":
 			hasDSN = true
+			dsnRequired = p.Required
 		}
 	}
-	if !hasDriver {
-		t.Error("schema missing required 'driver' param")
+	if !hasConnector {
+		t.Error("schema missing 'connector' param")
 	}
-	if !hasDSN {
-		t.Error("schema missing required 'dsn' param")
+	if !hasDriver || !hasDSN {
+		t.Error("schema missing 'driver'/'dsn' params")
+	}
+	if driverRequired || dsnRequired {
+		t.Error("driver/dsn must not be marked Required (connector mode omits them)")
 	}
 }
 

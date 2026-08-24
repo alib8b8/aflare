@@ -203,6 +203,8 @@ func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, sa
 		err = cli.HandleServe(args)
 	case "secrets":
 		err = cli.HandleSecrets(args)
+	case "connector":
+		err = cli.HandleConnector(args)
 	case "resume":
 		err = cli.HandleResume(args)
 	case "chat":

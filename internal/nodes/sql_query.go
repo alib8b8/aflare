@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alib8b8/aflare/internal/connector"
 	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/nodes/core"
 )
@@ -54,18 +55,19 @@ func (n *SQLQueryNode) Description() string {
 func (n *SQLQueryNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "sql_query",
-		Description: "Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1) to prevent SQL injection. Read-only by default (SELECT/SHOW/EXPLAIN/PRAGMA only); set read_only=false to allow DML/DDL. Supports a 'schema' action that lists tables and columns.",
+		Description: "Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1) to prevent SQL injection. Read-only by default (SELECT/SHOW/EXPLAIN/PRAGMA only); set read_only=false to allow DML/DDL. Supports a 'schema' action that lists tables and columns. Prefer the `connector` param (named connection from `aflare connector add`) over inline driver/dsn — connectors keep credentials out of workflow files and enforce their own read_only/max_rows/timeout ceilings.",
 		Input:       "string - SQL query (when action=query and no `sql` param, input is used as the query)",
 		Output:      "string - JSON array of rows (query), or schema description (schema action)",
 		Params: []core.ParamSchema{
+			{Name: "connector", Type: "string", Description: "Named connector registered via `aflare connector add`. When set, driver/dsn/credentials are resolved from the connector and inline driver/dsn must be omitted. Node-level read_only/max_rows/timeout can only tighten the connector's policy.", Required: false},
 			{Name: "action", Type: "string", Description: "query (default) | schema | tables", Required: false, Default: "query"},
-			{Name: "driver", Type: "string", Description: "database/sql driver name (e.g. sqlite3, postgres, mysql)", Required: true},
-			{Name: "dsn", Type: "string", Description: "Data source name (driver-specific). For SQLite: path to .db file.", Required: true},
+			{Name: "driver", Type: "string", Description: "database/sql driver name (e.g. sqlite3, postgres, mysql). Required unless `connector` is set.", Required: false},
+			{Name: "dsn", Type: "string", Description: "Data source name (driver-specific). For SQLite: path to .db file. Required unless `connector` is set.", Required: false},
 			{Name: "sql", Type: "string", Description: "SQL statement. Use ? (mysql/sqlite) or $1,$2 (postgres) placeholders for `args`.", Required: false},
 			{Name: "args", Type: "string", Description: "JSON array of bind parameters, e.g. [\"foo\", 42]. Optional.", Required: false},
-			{Name: "read_only", Type: "string", Description: "Reject writes if true (default). Set false to allow INSERT/UPDATE/DELETE/DDL.", Required: false, Default: "true"},
-			{Name: "max_rows", Type: "string", Description: "Max rows to return (default 1000). Protects against huge result sets.", Required: false, Default: "1000"},
-			{Name: "timeout", Type: "string", Description: "Query timeout in seconds (default 30).", Required: false, Default: "30"},
+			{Name: "read_only", Type: "string", Description: "Reject writes if true (default). Set false to allow INSERT/UPDATE/DELETE/DDL. A read-only connector stays read-only regardless.", Required: false, Default: "true"},
+			{Name: "max_rows", Type: "string", Description: "Max rows to return (default 1000; a connector's max_rows is the ceiling). Protects against huge result sets.", Required: false, Default: "1000"},
+			{Name: "timeout", Type: "string", Description: "Query timeout in seconds (default 30; a connector's timeout is the ceiling).", Required: false, Default: "30"},
 		},
 	}
 }
@@ -174,6 +176,54 @@ func scanRows(rows *sql.Rows, maxRows int) ([]map[string]interface{}, error) {
 	return out, nil
 }
 
+// applyConnectorCeiling merges a node-level limit with the connector's
+// ceiling: an unset node param adopts the connector value; a set node
+// param is capped at the connector value (nodes can only tighten, never
+// loosen, connector policy).
+func applyConnectorCeiling(nodeVal int, nodeSet bool, ceiling int) int {
+	if !nodeSet {
+		return ceiling
+	}
+	return min(nodeVal, ceiling)
+}
+
+// resolveConnectorSpec loads the named connector spec from the default
+// registry.
+func resolveConnectorSpec(name string) (connector.Spec, error) {
+	reg, err := connector.LoadDefaultRegistry()
+	if err != nil {
+		return connector.Spec{}, fmt.Errorf("failed to load connectors registry: %w", err)
+	}
+	spec, ok := reg.Get(name)
+	if !ok {
+		return connector.Spec{}, fmt.Errorf("connector %q is not registered (register it with: aflare connector add)", name)
+	}
+	return spec, nil
+}
+
+// resolveConnector turns a connector name into (driver, dsn) plus the
+// connector's policy ceilings. Credentials are resolved through the
+// default CredentialResolver (secrets store or environment) so workflow
+// files never contain them.
+func resolveConnector(name string) (driver, dsn string, spec connector.Spec, err error) {
+	spec, err = resolveConnectorSpec(name)
+	if err != nil {
+		return "", "", spec, err
+	}
+	password := ""
+	if spec.Credential != nil {
+		password, err = connector.DefaultResolver().Resolve(*spec.Credential)
+		if err != nil {
+			return "", "", spec, fmt.Errorf("connector %q credential: %w", name, err)
+		}
+	}
+	driver, dsn, err = connector.BuildDSN(spec, password)
+	if err != nil {
+		return "", "", spec, fmt.Errorf("connector %q: %w", name, err)
+	}
+	return driver, dsn, spec, nil
+}
+
 func (n *SQLQueryNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	driver := core.GetParam(params, "driver", "")
 	dsn := core.GetParam(params, "dsn", "")
@@ -181,6 +231,26 @@ func (n *SQLQueryNode) Execute(ctx context.Context, input string, params map[str
 	readOnly := core.GetParam(params, "read_only", "true") == "true"
 	maxRows := core.ParamInt(params, "max_rows", 1000, 1, 100000)
 	timeoutSec := core.ParamInt(params, "timeout", 30, 1, 600)
+
+	// Connector mode: resolve driver/dsn/credential from the named
+	// connector. The connector's policy is the ceiling — node parameters
+	// can only tighten (more read-only, fewer rows, shorter timeout).
+	if connName := core.GetParam(params, "connector", ""); connName != "" {
+		if driver != "" || dsn != "" {
+			return "", fmt.Errorf("connector %q and inline driver/dsn are mutually exclusive: set either the connector or driver+dsn, not both", connName)
+		}
+		var spec connector.Spec
+		var err error
+		driver, dsn, spec, err = resolveConnector(connName)
+		if err != nil {
+			return "", err
+		}
+		readOnly = readOnly || spec.IsReadOnly()
+		_, maxRowsSet := params["max_rows"]
+		maxRows = applyConnectorCeiling(maxRows, maxRowsSet, spec.EffectiveMaxRows())
+		_, timeoutSet := params["timeout"]
+		timeoutSec = applyConnectorCeiling(timeoutSec, timeoutSet, spec.EffectiveTimeoutSec())
+	}
 
 	db, err := openDB(driver, dsn)
 	if err != nil {
