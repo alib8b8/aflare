@@ -672,10 +672,13 @@ func TestSaveCurrentStateAndRestoreState(t *testing.T) {
 // ── ConcurrencyLimiter tests ──
 
 func TestConcurrencyLimiter_AcquireRelease(t *testing.T) {
-	limiter := NewConcurrencyLimiter(1)
+	limiter, err := NewConcurrencyLimiter(1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	ctx := context.Background()
 
-	err := limiter.Acquire(ctx)
+	err = limiter.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -692,13 +695,16 @@ func TestConcurrencyLimiter_Nil(t *testing.T) {
 }
 
 func TestConcurrencyLimiter_ContextCancel(t *testing.T) {
-	limiter := NewConcurrencyLimiter(1)
+	limiter, err := NewConcurrencyLimiter(1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 
 	limiter.Acquire(ctx)
 	cancel()
 
-	err := limiter.Acquire(ctx)
+	err = limiter.Acquire(ctx)
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got %v", err)
 	}
@@ -706,9 +712,43 @@ func TestConcurrencyLimiter_ContextCancel(t *testing.T) {
 }
 
 func TestConcurrencyLimiter_ZeroMax(t *testing.T) {
-	limiter := NewConcurrencyLimiter(0)
+	limiter, err := NewConcurrencyLimiter(0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if limiter != nil {
 		t.Error("expected nil limiter for max <= 0")
+	}
+}
+
+func TestNewConcurrencyLimiterLimit(t *testing.T) {
+	tests := []struct {
+		name    string
+		max     int
+		wantErr bool
+	}{
+		{name: "normal", max: 8},
+		{name: "zero is unlimited", max: 0},
+		{name: "at limit", max: maxConcurrencySlots},
+		{name: "over limit", max: maxConcurrencySlots + 1, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			limiter, err := NewConcurrencyLimiter(tt.max)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("max=%d: expected error, got nil", tt.max)
+				}
+				if limiter != nil {
+					t.Errorf("max=%d: expected nil limiter on error", tt.max)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("max=%d: unexpected error: %v", tt.max, err)
+			}
+		})
 	}
 }
 

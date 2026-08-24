@@ -42,7 +42,7 @@ import (
 // is safe to run in air-gapped/intranet environments where those probes
 // would simply time out and add noise. All local checks (aflare/Go/bwrap,
 // config file, Ollama binary+port, LLM config, proxy env) still run.
-func HandleDoctor(args []string) {
+func HandleDoctor(args []string) error {
 	offline := false
 	for _, a := range args {
 		switch a {
@@ -151,7 +151,7 @@ func HandleDoctor(args []string) {
 	fmt.Println()
 	if len(problems) == 0 {
 		fmt.Println("✅ 所有检查通过，aflare 环境正常。")
-		return
+		return nil
 	}
 
 	fmt.Printf("发现 %d 个问题：\n", len(problems))
@@ -167,6 +167,7 @@ func HandleDoctor(args []string) {
 			fmt.Printf("     %s\n", line)
 		}
 	}
+	return nil
 }
 
 // doctorProblem holds a diagnosed issue with its category and fix hint.

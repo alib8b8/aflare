@@ -156,7 +156,7 @@ func (n *MultimodalNode) ocrImage(ctx context.Context, imagePath, prompt, lang, 
 	safeLang := sanitizeTesseractLang(lang)
 	safePath, err := validateReadPath(imagePath)
 	if err == nil {
-		if _, statErr := os.Stat(safePath); statErr == nil {
+		if _, statErr := os.Stat(safePath); statErr == nil { // codeql[go/path-injection] -- safePath is the validateReadPath result of imagePath
 			if tess, lookErr := exec.LookPath("tesseract"); lookErr == nil {
 				args := []string{safePath, "stdout", "-l", safeLang, "--oem", "1", "--psm", "6"}
 				cmd := exec.CommandContext(ctx, tess, args...) // #nosec G204 -- tess from LookPath, args are standard OCR flags
@@ -228,11 +228,11 @@ func resolveImageURL(imagePath string) (string, error) {
 		return "", fmt.Errorf("invalid image path: %w", err)
 	}
 
-	if _, err := os.Stat(safePath); os.IsNotExist(err) {
+	if _, err := os.Stat(safePath); os.IsNotExist(err) { // codeql[go/path-injection] -- safePath is the validateReadPath result of imagePath in resolveImageURL
 		return "", fmt.Errorf("image file not found: %s", safePath)
 	}
 
-	data, err := os.ReadFile(safePath)
+	data, err := os.ReadFile(safePath) // codeql[go/path-injection] -- safePath is the validateReadPath result of imagePath in resolveImageURL
 	if err != nil {
 		return "", fmt.Errorf("failed to read image: %w", err)
 	}
@@ -390,7 +390,7 @@ func fallbackVisionCall(ctx context.Context, provider, model, apiKey, endpoint s
 		CheckRedirect: core.HTTPRedirectValidator(core.ValidateLMLEndpoint),
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // codeql[go/request-forgery] -- vision endpoint from provider config, pre-validated by core.ValidateLMLEndpoint; client uses core.SafeLLMHTTPClient.Transport (dial-time SSRF/IP validation, DNS-rebinding protection), core.HTTPRedirectValidator(core.ValidateLMLEndpoint) re-checks redirects, core.DefaultLLMTimeout; response capped by core.MaxHTTPResponseSize
 	if err != nil {
 		return "", fmt.Errorf("failed to call %s vision API: %w", provider, err)
 	}
@@ -449,21 +449,24 @@ func sanitizeTesseractLang(lang string) string {
 }
 
 func formatMultimodalOutput(content, source, mode, outputFormat string) string {
-	switch outputFormat {
-	case "json":
-		return fmt.Sprintf(`{
-  "mode": %s,
-  "source": %s,
-  "result": %s
-}`, escapeJSON(mode), escapeJSON(source), escapeJSON(content))
-	default:
-		var builder strings.Builder
-		builder.WriteString(fmt.Sprintf("## Multimodal Analysis (%s)\n\n", mode))
-		builder.WriteString(fmt.Sprintf("**Source:** %s\n\n", source))
-		builder.WriteString("---\n\n")
-		builder.WriteString(content)
-		return builder.String()
+	if outputFormat == "json" {
+		// Marshal via encoding/json so user-controlled values (mode,
+		// source, content) can never break the JSON structure.
+		payload := struct {
+			Mode   string `json:"mode"`
+			Source string `json:"source"`
+			Result string `json:"result"`
+		}{Mode: mode, Source: source, Result: content}
+		if b, err := json.MarshalIndent(payload, "", "  "); err == nil {
+			return string(b)
+		}
 	}
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("## Multimodal Analysis (%s)\n\n", mode))
+	builder.WriteString(fmt.Sprintf("**Source:** %s\n\n", source))
+	builder.WriteString("---\n\n")
+	builder.WriteString(content)
+	return builder.String()
 }
 
 // escapeJSON returns s as a JSON-encoded string (with surrounding quotes).

@@ -218,7 +218,10 @@ func TestExtractKeywords(t *testing.T) {
 		"Deep learning is advanced machine learning. " +
 		"AI systems use machine learning algorithms."
 
-	keywords := ExtractKeywords(text, 5)
+	keywords, err := ExtractKeywords(text, 5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(keywords) == 0 {
 		t.Error("ExtractKeywords should return keywords")
 	}
@@ -232,6 +235,42 @@ func TestExtractKeywords(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("Expected 'machine' or 'learning' in top keywords, got %v", keywords)
+	}
+}
+
+func TestExtractKeywordsTopNLimit(t *testing.T) {
+	text := "alpha beta gamma delta epsilon. alpha beta zeta eta."
+
+	tests := []struct {
+		name    string
+		topN    int
+		wantErr bool
+	}{
+		{name: "normal", topN: 3},
+		{name: "zero", topN: 0},
+		{name: "at limit", topN: maxKeywords},
+		{name: "over limit", topN: maxKeywords + 1, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keywords, err := ExtractKeywords(text, tt.topN)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("topN=%d: expected error, got nil", tt.topN)
+				}
+				if keywords != nil {
+					t.Errorf("topN=%d: expected nil keywords on error, got %v", tt.topN, keywords)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("topN=%d: unexpected error: %v", tt.topN, err)
+			}
+			if len(keywords) > tt.topN {
+				t.Errorf("topN=%d: got %d keywords, want at most %d", tt.topN, len(keywords), tt.topN)
+			}
+		})
 	}
 }
 

@@ -219,7 +219,7 @@ func (n *SQLQueryNode) Execute(ctx context.Context, input string, params map[str
 		}
 	}
 
-	rows, err := db.QueryContext(queryCtx, query, args...)
+	rows, err := db.QueryContext(queryCtx, query, args...) // codeql[go/sql-injection] -- executing user-configured SQL is sql_query's function; read_only=true by default enforces isReadOnlySQL (SELECT/WITH/SHOW/EXPLAIN/PRAGMA/DESC only), user values passed via parameterized args (no string interpolation), queryCtx timeout, maxRows cap
 	if err != nil {
 		return "", fmt.Errorf("query failed: %w", err)
 	}
@@ -308,8 +308,12 @@ func (n *SQLQueryNode) actionSchema(ctx context.Context, db *sql.DB, table strin
 		colRows, err := db.QueryContext(ctx,
 			"SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position", t)
 		if err != nil {
-			// SQLite-style fallback: PRAGMA table_info.
-			colRows, err = db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%q)", t))
+			// SQLite-style fallback: PRAGMA table_info. PRAGMA cannot bind
+			// the table name as a parameter, so escape it with SQLite
+			// identifier quoting (doubling embedded double quotes) — unlike
+			// Go's %q, whose \" escaping is not recognized by SQLite and
+			// would allow premature identifier termination.
+			colRows, err = db.QueryContext(ctx, fmt.Sprintf(`PRAGMA table_info("%s")`, strings.ReplaceAll(t, `"`, `""`))) // codeql[go/sql-injection] -- table identifier cannot be a bind parameter in PRAGMA; escaped with SQLite identifier quoting (double-quote doubling), which cannot terminate the statement; t comes from the table param or the driver's own table list
 			if err != nil {
 				schema[t] = []interface{}{}
 				continue

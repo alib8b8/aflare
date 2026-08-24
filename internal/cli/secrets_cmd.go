@@ -41,10 +41,10 @@ import (
 // AFLARE_SECRETS_CIPHER=aes-gcm|sm4-gcm), keyed by a master password from the
 // OS keyring (or AFLARE_SECRETS_PASSWORD).
 // This is the local-first alternative to storing API keys in plaintext config.
-func HandleSecrets(args []string) {
+func HandleSecrets(args []string) error {
 	if len(args) == 0 {
 		PrintSecretsUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	subCmd := args[0]
@@ -53,23 +53,30 @@ func HandleSecrets(args []string) {
 	case "-h", "--help", "help":
 		PrintSecretsUsage()
 	case "set":
-		handleSecretSet(rest)
+		if err := handleSecretSet(rest); err != nil {
+			return err
+		}
 	case "get":
-		handleSecretGet(rest)
+		if err := handleSecretGet(rest); err != nil {
+			return err
+		}
 	case "list":
-		handleSecretList(rest)
+		if err := handleSecretList(rest); err != nil {
+			return err
+		}
 	default:
 		fmt.Printf("Unknown secrets subcommand: %s\n\n", subCmd)
 		PrintSecretsUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 // loadSecretsOrFail opens the secret manager, exiting with a friendly hint on
 // failure. The most common failure on headless Linux / CI / containers is that
 // no OS keyring (D-Bus secret service) is available and no master password is
 // configured — surface that case explicitly instead of a raw English error.
-func loadSecretsOrFail() *secrets.SecretManager {
+func loadSecretsOrFail() (*secrets.SecretManager, error) {
 	sm, err := secrets.GetSecretManager()
 	if err != nil {
 		fmt.Printf("❌ 无法打开密钥库：%v\n", err)
@@ -81,18 +88,18 @@ func loadSecretsOrFail() *secrets.SecretManager {
 			fmt.Println("请设置主密码环境变量后重试：")
 			fmt.Println("  export AFLARE_SECRETS_PASSWORD='你的主密码'")
 		}
-		os.Exit(1)
+		return nil, exitErr(1)
 	}
-	return sm
+	return sm, nil
 }
 
 // handleSecretSet stores a secret. Usage: aflare secrets set <group> <key> [value]
 // If value is omitted, prompts on stderr without echo.
-func handleSecretSet(args []string) {
+func handleSecretSet(args []string) error {
 	if len(args) < 2 {
 		fmt.Println("Usage: aflare secrets set <group> <key> [value]")
 		fmt.Println("  (value omitted → secure prompt without echo)")
-		os.Exit(1)
+		return exitErr(1)
 	}
 	group, key := args[0], args[1]
 	value := ""
@@ -103,26 +110,30 @@ func handleSecretSet(args []string) {
 		v, err := readSecretValueFromTerminal("Enter value for " + key + ": ")
 		if err != nil {
 			fmt.Printf("❌ %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		value = v
 	}
 	if value == "" {
 		fmt.Println("❌ value cannot be empty")
-		os.Exit(1)
+		return exitErr(1)
 	}
 
-	sm := loadSecretsOrFail()
+	sm, err := loadSecretsOrFail()
+	if err != nil {
+		return err
+	}
 
 	if err := secretSet(sm, group, key, value); err != nil {
 		fmt.Printf("❌ %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if err := sm.SaveToFile(secrets.DefaultPath()); err != nil {
 		fmt.Printf("❌ save: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	fmt.Printf("✅ saved %s/%s (encrypted, masked below)\n", group, key)
+	return nil
 }
 
 // secretSet upserts a secret into the in-memory manager (caller persists via
@@ -146,10 +157,10 @@ func secretSet(sm *secrets.SecretManager, group, key, value string) error {
 
 // handleSecretGet prints a secret value. Default masked; --raw prints cleartext.
 // Usage: aflare secrets get <group> <key> [--raw]
-func handleSecretGet(args []string) {
+func handleSecretGet(args []string) error {
 	if len(args) < 2 {
 		fmt.Println("Usage: aflare secrets get <group> <key> [--raw]")
-		os.Exit(1)
+		return exitErr(1)
 	}
 	group, key := args[0], args[1]
 	raw := false
@@ -159,14 +170,18 @@ func handleSecretGet(args []string) {
 		}
 	}
 
-	sm := loadSecretsOrFail()
+	sm, err := loadSecretsOrFail()
+	if err != nil {
+		return err
+	}
 
 	out, err := secretGet(sm, group, key, raw)
 	if err != nil {
 		fmt.Printf("❌ %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	fmt.Println(out)
+	return nil
 }
 
 // secretGet resolves a secret value (masked unless raw) from the manager.
@@ -180,15 +195,19 @@ func secretGet(sm *secrets.SecretManager, group, key string, raw bool) (string, 
 
 // handleSecretList lists groups, or secrets within a group (masked).
 // Usage: aflare secrets list [group]
-func handleSecretList(args []string) {
-	sm := loadSecretsOrFail()
+func handleSecretList(args []string) error {
+	sm, err := loadSecretsOrFail()
+	if err != nil {
+		return err
+	}
 
 	out, err := secretList(sm, args)
 	if err != nil {
 		fmt.Printf("❌ %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	fmt.Print(out)
+	return nil
 }
 
 // secretList builds the listing text (groups, or secrets in a group, masked).

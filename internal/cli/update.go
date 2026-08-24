@@ -28,16 +28,17 @@ import (
 )
 
 // HandleSelfUpdate handles the "self-update" / "update" command.
-func HandleSelfUpdate() {
+func HandleSelfUpdate() error {
 	repo := "alib8b8/aflare"
 	fmt.Println("Checking for updates...")
 	result, err := SelfUpdate(repo)
 	if err != nil {
 		fmt.Printf("❌ Update failed: %v\n", err)
 		fmt.Print(updateNetworkHint(err))
-		os.Exit(1)
+		return exitErr(1)
 	}
 	fmt.Printf("✅ %s\n", result)
+	return nil
 }
 
 // updateNetworkHint returns a actionable hint when an update error looks like
@@ -58,7 +59,7 @@ func updateNetworkHint(err error) string {
 // HandleUpgrade handles the "upgrade" command (断点17: 没有 aflare upgrade
 // 一键升级). It wraps SelfUpdate with a friendlier, step-by-step progress
 // output so users get clear feedback during the update process.
-func HandleUpgrade(args []string) {
+func HandleUpgrade(args []string) error {
 	repo := "alib8b8/aflare"
 	current := meta.GetVersion()
 
@@ -67,7 +68,7 @@ func HandleUpgrade(args []string) {
 	if err != nil {
 		fmt.Printf("❌ 检查更新失败: %v\n", err)
 		fmt.Println("提示：检查网络连接，或设置 HTTPS_PROXY 后重试。")
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("当前版本：%s\n", current)
@@ -75,7 +76,7 @@ func HandleUpgrade(args []string) {
 
 	if !hasUpdate {
 		fmt.Println("已是最新版本。")
-		return
+		return nil
 	}
 
 	fmt.Print("下载中... ")
@@ -84,13 +85,14 @@ func HandleUpgrade(args []string) {
 		fmt.Println()
 		fmt.Printf("❌ 更新失败: %v\n", err)
 		fmt.Print(updateNetworkHint(err))
-		os.Exit(1)
+		return exitErr(1)
 	}
 	// SelfUpdate verifies the SHA256 checksum internally before replacing the
 	// binary; reaching here means verification passed.
 	fmt.Println("████████████████████ 100%")
 	fmt.Println("校验 SHA256... ✓")
 	fmt.Printf("更新完成。%s\n", result)
+	return nil
 }
 
 // CheckUpdateNotice performs a short, non-blocking check for a newer aflare
@@ -145,25 +147,28 @@ func PrintUpdateNoticeAsync(w io.Writer, timeout time.Duration) {
 }
 
 // HandleAutoUpgrade handles the "autoupgrade" / "au" command.
-func HandleAutoUpgrade(args []string) {
+func HandleAutoUpgrade(args []string) error {
 	if len(args) == 0 {
 		PrintAutoUpgradeUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	config, err := autoupgrade.LoadConfig()
 	if err != nil {
 		fmt.Printf("❌ Failed to load config: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	engine := autoupgrade.NewUpgradeEngine(config)
 
-	handleAutoUpgradeSubCmd(args, config, engine)
+	if err := handleAutoUpgradeSubCmd(args, config, engine); err != nil {
+		return err
+	}
+	return nil
 }
 
 // handleAutoUpgradeSubCmd dispatches the autoupgrade subcommand to the appropriate handler.
-func handleAutoUpgradeSubCmd(args []string, config *autoupgrade.UpgradeConfig, engine *autoupgrade.UpgradeEngine) {
+func handleAutoUpgradeSubCmd(args []string, config *autoupgrade.UpgradeConfig, engine *autoupgrade.UpgradeEngine) error {
 	subCmd := args[0]
 	switch subCmd {
 	case "status":
@@ -187,7 +192,7 @@ func handleAutoUpgradeSubCmd(args []string, config *autoupgrade.UpgradeConfig, e
 		config.AutoUpdateEnabled = true
 		if err := autoupgrade.SaveConfig(config); err != nil {
 			fmt.Printf("❌ Failed to save config: %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		fmt.Println("✅ Auto-upgrade enabled")
 		fmt.Println("   Mode: auto (will automatically download and install updates)")
@@ -197,7 +202,7 @@ func handleAutoUpgradeSubCmd(args []string, config *autoupgrade.UpgradeConfig, e
 		config.AutoUpdateEnabled = false
 		if err := autoupgrade.SaveConfig(config); err != nil {
 			fmt.Printf("❌ Failed to save config: %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		fmt.Println("✅ Auto-upgrade disabled")
 		fmt.Println("   Mode: manual (you need to run 'aflare self-update' manually)")
@@ -206,7 +211,7 @@ func handleAutoUpgradeSubCmd(args []string, config *autoupgrade.UpgradeConfig, e
 		config.Mode = autoupgrade.ModeMonitor
 		if err := autoupgrade.SaveConfig(config); err != nil {
 			fmt.Printf("❌ Failed to save config: %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		fmt.Println("✅ Auto-upgrade set to monitor mode")
 		fmt.Println("   Mode: monitor (checks for updates but does not install)")
@@ -216,7 +221,7 @@ func handleAutoUpgradeSubCmd(args []string, config *autoupgrade.UpgradeConfig, e
 		result, err := engine.RunSelfUpdate()
 		if err != nil {
 			fmt.Printf("❌ Upgrade failed: %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		fmt.Printf("✅ %s\n", result)
 
@@ -230,7 +235,7 @@ func handleAutoUpgradeSubCmd(args []string, config *autoupgrade.UpgradeConfig, e
 			fmt.Println("  interval       - 1h, 6h, 24h, etc.")
 			fmt.Println("  backup         - true, false")
 			fmt.Println("  rollback       - true, false")
-			os.Exit(1)
+			return exitErr(1)
 		}
 
 		for _, arg := range args[1:] {
@@ -245,7 +250,7 @@ func handleAutoUpgradeSubCmd(args []string, config *autoupgrade.UpgradeConfig, e
 
 		if err := autoupgrade.SaveConfig(config); err != nil {
 			fmt.Printf("❌ Failed to save config: %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		fmt.Println("✅ Config updated")
 
@@ -253,15 +258,16 @@ func handleAutoUpgradeSubCmd(args []string, config *autoupgrade.UpgradeConfig, e
 		result, err := engine.RunAutoMerge()
 		if err != nil {
 			fmt.Printf("❌ Auto-merge failed: %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		fmt.Printf("✅ %s\n", result)
 
 	default:
 		fmt.Printf("❌ Unknown command: %s\n", subCmd)
 		PrintAutoUpgradeUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 // PrintAutoUpgradeUsage prints usage information for the autoupgrade command.

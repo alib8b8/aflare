@@ -18,7 +18,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/alib8b8/aflare/internal/agentplugins"
 	"github.com/alib8b8/aflare/internal/marketplace"
@@ -26,34 +25,41 @@ import (
 )
 
 // HandleMarketplace handles the "marketplace" command.
-func HandleMarketplace(args []string) {
+func HandleMarketplace(args []string) error {
 	if len(args) == 0 {
 		PrintMarketplaceUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	subCmd := args[0]
 	switch subCmd {
 	case "export":
-		HandleMarketplaceExport(args[1:])
+		if err := HandleMarketplaceExport(args[1:]); err != nil {
+			return err
+		}
 	case "import":
-		HandleMarketplaceImport(args[1:])
+		if err := HandleMarketplaceImport(args[1:]); err != nil {
+			return err
+		}
 	case "install":
-		HandleMarketplaceInstall(args[1:])
+		if err := HandleMarketplaceInstall(args[1:]); err != nil {
+			return err
+		}
 	case "-h", "--help", "help":
 		PrintMarketplaceUsage()
 	default:
 		fmt.Printf("Unknown marketplace subcommand: %s\n\n", subCmd)
 		PrintMarketplaceUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 // HandleMarketplaceExport handles the "marketplace export" subcommand.
-func HandleMarketplaceExport(args []string) {
+func HandleMarketplaceExport(args []string) error {
 	if len(args) < 1 {
 		fmt.Println("Usage: aflare marketplace export <package-name> [--dir <output-dir>]")
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	packageName := args[0]
@@ -70,7 +76,7 @@ func HandleMarketplaceExport(args []string) {
 			fmt.Println("\nExport a workflow package as an Agent Plugins 1.0.0 compatible directory.")
 			fmt.Println("\nOptions:")
 			fmt.Println("  --dir, -d <dir>   Output directory (default: current directory)")
-			return
+			return nil
 		}
 	}
 
@@ -78,7 +84,7 @@ func HandleMarketplaceExport(args []string) {
 	pluginDir, err := reg.ExportPlugin(packageName, outputDir)
 	if err != nil {
 		fmt.Printf("❌ Export failed: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("✅ Exported %q to %s\n", packageName, pluginDir)
@@ -89,20 +95,21 @@ func HandleMarketplaceExport(args []string) {
 	fmt.Printf("   └── mcp.json\n")
 	fmt.Println()
 	fmt.Println("   Compatible with: VS Code, Cursor, GitHub Copilot, ChatGPT, Codex, Kiro")
+	return nil
 }
 
 // HandleMarketplaceImport handles the "marketplace import" subcommand.
-func HandleMarketplaceImport(args []string) {
+func HandleMarketplaceImport(args []string) error {
 	if len(args) < 1 {
 		fmt.Println("Usage: aflare marketplace import <plugin-dir>")
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	pluginDir := args[0]
 	manifest, err := marketplace.ImportPlugin(pluginDir)
 	if err != nil {
 		fmt.Printf("❌ Import failed: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("✅ Imported Agent Plugin: %s\n", manifest.Name)
@@ -118,19 +125,20 @@ func HandleMarketplaceImport(args []string) {
 	if len(manifest.Keywords) > 0 {
 		fmt.Printf("   Keywords:    %v\n", manifest.Keywords)
 	}
+	return nil
 }
 
 // HandleMarketplaceInstall handles the "marketplace install" subcommand: it
 // installs an Agent Plugins 1.0.0 directory into aflare — skills become
 // runnable workflows, stdio MCP servers are registered into .mcp.json.
-func HandleMarketplaceInstall(args []string) {
+func HandleMarketplaceInstall(args []string) error {
 	if len(args) < 1 || args[0] == "--help" || args[0] == "-h" {
 		fmt.Println("Usage: aflare marketplace install <plugin-dir>")
 		fmt.Println("\nInstall an Agent Plugins 1.0.0 plugin into aflare.")
 		fmt.Println("  - skills/*/SKILL.md become runnable skills under the 'plugin' category")
 		fmt.Println("  - stdio servers from mcp.json are registered into .mcp.json")
 		fmt.Println("  - nothing from the plugin is executed during installation")
-		return
+		return nil
 	}
 	pluginDir := args[0]
 
@@ -140,7 +148,7 @@ func HandleMarketplaceInstall(args []string) {
 	})
 	if err != nil {
 		fmt.Printf("❌ Install failed: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("✅ Installed Agent Plugin: %s\n", res.Manifest.Name)
@@ -156,6 +164,7 @@ func HandleMarketplaceInstall(args []string) {
 	if len(res.SkillsInstalled) == 0 && len(res.MCPServers) == 0 {
 		fmt.Println("   (plugin shipped no installable components)")
 	}
+	return nil
 }
 
 // PrintMarketplaceUsage prints usage information for the marketplace command.

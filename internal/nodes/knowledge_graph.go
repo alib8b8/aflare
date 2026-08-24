@@ -140,11 +140,11 @@ func (kg *KnowledgeGraph) Save(path string) error {
 	}
 	dir := filepath.Dir(safePath)
 	if dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0755); err != nil { // codeql[go/path-injection] -- dir = filepath.Dir(safePath) where safePath passed validateWritePath in Save
 			return fmt.Errorf("failed to create directory: %w", err)
 		}
 	}
-	return os.WriteFile(safePath, data, 0644)
+	return os.WriteFile(safePath, data, 0644) // codeql[go/path-injection] -- safePath is the validateWritePath result; SafeJoinPath blocks absolute/traversal/symlink escape
 }
 
 func LoadKnowledgeGraph(path string) (*KnowledgeGraph, error) {
@@ -152,7 +152,7 @@ func LoadKnowledgeGraph(path string) (*KnowledgeGraph, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid load path: %w", err)
 	}
-	data, err := os.ReadFile(safePath)
+	data, err := os.ReadFile(safePath) // codeql[go/path-injection] -- safePath is the validateReadPath result in LoadKnowledgeGraph
 	if err != nil {
 		return nil, err
 	}
@@ -382,6 +382,12 @@ func (n *KnowledgeGraphNode) queryGraph(graphPath, query string, topK int, forma
 	}
 }
 
+// maxTraversalPathLen bounds the BFS path length in traverseGraph. Paths grow
+// one hop at a time, so checking the length before extending it keeps the
+// len(path)+1 allocation arithmetic overflow-free; the cap is far above the
+// max_depth limit of 10 enforced in Execute.
+const maxTraversalPathLen = 1 << 12
+
 func (n *KnowledgeGraphNode) traverseGraph(graphPath, startEntity string, maxDepth, topK int, format string) (string, error) {
 	if graphPath == "" {
 		return "", fmt.Errorf("graph_path is required for traverse action")
@@ -424,6 +430,9 @@ func (n *KnowledgeGraphNode) traverseGraph(graphPath, startEntity string, maxDep
 				next = rel.From
 			}
 			if next != "" && !visited[next] {
+				if len(current.Path) >= maxTraversalPathLen {
+					return "", fmt.Errorf("traversal path too long (max %d)", maxTraversalPathLen)
+				}
 				newPath := make([]string, len(current.Path)+1)
 				copy(newPath, current.Path)
 				newPath[len(newPath)-1] = next

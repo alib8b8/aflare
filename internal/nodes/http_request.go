@@ -167,7 +167,7 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 		}
 		req.Header = headers.Clone()
 
-		resp, err := client.Do(req)
+		resp, err := client.Do(req) // codeql[go/request-forgery] -- calling a user-configured URL is http_request's function; url pre-validated by validateURL (SSRF: scheme/userinfo/localhost/IP-range checks); client uses safeHTTPClient.Transport (dial-time IP validation, DNS-rebinding protection), httpRedirectValidator(validateURL) re-checks redirects; method allowlist, CRLF-checked headers, per-host rate limit
 		if err != nil {
 			lastErr = err
 			lastStatus = 0

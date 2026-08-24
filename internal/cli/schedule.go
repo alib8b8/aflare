@@ -32,29 +32,38 @@ import (
 )
 
 // HandleSchedule handles the "schedule" command.
-func HandleSchedule(args []string) {
+func HandleSchedule(args []string) error {
 	if len(args) == 0 {
 		PrintScheduleUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	subCmd := args[0]
 	switch subCmd {
 	case "add":
-		HandleScheduleAdd(args[1:])
+		if err := HandleScheduleAdd(args[1:]); err != nil {
+			return err
+		}
 	case "list":
-		HandleScheduleList()
+		if err := HandleScheduleList(); err != nil {
+			return err
+		}
 	case "remove":
-		HandleScheduleRemove(args[1:])
+		if err := HandleScheduleRemove(args[1:]); err != nil {
+			return err
+		}
 	case "start":
-		HandleScheduleStart()
+		if err := HandleScheduleStart(); err != nil {
+			return err
+		}
 	case "-h", "--help", "help":
 		PrintScheduleUsage()
 	default:
 		fmt.Printf("Unknown schedule subcommand: %s\n\n", subCmd)
 		PrintScheduleUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 // HandleScheduleAdd handles the "schedule add" subcommand.
@@ -63,11 +72,13 @@ func HandleSchedule(args []string) {
 //	aflare schedule add --cron "0 9 * * *" my-workflow.yaml
 //	aflare schedule add --cron "0 9 * * *" --desc "Check git repo status"
 //	aflare schedule add --add "每天9点检查git仓库状态"  (auto-parse cron)
-func HandleScheduleAdd(args []string) {
+func HandleScheduleAdd(args []string) error {
 	var cronExpr, taskID, wfPath, desc string
 	var autoParse string
 
-	parseScheduleAddArgs(args, &cronExpr, &taskID, &wfPath, &desc, &autoParse)
+	if err := parseScheduleAddArgs(args, &cronExpr, &taskID, &wfPath, &desc, &autoParse); err != nil {
+		return err
+	}
 
 	// ── Auto-parse natural language ─────────────────────────────────────
 	if autoParse != "" {
@@ -76,7 +87,7 @@ func HandleScheduleAdd(args []string) {
 			fmt.Printf("❌ Could not parse schedule from: %s\n", autoParse)
 			fmt.Println("   Please use --cron with an explicit cron expression.")
 			fmt.Println("   Examples: '0 9 * * *' (daily 9:00), '0 */2 * * *' (every 2 hours)")
-			os.Exit(1)
+			return exitErr(1)
 		}
 		cronExpr = parsedCron
 		if desc == "" {
@@ -87,14 +98,14 @@ func HandleScheduleAdd(args []string) {
 	if cronExpr == "" {
 		fmt.Println("❌ --cron is required (or use --add for natural language)")
 		PrintScheduleUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// At least one of: workflow file or description
 	if wfPath == "" && desc == "" {
 		fmt.Println("❌ Either a workflow file or --desc is required")
 		PrintScheduleUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Validate workflow file if provided
@@ -102,11 +113,11 @@ func HandleScheduleAdd(args []string) {
 		absPath, err := filepath.Abs(wfPath)
 		if err != nil {
 			fmt.Printf("❌ Failed to resolve workflow path: %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		if _, err := os.Stat(absPath); err != nil {
 			fmt.Printf("❌ Workflow file not found: %s\n", absPath)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		wfPath = absPath
 	}
@@ -126,7 +137,7 @@ func HandleScheduleAdd(args []string) {
 	validateSched := scheduler.New()
 	if err := validateSched.AddTask(taskID, cronExpr, func(context.Context) {}); err != nil {
 		fmt.Printf("❌ Invalid cron expression: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Load existing schedules and check for duplicate ID.
@@ -134,12 +145,12 @@ func HandleScheduleAdd(args []string) {
 	entries, err := scheduler.LoadSchedules(path)
 	if err != nil {
 		fmt.Printf("❌ Failed to load schedules: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	for _, e := range entries {
 		if e.ID == taskID {
 			fmt.Printf("❌ Task with id %q already exists (use --id to specify a different id)\n", taskID)
-			os.Exit(1)
+			return exitErr(1)
 		}
 	}
 
@@ -151,7 +162,7 @@ func HandleScheduleAdd(args []string) {
 	})
 	if err := scheduler.SaveSchedules(path, entries); err != nil {
 		fmt.Printf("❌ Failed to save schedule: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("✅ Scheduled task %q added\n", taskID)
@@ -162,43 +173,44 @@ func HandleScheduleAdd(args []string) {
 	if wfPath != "" {
 		fmt.Printf("   Workflow: %s\n", wfPath)
 	}
+	return nil
 }
 
 // parseScheduleAddArgs parses the command-line arguments for schedule add.
-func parseScheduleAddArgs(args []string, cronExpr, taskID, wfPath, desc, autoParse *string) {
+func parseScheduleAddArgs(args []string, cronExpr, taskID, wfPath, desc, autoParse *string) error {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--cron":
 			if i+1 >= len(args) {
 				fmt.Println("❌ --cron requires a value")
-				os.Exit(1)
+				return exitErr(1)
 			}
 			*cronExpr = args[i+1]
 			i++
 		case "--desc":
 			if i+1 >= len(args) {
 				fmt.Println("❌ --desc requires a value")
-				os.Exit(1)
+				return exitErr(1)
 			}
 			*desc = args[i+1]
 			i++
 		case "--id":
 			if i+1 >= len(args) {
 				fmt.Println("❌ --id requires a value")
-				os.Exit(1)
+				return exitErr(1)
 			}
 			*taskID = args[i+1]
 			i++
 		case "--add":
 			if i+1 >= len(args) {
 				fmt.Println("❌ --add requires a value")
-				os.Exit(1)
+				return exitErr(1)
 			}
 			*autoParse = args[i+1]
 			i++
 		case "--help", "-h":
 			PrintScheduleUsage()
-			return
+			return nil
 		default:
 			switch {
 			case strings.HasPrefix(args[i], "--cron="):
@@ -213,23 +225,24 @@ func parseScheduleAddArgs(args []string, cronExpr, taskID, wfPath, desc, autoPar
 				*wfPath = args[i]
 			default:
 				fmt.Printf("❌ Unknown argument: %s\n", args[i])
-				os.Exit(1)
+				return exitErr(1)
 			}
 		}
 	}
+	return nil
 }
 
 // HandleScheduleList handles the "schedule list" subcommand.
-func HandleScheduleList() {
+func HandleScheduleList() error {
 	path := scheduler.DefaultSchedulesPath()
 	entries, err := scheduler.LoadSchedules(path)
 	if err != nil {
 		fmt.Printf("❌ Failed to load schedules: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if len(entries) == 0 {
 		fmt.Println("No scheduled tasks. Use 'aflare schedule add' to add one.")
-		return
+		return nil
 	}
 
 	fmt.Printf("Scheduled tasks (%d):\n", len(entries))
@@ -243,13 +256,14 @@ func HandleScheduleList() {
 		}
 		fmt.Printf("  %-20s %-20s %s\n", e.ID, e.Cron, display)
 	}
+	return nil
 }
 
 // HandleScheduleRemove handles the "schedule remove" subcommand.
-func HandleScheduleRemove(args []string) {
+func HandleScheduleRemove(args []string) error {
 	if len(args) < 1 {
 		fmt.Println("Usage: aflare schedule remove <id>")
-		os.Exit(1)
+		return exitErr(1)
 	}
 	id := args[0]
 
@@ -257,7 +271,7 @@ func HandleScheduleRemove(args []string) {
 	entries, err := scheduler.LoadSchedules(path)
 	if err != nil {
 		fmt.Printf("❌ Failed to load schedules: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	found := false
@@ -271,27 +285,28 @@ func HandleScheduleRemove(args []string) {
 	}
 	if !found {
 		fmt.Printf("❌ Task with id %q not found\n", id)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	if err := scheduler.SaveSchedules(path, updated); err != nil {
 		fmt.Printf("❌ Failed to save schedules: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	fmt.Printf("✅ Removed task %q\n", id)
+	return nil
 }
 
 // HandleScheduleStart handles the "schedule start" subcommand.
-func HandleScheduleStart() {
+func HandleScheduleStart() error {
 	path := scheduler.DefaultSchedulesPath()
 	entries, err := scheduler.LoadSchedules(path)
 	if err != nil {
 		fmt.Printf("❌ Failed to load schedules: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if len(entries) == 0 {
 		fmt.Println("No scheduled tasks. Use 'aflare schedule add' to add one.")
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	sched := scheduler.New()
@@ -302,7 +317,7 @@ func HandleScheduleStart() {
 			wf, reg, err := PrepareWorkflow(entry.WorkflowPath)
 			if err != nil {
 				fmt.Printf("❌ Failed to prepare workflow %q: %v\n", entry.WorkflowPath, err)
-				os.Exit(1)
+				return exitErr(1)
 			}
 			taskFunc := func(ctx context.Context) {
 				if _, _, err := workflow.ExecuteWorkflow(ctx, wf, reg); err != nil {
@@ -311,7 +326,7 @@ func HandleScheduleStart() {
 			}
 			if err := sched.AddTask(entry.ID, entry.Cron, taskFunc); err != nil {
 				fmt.Printf("❌ Failed to add task %q: %v\n", entry.ID, err)
-				os.Exit(1)
+				return exitErr(1)
 			}
 			fmt.Printf("📋 Loaded workflow task %q (%s -> %s)\n", entry.ID, entry.Cron, entry.WorkflowPath)
 		} else {
@@ -338,6 +353,7 @@ func HandleScheduleStart() {
 	fmt.Println("\n⏹  Stopping scheduler...")
 	sched.Stop()
 	fmt.Println("✅ Scheduler stopped.")
+	return nil
 }
 
 // PrintScheduleUsage prints usage information for the schedule command.

@@ -18,23 +18,22 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/alib8b8/aflare/internal/i18n"
 	"github.com/alib8b8/aflare/internal/workflow"
 )
 
 // HandleValidate handles the "validate" command.
-func HandleValidate(args []string) {
+func HandleValidate(args []string) error {
 	if len(args) < 1 {
 		fmt.Println(i18n.T("validate.usage"))
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	wf, reg, err := PrepareWorkflow(args[0])
 	if err != nil {
 		fmt.Printf("❌ %s\n", i18n.T("validate.error", err))
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	warnings := workflow.ValidateWorkflow(wf)
@@ -55,6 +54,7 @@ func HandleValidate(args []string) {
 		for _, warning := range warnings {
 			fmt.Printf("  - %s\n", warning)
 		}
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }

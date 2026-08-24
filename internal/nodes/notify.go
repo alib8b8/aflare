@@ -150,7 +150,7 @@ func (n *NotifyNode) sendSlack(ctx context.Context, message string, params map[s
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := notifyHTTPClient.Do(req)
+	resp, err := notifyHTTPClient.Do(req) // codeql[go/request-forgery] -- webhook URL from node config, pre-validated by notifyURLValidator (HTTPS-only + validateURL SSRF checks); notifyHTTPClient uses safeHTTPClient.Transport (dial-time IP validation, DNS-rebinding protection) and httpRedirectValidator(validateNotifyURL); notifyTimeout; payload capped by maxNotifyBodySize
 	if err != nil {
 		return "", fmt.Errorf("slack request failed: %w", err)
 	}
@@ -192,7 +192,7 @@ func (n *NotifyNode) sendDiscord(ctx context.Context, message string, params map
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := notifyHTTPClient.Do(req)
+	resp, err := notifyHTTPClient.Do(req) // codeql[go/request-forgery] -- webhook URL from node config, pre-validated by notifyURLValidator (HTTPS-only + validateURL SSRF checks); notifyHTTPClient uses safeHTTPClient.Transport (dial-time IP validation, DNS-rebinding protection) and httpRedirectValidator(validateNotifyURL); notifyTimeout; payload capped by maxNotifyBodySize
 	if err != nil {
 		return "", fmt.Errorf("discord request failed: %w", err)
 	}
@@ -292,7 +292,7 @@ func (n *NotifyNode) postGroupBotWebhook(ctx context.Context, channel string, we
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := notifyHTTPClient.Do(req)
+	resp, err := notifyHTTPClient.Do(req) // codeql[go/request-forgery] -- webhook URL from node config, pre-validated by notifyURLValidator (HTTPS-only + validateURL SSRF checks); notifyHTTPClient uses safeHTTPClient.Transport (dial-time IP validation, DNS-rebinding protection) and httpRedirectValidator(validateNotifyURL); notifyTimeout; payload capped by maxNotifyBodySize
 	if err != nil {
 		return fmt.Errorf("%s request failed: %w", channel, err)
 	}
@@ -440,7 +440,7 @@ func (n *NotifyNode) sendWebhook(ctx context.Context, message string, params map
 		}
 	}
 
-	resp, err := notifyHTTPClient.Do(req)
+	resp, err := notifyHTTPClient.Do(req) // codeql[go/request-forgery] -- webhook URL from node config, pre-validated by notifyURLValidator (HTTPS-only + validateURL SSRF checks); notifyHTTPClient uses safeHTTPClient.Transport (dial-time IP validation, DNS-rebinding protection) and httpRedirectValidator(validateNotifyURL); notifyTimeout; payload capped by maxNotifyBodySize; method allowlist GET/POST/PUT
 	if err != nil {
 		return "", fmt.Errorf("webhook request failed: %w", err)
 	}

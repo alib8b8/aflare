@@ -45,7 +45,7 @@ func safeWorkflowPath(path string) (string, error) {
 		return "", aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to resolve path")
 	}
 
-	info, err := os.Lstat(absPath)
+	info, err := os.Lstat(absPath) // codeql[go/path-injection] -- this Lstat is itself part of safeWorkflowPath validation (symlink check); path comes from operator-supplied CLI/config and the .yaml/.yml extension whitelist below limits readable files
 	if err != nil {
 		return "", aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to stat file")
 	}
@@ -73,7 +73,7 @@ func ParseWorkflow(path string) (*Workflow, error) {
 		return nil, aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "invalid workflow file path")
 	}
 
-	file, err := os.Open(safePath) // #nosec G304 -- path validated
+	file, err := os.Open(safePath) // #nosec G304 -- path validated // codeql[go/path-injection] -- safePath returned by safeWorkflowPath: .yaml/.yml extension whitelist enforced and symlinks resolved; input is the operator's own workflow file path
 	if err != nil {
 		return nil, aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to open workflow file")
 	}

@@ -33,41 +33,46 @@ import (
 //
 //	aflare resume <run-id>        Resume a paused workflow
 //	aflare resume list            List all paused workflows
-func HandleResume(args []string) {
+func HandleResume(args []string) error {
 	if len(args) == 0 {
 		fmt.Println(i18n.T("resume.usage"))
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	subCmd := args[0]
 	switch subCmd {
 	case "list":
-		HandleResumeList()
+		if err := HandleResumeList(); err != nil {
+			return err
+		}
 	case "-h", "--help", "help":
 		fmt.Println(i18n.T("resume.usage"))
 	default:
 		runID := subCmd
-		HandleResumeRun(runID)
+		if err := HandleResumeRun(runID); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // HandleResumeRun resumes a specific paused workflow by run-id.
-func HandleResumeRun(runID string) {
+func HandleResumeRun(runID string) error {
 	// Validate run-id: reject path traversal attempts
 	if strings.Contains(runID, "/") || strings.Contains(runID, "\\") || strings.Contains(runID, "..") {
 		fmt.Fprintf(os.Stderr, "invalid run-id: %s\n", runID)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Check that the run exists and is paused
 	meta, err := workflow.LoadRunMeta(runID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load run %q: %v\n", runID, err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if meta.Status != "paused" {
 		fmt.Fprintf(os.Stderr, "run %q is not paused (status: %s)\n", runID, meta.Status)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("Resuming workflow %q (run-id: %s, paused at step %d: %s)...\n",
@@ -77,25 +82,26 @@ func HandleResumeRun(runID string) {
 	output, results, err := workflow.ResumeWorkflow(ctx, runID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "resume failed: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("\nWorkflow resumed and completed successfully.\n")
 	fmt.Printf("Output: %s\n", output)
 	fmt.Printf("Steps executed: %d\n", len(results))
+	return nil
 }
 
 // HandleResumeList lists all paused workflow runs.
-func HandleResumeList() {
+func HandleResumeList() error {
 	runs, err := workflow.ListPausedRuns()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to list paused runs: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	if len(runs) == 0 {
 		fmt.Println("No paused workflows.")
-		return
+		return nil
 	}
 
 	fmt.Printf("Paused workflows (%d):\n\n", len(runs))
@@ -107,4 +113,5 @@ func HandleResumeList() {
 		fmt.Printf("  Resume on: %s\n", r.ResumeOn)
 		fmt.Println()
 	}
+	return nil
 }

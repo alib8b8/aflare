@@ -32,25 +32,30 @@ import (
 const auditDateOnlyLayout = "2006-01-02"
 
 // HandleAudit handles the "audit" command.
-func HandleAudit(args []string) {
+func HandleAudit(args []string) error {
 	if len(args) == 0 {
 		PrintAuditUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	subCmd := args[0]
 	switch subCmd {
 	case "verify":
-		HandleAuditVerify(args[1:])
+		if err := HandleAuditVerify(args[1:]); err != nil {
+			return err
+		}
 	case "export":
-		HandleAuditExport(args[1:])
+		if err := HandleAuditExport(args[1:]); err != nil {
+			return err
+		}
 	case "-h", "--help", "help":
 		PrintAuditUsage()
 	default:
 		fmt.Printf("Unknown audit subcommand: %s\n\n", subCmd)
 		PrintAuditUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 // auditChainBrokenError signals that the live audit chain failed verification,
@@ -126,15 +131,15 @@ func parseAuditExportArgs(args []string) (auditExportOptions, error) {
 // HandleAuditExport handles the "audit export" subcommand: it verifies the
 // live audit chain first (refusing to export a broken chain), then writes a
 // signed single-file JSON bundle.
-func HandleAuditExport(args []string) {
+func HandleAuditExport(args []string) error {
 	opts, err := parseAuditExportArgs(args)
 	if err != nil {
 		fmt.Printf("❌ %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if opts.help {
 		PrintAuditExportUsage()
-		return
+		return nil
 	}
 
 	bundle, outPath, err := runAuditExport(opts)
@@ -144,10 +149,10 @@ func HandleAuditExport(args []string) {
 			fmt.Printf("❌ 审计链已损坏（第 %d 行）：%s\n", broken.line, broken.path)
 			fmt.Println("❌ 已拒绝导出：合规导出包必须基于完整且可验证的审计链。")
 			fmt.Println(auditChainRepairHints(broken.line))
-			os.Exit(1)
+			return exitErr(1)
 		}
 		fmt.Printf("❌ 审计导出失败：%v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	timeRange := "无记录"
@@ -158,6 +163,7 @@ func HandleAuditExport(args []string) {
 	fmt.Printf("   记录条数：%d\n", bundle.RecordCount)
 	fmt.Printf("   时间范围：%s\n", timeRange)
 	fmt.Printf("   head_hash：%s\n", bundle.HeadHash)
+	return nil
 }
 
 // auditChainRepairHints returns the Chinese repair suggestions printed when
@@ -298,7 +304,7 @@ func runAuditExport(opts auditExportOptions) (*history.AuditBundle, string, erro
 // HandleAuditVerify handles the "audit verify" subcommand. With --bundle it
 // verifies an exported bundle; without it the live audit log chain is
 // verified (original behavior unchanged).
-func HandleAuditVerify(args []string) {
+func HandleAuditVerify(args []string) error {
 	auditPath := ""
 	bundlePath := ""
 	for i := 0; i < len(args); i++ {
@@ -309,7 +315,7 @@ func HandleAuditVerify(args []string) {
 				i++
 			} else {
 				fmt.Println("❌ --file requires a value")
-				os.Exit(1)
+				return exitErr(1)
 			}
 		case "--bundle", "-b":
 			if i+1 < len(args) {
@@ -317,7 +323,7 @@ func HandleAuditVerify(args []string) {
 				i++
 			} else {
 				fmt.Println("❌ --bundle requires a value")
-				os.Exit(1)
+				return exitErr(1)
 			}
 		case "--help", "-h":
 			fmt.Println("Usage: aflare audit verify [--file <path>] [--bundle <path>]")
@@ -327,7 +333,7 @@ func HandleAuditVerify(args []string) {
 			fmt.Println()
 			fmt.Println("  --file, -f <path>     Audit log file to verify (defaults to the standard location)")
 			fmt.Println("  --bundle, -b <path>   Verify the given audit export bundle instead of the live log")
-			return
+			return nil
 		default:
 			switch {
 			case strings.HasPrefix(args[i], "--file="):
@@ -336,46 +342,48 @@ func HandleAuditVerify(args []string) {
 				bundlePath = strings.TrimPrefix(args[i], "--bundle=")
 			default:
 				fmt.Printf("❌ Unknown argument: %s\n", args[i])
-				os.Exit(1)
+				return exitErr(1)
 			}
 		}
 	}
 
 	if bundlePath != "" {
-		verifyAuditBundleOrExit(bundlePath)
-		return
+		if err := verifyAuditBundleOrExit(bundlePath); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	if auditPath == "" {
 		auditPath = history.GetAuditLogPath()
 		if auditPath == "" {
 			fmt.Println("❌ Could not resolve audit log path. Specify one with --file.")
-			os.Exit(1)
+			return exitErr(1)
 		}
 	}
 
 	valid, brokenAt, err := history.VerifyAuditChain(auditPath)
 	if err != nil {
 		fmt.Printf("❌ Audit log verification error in %s: %v\n", auditPath, err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if valid {
 		fmt.Printf("✅ Audit log chain is valid: %s\n", auditPath)
-		return
+		return nil
 	}
 	fmt.Printf("❌ Audit log chain is BROKEN at line %d: %s\n", brokenAt, auditPath)
-	os.Exit(1)
+	return exitErr(1)
 }
 
 // verifyAuditBundleOrExit verifies an exported bundle and exits non-zero on
 // failure, naming exactly which of the three checks failed.
-func verifyAuditBundleOrExit(bundlePath string) {
+func verifyAuditBundleOrExit(bundlePath string) error {
 	bundle, err := runAuditVerifyBundle(bundlePath)
 	if err == nil {
 		fmt.Printf("✅ 审计导出包验证通过：%s\n", bundlePath)
 		fmt.Printf("   签名校验：通过；记录摘要（records_sha256）：通过；哈希链重放：通过\n")
 		fmt.Printf("   记录条数：%d；head_hash：%s\n", bundle.RecordCount, bundle.HeadHash)
-		return
+		return nil
 	}
 
 	switch {
@@ -394,7 +402,7 @@ func verifyAuditBundleOrExit(bundlePath string) {
 	default:
 		fmt.Printf("❌ 导出包验证失败：%s：%v\n", bundlePath, err)
 	}
-	os.Exit(1)
+	return exitErr(1)
 }
 
 // runAuditVerifyBundle loads and verifies a bundle without printing or

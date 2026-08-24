@@ -17,6 +17,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -37,14 +38,14 @@ import (
 //     - 若已配置 LLM (aflare init 配置或环境变量), 自动降级到 LLM 生成。
 //     - 若未配置 LLM, 打印可操作的建议 (改造已有模板 / --ai / 手动创建),
 //     而不是静默生成一个只有占位 combine 节点的无意义工作流。
-func HandleCreate(args []string, aiMode bool) {
+func HandleCreate(args []string, aiMode bool) error {
 	// Short-circuit --help/-h before any processing. Without this, --help
 	// is treated as the workflow description and a file gets generated
 	// (e.g. `aflare create --help` → writes a workflow from prompt "--help").
 	for _, a := range args {
 		if a == "--help" || a == "-h" {
 			printCreateUsage()
-			return
+			return nil
 		}
 	}
 
@@ -62,7 +63,7 @@ func HandleCreate(args []string, aiMode bool) {
 
 	if len(filteredArgs) < 1 {
 		printCreateUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	description := SummarizeCommand("", filteredArgs)
@@ -77,8 +78,14 @@ func HandleCreate(args []string, aiMode bool) {
 		filename, err = createWithKeywordOrFallback(description)
 	}
 	if err != nil {
+		// createWithKeywordOrFallback may return an ExitError after already
+		// printing its message; propagate it unchanged to avoid double output.
+		var ee *ExitError
+		if errors.As(err, &ee) {
+			return err
+		}
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	fmt.Printf("\n✅ %s\n", i18n.T("create.success", filename))
@@ -99,6 +106,7 @@ func HandleCreate(args []string, aiMode bool) {
 		fmt.Println("Type /quit to exit.")
 		EnterChatMode()
 	}
+	return nil
 }
 
 // printCreateUsage prints the create command usage and examples. Shared by the
@@ -140,8 +148,7 @@ func createWithKeywordOrFallback(description string) (string, error) {
 
 	// 未配置 LLM: 打印建议而不是静默生成无意义工作流。
 	printCreateSuggestions(description)
-	os.Exit(1)
-	return "", nil
+	return "", exitErr(1)
 }
 
 // printCreateSuggestions prints actionable next steps when keyword matching

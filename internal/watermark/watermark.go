@@ -711,7 +711,7 @@ func buildPayload(content string, deployID uint16) []byte {
 	copy(payload[0:4], magicBytes)
 	payload[4] = wmVersion
 	binary.BigEndian.PutUint64(payload[5:13], uint64(time.Now().Unix()))
-	hash := sha256.Sum256([]byte(content))
+	hash := sha256.Sum256([]byte(content)) // codeql[go/weak-sensitive-data-hashing] -- SHA-256 content hash for watermark provenance fingerprinting, not password storage
 	copy(payload[13:19], hash[:6])
 	binary.BigEndian.PutUint16(payload[19:21], deployID)
 	return payload

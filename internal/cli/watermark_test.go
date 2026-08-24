@@ -20,6 +20,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/alib8b8/aflare/internal/watermark"
@@ -128,5 +129,51 @@ func TestEncodeSourceAllIdempotent(t *testing.T) {
 	}
 	if string(first) != string(second) {
 		t.Error("second run rewrote an already-watermarked file")
+	}
+}
+
+// TestCheckSourceAll verifies the read-only coverage check: watermarked trees
+// pass, a missing watermark is reported by path, and excluded directories are
+// ignored exactly like in encodeSourceAll.
+func TestCheckSourceAll(t *testing.T) {
+	dir := t.TempDir()
+	write := func(rel, content string) {
+		t.Helper()
+		path := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	write("marked.go", watermark.EncodeSource(wmLicensedSrc))
+	write("vendor/lib.go", wmLicensedSrc) // excluded dir — must be ignored
+
+	missing, err := checkSourceAll(dir)
+	if err != nil {
+		t.Fatalf("checkSourceAll: %v", err)
+	}
+	if len(missing) != 0 {
+		t.Errorf("missing = %v, want empty for fully watermarked tree", missing)
+	}
+
+	write("unmarked.go", wmLicensedSrc)
+	missing, err = checkSourceAll(dir)
+	if err != nil {
+		t.Fatalf("checkSourceAll after adding file: %v", err)
+	}
+	if len(missing) != 1 || !strings.HasSuffix(missing[0], "unmarked.go") {
+		t.Errorf("missing = %v, want exactly [unmarked.go]", missing)
+	}
+
+	// The check must never modify files.
+	data, err := os.ReadFile(filepath.Join(dir, "unmarked.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != wmLicensedSrc {
+		t.Error("checkSourceAll modified a file — it must be read-only")
 	}
 }

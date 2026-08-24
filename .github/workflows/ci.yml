@@ -27,6 +27,12 @@ jobs:
     - name: Build
       run: go build ./...
 
+    # Blocking: every .go file in the repository must carry an invisible
+    # provenance watermark (see internal/watermark). New files without one
+    # fail here — run `aflare watermark encode-source --all` to embed them.
+    - name: Check source watermark coverage
+      run: go run ./cmd/aflare watermark check-source --all
+
     - name: Test with race detector
       run: go test ./... -race -short
 

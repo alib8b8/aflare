@@ -94,7 +94,7 @@ func (n *EvaluatorNode) Execute(ctx context.Context, input string, params map[st
 		if i > 0 {
 			dimensionJSON += ",\n"
 		}
-		dimensionJSON += fmt.Sprintf("    \"%s\": {\"score\": N, \"justification\": \"brief reason\"}", d)
+		dimensionJSON += fmt.Sprintf("    %s: {\"score\": N, \"justification\": \"brief reason\"}", escapeJSON(d))
 	}
 
 	systemPrompt := fmt.Sprintf(`You are an objective evaluator. Score the given content on multiple dimensions.

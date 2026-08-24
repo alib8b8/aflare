@@ -42,10 +42,12 @@ import (
 // HandleAgent handles the "agent" command — unified daemon agent.
 // It supports stdin (interactive chat), scheduler events, file-watch
 // events, and task queue, all feeding into the same AgentLoop.
-func HandleAgent(args []string) {
+func HandleAgent(args []string) error {
 	cfg := agent.DefaultConfig()
 	var watchDir string
-	parseAgentArgs(args, &cfg, &watchDir)
+	if err := parseAgentArgs(args, &cfg, &watchDir); err != nil {
+		return err
+	}
 
 	loop := agent.NewAgentLoop(cfg)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -210,6 +212,7 @@ func HandleAgent(args []string) {
 	close(inputs)
 	cancel()
 	fmt.Println("Goodbye!")
+	return nil
 }
 
 // handleAgentCommand processes slash commands in agent mode.
@@ -315,7 +318,7 @@ func PrintAgentUsage() {
 }
 
 // parseAgentArgs parses CLI arguments for the agent command.
-func parseAgentArgs(args []string, cfg *agent.Config, watchDir *string) {
+func parseAgentArgs(args []string, cfg *agent.Config, watchDir *string) error {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--smart":
@@ -382,11 +385,12 @@ func parseAgentArgs(args []string, cfg *agent.Config, watchDir *string) {
 			// daemon-only mode: no interactive input
 		case "--help", "-h":
 			PrintAgentUsage()
-			return
+			return nil
 		default:
 			fmt.Printf("Unknown argument: %s\n", args[i])
 			PrintAgentUsage()
-			os.Exit(1)
+			return exitErr(1)
 		}
 	}
+	return nil
 }

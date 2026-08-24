@@ -27,36 +27,37 @@ import (
 )
 
 // HandleMCP starts the MCP JSON-RPC server over stdio.
-func HandleMCP() {
+func HandleMCP() error {
 	server := mcp.NewServer()
 	if err := server.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 // HandleMCPCommand dispatches `aflare mcp` subcommands. With no arguments it
 // starts the stdio MCP server, exactly matching the historical bare
 // `aflare mcp` / `--mcp-server` behavior.
-func HandleMCPCommand(args []string) {
+func HandleMCPCommand(args []string) error {
 	if len(args) == 0 {
-		HandleMCP()
-		return
+		return HandleMCP()
 	}
 	switch args[0] {
 	case "install":
-		handleMCPInstall(args[1:])
+		return handleMCPInstall(args[1:])
 	case "list":
-		handleMCPList()
+		return handleMCPList()
 	case "help", "-h", "--help":
 		fmt.Print(mcpHelpText())
+		return nil
 	default:
 		fmt.Fprintf(os.Stderr, "❌ 未知的 mcp 子命令：%s\n", args[0])
 		if suggestions := suggestSubcommand(args[0], []string{"install", "list"}); len(suggestions) > 0 {
 			fmt.Fprintf(os.Stderr, "你是不是想输入：%s\n", strings.Join(suggestions, ", "))
 		}
 		fmt.Fprint(os.Stderr, mcpHelpText())
-		os.Exit(1)
+		return exitErr(1)
 	}
 }
 
@@ -68,21 +69,21 @@ func defaultMCPConfigPath() string {
 	return ".mcp.json"
 }
 
-func handleMCPInstall(args []string) {
+func handleMCPInstall(args []string) error {
 	if len(args) != 1 {
 		fmt.Fprint(os.Stderr, "用法：aflare mcp install <name>\n")
 		fmt.Fprintf(os.Stderr, "可用名称见 aflare mcp list\n")
-		os.Exit(1)
+		return exitErr(1)
 	}
 	name := args[0]
 	created, err := installMCPServer(name, defaultMCPConfigPath())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if !created {
 		fmt.Printf("ℹ️  %s 已存在于 %s，无需重复安装\n", name, defaultMCPConfigPath())
-		return
+		return nil
 	}
 	entry, _ := mcp.LookupCatalog(name)
 	fmt.Printf("✅ 已安装 MCP server：%s\n", entry.Name)
@@ -98,6 +99,7 @@ func handleMCPInstall(args []string) {
 			fmt.Fprintf(os.Stderr, "⚠️  未检测到 %s，MCP client 实际启动该 server 时会失败。请先安装 %s\n", entry.Command, entry.Command)
 		}
 	}
+	return nil
 }
 
 // installMCPServer resolves a catalog name and upserts it into the config.
@@ -116,11 +118,12 @@ func installMCPServer(name, configPath string) (created bool, err error) {
 	return mcp.UpsertMCPServer(configPath, entry.Name, mcp.EntryFromCatalog(entry))
 }
 
-func handleMCPList() {
+func handleMCPList() error {
 	if err := renderMCPList(defaultMCPConfigPath(), os.Stdout); err != nil {
 		fmt.Fprintf(os.Stderr, "❌ %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
+	return nil
 }
 
 // renderMCPList writes the built-in catalog with installed markers to w.

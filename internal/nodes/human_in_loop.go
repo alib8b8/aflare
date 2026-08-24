@@ -76,7 +76,7 @@ func (n *HumanInLoopNode) Execute(ctx context.Context, input string, params map[
 		if err != nil {
 			return "", fmt.Errorf("approval file path validation failed: %w", err)
 		}
-		_, err = os.Stat(safeApprovalFile)
+		_, err = os.Stat(safeApprovalFile) // codeql[go/path-injection] -- safeApprovalFile is the validateWritePath result; SafeJoinPath blocks absolute/traversal/symlink escape
 		if err == nil {
 			return buildApprovedOutput(input, onApprove, true, fmt.Sprintf("file %s exists", safeApprovalFile)), nil
 		}
@@ -85,7 +85,7 @@ func (n *HumanInLoopNode) Execute(ctx context.Context, input string, params map[
 			reviewContent = customPrompt + "\n\n" + input
 		}
 		reviewFile := safeApprovalFile + ".review"
-		if writeErr := os.WriteFile(reviewFile, []byte(reviewContent), 0600); writeErr != nil {
+		if writeErr := os.WriteFile(reviewFile, []byte(reviewContent), 0600); writeErr != nil { // codeql[go/path-injection] -- reviewFile is safeApprovalFile (validateWritePath result) + constant ".review" suffix; base path already confined
 			return "", fmt.Errorf("failed to write review file: %w", writeErr)
 		}
 		return "", fmt.Errorf("human approval required: review %s, then create %s to approve", reviewFile, safeApprovalFile)

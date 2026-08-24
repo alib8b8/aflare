@@ -308,7 +308,7 @@ func (n *DroneNode) callBridge(ctx context.Context, host, port, token, action st
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := droneBridgeClient.Do(req)
+	resp, err := droneBridgeClient.Do(req) // codeql[go/request-forgery] -- bridge URL built from node config (bridge_host/bridge_port), pre-validated by validateDroneBridgeURL; droneBridgeClient (httpclient.NewClient) applies validateDroneBridgeIP at dial time (blocks link-local/metadata, multicast, unspecified, reserved IPs); per-call context timeout; response capped by droneMaxResponseSize (1MB)
 	if err != nil {
 		return nil, nil, fmt.Errorf("drone bridge call failed: %w", err)
 	}

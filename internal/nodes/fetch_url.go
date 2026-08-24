@@ -134,7 +134,7 @@ func (n *FetchURLNode) Execute(ctx context.Context, input string, params map[str
 	}
 
 	// Send request
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // codeql[go/request-forgery] -- fetching a user-specified URL is fetch_url's function; url pre-validated by validateURL (SSRF: scheme/userinfo/localhost/IP-range checks); client uses safeHTTPClient.Transport (dial-time IP validation, DNS-rebinding protection), httpRedirectValidator(validateURL) re-checks redirects, timeout capped at 5m; body capped by maxFetchURLSize
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch URL: %w", err)
 	}

@@ -40,7 +40,7 @@ func BenchmarkExtractKeywords(b *testing.B) {
 	input := strings.Repeat("The quick brown fox jumps over the lazy dog. ", 50)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ExtractKeywords(input, 10)
+		_, _ = ExtractKeywords(input, 10)
 	}
 }
 

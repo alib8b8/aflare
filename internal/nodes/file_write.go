@@ -89,7 +89,7 @@ func (n *FileWriteNode) Execute(ctx context.Context, input string, params map[st
 }
 
 func appendToFile(path string, data []byte) error {
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600) // #nosec G304 -- path validated by validateWritePath
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600) // #nosec G304 -- path validated by validateWritePath // codeql[go/path-injection] -- path is the safePath from validateWritePath in Execute; only called with that value
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 		dir = "."
 	}
 
-	tmpFile, err := os.CreateTemp(dir, ".tmp-*-"+filepath.Base(path))
+	tmpFile, err := os.CreateTemp(dir, ".tmp-*-"+filepath.Base(path)) // codeql[go/path-injection] -- dir = filepath.Dir(path); path is the validateWritePath-sanitized safePath passed by Execute
 	if err != nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 		return err
 	}
 
-	if err := os.Rename(tmpPath, path); err != nil {
+	if err := os.Rename(tmpPath, path); err != nil { // codeql[go/path-injection] -- path is the validateWritePath-sanitized safePath; tmpPath is the CreateTemp file created in its own directory
 		if rerr := os.Remove(tmpPath); rerr != nil && !os.IsNotExist(rerr) {
 			logger.Warn("temp file cleanup failed", "path", tmpPath, "err", rerr)
 		}

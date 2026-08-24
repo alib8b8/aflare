@@ -63,7 +63,7 @@ func (n *TemplateRenderNode) Execute(ctx context.Context, input string, params m
 		if err != nil {
 			return "", fmt.Errorf("template file path validation failed: %w", err)
 		}
-		data, err := os.ReadFile(safePath) // #nosec G304 -- path validated by validateReadPath
+		data, err := os.ReadFile(safePath) // #nosec G304 -- path validated by validateReadPath // codeql[go/path-injection] -- safePath is the validateReadPath result of template_file
 		if err != nil {
 			return "", fmt.Errorf("failed to read template file: %w", err)
 		}

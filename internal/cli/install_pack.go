@@ -82,21 +82,21 @@ func saveInstalledPack(m *installedPackManifest) error {
 // Usage: aflare install-pack <pack-name>
 // Usage: aflare install-pack --list
 // Usage: aflare install-pack <pack-name> --force
-func HandleInstallPack(args []string) {
+func HandleInstallPack(args []string) error {
 	if len(args) == 0 {
 		PrintInstallPackUsage()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Handle --list flag
 	if args[0] == "--list" || args[0] == "-l" {
 		listPacks()
-		return
+		return nil
 	}
 
 	if args[0] == "--help" || args[0] == "-h" {
 		PrintInstallPackUsage()
-		return
+		return nil
 	}
 
 	packName := args[0]
@@ -112,7 +112,7 @@ func HandleInstallPack(args []string) {
 		fmt.Printf("Error: pack %q not found.\n\n", packName)
 		fmt.Println("Available packs:")
 		listPacks()
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Idempotent: check if already installed.
@@ -125,7 +125,7 @@ func HandleInstallPack(args []string) {
 			fmt.Println()
 			fmt.Println("Use --force to reinstall:")
 			fmt.Printf("  aflare install-pack %s --force\n", packName)
-			return
+			return nil
 		}
 	}
 
@@ -135,7 +135,7 @@ func HandleInstallPack(args []string) {
 	registry := skills.NewSkillRegistry(templatesDir)
 	if err := registry.Load(); err != nil {
 		fmt.Printf("Error: failed to load skills registry: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Collect matching skills.
@@ -151,7 +151,7 @@ func HandleInstallPack(args []string) {
 
 	if len(matchingSkills) == 0 {
 		fmt.Printf("No templates found for pack %q. Try running 'aflare skills scan' first.\n", packName)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Deduplicate by ID.
@@ -212,6 +212,7 @@ func HandleInstallPack(args []string) {
 	fmt.Printf("  aflare agent -c %s\n", strings.Join(pack.Capabilities, ","))
 	fmt.Println()
 	fmt.Printf("Pack %q installed successfully. %d templates ready to use.\n", pack.Name, len(unique))
+	return nil
 }
 
 // listPacks prints all available scenario packs and marks installed ones.

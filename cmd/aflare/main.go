@@ -85,24 +85,19 @@ func run() int {
 	}
 
 	if mcpServer {
-		cli.HandleMCP()
-		return 0
+		return cli.ExitCode(cli.HandleMCP())
 	}
 	if serveMode {
-		cli.HandleServe(args)
-		return 0
+		return cli.ExitCode(cli.HandleServe(args))
 	}
 	if initMCP != "" {
-		cli.HandleInitMCPQuick(initMCP)
-		return 0
+		return cli.ExitCode(cli.HandleInitMCPQuick(initMCP))
 	}
 	if initAgent != "" {
-		cli.HandleInitAgentQuick(initAgent)
-		return 0
+		return cli.ExitCode(cli.HandleInitAgentQuick(initAgent))
 	}
 	if updateChannel != "" {
-		cli.HandleChannelQuick(updateChannel)
-		return 0
+		return cli.ExitCode(cli.HandleChannelQuick(updateChannel))
 	}
 	if safeMode {
 		nodes.SetSafeMode(true)
@@ -132,11 +127,11 @@ func run() int {
 	if wantsUpdateNoticeBefore(command) {
 		cli.PrintUpdateNoticeAsync(os.Stderr, 1500*time.Millisecond)
 	}
-	dispatchCommand(command, args, aiMode, dryRun, safeMode)
+	exitCode := dispatchCommand(command, args, aiMode, dryRun, safeMode)
 	if wantsUpdateNoticeAfter(command) {
 		cli.PrintUpdateNoticeAsync(os.Stderr, 1500*time.Millisecond)
 	}
-	return 0
+	return exitCode
 }
 
 // wantsUpdateNoticeBefore returns true for interactive commands that should
@@ -159,74 +154,80 @@ func wantsUpdateNoticeAfter(command string) bool {
 	return false
 }
 
-func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, safeMode bool) {
+// dispatchCommand routes a validated command to its handler and maps the
+// returned error to a process exit code. This is the single place where
+// handler errors become exit codes — handlers themselves never call os.Exit
+// (issue #83), keeping them testable and reusable from long-running hosts.
+func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, safeMode bool) int {
+	var err error
 	switch command {
 	case "create":
-		cli.HandleCreate(args, aiMode)
+		err = cli.HandleCreate(args, aiMode)
 	case "run":
-		cli.HandleRun(args, dryRun, safeMode)
+		err = cli.HandleRun(args, dryRun, safeMode)
 	case "install":
-		cli.HandleInstall(args)
+		err = cli.HandleInstall(args)
 	case "uninstall":
-		cli.HandleUninstall(args)
+		err = cli.HandleUninstall(args)
 	case "registry":
-		cli.HandleRegistry(args)
+		err = cli.HandleRegistry(args)
 	case "list":
 		cli.HandleList()
 	case "validate":
-		cli.HandleValidate(args)
+		err = cli.HandleValidate(args)
 	case "review":
-		cli.HandleReview(args)
+		err = cli.HandleReview(args)
 	case "version", "--version", "-v":
 		fmt.Println(cli.PrintVersion())
 	case "self-update", "update":
-		cli.HandleSelfUpdate()
+		err = cli.HandleSelfUpdate()
 	case "upgrade":
-		cli.HandleUpgrade(args)
+		err = cli.HandleUpgrade(args)
 	case "doctor":
-		cli.HandleDoctor(args)
+		err = cli.HandleDoctor(args)
 	case "autoupgrade", "au":
-		cli.HandleAutoUpgrade(args)
+		err = cli.HandleAutoUpgrade(args)
 	case "init":
-		cli.HandleInit(args)
+		err = cli.HandleInit(args)
 	case "config":
-		cli.HandleConfig(args)
+		err = cli.HandleConfig(args)
 	case "skills":
-		cli.HandleSkills(args)
+		err = cli.HandleSkills(args)
 	case "-h", "--help", "help":
 		fmt.Println(cli.PrintUsage())
 	case "webui":
-		cli.HandleWebUI(args)
+		err = cli.HandleWebUI(args)
 	case "schedule":
-		cli.HandleSchedule(args)
+		err = cli.HandleSchedule(args)
 	case "audit":
-		cli.HandleAudit(args)
+		err = cli.HandleAudit(args)
 	case "serve":
-		cli.HandleServe(args)
+		err = cli.HandleServe(args)
 	case "marketplace":
-		cli.HandleMarketplace(args)
+		err = cli.HandleMarketplace(args)
 	case "secrets":
-		cli.HandleSecrets(args)
+		err = cli.HandleSecrets(args)
 	case "resume":
-		cli.HandleResume(args)
+		err = cli.HandleResume(args)
 	case "chat":
-		cli.HandleChat(args)
+		err = cli.HandleChat(args)
 	case "agent":
-		cli.HandleAgent(args)
+		err = cli.HandleAgent(args)
 	case "template":
-		cli.HandleTemplateSubmit(args, dryRun, safeMode)
+		err = cli.HandleTemplateSubmit(args, dryRun, safeMode)
 	case "install-pack":
-		cli.HandleInstallPack(args)
+		err = cli.HandleInstallPack(args)
 	case "watermark":
-		cli.HandleWatermark(args)
+		err = cli.HandleWatermark(args)
 	case "badge":
-		cli.HandleBadge(args)
+		err = cli.HandleBadge(args)
 	case "mcp":
 		// 子命令入口与 --mcp-server flag 等价，文档（docs/mcp.md、docs/dsh.md）
 		// 与 DSH 集成配置均使用 `aflare mcp` 形式；无参数时行为不变，
 		// 有参数时分发 install/list 等子命令。
-		cli.HandleMCPCommand(args)
+		err = cli.HandleMCPCommand(args)
 	default:
-		cli.HandleRunFile(command, dryRun, false, "", safeMode, nil)
+		err = cli.HandleRunFile(command, dryRun, false, "", safeMode, nil)
 	}
+	return cli.ExitCode(err)
 }

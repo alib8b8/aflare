@@ -79,14 +79,14 @@ func redactParams(params map[string]string) map[string]string {
 //	--params="k=v k2=v2" <file>      [deprecated] single-token legacy form
 //
 // Merge priority (later overrides earlier): --params < --set < --params-file
-func HandleRun(args []string, dryRun bool, safeMode bool) {
+func HandleRun(args []string, dryRun bool, safeMode bool) error {
 	// Short-circuit --help/-h before flag parsing. Without this, --help
 	// falls into the position-args path and gets treated as a workflow
 	// file path (e.g. `aflare run --help` → "failed to parse workflow").
 	for _, a := range args {
 		if a == "--help" || a == "-h" {
 			fmt.Println(i18n.T("run.usage"))
-			return
+			return nil
 		}
 	}
 
@@ -147,7 +147,7 @@ func HandleRun(args []string, dryRun bool, safeMode bool) {
 	}
 	if len(filtered) < 1 {
 		fmt.Println(i18n.T("run.usage"))
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// Merge params: --params (lowest) < --set < --params-file (highest).
@@ -162,17 +162,16 @@ func HandleRun(args []string, dryRun bool, safeMode bool) {
 		fileParams, err := loadParamsFile(paramsFile)
 		if err != nil {
 			fmt.Printf("读取参数文件失败：%v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		for k, v := range fileParams {
 			merged[k] = v
 		}
 	}
 	if len(merged) == 0 {
-		HandleRunFile(filtered[0], dryRun, resumeEnabled, resumePath, safeMode, nil)
-	} else {
-		HandleRunFile(filtered[0], dryRun, resumeEnabled, resumePath, safeMode, merged)
+		return HandleRunFile(filtered[0], dryRun, resumeEnabled, resumePath, safeMode, nil)
 	}
+	return HandleRunFile(filtered[0], dryRun, resumeEnabled, resumePath, safeMode, merged)
 }
 
 // printInputSchemaHelp prints a human-readable description of a workflow's
@@ -324,18 +323,18 @@ func loadParamsFile(path string) (map[string]string, error) {
 // params (from --params) are injected into wf.Vars; when the workflow declares
 // an input_schema but no params are supplied, the schema is printed as guidance
 // and the process exits (断点8: 模板参数不透明).
-func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath string, safeMode bool, params map[string]string) {
+func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath string, safeMode bool, params map[string]string) error {
 	wf, reg, err := PrepareWorkflow(wfPath)
 	if err != nil {
 		fmt.Printf("Error preparing workflow: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// 断点8: 当工作流声明了 input_schema 但未通过 --params 传参时，打印参数
 	// 说明并给出可复制的示例命令，而不是让用户对着空参数报错发呆。
 	if len(wf.InputSchema) > 0 && len(params) == 0 {
 		printInputSchemaHelp(wfPath, wf)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	// 断点E: 对没有 input_schema 但 YAML 里引用了 {{var.xxx}} / {{ .params.xxx }}
@@ -353,7 +352,7 @@ func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath st
 			}
 			if len(missing) > 0 {
 				printExtractedParamsHelp(wfPath, missing)
-				os.Exit(1)
+				return exitErr(1)
 			}
 		}
 	}
@@ -375,7 +374,7 @@ func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath st
 		fmt.Println("此工作流需要 LLM，但尚未配置 LLM provider。")
 		fmt.Println("运行 aflare init 完成首次配置（推荐 Ollama 本地，或配置 DeepSeek/OpenAI API Key）。")
 		fmt.Printf("配置后重试：aflare run %s\n", wfPath)
-		os.Exit(1)
+		return exitErr(1)
 	}
 
 	if suggestions := workflow.ValidateWorkflow(wf); len(suggestions) > 0 {
@@ -395,7 +394,7 @@ func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath st
 
 	if dryRun {
 		fmt.Println("\n✅ Dry run completed - workflow is valid")
-		return
+		return nil
 	}
 
 	// Compute the checkpoint state path.
@@ -432,10 +431,9 @@ func HandleRunFile(wfPath string, dryRun bool, resumeEnabled bool, resumePath st
 	}
 
 	if isatty.IsTerminal(os.Stdout.Fd()) {
-		RunTUI(wfPath, wf, reg, statePath, walPath, safeMode)
-	} else {
-		RunCLI(wfPath, wf, reg, statePath, walPath, safeMode)
+		return RunTUI(wfPath, wf, reg, statePath, walPath, safeMode)
 	}
+	return RunCLI(wfPath, wf, reg, statePath, walPath, safeMode)
 }
 
 // resolveAuditDir returns the directory the audit log will land in for a given
@@ -536,10 +534,11 @@ func newPolicyEngine(safeMode bool) *policy.Engine {
 }
 
 // RunTUI runs a workflow in interactive TUI mode.
-func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, walPath string, safeMode bool) {
+func RunTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, walPath string, safeMode bool) error {
 	if code := runTUI(wfPath, wf, reg, statePath, walPath, safeMode); code != 0 {
-		os.Exit(code)
+		return exitErr(code)
 	}
+	return nil
 }
 
 func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, walPath string, safeMode bool) int {
@@ -589,10 +588,11 @@ func runTUI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath
 //
 // Errors are translated to user-friendly messages via humanizeError (断点11),
 // while the raw error is logged at debug level for troubleshooting.
-func RunCLI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, walPath string, safeMode bool) {
+func RunCLI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, walPath string, safeMode bool) error {
 	if code := runCLI(wfPath, wf, reg, statePath, walPath, safeMode); code != 0 {
-		os.Exit(code)
+		return exitErr(code)
 	}
+	return nil
 }
 
 func runCLI(wfPath string, wf *workflow.Workflow, reg *nodes.Registry, statePath string, walPath string, safeMode bool) int {

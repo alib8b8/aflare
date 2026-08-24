@@ -18,14 +18,13 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/alib8b8/aflare/internal/autoupgrade"
 )
 
 // HandleInit handles the "init" command.
-func HandleInit(args []string) {
+func HandleInit(args []string) error {
 	mcpTarget := ""
 	agentTarget := ""
 	channel := ""
@@ -53,7 +52,7 @@ func HandleInit(args []string) {
 			}
 		case "--help", "-h":
 			PrintInitUsage()
-			return
+			return nil
 		default:
 			switch {
 			case strings.HasPrefix(args[i], "--mcp="):
@@ -68,15 +67,14 @@ func HandleInit(args []string) {
 
 	if mcpTarget == "" && agentTarget == "" && channel == "" {
 		// No flags: run the interactive first-run setup wizard.
-		runInitWizard()
-		return
+		return runInitWizard()
 	}
 
 	if mcpTarget != "" {
 		result, err := SetupMCP(mcpTarget)
 		if err != nil {
 			fmt.Printf("❌ MCP setup failed: %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		fmt.Printf("✅ MCP configured for %s\n", result.Agent)
 		fmt.Printf("   Config: %s\n", result.ConfigPath)
@@ -87,7 +85,7 @@ func HandleInit(args []string) {
 		result, err := InstallSkills(agentTarget)
 		if err != nil {
 			fmt.Printf("❌ Skill installation failed: %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		fmt.Printf("✅ Skills installed for %s\n", result.Agent)
 		fmt.Printf("   Path: %s\n", result.SkillPath)
@@ -102,15 +100,15 @@ func HandleInit(args []string) {
 		config, err := autoupgrade.LoadConfig()
 		if err != nil {
 			fmt.Printf("❌ Failed to load config: %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		if err := autoupgrade.SetChannel(config, channel); err != nil {
 			fmt.Printf("❌ Failed to set channel: %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		if err := autoupgrade.SaveConfig(config); err != nil {
 			fmt.Printf("❌ Failed to save config: %v\n", err)
-			os.Exit(1)
+			return exitErr(1)
 		}
 		fmt.Printf("✅ Update channel set to: %s\n", channel)
 	}
@@ -119,6 +117,7 @@ func HandleInit(args []string) {
 	// wizard configured LLM). Offer LLM setup so `aflare init --mcp all`
 	// also leaves the user with a working provider.
 	offerLLMConfig()
+	return nil
 }
 
 // PrintInitUsage prints usage information for the init command.
@@ -139,41 +138,43 @@ func PrintInitUsage() {
 }
 
 // HandleChannelQuick handles the --channel flag (pre-command flag, not "init" subcommand).
-func HandleChannelQuick(updateChannel string) {
+func HandleChannelQuick(updateChannel string) error {
 	config, err := autoupgrade.LoadConfig()
 	if err != nil {
 		fmt.Printf("❌ Failed to load config: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if err := autoupgrade.SetChannel(config, updateChannel); err != nil {
 		fmt.Printf("❌ Failed to set channel: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	if err := autoupgrade.SaveConfig(config); err != nil {
 		fmt.Printf("❌ Failed to save config: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	fmt.Printf("✅ Update channel set to: %s\n", updateChannel)
+	return nil
 }
 
 // HandleInitMCPQuick handles the --mcp flag (pre-command flag).
-func HandleInitMCPQuick(initMCP string) {
+func HandleInitMCPQuick(initMCP string) error {
 	result, err := SetupMCP(initMCP)
 	if err != nil {
 		fmt.Printf("❌ MCP setup failed: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	fmt.Printf("✅ MCP configured for %s\n", result.Agent)
 	fmt.Printf("   Config: %s\n", result.ConfigPath)
 	fmt.Printf("   Command: %s\n", result.Command)
+	return nil
 }
 
 // HandleInitAgentQuick handles the --agent flag (pre-command flag).
-func HandleInitAgentQuick(initAgent string) {
+func HandleInitAgentQuick(initAgent string) error {
 	result, err := InstallSkills(initAgent)
 	if err != nil {
 		fmt.Printf("❌ Skill installation failed: %v\n", err)
-		os.Exit(1)
+		return exitErr(1)
 	}
 	fmt.Printf("✅ Skills installed for %s\n", result.Agent)
 	fmt.Printf("   Path: %s\n", result.SkillPath)
@@ -182,4 +183,5 @@ func HandleInitAgentQuick(initAgent string) {
 	} else {
 		fmt.Println("   Status: skills directory ready (no source templates found)")
 	}
+	return nil
 }
