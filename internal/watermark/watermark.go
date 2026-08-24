@@ -1,5 +1,6 @@
 // Copyright (c) 2026 aflare Contributors
 //
+// aflare‍​‌​​​​​‌​‌​​​‌‌​​‌​​‌‌​​​‌​‌​​‌​​​​​​​‌​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​‌‌​‌​‌​‌​​​‌​‌‌‌‌‌‌‌‌‌‌​​​‌‌​​‌‌​‌‌​​​‌‌​‌​‌​‌​‌​‌‌‌​​​​‌​‌‌‌​‌​​​‌‌​‌‌​‌‌​‌‌‌‌​​​​​​​​​​​​​​​​​‌‌​​​‌‌​​‌‌‌‌‌​⁠
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or
@@ -64,7 +65,13 @@ const (
 	zwBit0  = '\u200B' // zero-width space → bit 0
 	zwBit1  = '\u200C' // zero-width non-joiner → bit 1
 	zwStart = '\u200D' // zero-width joiner → shard start marker
-	zwEnd   = '\uFEFF' // zero-width no-break space (BOM) → shard end marker
+	// zwEnd is the shard end marker. It must not be U+FEFF: the Go
+	// compiler rejects a byte order mark anywhere except the very start
+	// of a source file ("illegal byte order mark"), which would break
+	// every watermarked .go file. U+2060 (word joiner) is invisible and
+	// source-safe. U+FEFF remains decodable as the legacy marker.
+	zwEnd       = '\u2060' // word joiner → shard end marker
+	zwEndLegacy = '\uFEFF' // pre-v0.10 shard end marker, still accepted on decode
 
 	// Whitespace characters for the secondary encoding layer.
 	wsBit0 = ' '      // regular space (U+0020) → bit 0
@@ -222,9 +229,13 @@ content back to the deployment that generated it. Version 1 watermarks
 (8-byte hash, no deploy ID) are still decoded.
 
 Usage:
-  aflare watermark decode <file>   — extract watermark from file
-  aflare watermark verify <file>   — verify watermark integrity
-  aflare watermark info            — show this info`
+  aflare watermark decode <file>             — extract watermark from file
+  aflare watermark verify <file>             — verify watermark integrity
+  aflare watermark info                      — show this info
+  aflare watermark encode-source <file>      — watermark one Go file
+  aflare watermark encode-source --all       — watermark every .go file
+  aflare watermark decode-source <file>      — extract source watermark
+  aflare watermark strip-source <file>       — remove source watermark`
 }
 
 // ── Shard construction ───────────────────────────────────────────────────
@@ -329,8 +340,28 @@ func concat3Shards(a, b, c []byte) []byte {
 
 // ── Shard extraction ─────────────────────────────────────────────────────
 
+// indexZeroWidthEnd returns the byte index and rune of the first shard-end
+// marker in s. Both the current marker (U+2060) and the legacy marker
+// (U+FEFF) are accepted so watermarks written by older versions keep
+// decoding. Returns (-1, 0) when no marker is present.
+func indexZeroWidthEnd(s string) (int, rune) {
+	iCur := strings.IndexRune(s, zwEnd)
+	iOld := strings.IndexRune(s, zwEndLegacy)
+	switch {
+	case iCur == -1:
+		return iOld, zwEndLegacy
+	case iOld == -1:
+		return iCur, zwEnd
+	case iCur < iOld:
+		return iCur, zwEnd
+	default:
+		return iOld, zwEndLegacy
+	}
+}
+
 // extractAllShards finds all zero-width watermark shards in the text.
-// Each shard is delimited by zwStart (U+200D) and zwEnd (U+FEFF).
+// Each shard is delimited by zwStart (U+200D) and a shard-end marker
+// (U+2060, or legacy U+FEFF).
 func extractAllShards(text string) [][]byte {
 	var shards [][]byte
 
@@ -342,7 +373,7 @@ func extractAllShards(text string) [][]byte {
 		}
 
 		rest := remaining[startIdx+utf8.RuneLen(zwStart):]
-		endIdx := strings.IndexRune(rest, zwEnd)
+		endIdx, endRune := indexZeroWidthEnd(rest)
 		if endIdx == -1 {
 			break
 		}
@@ -353,7 +384,7 @@ func extractAllShards(text string) [][]byte {
 			shards = append(shards, shard)
 		}
 
-		remaining = rest[endIdx+utf8.RuneLen(zwEnd):]
+		remaining = rest[endIdx+utf8.RuneLen(endRune):]
 	}
 
 	return shards
@@ -624,7 +655,7 @@ func decodeLegacy(text string) (Payload, bool) {
 	}
 
 	rest := text[startIdx+utf8.RuneLen(zwStart):]
-	endIdx := strings.IndexRune(rest, zwEnd)
+	endIdx, _ := indexZeroWidthEnd(rest)
 	if endIdx == -1 {
 		return Payload{}, false
 	}
@@ -824,7 +855,7 @@ func DecodeSource(src string) (Payload, bool) {
 	}
 
 	rest = rest[startIdx+utf8.RuneLen(zwStart):]
-	endIdx := strings.IndexRune(rest, zwEnd)
+	endIdx, _ := indexZeroWidthEnd(rest)
 	if endIdx == -1 {
 		return Payload{}, false
 	}
@@ -863,7 +894,7 @@ func StripSourceWatermark(src string) string {
 	}
 
 	rest = rest[startIdx+utf8.RuneLen(zwStart):]
-	endIdx := strings.IndexRune(rest, zwEnd)
+	endIdx, endRune := indexZeroWidthEnd(rest)
 	if endIdx == -1 {
 		return src
 	}
@@ -875,10 +906,13 @@ func StripSourceWatermark(src string) string {
 		lineStart = nl + 1
 	}
 
-	lineEnd := idx + len(zwPrefix) + startIdx + utf8.RuneLen(zwStart) + endIdx + utf8.RuneLen(zwEnd)
-	// Extend to the next newline.
+	lineEnd := idx + len(zwPrefix) + startIdx + utf8.RuneLen(zwStart) + endIdx + utf8.RuneLen(endRune)
+	// Extend past the terminating newline so the whole line is removed.
+	// Stopping AT the newline would leave a blank line behind, and every
+	// strip+encode cycle would accumulate another one (eventually breaking
+	// gofmt, which collapses runs of blank lines).
 	if nl := strings.Index(src[lineEnd:], "\n"); nl >= 0 {
-		lineEnd += nl
+		lineEnd += nl + 1
 	}
 
 	return src[:lineStart] + src[lineEnd:]
