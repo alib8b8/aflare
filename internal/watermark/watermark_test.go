@@ -1,5 +1,6 @@
 // Copyright (c) 2026 aflare Contributors
 //
+// aflare‍​‌​​​​​‌​‌​​​‌‌​​‌​​‌‌​​​‌​‌​​‌​​​​​​​‌​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​‌‌​‌​‌​‌​​​‌​‌‌‌‌‌‌‌‌‌‌​​​‌‌‌​​‌​​‌​‌​‌​​‌​‌‌​​​​​‌​​​​‌​​​‌‌​​‌‌​​‌‌‌‌​​​​​‌​‌​​​​​​​​​​​​​​​​‌‌‌​​​​‌‌​‌​‌‌​​⁠
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or
@@ -567,6 +568,11 @@ func TestStripSourceWatermark(t *testing.T) {
 	}
 	if !strings.Contains(stripped, "fmt.Println(\"hello aflare\")") {
 		t.Error("stripped source should preserve function body")
+	}
+	// Stripping must restore the exact original source: the watermark line
+	// is removed together with its newline, so no blank line may remain.
+	if stripped != sampleGoSource {
+		t.Errorf("strip(encode(src)) should round-trip to src\n got: %q\nwant: %q", stripped, sampleGoSource)
 	}
 }
 
