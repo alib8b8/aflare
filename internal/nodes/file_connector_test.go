@@ -377,6 +377,85 @@ func TestFilesList_SkipsSymlinks(t *testing.T) {
 	}
 }
 
+// --- symlink containment (V1 regression tests) ---
+
+func TestFileRead_ConnectorSymlinkEscapeRejected(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	writeFile(t, filepath.Join(outside, "secret.md"), "secret")
+	if err := os.Symlink(filepath.Join(outside, "secret.md"), filepath.Join(root, "evil.md")); err != nil {
+		t.Skipf("symlink creation failed: %v", err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "linkdir")); err != nil {
+		t.Skipf("symlink creation failed: %v", err)
+	}
+
+	setupConnectorRegistry(t, connector.Spec{Name: "docs", Type: connector.TypeFiles, Root: root})
+	n := &FileReadNode{}
+
+	cases := map[string]string{
+		"evil.md":           "symlinked final component",
+		"linkdir/secret.md": "path through symlinked directory",
+	}
+	for path, desc := range cases {
+		_, err := n.Execute(t.Context(), "", map[string]string{"connector": "docs", "path": path, "redact": "false"})
+		if err == nil || !strings.Contains(err.Error(), "symlink") {
+			t.Errorf("%s should be rejected, got %v", desc, err)
+		}
+	}
+}
+
+func TestFileWrite_ConnectorSymlinkEscapeRejected(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(root, "linkdir")); err != nil {
+		t.Skipf("symlink creation failed: %v", err)
+	}
+	// Dangling symlink: the append path would follow it and create the
+	// target outside the root.
+	if err := os.Symlink(filepath.Join(outside, "target.md"), filepath.Join(root, "evil.md")); err != nil {
+		t.Skipf("symlink creation failed: %v", err)
+	}
+
+	setupConnectorRegistry(t, connector.Spec{Name: "docs", Type: connector.TypeFiles, Root: root, ReadOnly: boolPtr(false)})
+	n := &FileWriteNode{}
+
+	for _, tc := range []struct{ path, mode, desc string }{
+		{"linkdir/pwned.md", "write", "write through symlinked directory"},
+		{"evil.md", "append", "append through dangling symlink"},
+	} {
+		_, err := n.Execute(t.Context(), "pwned", map[string]string{"connector": "docs", "path": tc.path, "mode": tc.mode})
+		if err == nil || !strings.Contains(err.Error(), "symlink") {
+			t.Errorf("%s should be rejected, got %v", tc.desc, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(outside, "pwned.md")); err == nil {
+		t.Error("file must not be created outside the connector root")
+	}
+	if _, err := os.Stat(filepath.Join(outside, "target.md")); err == nil {
+		t.Error("dangling symlink target must not be created outside the connector root")
+	}
+}
+
+func TestFileNodes_RejectSymlinkRoot(t *testing.T) {
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "vault")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlink creation failed: %v", err)
+	}
+	setupConnectorRegistry(t, connector.Spec{Name: "docs", Type: connector.TypeFiles, Root: link, ReadOnly: boolPtr(false)})
+
+	if _, err := (&FileReadNode{}).Execute(t.Context(), "", map[string]string{"connector": "docs", "path": "a.md"}); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Errorf("file_read with symlink root should be rejected, got %v", err)
+	}
+	if _, err := (&FileWriteNode{}).Execute(t.Context(), "x", map[string]string{"connector": "docs", "path": "a.md"}); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Errorf("file_write with symlink root should be rejected, got %v", err)
+	}
+	if _, err := (&FilesListNode{}).Execute(t.Context(), "", map[string]string{"connector": "docs"}); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Errorf("files_list with symlink root should be rejected, got %v", err)
+	}
+}
+
 func TestMatchRel(t *testing.T) {
 	cases := []struct {
 		pattern, rel string

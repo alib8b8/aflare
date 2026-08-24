@@ -227,17 +227,30 @@ func handleConnectorAdd(args []string) error {
 
 	// For file connectors the root must exist and be a directory now —
 	// registering a typo'd path would silently fail every later read.
-	// (An empty root is left to spec.Validate for the proper message.)
+	// Symlinks are resolved before storing so the spec holds the real
+	// boundary: a symlink root (e.g. ~/vault → /) would silently widen
+	// the connector's effective scope, and the file nodes reject
+	// symlink roots anyway. (An empty root is left to spec.Validate
+	// for the proper message.)
 	if spec.IsFileConnector() && spec.Root != "" {
-		fi, err := os.Stat(spec.Root)
+		resolved, err := filepath.EvalSymlinks(spec.Root)
 		if err != nil {
 			fmt.Printf("❌ 无法访问根目录 %s：%v\n", spec.Root, err)
 			return exitErr(1)
 		}
-		if !fi.IsDir() {
-			fmt.Printf("❌ root %s 不是目录\n", spec.Root)
+		fi, err := os.Stat(resolved)
+		if err != nil {
+			fmt.Printf("❌ 无法访问根目录 %s：%v\n", resolved, err)
 			return exitErr(1)
 		}
+		if !fi.IsDir() {
+			fmt.Printf("❌ root %s 不是目录\n", resolved)
+			return exitErr(1)
+		}
+		if resolved != spec.Root {
+			fmt.Printf("ℹ️ 根目录已解析符号链接：%s → %s\n", spec.Root, resolved)
+		}
+		spec.Root = resolved
 	}
 
 	switch {

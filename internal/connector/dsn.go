@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/url"
 	"strconv"
-	"strings"
 )
 
 // Default ports applied when the spec leaves Port unset.
@@ -70,19 +69,15 @@ func BuildDSN(spec Spec, password string) (driver, dsn string, err error) {
 // buildSQLiteDSN renders the sqlite DSN. Read-only connectors (the
 // default) get a file: URI with mode=ro so the driver itself rejects
 // writes — even if the node-level read_only gate were bypassed, the
-// database file cannot be modified through this connection.
+// database file cannot be modified through this connection. Spec
+// validation guarantees Database is a plain path (no file: prefix, no
+// ? / # params), so the URI is built deterministically here and an
+// injected mode= parameter cannot override the read-only enforcement.
 func buildSQLiteDSN(spec Spec) string {
 	if !spec.IsReadOnly() {
 		return spec.Database
 	}
-	db := spec.Database
-	if strings.HasPrefix(db, "file:") {
-		if strings.Contains(db, "?") {
-			return db + "&mode=ro"
-		}
-		return db + "?mode=ro"
-	}
-	return "file:" + db + "?mode=ro"
+	return "file:" + spec.Database + "?mode=ro"
 }
 
 // buildPostgresDSN renders a postgres:// URL DSN. url.UserPassword

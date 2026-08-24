@@ -82,10 +82,14 @@ func (n *FileWriteNode) Execute(ctx context.Context, input string, params map[st
 			return "", fmt.Errorf("connector %q is read-only; re-register it with --writable to allow writes", connName)
 		}
 		// Keep the same containment + dotfile/extension rules as
-		// workdir mode (.env/.sh etc. stay unwritable).
+		// workdir mode (.env/.sh etc. stay unwritable), plus the
+		// unconditional connector-root symlink containment check.
 		safePath, err = core.ValidateWritePathIn(spec.Root, path)
 		if err != nil {
 			return "", fmt.Errorf("path validation failed: %w", err)
+		}
+		if cerr := validateConnectorPathContainment(spec.Root, safePath); cerr != nil {
+			return "", fmt.Errorf("path validation failed: %w", cerr)
 		}
 		if !spec.MatchInclude(filepath.Base(safePath)) {
 			return "", fmt.Errorf("connector %q does not allow writing %q (include allowlist: %s)",

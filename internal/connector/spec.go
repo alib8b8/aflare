@@ -232,6 +232,37 @@ func (s *Spec) Validate() error {
 		if s.Database == "" {
 			return fmt.Errorf("connector %q: database (file path) is required for type sqlite", s.Name)
 		}
+		// The database must be a plain file path: aflare builds the
+		// read-only DSN itself ("file:<path>?mode=ro"). A value that
+		// already looks like a URI (file: prefix) or carries a query
+		// string could inject its own mode= parameter and silently
+		// defeat the driver-level read-only enforcement.
+		if strings.HasPrefix(s.Database, "file:") {
+			return fmt.Errorf("connector %q: database must be a plain file path, not a file: URI (the read-only URI is built by aflare)", s.Name)
+		}
+		if strings.ContainsAny(s.Database, "?#") {
+			return fmt.Errorf("connector %q: database must not contain URI parameters (got %q)", s.Name, s.Database)
+		}
+		// Fall through to the database-type field checks below (file-only
+		// fields like root/include/max_bytes are rejected there).
+	}
+
+	// File-connector-only fields on a database connector would be
+	// silently ignored — reject them so a stored spec never lies about
+	// what it enforces (mirrors the files-branch checks above).
+	if !s.IsFileConnector() {
+		if s.Root != "" {
+			return fmt.Errorf("connector %q: root is not valid for type %s (files/notes only)", s.Name, s.Type)
+		}
+		if len(s.Include) > 0 {
+			return fmt.Errorf("connector %q: include is not valid for type %s (files/notes only)", s.Name, s.Type)
+		}
+		if s.MaxBytes != 0 {
+			return fmt.Errorf("connector %q: max_bytes is not valid for type %s (use max_rows)", s.Name, s.Type)
+		}
+	}
+
+	switch s.Type {
 	case TypeFiles, TypeNotes:
 		if s.Root == "" {
 			return fmt.Errorf("connector %q: root is required for type %s", s.Name, s.Type)

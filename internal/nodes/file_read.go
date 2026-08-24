@@ -57,8 +57,13 @@ func (n *FileReadNode) Schema() NodeSchema {
 	}
 }
 
-// resolveFileConnector loads a files/notes connector spec. Database
-// connectors are rejected with a hint toward sql_query.
+// resolveFileConnector loads a files/notes connector spec and verifies
+// its root is usable as a containment boundary: it must exist, be a
+// directory, and not itself be a symlink — a symlink root (e.g.
+// ~/vault → /) would silently widen the declared boundary to wherever
+// it points, so the CLI resolves symlinks at registration and the
+// nodes reject them. Database connectors are rejected with a hint
+// toward sql_query.
 func resolveFileConnector(name string) (connector.Spec, error) {
 	spec, err := resolveConnectorSpec(name)
 	if err != nil {
@@ -67,7 +72,58 @@ func resolveFileConnector(name string) (connector.Spec, error) {
 	if !spec.IsFileConnector() {
 		return connector.Spec{}, fmt.Errorf("connector %q is a %s connector; file nodes expect files/notes connectors (use sql_query for databases)", name, spec.Type)
 	}
+	fi, err := os.Lstat(spec.Root)
+	if err != nil {
+		return connector.Spec{}, fmt.Errorf("connector %q root %q is not accessible: %w", name, spec.Root, err)
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		return connector.Spec{}, fmt.Errorf("connector %q root %q is a symlink; re-register the connector so the resolved path is stored", name, spec.Root)
+	}
+	if !fi.IsDir() {
+		return connector.Spec{}, fmt.Errorf("connector %q root %q is not a directory", name, spec.Root)
+	}
 	return spec, nil
+}
+
+// validateConnectorPathContainment enforces that the physical path
+// reached through safePath stays within the connector root even when
+// intermediate directories (or the final component) are symlinks. The
+// check is unconditional: unlike the L2+ symlink check in
+// core.SafeJoinPath, a connector root is an explicitly declared trust
+// boundary and symlink escapes across it are blocked at every security
+// level — matching files_list, which never follows symlinks at all.
+func validateConnectorPathContainment(root, safePath string) error {
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return fmt.Errorf("cannot resolve connector root: %w", err)
+	}
+	// The final component itself must never be a symlink — not even a
+	// dangling one: append mode would follow it and create the target
+	// outside the root, and write mode would silently replace the link.
+	if fi, err := os.Lstat(safePath); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("path resolves outside the connector root (symlink escape)")
+	}
+	// Intermediate directories of a write target may not exist yet;
+	// validate against the deepest existing ancestor instead.
+	probe := safePath
+	for {
+		resolved, err := filepath.EvalSymlinks(probe)
+		if err == nil {
+			rel, rerr := filepath.Rel(resolvedRoot, resolved)
+			if rerr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				return fmt.Errorf("path resolves outside the connector root (symlink escape)")
+			}
+			return nil
+		}
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("cannot resolve path %q: %w", probe, err)
+		}
+		parent := filepath.Dir(probe)
+		if parent == probe {
+			return fmt.Errorf("path validation failed for %q", safePath)
+		}
+		probe = parent
+	}
 }
 
 func (n *FileReadNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
@@ -86,10 +142,15 @@ func (n *FileReadNode) Execute(ctx context.Context, input string, params map[str
 		}
 		// Paths resolve inside the connector root with the same
 		// containment rules as workdir mode: no absolute paths, no
-		// traversal, L2+ symlink-escape checks.
+		// traversal, L2+ symlink-escape checks — plus an
+		// unconditional symlink-escape check for the connector root
+		// (it is a declared trust boundary, enforced at every level).
 		safePath, err = core.ValidateReadPathIn(spec.Root, path)
 		if err != nil {
 			return "", fmt.Errorf("path validation failed: %w", err)
+		}
+		if cerr := validateConnectorPathContainment(spec.Root, safePath); cerr != nil {
+			return "", fmt.Errorf("path validation failed: %w", cerr)
 		}
 		if !spec.MatchInclude(filepath.Base(safePath)) {
 			return "", fmt.Errorf("connector %q does not allow reading %q (include allowlist: %s)",

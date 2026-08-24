@@ -26,7 +26,8 @@ Connector API 统一解决：
 2. **无策略上限**：连接器声明天花板（只读、行数、字节数、超时、扩展名
    白名单），节点参数只能收紧、不能放宽。
 3. **目录授权**：files/notes 连接器把 workdir 沙箱的同一套遏制规则
-   （禁绝对路径、禁穿越、L2+ symlink 检查）应用到用户授权的目录根。
+   （禁绝对路径、禁穿越）应用到用户授权的目录根，且对符号链接逃逸
+   **无条件拒绝**（不受 L2 门控限制）。
 
 ## 2. 核心概念
 
@@ -91,7 +92,8 @@ files/notes 连接器把「workdir 沙箱」的规则**原样搬到授权目录�
 
 | 维度 | 规则 |
 |---|---|
-| 路径遏制 | `path` 只能是 root 内的相对路径：拒绝绝对路径、`..` 穿越；L2+ 拒绝 symlink 逃逸（复用 `core.SafeJoinPath`） |
+| 路径遏制 | `path` 只能是 root 内的相对路径：拒绝绝对路径、`..` 穿越（复用 `core.SafeJoinPath`）；**任何安全级别**均拒绝 symlink 逃逸（root 是显式声明的信任边界，比 workdir 的 L2+ 门控更严） |
+| root 本身 | 注册时 CLI 解析符号链接并存储真实路径；root 为符号链接的 spec 在节点层直接拒绝（防止 `~/vault → /` 式静默扩权） |
 | `read_only` | 默认 true。只读连接器上 `file_write` 直接拒绝，节点参数无法放宽 |
 | `include` | glob 白名单匹配文件名。notes 默认 `*.md`/`*.markdown`；files 不设则全类型 |
 | `max_bytes` | 单文件读取上限（默认 10MB，且永不放宽节点 10MB 硬上限） |
@@ -110,6 +112,9 @@ files/notes 连接器把「workdir 沙箱」的规则**原样搬到授权目录�
 
 **SQLite 纵深防御**：只读 sqlite 连接器（默认）的 DSN 附加
 `file:...?mode=ro` —— 即使节点层只读门被绕过，驱动本身也拒绝写。
+`database` 必须是纯文件路径：spec 校验拒绝 `file:` URI 前缀与
+`?`/`#` 参数，防止注入自定义 `mode=` 参数绕过只读（DSN 由 aflare
+确定性构建）。
 
 ### 2.4 CredentialResolver —— 部署 profile 的抽象点
 
@@ -131,6 +136,8 @@ files/notes 连接器本地文件无需凭据，spec 直接拒绝 credential 字
   `url.UserPassword` 百分号编码 —— 密码中的 `:@/?` 无法破坏 DSN 结构。
 - **mysql**：`user:pass@tcp(host:port)/db`（go-sql-driver 格式）。
 - **sqlite**：只读连接器 → `file:<path>?mode=ro`；可写连接器 → 原路径。
+  `database` 只接受纯路径（校验拒绝 `file:` 前缀与 `?`/`#`），DSN 由
+  aflare 确定性构建，`mode=` 参数无法被注入。
 
 驱动本身仍由宿主程序注册（`sql_query` 不引入第三方/CGO 依赖）。
 

@@ -153,7 +153,7 @@ func (n *FilesListNode) Execute(ctx context.Context, input string, params map[st
 			// silently skipping the entry.
 			return fmt.Errorf("make %q relative to connector root: %w", path, rerr)
 		}
-		if !matchRel(pattern, rel) {
+		if !matchRel(cleanPattern, rel) {
 			return nil
 		}
 		if len(res.Files) >= maxEntries {

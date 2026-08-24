@@ -141,19 +141,20 @@ func TestBuildDSN_SQLiteWritable(t *testing.T) {
 	}
 }
 
-func TestBuildDSN_SQLiteFileURIReadOnly(t *testing.T) {
-	cases := map[string]string{
-		"file:/data/app.db":          "file:/data/app.db?mode=ro",
-		"file:/data/app.db?cache=sh": "file:/data/app.db?cache=sh&mode=ro",
-	}
-	for in, want := range cases {
-		spec := Spec{Name: "db", Type: TypeSQLite, Database: in}
-		_, dsn, err := BuildDSN(spec, "")
-		if err != nil {
-			t.Fatalf("%s: unexpected error: %v", in, err)
-		}
-		if dsn != want {
-			t.Errorf("dsn = %q, want %q", dsn, want)
+func TestBuildDSN_SQLiteRejectsURIDatabase(t *testing.T) {
+	// Database values that look like URIs or carry a query string could
+	// inject their own mode= parameter and silently defeat the driver
+	// level read-only enforcement — validation must reject them so the
+	// DSN is always built deterministically as file:<path>?mode=ro.
+	for _, db := range []string{
+		"file:/data/app.db",
+		"file:/data/app.db?mode=rw",
+		"/data/app.db?cache=shared",
+		"/data/app.db#frag",
+	} {
+		spec := Spec{Name: "db", Type: TypeSQLite, Database: db}
+		if _, _, err := BuildDSN(spec, ""); err == nil {
+			t.Errorf("database %q should be rejected by spec validation", db)
 		}
 	}
 }

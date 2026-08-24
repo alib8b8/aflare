@@ -241,6 +241,45 @@ func TestHandleConnector_AddFilesConnector(t *testing.T) {
 	}
 }
 
+func TestHandleConnector_AddFilesConnectorResolvesSymlinkRoot(t *testing.T) {
+	connectorTestFile(t)
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "vault")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlink creation failed: %v", err)
+	}
+
+	// A symlink root must be resolved to the real path at registration:
+	// the stored spec is the actual containment boundary.
+	if err := HandleConnector([]string{"add", "my-notes", "--type", "notes", "--root", link}); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	reg, err := connector.LoadDefaultRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, ok := reg.Get("my-notes")
+	if !ok {
+		t.Fatal("my-notes not registered")
+	}
+	if spec.Root != real {
+		t.Errorf("root = %q, want resolved %q", spec.Root, real)
+	}
+}
+
+func TestHandleConnector_AddSQLiteRejectsURIDatabase(t *testing.T) {
+	connectorTestFile(t)
+	// A database value carrying URI parameters could inject its own
+	// mode= parameter and defeat the driver-level read-only DSN —
+	// registration must reject it.
+	for _, db := range []string{"file:/tmp/x.db", "/tmp/x.db?mode=rw"} {
+		err := HandleConnector([]string{"add", "db", "--type", "sqlite", "--database", db})
+		if err == nil {
+			t.Errorf("database %q should be rejected", db)
+		}
+	}
+}
+
 func TestHandleConnector_AddFilesConnectorWithIncludeAndWritable(t *testing.T) {
 	connectorTestFile(t)
 	root := t.TempDir()
