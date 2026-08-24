@@ -254,62 +254,6 @@ func TestToolHistoryList_WithRecords(t *testing.T) {
 	}
 }
 
-func TestToolTemplateList(t *testing.T) {
-	s := NewServer()
-	result, err := s.toolTemplateList(map[string]interface{}{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result == nil || len(result.Content) == 0 {
-		t.Fatal("expected non-empty result")
-	}
-	text := result.Content[0].Text
-	if !strings.Contains(text, "simple-llm") {
-		t.Errorf("expected simple-llm template in output, got: %s", text)
-	}
-}
-
-func TestToolTemplateList_ByCategory(t *testing.T) {
-	s := NewServer()
-	result, err := s.toolTemplateList(map[string]interface{}{"category": "llm"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	text := result.Content[0].Text
-	if !strings.Contains(text, "simple-llm") && !strings.Contains(text, "translation") {
-		t.Errorf("expected llm templates in output, got: %s", text)
-	}
-}
-
-func TestToolTemplateRender_MissingName(t *testing.T) {
-	s := NewServer()
-	_, err := s.toolTemplateRender(map[string]interface{}{})
-	if err == nil {
-		t.Fatal("expected error for missing name")
-	}
-}
-
-func TestToolTemplateRender_Valid(t *testing.T) {
-	s := NewServer()
-	result, err := s.toolTemplateRender(map[string]interface{}{
-		"name": "simple-llm",
-		"vars": map[string]interface{}{
-			"workflow_name": "my-llm",
-			"prompt":        "Say hello",
-		},
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result == nil || len(result.Content) == 0 {
-		t.Fatal("expected non-empty result")
-	}
-	text := result.Content[0].Text
-	if !strings.Contains(text, "my-llm") {
-		t.Errorf("expected rendered workflow name, got: %s", text)
-	}
-}
-
 func TestSanitizeError(t *testing.T) {
 	// Should redact sensitive keywords
 	err := sanitizeError(fmt.Errorf("invalid api key: secret123"))
@@ -950,29 +894,6 @@ func TestHandleRequest_ToolsCall_HistoryList(t *testing.T) {
 	}
 }
 
-func TestHandleRequest_ToolsCall_TemplateList(t *testing.T) {
-	s := NewServer()
-	params, _ := json.Marshal(map[string]interface{}{"name": "template_list", "arguments": map[string]interface{}{}})
-	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
-	resp := s.handleRequest(req)
-	if resp == nil {
-		t.Fatal("expected non-nil response")
-	}
-	if resp.Error != nil {
-		t.Fatalf("unexpected error: %v", resp.Error)
-	}
-}
-
-func TestHandleRequest_ToolsCall_TemplateRender(t *testing.T) {
-	s := NewServer()
-	params, _ := json.Marshal(map[string]interface{}{"name": "template_render", "arguments": map[string]interface{}{"name": "simple-llm"}})
-	req := &rpcRequest{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call", Params: params}
-	resp := s.handleRequest(req)
-	if resp == nil {
-		t.Fatal("expected non-nil response")
-	}
-}
-
 // ------------------------------------------------------------------
 // Concurrency tests
 // ------------------------------------------------------------------
@@ -1157,17 +1078,6 @@ func TestToolHistoryList_WithFilters(t *testing.T) {
 	}
 }
 
-func TestToolTemplateList_ByKeyword(t *testing.T) {
-	s := NewServer()
-	result, err := s.toolTemplateList(map[string]interface{}{"keyword": "llm"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result == nil || len(result.Content) == 0 {
-		t.Fatal("expected non-empty result")
-	}
-}
-
 func TestCallExtendedTool_AllTools(t *testing.T) {
 	s := NewServer()
 	tools := []string{
@@ -1183,8 +1093,6 @@ func TestCallExtendedTool_AllTools(t *testing.T) {
 		"node_list",
 		"node_info",
 		"history_list",
-		"template_list",
-		"template_render",
 	}
 
 	for _, toolName := range tools {
@@ -1201,8 +1109,6 @@ func TestCallExtendedTool_AllTools(t *testing.T) {
 				args = map[string]interface{}{"file": "/nonexistent.yaml"}
 			case "node_info":
 				args = map[string]interface{}{"name": "file_read"}
-			case "template_render":
-				args = map[string]interface{}{"name": "simple-llm"}
 			default:
 				args = map[string]interface{}{}
 			}

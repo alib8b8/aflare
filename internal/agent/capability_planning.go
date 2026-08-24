@@ -377,14 +377,12 @@ func extractStepGoal(line string) string {
 func inferToolForStep(goal string) string {
 	lower := strings.ToLower(goal)
 	switch {
-	case strings.Contains(lower, "search") || strings.Contains(lower, "find"):
-		return "template_list"
-	case strings.Contains(lower, "run") || strings.Contains(lower, "execute"):
+	case strings.Contains(lower, "search") || strings.Contains(lower, "find") ||
+		strings.Contains(lower, "run") || strings.Contains(lower, "execute"):
 		return "run_workflow"
-	case strings.Contains(lower, "create") || strings.Contains(lower, "build") || strings.Contains(lower, "make"):
+	case strings.Contains(lower, "create") || strings.Contains(lower, "build") || strings.Contains(lower, "make") ||
+		strings.Contains(lower, "info") || strings.Contains(lower, "check") || strings.Contains(lower, "inspect"):
 		return "create_workflow"
-	case strings.Contains(lower, "info") || strings.Contains(lower, "check") || strings.Contains(lower, "inspect"):
-		return "template_info"
 	case strings.Contains(lower, "remember") || strings.Contains(lower, "store") || strings.Contains(lower, "save"):
 		return "memory_store"
 	case strings.Contains(lower, "recall") || strings.Contains(lower, "retrieve") || strings.Contains(lower, "get"):

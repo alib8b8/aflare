@@ -290,7 +290,7 @@ func (u *UtilityCapability) scoreEfficiency(output, lower string, length int) fl
 	}
 
 	// Direct action is efficient
-	if strings.Contains(lower, "template_list") || strings.Contains(lower, "run_workflow") {
+	if strings.Contains(lower, "run_workflow") || strings.Contains(lower, "create_workflow") {
 		score += 0.2
 	}
 
@@ -367,7 +367,7 @@ func (u *UtilityCapability) scoreActionability(output, lower string, input strin
 	}
 
 	// Has tool calls
-	if strings.Contains(lower, "template_list") || strings.Contains(lower, "run_workflow") {
+	if strings.Contains(lower, "run_workflow") || strings.Contains(lower, "create_workflow") {
 		score += 0.2
 	}
 

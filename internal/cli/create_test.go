@@ -94,32 +94,10 @@ func TestParseParams(t *testing.T) {
 	}
 }
 
-// TestSuggestSkeletonName verifies the kebab-case name derivation for the
-// `aflare template new` hint (断点9).
-func TestSuggestSkeletonName(t *testing.T) {
-	tests := []struct {
-		desc string
-		want string
-	}{
-		{"", "my-workflow"},
-		{"x", "my-workflow"}, // single short word -> fallback
-		{"auto reply email", "auto-reply"},
-		{"Help me auto reply email please", "auto-reply"}, // stopwords skipped
-		{"fetch example.com and save to file", "fetch-example.com"},
-	}
-	for _, tc := range tests {
-		t.Run(tc.desc, func(t *testing.T) {
-			if got := suggestSkeletonName(tc.desc); got != tc.want {
-				t.Errorf("suggestSkeletonName(%q) = %q, want %q", tc.desc, got, tc.want)
-			}
-		})
-	}
-}
-
 // TestPrintCreateSuggestions_Output captures stdout and verifies that the
-// suggestions include the --ai and template new hints (断点9). This function
-// is invoked when keyword matching fails and no LLM is configured; it always
-// prints the actionable hints regardless of the template registry state.
+// suggestions include the --ai and manual-creation hints (断点9). This
+// function is invoked when keyword matching fails and no LLM is configured;
+// it always prints the actionable hints.
 func TestPrintCreateSuggestions_Output(t *testing.T) {
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -136,28 +114,10 @@ func TestPrintCreateSuggestions_Output(t *testing.T) {
 		"未找到完全匹配的模板",
 		"--ai",
 		"aflare init",
-		"aflare template new",
+		"aflare run",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("suggestions missing %q in output:\n%s", want, got)
-		}
-	}
-}
-
-// TestSearchTemplatesForSuggestion_NoPanic verifies the helper does not panic
-// when the template registry cannot be loaded (e.g. no templates directory in
-// the test working directory). It returns either nil or a non-nil slice; the
-// contract under test is graceful degradation, not a specific result.
-func TestSearchTemplatesForSuggestion_NoPanic(t *testing.T) {
-	// In the test working directory (internal/cli) there is typically no
-	// templates/ subdirectory, so registry.Load() fails and the helper
-	// returns nil. If a templates dir happens to exist, results may be
-	// non-nil — either way it must not panic.
-	got := searchTemplatesForSuggestion("ssl cert checker")
-	// No assertion on len: just ensure no panic and no invalid entries.
-	for _, s := range got {
-		if s == nil {
-			t.Error("search returned a nil SkillMeta entry")
 		}
 	}
 }

@@ -158,7 +158,6 @@
   "usage.chat": "Start interactive chat with AI agent",
   "usage.agent": "Start unified agent daemon (chat + scheduler + filewatch)",
   "usage.watermark": "Extract or verify content provenance watermark",
-  "usage.badge": "View or award contributor virtual badges",
   "resume.usage": "Usage: aflare resume <run-id>\n       aflare resume list",
   "resume.list_empty": "No paused workflows.",
   "resume.list_title": "Paused workflows (%d):",

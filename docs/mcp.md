@@ -157,7 +157,6 @@ authoritative list is available at runtime via `tools/list`; the groups are:
 | Workflow | `workflow_run`, `workflow_create`, `workflow_list`, `workflow_validate` |
 | Nodes | `node_list`, `node_info` |
 | History | `history_list` |
-| Templates | `template_list`, `template_render` |
 | Memory | `memory_store`, `memory_retrieve`, `memory_search`, `memory_stats`, `memory_list_sessions` |
 | Code knowledge graph | `code_graph_index`, `code_graph_query`, `code_graph_stats` |
 | Context | `context_compress` |

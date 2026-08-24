@@ -138,12 +138,12 @@ func TestE2E_AgentFullChain(t *testing.T) {
 }
 
 // TestE2E_AgentToolExecution verifies that the ReActAgent correctly calls
-// tools and returns results. Uses a mock that triggers template_list tool.
+// tools and returns results. Uses a mock that triggers the create_workflow tool.
 func TestE2E_AgentToolExecution(t *testing.T) {
 	mock := &mockLLMProvider{
 		responses: []string{
-			`{"thought": "Let me search for templates", "action": "template_list", "action_input": "search build"}`,
-			`{"thought": "I found some templates", "final_answer": "Here are the templates matching your search."}`,
+			`{"thought": "Let me compose a workflow for this", "action": "create_workflow", "action_input": "summarize the build results"}`,
+			`{"thought": "The workflow was generated", "final_answer": "I composed a workflow for your request."}`,
 		},
 	}
 
@@ -158,7 +158,7 @@ func TestE2E_AgentToolExecution(t *testing.T) {
 	loop.SetLLMProvider(mock)
 	ctx := context.Background()
 
-	response, err := loop.Process(ctx, "find templates for building", ProcessOptions{})
+	response, err := loop.Process(ctx, "create a workflow for summarizing builds", ProcessOptions{})
 	if err != nil {
 		t.Fatalf("Process failed: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestE2E_AgentUnknownTool(t *testing.T) {
 	mock := &mockLLMProvider{
 		responses: []string{
 			`{"thought": "Let me try an unknown tool", "action": "nonexistent_tool", "action_input": "test"}`,
-			`{"thought": "That tool doesn't exist, I'll try something else", "action": "template_list", "action_input": "search"}`,
+			`{"thought": "That tool doesn't exist, I'll try something else", "action": "run_workflow", "action_input": "search"}`,
 			`{"thought": "Found templates", "final_answer": "Here are the results."}`,
 		},
 	}
@@ -203,7 +203,7 @@ func TestE2E_AgentUnknownTool(t *testing.T) {
 func TestE2E_AgentMaxIterations(t *testing.T) {
 	responses := make([]string, 5)
 	for i := range responses {
-		responses[i] = `{"thought": "looping", "action": "template_list", "action_input": "search"}`
+		responses[i] = `{"thought": "looping", "action": "run_workflow", "action_input": "search"}`
 	}
 
 	mock := &mockLLMProvider{responses: responses}
@@ -696,7 +696,7 @@ func TestE2E_ChatNodeRegistration(t *testing.T) {
 	registerChatNodes(reg)
 
 	requiredNodes := []string{
-		"template_list", "template_info", "run_workflow", "create_workflow",
+		"run_workflow", "create_workflow",
 		"memory", "compress", "self_update",
 	}
 

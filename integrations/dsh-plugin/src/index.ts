@@ -126,32 +126,4 @@ export function apply(ctx: Context) {
       },
     }),
   )
-
-  ctx.tools.register(
-    defineTool({
-      name: 'aflare_template_list',
-      description: 'List available aflare templates. all=true includes templates that need an LLM provider.',
-      parameters: {
-        all: { type: 'boolean', description: 'Include all difficulty levels (default false)' },
-      },
-      output: { schema: { type: 'json' }, render: renderRun },
-      async execute(args: { all?: boolean }) {
-        return runAflare(args.all ? ['template', 'list', '--all'] : ['template', 'list'])
-      },
-    }),
-  )
-
-  ctx.tools.register(
-    defineTool({
-      name: 'aflare_template_run',
-      description: 'Run a built-in aflare template by ID in one step (no cloning needed), e.g. devops/ssl-cert-checker.',
-      parameters: {
-        id: { type: 'string', required: true, description: 'Template ID from aflare_template_list' },
-      },
-      output: { schema: { type: 'json' }, render: renderRun },
-      async execute(args: { id: string }) {
-        return runAflare(['template', 'run', args.id])
-      },
-    }),
-  )
 }

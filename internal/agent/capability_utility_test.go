@@ -149,13 +149,13 @@ func TestUtilityScore_Dimensions(t *testing.T) {
 		{"completeness very short", "hi"},
 		{"completeness long with structure", "1. first\n2. second\n3. third\nexample: e.g. " + strings.Repeat("x", 600)},
 		{"efficiency hedges", "maybe perhaps might could try not sure about this"},
-		{"efficiency tool", "run_workflow template_list"},
+		{"efficiency tool", "run_workflow create_workflow"},
 		{"efficiency very long", strings.Repeat("a", 2100)},
 		{"safety dangerous", "rm -rf delete remove overwrite"},
 		{"safety confirm and safe", "are you sure confirm safe backup"},
 		{"clarity structured", "## Header\n\nline1\n\nline2\n\n```code```\n\nline3"},
 		{"clarity code block only", "text ```code```"},
-		{"actionability steps", "step 1 first template_list run_workflow ```cmd```"},
+		{"actionability steps", "step 1 first create_workflow run_workflow ```cmd```"},
 		{"actionability input match", "the answer is input here"},
 	}
 

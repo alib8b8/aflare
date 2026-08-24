@@ -468,8 +468,8 @@ func TestHandleRequest_ToolsCall_UnknownTool(t *testing.T) {
 func TestGetTools(t *testing.T) {
 	s := NewServer()
 	tools := s.getTools()
-	if len(tools) != 27 {
-		t.Errorf("expected 27 tools, got %d", len(tools))
+	if len(tools) != 25 {
+		t.Errorf("expected 25 tools, got %d", len(tools))
 	}
 	expectedNames := map[string]bool{
 		"create_workflow":      true,
@@ -484,8 +484,6 @@ func TestGetTools(t *testing.T) {
 		"node_list":            true,
 		"node_info":            true,
 		"history_list":         true,
-		"template_list":        true,
-		"template_render":      true,
 		"memory_store":         true,
 		"memory_retrieve":      true,
 		"memory_search":        true,

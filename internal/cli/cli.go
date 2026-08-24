@@ -146,9 +146,9 @@ func ParseArgs(args []string) (command string, commandArgs []string, safeMode bo
 var knownCommands = []string{
 	"create", "run", "help", "install", "uninstall", "registry", "list",
 	"validate", "review", "version", "self-update", "update", "upgrade",
-	"autoupgrade", "init", "config", "webui", "skills", "schedule", "audit",
-	"serve", "marketplace", "secrets", "resume", "chat", "agent", "template",
-	"install-pack", "watermark", "badge", "doctor", "mcp",
+	"autoupgrade", "init", "config", "webui", "schedule", "audit",
+	"serve", "secrets", "resume", "chat", "agent",
+	"watermark", "doctor", "mcp",
 }
 
 // ValidateCommand checks if the command is recognized.
@@ -178,7 +178,7 @@ func SuggestCommand(command string) []string {
 	}
 	lower := strings.ToLower(command)
 
-	// 1. Exact prefix matches (e.g. "tem" → "template").
+	// 1. Exact prefix matches (e.g. "aut" → "autoupgrade").
 	var prefixMatches []string
 	for _, c := range knownCommands {
 		if strings.HasPrefix(c, lower) {
@@ -289,7 +289,6 @@ func PrintUsage() string {
   aflare chat                            %s
   aflare agent                           %s
   aflare watermark <decode|verify|info>  %s
-  aflare badge <list|show|award>         %s
   aflare mcp                             %s
   aflare help                            %s
 
@@ -325,7 +324,6 @@ func PrintUsage() string {
 		i18n.T("usage.chat"),
 		i18n.T("usage.agent"),
 		i18n.T("usage.watermark"),
-		i18n.T("usage.badge"),
 		i18n.T("usage.mcp"),
 		i18n.T("usage.help"),
 		i18n.T("options"),

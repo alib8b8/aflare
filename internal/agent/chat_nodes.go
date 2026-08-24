@@ -15,13 +15,12 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // chat_nodes.go registers nodes that bridge the chat agent's tools to the
-// project's existing template and workflow functionality. These nodes are
+// project's existing workflow functionality. These nodes are
 // registered in the global registry during chat session initialization
 // so they are discoverable by the ReActAgent.
 //
-// The 300+ templates in the templates/ directory are treated as the agent's
-// skills — the agent can discover them via template_list, inspect them via
-// template_info, and execute them via run_workflow.
+// The agent composes new workflows via create_workflow and executes
+// them — or any workflow file on disk — via run_workflow.
 
 package agent
 
@@ -40,7 +39,6 @@ import (
 	"github.com/alib8b8/aflare/internal/metrics"
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/nodes/core"
-	"github.com/alib8b8/aflare/internal/templates"
 	workflow "github.com/alib8b8/aflare/internal/workflow"
 )
 
@@ -175,234 +173,6 @@ func extractDescription(path string) string {
 	return strings.Join(desc, " ")
 }
 
-// ── TemplateListNode ────────────────────────────────────────────────────
-
-type templateListNode struct{}
-
-func (n *templateListNode) Name() string { return "template_list" }
-func (n *templateListNode) Description() string {
-	return "Search available workflow templates (skills) by keyword or category. Returns 300+ pre-built skills across 17 domains."
-}
-
-func (n *templateListNode) Schema() core.NodeSchema {
-	return core.NodeSchema{
-		Name:        "template_list",
-		Description: "Search available workflow templates (skills) by keyword or category. These are pre-built workflows the agent can run. Use this to find the right skill for the user's request.",
-		Input:       "string - keyword to search for (optional)",
-		Output:      "string - formatted list of matching templates with category, name, and description",
-		Params: []core.ParamSchema{
-			{Name: "keyword", Type: "string", Description: "Keyword to search in template name, description, or category", Required: false},
-			{Name: "category", Type: "string", Description: "Filter by category name (e.g. finance, healthcare, software-engineering)", Required: false},
-		},
-	}
-}
-
-func (n *templateListNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
-	category := core.GetParam(params, "category", "")
-	keyword := core.GetParam(params, "keyword", "")
-	if keyword == "" && input != "" {
-		keyword = input
-	}
-
-	keyword = strings.ToLower(keyword)
-
-	// Scan external templates (the 300+ skills)
-	extTemplates := scanExternalTemplates()
-
-	// Also get built-in templates
-	tm := templates.NewTemplateManager()
-	builtins := tm.List()
-
-	// Merge and filter
-	type entry struct {
-		Name        string
-		Category    string
-		Description string
-		Version     string
-	}
-	var results []entry
-
-	// Add built-in templates
-	for _, t := range builtins {
-		if category != "" && t.Category != category {
-			continue
-		}
-		if keyword != "" && !matchKeyword(t.Name, t.Description, t.Category, keyword) {
-			continue
-		}
-		results = append(results, entry{
-			Name:        t.Name,
-			Category:    t.Category,
-			Description: t.Description,
-			Version:     t.Version,
-		})
-	}
-
-	// Add external templates
-	for _, t := range extTemplates {
-		if category != "" && t.Category != category {
-			continue
-		}
-		if keyword != "" && !matchKeyword(t.Name, t.Description, t.Category, keyword) {
-			continue
-		}
-		results = append(results, entry{
-			Name:        t.Name,
-			Category:    t.Category,
-			Description: t.Description,
-			Version:     "1.0.0",
-		})
-	}
-
-	if len(results) == 0 {
-		if keyword != "" {
-			return fmt.Sprintf("No templates found matching %q. Try a different keyword or use /skills to browse categories.", keyword), nil
-		}
-		return "No templates found.", nil
-	}
-
-	// Limit results
-	if len(results) > 50 {
-		results = results[:50]
-	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Templates (%d found", len(results)))
-	if keyword != "" {
-		sb.WriteString(fmt.Sprintf(" for %q", keyword))
-	}
-	sb.WriteString("):\n\n")
-	sb.WriteString(fmt.Sprintf("%-22s %-22s %s\n", "NAME", "CATEGORY", "DESCRIPTION"))
-	sb.WriteString(strings.Repeat("-", 100))
-	sb.WriteString("\n")
-	for _, t := range results {
-		sb.WriteString(fmt.Sprintf("%-22s %-22s %s\n",
-			truncateStr(t.Name, 22),
-			truncateStr(t.Category, 22),
-			t.Description,
-		))
-	}
-	if len(results) >= 50 {
-		sb.WriteString("\n... (results truncated, use keyword to narrow search)")
-	}
-	sb.WriteString("\n\nUse template_info <name> to see details, run_workflow to execute.")
-
-	return sb.String(), nil
-}
-
-func matchKeyword(name, description, category, keyword string) bool {
-	return strings.Contains(strings.ToLower(name), keyword) ||
-		strings.Contains(strings.ToLower(description), keyword) ||
-		strings.Contains(strings.ToLower(category), keyword)
-}
-
-// ── TemplateInfoNode ────────────────────────────────────────────────────
-
-type templateInfoNode struct{}
-
-func (n *templateInfoNode) Name() string { return "template_info" }
-func (n *templateInfoNode) Description() string {
-	return "Get detailed info about a template including its YAML content and required parameters"
-}
-
-func (n *templateInfoNode) Schema() core.NodeSchema {
-	return core.NodeSchema{
-		Name:        "template_info",
-		Description: "Get detailed info about a specific template. Shows the template's YAML content, parameters, and usage instructions.",
-		Input:       "string - template name (e.g. 'stock-screener' or 'finance/stock-screener')",
-		Output:      "string - template details with YAML content",
-		Params: []core.ParamSchema{
-			{Name: "name", Type: "string", Description: "Template name. Can include category prefix: 'finance/stock-screener'", Required: true},
-		},
-	}
-}
-
-func (n *templateInfoNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
-	name := core.GetParam(params, "name", "")
-	if name == "" {
-		name = input
-	}
-	if name == "" {
-		return "", fmt.Errorf("template name is required")
-	}
-
-	// Handle "category/name" format
-	category := ""
-	if cat, rest, ok := strings.Cut(name, "/"); ok {
-		category = cat
-		name = rest
-	}
-
-	// Try external templates first
-	if info := lookupExternalTemplate(name, category); info != "" {
-		return info, nil
-	}
-
-	// Fall back to built-in templates
-	tm := templates.NewTemplateManager()
-	t, err := tm.Get(name)
-	if err != nil {
-		return "", fmt.Errorf("template not found: %s. Use template_list to see available templates.", name)
-	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Template: %s\n", t.Name))
-	sb.WriteString(fmt.Sprintf("Category: %s\n", t.Category))
-	sb.WriteString(fmt.Sprintf("Version:  %s\n", t.Version))
-	if len(t.Tags) > 0 {
-		sb.WriteString(fmt.Sprintf("Tags:     %s\n", strings.Join(t.Tags, ", ")))
-	}
-	sb.WriteString(fmt.Sprintf("Description: %s\n\n", t.Description))
-
-	if len(t.Variables) > 0 {
-		sb.WriteString("Variables:\n")
-		for _, v := range t.Variables {
-			req := ""
-			if v.Required {
-				req = " (required)"
-			}
-			sb.WriteString(fmt.Sprintf("  - %s: %s%s", v.Name, v.Description, req))
-			if v.Default != "" {
-				sb.WriteString(fmt.Sprintf(" [default: %s]", v.Default))
-			}
-			sb.WriteString("\n")
-		}
-	}
-
-	sb.WriteString("\n--- Template Content ---\n")
-	sb.WriteString(t.Content)
-
-	return sb.String(), nil
-}
-
-// lookupExternalTemplate finds and reads an external template by name/category.
-func lookupExternalTemplate(name, category string) string {
-	extTemplates := scanExternalTemplates()
-	for _, t := range extTemplates {
-		if !strings.EqualFold(t.Name, name) {
-			continue
-		}
-		if category != "" && t.Category != category {
-			continue
-		}
-		data, err := os.ReadFile(t.FilePath)
-		if err != nil {
-			return ""
-		}
-		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Template: %s\n", t.Name))
-		sb.WriteString(fmt.Sprintf("Category: %s\n", t.Category))
-		if t.Description != "" {
-			sb.WriteString(fmt.Sprintf("Description: %s\n", t.Description))
-		}
-		sb.WriteString(fmt.Sprintf("File:     %s\n\n", t.FilePath))
-		sb.WriteString("--- Template Content ---\n")
-		sb.WriteString(string(data))
-		return sb.String()
-	}
-	return ""
-}
-
 // ── RunWorkflowNode ─────────────────────────────────────────────────────
 
 type runWorkflowNode struct{}
@@ -440,7 +210,7 @@ func (n *runWorkflowNode) Execute(ctx context.Context, input string, params map[
 	if templateName != "" {
 		file = resolveTemplatePath(templateName)
 		if file == "" {
-			return "", fmt.Errorf("template not found: %s. Use template_list to see available templates.", templateName)
+			return "", fmt.Errorf("template not found: %s. Use create_workflow to compose a new workflow.", templateName)
 		}
 	}
 
@@ -484,13 +254,7 @@ func (n *runWorkflowNode) Execute(ctx context.Context, input string, params map[
 
 	// Record template usage metric
 	if templateName != "" {
-		source := "external"
-		// Check if it's a built-in template
-		tm := templates.NewTemplateManager()
-		if _, err := tm.Get(templateName); err == nil {
-			source = "builtin"
-		}
-		metrics.RecordTemplateUsage(templateName, source)
+		metrics.RecordTemplateUsage(templateName, "external")
 	}
 
 	return result, nil
@@ -646,8 +410,6 @@ func truncateStr(s string, maxLen int) string {
 
 // registerChatNodes registers the chat-specific nodes in the global registry.
 func registerChatNodes(reg *core.Registry) {
-	reg.Register(&templateListNode{})
-	reg.Register(&templateInfoNode{})
 	reg.Register(&runWorkflowNode{})
 	reg.Register(&createWorkflowNode{})
 	reg.Register(&selfUpdateNode{})

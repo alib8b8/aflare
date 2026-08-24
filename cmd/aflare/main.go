@@ -191,8 +191,6 @@ func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, sa
 		err = cli.HandleInit(args)
 	case "config":
 		err = cli.HandleConfig(args)
-	case "skills":
-		err = cli.HandleSkills(args)
 	case "-h", "--help", "help":
 		fmt.Println(cli.PrintUsage())
 	case "webui":
@@ -203,8 +201,6 @@ func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, sa
 		err = cli.HandleAudit(args)
 	case "serve":
 		err = cli.HandleServe(args)
-	case "marketplace":
-		err = cli.HandleMarketplace(args)
 	case "secrets":
 		err = cli.HandleSecrets(args)
 	case "resume":
@@ -213,14 +209,8 @@ func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, sa
 		err = cli.HandleChat(args)
 	case "agent":
 		err = cli.HandleAgent(args)
-	case "template":
-		err = cli.HandleTemplateSubmit(args, dryRun, safeMode)
-	case "install-pack":
-		err = cli.HandleInstallPack(args)
 	case "watermark":
 		err = cli.HandleWatermark(args)
-	case "badge":
-		err = cli.HandleBadge(args)
 	case "mcp":
 		// 子命令入口与 --mcp-server flag 等价，文档（docs/mcp.md、docs/dsh.md）
 		// 与 DSH 集成配置均使用 `aflare mcp` 形式；无参数时行为不变，

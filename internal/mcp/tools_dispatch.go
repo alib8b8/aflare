@@ -78,10 +78,6 @@ func (s *Server) callExtendedTool(params *toolCallParams) (*toolCallResult, erro
 			r.res, r.err = s.toolNodeInfo(params.Arguments)
 		case "history_list":
 			r.res, r.err = s.toolHistoryList(params.Arguments)
-		case "template_list":
-			r.res, r.err = s.toolTemplateList(params.Arguments)
-		case "template_render":
-			r.res, r.err = s.toolTemplateRender(params.Arguments)
 		// Memory tools
 		case "memory_store":
 			r.res, r.err = s.toolMemoryStore(params.Arguments)

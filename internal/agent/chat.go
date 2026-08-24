@@ -34,7 +34,7 @@ import (
 // DefaultTools is the default tool set for the chat agent.
 // Safe by default: no execute, no file_write.
 var DefaultTools = []string{
-	"template_list", "template_info", "run_workflow", "create_workflow",
+	"run_workflow", "create_workflow",
 	"memory_store", "memory_retrieve", "memory_search",
 	"fetch_url", "http_request", "file_read", "json_parse",
 	"transform", "combine", "template",
@@ -376,7 +376,7 @@ func (s *ChatSession) handleCommand(cmd string) {
 	case "/help", "/h":
 		fmt.Println("Commands:")
 		fmt.Println("  /help, /h      Show this help")
-		fmt.Println("  /skills        List skill categories (300+ templates)")
+		fmt.Println("  /skills        List installed workflow categories")
 		fmt.Println("  /tools         List available tools")
 		fmt.Println("  /capabilities  List active capabilities")
 		fmt.Println("  /history       Show conversation state")

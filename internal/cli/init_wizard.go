@@ -129,7 +129,7 @@ func runInitWizard() error {
 
 	fmt.Println()
 	fmt.Println("试试这个不需要 LLM 的模板：")
-	fmt.Println("  aflare template list            # 查看可用模板")
+	fmt.Println("  aflare create                  # 创建工作流")
 	fmt.Println()
 	fmt.Println("或者启动 Agent 对话：")
 	fmt.Println("  aflare chat")

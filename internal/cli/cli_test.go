@@ -1140,7 +1140,6 @@ func TestParseArgs_ValidateCommandAfterParse(t *testing.T) {
 		{"autoupgrade", "check"},
 		{"serve"},
 		{"audit"},
-		{"skills"},
 		{"schedule"},
 		{"list"},
 		{"init"},
@@ -1538,7 +1537,7 @@ func TestValidateCommand_AllKnownCommands(t *testing.T) {
 		"create", "run", "help", "-h", "--help", "install", "uninstall",
 		"registry", "list", "validate", "review", "version", "--version", "-v",
 		"self-update", "update", "autoupgrade", "au", "init", "webui",
-		"skills", "schedule", "audit", "serve",
+		"schedule", "audit", "serve",
 	}
 	for _, cmd := range allCommands {
 		if err := ValidateCommand(cmd); err != nil {

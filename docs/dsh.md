@@ -5,7 +5,7 @@ aflare integrates with [DeepSeek Harness](https://github.com/deepseek-ai/deepsee
 
 - **Option A — MCP bridge (zero code):** DSH ships a built-in MCP client
   (`@deepseek-ai/dsh-mcp-client`). aflare already runs a stdio MCP server
-  (`aflare mcp`), so a single `cordis.yml` entry exposes all 27 aflare tools
+  (`aflare mcp`), so a single `cordis.yml` entry exposes all 25 aflare tools
   to the DSH agent as `mcp__aflare__<tool>`.
 - **Option B — native Cordis plugin (TypeScript):** the plugin skeleton in
   [`integrations/dsh-plugin/`](../integrations/dsh-plugin/) registers curated
@@ -61,7 +61,7 @@ List my available aflare tools, then call the aflare version tool.
 ```
 
 The model should see `mcp__aflare__list_nodes`, `mcp__aflare__run_workflow_yaml`,
-`mcp__aflare__template_list`, `mcp__aflare__memory_search`, and the rest of the
+`mcp__aflare__memory_search`, and the rest of the
 [MCP tool set](mcp.md#available-tools). Two tools make a good smoke test:
 
 - `mcp__aflare__list_nodes` — discover the 20+ workflow nodes
@@ -113,7 +113,7 @@ Install the aflare MCP server for me, step by step:
 
 See [`integrations/dsh-plugin/`](../integrations/dsh-plugin/) for a TypeScript
 Cordis plugin that registers curated tools (`aflare_run`, `aflare_generate`,
-`aflare_template_run`, ...) backed by the `aflare` CLI. Choose this when you
+...) backed by the `aflare` CLI. Choose this when you
 want the tools to appear as native DSH tools (no `mcp__` prefix, full
 Trajectory integration) or plan to publish to npm.
 
@@ -122,7 +122,7 @@ Trajectory integration) or plan to publish to npm.
 | | Option A (MCP) | Option B (plugin) |
 |---|---|---|
 | Setup effort | One YAML entry | Clone + build (or npm install once published) |
-| Tool surface | All 27 MCP tools | Curated subset, tuned prompts |
+| Tool surface | All 25 MCP tools | Curated subset, tuned prompts |
 | Naming | `mcp__aflare__*` | `aflare_*` |
 | Maintenance | None (tracks `aflare mcp`) | Plugin repo, but survives DSH MCP changes |
 

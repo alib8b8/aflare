@@ -49,18 +49,11 @@ function fakeExec(): ToolRunContext {
   } as unknown as ToolRunContext
 }
 
-test('apply registers the six aflare tools', () => {
+test('apply registers the four aflare tools', () => {
   const defs = registerAll()
   assert.deepEqual(
     defs.map((d) => d.name),
-    [
-      'aflare_version',
-      'aflare_generate',
-      'aflare_validate',
-      'aflare_run',
-      'aflare_template_list',
-      'aflare_template_run',
-    ],
+    ['aflare_version', 'aflare_generate', 'aflare_validate', 'aflare_run'],
   )
   for (const d of defs) {
     assert.ok(d.description.length > 20, `${d.name} needs a model-facing description`)
