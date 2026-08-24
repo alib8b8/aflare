@@ -229,7 +229,7 @@ func compressExtract(text string, cfg Config) Result {
 }
 
 func compressKeyword(text string, cfg Config) Result {
-	keywords := ExtractKeywords(text, 20)
+	keywords, _ := ExtractKeywords(text, 20) // constant topN, always within maxKeywords
 
 	sentences := splitSentences(text)
 	targetSentences := max(1, int(float64(len(sentences))*cfg.TargetRatio))
@@ -457,7 +457,15 @@ func scoreSentence(sentence string, wordFreq map[string]int, cfg Config) float64
 	return score
 }
 
-func ExtractKeywords(text string, topN int) []string {
+// maxKeywords caps the user-provided topN in ExtractKeywords so the result
+// slice is never sized by an unbounded request.
+const maxKeywords = 1 << 20 // 1M keywords, far beyond any real vocabulary
+
+func ExtractKeywords(text string, topN int) ([]string, error) {
+	if topN > maxKeywords {
+		return nil, fmt.Errorf("keyword count too large (max %d)", maxKeywords)
+	}
+
 	sentences := splitSentences(text)
 	freq := buildWordFrequency(sentences)
 
@@ -475,12 +483,12 @@ func ExtractKeywords(text string, topN int) []string {
 		return scores[i].score > scores[j].score
 	})
 
-	n := min(topN, len(scores))
+	n := max(0, min(topN, len(scores)))
 	keywords := make([]string, n)
 	for i := 0; i < n; i++ {
 		keywords[i] = scores[i].word
 	}
-	return keywords
+	return keywords, nil
 }
 
 func makeCacheKey(text string, cfg Config) string {

@@ -370,14 +370,14 @@ func evalFileContents(name string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("file path validation failed: %w", err)
 	}
-	info, err := os.Stat(safePath)
+	info, err := os.Stat(safePath) // codeql[go/path-injection] -- safePath is the validateExprFilePath result: rejects absolute paths, resolves symlinks, confines the file under the working directory
 	if err != nil {
 		return "", fmt.Errorf("failed to stat file '%s': %w", name, err)
 	}
 	if info.Size() > maxExprFileSize {
 		return "", fmt.Errorf("file '%s' too large (max %d bytes)", name, maxExprFileSize)
 	}
-	content, err := os.ReadFile(safePath) // #nosec G304 -- path validated by validateExprFilePath
+	content, err := os.ReadFile(safePath) // #nosec G304 -- path validated by validateExprFilePath // codeql[go/path-injection] -- safePath is the validateExprFilePath result (absolute/traversal/symlink escape rejected)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file '%s': %w", name, err)
 	}

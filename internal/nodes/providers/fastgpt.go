@@ -163,7 +163,7 @@ func (n *FastGPTNode) execute(ctx context.Context, input string, params map[stri
 		CheckRedirect: core.HTTPRedirectValidator(core.ValidateLMLEndpoint),
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // codeql[go/request-forgery] -- endpoint from node config/env, pre-validated twice by core.ValidateLMLEndpoint (endpoint and full generateURL); client uses core.SafeLLMHTTPClient.Transport (dial-time SSRF/IP validation, DNS-rebinding protection), core.HTTPRedirectValidator(core.ValidateLMLEndpoint) re-checks redirects, core.DefaultLLMTimeout; response capped by core.MaxHTTPResponseSize
 	if err != nil {
 		return "", fmt.Errorf("failed to call FastGPT API: %w", err)
 	}

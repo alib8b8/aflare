@@ -123,7 +123,7 @@ func (n *CodeInterpreterNode) Execute(ctx context.Context, input string, params 
 		workDir = safeWorkDir
 	}
 
-	if err := os.MkdirAll(workDir, 0755); err != nil {
+	if err := os.MkdirAll(workDir, 0755); err != nil { // codeql[go/path-injection] -- workDir is either a fresh os.MkdirTemp dir or the validateWritePath-sanitized params["work_dir"]
 		return "", fmt.Errorf("failed to create work dir: %w", err)
 	}
 
@@ -208,7 +208,7 @@ func bwrapInstallHint() string {
 
 func runPython(ctx context.Context, code, workDir string, timeout time.Duration, stdin string, allowNetwork bool) (string, error) {
 	scriptPath := filepath.Join(workDir, "script.py")
-	if err := os.WriteFile(scriptPath, []byte(code), 0644); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(code), 0644); err != nil { // codeql[go/path-injection] -- scriptPath = filepath.Join(workDir, "script.py"); workDir came from validateWritePath in Execute (or MkdirTemp)
 		return "", fmt.Errorf("failed to write script: %w", err)
 	}
 
@@ -232,7 +232,7 @@ urllib.request.urlopen = _block_urlopen
 	}
 
 	finalCode := networkDisabledCode + code
-	if err := os.WriteFile(scriptPath, []byte(finalCode), 0644); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(finalCode), 0644); err != nil { // codeql[go/path-injection] -- scriptPath = filepath.Join(workDir, "script.py"); workDir came from validateWritePath in Execute (or MkdirTemp)
 		return "", fmt.Errorf("failed to write script: %w", err)
 	}
 
@@ -261,7 +261,7 @@ urllib.request.urlopen = _block_urlopen
 		cmd = exec.CommandContext(ctx, bwrap, args...) // #nosec G204 -- sandboxed/audited execution with internally generated paths
 	} else {
 		logger.Warn("bwrap not found, running python without sandbox isolation")
-		cmd = exec.CommandContext(ctx, "python3", scriptPath) // #nosec G204 -- sandboxed/audited execution with internally generated paths
+		cmd = exec.CommandContext(ctx, "python3", scriptPath) // #nosec G204 -- sandboxed/audited execution with internally generated paths // codeql[go/command-injection] -- executing user code is the code_interpreter node's function; mitigations: bwrap sandbox (ro-bind fs, --unshare-all, --unshare-net unless network=true), context.WithTimeout (5-120s by security level), MkdirTemp workDir, python network-block prologue; this no-bwrap fallback only runs below L2 (checkSandbox enforces bwrap at L2+)
 	}
 	cmd.Dir = workDir
 	cmd.Stdin = strings.NewReader(stdin)
@@ -316,7 +316,7 @@ require('https').get = _blockNet;
 	}
 
 	finalCode := networkDisabledCode + code
-	if err := os.WriteFile(scriptPath, []byte(finalCode), 0644); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(finalCode), 0644); err != nil { // codeql[go/path-injection] -- scriptPath = filepath.Join(workDir, "script.js"); workDir came from validateWritePath in Execute (or MkdirTemp)
 		return "", fmt.Errorf("failed to write script: %w", err)
 	}
 
@@ -348,7 +348,7 @@ require('https').get = _blockNet;
 		cmd = exec.CommandContext(ctx, bwrap, args...) // #nosec G204 -- sandboxed/audited execution with internally generated paths
 	} else {
 		logger.Warn("bwrap not found, running node without sandbox isolation")
-		cmd = exec.CommandContext(ctx, "node", scriptPath) // #nosec G204 -- sandboxed/audited execution with internally generated paths
+		cmd = exec.CommandContext(ctx, "node", scriptPath) // #nosec G204 -- sandboxed/audited execution with internally generated paths // codeql[go/command-injection] -- executing user code is the code_interpreter node's function; mitigations: bwrap sandbox (ro-bind fs, --unshare-all, --unshare-net unless network=true), context.WithTimeout (5-120s by security level), MkdirTemp workDir, node network-block prologue (fetch/http/https disabled); this no-bwrap fallback only runs below L2 (checkSandbox enforces bwrap at L2+)
 	}
 	cmd.Dir = workDir
 	cmd.Stdin = strings.NewReader(stdin)
@@ -402,7 +402,7 @@ mod net_block {
 	}
 
 	finalCode := networkCrateBlock + code
-	if err := os.WriteFile(srcPath, []byte(finalCode), 0644); err != nil {
+	if err := os.WriteFile(srcPath, []byte(finalCode), 0644); err != nil { // codeql[go/path-injection] -- srcPath = filepath.Join(workDir, "main.rs"); workDir came from validateWritePath in Execute (or MkdirTemp)
 		return "", fmt.Errorf("failed to write source: %w", err)
 	}
 
@@ -414,7 +414,7 @@ mod net_block {
 	if bwrap, err := exec.LookPath("bwrap"); err == nil {
 		roBinds := []string{}
 		for _, p := range []string{"/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc/ld.so.cache", "/etc/alternatives", filepath.Dir(srcPath)} {
-			if _, err := os.Stat(p); err == nil {
+			if _, err := os.Stat(p); err != nil { // codeql[go/path-injection] -- p is a system-dir constant or filepath.Dir(srcPath); srcPath derives from workDir already validated by validateWritePath
 				roBinds = append(roBinds, "--ro-bind", p, p)
 			}
 		}
@@ -479,7 +479,7 @@ mod net_block {
 		runCmd = exec.CommandContext(runCtx, bwrap, args...) // #nosec G204 -- sandboxed/audited execution with internally generated paths
 	} else {
 		logger.Warn("bwrap not found, running rust binary without sandbox isolation")
-		runCmd = exec.CommandContext(runCtx, binPath) // #nosec G204 -- sandboxed/audited execution with internally generated paths
+		runCmd = exec.CommandContext(runCtx, binPath) // #nosec G204 -- sandboxed/audited execution with internally generated paths // codeql[go/command-injection] -- binPath is the rustc-compiled artifact inside the MkdirTemp/validateWritePath workDir, not a user-supplied command; mitigations: bwrap sandbox (ro-bind fs, --unshare-all, --unshare-net unless network=true), run timeout via context.WithTimeout; this no-bwrap fallback only runs below L2 (checkSandbox enforces bwrap at L2+)
 	}
 	runCmd.Dir = workDir
 	runCmd.Stdin = strings.NewReader(stdin)
@@ -517,7 +517,7 @@ mod net_block {
 
 func listGeneratedFiles(dir string) ([]string, error) {
 	var files []string
-	entries, err := os.ReadDir(dir)
+	entries, err := os.ReadDir(dir) // codeql[go/path-injection] -- dir is the code_interpreter workDir, validated by validateWritePath in Execute (or a fresh MkdirTemp dir); sole production caller
 	if err != nil {
 		return nil, err
 	}

@@ -27,7 +27,7 @@ import (
 )
 
 // HandleWatermark handles the "watermark" command.
-// Subcommands: decode, verify, info, encode-source, decode-source, strip-source
+// Subcommands: decode, verify, info, encode-source, check-source, decode-source, strip-source
 func HandleWatermark(args []string) {
 	if len(args) == 0 {
 		fmt.Println(watermark.Info())
@@ -67,6 +67,16 @@ func HandleWatermark(args []string) {
 			os.Exit(1)
 		}
 
+	case "check-source":
+		if len(args) >= 2 && args[1] == "--all" {
+			handleWatermarkCheckSourceAll(".")
+		} else {
+			fmt.Println("Usage: aflare watermark check-source --all")
+			fmt.Println("       Verifies every .go file of the repository carries a source")
+			fmt.Println("       watermark. Exits non-zero listing files that lack one.")
+			os.Exit(1)
+		}
+
 	case "decode-source":
 		if len(args) < 2 {
 			fmt.Println("Usage: aflare watermark decode-source <file>")
@@ -89,6 +99,7 @@ func HandleWatermark(args []string) {
 		fmt.Println("  info                 — show watermark system info")
 		fmt.Println("  encode-source <file> — embed source-code watermark in Go file")
 		fmt.Println("  encode-source --all  — embed source-code watermark in every .go file")
+		fmt.Println("  check-source --all   — verify every .go file carries a watermark")
 		fmt.Println("  decode-source <file> — extract source-code watermark")
 		fmt.Println("  strip-source <file>  — remove source-code watermark")
 		os.Exit(1)
@@ -113,14 +124,11 @@ func sourceWatermarkSkipDir(name string) bool {
 	return false
 }
 
-// encodeSourceAll walks root recursively and embeds an invisible source
-// watermark in every .go file that does not already carry one. Files are
-// rewritten in place with their permissions preserved. Errors abort the
-// walk and are returned; files processed before the error stay watermarked
-// (the command is idempotent — re-running skips already-marked files).
-func encodeSourceAll(root string) (encodeSourceAllResult, error) {
-	var res encodeSourceAllResult
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+// walkGoFiles walks root recursively, skipping excluded directories, and
+// calls visit for every .go file with its path and current content. Returning
+// an error from visit aborts the walk.
+func walkGoFiles(root string, visit func(path, src string) error) error {
+	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -137,12 +145,23 @@ func encodeSourceAll(root string) (encodeSourceAllResult, error) {
 		if err != nil {
 			return fmt.Errorf("read %s: %w", path, err)
 		}
-		src := string(data)
+		return visit(path, string(data))
+	})
+}
+
+// encodeSourceAll walks root recursively and embeds an invisible source
+// watermark in every .go file that does not already carry one. Files are
+// rewritten in place with their permissions preserved. Errors abort the
+// walk and are returned; files processed before the error stay watermarked
+// (the command is idempotent — re-running skips already-marked files).
+func encodeSourceAll(root string) (encodeSourceAllResult, error) {
+	var res encodeSourceAllResult
+	err := walkGoFiles(root, func(path, src string) error {
 		if watermark.HasSourceWatermark(src) {
 			res.Skipped++
 			return nil
 		}
-		info, err := d.Info()
+		info, err := os.Stat(path)
 		if err != nil {
 			return fmt.Errorf("stat %s: %w", path, err)
 		}
@@ -153,6 +172,39 @@ func encodeSourceAll(root string) (encodeSourceAllResult, error) {
 		return nil
 	})
 	return res, err
+}
+
+// checkSourceAll walks root recursively and returns the paths of every
+// eligible .go file that does not carry a valid source watermark. It never
+// modifies files — the exit code alone tells CI whether coverage is complete.
+func checkSourceAll(root string) ([]string, error) {
+	var missing []string
+	err := walkGoFiles(root, func(path, src string) error {
+		if !watermark.HasSourceWatermark(src) {
+			missing = append(missing, path)
+		}
+		return nil
+	})
+	return missing, err
+}
+
+// handleWatermarkCheckSourceAll fails (exit 1) when any eligible .go file
+// under root lacks a source watermark, listing the offenders.
+func handleWatermarkCheckSourceAll(root string) {
+	missing, err := checkSourceAll(root)
+	if err != nil {
+		fmt.Printf("Error checking source watermarks: %v\n", err)
+		os.Exit(1)
+	}
+	if len(missing) > 0 {
+		fmt.Printf("✗ %d Go file(s) missing a source watermark:\n", len(missing))
+		for _, p := range missing {
+			fmt.Printf("  %s\n", p)
+		}
+		fmt.Println("Run: aflare watermark encode-source --all")
+		os.Exit(1)
+	}
+	fmt.Println("✓ All Go files carry a source watermark")
 }
 
 // handleWatermarkEncodeSourceAll watermarks every eligible .go file under root.

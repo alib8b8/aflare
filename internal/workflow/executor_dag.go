@@ -641,7 +641,10 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 		return sm.GetSecret(group, key)
 	})
 
-	globalLimiter := NewConcurrencyLimiter(wf.MaxConcurrency)
+	globalLimiter, err := NewConcurrencyLimiter(wf.MaxConcurrency)
+	if err != nil {
+		return "", nil, trace, err
+	}
 	initialInput := ""
 	// Branch sub-workflows (if then/else) seed their initial input via context.
 	if v, ok := ctx.Value(ifInputKey).(string); ok {
@@ -752,28 +755,28 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 	if wStep.IsLoop() {
 		// loop 用独立 engine；DAG 下 loop 的 {{step.X}} 引用无法访问主 workflow 步骤输出。
 		loopEngine := NewExpressionEngine()
-		_, output, execErr = executeLoopStep(ctx, 0, wStep, input, loopEngine, reg, nil, NewConcurrencyLimiter(0))
+		_, output, execErr = executeLoopStep(ctx, 0, wStep, input, loopEngine, reg, nil, nil)
 		attemptsMade = 1
 		return
 	}
 	if wStep.IsParallel() {
 		// parallel 自带预求值机制，用独立 engine。
 		parEngine := NewExpressionEngine()
-		_, output, execErr = executeParallelStep(ctx, 0, wStep, input, parEngine, reg, nil, NewConcurrencyLimiter(0))
+		_, output, execErr = executeParallelStep(ctx, 0, wStep, input, parEngine, reg, nil, nil)
 		attemptsMade = 1
 		return
 	}
 	if wStep.IsMap() {
 		// map 用独立 engine；{{item}}/{{index}} 在迭代内生效。
 		mapEngine := NewExpressionEngine()
-		_, output, execErr = executeMapStep(ctx, 0, wStep, input, mapEngine, reg, nil, NewConcurrencyLimiter(0))
+		_, output, execErr = executeMapStep(ctx, 0, wStep, input, mapEngine, reg, nil, nil)
 		attemptsMade = 1
 		return
 	}
 	if wStep.IsReduce() {
 		// reduce 用独立 engine；{{loop.acc}}/{{loop.item}} 在迭代内生效。
 		reduceEngine := NewExpressionEngine()
-		_, output, execErr = executeReduceStep(ctx, 0, wStep, input, reduceEngine, reg, nil, NewConcurrencyLimiter(0))
+		_, output, execErr = executeReduceStep(ctx, 0, wStep, input, reduceEngine, reg, nil, nil)
 		attemptsMade = 1
 		return
 	}
@@ -782,7 +785,7 @@ func executeDAGStep(ctx context.Context, wStep WorkflowStep, input string, param
 		// DAG 下 saga 的 {{step.X}} 引用无法访问主 workflow 步骤输出，
 		// 与其他复合步骤一致，应通过 input 传递数据。
 		sagaEngine := NewExpressionEngine()
-		_, output, execErr = executeSagaStep(ctx, 0, wStep, input, sagaEngine, reg, nil, NewConcurrencyLimiter(0))
+		_, output, execErr = executeSagaStep(ctx, 0, wStep, input, sagaEngine, reg, nil, nil)
 		attemptsMade = 1
 		return
 	}

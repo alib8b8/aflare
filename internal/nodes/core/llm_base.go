@@ -696,7 +696,7 @@ func (n *OpenAICompatibleNode) execute(ctx context.Context, input string, params
 		CheckRedirect: HTTPRedirectValidator(ValidateLMLEndpoint),
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // codeql[go/request-forgery] -- LLM endpoint comes from trusted provider config and is pre-validated by ValidateLMLEndpoint (scheme/userinfo/host + resolved-IP checks); client uses SafeLLMHTTPClient.Transport (dial-time SSRF/IP validation, DNS-rebinding protection), HTTPRedirectValidator(ValidateLMLEndpoint) re-checks redirects, DefaultLLMTimeout; response body capped by MaxHTTPResponseSize
 	if err != nil {
 		tel.ErrText = err.Error()
 		return "", aferrors.Wrapf(err, aferrors.CodeLLMProviderFailed, "failed to call %s API", n.config.ProviderName)
@@ -821,7 +821,7 @@ func (n *OpenAICompatibleNode) doUpstreamCall(ctx context.Context, generateURL s
 		CheckRedirect: HTTPRedirectValidator(ValidateLMLEndpoint),
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // codeql[go/request-forgery] -- LLM endpoint comes from trusted provider config and is pre-validated by ValidateLMLEndpoint (scheme/userinfo/host + resolved-IP checks); client uses SafeLLMHTTPClient.Transport (dial-time SSRF/IP validation, DNS-rebinding protection), HTTPRedirectValidator(ValidateLMLEndpoint) re-checks redirects, DefaultLLMTimeout; response body capped by MaxHTTPResponseSize
 	if err != nil {
 		err = aferrors.Wrapf(err, aferrors.CodeLLMProviderFailed, "failed to call %s API", n.config.ProviderName)
 		return llmUpstreamResult{err: err, errText: err.Error()}
@@ -1093,7 +1093,9 @@ func applyLLMRequestParams(req *LLMRequest, params map[string]string) error {
 	if v, ok := params["tool_choice"]; ok && v != "" {
 		// Accept bare "none"/"auto" strings or a JSON object.
 		if v == "none" || v == "auto" {
-			req.ToolChoice = json.RawMessage(`"` + v + `"`)
+			// strconv.Quote emits a valid JSON string literal, so v can
+			// never break out of the quoted context.
+			req.ToolChoice = json.RawMessage(strconv.Quote(v))
 		} else {
 			// Validate it parses as JSON; store raw.
 			var probe json.RawMessage
@@ -1226,7 +1228,7 @@ func (n *OpenAICompatibleNode) CallWithTools(ctx context.Context, messages []LLM
 		CheckRedirect: HTTPRedirectValidator(ValidateLMLEndpoint),
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // codeql[go/request-forgery] -- LLM endpoint comes from trusted provider config and is pre-validated by ValidateLMLEndpoint (scheme/userinfo/host + resolved-IP checks); client uses SafeLLMHTTPClient.Transport (dial-time SSRF/IP validation, DNS-rebinding protection), HTTPRedirectValidator(ValidateLMLEndpoint) re-checks redirects, DefaultLLMTimeout; response body capped by MaxHTTPResponseSize
 	if err != nil {
 		return nil, aferrors.Wrapf(err, aferrors.CodeLLMProviderFailed, "failed to call %s API", n.config.ProviderName)
 	}
@@ -1309,7 +1311,7 @@ func (n *OpenAICompatibleNode) CallWithToolsStream(ctx context.Context, messages
 		CheckRedirect: HTTPRedirectValidator(ValidateLMLEndpoint),
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // codeql[go/request-forgery] -- LLM endpoint comes from trusted provider config and is pre-validated by ValidateLMLEndpoint (scheme/userinfo/host + resolved-IP checks); client uses SafeLLMHTTPClient.Transport (dial-time SSRF/IP validation, DNS-rebinding protection), HTTPRedirectValidator(ValidateLMLEndpoint) re-checks redirects, DefaultLLMTimeout; response body capped by MaxHTTPResponseSize
 	if err != nil {
 		return nil, aferrors.Wrapf(err, aferrors.CodeLLMProviderFailed, "failed to call %s API", n.config.ProviderName)
 	}

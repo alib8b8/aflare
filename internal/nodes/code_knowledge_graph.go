@@ -131,7 +131,7 @@ func (n *CodeKnowledgeGraphNode) Execute(ctx context.Context, input string, para
 		return "", fmt.Errorf("path validation failed: %w", err)
 	}
 
-	info, err := os.Stat(safePath)
+	info, err := os.Stat(safePath) // codeql[go/path-injection] -- safePath is the validateReadPath result; SafeJoinPath blocks absolute/traversal/symlink escape
 	if err != nil {
 		return "", fmt.Errorf("failed to stat path: %w", err)
 	}

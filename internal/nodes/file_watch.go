@@ -246,7 +246,7 @@ func parseIntWithDefault(s string, defaultVal int) (int, error) {
 func snapshotPath(rootPath, userPath, pattern string) (map[string]fileMeta, error) {
 	result := make(map[string]fileMeta)
 
-	info, err := os.Lstat(rootPath)
+	info, err := os.Lstat(rootPath) // codeql[go/path-injection] -- rootPath is the safePath produced by validateReadPath in Execute (the only production caller)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// 路径不存在：返回空快照，后续轮询中可能出现 create 事件

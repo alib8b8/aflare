@@ -126,7 +126,7 @@ func (n *OllamaNode) execute(ctx context.Context, input string, params map[strin
 		CheckRedirect: core.HTTPRedirectValidator(core.ValidateLMLEndpoint),
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // codeql[go/request-forgery] -- endpoint from node config, pre-validated by core.ValidateLMLEndpoint (loopback allowed for local Ollama servers, private/link-local/metadata ranges still blocked); client uses core.SafeLLMHTTPClient.Transport (dial-time SSRF/IP validation, DNS-rebinding protection), core.HTTPRedirectValidator(core.ValidateLMLEndpoint) re-checks redirects, core.DefaultLLMTimeout
 	if err != nil {
 		return "", fmt.Errorf("ollama not running, please start it first (check endpoint configuration): %w", err)
 	}

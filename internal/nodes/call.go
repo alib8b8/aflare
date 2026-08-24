@@ -96,7 +96,7 @@ func (n *CallNode) Execute(ctx context.Context, input string, params map[string]
 	}
 	childCtx := context.WithValue(ctx, callDepthKey, depth+1)
 
-	data, err := os.ReadFile(workflowPath) // #nosec G304 -- workflow path from trusted config
+	data, err := os.ReadFile(workflowPath) // #nosec G304 -- workflow path from trusted config // codeql[go/path-injection] -- workflowPath was reassigned from the validateReadPath result above; SafeJoinPath blocks absolute/traversal/symlink escape
 	if err != nil {
 		return "", fmt.Errorf("failed to read workflow file %q: %w", workflowPath, err)
 	}

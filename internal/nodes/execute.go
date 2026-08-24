@@ -156,9 +156,9 @@ func (n *ExecuteNode) Execute(ctx context.Context, input string, params map[stri
 
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		cmd = exec.CommandContext(ctx, "cmd.exe", "/c", command) // #nosec G204 -- command is audited and timeout-capped
+		cmd = exec.CommandContext(ctx, "cmd.exe", "/c", command) // #nosec G204 -- command is audited and timeout-capped // codeql[go/command-injection] -- executing user commands is the execute node's function; mitigations: SafeCommandWhitelist first-word allowlist, shellMetachars block, sed/awk -i/-f block, fail-closed auditLog, timeout capped at 30m, 4096-char command cap; disabled in safe mode
 	} else {
-		cmd = exec.CommandContext(ctx, "sh", "-c", command) // #nosec G204 -- command is audited and timeout-capped
+		cmd = exec.CommandContext(ctx, "sh", "-c", command) // #nosec G204 -- command is audited and timeout-capped // codeql[go/command-injection] -- executing user commands is the execute node's function; mitigations: SafeCommandWhitelist first-word allowlist, shellMetachars block, sed/awk -i/-f block, fail-closed auditLog, timeout capped at 30m, 4096-char command cap; disabled in safe mode
 	}
 
 	output, err := cmd.CombinedOutput()

@@ -255,7 +255,7 @@ func (n *DocParseNode) callOCRAPI(ctx context.Context, endpoint, apiKey, imageBa
 		CheckRedirect: httpRedirectValidator(validateURL),
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // codeql[go/request-forgery] -- OCR endpoint from node config, pre-validated by validateURL (SSRF: scheme/userinfo/localhost/IP-range checks); client uses safeHTTPClient.Transport (dial-time IP validation, DNS-rebinding protection), httpRedirectValidator(validateURL) re-checks redirects, 60s timeout; response capped by maxDocParseSize
 	if err != nil {
 		return "", fmt.Errorf("OCR API request failed: %w", err)
 	}
@@ -325,7 +325,7 @@ func downloadAsBase64(ctx context.Context, rawURL string) (string, error) {
 		CheckRedirect: httpRedirectValidator(validateURL),
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // codeql[go/request-forgery] -- downloading a user-specified URL is doc_parse's function; rawURL pre-validated by validateURL (SSRF: scheme/userinfo/localhost/IP-range checks); client uses safeHTTPClient.Transport (dial-time IP validation, DNS-rebinding protection), httpRedirectValidator(validateURL) re-checks redirects, 30s timeout; response capped by maxDocParseSize
 	if err != nil {
 		return "", fmt.Errorf("failed to download URL: %w", err)
 	}

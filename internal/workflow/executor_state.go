@@ -395,13 +395,22 @@ type ConcurrencyLimiter struct {
 	sem chan struct{}
 }
 
+// maxConcurrencySlots bounds the max argument of NewConcurrencyLimiter: the
+// value comes from workflow config (max_concurrency) and sizes the channel
+// buffer directly.
+const maxConcurrencySlots = 1 << 20 // 1M slots, far beyond any real workload
+
 // NewConcurrencyLimiter creates a limiter with the given max concurrency.
-// If max <= 0, returns nil (unlimited).
-func NewConcurrencyLimiter(max int) *ConcurrencyLimiter {
+// If max <= 0, returns nil (unlimited). It returns an error when max
+// exceeds maxConcurrencySlots.
+func NewConcurrencyLimiter(max int) (*ConcurrencyLimiter, error) {
 	if max <= 0 {
-		return nil
+		return nil, nil
 	}
-	return &ConcurrencyLimiter{sem: make(chan struct{}, max)}
+	if max > maxConcurrencySlots {
+		return nil, fmt.Errorf("concurrency limit too large (max %d)", maxConcurrencySlots)
+	}
+	return &ConcurrencyLimiter{sem: make(chan struct{}, max)}, nil
 }
 
 // Acquire blocks until a slot is available. No-op if limiter is nil.

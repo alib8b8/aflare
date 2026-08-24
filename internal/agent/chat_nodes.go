@@ -256,7 +256,7 @@ func (n *templateListNode) Execute(ctx context.Context, input string, params map
 
 	if len(results) == 0 {
 		if keyword != "" {
-			return fmt.Sprintf("No templates found matching '%s'. Try a different keyword or use /skills to browse categories.", keyword), nil
+			return fmt.Sprintf("No templates found matching %q. Try a different keyword or use /skills to browse categories.", keyword), nil
 		}
 		return "No templates found.", nil
 	}
@@ -269,7 +269,7 @@ func (n *templateListNode) Execute(ctx context.Context, input string, params map
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Templates (%d found", len(results)))
 	if keyword != "" {
-		sb.WriteString(fmt.Sprintf(" for '%s'", keyword))
+		sb.WriteString(fmt.Sprintf(" for %q", keyword))
 	}
 	sb.WriteString("):\n\n")
 	sb.WriteString(fmt.Sprintf("%-22s %-22s %s\n", "NAME", "CATEGORY", "DESCRIPTION"))
@@ -573,12 +573,12 @@ func (n *createWorkflowNode) Execute(ctx context.Context, input string, params m
 			return "", fmt.Errorf("invalid skill name: %q", wf.Name)
 		}
 		skillDir := filepath.Join(saveDir, skillName)
-		if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		if err := os.MkdirAll(skillDir, 0o755); err != nil { // codeql[go/path-injection] -- skillName passed filepath.Base + '.'/'..' rejection so no separators or traversal survive; saveDir is the constant templates/custom
 			return "", fmt.Errorf("failed to create skill directory: %w", err)
 		}
 
 		skillPath := filepath.Join(skillDir, "workflow.yaml")
-		if err := os.WriteFile(skillPath, yamlBytes, 0o644); err != nil {
+		if err := os.WriteFile(skillPath, yamlBytes, 0o644); err != nil { // codeql[go/path-injection] -- wf.Name may be tool/LLM-influenced but skillName was stripped to a single path element via filepath.Base before joining under constant templates/custom
 			return "", fmt.Errorf("failed to save skill: %w", err)
 		}
 

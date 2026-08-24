@@ -459,7 +459,7 @@ func (s *WebhookServer) findWorkflowPath(name string) (string, error) {
 		if err != nil || strings.HasPrefix(rel, "..") {
 			continue
 		}
-		if _, err := os.Stat(absPath); err == nil {
+		if _, err := os.Stat(absPath); err == nil { // codeql[go/path-injection] -- name is restricted to [a-zA-Z0-9_-] by isValidWorkflowName (no separators/traversal) and absPath is re-verified to stay under workflowsDir by the filepath.Rel ".." check above
 			return absPath, nil
 		}
 	}

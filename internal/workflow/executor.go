@@ -248,7 +248,13 @@ func initExecState(ctx context.Context, wf *Workflow, reg *nodes.Registry, progr
 		}
 		return sm.GetSecret(group, key)
 	})
-	globalLimiter := NewConcurrencyLimiter(wf.MaxConcurrency)
+	globalLimiter, err := NewConcurrencyLimiter(wf.MaxConcurrency)
+	if err != nil {
+		trace.finish(time.Now())
+		wfSpan.End()
+		cancel()
+		return nil, nil, err
+	}
 
 	if program != nil {
 		program.Send(tui.WorkflowStartMsg{Name: wf.Name, Path: "", Steps: len(wf.Steps)})

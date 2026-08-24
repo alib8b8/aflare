@@ -35,7 +35,7 @@ func (n *CodeKnowledgeGraphNode) executeMCPTool(input string, params map[string]
 	}
 
 	var files []string
-	if info, err := os.Stat(safePath); err == nil && info.IsDir() {
+	if info, err := os.Stat(safePath); err == nil && info.IsDir() { // codeql[go/path-injection] -- safePath is the validateReadPath result; SafeJoinPath blocks absolute/traversal/symlink escape
 		files, err = n.collectFiles(safePath)
 		if err != nil {
 			return "", fmt.Errorf("failed to collect files: %w", err)

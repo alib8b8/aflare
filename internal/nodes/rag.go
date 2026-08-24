@@ -126,7 +126,7 @@ func (n *RAGNode) Execute(ctx context.Context, input string, params map[string]s
 		if err != nil {
 			return "", fmt.Errorf("invalid file path: %w", err)
 		}
-		content, err := os.ReadFile(safePath)
+		content, err := os.ReadFile(safePath) // codeql[go/path-injection] -- safePath is the validateReadPath result of source (file branch)
 		if err != nil {
 			return "", fmt.Errorf("failed to read file %s: %w", safePath, err)
 		}
@@ -145,19 +145,19 @@ func (n *RAGNode) Execute(ctx context.Context, input string, params map[string]s
 		}
 		documents = docs
 	default:
-		if _, err := os.Stat(source); err == nil {
+		if _, err := os.Stat(source); err == nil { // codeql[go/path-injection] -- existence probe on raw source only decides file/dir vs inline text; every actual read below goes through safePath from validateReadPath
 			safePath, validateErr := validateReadPath(source)
 			if validateErr != nil {
 				return "", fmt.Errorf("invalid path: %w", validateErr)
 			}
-			if info, _ := os.Stat(safePath); info.IsDir() {
+			if info, _ := os.Stat(safePath); info.IsDir() { // codeql[go/path-injection] -- safePath is the validateReadPath result of source
 				docs, err := loadDirectory(safePath)
 				if err != nil {
 					return "", fmt.Errorf("failed to load directory: %w", err)
 				}
 				documents = docs
 			} else {
-				content, err := os.ReadFile(safePath)
+				content, err := os.ReadFile(safePath) // codeql[go/path-injection] -- safePath is the validateReadPath result of source (auto-detect branch)
 				if err != nil {
 					return "", fmt.Errorf("failed to read file: %w", err)
 				}

@@ -177,9 +177,9 @@ func (e *ExternalNode) Execute(ctx context.Context, input string, params map[str
 
 	switch {
 	case strings.HasSuffix(entryPath, ".py"):
-		cmd = exec.CommandContext(ctx, "python3", entryPath) // #nosec G204 -- entryPath validated against path traversal and symlink
+		cmd = exec.CommandContext(ctx, "python3", entryPath) // #nosec G204 -- entryPath validated against path traversal and symlink // codeql[go/command-injection] -- running the plugin entry is ExternalNode's function; entryPath restricted to .py/.sh suffix by the switch, checked against path traversal via filepath.Rel and symlinked entries rejected via os.Lstat; interpreter name is fixed (python3), no user input reaches argv[0]
 	case strings.HasSuffix(entryPath, ".sh"):
-		cmd = exec.CommandContext(ctx, "bash", entryPath) // #nosec G204 -- entryPath validated against path traversal and symlink
+		cmd = exec.CommandContext(ctx, "bash", entryPath) // #nosec G204 -- entryPath validated against path traversal and symlink // codeql[go/command-injection] -- running the plugin entry is ExternalNode's function; entryPath restricted to .sh suffix by the switch, checked against path traversal via filepath.Rel and symlinked entries rejected via os.Lstat; interpreter name is fixed (bash), no user input reaches argv[0]
 	default:
 		return "", fmt.Errorf("only .py and .sh entry files are allowed")
 	}
