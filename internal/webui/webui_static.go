@@ -135,7 +135,7 @@ var indexHTML = `<!DOCTYPE html>
             <div class="tab-content" id="chatTab" style="display:none">
                 <div class="chat-container">
                     <div class="chat-messages" id="chatMessages">
-                        <div class="chat-message assistant">Hello! I'm aflare, your local-first automation agent. Ask me anything — I can run workflows, search templates, compose new automations, and more.</div>
+                        <div class="chat-message assistant">Hello! I'm aflare, your local-first automation agent. Ask me anything — I can run workflows, compose new automations, and work with your own data.</div>
                     </div>
                     <div class="chat-input-area">
                         <input type="text" id="chatInput" placeholder="Type your message..." onkeydown="if(event.key==='Enter')sendChat()" />

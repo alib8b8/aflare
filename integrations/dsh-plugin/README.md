@@ -16,8 +16,6 @@ makes.
 | `aflare_generate` | Create workflow YAML from a description (optional `ai: true` for LLM generation) |
 | `aflare_validate` | Validate a workflow YAML |
 | `aflare_run` | Execute a workflow YAML and return the output |
-| `aflare_template_list` | List built-in templates |
-| `aflare_template_run` | Run a template by ID |
 
 ## Install
 

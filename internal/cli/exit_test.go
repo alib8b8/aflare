@@ -17,8 +17,11 @@
 package cli
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"testing"
 )
 
@@ -72,4 +75,26 @@ func TestExitCode_ExitErrHelper(t *testing.T) {
 	if code := ExitCode(err); code != 2 {
 		t.Errorf("ExitCode(exitErr(2)) = %d, want 2", code)
 	}
+}
+
+// captureOutput captures stdout during a function call.
+func captureOutput(fn func()) string {
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	fn()
+
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	return buf.String()
+}
+
+// exitCodeForErr maps a handler error to its process exit code, mirroring
+// what cmd/aflare does at the single dispatch site.
+func exitCodeForErr(err error) int {
+	return ExitCode(err)
 }

@@ -20,12 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/alib8b8/aflare/internal/agent"
 	"github.com/alib8b8/aflare/internal/i18n"
-	"github.com/alib8b8/aflare/internal/meta"
-	skillsPkg "github.com/alib8b8/aflare/internal/skills"
 	"github.com/alib8b8/aflare/internal/workflow"
 )
 
@@ -152,122 +149,20 @@ func createWithKeywordOrFallback(description string) (string, error) {
 }
 
 // printCreateSuggestions prints actionable next steps when keyword matching
-// fails and no LLM is configured. It searches the template registry for the
-// closest existing templates so the user can clone-and-modify instead of
-// starting from scratch.
+// fails and no LLM is configured.
 func printCreateSuggestions(description string) {
 	fmt.Println("未找到完全匹配的模板。你可能需要：")
 	fmt.Println()
 
-	// 1. 用已有模板改造: 从描述中提取关键词搜索最接近的模板。
-	matches := searchTemplatesForSuggestion(description)
-	if len(matches) > 0 {
-		fmt.Println("  1. 用已有模板改造：")
-		shown := 0
-		for _, s := range matches {
-			if shown >= 3 {
-				break
-			}
-			// 跳过无效条目。
-			if s.ID == "" {
-				continue
-			}
-			label := s.Name
-			if label == "" {
-				label = s.ID
-			}
-			fmt.Printf("     - %s （%s）\n", s.ID, label)
-			shown++
-		}
-		if shown > 0 {
-			cloneID := matches[0].ID
-			fmt.Println()
-			fmt.Printf("     复制并修改：aflare template clone %s my-workflow\n", cloneID)
-		}
-		fmt.Println()
-	}
-
-	// 2. 用自然语言描述生成 (需要 LLM)。
-	fmt.Println("  2. 用自然语言描述生成（需要配置 LLM）：")
+	// 1. 用自然语言描述生成 (需要 LLM)。
+	fmt.Println("  1. 用自然语言描述生成（需要配置 LLM）：")
 	fmt.Printf("     aflare create \"%s\" --ai\n", description)
 	fmt.Println("     未配置 LLM？运行：aflare init")
 	fmt.Println()
 
-	// 3. 手动创建。
-	skeletonName := suggestSkeletonName(description)
-	fmt.Println("  3. 手动创建：")
-	fmt.Printf("     aflare template new %s\n", skeletonName)
-}
-
-// createStopwords are common filler words (EN + ZH) stripped when extracting
-// keywords for template search and skeleton-name suggestion, so the resulting
-// hints reflect the user's intent rather than surrounding grammar.
-var createStopwords = map[string]bool{
-	"the": true, "a": true, "an": true, "to": true, "and": true, "or": true,
-	"of": true, "for": true, "with": true, "in": true, "on": true, "at": true,
-	"my": true, "me": true, "please": true, "help": true, "帮我": true,
-	"自动": true, "一个": true, "的": true,
-}
-
-// searchTemplatesForSuggestion loads the template registry and searches for
-// templates whose id/name/description/tags match keywords extracted from the
-// user's description. Returns at most a handful of candidates ordered by id.
-func searchTemplatesForSuggestion(description string) []*skillsPkg.SkillMeta {
-	templatesDir := meta.ResolveTemplatesPath()
-	if templatesDir == "" {
-		return nil
-	}
-	_ = skillsPkg.EnsureEmbeddedTemplates(templatesDir)
-	registry := skillsPkg.NewSkillRegistry(templatesDir)
-	if err := registry.Load(); err != nil {
-		return nil
-	}
-
-	keywords := extractKeywords(description)
-
-	var results []*skillsPkg.SkillMeta
-	seen := make(map[string]bool)
-	for _, kw := range keywords {
-		for _, s := range registry.Search(kw) {
-			if seen[s.ID] {
-				continue
-			}
-			seen[s.ID] = true
-			results = append(results, s)
-		}
-	}
-	return results
-}
-
-// extractKeywords returns lowercase content words (length >= 2, not in
-// createStopwords) from a natural-language description.
-func extractKeywords(description string) []string {
-	keywords := make([]string, 0, 8)
-	for _, w := range strings.Fields(strings.ToLower(description)) {
-		w = strings.Trim(w, ".,;:!?\"'()[]{}，。；：！？")
-		if len(w) < 2 || createStopwords[w] {
-			continue
-		}
-		keywords = append(keywords, w)
-	}
-	return keywords
-}
-
-// suggestSkeletonName derives a short kebab-case name for `aflare template new`
-// from the description, falling back to "my-workflow". Stopwords are skipped
-// so the name reflects intent (e.g. "auto-reply") rather than filler words.
-func suggestSkeletonName(description string) string {
-	var parts []string
-	for _, w := range extractKeywords(description) {
-		parts = append(parts, w)
-		if len(parts) >= 2 {
-			break
-		}
-	}
-	if len(parts) == 0 {
-		return "my-workflow"
-	}
-	return strings.Join(parts, "-")
+	// 2. 手动创建。
+	fmt.Println("  2. 手动创建：")
+	fmt.Println("     参考 examples/ 目录中的示例，手写工作流 YAML 后用 aflare run 运行")
 }
 
 // EnterChatMode starts an interactive chat session for workflow validation.

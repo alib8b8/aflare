@@ -142,9 +142,8 @@ func (r *ReflectionCapability) evaluateQuality(input, output string) []string {
 	// Check for missing action — only flag when the input clearly asks for action
 	// but the output contains no concrete steps or results. Don't flag when the
 	// output is a legitimate final answer (e.g. presenting results of a tool call).
-	hasAction := strings.Contains(output, "template_list") ||
-		strings.Contains(output, "run_workflow") ||
-		strings.Contains(output, "template_info") ||
+	hasAction := strings.Contains(output, "run_workflow") ||
+		strings.Contains(output, "create_workflow") ||
 		strings.Contains(output, "I'll") ||
 		strings.Contains(output, "Let me") ||
 		strings.Contains(output, "Here") ||
@@ -197,7 +196,7 @@ func (r *ReflectionCapability) buildReflectionPrompt(input, output string, issue
 		}
 		sb.WriteString(issue)
 	}
-	sb.WriteString(". Please provide a better response with concrete actions, clear steps, and confident tone. Use your tools (template_list, run_workflow) to take action rather than just describing what could be done.")
+	sb.WriteString(". Please provide a better response with concrete actions, clear steps, and confident tone. Use your tools (run_workflow, create_workflow) to take action rather than just describing what could be done.")
 	sb.WriteString("\n--- [End Self-Reflection] ---")
 
 	return sb.String()

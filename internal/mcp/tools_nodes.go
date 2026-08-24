@@ -24,11 +24,10 @@ import (
 
 	"github.com/alib8b8/aflare/internal/history"
 	"github.com/alib8b8/aflare/internal/nodes"
-	"github.com/alib8b8/aflare/internal/templates"
 )
 
 // ------------------------------------------------------------------
-// Node / history / template tool implementations
+// Node / history tool implementations
 // ------------------------------------------------------------------
 
 func (s *Server) toolNodeList() (*toolCallResult, error) {
@@ -139,75 +138,6 @@ func (s *Server) toolHistoryList(args map[string]interface{}) (*toolCallResult, 
 
 	return &toolCallResult{
 		Content: []content{{Type: "text", Text: sb.String()}},
-	}, nil
-}
-
-func (s *Server) toolTemplateList(args map[string]interface{}) (*toolCallResult, error) {
-	tm := templates.NewTemplateManager()
-
-	category := optionalString(args, "category")
-	keyword := optionalString(args, "keyword")
-
-	var list []*templates.Template
-	switch {
-	case keyword != "":
-		list = tm.Search(keyword)
-	case category != "":
-		list = tm.ListByCategory(category)
-	default:
-		list = tm.List()
-	}
-
-	if len(list) == 0 {
-		return &toolCallResult{
-			Content: []content{{Type: "text", Text: "No templates found."}},
-		}, nil
-	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Templates (%d found):\n\n", len(list)))
-	sb.WriteString(fmt.Sprintf("%-20s %-15s %-30s %s\n", "NAME", "CATEGORY", "DESCRIPTION", "VERSION"))
-	sb.WriteString(strings.Repeat("-", 100))
-	sb.WriteString("\n")
-	for _, t := range list {
-		sb.WriteString(fmt.Sprintf("%-20s %-15s %-30s %s\n",
-			truncate(t.Name, 20),
-			truncate(t.Category, 15),
-			truncate(t.Description, 30),
-			t.Version,
-		))
-	}
-
-	return &toolCallResult{
-		Content: []content{{Type: "text", Text: sb.String()}},
-	}, nil
-}
-
-func (s *Server) toolTemplateRender(args map[string]interface{}) (*toolCallResult, error) {
-	name, err := requireString(args, "name")
-	if err != nil {
-		return nil, err
-	}
-
-	vars := make(map[string]string)
-	if rawVars, ok := args["vars"].(map[string]interface{}); ok {
-		for k, v := range rawVars {
-			if str, ok := v.(string); ok {
-				vars[k] = str
-			} else {
-				vars[k] = fmt.Sprintf("%v", v)
-			}
-		}
-	}
-
-	tm := templates.NewTemplateManager()
-	rendered, err := tm.Render(name, vars)
-	if err != nil {
-		return nil, fmt.Errorf("failed to render template: %w", err)
-	}
-
-	return &toolCallResult{
-		Content: []content{{Type: "text", Text: rendered}},
 	}, nil
 }
 

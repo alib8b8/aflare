@@ -1,6 +1,6 @@
 {
   "name": "aflare-tools",
-  "description": "aflare deterministic workflow tools for DeepSeek Harness (DSH): generate, validate, run, and template local aflare workflows",
+  "description": "aflare deterministic workflow tools for DeepSeek Harness (DSH): generate, validate, and run local aflare workflows",
   "version": "0.1.0",
   "entry": {
     "name": "@alib8b8/dsh-plugin-aflare",

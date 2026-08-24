@@ -216,41 +216,6 @@ func (s *Server) newRequestedTools() []tool {
 				},
 			},
 		},
-		{
-			Name:        "template_list",
-			Description: "List available workflow templates.",
-			InputSchema: inputSchema{
-				Type: "object",
-				Properties: map[string]interface{}{
-					"category": map[string]interface{}{
-						"type":        "string",
-						"description": "Filter by category",
-					},
-					"keyword": map[string]interface{}{
-						"type":        "string",
-						"description": "Search keyword for template name or description",
-					},
-				},
-			},
-		},
-		{
-			Name:        "template_render",
-			Description: "Render a workflow template with variables.",
-			InputSchema: inputSchema{
-				Type: "object",
-				Properties: map[string]interface{}{
-					"name": map[string]interface{}{
-						"type":        "string",
-						"description": "Name of the template to render",
-					},
-					"vars": map[string]interface{}{
-						"type":        "object",
-						"description": "Variables to pass to the template (key-value map)",
-					},
-				},
-				Required: []string{"name"},
-			},
-		},
 	}
 }
 

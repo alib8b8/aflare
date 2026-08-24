@@ -108,15 +108,14 @@ func (w *WorkflowCapability) PreProcess(ctx context.Context, input string) (stri
 		sb.WriteString("\n")
 	}
 
-	// Guidance for template selection
+	// Guidance for workflow execution
 	sb.WriteString(fmt.Sprintf("%d templates available. ", templateCount))
-	sb.WriteString("Prefer existing templates: use template_list to find a matching workflow, ")
-	sb.WriteString("template_info to inspect parameters, and run_workflow to execute. ")
-	sb.WriteString("Only compose new workflows with create_workflow when no template matches.\n")
+	sb.WriteString("Run known workflows with run_workflow, or compose a new one with create_workflow ")
+	sb.WriteString("when no existing workflow matches.\n")
 
-	// If input suggests a new task, suggest matching templates
+	// If input suggests a new task, suggest composing a workflow
 	if suggestsTask(input) {
-		sb.WriteString("Hint: use template_list with keywords from your request to find related workflows.\n")
+		sb.WriteString("Hint: use create_workflow to compose a workflow for this task, then run_workflow to execute it.\n")
 	}
 
 	return input + sb.String(), nil

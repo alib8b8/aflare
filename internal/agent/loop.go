@@ -330,12 +330,10 @@ func (a *AgentLoop) NotifyEvent(ctx context.Context, source InputSource, message
 }
 
 // buildToolList creates the agent tool list from tool names.
-// Chat-specific tools (template_list, run_workflow, etc.) are always included.
+// Chat-specific tools (run_workflow, create_workflow, etc.) are always included.
 // When safeMode is true, dangerous tools (execute, file_write, code_interpreter) are excluded.
 func buildToolList(toolNames []string, safeMode bool) []core.AgentTool {
 	chatTools := []core.AgentTool{
-		{Name: "template_list", Description: "Search available workflow templates by keyword or category", NodeName: "template_list"},
-		{Name: "template_info", Description: "Get detailed info about a specific template", NodeName: "template_info"},
 		{Name: "run_workflow", Description: "Run a workflow template. Input: JSON with 'template' and 'params'", NodeName: "run_workflow"},
 		{Name: "create_workflow", Description: "Compose and run a new workflow from available nodes", NodeName: "create_workflow"},
 		{Name: "memory_store", Description: "Store important information for later recall", NodeName: "memory"},

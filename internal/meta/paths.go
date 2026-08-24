@@ -152,30 +152,3 @@ func EnsureDirs() error {
 	}
 	return nil
 }
-
-// ResolveTemplatesPath 解析模板目录路径：优先使用主目录下模板，其次当前工作目录，
-// 兜底返回主目录下模板路径（用于首次自动释放 embedded 模板到该位置）。
-func ResolveTemplatesPath() string {
-	if tplDir := TemplatesDir(); dirExists(tplDir) {
-		return tplDir
-	}
-	if cwd, err := os.Getwd(); err == nil {
-		localTpl := filepath.Join(cwd, TemplatesDirName)
-		if dirExists(localTpl) {
-			return localTpl
-		}
-	}
-	// Neither the user-home templates dir nor a cwd-local one exists yet.
-	// Default to the user-home templates dir so that the embedded template
-	// catalog, when materialized on first use, lands in a persistent,
-	// per-user location rather than polluting the current working directory.
-	return TemplatesDir()
-}
-
-func dirExists(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return info.IsDir()
-}

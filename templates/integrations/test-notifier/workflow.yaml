@@ -1,7 +1,0 @@
-name: test-notifier
-description: Send a test notification when a condition is met
-steps:
-  - node: notify
-    params:
-      channel: stdout
-      message: "Test notification sent"

@@ -349,8 +349,8 @@ func TestWorkflowCapability_PreProcess(t *testing.T) {
 	if result == "" || !strings.Contains(result, "Workflow Mode") {
 		t.Fatal("should inject workflow guidance")
 	}
-	if !strings.Contains(result, "template_list") {
-		t.Error("should mention template_list tool")
+	if !strings.Contains(result, "run_workflow") {
+		t.Error("should mention run_workflow tool")
 	}
 }
 
