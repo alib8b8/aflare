@@ -5,7 +5,8 @@
     <strong>English</strong>
   </p>
   <p><strong>AI Beyond Chat — Get Things Done</strong></p>
-  <p><em>Local-first · Data Stays Local · Connect Your Own LLM / Database / Knowledge Base · ReAct Reasoning · Deterministic Workflow Execution</em></p>
+  <p><em>Personal-first · Runs Locally · Data Stays Local · Connect Your Own LLM / Files / Notes / Databases · ReAct Reasoning · Deterministic Workflow Execution</em></p>
+  <p>The deterministic and secure control layer between AI and your data</p>
 
   <p>
     <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
@@ -95,13 +96,13 @@ aflare agent -c reflection,planning,utility
 
 ## Project Status
 
-aflare is currently at **v0.10.0 stage**. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. v0.9.0 delivers Chinese national cryptography support (SM3 audit chain / SM4 secrets, opt-in), audit-chain security hardening (per-install random HMAC key, cross-process log lock, bundle truncation-forgery defense), one-command MCP server install (`aflare mcp install`), and byte-identical 0.8.x upgrade compatibility. v0.10.0 adds: **MemHarness memory critique-reconstruction mode** (memory is a cue to reconstruct, not a fact of the current task), **step-level typed output contracts and bounded preview inputs**, **watermark deployment tracing**, plus a security self-audit round that fixed plugin path traversal, symlink bypass and memory data races (see [CHANGELOG](CHANGELOG.md)). Local inference services running on domestic chips (Ascend/Cambricon/Hygon) are accessed through OpenAI-compatible endpoints (no native SDK integration), and support keeps improving. Hardware device control (robots etc.) is not built in — users can integrate via custom nodes or MCP Server, with data staying on their intranet.
+aflare is currently at **v0.10.0 stage**, with **personal users as the first target**: personal data lives on your machine (files, note libraries, personal SQLite databases), and aflare is the deterministic and secure control layer between AI and that data. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. v0.9.0 delivers Chinese national cryptography support (SM3 audit chain / SM4 secrets, opt-in), audit-chain security hardening, and one-command MCP server install (`aflare mcp install`). v0.10.0 adds: **MemHarness memory critique-reconstruction mode**, **step-level typed output contracts and bounded preview inputs**, **watermark deployment tracing**, plus a security self-audit round that fixed plugin path traversal, symlink bypass and memory data races. Merged into main after v0.10.0: the **Connector API** (personal-first track) — five named connector types `files` / `notes` / `sqlite` / `mysql` / `postgres`; workflows reference only the connector name while credentials live exclusively in the secrets store / environment variables; connectors declare permission ceilings (read-only, row/byte limits, extension allowlists) that node parameters can only tighten, never loosen; directory grants apply the same containment rules as the workdir sandbox (no absolute paths, no traversal, unconditional symlink-escape rejection) to user-authorized roots, with SQLite read-only defense-in-depth (DSN forced to `mode=ro`) (see [docs/connector-api.md](docs/connector-api.md) and [CHANGELOG](CHANGELOG.md)). Local inference services running on domestic chips (Ascend/Cambricon/Hygon) are accessed through OpenAI-compatible endpoints (no native SDK integration), and support keeps improving. Hardware device control (robots etc.) is not built in — users can integrate via custom nodes or MCP Server, with data staying on their intranet.
 
 ---
 
 ## What is this?
 
-aflare is both a **local-first automation Agent** and a **deterministic workflow execution engine**. Two modes, one core:
+aflare is both a **local-first automation Agent** and a **deterministic workflow execution engine** — and above all, **the deterministic and secure control layer between AI and your data**: you explicitly grant access to specific data (directories, note libraries, personal databases), and the AI works deterministically inside the permission ceiling you define. Two modes, one core:
 
 ```
 Conversational Agent             Declarative Workflow
@@ -146,7 +147,9 @@ L2: Runtime      —  Execution layer
 
 ## Project Strengths
 
-aflare is built for intranet / local-first users — enterprises and individuals who are sensitive about data privacy and security. Core strengths:
+aflare puts **personal users first** (intranet / local-first enterprise scenarios are equally supported), serving anyone sensitive about data privacy and security. Core strengths:
+
+**Personal data connectors (Connector API)** — Explicitly authorize local directories, note libraries and personal databases via `aflare connector add`; workflows reference only the connector name. `files` / `notes` directory connectors apply the workdir sandbox's containment rules (no absolute paths, no traversal, unconditional symlink-escape rejection, extension allowlists, byte limits) to roots you grant like `~/notes` or `~/Documents`; `sqlite` / `mysql` / `postgres` database connectors keep credentials exclusively in the secrets store / environment variables, with SQLite read-only defense-in-depth (DSN forced to `mode=ro`). Permission ceilings declared on the connector (read-only, rows, bytes) can only be tightened by nodes, never loosened — you define the AI's capability boundary.
 
 **Local-first, data never leaves your machine** — Single binary with zero runtime deps, runs in ~5MB RAM; workflows, execution history, memory and secrets all stay on local disk; API keys are injected via environment variables or the OS keyring, never written in cleartext to `config.yaml`; fully offline-capable (offline install, `aflare doctor --offline`, WebUI Mermaid offline fallback).
 
@@ -189,6 +192,7 @@ aflare is built for intranet / local-first users — enterprises and individuals
 | Keyword-based Workflow Generation | ✅ | Tested |
 | MCP Protocol Support (Server/Client) | ✅ | Tested |
 | **MemHarness Memory Critique-Reconstruction** (`harness_search` + session critique injection) | ✅ | Tested |
+| **Connector API** (`files`/`notes`/`sqlite`/`mysql`/`postgres` named connectors, credential isolation + permission ceilings + root containment) | ✅ | Tested |
 | **Step-level Output Contracts** (`output_schema`) | ✅ | Tested |
 | **Bounded Preview Inputs** (`preview_input`, 16KiB) | ✅ | Tested |
 | LLM Nodes (18 built-in providers, any OpenAI-compatible model usable) | ✅ | Tested |
@@ -238,6 +242,31 @@ aflare is built for intranet / local-first users — enterprises and individuals
 - Provides workflow execution, validation, node query, code graph, and other tools
 - Built-in MCP Client, workflows can call external MCP services directly
 - `aflare mcp install <name>` one-command install of 8 built-in community servers
+
+### Connector API (personal-data track)
+
+A named connector = a data source you explicitly authorize + a policy ceiling. Workflows reference only the connector name; credentials never enter YAML:
+
+```bash
+# Grant a notes directory (read-only by default, symlink escape unconditionally rejected)
+aflare connector add my-notes --type notes --root ~/notes
+
+# Grant a documents directory (md/txt only, writes explicitly enabled)
+aflare connector add my-docs --type files --root ~/Documents --include '*.md' --include '*.txt' --writable
+
+# Personal SQLite library (DSN forced to mode=ro)
+aflare connector add my-library --type sqlite --database ~/calibre/metadata.db
+
+# Remote database (credentials in the secrets store, spec holds only a reference)
+aflare connector add my-pg --type postgres --host db.example.com --database analytics \
+  --username readonly --credential-group connectors
+```
+
+- **Five connector types**: `files` / `notes` (directories, used by `file_read`/`file_write`/`files_list` nodes) + `sqlite` / `mysql` / `postgres` (databases, used by the `sql_query` node)
+- **Credential isolation**: workflows reference only the connector name; credentials live exclusively in the secrets store (`aflare secrets set`) or environment variables
+- **Permission ceilings**: connectors declare read-only / max_rows / max_bytes / extension allowlists / timeouts — node parameters can only tighten, never loosen
+- **Root containment**: the workdir sandbox's rules (no absolute paths, no traversal) apply to authorized roots, with **unconditional** symlink-escape rejection; SQLite read-only defense-in-depth
+- Full design at [docs/connector-api.md](docs/connector-api.md)
 
 ### Memory Critique-Reconstruction (MemHarness mode)
 - memory node `harness_search` operation: retrieves candidates with full source state (type/level/confidence/recorded-at/score) and emits a self-contained critique prompt; the LLM critique (keep/rewrite/discard) runs as an explicit, retryable workflow step, outputting `<EMPTY>` instead of inventing when nothing applies
@@ -311,7 +340,8 @@ aflare is built for intranet / local-first users — enterprises and individuals
 | v0.7 | Done | Financial scenario enhancement (Saga / Idempotency / Audit chain), ReAct Agent chat, 6 pluggable capabilities, Agent unified event loop |
 | **v0.8** | **Done** | Offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding, CLI UX improvements (smart command hints), CI speedup |
 | **v0.9** | **Done** | National cryptography support (SM3/SM4, opt-in), audit-chain security hardening (random HMAC key, cross-process lock, bundle truncation-forgery defense), `aflare mcp install`, supply-chain scenario pack, loong64 |
-| **v0.10** | **Done** | MemHarness memory critique-reconstruction, step-level output contracts & bounded preview, watermark deployment tracing, security self-audit fixes; next: domestic chip support refinement, Agent capability deepening |
+| **v0.10** | **Done** | MemHarness memory critique-reconstruction, step-level output contracts & bounded preview, watermark deployment tracing, security self-audit fixes |
+| **main** | **In progress** | **Connector API (personal-first track)**: files/notes/sqlite/mysql/postgres named connectors, credential isolation, permission ceilings, root containment; next: personal note-app connectors, Agent capability deepening, domestic chip support refinement |
 | v1.0 | Planned | Stable API, LTS |
 
 See [CHANGELOG.md](CHANGELOG.md) for details.
@@ -364,7 +394,7 @@ What aflare can and cannot do in finance:
 ## Documentation
 
 - [Getting Started](docs/getting-started.md) · [Tutorial](docs/tutorial.md) · [YAML Syntax](docs/getting-started.md#workflow-configuration)
-- [Dataflow](docs/dataflow.md) · [Scheduling](docs/scheduling.md) · [MCP](docs/mcp.md) · [Plugins](docs/plugins.md)
+- [Dataflow](docs/dataflow.md) · [Scheduling](docs/scheduling.md) · [MCP](docs/mcp.md) · [Plugins](docs/plugins.md) · [Connectors](docs/connector-api.md)
 - [Web UI](docs/webui.md) · [Visualizer](docs/visualizer.md) · [Custom Nodes](docs/custom-nodes.md)
 - [API Reference](docs/api.md) · [Nodes Reference](docs/nodes-reference.md)
 - [Deployment](docs/deployment.md) · [Docker](docs/docker.md) · [Multi-Tenancy](docs/tenants.md)
