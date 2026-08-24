@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/nodes/core"
 )
 
 // FileWriteNode writes content to a file
@@ -49,7 +50,8 @@ func (n *FileWriteNode) Schema() NodeSchema {
 		Input:       "string - content to write to the file",
 		Output:      "string - confirmation message",
 		Params: []ParamSchema{
-			{Name: "path", Type: "string", Description: "File path to write to", Required: true},
+			{Name: "path", Type: "string", Description: "File path to write to. Relative to the working directory, or relative to the connector root when `connector` is set.", Required: true},
+			{Name: "connector", Type: "string", Description: "Named files/notes connector. Must be registered with --writable; paths resolve inside its root and its include allowlist applies.", Required: false},
 			{Name: "mode", Type: "string", Description: "Write mode: write (default) or append", Required: false, Default: "write"},
 		},
 	}
@@ -67,9 +69,33 @@ func (n *FileWriteNode) Execute(ctx context.Context, input string, params map[st
 		mode = "write"
 	}
 
-	safePath, err := validateWritePath(path)
-	if err != nil {
-		return "", fmt.Errorf("path validation failed: %w", err)
+	var safePath string
+	var err error
+	if connName := getParam(params, "connector", ""); connName != "" {
+		spec, cerr := resolveFileConnector(connName)
+		if cerr != nil {
+			return "", cerr
+		}
+		// Read-only connectors (the default) cannot be written through
+		// at all — node params can only tighten, never loosen.
+		if spec.IsReadOnly() {
+			return "", fmt.Errorf("connector %q is read-only; re-register it with --writable to allow writes", connName)
+		}
+		// Keep the same containment + dotfile/extension rules as
+		// workdir mode (.env/.sh etc. stay unwritable).
+		safePath, err = core.ValidateWritePathIn(spec.Root, path)
+		if err != nil {
+			return "", fmt.Errorf("path validation failed: %w", err)
+		}
+		if !spec.MatchInclude(filepath.Base(safePath)) {
+			return "", fmt.Errorf("connector %q does not allow writing %q (include allowlist: %s)",
+				connName, filepath.Base(safePath), strings.Join(spec.EffectiveInclude(), ", "))
+		}
+	} else {
+		safePath, err = validateWritePath(path)
+		if err != nil {
+			return "", fmt.Errorf("path validation failed: %w", err)
+		}
 	}
 
 	switch strings.ToLower(mode) {

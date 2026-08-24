@@ -17,6 +17,7 @@
 package cli
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -195,5 +196,135 @@ func TestHandleConnector_ListEmpty(t *testing.T) {
 	connectorTestFile(t)
 	if err := HandleConnector([]string{"list"}); err != nil {
 		t.Errorf("list on empty registry: %v", err)
+	}
+}
+
+func TestHandleConnector_AddFilesConnector(t *testing.T) {
+	connectorTestFile(t)
+	root := t.TempDir()
+
+	err := HandleConnector([]string{
+		"add", "my-notes", "--type", "notes", "--root", root,
+		"--max-bytes", "65536",
+	})
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	reg, err := connector.LoadDefaultRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, ok := reg.Get("my-notes")
+	if !ok {
+		t.Fatal("my-notes not registered")
+	}
+	if spec.Root != root {
+		t.Errorf("root = %q, want %q", spec.Root, root)
+	}
+	if !spec.IsReadOnly() {
+		t.Error("notes connector must be read-only by default")
+	}
+	if spec.EffectiveMaxBytes() != 65536 {
+		t.Errorf("max_bytes = %d, want 65536", spec.EffectiveMaxBytes())
+	}
+	// No explicit include → notes default is markdown.
+	if !spec.MatchInclude("a.md") || spec.MatchInclude("a.txt") {
+		t.Errorf("notes default include should be markdown-only: %v", spec.EffectiveInclude())
+	}
+
+	// list / show must not error on file connectors
+	if err := HandleConnector([]string{"list"}); err != nil {
+		t.Errorf("list: %v", err)
+	}
+	if err := HandleConnector([]string{"show", "my-notes"}); err != nil {
+		t.Errorf("show: %v", err)
+	}
+}
+
+func TestHandleConnector_AddFilesConnectorWithIncludeAndWritable(t *testing.T) {
+	connectorTestFile(t)
+	root := t.TempDir()
+
+	err := HandleConnector([]string{
+		"add", "my-docs", "--type", "files", "--root", root,
+		"--writable", "--include", "*.md", "--include", "*.txt",
+	})
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	reg, err := connector.LoadDefaultRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, ok := reg.Get("my-docs")
+	if !ok {
+		t.Fatal("my-docs not registered")
+	}
+	if spec.IsReadOnly() {
+		t.Error("--writable should produce a writable files connector")
+	}
+	if len(spec.Include) != 2 || spec.Include[0] != "*.md" || spec.Include[1] != "*.txt" {
+		t.Errorf("include mismatch: %v", spec.Include)
+	}
+	if spec.MatchInclude("a.exe") {
+		t.Error("include allowlist should reject non-listed extensions")
+	}
+}
+
+func TestHandleConnector_AddFilesConnectorErrors(t *testing.T) {
+	connectorTestFile(t)
+	root := t.TempDir()
+	missing := filepath.Join(t.TempDir(), "does-not-exist")
+	filePath := filepath.Join(root, "file.md")
+	if err := os.WriteFile(filePath, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := [][]string{
+		// files without root
+		{"add", "x", "--type", "files"},
+		// root that does not exist
+		{"add", "x", "--type", "files", "--root", missing},
+		// root that is not a directory
+		{"add", "x", "--type", "files", "--root", filePath},
+		// relative root
+		{"add", "x", "--type", "files", "--root", "relative/dir"},
+		// credential on a file connector
+		{"add", "x", "--type", "files", "--root", root, "--credential-env", "E"},
+		// database fields on a file connector
+		{"add", "x", "--type", "files", "--root", root, "--database", "app"},
+		// bad include pattern
+		{"add", "x", "--type", "files", "--root", root, "--include", "["},
+	}
+	for i, args := range cases {
+		if err := HandleConnector(args); err == nil {
+			t.Errorf("case %d: expected error for %v", i, args)
+		}
+	}
+}
+
+func TestHandleConnector_HomeExpansion(t *testing.T) {
+	connectorTestFile(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	notesDir := filepath.Join(home, "notes")
+	if err := os.MkdirAll(notesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// --root ~/notes must expand to $HOME/notes before validation.
+	if err := HandleConnector([]string{"add", "vault", "--type", "notes", "--root", "~/notes"}); err != nil {
+		t.Fatalf("add with ~ root: %v", err)
+	}
+	reg, err := connector.LoadDefaultRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, ok := reg.Get("vault")
+	if !ok {
+		t.Fatal("vault not registered")
+	}
+	if spec.Root != notesDir {
+		t.Errorf("root = %q, want %q (unexpanded ~)", spec.Root, notesDir)
 	}
 }

@@ -33,24 +33,39 @@ package connector
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
 
-// Connector type identifiers. A type maps to a provider that knows how to
-// build the driver-specific DSN and which database/sql driver name to use.
+// Connector type identifiers. Database types map to a provider that knows
+// how to build the driver-specific DSN; file types (files/notes) route
+// through the file nodes (file_read/file_write/files_list) with the root
+// directory acting as the containment boundary.
 const (
 	TypePostgres = "postgres"
 	TypeMySQL    = "mysql"
 	TypeSQLite   = "sqlite"
+	TypeFiles    = "files"
+	TypeNotes    = "notes"
 )
+
+// typeNames lists supported types for error messages, in help order.
+var typeNames = []string{TypePostgres, TypeMySQL, TypeSQLite, TypeFiles, TypeNotes}
 
 // Default limits applied when the spec leaves them unset. Node parameters
 // may only request lower values.
 const (
 	DefaultMaxRows    = 1000
 	DefaultTimeoutSec = 30
+	// DefaultMaxFileBytes matches the file_read node's hard read cap so a
+	// files/notes connector never loosens it.
+	DefaultMaxFileBytes = 10 * 1024 * 1024
 )
+
+// notesDefaultInclude is the extension allowlist applied to notes
+// connectors that declare none: a notes vault is markdown.
+var notesDefaultInclude = []string{"*.md", "*.markdown"}
 
 // Credential kinds.
 const (
@@ -83,6 +98,11 @@ type Spec struct {
 	Port     int    `yaml:"port,omitempty" json:"port,omitempty"`
 	Database string `yaml:"database,omitempty" json:"database,omitempty"`
 	Username string `yaml:"username,omitempty" json:"username,omitempty"`
+	// Root is the absolute directory root for files/notes connectors.
+	// Node paths resolve relative to it and can never escape it — the
+	// same containment rules (no absolute paths, no traversal, L2+
+	// symlink checks) that confine nodes to the working directory.
+	Root string `yaml:"root,omitempty" json:"root,omitempty"`
 	// Credential is optional: sqlite connectors and trust/cert-auth
 	// servers do not need one.
 	Credential *CredentialRef `yaml:"credential,omitempty" json:"credential,omitempty"`
@@ -92,6 +112,18 @@ type Spec struct {
 	MaxRows int `yaml:"max_rows,omitempty" json:"max_rows,omitempty"`
 	// TimeoutSec caps query execution time (default 30s).
 	TimeoutSec int `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+	// MaxBytes caps a single file read through files/notes connectors
+	// (default 10MB, matching the file_read node's hard cap).
+	MaxBytes int `yaml:"max_bytes,omitempty" json:"max_bytes,omitempty"`
+	// Include is an optional glob allowlist matched against the file's
+	// base name. Notes connectors default to *.md / *.markdown.
+	Include []string `yaml:"include,omitempty" json:"include,omitempty"`
+}
+
+// IsFileConnector reports whether the type routes through the file nodes
+// (file_read/file_write/files_list) rather than sql_query.
+func (s *Spec) IsFileConnector() bool {
+	return s.Type == TypeFiles || s.Type == TypeNotes
 }
 
 // IsReadOnly reports whether the connector allows writes. Unset → true.
@@ -120,13 +152,50 @@ func (s *Spec) EffectiveTimeoutSec() int {
 	return s.TimeoutSec
 }
 
+// EffectiveMaxBytes returns the per-file read ceiling for file
+// connectors, applying the default when unset.
+func (s *Spec) EffectiveMaxBytes() int {
+	if s.MaxBytes <= 0 {
+		return DefaultMaxFileBytes
+	}
+	return s.MaxBytes
+}
+
+// EffectiveInclude returns the glob allowlist for file connectors.
+// Notes connectors default to markdown files; files connectors with no
+// include list accept every file (still subject to the node-level
+// security checks).
+func (s *Spec) EffectiveInclude() []string {
+	if s.Type == TypeNotes && len(s.Include) == 0 {
+		return notesDefaultInclude
+	}
+	return s.Include
+}
+
+// MatchInclude reports whether name (a file base name) passes the
+// connector's include allowlist. An empty allowlist matches everything.
+func (s *Spec) MatchInclude(name string) bool {
+	include := s.EffectiveInclude()
+	if len(include) == 0 {
+		return true
+	}
+	for _, pattern := range include {
+		if ok, err := filepath.Match(pattern, name); err == nil && ok {
+			return true
+		}
+	}
+	return false
+}
+
 // supportedTypes lists the connector types the current provider set can
-// build DSNs for.
+// build DSNs for or route to the file nodes.
 func supportedTypes() map[string]bool {
 	return map[string]bool{
 		TypePostgres: true,
 		TypeMySQL:    true,
 		TypeSQLite:   true,
+		TypeFiles:    true,
+		TypeNotes:    true,
 	}
 }
 
@@ -142,7 +211,7 @@ func (s *Spec) Validate() error {
 		return fmt.Errorf("connector name %q must match %s", s.Name, namePattern.String())
 	}
 	if !supportedTypes()[s.Type] {
-		return fmt.Errorf("connector %q: unsupported type %q (supported: postgres, mysql, sqlite)", s.Name, s.Type)
+		return fmt.Errorf("connector %q: unsupported type %q (supported: %s)", s.Name, s.Type, strings.Join(typeNames, ", "))
 	}
 	if err := validateNoNullBytes(s); err != nil {
 		return err
@@ -162,6 +231,33 @@ func (s *Spec) Validate() error {
 	case TypeSQLite:
 		if s.Database == "" {
 			return fmt.Errorf("connector %q: database (file path) is required for type sqlite", s.Name)
+		}
+	case TypeFiles, TypeNotes:
+		if s.Root == "" {
+			return fmt.Errorf("connector %q: root is required for type %s", s.Name, s.Type)
+		}
+		if !filepath.IsAbs(s.Root) {
+			return fmt.Errorf("connector %q: root must be an absolute path (got %q)", s.Name, s.Root)
+		}
+		// File connectors live on the local filesystem: database
+		// endpoint and credential fields would be silently ignored, so
+		// reject them instead of storing misleading specs.
+		if s.Host != "" || s.Port != 0 || s.Database != "" || s.Username != "" {
+			return fmt.Errorf("connector %q: host/port/database/username are not valid for type %s (use root)", s.Name, s.Type)
+		}
+		if s.Credential != nil {
+			return fmt.Errorf("connector %q: credential is not supported for type %s (local files need none)", s.Name, s.Type)
+		}
+		for _, pattern := range s.Include {
+			if _, err := filepath.Match(pattern, "x"); err != nil {
+				return fmt.Errorf("connector %q: bad include pattern %q: %w", s.Name, pattern, err)
+			}
+		}
+		if s.MaxRows != 0 {
+			return fmt.Errorf("connector %q: max_rows is not valid for type %s (use max_bytes)", s.Name, s.Type)
+		}
+		if s.TimeoutSec != 0 {
+			return fmt.Errorf("connector %q: timeout is not valid for type %s", s.Name, s.Type)
 		}
 	}
 
@@ -189,6 +285,9 @@ func (s *Spec) Validate() error {
 	if s.TimeoutSec < 0 {
 		return fmt.Errorf("connector %q: timeout must be >= 0", s.Name)
 	}
+	if s.MaxBytes < 0 {
+		return fmt.Errorf("connector %q: max_bytes must be >= 0", s.Name)
+	}
 	return nil
 }
 
@@ -205,6 +304,7 @@ func validateNoNullBytes(s *Spec) error {
 		"host":           s.Host,
 		"database":       s.Database,
 		"username":       s.Username,
+		"root":           s.Root,
 		"credential.key": credentialKey,
 	}
 	for field, value := range fields {

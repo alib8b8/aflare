@@ -115,6 +115,8 @@ func TestBuildDSN_MySQLDefaultPortNoUser(t *testing.T) {
 }
 
 func TestBuildDSN_SQLite(t *testing.T) {
+	// Read-only (the default) opens with mode=ro: the driver itself
+	// rejects writes — defense in depth on top of the node gate.
 	spec := Spec{Name: "db", Type: TypeSQLite, Database: "/data/app.db"}
 	driver, dsn, err := BuildDSN(spec, "ignored")
 	if err != nil {
@@ -123,8 +125,36 @@ func TestBuildDSN_SQLite(t *testing.T) {
 	if driver != "sqlite3" {
 		t.Errorf("driver = %q, want sqlite3", driver)
 	}
+	if want := "file:/data/app.db?mode=ro"; dsn != want {
+		t.Errorf("dsn = %q, want %q", dsn, want)
+	}
+}
+
+func TestBuildDSN_SQLiteWritable(t *testing.T) {
+	spec := Spec{Name: "db", Type: TypeSQLite, Database: "/data/app.db", ReadOnly: boolPtr(false)}
+	_, dsn, err := BuildDSN(spec, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if dsn != "/data/app.db" {
 		t.Errorf("dsn = %q, want /data/app.db", dsn)
+	}
+}
+
+func TestBuildDSN_SQLiteFileURIReadOnly(t *testing.T) {
+	cases := map[string]string{
+		"file:/data/app.db":          "file:/data/app.db?mode=ro",
+		"file:/data/app.db?cache=sh": "file:/data/app.db?cache=sh&mode=ro",
+	}
+	for in, want := range cases {
+		spec := Spec{Name: "db", Type: TypeSQLite, Database: in}
+		_, dsn, err := BuildDSN(spec, "")
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", in, err)
+		}
+		if dsn != want {
+			t.Errorf("dsn = %q, want %q", dsn, want)
+		}
 	}
 }
 
