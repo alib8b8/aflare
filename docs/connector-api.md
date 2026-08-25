@@ -1,6 +1,6 @@
 # Connector API 设计
 
-> 状态：骨架已实现（数据库 + 文件/笔记），见文末 Roadmap
+> 状态：已实现并合入 main（数据库 + 文件/笔记，含安全加固），随下个版本发布，见文末 Roadmap
 > 定位：aflare 是 AI 与用户数据之间「确定且安全」的控制层。Connector API
 > 是这个控制层的数据源接入标准 —— 用户自带数据源，aflare 只负责命名连
 > 接、凭据隔离与权限控制。
@@ -204,7 +204,7 @@ steps:
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | PR #95 | 数据库连接器骨架：Spec/Registry/Resolver/DSN + sql_query 接入 + CLI | ✅ 已合并 |
-| 本 PR | **文件/笔记/个人库**：files/notes 类型 + file_read/file_write/files_list 接入 + sqlite mode=ro | ✅ |
+| #96 | **文件/笔记/个人库**：files/notes 类型 + file_read/file_write/files_list 接入 + sqlite mode=ro | ✅ 已合并 |
 | 下一步（个人） | 笔记搜索：frontmatter/tags/全文检索节点（notes 专属，走 connector root）；连接器级审计事件 | 计划 |
 | 之后（个人→通用） | HTTP/API 连接器（http_request 接 `connector`，Bearer/Basic 注入）——个人云盘/API 与企业内网 API 复用 | 计划 |
 | 最后（企业） | 企业 profile：Vault/SSO Resolver、内网 allowlist 与策略引擎联动、按连接器名的连接池缓存 | 计划 |
@@ -216,5 +216,5 @@ steps:
 接入，由 aflare 让 AI 确定且安全地运行。**
 
 目标用户先个人：个人用户「开箱即用」的数据就是本机文件、笔记库、
-SQLite 个人库 —— 本 PR 让这三类零凭据、零配置地接入同一个安全模型。
+SQLite 个人库 —— Connector API 让这三类零凭据、零配置地接入同一个安全模型。
 企业内网系统走同一套 Spec/Resolver/天花板抽象，后续按 Roadmap 落地。

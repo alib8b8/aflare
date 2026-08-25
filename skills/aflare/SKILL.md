@@ -54,6 +54,14 @@ aflare --dry-run run workflow.yaml
 
 # Safe mode (disables execute node)
 aflare --safe-mode run workflow.yaml
+
+# Register a named connector (database / files / notes)
+aflare connector add my-notes --type notes --root ~/notes
+
+# List / inspect / remove connectors
+aflare connector list
+aflare connector show my-notes
+aflare connector remove my-notes
 ```
 
 ### Available Nodes
@@ -71,6 +79,8 @@ aflare --safe-mode run workflow.yaml
 | `transform` | Transform text (uppercase, lowercase, trim, replace, regex) |
 | `combine` | Merge multiple inputs into one |
 | `notify` | Print or send notifications |
+
+**Connector-aware nodes:** `sql_query`, `file_read`, `file_write`, `files_list` accept a `connector` param — reference a named connector (registered via `aflare connector add`) instead of inline DSNs/paths. Credentials stay out of workflow files; read-only by default; connector ceilings (max_rows / timeout / max_bytes) always apply.
 
 **LLM Nodes:**
 | Node | Provider |
