@@ -43,12 +43,9 @@ irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 | iex
 ```
 
 <details>
-<summary><b>Other install methods</b> (Homebrew / manual download / deb · rpm)</summary>
+<summary><b>Other install methods</b> (manual download / deb · rpm)</summary>
 
 ```bash
-# Homebrew (macOS / Linuxbrew)
-brew install alib8b8/tap/aflare
-
 # Manual binary download
 #   GitHub:  https://github.com/alib8b8/aflare/releases
 #   CN accelerated: https://ghproxy.com/https://github.com/alib8b8/aflare/releases
@@ -155,7 +152,7 @@ aflare puts **personal users first** (intranet / local-first enterprise scenario
 
 **Personal data connectors (Connector API)** — Explicitly authorize local directories, note libraries and personal databases via `aflare connector add`; workflows reference only the connector name. `files` / `notes` directory connectors apply the workdir sandbox's containment rules (no absolute paths, no traversal, unconditional symlink-escape rejection, extension allowlists, byte limits) to roots you grant like `~/notes` or `~/Documents`; `sqlite` / `mysql` / `postgres` database connectors keep credentials exclusively in the secrets store / environment variables, with SQLite read-only defense-in-depth (DSN forced to `mode=ro`). Permission ceilings declared on the connector (read-only, rows, bytes) can only be tightened by nodes, never loosened — you define the AI's capability boundary.
 
-**Local-first, data never leaves your machine** — Single binary with zero runtime deps, runs in ~5MB RAM; workflows, execution history, memory and secrets all stay on local disk; API keys are injected via environment variables or the OS keyring, never written in cleartext to `config.yaml`; fully offline-capable (offline install, `aflare doctor --offline`, WebUI Mermaid offline fallback).
+**Local-first, data never leaves your machine** — Single binary with zero runtime deps, runs in ~10–30MB RAM; workflows, execution history, memory and secrets all stay on local disk; API keys are injected via environment variables or the OS keyring, never written in cleartext to `config.yaml`; fully offline-capable (offline install, `aflare doctor --offline`, WebUI Mermaid offline fallback).
 
 **Connect your own LLM** — Ollama / vLLM / LM Studio / local DeepSeek / any OpenAI-compatible endpoint, with loopback addresses (127.0.0.1 / localhost) requiring no API key. With a local LLM, the LLM drives intent understanding and dynamic workflow generation (`--ai` / `chat`); without one, keyword matching falls back so offline use still works.
 

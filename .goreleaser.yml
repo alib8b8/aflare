@@ -75,8 +75,6 @@ release:
     irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 | iex
     ```
 
-    Homebrew: `brew install alib8b8/tap/aflare`
-
     ## Build verification status
 
     | Artifact        | CI verified                                                       |
