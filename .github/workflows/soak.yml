@@ -1,0 +1,43 @@
+name: Nightly Soak
+
+# Long-running stability checks that are too slow for the per-PR CI gate:
+#   - daemon soak (RSS/thread sampling over ~1min, gated by AFLARE_SOAK=1)
+#   - full test suite without -short (exercises every non-short test)
+# Runs nightly on main and on demand via workflow_dispatch.
+on:
+  schedule:
+    - cron: '0 18 * * *'  # 18:00 UTC daily
+  workflow_dispatch:       # manual trigger with optional soak duration override
+
+jobs:
+  soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Set up Go
+      uses: actions/setup-go@v7
+      with:
+        go-version: '1.26.7' # keep in sync with ci.yml
+
+    # Daemon-level stability: builds the real binary, runs it with the
+    # scheduler + filewatch live, samples RSS/threads, and asserts both
+    # bounded memory growth and graceful SIGINT teardown. This is the
+    # regression net for the stdin-idle signal deadlock fixed in the
+    # daemon main loop.
+    - name: Daemon soak test (RSS/thread stability + graceful shutdown)
+      env:
+        AFLARE_SOAK: '1'
+      run: go test ./internal/cli/ -run 'TestDaemon_SoakStability|TestDaemon_SIGINTGracefulShutdown' -v -count=1 -timeout 20m
+
+    # Nightly full run: everything the -short CI gate skips, including
+    # the daemon integration tests above and any other long tests.
+    - name: Full test suite (no -short)
+      run: go test ./... -count=1 -timeout 30m
+
+    # Soak is about runtime health, not coverage — but a race-detector
+    # pass over the concurrency-heavy packages catches data races that
+    # only surface under the longer schedules exercised here.
+    - name: Race check on daemon packages
+      run: go test ./internal/cli/ ./internal/scheduler/ ./internal/taskqueue/ -race -count=1 -timeout 20m
