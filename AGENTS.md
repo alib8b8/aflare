@@ -4,6 +4,9 @@
 - Go 1.26 (go.mod pins `go 1.26.0` + `toolchain go1.26.7`; CI uses go-version 1.26.7). Never
   downgrade below the pinned patch — stdlib vulnerabilities are surfaced by govulncheck.
 - golangci-lint v2.13.1 — must match CI. Binaries built with older Go (e.g. v2.12.2 built with go1.25) cannot lint this repo.
+- govulncheck v1.7.0 — pinned in mise.toml and in all four workflows that run it
+  (ci.yml, pr-review.yml, supply-chain.yml, security-auto-fix.yml); keep them in
+  sync when bumping.
 
 ## CI gate — must pass locally before any commit
 Run all of these; all must be green:

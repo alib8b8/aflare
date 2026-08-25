@@ -69,5 +69,5 @@ jobs:
     # (matches ci.yml / pr-review.yml and docs/code-review.md "Blocking: Yes").
     - name: Run govulncheck
       run: |
-        go install golang.org/x/vuln/cmd/govulncheck@latest
+        go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
         govulncheck -show verbose ./...
