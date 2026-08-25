@@ -529,7 +529,7 @@ func (r *Registry) Search(query string) []NodeInfo {
 
 // NodesByCategory returns the registered nodes that belong to the given
 // category, based on a hardcoded name->category mapping maintained here
-// so that the marketplace node and the CLI can share it.
+// so that the CLI can share it.
 func (r *Registry) NodesByCategory(category NodeCategory) []NodeInfo {
 	categoryMap := map[NodeCategory][]string{
 		CategoryLLM: {
@@ -549,17 +549,17 @@ func (r *Registry) NodesByCategory(category NodeCategory) []NodeInfo {
 			"markdown_render", "base64_encode", "base64_decode",
 		},
 		CategoryFlow: {
-			"if", "switch", "loop", "wait", "parallel", "map",
+			"if", "switch", "loop", "parallel", "map",
 		},
 		CategoryData: {
 			"rag", "knowledge_graph", "code_interpreter",
-			"execute", "multimodal", "node_marketplace",
+			"execute", "multimodal",
 		},
 		CategorySecurity: {
 			"hash", "encrypt", "decrypt", "sign", "verify",
 		},
 		CategoryUtility: {
-			"echo", "wait", "log", "env", "variable",
+			"echo", "log", "env", "variable",
 		},
 	}
 
