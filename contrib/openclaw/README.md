@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/alib8b8/aflare">
-    <img src="https://img.shields.io/badge/aflare-v1.0.0-blue" alt="aflare"/>
+    <img src="https://img.shields.io/badge/aflare-v0.10.0-blue" alt="aflare"/>
   </a>
   <a href="https://github.com/alib8b8/openclaw-aflare">
     <img src="https://img.shields.io/badge/OpenClaw-Plugin-green" alt="OpenClaw Plugin"/>
