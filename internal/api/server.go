@@ -36,6 +36,7 @@ import (
 	"github.com/alib8b8/aflare/internal/agent"
 	"github.com/alib8b8/aflare/internal/meta"
 	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/policy"
 	"github.com/alib8b8/aflare/internal/workflow"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -365,13 +366,33 @@ func (s *Server) handleRunWorkflow(w http.ResponseWriter, r *http.Request) {
 	// Build the registry
 	reg := nodes.GetGlobalRegistry()
 
-	// Execute the workflow
-	exec := workflow.NewExecutor().WithTimeout(timeout)
+	// Execute the workflow with the same audit + policy guarantees as the
+	// `aflare run` CLI path (self-test finding: this remote entry point
+	// previously ran a bare executor — zero audit records, zero policy
+	// checks). Audit writes are serialized in-process by the history
+	// package, so concurrent requests extend the same hash chain safely.
+	exec := workflow.NewExecutor().
+		WithTimeout(timeout).
+		WithAuditLog(true, "")
+	pexec := workflow.NewPolicyExecutor(exec, policy.NewEngine(policy.DefaultPolicy(), nil))
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
+	// Policy gate before any step runs: fail fast with 400 instead of
+	// executing half a workflow. DefaultPolicy parity with the CLI means
+	// approval-required actions (e.g. file_delete) are denied here — there
+	// is no human on this path to approve them.
+	if verr := pexec.ValidateWorkflow(ctx, wf); verr != nil {
+		atomic.AddUint64(&s.workflowsFailed, 1)
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("policy violation: %v", verr),
+		})
+		return
+	}
+
 	start := time.Now()
-	output, stepResults, execErr := exec.Execute(ctx, wf, reg)
+	output, stepResults, execErr := pexec.Execute(ctx, wf, reg)
 	duration := time.Since(start)
 
 	resp := runWorkflowResponse{

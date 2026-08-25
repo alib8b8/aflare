@@ -35,6 +35,7 @@ import (
 
 	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/policy"
 	"github.com/alib8b8/aflare/internal/workflow"
 )
 
@@ -414,7 +415,24 @@ func (s *WebhookServer) runTask(task *Task, body []byte, query map[string][]stri
 	ctx, cancel := context.WithTimeout(context.Background(), workflow.DefaultWorkflowTimeout)
 	defer cancel()
 
-	output, _, err := workflow.ExecuteWorkflow(ctx, wf, s.registry)
+	// Same audit + policy guarantees as the `aflare run` CLI path (self-test
+	// finding: this entry point previously ran the bare package-level
+	// ExecuteWorkflow — zero audit records, zero policy checks, while the
+	// request body/query flow into workflow vars as untrusted input).
+	// Approval-required actions are denied: no human is on this path.
+	exec := workflow.NewExecutor().WithAuditLog(true, "")
+	pexec := workflow.NewPolicyExecutor(exec, policy.NewEngine(policy.DefaultPolicy(), nil))
+	if verr := pexec.ValidateWorkflow(ctx, wf); verr != nil {
+		logger.Error("webhook workflow blocked by policy",
+			"task_id", task.ID,
+			"workflow", task.WorkflowName,
+			"err", verr.Error(),
+		)
+		s.completeTask(task.ID, TaskFailed, "", "workflow blocked by policy")
+		return
+	}
+
+	output, _, err := pexec.Execute(ctx, wf, s.registry)
 	if err != nil {
 		// ExecuteWorkflow errors may contain node internals, file paths,
 		// or partial output. Log the full error server-side for debugging,
