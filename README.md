@@ -43,12 +43,9 @@ irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 | iex
 ```
 
 <details>
-<summary><b>其他安装方式</b>(Homebrew / 手动下载 / deb · rpm)</summary>
+<summary><b>其他安装方式</b>(手动下载 / deb · rpm)</summary>
 
 ```bash
-# Homebrew(macOS / Linuxbrew)
-brew install alib8b8/tap/aflare
-
 # 手动下载二进制
 #   GitHub:  https://github.com/alib8b8/aflare/releases
 #   国内加速: https://ghproxy.com/https://github.com/alib8b8/aflare/releases
@@ -150,7 +147,7 @@ aflare 面向个人用户优先（企业内网 / 本地优先场景同样适用�
 
 **个人数据连接器（Connector API）** — 用 `aflare connector add` 显式授权本地目录、笔记库、个人数据库，工作流只引用连接器名：`files` / `notes` 目录连接器把 workdir 沙箱的遏制规则（禁绝对路径、禁穿越、symlink 逃逸无条件拒绝、扩展名白名单、字节数上限）应用到 `~/notes`、`~/Documents` 等你授权的根；`sqlite` / `mysql` / `postgres` 数据库连接器凭据只存 secrets store / 环境变量，SQLite 只读模式纵深防御（DSN 强制 `mode=ro`）。连接器声明的权限天花板（只读、行数、字节）节点只能收紧、不能放宽——AI 的能力边界由你定义。
 
-**本地优先，数据不出本地** — 单二进制零运行时依赖，~5MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退）。
+**本地优先，数据不出本地** — 单二进制零运行时依赖，约 10–30MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退）。
 
 **连接你自己的 LLM** — Ollama / vLLM / LM Studio / DeepSeek 本地部署 / 任何 OpenAI 兼容 endpoint，loopback 地址（127.0.0.1 / localhost）免 API Key 接入。有本地 LLM 时由 LLM 做意图理解与动态生成工作流（`--ai` / `chat`），无 LLM 时关键词匹配兜底，离线仍可用。
 
