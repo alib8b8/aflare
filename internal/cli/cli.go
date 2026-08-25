@@ -147,7 +147,7 @@ var knownCommands = []string{
 	"create", "run", "help", "install", "uninstall", "registry", "list",
 	"validate", "review", "version", "self-update", "update", "upgrade",
 	"autoupgrade", "init", "config", "webui", "schedule", "audit",
-	"serve", "secrets", "connector", "resume", "chat", "agent",
+	"serve", "webhook", "secrets", "connector", "resume", "chat", "agent",
 	"watermark", "doctor", "mcp",
 }
 
@@ -300,6 +300,7 @@ func PrintUsage() string {
   aflare audit <cmd>                     %s
   aflare review <workflow.yaml>          %s
   aflare serve                           %s
+  aflare webhook                         %s
   aflare webui                           %s
   aflare help                            %s
 
@@ -346,6 +347,7 @@ func PrintUsage() string {
 		i18n.T("usage.audit"),
 		i18n.T("usage.review"),
 		i18n.T("usage.serve"),
+		i18n.T("usage.webhook"),
 		i18n.T("usage.webui"),
 		i18n.T("usage.help"),
 		i18n.T("options"),

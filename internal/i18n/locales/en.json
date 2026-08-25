@@ -170,5 +170,6 @@
   "usage.audit": "Query and verify the audit log",
   "usage.review": "AI-review a workflow (suggestions & security checks)",
   "usage.serve": "Start the HTTP API server (localhost by default)",
+  "usage.webhook": "Start the webhook trigger server (event-driven, triggers local workflows by name)",
   "usage.webui": "Start the Web UI"
 }
