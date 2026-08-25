@@ -77,15 +77,36 @@ type agentResult struct {
 	Error   string `json:"error,omitempty"`
 }
 
+// maxDelegationParallelism caps the supervisor's delegation concurrency
+// so a large plan cannot fork an unbounded number of agent subprocesses
+// or A2A connections at once.
+const maxDelegationParallelism = 16
+
+// defaultDelegationParallelism is the concurrency used when the
+// max_parallel param is absent or unparseable.
+const defaultDelegationParallelism = 4
+
+// clampParallelism bounds the delegation concurrency to a sane range.
+func clampParallelism(n int) int {
+	if n < 1 {
+		return 1
+	}
+	if n > maxDelegationParallelism {
+		return maxDelegationParallelism
+	}
+	return n
+}
+
 // delegateToAgents runs the real-delegation loop: LLM planning (when an
 // LLM is available), parallel supervised execution, LLM synthesis (when
 // available). When no LLM is configured the input is fanned out to every
 // listed agent and the raw outputs are merged — command and supervision
-// still work without a planner.
-func delegateToAgents(ctx context.Context, refs []agentRef, goal string, llm llmCaller) (string, error) {
+// still work without a planner. At most maxParallel delegations run at
+// once (backpressure: excess jobs queue instead of spiking the host).
+func delegateToAgents(ctx context.Context, refs []agentRef, goal string, llm llmCaller, maxParallel int) (string, error) {
 	plan, planned := planDelegations(ctx, refs, goal, llm)
 
-	results := runDelegations(ctx, refs, goal, plan)
+	results := runDelegations(ctx, refs, goal, plan, maxParallel)
 
 	synthesis := synthesizeResults(ctx, goal, results, llm)
 
@@ -156,10 +177,12 @@ func parseDelegationPlan(resp string, refs []agentRef) ([]delegation, error) {
 }
 
 // runDelegations executes the plan in parallel with per-delegation
-// supervision. Unplanned agents are skipped when a plan exists; without
-// a plan every agent receives the full goal. Each result records
-// success/failure so one failing agent cannot sink the batch.
-func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []delegation) []agentResult {
+// supervision, bounded to maxParallel concurrent delegations (excess
+// jobs queue on the semaphore — backpressure instead of fork bombs).
+// Unplanned agents are skipped when a plan exists; without a plan every
+// agent receives the full goal. Each result records success/failure so
+// one failing agent cannot sink the batch.
+func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []delegation, maxParallel int) []agentResult {
 	byName := make(map[string]agentx.AgentDef, len(refs))
 	for _, ref := range refs {
 		byName[ref.Name] = ref.Def
@@ -174,12 +197,27 @@ func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []de
 		}
 	}
 
+	if maxParallel <= 0 {
+		maxParallel = defaultDelegationParallelism
+	}
+	maxParallel = clampParallelism(maxParallel)
+	sem := make(chan struct{}, maxParallel)
+
 	results := make([]agentResult, len(jobs))
 	var wg sync.WaitGroup
 	for i, job := range jobs {
 		wg.Add(1)
 		go func(i int, job delegation) {
 			defer wg.Done()
+			// Backpressure: block until a delegation slot frees up so a
+			// 20-agent plan runs 16-at-most concurrently, not 20-at-once.
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				results[i] = agentResult{Agent: job.Agent, Subtask: job.Subtask, Error: ctx.Err().Error()}
+				return
+			}
+			defer func() { <-sem }()
 			res := agentResult{Agent: job.Agent, Subtask: job.Subtask}
 			def := byName[job.Agent]
 			def.Name = job.Agent

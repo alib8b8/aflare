@@ -26,6 +26,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alib8b8/aflare/internal/agentx"
 )
@@ -144,7 +145,7 @@ func TestRunDelegations_ParallelFanOut(t *testing.T) {
 	}
 
 	// No plan → fan-out: every agent gets the full goal.
-	results := runDelegations(context.Background(), refs, "shared goal", nil)
+	results := runDelegations(context.Background(), refs, "shared goal", nil, 0)
 	if len(results) != 2 {
 		t.Fatalf("results = %d, want 2", len(results))
 	}
@@ -173,7 +174,7 @@ func TestRunDelegations_FailureIsolated(t *testing.T) {
 		{Name: "bad", Def: mustAgent(t, "bad")},
 	}
 
-	results := runDelegations(context.Background(), refs, "goal", nil)
+	results := runDelegations(context.Background(), refs, "goal", nil, 0)
 	byAgent := map[string]agentResult{}
 	for _, res := range results {
 		byAgent[res.Agent] = res
@@ -183,6 +184,58 @@ func TestRunDelegations_FailureIsolated(t *testing.T) {
 	}
 	if byAgent["bad"].OK || byAgent["bad"].Error == "" {
 		t.Errorf("bad agent result = %+v, want recorded failure", byAgent["bad"])
+	}
+}
+
+// TestRunDelegations_BoundedConcurrency pins the backpressure contract:
+// with maxParallel=2 and six 400ms delegations, the batch must take at
+// least three waves (>=1200ms). Unbounded fan-out would finish in ~400ms.
+func TestRunDelegations_BoundedConcurrency(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script fake agent is POSIX-only")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fake-slow")
+	script := "#!/bin/sh\nsleep 0.4\necho ok\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil { // #nosec G306 -- test helper must be executable
+		t.Fatalf("write fake agent: %v", err)
+	}
+
+	agents := map[string]agentx.AgentDef{}
+	var refs []agentRef
+	for _, name := range []string{"a1", "a2", "a3", "a4", "a5", "a6"} {
+		agents[name] = agentx.AgentDef{Driver: agentx.DriverCLI, Profile: "generic", Binary: path}
+	}
+	registerTestAgents(t, agents)
+	for _, name := range []string{"a1", "a2", "a3", "a4", "a5", "a6"} {
+		refs = append(refs, agentRef{Name: name, Def: mustAgent(t, name)})
+	}
+
+	start := time.Now()
+	results := runDelegations(context.Background(), refs, "goal", nil, 2)
+	elapsed := time.Since(start)
+
+	if len(results) != 6 {
+		t.Fatalf("results = %d, want 6", len(results))
+	}
+	for _, res := range results {
+		if !res.OK {
+			t.Errorf("agent %s failed: %s", res.Agent, res.Error)
+		}
+	}
+	if minWaves := 3 * 400 * time.Millisecond; elapsed < minWaves {
+		t.Errorf("elapsed = %v, want >= %v (maxParallel=2 must force >= 3 waves, not unbounded fan-out)", elapsed, minWaves)
+	}
+}
+
+func TestClampParallelism(t *testing.T) {
+	cases := []struct{ in, want int }{
+		{-5, 1}, {0, 1}, {1, 1}, {4, 4}, {16, 16}, {100, 16},
+	}
+	for _, c := range cases {
+		if got := clampParallelism(c.in); got != c.want {
+			t.Errorf("clampParallelism(%d) = %d, want %d", c.in, got, c.want)
+		}
 	}
 }
 
@@ -215,7 +268,7 @@ func TestDelegateToAgents_WithPlannerAndSynthesis(t *testing.T) {
 		return "SYNTHESIS: merged answer", nil
 	}
 
-	out, err := delegateToAgents(context.Background(), refs, "build feature X", llm)
+	out, err := delegateToAgents(context.Background(), refs, "build feature X", llm, 0)
 	if err != nil {
 		t.Fatalf("delegateToAgents: %v", err)
 	}
@@ -258,7 +311,7 @@ func TestDelegateToAgents_PlannerFailureFallsBackToFanOut(t *testing.T) {
 	llm := func(ctx context.Context, systemPrompt, userInput string) (string, error) {
 		return "", context.DeadlineExceeded
 	}
-	out, err := delegateToAgents(context.Background(), refs, "the goal", llm)
+	out, err := delegateToAgents(context.Background(), refs, "the goal", llm, 0)
 	if err != nil {
 		t.Fatalf("delegateToAgents: %v", err)
 	}
@@ -283,7 +336,7 @@ func TestDelegateToAgents_NoLLMFanOut(t *testing.T) {
 	})
 	refs := []agentRef{{Name: "alpha", Def: mustAgent(t, "alpha")}}
 
-	out, err := delegateToAgents(context.Background(), refs, "the goal", nil)
+	out, err := delegateToAgents(context.Background(), refs, "the goal", nil, 0)
 	if err != nil {
 		t.Fatalf("delegateToAgents: %v", err)
 	}
@@ -304,7 +357,7 @@ func TestDelegateToAgents_A2AAgent(t *testing.T) {
 	})
 	refs := []agentRef{{Name: "remote", Def: mustAgent(t, "remote")}}
 
-	out, err := delegateToAgents(context.Background(), refs, "the goal", nil)
+	out, err := delegateToAgents(context.Background(), refs, "the goal", nil, 0)
 	if err != nil {
 		t.Fatalf("delegateToAgents: %v", err)
 	}

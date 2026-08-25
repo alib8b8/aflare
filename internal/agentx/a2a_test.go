@@ -19,6 +19,9 @@ package agentx
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -292,5 +295,162 @@ func TestFetchAgentCard_NoCardAnywhere(t *testing.T) {
 	def := AgentDef{Name: "r", Driver: DriverA2A, URL: srv.URL + "/"}
 	if _, err := FetchAgentCard(context.Background(), def); err == nil {
 		t.Fatal("missing agent card accepted, want error")
+	}
+}
+
+// TestSendMessage_PollRetriesTransient5xx verifies that one transient
+// 502 on tasks/get no longer kills the whole delegation: the poll is an
+// idempotent read, so it is retried and the delegation completes.
+func TestSendMessage_PollRetriesTransient5xx(t *testing.T) {
+	var polls atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Method string `json:"method"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch req.Method {
+		case "message/send":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"jsonrpc": "2.0", "id": 1,
+				"result": map[string]any{
+					"id":     "task-1",
+					"status": map[string]any{"state": "working"},
+				},
+			})
+		case "tasks/get":
+			if polls.Add(1) == 1 {
+				http.Error(w, "bad gateway", http.StatusBadGateway)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"jsonrpc": "2.0", "id": 1,
+				"result": map[string]any{
+					"id": "task-1",
+					"status": map[string]any{"state": "completed", "message": map[string]any{
+						"role":  "agent",
+						"parts": []map[string]any{{"kind": "text", "text": "recovered"}},
+					}},
+				},
+			})
+		default:
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"jsonrpc": "2.0", "id": 1,
+				"error": map[string]any{"code": -32601, "message": "Method not found"},
+			})
+		}
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	def := AgentDef{Name: "r", Driver: DriverA2A, URL: srv.URL + "/"}
+	out, err := SendMessage(context.Background(), def, Task{Prompt: "x"})
+	if err != nil {
+		t.Fatalf("SendMessage: %v (want transient 502 on poll to be retried)", err)
+	}
+	if !strings.Contains(out, "recovered") {
+		t.Errorf("output = %q, want recovered task text", out)
+	}
+	if got := polls.Load(); got != 2 {
+		t.Errorf("polls = %d, want 2 (first 502 then success)", got)
+	}
+}
+
+// TestSendMessage_SubmitDoesNotRetryServerErrors verifies the submit
+// retry policy: message/send is not idempotent, so a server-side 5xx
+// (request was delivered) must NOT be retried.
+func TestSendMessage_SubmitDoesNotRetryServerErrors(t *testing.T) {
+	var sends atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Method string `json:"method"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if req.Method == "message/send" {
+			sends.Add(1)
+			http.Error(w, "boom", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"jsonrpc": "2.0", "id": 1,
+			"error": map[string]any{"code": -32601, "message": "Method not found"},
+		})
+	}))
+	t.Cleanup(srv.Close)
+
+	def := AgentDef{Name: "r", Driver: DriverA2A, URL: srv.URL + "/"}
+	_, err := SendMessage(context.Background(), def, Task{Prompt: "x"})
+	if err == nil || !strings.Contains(err.Error(), "HTTP 500") {
+		t.Fatalf("err = %v, want HTTP 500 failure surfaced", err)
+	}
+	if got := sends.Load(); got != 1 {
+		t.Errorf("send attempts = %d, want 1 (delivered submits must not be retried)", got)
+	}
+}
+
+// TestSendMessage_SubmitRetriesDialErrors verifies the other half of
+// the submit retry policy: a dial failure means the request never
+// reached the agent, so the submit IS retried (three attempts total).
+func TestSendMessage_SubmitRetriesDialErrors(t *testing.T) {
+	// Reserve a port and close it: nothing listens, so every attempt
+	// fails at connection establishment.
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("cannot reserve port: %v", err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	if err := l.Close(); err != nil {
+		t.Fatalf("close listener: %v", err)
+	}
+
+	origDelays := a2aRetryDelays
+	a2aRetryDelays = []time.Duration{10 * time.Millisecond, 20 * time.Millisecond}
+	t.Cleanup(func() { a2aRetryDelays = origDelays })
+
+	def := AgentDef{Name: "r", Driver: DriverA2A, URL: fmt.Sprintf("http://127.0.0.1:%d/", port)}
+	start := time.Now()
+	_, err = SendMessage(context.Background(), def, Task{Prompt: "x"})
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("dial to dead port accepted, want error")
+	}
+	if !isA2ADialError(err) {
+		t.Errorf("err = %v, want dial error classification", err)
+	}
+	// Three attempts with 10ms + 20ms backoff must take at least 30ms;
+	// a single attempt would return almost instantly.
+	if elapsed < 30*time.Millisecond {
+		t.Errorf("elapsed = %v, want >= 30ms (submit retried on dial failure)", elapsed)
+	}
+}
+
+// TestA2AErrorClassification pins the retry classifiers: dial failures
+// are pre-delivery (safe for submits); transport failures and 5xx are
+// retryable only for idempotent reads; 4xx never are.
+func TestA2AErrorClassification(t *testing.T) {
+	dialErr := fmt.Errorf("message/send request failed: %w", &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("refused")})
+	readErr := fmt.Errorf("tasks/get request failed: %w", &net.OpError{Op: "read", Net: "tcp", Err: errors.New("reset")})
+	http5xx := &a2aHTTPStatusError{Method: "tasks/get", Status: 502, Body: "bad gateway"}
+	http4xx := &a2aHTTPStatusError{Method: "tasks/get", Status: 404, Body: "nope"}
+
+	if !isA2ADialError(dialErr) {
+		t.Error("dial error not classified as dial")
+	}
+	if isA2ADialError(readErr) || isA2ADialError(http5xx) || isA2ADialError(http4xx) {
+		t.Error("non-dial errors classified as dial")
+	}
+	for _, err := range []error{dialErr, readErr, http5xx} {
+		if !isA2ARetryableReadError(err) {
+			t.Errorf("err = %v, want retryable read", err)
+		}
+	}
+	if isA2ARetryableReadError(http4xx) {
+		t.Error("HTTP 404 classified as retryable, want permanent")
 	}
 }

@@ -175,6 +175,7 @@ aflare 面向个人用户优先（企业内网 / 本地优先场景同样适用�
 |------|------|----------|
 | **ReAct Agent 对话** (`aflare chat`) | ✅ | 有测试 |
 | **守护进程式 Agent** (`aflare agent`) | ✅ | 有测试 |
+| **Agent 互联与指挥**（`@agent` 真实委派 / `cli_agent` / `a2a_agent` 节点） | ✅ | 有测试 |
 | **6 类可插拔能力**（反思/HITL/效用驱动等） | ✅ | 有测试 |
 | **多源输入融合**（stdin + 定时任务 + 文件监听） | ✅ | 有测试 |
 | DAG 并行调度 | ✅ | 有测试 + TLA+ 形式化验证 |
@@ -210,6 +211,53 @@ aflare 面向个人用户优先（企业内网 / 本地优先场景同样适用�
 | `memory` | 有状态 | 跨会话长期记忆 + MemHarness 批判注入：记忆带来源状态标注（记录日期/类别）注入，超 30 天未复用自动丢弃，模型先判断适用性再使用 |
 | `planning` | 规划式 | 行动前生成计划，逐步执行 |
 | `workflow` | 工作流/管道式 | 优先使用已有模板，稳定可预测 |
+
+### Agent 互联与指挥（aflare 作为上位指挥者）
+
+aflare 不是以 skill / 插件形式嵌入其他 Agent，而是反过来：**用户安装 aflare 后，由 aflare 指挥和监督其他 Agent 工作**。两条互联通道：
+
+- **CLI 通道** — 把本地 Agent CLI（`codex` / `claude` / `gemini` 内置预设，或任意通用 CLI）作为受管子进程运行：参数白名单校验、超时控制、输出捕获
+- **A2A 通道** — 通过 [A2A 协议](https://a2a-protocol.org/) 连接远程 Agent：Agent Card 自动发现、任务提交、状态轮询、Bearer 认证（密钥走环境变量，不落盘）
+
+**注册外部 Agent**（`~/.config/aflare/config.yaml`）：
+
+```yaml
+agents:
+  codex:                      # 内置预设，开箱即用
+    driver: cli
+    description: 代码实现与工程任务
+  research-a2a:               # 任意 A2A 远程 Agent
+    driver: a2a
+    url: http://127.0.0.1:8080/
+    api_key_env: MY_AGENT_KEY # Bearer token 从该环境变量读取
+    description: 深度调研
+  my-tool:                    # 任意通用 CLI
+    driver: cli
+    profile: generic
+    binary: /usr/local/bin/my-agent
+    args: ["--json"]
+```
+
+```bash
+aflare agent list    # 查看已注册、可指挥的外部 Agent
+```
+
+**指挥方式**（三种，均带监督）：
+
+1. **supervisor 节点真实委派** — `specialists` 中以 `@` 前缀引用注册的 Agent，aflare 用 LLM 规划子任务、并行委派（`max_parallel` 限流，默认 4 / 上限 16）、汇总结果：
+
+```yaml
+- id: orchestrate
+  node: supervisor
+  params:
+    specialists: "@codex,@research-a2a"   # 混搭 CLI 与 A2A Agent
+    max_parallel: "2"                      # 背压：并发委派上限
+```
+
+2. **`cli_agent` / `a2a_agent` 节点** — 工作流中单步直接委派：`cli_agent` 支持 `model` / `sandbox` / `approval_policy` / `max_turns` / `timeout`，`a2a_agent` 支持 `agent` / `url` / `api_key_env` / `timeout`
+3. **失败隔离** — 单个 Agent 失败只记录该次结果，不拖垮整批委派；A2A 轮询对瞬时 5xx/网络抖动自动重试（提交阶段仅重试"未送达"的连接错误，避免重复执行）
+
+> 安全约束：所有委派经 fail-closed 审计钩子（审计失败即拒绝执行）、prompt 长度上限、超时硬边界；CLI Agent 的 prompt 永远作为单个 argv 参数传递，不参与 flag 解析，杜绝命令注入。
 
 ### Runtime 保障（确定性执行）
 - **DAG 并行调度** — 拓扑排序依赖调度，无依赖步骤并发执行
