@@ -1,6 +1,6 @@
 # Node Reference
 
-> Auto-generated from `Schema()` metadata. 66 nodes registered.
+> Auto-generated from `Schema()` metadata. 68 nodes registered.
 
 | Node | Description | Params |
 |------|-------------|--------|
@@ -15,6 +15,7 @@
 | [`code_interpreter`](#code_interpreter) | Execute Python/Node.js/Rust code in a sandboxed environment with file I/O | 6 |
 | [`code_knowledge_graph`](#code_knowledge_graph) | Semantic code knowledge graph with vector retrieval, 158 language support, MCP tool exposure, and token-efficient rev... | 13 |
 | [`code_review`](#code_review) | Hybrid code review combining deterministic rule engine (NPE, thread-safety, security) with LLM deep analysis. Inspire... | 11 |
+| [`codex_agent`](#codex_agent) | Runs one bounded Codex agent task via `codex exec` and returns its final output. Requires the codex CLI (https://gith... | 7 |
 | [`combine`](#combine) | Combine multiple inputs into one | 1 |
 | [`compress`](#compress) | Intelligent context compression with 6 algorithms: extractive, keyword, cluster, sliding_window, hybrid (headroom-ins... | 7 |
 | [`condition`](#condition) | Evaluate conditional expressions (contains, equals, regex, empty) | 2 |
@@ -29,9 +30,10 @@
 | [`execute`](#execute) | Execute shell commands (disabled in safe mode) | 3 |
 | [`fastgpt`](#fastgpt) | Call FastGPT API | 5 |
 | [`fetch_url`](#fetch_url) | Fetch content from a URL | 3 |
-| [`file_read`](#file_read) | Read content from a file. Automatically redacts secrets (API keys, tokens, .env files) by default for privacy — set... | 2 |
+| [`file_read`](#file_read) | Read content from a file. Automatically redacts secrets (API keys, tokens, .env files) by default for privacy — set... | 3 |
 | [`file_watch`](#file_watch) | Polls a file or directory for create/modify/delete events and returns them as JSON. Suitable for log-monitor and file... | 6 |
-| [`file_write`](#file_write) | Write content to a file | 2 |
+| [`file_write`](#file_write) | Write content to a file | 3 |
+| [`files_list`](#files_list) | List files under a files/notes connector root (relative paths + sizes). Skips dotfiles/dot-directories and symlinks. ... | 3 |
 | [`gemini`](#gemini) | Call Google Gemini LLM API | 15 |
 | [`glm`](#glm) | Call GLM LLM API | 15 |
 | [`http_request`](#http_request) | Make HTTP requests with custom method, headers, and body | 12 |
@@ -62,7 +64,7 @@
 | [`search_aggregate`](#search_aggregate) | Multi-platform search aggregator with real-signal ranking: Reddit/Twitter/YouTube/HN/GitHub, sorted by votes/comments... | 8 |
 | [`session_manager`](#session_manager) | Multi-session memory management. Create isolated sessions, fork a session from a parent, merge sessions, and share fa... | 11 |
 | [`skill_distill`](#skill_distill) | Distill methodologies from books, videos, podcasts, and documents into callable skills. Supports workflow, decision, ... | 6 |
-| [`sql_query`](#sql_query) | Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1)... | 8 |
+| [`sql_query`](#sql_query) | Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1)... | 9 |
 | [`structured_output`](#structured_output) | LLM-driven structured output with local JSON Schema validation and self-correction retries | 11 |
 | [`supervisor`](#supervisor) | Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates | 13 |
 | [`template_render`](#template_render) | Render Go templates with input data | 2 |
@@ -338,6 +340,27 @@ Hybrid code review combining deterministic rule engine (NPE, thread-safety, secu
 | `use_llm` | string | No | true | Run LLM deep analysis (default: true) |
 | `auto_clarify` | string | No | false | Run ACQUIRE-style clarification before review (default: false) |
 | `clarify_threshold` | string | No | 70 | Confidence threshold for auto-clarification 0-100 (default: 70) |
+
+---
+
+## codex_agent
+
+Runs one bounded Codex agent task via `codex exec` and returns its final output. Requires the codex CLI (https://github.com/openai/codex) installed and authenticated.
+
+- **Input**: string - the task/prompt for the Codex agent
+- **Output**: string - the Codex agent's final answer (stdout)
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `binary` | string | No | codex | Path to the codex executable (default: codex, resolved from PATH) |
+| `model` | string | No |  | Model to use (passed as --model, e.g. gpt-5.6; empty = codex default) |
+| `sandbox` | string | No | strict | Codex sandbox level: strict, permissive, danger-full-access (default: strict) |
+| `approval_policy` | string | No | never | Approval policy for non-interactive runs: never, on-failure, on-request, untrusted (default: never) |
+| `max_turns` | string | No | 0 | Maximum agent turns, 0 for unlimited (default: 0) |
+| `cwd` | string | No |  | Working directory for the agent (must exist; default: current directory) |
+| `timeout` | string | No | 10m | Overall step timeout, e.g. 30s, 10m, 1h (default: 10m, max 60m) |
 
 ---
 
@@ -642,7 +665,7 @@ Fetch content from a URL
 
 ## file_read
 
-Read content from a file. Automatically redacts secrets (API keys, tokens, .env files) by default for privacy — set redact=false to disable.
+Read content from a file. Automatically redacts secrets (API keys, tokens, .env files) by default for privacy — set redact=false to disable. With a `connector` (files/notes) the path is resolved inside the connector's root and its include/max_bytes ceilings apply.
 
 - **Input**: string - not used
 - **Output**: string - file content (with secrets redacted by default)
@@ -651,7 +674,8 @@ Read content from a file. Automatically redacts secrets (API keys, tokens, .env 
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `path` | string | Yes |  | File path to read from |
+| `path` | string | Yes |  | File path to read from. Relative to the working directory, or relative to the connector root when `connector` is set. |
+| `connector` | string | No |  | Named files/notes connector (aflare connector add --type files|notes). Paths resolve inside its root and cannot escape; the connector's include allowlist and max_bytes ceiling apply. Ignored database connectors are rejected. |
 | `redact` | string | No | true | Redact secrets in output: true (default) / false. When true, .env and credential files are fully masked; other files have known secret patterns masked. |
 
 ---
@@ -687,8 +711,26 @@ Write content to a file
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `path` | string | Yes |  | File path to write to |
+| `path` | string | Yes |  | File path to write to. Relative to the working directory, or relative to the connector root when `connector` is set. |
+| `connector` | string | No |  | Named files/notes connector. Must be registered with --writable; paths resolve inside its root and its include allowlist applies. |
 | `mode` | string | No | write | Write mode: write (default) or append |
+
+---
+
+## files_list
+
+List files under a files/notes connector root (relative paths + sizes). Skips dotfiles/dot-directories and symlinks. The connector's include allowlist applies. Use it to discover paths before file_read.
+
+- **Input**: string - not used
+- **Output**: string - JSON {files: [{path, bytes}], count, truncated}
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `connector` | string | Yes |  | Named files/notes connector whose root is listed. |
+| `pattern` | string | No | **/* | Glob matched against paths relative to the connector root, e.g. "notes/*.md" (single level) or "**/*.md" (any depth). Default: all files. |
+| `max_entries` | string | No | 200 | Max entries to return (default 200, hard cap 1000). |
 
 ---
 
@@ -788,7 +830,7 @@ Human approval gate — pauses workflow for human review and approval before con
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `mode` | string | No | file | Approval mode: file, env, stdin, auto_approve (default: file) |
-| `approval_file` | string | No | .aflare-approval | Path to approval flag file (mode=file) |
+| `approval_file` | string | No | aflare-approval | Path to approval flag file (mode=file). Must not be a dotfile or carry a forbidden extension — the path goes through the standard write-path security validation. |
 | `approval_env` | string | No | AFLARE_APPROVED | Environment variable to check for approval (mode=env) |
 | `prompt` | string | No |  | Custom prompt message for the human reviewer |
 | `on_approve` | string | No | original | What to output on approve: original, modified, passthrough (default: original) |
@@ -1423,7 +1465,7 @@ Distill methodologies from books, videos, podcasts, and documents into callable 
 
 ## sql_query
 
-Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1) to prevent SQL injection. Read-only by default (SELECT/SHOW/EXPLAIN/PRAGMA only); set read_only=false to allow DML/DDL. Supports a 'schema' action that lists tables and columns.
+Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1) to prevent SQL injection. Read-only by default (SELECT/SHOW/EXPLAIN/PRAGMA only); set read_only=false to allow DML/DDL. Supports a 'schema' action that lists tables and columns. Prefer the `connector` param (named connection from `aflare connector add`) over inline driver/dsn — connectors keep credentials out of workflow files and enforce their own read_only/max_rows/timeout ceilings.
 
 - **Input**: string - SQL query (when action=query and no `sql` param, input is used as the query)
 - **Output**: string - JSON array of rows (query), or schema description (schema action)
@@ -1432,14 +1474,15 @@ Execute SQL via database/sql. The driver must be registered by the host program.
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
+| `connector` | string | No |  | Named connector registered via `aflare connector add`. When set, driver/dsn/credentials are resolved from the connector and inline driver/dsn must be omitted. Node-level read_only/max_rows/timeout can only tighten the connector's policy. |
 | `action` | string | No | query | query (default) | schema | tables |
-| `driver` | string | Yes |  | database/sql driver name (e.g. sqlite3, postgres, mysql) |
-| `dsn` | string | Yes |  | Data source name (driver-specific). For SQLite: path to .db file. |
+| `driver` | string | No |  | database/sql driver name (e.g. sqlite3, postgres, mysql). Required unless `connector` is set. |
+| `dsn` | string | No |  | Data source name (driver-specific). For SQLite: path to .db file. Required unless `connector` is set. |
 | `sql` | string | No |  | SQL statement. Use ? (mysql/sqlite) or $1,$2 (postgres) placeholders for `args`. |
 | `args` | string | No |  | JSON array of bind parameters, e.g. ["foo", 42]. Optional. |
-| `read_only` | string | No | true | Reject writes if true (default). Set false to allow INSERT/UPDATE/DELETE/DDL. |
-| `max_rows` | string | No | 1000 | Max rows to return (default 1000). Protects against huge result sets. |
-| `timeout` | string | No | 30 | Query timeout in seconds (default 30). |
+| `read_only` | string | No | true | Reject writes if true (default). Set false to allow INSERT/UPDATE/DELETE/DDL. A read-only connector stays read-only regardless. |
+| `max_rows` | string | No | 1000 | Max rows to return (default 1000; a connector's max_rows is the ceiling). Protects against huge result sets. |
+| `timeout` | string | No | 30 | Query timeout in seconds (default 30; a connector's timeout is the ceiling). |
 
 ---
 
