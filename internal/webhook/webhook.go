@@ -18,7 +18,9 @@ package webhook
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
@@ -186,6 +188,12 @@ func (s *WebhookServer) resolveAddr() string {
 	return ":" + s.port
 }
 
+// Addr returns the address the server will bind to (see resolveAddr for the
+// host fallback rules). Safe to call before Start.
+func (s *WebhookServer) Addr() string {
+	return s.resolveAddr()
+}
+
 // Start starts the HTTP server.
 func (s *WebhookServer) Start() error {
 	srv := &http.Server{
@@ -285,13 +293,59 @@ func (s *WebhookServer) requireSecret(w http.ResponseWriter, r *http.Request) bo
 	return true
 }
 
+// requireAuth validates a trigger request when a secret is configured. Two
+// credential forms are accepted, both verified in constant time:
+//
+//  1. X-Hub-Signature-256 — the GitHub webhook signature scheme (also used
+//     by Gitea/Forgejo): "sha256=<hex HMAC-SHA256 of the raw body>" keyed by
+//     the same secret configured in the repository webhook settings. Proves
+//     both the delivery origin and body integrity, so it works for
+//     untrusted callers where a shared-secret header alone cannot.
+//  2. X-Webhook-Secret — the plain shared-secret header for trusted
+//     automation callers (curl, n8n, cron jobs, ...).
+//
+// A request presenting a signature header that FAILS verification is
+// rejected without falling back to the shared-secret check: a bad signature
+// is tamper evidence, not a missing credential.
+func (s *WebhookServer) requireAuth(w http.ResponseWriter, r *http.Request, body []byte) bool {
+	if s.secret == "" {
+		return true
+	}
+	if sig := r.Header.Get("X-Hub-Signature-256"); sig != "" {
+		if verifyWebhookSignature(body, s.secret, sig) {
+			return true
+		}
+		logger.Warn("webhook request rejected: invalid X-Hub-Signature-256",
+			"client", getClientIP(r),
+			"workflow", strings.TrimPrefix(r.URL.Path, "/webhook/"),
+		)
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return false
+	}
+	return s.requireSecret(w, r)
+}
+
+// verifyWebhookSignature checks a GitHub-style X-Hub-Signature-256 header
+// ("sha256=<hexdigest>") against the HMAC-SHA256 of the raw request body
+// keyed by secret. Malformed headers and decode failures return false
+// immediately; the digest comparison is constant time.
+func verifyWebhookSignature(body []byte, secret, header string) bool {
+	const prefix = "sha256="
+	if !strings.HasPrefix(header, prefix) {
+		return false
+	}
+	got, err := hex.DecodeString(strings.TrimPrefix(header, prefix))
+	if err != nil {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body) // hash.Hash.Write never returns an error
+	return hmac.Equal(got, mac.Sum(nil))
+}
+
 func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	if !s.rateLimiter.Allow(getClientIP(r)) {
 		http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
-		return
-	}
-
-	if !s.requireSecret(w, r) {
 		return
 	}
 
@@ -308,6 +362,12 @@ func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(body) > maxBodySize {
 		http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	// Auth runs after the body is read because signature verification needs
+	// the raw bytes. See requireAuth for the accepted credential forms.
+	if !s.requireAuth(w, r, body) {
 		return
 	}
 

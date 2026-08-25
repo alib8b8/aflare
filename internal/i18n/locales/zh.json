@@ -170,5 +170,6 @@
   "usage.audit": "查询与验证审计日志",
   "usage.review": "AI 审查工作流（优化建议与安全检查）",
   "usage.serve": "启动 HTTP API 服务器（默认仅绑定本地）",
+  "usage.webhook": "启动 webhook 触发服务器（事件驱动，按名触发本地工作流）",
   "usage.webui": "启动 Web 界面"
 }

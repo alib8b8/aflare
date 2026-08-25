@@ -201,6 +201,8 @@ func dispatchCommand(command string, args []string, aiMode bool, dryRun bool, sa
 		err = cli.HandleAudit(args)
 	case "serve":
 		err = cli.HandleServe(args)
+	case "webhook":
+		err = cli.HandleWebhook(args)
 	case "secrets":
 		err = cli.HandleSecrets(args)
 	case "connector":

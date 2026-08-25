@@ -19,6 +19,9 @@ package webhook
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -381,6 +384,158 @@ steps:
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusAccepted {
 		t.Errorf("expected status 202 for correct secret, got %d", resp.StatusCode)
+	}
+}
+
+// signBody computes a GitHub-style X-Hub-Signature-256 header value for the
+// given body and secret (same scheme GitHub/Gitea/Forgejo use for webhook
+// deliveries).
+func signBody(t *testing.T, body []byte, secret string) string {
+	t.Helper()
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+}
+
+// TestWebhookServer_GitHubSignatureAuth covers the GitHub-style signature
+// credential: a correctly signed delivery must be accepted without the
+// shared-secret header, while a bad signature must be rejected — even when
+// the request also carries a valid shared secret (a bad signature is tamper
+// evidence, not a missing credential).
+func TestWebhookServer_GitHubSignatureAuth(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	srv.secret = "gh-webhook-secret"
+
+	createWorkflowFile(t, tmpDir, "gh", `name: gh-workflow
+steps:
+  - node: echo
+    params:
+      prefix: "{{var.input}}"
+`)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	body := []byte(`{"action":"opened","pr":123}`)
+
+	// 1. Valid signature, no shared-secret header → accepted (202).
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/webhook/gh", bytes.NewReader(body))
+	req.Header.Set("X-Hub-Signature-256", signBody(t, body, "gh-webhook-secret"))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Errorf("valid signature: expected 202, got %d", resp.StatusCode)
+	}
+
+	// 2. Signature over a DIFFERENT body (tampered delivery) → 401, no
+	// fallback to the shared-secret check even though the header is valid.
+	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/webhook/gh", bytes.NewReader([]byte(`{"action":"tampered"}`)))
+	req.Header.Set("X-Hub-Signature-256", signBody(t, body, "gh-webhook-secret"))
+	req.Header.Set("X-Webhook-Secret", "gh-webhook-secret")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("tampered body with stale signature: expected 401, got %d", resp.StatusCode)
+	}
+
+	// 3. Signature keyed with the wrong secret → 401.
+	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/webhook/gh", bytes.NewReader(body))
+	req.Header.Set("X-Hub-Signature-256", signBody(t, body, "wrong-secret"))
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("wrong signing key: expected 401, got %d", resp.StatusCode)
+	}
+
+	// 4. Malformed signature header values → 401.
+	for _, bad := range []string{
+		"sha256=not-hex-at-all",
+		"sha1=deadbeef", // wrong algorithm prefix
+		"deadbeef",      // missing prefix
+		"sha256=",       // empty digest
+	} {
+		req, _ = http.NewRequest(http.MethodPost, ts.URL+"/webhook/gh", bytes.NewReader(body))
+		req.Header.Set("X-Hub-Signature-256", bad)
+		resp, err = http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("webhook request failed: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("malformed signature %q: expected 401, got %d", bad, resp.StatusCode)
+		}
+	}
+
+	// 5. Signed delivery actually executes the workflow with the body as input.
+	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/webhook/gh", bytes.NewReader([]byte("signed-run")))
+	req.Header.Set("X-Hub-Signature-256", signBody(t, []byte("signed-run"), "gh-webhook-secret"))
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	var triggerResp map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&triggerResp); err != nil {
+		t.Fatalf("failed to decode trigger response: %v", err)
+	}
+	resp.Body.Close()
+	task := waitForTask(t, srv, triggerResp["task_id"])
+	if task.Status != TaskCompleted {
+		t.Fatalf("expected task completed, got %s (error: %s)", task.Status, task.Error)
+	}
+	if task.Output != "signed-run " {
+		t.Errorf("expected body to flow into {{var.input}}, got output %q", task.Output)
+	}
+}
+
+// TestWebhookServer_StatusStillRequiresSharedSecret pins the status
+// endpoint's auth model: it accepts the shared-secret header only —
+// signature headers are for deliveries, not status queries.
+func TestWebhookServer_StatusStillRequiresSharedSecret(t *testing.T) {
+	srv, _, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	srv.secret = "status-secret"
+	task := &Task{ID: "t1", WorkflowName: "w", Status: TaskCompleted}
+	srv.addTask(task)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	// A signature header alone must not authorize a status query (the
+	// status endpoint has no body to verify the signature against).
+	sig := signBody(t, []byte{}, "status-secret")
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/webhook/status/t1", nil)
+	req.Header.Set("X-Hub-Signature-256", sig)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("status request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("signature header on status endpoint: expected 401, got %d", resp.StatusCode)
+	}
+
+	// Shared secret still works.
+	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/webhook/status/t1", nil)
+	req.Header.Set("X-Webhook-Secret", "status-secret")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("status request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("shared secret on status endpoint: expected 200, got %d", resp.StatusCode)
 	}
 }
 
