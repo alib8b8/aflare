@@ -5,7 +5,7 @@
     <a href="README.en.md">English</a>
   </p>
   <p><strong>让 AI 告别聊天，开始执行</strong></p>
-  <p><em>个人优先 · 本地运行 · 数据不出本地 · 连接你自己的 LLM / 文件 / 笔记 / 数据库 · ReAct 推理 · 确定性工作流执行</em></p>
+  <p><em>个人优先 · 数据不出本地 · 连接你自己的 LLM / 文件 / 笔记 / 数据库</em></p>
   <p>AI 与你的数据之间「确定且安全」的控制层</p>
 
   <p>
@@ -92,7 +92,11 @@ aflare agent -c reflection,planning,utility
 
 ## 项目状态
 
-aflare 目前处于 **v0.10.0 阶段**，目标用户**先做个人**：个人用户的数据在本机（文件、笔记库、个人 SQLite 库），aflare 做 AI 与这些数据之间「确定且安全」的控制层。核心 Runtime 能力（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断）已实现并通过 CI 验证。v0.9.0 交付国密算法支持（SM3 审计链 / SM4 密钥存储，opt-in）、审计链安全硬化、MCP server 一键安装（`aflare mcp install`）。v0.10.0 新增交付：**MemHarness 记忆批判-重构模式**、**步骤级类型化输出契约与有界预览输入**、**水印部署溯源**，并经一轮安全自检修复插件路径穿越、symlink 绕过与记忆数据竞争等问题。v0.10.0 后 main 分支已合入 **Connector API**（个人优先主线）：`files` / `notes` / `sqlite` / `mysql` / `postgres` 五类命名连接器——工作流只引用连接器名，凭据只存 secrets store / 环境变量；连接器声明天花板（只读、行数、字节数、扩展名白名单），节点参数只能收紧、不能放宽；目录授权把 workdir 沙箱的同一套遏制规则（禁绝对路径、禁穿越、symlink 逃逸无条件拒绝）应用到用户授权的目录根，SQLite 只读模式纵深防御（DSN 强制 `mode=ro`）（见 [docs/connector-api.md](docs/connector-api.md) 与 [CHANGELOG](CHANGELOG.md)）。国产芯片（昇腾/寒武纪/海光）场景通过 OpenAI 兼容接口接入本地推理服务（非原生 SDK 集成），持续完善中。硬件设备控制（机器人等）不在内置范围——用户可通过自定义节点或 MCP Server 自行接入，数据不出内网。
+aflare 当前 **v0.10.0**，目标用户**先做个人**——个人数据在本机（文件、笔记库、个人 SQLite 库），aflare 做 AI 与这些数据之间「确定且安全」的控制层。
+
+- **已交付**：核心 Runtime（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断，CI 验证）；v0.9 国密算法（SM3 审计链 / SM4 密钥存储，opt-in）与 MCP 一键安装；v0.10 MemHarness 记忆批判-重构、步骤级类型化输出契约、水印部署溯源（含一轮安全自检修复）
+- **main 分支预览**：**Connector API**（个人优先主线）——v0.10.0 后已合入 main，随下个版本发布，详见 [CHANGELOG](CHANGELOG.md) 与 [docs/connector-api.md](docs/connector-api.md)
+- **边界声明**：国产芯片（昇腾/寒武纪/海光）经 OpenAI 兼容接口接入本地推理（非原生 SDK），持续完善；硬件设备控制（机器人等）不在内置范围，可经自定义节点或 MCP Server 自行接入，数据不出内网
 
 ---
 
@@ -150,7 +154,7 @@ aflare 面向个人用户优先（企业内网 / 本地优先场景同样适用�
 
 **连接你自己的 LLM** — Ollama / vLLM / LM Studio / DeepSeek 本地部署 / 任何 OpenAI 兼容 endpoint，loopback 地址（127.0.0.1 / localhost）免 API Key 接入。有本地 LLM 时由 LLM 做意图理解与动态生成工作流（`--ai` / `chat`），无 LLM 时关键词匹配兜底，离线仍可用。
 
-**连接你自己的数据库与知识库** — SQL Query 节点直连你的数据库，RAG 节点 + 向量存储 + 文档解析接入你的知识库，MCP 协议连接外部服务，自定义节点用 Go 写任意集成。aflare 不回传你的数据，遥测可关闭——只干活，不窃取企业内部数据。
+**连接你自己的数据库与知识库** — SQL Query 节点直连你的数据库，RAG 节点 + 向量存储 + 文档解析接入你的知识库，MCP 协议连接外部服务，自定义节点用 Go 写任意集成。aflare 不回传你的数据，遥测可关闭——只干活，不外传。
 
 **确定性执行保障** — YAML 声明式工作流：每一步做什么、依赖谁、失败怎么办全部确定。DAG 并行调度（TLA+ 形式化验证）、WAL 崩溃恢复 + Checkpoint（`--resume` 从中断处恢复）、Session 跨轮次持久化、Saga 事务补偿、幂等（Idempotency-Key + 跨进程锁）、重试 / 限流 / 熔断。所有操作可追溯、可回放、可验证。
 

@@ -5,7 +5,7 @@
     <strong>English</strong>
   </p>
   <p><strong>AI Beyond Chat — Get Things Done</strong></p>
-  <p><em>Personal-first · Runs Locally · Data Stays Local · Connect Your Own LLM / Files / Notes / Databases · ReAct Reasoning · Deterministic Workflow Execution</em></p>
+  <p><em>Personal-first · Data Stays Local · Connect Your Own LLM / Files / Notes / Databases</em></p>
   <p>The deterministic and secure control layer between AI and your data</p>
 
   <p>
@@ -96,7 +96,11 @@ aflare agent -c reflection,planning,utility
 
 ## Project Status
 
-aflare is currently at **v0.10.0 stage**, with **personal users as the first target**: personal data lives on your machine (files, note libraries, personal SQLite databases), and aflare is the deterministic and secure control layer between AI and that data. Core Runtime capabilities (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking) are implemented and verified by CI. v0.9.0 delivers Chinese national cryptography support (SM3 audit chain / SM4 secrets, opt-in), audit-chain security hardening, and one-command MCP server install (`aflare mcp install`). v0.10.0 adds: **MemHarness memory critique-reconstruction mode**, **step-level typed output contracts and bounded preview inputs**, **watermark deployment tracing**, plus a security self-audit round that fixed plugin path traversal, symlink bypass and memory data races. Merged into main after v0.10.0: the **Connector API** (personal-first track) — five named connector types `files` / `notes` / `sqlite` / `mysql` / `postgres`; workflows reference only the connector name while credentials live exclusively in the secrets store / environment variables; connectors declare permission ceilings (read-only, row/byte limits, extension allowlists) that node parameters can only tighten, never loosen; directory grants apply the same containment rules as the workdir sandbox (no absolute paths, no traversal, unconditional symlink-escape rejection) to user-authorized roots, with SQLite read-only defense-in-depth (DSN forced to `mode=ro`) (see [docs/connector-api.md](docs/connector-api.md) and [CHANGELOG](CHANGELOG.md)). Local inference services running on domestic chips (Ascend/Cambricon/Hygon) are accessed through OpenAI-compatible endpoints (no native SDK integration), and support keeps improving. Hardware device control (robots etc.) is not built in — users can integrate via custom nodes or MCP Server, with data staying on their intranet.
+aflare is currently at **v0.10.0**, with **personal users as the first target** — personal data lives on your machine (files, note libraries, personal SQLite databases), and aflare is the deterministic and secure control layer between AI and that data.
+
+- **Shipped**: core Runtime (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking, CI-verified); v0.9 Chinese national cryptography (SM3 audit chain / SM4 secrets, opt-in) and one-command MCP install; v0.10 MemHarness memory critique-reconstruction, step-level typed output contracts, watermark deployment tracing (plus a security self-audit round)
+- **On main, unreleased**: the **Connector API** (personal-first track) — merged after v0.10.0, shipping with the next release; see [CHANGELOG](CHANGELOG.md) and [docs/connector-api.md](docs/connector-api.md)
+- **Boundaries**: local inference on domestic chips (Ascend/Cambricon/Hygon) goes through OpenAI-compatible endpoints (no native SDK), still improving; hardware device control (robots etc.) is not built in — integrate via custom nodes or MCP Server, data stays on your intranet
 
 ---
 
@@ -155,7 +159,7 @@ aflare puts **personal users first** (intranet / local-first enterprise scenario
 
 **Connect your own LLM** — Ollama / vLLM / LM Studio / local DeepSeek / any OpenAI-compatible endpoint, with loopback addresses (127.0.0.1 / localhost) requiring no API key. With a local LLM, the LLM drives intent understanding and dynamic workflow generation (`--ai` / `chat`); without one, keyword matching falls back so offline use still works.
 
-**Connect your own databases and knowledge bases** — SQL Query node connects directly to your database, RAG node + vector store + document parsing hook into your knowledge base, MCP protocol bridges external services, and custom nodes let you write any integration in Go. aflare never exfiltrates your data and telemetry is opt-out — it only does the work, without leaking internal enterprise data.
+**Connect your own databases and knowledge bases** — SQL Query node connects directly to your database, RAG node + vector store + document parsing hook into your knowledge base, MCP protocol bridges external services, and custom nodes let you write any integration in Go. aflare never exfiltrates your data and telemetry is opt-out — it only does the work; your data stays yours.
 
 **Deterministic execution guarantees** — YAML declarative workflows: every step's action, dependencies and failure handling are fully determined. DAG parallel scheduling (TLA+ formally verified), WAL crash recovery + checkpoint (`--resume` from the interruption point), cross-turn session persistence, Saga transactional compensation, idempotency (Idempotency-Key + cross-process lock), retry / rate limit / circuit breaker. Every operation is traceable, replayable, verifiable.
 
