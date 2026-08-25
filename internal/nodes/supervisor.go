@@ -44,7 +44,7 @@ func (n *SupervisorNode) Schema() NodeSchema {
 		{Name: "endpoint", Type: "string", Description: "API endpoint URL", Required: false},
 	}
 	params = append(params,
-		ParamSchema{Name: "specialists", Type: "string", Description: "Comma-separated list of specialist agents: planner,researcher,critic,code_review,evaluator,reflector,legal_expert,medical_expert,educational_expert,financial_expert,creative_writer,data_analyst", Required: false, Default: "planner,researcher,critic,evaluator"},
+		ParamSchema{Name: "specialists", Type: "string", Description: "Comma-separated specialists. Persona roles: planner,researcher,critic,code_review,evaluator,reflector,legal_expert,medical_expert,educational_expert,financial_expert,creative_writer,data_analyst. Registered external agents: prefix with @ (e.g. @codex,@claude,@my-a2a-agent) for real delegation", Required: false, Default: "planner,researcher,critic,evaluator"},
 		ParamSchema{Name: "strategy", Type: "string", Description: "Strategy: sequential, parallel, hierarchical, mindsearch, moe, agency, swarm (default: sequential)", Required: false, Default: "sequential"},
 		ParamSchema{Name: "output_format", Type: "string", Description: "Output format: json, markdown, summary (default: json)", Required: false, Default: "json"},
 		ParamSchema{Name: "domain", Type: "string", Description: "Domain specialization: general,legal,medical,education,finance,creative,tech,business (default: general)", Required: false, Default: "general"},
@@ -102,6 +102,27 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 	for i := range specialistList {
 		specialistList[i] = strings.TrimSpace(specialistList[i])
 	}
+
+	// Real delegation mode: specialists entries naming registered
+	// external agents ("@codex", "@my-a2a-agent") are commanded and
+	// supervised for real instead of being role-played by one LLM call.
+	personas, agentRefs, err := parseAgentRefs(specialistList)
+	if err != nil {
+		return "", err
+	}
+	if len(agentRefs) > 0 {
+		llm := func(ctx context.Context, systemPrompt, userInput string) (string, error) {
+			return runAgentLLM(ctx, provider, model, apiKey, endpoint, systemPrompt, userInput)
+		}
+		if outputFormat != "json" {
+			// Raw text mode: return only the synthesis so callers get a
+			// direct answer, not the supervision envelope.
+			results := runDelegations(ctx, agentRefs, input, nil)
+			return synthesizeResults(ctx, input, results, llm), nil
+		}
+		return delegateToAgents(ctx, agentRefs, input, llm)
+	}
+	specialistList = personas
 
 	specDescs := buildSpecialistDescriptions(specialistList)
 

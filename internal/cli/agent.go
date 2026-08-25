@@ -43,6 +43,13 @@ import (
 // It supports stdin (interactive chat), scheduler events, file-watch
 // events, and task queue, all feeding into the same AgentLoop.
 func HandleAgent(args []string) error {
+	// `aflare agent list` inspects the registry of external agents
+	// aflare can command — not a daemon mode, so intercept it before
+	// daemon flag parsing.
+	if len(args) > 0 && args[0] == "list" {
+		return listAgents()
+	}
+
 	cfg := agent.DefaultConfig()
 	var watchDir string
 	if err := parseAgentArgs(args, &cfg, &watchDir); err != nil {
