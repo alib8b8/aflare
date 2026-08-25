@@ -1,6 +1,6 @@
 # aflare Node Reference
 
-Complete catalog of built-in nodes available in aflare workflows.
+Quick reference for the most common built-in nodes (a curated subset — run `aflare list` for the full catalog of 68 registered nodes, and see the generated `docs/nodes-reference.md` in the repository for complete parameter schemas).
 
 ## Utility Nodes
 
@@ -47,7 +47,8 @@ Full HTTP client. Any method, headers, body. Returns response body and status co
 Read content from a local file. Path traversal protected.
 
 **Parameters:**
-- `path` (required) — Path to the file to read
+- `path` (required) — Path to the file to read (relative to connector root when `connector` is set)
+- `connector` (optional) — Named connector (registered via `aflare connector add`); when set, the path resolves inside the connector's root, credentials stay out of the workflow, and connector ceilings (max_bytes etc.) apply
 
 **Example:**
 ```yaml
@@ -61,8 +62,9 @@ Read content from a local file. Path traversal protected.
 Write content to a file. Atomic write (temp file + rename). Path traversal protected.
 
 **Parameters:**
-- `path` (required) — Path to the output file
+- `path` (required) — Path to the output file (relative to connector root when `connector` is set)
 - `content` (optional) — Content to write; defaults to previous step output
+- `connector` (optional) — Named connector; requires a read-write connector (read-only connectors reject writes)
 
 **Example:**
 ```yaml

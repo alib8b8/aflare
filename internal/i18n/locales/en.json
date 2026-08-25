@@ -17,11 +17,6 @@
   "usage.autoupgrade": "Manage automatic upgrade settings",
   "usage.help": "Show this help message",
   "usage.safe_mode": "Run in safe mode (disables execute and external nodes)",
-  "usage.template": "List and use workflow templates",
-  "usage.secret": "Manage secrets and variables",
-  "usage.debug": "Debug a workflow with breakpoints",
-  "usage.history": "Show workflow execution history",
-  "usage.plugin": "Manage plugins",
   "usage.schedule": "Schedule workflow execution",
   "safe_mode.enabled": "Safe mode enabled - execute node and external nodes are disabled",
   "dry_run.enabled": "Dry run mode - workflow will be validated but not executed",
@@ -166,5 +161,14 @@
   "resume.completed": "Workflow resumed and completed successfully.",
   "resume.failed": "resume failed: %v",
   "resume.not_paused": "run %q is not paused (status: %s)",
-  "resume.load_failed": "failed to load run %q: %v"
+  "resume.load_failed": "failed to load run %q: %v",
+  "usage.validate": "Validate a workflow file without executing",
+  "usage.list": "List all registered nodes",
+  "usage.init": "Interactive first-run wizard",
+  "usage.config": "View or manage configuration",
+  "usage.secrets": "Manage the secrets store (encrypted)",
+  "usage.audit": "Query and verify the audit log",
+  "usage.review": "AI-review a workflow (suggestions & security checks)",
+  "usage.serve": "Start the HTTP API server (localhost by default)",
+  "usage.webui": "Start the Web UI"
 }

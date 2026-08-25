@@ -486,29 +486,6 @@ func LoadExternalNodes(dir string) error {
 	return globalRegistry.LoadExternalNodes(dir)
 }
 
-// NodeCategory labels a node's functional category (llm, agent, io, etc.).
-// It is used by Registry.Search and Registry.NodesByCategory.
-type NodeCategory string
-
-const (
-	// CategoryLLM groups LLM provider nodes.
-	CategoryLLM NodeCategory = "llm"
-	// CategoryAgent groups agent / ReAct-style nodes.
-	CategoryAgent NodeCategory = "agent"
-	// CategoryIO groups input/output nodes (file_read, fetch_url, etc.).
-	CategoryIO NodeCategory = "io"
-	// CategoryTransform groups data-transformation nodes.
-	CategoryTransform NodeCategory = "transform"
-	// CategoryFlow groups control-flow nodes (if/switch/loop).
-	CategoryFlow NodeCategory = "flow"
-	// CategoryData groups data/storage nodes (rag, knowledge_graph, etc.).
-	CategoryData NodeCategory = "data"
-	// CategorySecurity groups security-related nodes (hash, sign, etc.).
-	CategorySecurity NodeCategory = "security"
-	// CategoryUtility groups miscellaneous utility nodes.
-	CategoryUtility NodeCategory = "utility"
-)
-
 // Search returns the registered nodes whose Name or Description contain
 // query (case-insensitive), sorted by Name.
 func (r *Registry) Search(query string) []NodeInfo {
@@ -525,55 +502,4 @@ func (r *Registry) Search(query string) []NodeInfo {
 		return matched[i].Name < matched[j].Name
 	})
 	return matched
-}
-
-// NodesByCategory returns the registered nodes that belong to the given
-// category, based on a hardcoded name->category mapping maintained here
-// so that the CLI can share it.
-func (r *Registry) NodesByCategory(category NodeCategory) []NodeInfo {
-	categoryMap := map[NodeCategory][]string{
-		CategoryLLM: {
-			"ollama", "openai", "deepseek", "glm", "kimi", "qwen", "mistral", "yi",
-			"anthropic", "gemini", "cohere", "together", "groq",
-		},
-		CategoryAgent: {
-			"agent", "supervisor", "planner", "researcher", "critic",
-			"evaluator", "reflector", "code_review",
-		},
-		CategoryIO: {
-			"file_read", "file_write", "file_append", "file_list",
-			"fetch_url", "http_request", "stdin", "stdout", "output",
-		},
-		CategoryTransform: {
-			"json_parse", "transform", "combine", "template_render",
-			"markdown_render", "base64_encode", "base64_decode",
-		},
-		CategoryFlow: {
-			"if", "switch", "loop", "parallel", "map",
-		},
-		CategoryData: {
-			"rag", "knowledge_graph", "code_interpreter",
-			"execute", "multimodal",
-		},
-		CategorySecurity: {
-			"hash", "encrypt", "decrypt", "sign", "verify",
-		},
-		CategoryUtility: {
-			"echo", "log", "env", "variable",
-		},
-	}
-
-	nodeNames, ok := categoryMap[category]
-	if !ok {
-		return nil
-	}
-
-	var result []NodeInfo
-	for _, name := range nodeNames {
-		if node, exists := r.Get(name); exists {
-			desc := node.Description()
-			result = append(result, NodeInfo{Name: name, Description: desc})
-		}
-	}
-	return result
 }

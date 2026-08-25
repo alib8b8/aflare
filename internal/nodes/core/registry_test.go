@@ -204,44 +204,6 @@ func TestRegistry_Search_EmptyRegistry(t *testing.T) {
 	}
 }
 
-// --- NodesByCategory ---
-
-func TestRegistry_NodesByCategory(t *testing.T) {
-	r := NewRegistry()
-	r.Register(&mockNode{name: "ollama", description: "Local LLM"})
-	r.Register(&mockNode{name: "openai", description: "OpenAI API"})
-	r.Register(&mockNode{name: "fetch_url", description: "Fetch URL"})
-	r.Register(&mockNode{name: "file_read", description: "Read file"})
-
-	llm := r.NodesByCategory(CategoryLLM)
-	if len(llm) != 2 {
-		t.Fatalf("expected 2 LLM nodes, got %d", len(llm))
-	}
-	gotNames := []string{llm[0].Name, llm[1].Name}
-	sort.Strings(gotNames)
-	if gotNames[0] != "ollama" || gotNames[1] != "openai" {
-		t.Errorf("LLM category = %v, want [ollama openai]", gotNames)
-	}
-
-	io := r.NodesByCategory(CategoryIO)
-	if len(io) != 2 {
-		t.Fatalf("expected 2 IO nodes, got %d", len(io))
-	}
-
-	// Unregistered category members -> empty result.
-	if got := r.NodesByCategory(CategorySecurity); len(got) != 0 {
-		t.Errorf("expected 0 security nodes, got %d", len(got))
-	}
-}
-
-func TestRegistry_NodesByCategory_UnknownCategory(t *testing.T) {
-	r := NewRegistry()
-	r.Register(&mockNode{name: "ollama"})
-	if got := r.NodesByCategory(NodeCategory("bogus")); got != nil {
-		t.Errorf("expected nil for unknown category, got %v", got)
-	}
-}
-
 // --- SafeMode ---
 
 func TestRegistry_SetSafeMode(t *testing.T) {
@@ -605,29 +567,6 @@ func TestExternalNode_Execute_RedactsSensitiveParams(t *testing.T) {
 	}
 	if strings.Contains(out, "sk-secret") || strings.Contains(out, "tok-secret") {
 		t.Errorf("sensitive values should be redacted from payload: %s", out)
-	}
-}
-
-// --- NodeMetadata / categories constants ---
-
-func TestNodeCategoryConstants(t *testing.T) {
-	cases := []struct {
-		cat   NodeCategory
-		value string
-	}{
-		{CategoryLLM, "llm"},
-		{CategoryAgent, "agent"},
-		{CategoryIO, "io"},
-		{CategoryTransform, "transform"},
-		{CategoryFlow, "flow"},
-		{CategoryData, "data"},
-		{CategorySecurity, "security"},
-		{CategoryUtility, "utility"},
-	}
-	for _, c := range cases {
-		if string(c.cat) != c.value {
-			t.Errorf("category = %q, want %q", c.cat, c.value)
-		}
 	}
 }
 
