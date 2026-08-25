@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -47,6 +48,54 @@ const maxA2AResponseSize = 10 * 1024 * 1024
 
 // a2aPollInterval is the delay between tasks/get polls.
 const a2aPollInterval = 2 * time.Second
+
+// a2aRetryDelays are the backoff delays between retry attempts for
+// transient transport failures.
+var a2aRetryDelays = []time.Duration{200 * time.Millisecond, 400 * time.Millisecond}
+
+// isA2ADialError reports whether err is a connection-establishment
+// failure. The request never reached the server, so retrying even a
+// non-idempotent submit cannot duplicate work.
+func isA2ADialError(err error) bool {
+	var opErr *net.OpError
+	return errors.As(err, &opErr) && opErr.Op == "dial"
+}
+
+// isA2ARetryableReadError reports whether err is transient and safe to
+// retry for an idempotent read (tasks/get): any transport failure, or
+// an HTTP 5xx from the server side.
+func isA2ARetryableReadError(err error) bool {
+	if isA2ADialError(err) {
+		return true
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
+	var statusErr *a2aHTTPStatusError
+	return errors.As(err, &statusErr) && statusErr.Status >= 500
+}
+
+// a2aCallRetried performs one JSON-RPC call with bounded retries for
+// transient failures. retryable decides which errors may be retried:
+// submits pass isA2ADialError (pre-delivery only), idempotent reads
+// pass isA2ARetryableReadError.
+func a2aCallRetried[T any](ctx context.Context, def AgentDef, base, method string, params map[string]any, retryable func(error) bool) (*T, error) {
+	for attempt := 0; ; attempt++ {
+		resp, err := a2aCall[T](ctx, def, base, method, params)
+		if err == nil {
+			return resp, nil
+		}
+		if attempt >= len(a2aRetryDelays) || !retryable(err) {
+			return nil, err
+		}
+		select {
+		case <-time.After(a2aRetryDelays[attempt]):
+		case <-ctx.Done():
+			return nil, err
+		}
+	}
+}
 
 // AgentCard is the subset of the A2A agent card aflare consumes.
 type AgentCard struct {
@@ -207,7 +256,10 @@ func a2aSendTask(ctx context.Context, def AgentDef, base, prompt string) (*a2aTa
 	}
 	var lastErr error
 	for _, method := range []string{"message/send", "tasks/send"} {
-		resp, err := a2aCall[a2aTask](ctx, def, base, method, params)
+		// Submit retry policy: only pre-delivery dial errors — the
+		// request never reached the agent, so a retry cannot duplicate
+		// the delegated task.
+		resp, err := a2aCallRetried[a2aTask](ctx, def, base, method, params, isA2ADialError)
 		if err == nil {
 			if resp.ID == "" {
 				return nil, fmt.Errorf("agent %q: %s returned a task without id", def.Name, method)
@@ -236,7 +288,11 @@ func a2aAwaitTerminal(ctx context.Context, def AgentDef, base string, task *a2aT
 			return nil, fmt.Errorf("agent %q: timed out waiting for task %s (last state %q)", def.Name, task.ID, task.Status.State)
 		case <-time.After(a2aPollInterval):
 		}
-		updated, err := a2aCall[a2aTask](ctx, def, base, "tasks/get", map[string]any{"id": task.ID})
+		// tasks/get is an idempotent read, so any transient transport
+		// failure or server-side 5xx may be retried without risking
+		// duplicate side effects — a single failed poll used to kill
+		// the whole delegation.
+		updated, err := a2aCallRetried[a2aTask](ctx, def, base, "tasks/get", map[string]any{"id": task.ID}, isA2ARetryableReadError)
 		if err != nil {
 			return nil, fmt.Errorf("agent %q: tasks/get for %s failed: %w", def.Name, task.ID, err)
 		}
@@ -328,7 +384,7 @@ func a2aCall[T any](ctx context.Context, def AgentDef, base, method string, para
 		return nil, fmt.Errorf("read %s response: %w", method, err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s returned HTTP %d: %s", method, resp.StatusCode, truncateForError(respBody))
+		return nil, &a2aHTTPStatusError{Method: method, Status: resp.StatusCode, Body: truncateForError(respBody)}
 	}
 
 	var rpcResp struct {
@@ -364,6 +420,18 @@ type methodNotFoundError struct{ err error }
 
 func (e *methodNotFoundError) Error() string { return e.err.Error() }
 func (e *methodNotFoundError) Unwrap() error { return e.err }
+
+// a2aHTTPStatusError marks a non-200 A2A response so transient server
+// errors (5xx) can be recognized and retried on idempotent reads.
+type a2aHTTPStatusError struct {
+	Method string
+	Status int
+	Body   string
+}
+
+func (e *a2aHTTPStatusError) Error() string {
+	return fmt.Sprintf("%s returned HTTP %d: %s", e.Method, e.Status, e.Body)
+}
 
 func isMethodNotFoundError(err error) bool {
 	var mnf *methodNotFoundError

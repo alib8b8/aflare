@@ -19,6 +19,7 @@ package nodes
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -45,6 +46,7 @@ func (n *SupervisorNode) Schema() NodeSchema {
 	}
 	params = append(params,
 		ParamSchema{Name: "specialists", Type: "string", Description: "Comma-separated specialists. Persona roles: planner,researcher,critic,code_review,evaluator,reflector,legal_expert,medical_expert,educational_expert,financial_expert,creative_writer,data_analyst. Registered external agents: prefix with @ (e.g. @codex,@claude,@my-a2a-agent) for real delegation", Required: false, Default: "planner,researcher,critic,evaluator"},
+		ParamSchema{Name: "max_parallel", Type: "string", Description: "Max concurrent external-agent delegations; excess subtasks queue (default: 4, max: 16)", Required: false, Default: "4"},
 		ParamSchema{Name: "strategy", Type: "string", Description: "Strategy: sequential, parallel, hierarchical, mindsearch, moe, agency, swarm (default: sequential)", Required: false, Default: "sequential"},
 		ParamSchema{Name: "output_format", Type: "string", Description: "Output format: json, markdown, summary (default: json)", Required: false, Default: "json"},
 		ParamSchema{Name: "domain", Type: "string", Description: "Domain specialization: general,legal,medical,education,finance,creative,tech,business (default: general)", Required: false, Default: "general"},
@@ -88,6 +90,14 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 		maxDepth = 10
 	}
 
+	// Delegation concurrency (backpressure): unparseable values fall
+	// back to the default instead of failing the node.
+	maxParallel := defaultDelegationParallelism
+	if v, err := strconv.Atoi(strings.TrimSpace(getParam(params, "max_parallel", "4"))); err == nil {
+		maxParallel = v
+	}
+	maxParallel = clampParallelism(maxParallel)
+
 	if collaborationTemplate != "" {
 		if template, ok := collaborationTemplates[collaborationTemplate]; ok {
 			if roleSpecialists, ok := template[templateRole]; ok {
@@ -117,10 +127,10 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 		if outputFormat != "json" {
 			// Raw text mode: return only the synthesis so callers get a
 			// direct answer, not the supervision envelope.
-			results := runDelegations(ctx, agentRefs, input, nil)
+			results := runDelegations(ctx, agentRefs, input, nil, maxParallel)
 			return synthesizeResults(ctx, input, results, llm), nil
 		}
-		return delegateToAgents(ctx, agentRefs, input, llm)
+		return delegateToAgents(ctx, agentRefs, input, llm, maxParallel)
 	}
 	specialistList = personas
 

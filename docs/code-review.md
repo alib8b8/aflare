@@ -84,6 +84,7 @@ fails the build.
 | Package | Target | Enforced |
 |---------|--------|----------|
 | `internal/agent` | 60% | Yes |
+| `internal/agentx` | 60% | Yes |
 | `internal/nodes` | 60% | Yes |
 | `internal/workflow` | 60% | Yes |
 | `internal/memory` | 60% | Yes |
