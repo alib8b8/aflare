@@ -140,6 +140,8 @@ func RegisterBuiltins(reg *Registry) {
 	reg.Register(&EngineerSkillsNode{})
 	reg.Register(&CompressNode{})
 	reg.Register(&CodexAgentNode{})
+	reg.Register(&CLIAgentNode{})
+	reg.Register(&A2AAgentNode{})
 
 	// OpenAI-compatible providers (openai, glm, kimi, qwen, deepseek,
 	// anthropic, gemini, mistral, yi, baichuan, internlm, minimax,

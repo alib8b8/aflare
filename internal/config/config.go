@@ -24,6 +24,8 @@ import (
 	"sync"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/alib8b8/aflare/internal/agentx"
 )
 
 type LLMProviderConfig struct {
@@ -53,6 +55,10 @@ type Config struct {
 	Router        RouterConfig                 `yaml:"router,omitempty"`
 	SafeMode      bool                         `yaml:"safe_mode,omitempty"`
 	SecurityLevel string                       `yaml:"security_level,omitempty"`
+
+	// Agents registers external agents aflare can command (CLI or A2A).
+	// Built-in presets (codex/claude/gemini) can be overridden by name.
+	Agents map[string]agentx.AgentDef `yaml:"agents,omitempty"`
 }
 
 var (
