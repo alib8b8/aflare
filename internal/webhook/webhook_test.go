@@ -32,6 +32,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alib8b8/aflare/internal/history"
 	"github.com/alib8b8/aflare/internal/nodes"
 )
 
@@ -598,6 +599,141 @@ steps:
 	}
 	if task.Error == "" {
 		t.Error("expected error message")
+	}
+}
+
+// isolateWebhookAudit redirects the process-global history directory to a
+// temp dir for one test, restoring the original afterwards. Needed because
+// the webhook run path enables the audit log with the default dir.
+func isolateWebhookAudit(t *testing.T) string {
+	t.Helper()
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
+	origPath := history.GetAuditLogPath()
+	dir := t.TempDir()
+	history.SetHistoryDir(dir)
+	t.Cleanup(func() {
+		if origPath == "" {
+			history.SetHistoryDir("")
+			return
+		}
+		history.SetHistoryDir(filepath.Dir(origPath))
+	})
+	return dir
+}
+
+// readWebhookAuditActions parses the audit log in dir and returns its
+// actions in file order. A missing file (nothing executed) yields nil.
+func readWebhookAuditActions(t *testing.T, dir string) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(dir, "audit.log.jsonl"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		t.Fatalf("failed to read audit log: %v", err)
+	}
+	var actions []string
+	for _, l := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		var entry struct {
+			Action string `json:"action"`
+		}
+		if err := json.Unmarshal([]byte(l), &entry); err != nil {
+			t.Fatalf("failed to parse audit record %q: %v", l, err)
+		}
+		actions = append(actions, entry.Action)
+	}
+	return actions
+}
+
+// TestWebhookServer_RunWritesAuditRecords is the regression guard for the
+// "entry point runs unaudited" bug class (self-test finding: the webhook
+// run path previously used the bare package-level ExecuteWorkflow, leaving
+// zero audit records). A triggered workflow must leave a start + per-step +
+// end trail in the tamper-evident audit log, exactly like `aflare run`.
+func TestWebhookServer_RunWritesAuditRecords(t *testing.T) {
+	auditDir := isolateWebhookAudit(t)
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	createWorkflowFile(t, tmpDir, "auditwf", `name: audit-workflow
+steps:
+  - node: echo
+`)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	resp, err := http.Post(ts.URL+"/webhook/auditwf", "application/json", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var triggerResp map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&triggerResp); err != nil {
+		t.Fatalf("failed to decode trigger response: %v", err)
+	}
+	task := waitForTask(t, srv, triggerResp["task_id"])
+	if task.Status != TaskCompleted {
+		t.Fatalf("expected task completed, got %s (error: %s)", task.Status, task.Error)
+	}
+
+	actions := readWebhookAuditActions(t, auditDir)
+	want := []string{"workflow_start", "workflow_step", "workflow_end"}
+	if len(actions) != len(want) {
+		t.Fatalf("audit actions = %v, want %v", actions, want)
+	}
+	for i := range want {
+		if actions[i] != want[i] {
+			t.Errorf("audit action[%d] = %q, want %q", i, actions[i], want[i])
+		}
+	}
+}
+
+// TestWebhookServer_PolicyBlocks is the regression guard for the "entry
+// point bypasses policy" bug class. file_delete is approval-required under
+// DefaultPolicy and no human is on the webhook path, so the workflow must
+// fail with a policy message BEFORE any step executes.
+func TestWebhookServer_PolicyBlocks(t *testing.T) {
+	auditDir := isolateWebhookAudit(t)
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	createWorkflowFile(t, tmpDir, "delwf", `name: delete-workflow
+steps:
+  - node: echo
+  - node: file_delete
+    params:
+      path: /tmp/aflare-webhook-policy-target
+`)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	resp, err := http.Post(ts.URL+"/webhook/delwf", "application/json", strings.NewReader("test"))
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var triggerResp map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&triggerResp); err != nil {
+		t.Fatalf("failed to decode trigger response: %v", err)
+	}
+	task := waitForTask(t, srv, triggerResp["task_id"])
+	if task.Status != TaskFailed {
+		t.Fatalf("expected task failed, got %s", task.Status)
+	}
+	if !strings.Contains(task.Error, "blocked by policy") {
+		t.Errorf("task error should report policy block, got %q", task.Error)
+	}
+
+	// Blocked before execution → no audit records at all.
+	if actions := readWebhookAuditActions(t, auditDir); len(actions) != 0 {
+		t.Errorf("audit actions = %v, want none (workflow was blocked pre-execution)", actions)
 	}
 }
 
