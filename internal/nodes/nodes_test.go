@@ -124,6 +124,45 @@ func TestFileWrite_PathTraversal(t *testing.T) {
 	}
 }
 
+func TestFileWrite_ContentParamOverridesInput(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldWorkDir := workDir
+	workDir = tmpDir
+	defer func() { workDir = oldWorkDir }()
+
+	ctx := context.Background()
+	writeNode := &FileWriteNode{}
+
+	// content param takes precedence over the step input
+	if _, err := writeNode.Execute(ctx, "step-input", map[string]string{
+		"path":    "content.txt",
+		"content": "from-content-param",
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(tmpDir, "content.txt"))
+	if err != nil {
+		t.Fatalf("read back failed: %v", err)
+	}
+	if string(got) != "from-content-param" {
+		t.Errorf("expected content param to win, got %q", string(got))
+	}
+
+	// without content param, the step input is written (legacy behaviour)
+	if _, err := writeNode.Execute(ctx, "legacy-input", map[string]string{
+		"path": "input.txt",
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, err = os.ReadFile(filepath.Join(tmpDir, "input.txt"))
+	if err != nil {
+		t.Fatalf("read back failed: %v", err)
+	}
+	if string(got) != "legacy-input" {
+		t.Errorf("expected step input, got %q", string(got))
+	}
+}
+
 func TestFileRead_PathTraversal(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWorkDir := workDir

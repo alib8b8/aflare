@@ -311,9 +311,9 @@ func PrintUsage() string {
   aflare init                            # interactive first-run wizard
   aflare config show                     # view current config
   aflare create "fetch example.com and save to file"
-  aflare run examples/basic_summary.yaml
-  aflare --safe-mode run examples/multi_step.yaml
-  aflare --lang zh run examples/basic_summary.yaml
+  aflare run examples/data-collector.yaml
+  aflare --safe-mode run examples/data-collector.yaml
+  aflare --lang zh run examples/data-collector.yaml
   aflare registry sync
   aflare registry search weather
   aflare doctor`,

@@ -32,7 +32,7 @@ import (
 // Usage:
 //
 //	aflare resume <run-id>        Resume a paused workflow
-//	aflare resume list            List all paused workflows
+//	aflare resume list            List all paused workflows (--list / -l also work)
 func HandleResume(args []string) error {
 	if len(args) == 0 {
 		fmt.Println(i18n.T("resume.usage"))
@@ -41,7 +41,7 @@ func HandleResume(args []string) error {
 
 	subCmd := args[0]
 	switch subCmd {
-	case "list":
+	case "list", "--list", "-l":
 		if err := HandleResumeList(); err != nil {
 			return err
 		}
@@ -79,7 +79,13 @@ func HandleResumeRun(runID string) error {
 		meta.WorkflowName, runID, meta.PausedStep+1, meta.StepName)
 
 	ctx := context.Background()
-	output, results, err := workflow.ResumeWorkflow(ctx, runID)
+	// Audit parity with `aflare run`: resumed runs write tamper-evident audit
+	// records too, under the same cross-process audit lock (H-6). Policy is
+	// re-applied inside ResumeWorkflowWith from the RunMeta recorded at pause
+	// time, so a --safe run resumes under --safe restrictions.
+	exec, releaseAudit := newAuditExecutor("", false)
+	defer releaseAudit()
+	output, results, err := workflow.ResumeWorkflowWith(ctx, runID, exec)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "resume failed: %v\n", err)
 		return exitErr(1)

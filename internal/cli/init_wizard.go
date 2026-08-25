@@ -128,8 +128,8 @@ func runInitWizard() error {
 	printAPIKeyHint(provider, apiKey)
 
 	fmt.Println()
-	fmt.Println("试试这个不需要 LLM 的模板：")
-	fmt.Println("  aflare create                  # 创建工作流")
+	fmt.Println("试试创建你的第一个工作流：")
+	fmt.Println("  aflare create \"fetch example.com and save to file\"   # 需要已配置 LLM")
 	fmt.Println()
 	fmt.Println("或者启动 Agent 对话：")
 	fmt.Println("  aflare chat")

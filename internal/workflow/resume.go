@@ -36,6 +36,7 @@ import (
 	"github.com/alib8b8/aflare/internal/logger"
 	"github.com/alib8b8/aflare/internal/meta"
 	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/policy"
 )
 
 // ErrWorkflowPaused is returned when a workflow is paused at a resumable step
@@ -64,6 +65,10 @@ type RunMeta struct {
 	StepName     string    `json:"step_name"`
 	ResumeOn     string    `json:"resume_on,omitempty"`
 	WebhookToken string    `json:"webhook_token,omitempty"`
+	// SafeMode records whether the run started under the strict (safe)
+	// policy, so the resume re-applies the same policy class. Absent
+	// (false) for runs paused by older versions.
+	SafeMode bool `json:"safe_mode,omitempty"`
 }
 
 // RunsDir returns the directory for storing paused run metadata.
@@ -163,8 +168,27 @@ func ListPausedRuns() ([]RunMeta, error) {
 
 // ResumeWorkflow resumes a paused workflow from the WAL and runs it to
 // completion. The original workflow file is re-parsed, and the WAL state
-// is restored so execution continues from the paused step.
+// is restored so execution continues from the paused step. Audit logging
+// is enabled (the default history directory is used); use
+// ResumeWorkflowWith to supply a caller-configured executor (e.g. one
+// holding the CLI's cross-process audit lock).
 func ResumeWorkflow(ctx context.Context, runID string) (string, []StepResult, error) {
+	return ResumeWorkflowWith(ctx, runID, nil)
+}
+
+// ResumeWorkflowWith resumes a paused workflow using the caller-supplied
+// executor. When base is nil a default executor with audit logging enabled
+// is built; when non-nil only the resume specifics (WAL path, 7-day timeout,
+// workflow path, safe-mode metadata) are applied on top, so the caller keeps
+// control of the audit configuration (a base executor with audit disabled
+// stays disabled — see the CLI's audit-lock fallback).
+//
+// Regardless of the executor, the resumed workflow is validated against the
+// policy class the run started under (RunMeta.SafeMode, recorded at pause
+// time; legacy metas default to the permissive DefaultPolicy). This keeps
+// resume on par with `aflare run` and blocks resuming a workflow whose file
+// was edited to add policy-restricted steps (e.g. shell) after the pause.
+func ResumeWorkflowWith(ctx context.Context, runID string, base *Executor) (string, []StepResult, error) {
 	meta, err := LoadRunMeta(runID)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to load run %q: %w", runID, err)
@@ -191,7 +215,13 @@ func ResumeWorkflow(ctx context.Context, runID string) (string, []StepResult, er
 	reg := nodes.GetGlobalRegistry()
 
 	// Build an executor with WAL-based resume
-	exec := NewExecutor().WithWAL(WALPath(runID))
+	var exec *Executor
+	if base != nil {
+		exec = base
+	} else {
+		exec = NewExecutor().WithAuditLog(true, "")
+	}
+	exec = exec.WithWAL(WALPath(runID))
 	// Use a very long timeout for resumed workflows (7 days)
 	exec = exec.WithTimeout(7 * 24 * time.Hour)
 	// Record the workflow path so a second pause during this resume still
@@ -206,6 +236,25 @@ func ResumeWorkflow(ctx context.Context, runID string) (string, []StepResult, er
 	}
 	if resumeWfPath != "" {
 		exec = exec.WithWorkflowPath(resumeWfPath)
+	}
+	// Keep the policy context stamped for a second pause during this resume.
+	exec = exec.WithSafeMode(meta.SafeMode)
+
+	// Policy parity with the run path: validate every step under the policy
+	// class this run started under BEFORE executing anything. This blocks
+	// resuming a workflow whose file was edited after the pause to add
+	// policy-restricted steps (e.g. shell under --safe).
+	var engine *policy.Engine
+	if meta.SafeMode {
+		engine = policy.NewEngine(policy.StrictPolicy(), nil)
+	} else {
+		engine = policy.NewEngine(policy.DefaultPolicy(), nil)
+	}
+	if perr := NewPolicyExecutor(exec, engine).ValidateWorkflow(ctx, wf); perr != nil {
+		if uerr := UpdateRunMetaStatus(runID, "paused"); uerr != nil {
+			logger.Warn("failed to restore run status to paused", "run_id", runID, "err", uerr)
+		}
+		return "", nil, fmt.Errorf("resume blocked by policy: %w", perr)
 	}
 
 	out, results, trace, err := exec.ExecuteWithTrace(ctx, wf, reg, nil)
@@ -235,7 +284,7 @@ func ResumeWorkflow(ctx context.Context, runID string) (string, []StepResult, er
 //
 // If sourceWALPath is non-empty, the WAL file is copied to the run directory
 // so that a subsequent resume can replay from the last completed step.
-func PauseWorkflow(wfPath string, wf *Workflow, stepIndex int, stepName string, resumeOn string, message string, sourceWALPath string) (*ErrWorkflowPaused, error) {
+func PauseWorkflow(wfPath string, wf *Workflow, stepIndex int, stepName string, resumeOn string, message string, sourceWALPath string, safeMode bool) (*ErrWorkflowPaused, error) {
 	runID := newRunID()
 	dir := RunDir(runID)
 	if err := os.MkdirAll(dir, 0700); err != nil {
@@ -281,6 +330,7 @@ func PauseWorkflow(wfPath string, wf *Workflow, stepIndex int, stepName string, 
 		PausedStep:   stepIndex,
 		StepName:     stepName,
 		ResumeOn:     resumeOn,
+		SafeMode:     safeMode,
 	}
 	if err := SaveRunMeta(meta); err != nil {
 		return nil, fmt.Errorf("failed to save run meta: %w", err)

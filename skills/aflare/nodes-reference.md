@@ -114,16 +114,16 @@ Render Go templates with variables. SSTI-safe (dangerous functions removed).
 
 **Parameters:**
 - `template` (required) — Go template string
-- `vars` (optional) — Variables for the template
+- `template_file` (optional) — Path to a template file (takes precedence over `template`)
+- Any other param — passed to the template as a variable. Note: param values must be strings (no nested maps), and there is no `vars` param; name variables directly as sibling params of `template`.
 
 **Example:**
 ```yaml
 - node: template_render
   params:
     template: "Hello {{.name}}, your score is {{.score}}"
-    vars:
-      name: "Alice"
-      score: 95
+    name: "Alice"
+    score: "95"
 ```
 
 ### transform
@@ -187,7 +187,7 @@ Print or send notifications.
 ## LLM Nodes (15+ providers)
 
 All LLM nodes share common parameters:
-- `prompt` (required) — Prompt text. Can reference previous step outputs via `{{.steps[N].output}}`
+- `prompt` (required) — Prompt text. Can reference previous step outputs via `{{step.<name>}}` (or `{{step.<N>}}`, 0-based index)
 - `model` (optional) — Model name (provider-specific default if omitted)
 - `temperature` (optional) — Sampling temperature
 - `max_tokens` (optional) — Max tokens to generate
@@ -213,10 +213,14 @@ All LLM nodes share common parameters:
 
 **Example:**
 ```yaml
+- node: fetch_url
+  name: fetch
+  params:
+    url: "https://example.com/article"
 - node: ollama
   params:
     model: "llama3"
-    prompt: "Summarize this article: {{.steps[0].output}}"
+    prompt: "Summarize this article: {{step.fetch}}"
     temperature: 0.3
 ```
 
@@ -227,16 +231,25 @@ All LLM nodes share common parameters:
 
 ### condition
 
-Conditional execution based on an expression.
+Evaluate a condition expression against the step input (previous step output). Returns "true"/"false".
+
+Supported expressions: `contains:<text>`, `equals:<value>`, `starts_with:<prefix>`, `ends_with:<suffix>`, `regex:<pattern>`, `empty`, `not_empty`, `true`, `false` — optionally prefixed with `not `.
 
 **Parameters:**
-- `expression` (required) — Go template expression (e.g., `{{.steps[0].output}} != ''`)
-- `type` (optional) — `regex` for regex matching, default is template expression
+- `expr` (required) — Condition expression (e.g. `contains:foo`, `regex:^test`, `not_empty`)
+- `condition` (optional) — Alias for `expr`
 
 **Example:**
 ```yaml
+- node: condition
+  params:
+    expr: "contains:error"
+```
+
+Step-level conditional execution uses the same expression syntax on the `condition` field:
+```yaml
 - node: notify
-  condition: "{{.steps[0].output}} != ''"
+  condition: "not_empty"
   params:
     channel: stdout
     message: "Data fetched successfully"
@@ -248,15 +261,14 @@ Call another workflow file (nested workflows). Recursive depth tracked (max 10).
 
 **Parameters:**
 - `workflow` (required) — Path to the workflow YAML file to call
-- `vars` (optional) — Variables to pass to the nested workflow
+- `vars` (optional) — Variables to pass to the nested workflow, as a JSON string (`{"key":"value"}`) or comma-separated `key=value` pairs
 
 **Example:**
 ```yaml
 - node: call
   params:
     workflow: "sub-workflows/parse-data.yaml"
-    vars:
-      input: "{{.steps[0].output}}"
+    vars: "input={{step.fetch}}"
 ```
 
 ## YAML Workflow Structure
@@ -268,6 +280,7 @@ vars:
   api_key: "your-api-key"    # workflow-level variables
 steps:
   - node: fetch_url
+    name: fetch
     params:
       url: "https://api.example.com/data"
   - node: json_parse
@@ -276,8 +289,9 @@ steps:
   - node: file_write
     params:
       path: "output.txt"
+      content: "{{step.fetch}}"
   - node: notify
-    condition: "{{.output}} != ''"
+    condition: "not_empty"
     params:
       channel: stdout
       message: "Done!"

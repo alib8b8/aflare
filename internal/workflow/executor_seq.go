@@ -54,6 +54,7 @@ type seqExecState struct {
 	walState      *WALStateManager // delta-record driver around wal (nil when wal is nil)
 	saveCP        func(int)        // saveCheckpointIfEnabled closure
 	progressCB    StepProgressFunc // 断点13: CLI 实时进度回调
+	safeMode      bool             // recorded into pause RunMeta so resume re-applies the same policy class
 }
 
 // initExecState validates the workflow, sets up tracing, timeouts, the
@@ -236,7 +237,7 @@ func clampStep(idx, totalSteps int) int {
 // Callers that go through an Executor pass e.workflowTimeout; the legacy
 // ExecuteWorkflowWithTrace global entry point passes the package-level
 // WorkflowTimeout.
-func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, statePath string, walPath string, wfPath string, timeout time.Duration, progressCB StepProgressFunc) (string, []StepResult, *WorkflowTrace, error) {
+func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, statePath string, walPath string, wfPath string, safeMode bool, timeout time.Duration, progressCB StepProgressFunc) (string, []StepResult, *WorkflowTrace, error) {
 	state, cleanup, err := initExecState(ctx, wf, reg, program, timeout, progressCB)
 	if err != nil {
 		return "", nil, nil, err
@@ -244,6 +245,7 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 	defer cleanup()
 
 	state.wfPath = wfPath
+	state.safeMode = safeMode
 	resumeFromStep := state.initResumeState(walPath, statePath)
 
 	// Deferred WAL close.

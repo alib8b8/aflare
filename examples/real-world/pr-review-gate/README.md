@@ -29,7 +29,7 @@ flowchart TD
 ## 前置条件
 
 1. **codex CLI 已安装并认证**（`codex --version` 可用，`OPENAI_API_KEY` 已设置）。
-2. **设置 `AFLARE_EXECUTE_UNSAFE=1`**：默认的 execute 命令白名单不含 `git`，且禁止 `|` 管道。本示例在受信任的环境（你自己的开发机 / CI）中运行，需显式关闭白名单；所有命令仍写入审计日志（`~/.config/aflare/audit.log`）。
+2. **设置 `AFLARE_EXECUTE_UNSAFE=1`**：默认的 execute 命令白名单不含 `git`，且禁止 `|` 管道。本示例在受信任的环境（你自己的开发机 / CI）中运行，需显式关闭白名单；所有命令仍写入审计日志（`~/.config/aflare/history/audit.log.jsonl`）。
 3. 当前目录是特性分支的 git 仓库（diff 基于 `base_branch` 计算）。
 
 ## 输入
@@ -70,7 +70,7 @@ git diff
 查看所有暂停中的运行：
 
 ```bash
-aflare resume --list   # 或按提示选择 run-id
+aflare resume list   # --list / -l 亦可
 ```
 
 ## 输出示例
@@ -78,7 +78,7 @@ aflare resume --list   # 或按提示选择 run-id
 首次运行（暂停在审批门）：
 
 ```
-workflow paused  name=PR Review Gate step=4 node=human_in_loop run_id=run-20260821-041233
+workflow paused  name=PR Review Gate step=4 node=human_in_loop run_id=16d5425b-2d98-4a4b-aefc-595603f7cdb6
 human approval required: review aflare-pr-review-approve.review,
 then create aflare-pr-review-approve to approve
 ```
