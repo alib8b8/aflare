@@ -93,8 +93,8 @@ func TestSetLanguageInvalid(t *testing.T) {
 
 func TestAvailableLanguages(t *testing.T) {
 	langs := AvailableLanguages()
-	if len(langs) < 3 {
-		t.Errorf("expected at least 3 languages, got %d", len(langs))
+	if len(langs) < 2 {
+		t.Errorf("expected at least 2 languages, got %d", len(langs))
 	}
 }
 
@@ -108,9 +108,9 @@ func TestNormalizeLang(t *testing.T) {
 		{"zh", "zh"},
 		{"zh_CN.UTF-8", "zh"},
 		{"zh-cn", "zh"},
-		{"ru", "ru"},
-		{"russian", "ru"},
 		// Removed languages should default to "en"
+		{"ru", "en"},
+		{"russian", "en"},
 		{"fr", "en"},
 		{"french", "en"},
 		{"ja", "en"},
@@ -145,10 +145,10 @@ func TestDetectLanguage(t *testing.T) {
 	os.Unsetenv("AFLARE_LANG")
 
 	// Test with LANG env var
-	os.Setenv("LANG", "ru_RU.UTF-8")
+	os.Setenv("LANG", "zh_CN.UTF-8")
 	lang = detectLanguage()
-	if lang != "ru" {
-		t.Errorf("expected ru, got %s", lang)
+	if lang != "zh" {
+		t.Errorf("expected zh, got %s", lang)
 	}
 	os.Unsetenv("LANG")
 

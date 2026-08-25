@@ -186,34 +186,6 @@ var systemPrompts = map[string]map[string]string{
 		"doc":       "你是一位技术写作人员。请创建清晰、全面的文档。",
 		"test":      "你是一位质量保证工程师。请为给定的代码编写全面的测试用例。",
 	},
-	"ru": {
-		"summarize": "Вы - помощник, который кратко суммирует текст.",
-		"translate": "Вы - переводчик. Переведите следующий текст на русский.",
-	},
-	"fr": {
-		"summarize": "Vous êtes un assistant utile qui résume le texte concisément.",
-		"translate": "Vous êtes un traducteur. Traduisez le texte suivant en français.",
-	},
-	"ja": {
-		"summarize": "あなたは、テキストを簡潔に要約する役立つアシスタントです。",
-		"translate": "あなたは翻訳者です。以下のテキストを日本語に翻訳してください。",
-	},
-	"ko": {
-		"summarize": "당신은 텍스트를 간결하게 요약하는 유용한 비서입니다.",
-		"translate": "당신은 번역가입니다. 다음 텍스트를 한국어로 번역하세요.",
-	},
-	"es": {
-		"summarize": "Eres un asistente útil que resume texto de forma concisa.",
-		"translate": "Eres un traductor. Traduce el siguiente texto al español.",
-	},
-	"ar": {
-		"summarize": "أنت مساعد مفيد يلخص النص بإيجاز.",
-		"translate": "أنت مترجم. اترجم النص التالي إلى العربية.",
-	},
-	"hi": {
-		"summarize": "आप एक सहायक सहायक हैं जो पाठ को संक्षेप में सारांशित करते हैं।",
-		"translate": "आप एक अनुवादक हैं। निम्नलिखित पाठ को हिंदी में अनुवाद करें।",
-	},
 }
 
 func getSystemPrompt(action string) string {
