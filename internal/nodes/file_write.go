@@ -51,6 +51,7 @@ func (n *FileWriteNode) Schema() NodeSchema {
 		Output:      "string - confirmation message",
 		Params: []ParamSchema{
 			{Name: "path", Type: "string", Description: "File path to write to. Relative to the working directory, or relative to the connector root when `connector` is set.", Required: true},
+			{Name: "content", Type: "string", Description: "Content to write; defaults to the step input (previous step output). Expressions like {{var.x}} are evaluated before the node runs.", Required: false},
 			{Name: "connector", Type: "string", Description: "Named files/notes connector. Must be registered with --writable; paths resolve inside its root and its include allowlist applies.", Required: false},
 			{Name: "mode", Type: "string", Description: "Write mode: write (default) or append", Required: false, Default: "write"},
 		},
@@ -67,6 +68,14 @@ func (n *FileWriteNode) Execute(ctx context.Context, input string, params map[st
 	mode, ok := params["mode"]
 	if !ok || mode == "" {
 		mode = "write"
+	}
+
+	// content param (documented in skills/aflare/nodes-reference.md) overrides
+	// the step input; when absent, keep the legacy behaviour of writing the
+	// previous step's output.
+	content := input
+	if c, has := params["content"]; has {
+		content = c
 	}
 
 	var safePath string
@@ -104,12 +113,12 @@ func (n *FileWriteNode) Execute(ctx context.Context, input string, params map[st
 
 	switch strings.ToLower(mode) {
 	case "append":
-		if err := appendToFile(safePath, []byte(input)); err != nil {
+		if err := appendToFile(safePath, []byte(content)); err != nil {
 			return "", fmt.Errorf("failed to append to file: %w", err)
 		}
 		return fmt.Sprintf("appended to %s", path), nil
 	case "write", "":
-		if err := atomicWriteFile(safePath, []byte(input), 0600); err != nil {
+		if err := atomicWriteFile(safePath, []byte(content), 0600); err != nil {
 			return "", fmt.Errorf("failed to write file: %w", err)
 		}
 		return fmt.Sprintf("written to %s", path), nil

@@ -503,24 +503,28 @@ func acquireAuditLock(dir string) (func(), error) {
 // history default"); the lock is taken on the resolved directory so the
 // default directory is also protected.
 func newAuditEnabledExecutor(auditDir string, safeMode bool) (*workflow.PolicyExecutor, func()) {
-	var exec *workflow.Executor
+	exec, release := newAuditExecutor(auditDir, safeMode)
+	policyEngine := newPolicyEngine(safeMode)
+	return workflow.NewPolicyExecutor(exec, policyEngine), release
+}
+
+// newAuditExecutor builds a plain Executor with tamper-evident audit logging
+// and the audit-directory lock (H-6), recording safeMode in the executor so
+// a pause stamps it into the RunMeta (see Executor.WithSafeMode). Policy
+// enforcement is NOT applied here — wrap with NewPolicyExecutor if needed,
+// or rely on ResumeWorkflowWith re-applying the policy on resume.
+func newAuditExecutor(auditDir string, safeMode bool) (*workflow.Executor, func()) {
 	resolved := resolveAuditDir(auditDir)
 	if resolved == "" {
-		exec = workflow.NewExecutor().WithAuditLog(true, "")
-	} else {
-		release, err := acquireAuditLock(resolved)
-		if err != nil {
-			logger.Warn("audit lock failed; disabling audit for this process to avoid cross-process hash-chain corruption",
-				"dir", resolved, "error", err)
-			exec = workflow.NewExecutor().WithAuditLog(false, "")
-		} else {
-			exec = workflow.NewExecutor().WithAuditLog(true, auditDir)
-			policyEngine := newPolicyEngine(safeMode)
-			return workflow.NewPolicyExecutor(exec, policyEngine), release
-		}
+		return workflow.NewExecutor().WithAuditLog(true, "").WithSafeMode(safeMode), func() {}
 	}
-	policyEngine := newPolicyEngine(safeMode)
-	return workflow.NewPolicyExecutor(exec, policyEngine), func() {}
+	release, err := acquireAuditLock(resolved)
+	if err != nil {
+		logger.Warn("audit lock failed; disabling audit for this process to avoid cross-process hash-chain corruption",
+			"dir", resolved, "error", err)
+		return workflow.NewExecutor().WithAuditLog(false, "").WithSafeMode(safeMode), func() {}
+	}
+	return workflow.NewExecutor().WithAuditLog(true, auditDir).WithSafeMode(safeMode), release
 }
 
 // newPolicyEngine returns a policy engine based on the safeMode flag.

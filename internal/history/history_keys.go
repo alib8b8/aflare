@@ -18,13 +18,17 @@ package history
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"golang.org/x/crypto/pbkdf2"
@@ -156,17 +160,32 @@ func auditKeyCandidates() [][]byte {
 
 // auditKeyForAppend resolves the signing key for a new record appended to the
 // audit log at auditPath:
-//   - env key / password-derived key win when configured (explicit operator
-//     intent, same as every version before 0.9.0);
-//   - otherwise, if the log is missing or empty (a NEW chain), the per-install
-//     random key file is generated and used — fresh deployments never sign
-//     with the public default;
+//   - the explicit env key always wins (operator intent, e.g. after a key
+//     rotation that archived and restarted the chain);
+//   - otherwise, when the chain already has records, the key its LAST record
+//     was signed with wins (chain continuity) — verification replays the
+//     whole chain under a single key, so silently switching keys (e.g. a run
+//     with AFLARE_SECRETS_PASSWORD exported, which derives a key, followed by
+//     a run without it, which uses the per-install key file) would
+//     permanently break verification at the switch point;
+//   - when no available key can verify the existing last record, the append
+//     is REFUSED rather than signed with a mismatched key: an audit chain is
+//     only worth anything while it stays verifiable (the workflow itself is
+//     unaffected; the append failure is logged as a warning);
+//   - otherwise, if the log is missing or empty (a NEW chain), the
+//     password-derived key or the per-install random key file is used —
+//     fresh deployments never sign with the public default;
 //   - otherwise (an existing legacy chain with records and no key file), the
 //     chain must continue under the key it was started with, so the public
 //     default is used with a warning; doctor explains how to migrate.
 func auditKeyForAppend(auditPath string) ([]byte, error) {
 	if key := os.Getenv(auditEnvHMACKey); key != "" {
 		return []byte(key), nil
+	}
+	if key, ok, err := chainContinuityKey(auditPath); err != nil {
+		return nil, err
+	} else if ok {
+		return key, nil
 	}
 	if password := os.Getenv(auditEnvSecretsPasswd); password != "" {
 		return deriveAuditKeyFromPassword(password), nil
@@ -185,6 +204,87 @@ func auditKeyForAppend(auditPath string) ([]byte, error) {
 			"migration", "AFLARE_AUDIT_HMAC_KEY=$(openssl rand -hex 32) aflare audit export --out archive.json && <move audit.log aside>")
 	})
 	return []byte(auditDefaultKey), nil
+}
+
+// ErrAuditKeyUnavailable is returned by an append when the existing chain's
+// last record was signed with a key that none of the currently available
+// candidates can reproduce (e.g. the chain was started under a
+// password-derived key but AFLARE_SECRETS_PASSWORD is no longer exported, or
+// the last record was tampered with). The append is refused so the chain
+// stays verifiable instead of silently forking.
+var ErrAuditKeyUnavailable = errors.New("audit chain key unavailable: the existing audit log was signed with a key that is not currently configured (set AFLARE_SECRETS_PASSWORD / AFLARE_AUDIT_HMAC_KEY, or archive and restart the chain)")
+
+// chainContinuityKey determines the key the existing chain's last record was
+// signed with, by testing every available candidate against that record's
+// HMAC. Returns:
+//
+//	key, true, nil    — the chain's current key; appends must continue with it
+//	nil,  false, nil  — no chain to continue (missing/empty file, legacy
+//	                    record without hash fields); caller falls through to
+//	                    the fresh-chain resolution order
+//	nil,  false, err  — the chain has records but NO available key verifies
+//	                    the last one: refuse the append (ErrAuditKeyUnavailable)
+func chainContinuityKey(auditPath string) ([]byte, bool, error) {
+	entry, ok := lastAuditRecord(auditPath)
+	if !ok {
+		return nil, false, nil
+	}
+	if entry.CurrHash == "" {
+		// Legacy pre-hash record: cannot determine the signing key.
+		return nil, false, nil
+	}
+	for _, key := range auditKeyCandidates() {
+		savedHash := entry.CurrHash
+		entry.CurrHash = ""
+		computed, err := computeAuditHash(key, entry)
+		entry.CurrHash = savedHash
+		if err != nil {
+			continue
+		}
+		if hmac.Equal([]byte(computed), []byte(savedHash)) {
+			return key, true, nil
+		}
+	}
+	return nil, false, ErrAuditKeyUnavailable
+}
+
+// lastAuditRecord returns the last non-empty record in the audit log, or
+// ok=false when the file is missing, empty, or its tail does not parse. It
+// reads only the trailing 8 KiB (records are small JSON lines); a torn final
+// line simply reports ok=false and the caller falls through to fresh-chain
+// resolution.
+func lastAuditRecord(path string) (AuditLog, bool) {
+	f, err := os.Open(path) // #nosec G304 -- internally generated history path
+	if err != nil {
+		return AuditLog{}, false
+	}
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil || stat.Size() == 0 {
+		return AuditLog{}, false
+	}
+	bufSize := int64(8192)
+	if bufSize > stat.Size() {
+		bufSize = stat.Size()
+	}
+	buf := make([]byte, bufSize)
+	if _, err := f.ReadAt(buf, stat.Size()-bufSize); err != nil && err != io.EOF {
+		return AuditLog{}, false
+	}
+	lines := strings.Split(string(buf), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+		var entry AuditLog
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			return AuditLog{}, false
+		}
+		return entry, true
+	}
+	return AuditLog{}, false
 }
 
 // AuditKeyStatus reports how the audit HMAC key is (or will be) resolved, for

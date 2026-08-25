@@ -143,6 +143,17 @@ func (e *Executor) WithWorkflowPath(path string) *Executor {
 	return e
 }
 
+// WithSafeMode records whether this Executor runs under the strict (safe)
+// policy. It does NOT enforce anything by itself — enforcement is the
+// PolicyExecutor's job (see NewPolicyExecutor). The flag is stamped into the
+// pause RunMeta so `aflare resume` re-applies the same policy class the run
+// started under, instead of silently resuming a --safe run without
+// restrictions. Returns the receiver for chaining.
+func (e *Executor) WithSafeMode(mode bool) *Executor {
+	e.safeMode = mode
+	return e
+}
+
 // WithProgress registers a StepProgressFunc callback that is invoked at each
 // step lifecycle event (started/completed/failed/skipped) during sequential
 // workflow execution (断点13: 实时进度输出). This is intended for the CLI's
@@ -327,7 +338,7 @@ func (e *Executor) ExecuteWithTrace(ctx context.Context, wf *Workflow, reg *node
 		if walPath != "" {
 			statePath = "" // WAL path is the source of truth
 		}
-		out, results, trace, err = executeWorkflowSequential(ctx, wf, reg, program, statePath, walPath, e.wfPath, e.workflowTimeout, e.progressCB)
+		out, results, trace, err = executeWorkflowSequential(ctx, wf, reg, program, statePath, walPath, e.wfPath, e.safeMode, e.workflowTimeout, e.progressCB)
 	}
 	recordWorkflowMetrics(trace, err)
 	audit.recordCompletion(results, trace, err)

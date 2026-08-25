@@ -491,7 +491,7 @@ func (s *seqExecState) handleStepFailure(i int, wStep WorkflowStep, execErr erro
 		if resumeOn == "" {
 			resumeOn = "manual"
 		}
-		paused, pauseErr := PauseWorkflow(s.wfPath, s.wf, i, wStep.Name, resumeOn, execErr.Error(), s.walPath)
+		paused, pauseErr := PauseWorkflow(s.wfPath, s.wf, i, wStep.Name, resumeOn, execErr.Error(), s.walPath, s.safeMode)
 		if pauseErr != nil {
 			logger.Error("failed to pause workflow", "name", s.wf.Name, "step", i, "error", pauseErr)
 			s.failTUI()

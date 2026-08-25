@@ -93,13 +93,14 @@ name: article-summarizer
 description: Fetch an article and summarize it with Ollama
 steps:
   - node: fetch_url
+    name: fetch
     params:
       url: "https://example.com/article"
       mode: "text"
   - node: ollama
     params:
       model: "llama3"
-      prompt: "Summarize the key points: {{.steps[0].output}}"
+      prompt: "Summarize the key points: {{step.fetch}}"
       temperature: 0.3
   - node: file_write
     params:

@@ -27,13 +27,14 @@ name: research-assistant
 description: Fetch an article and summarize with LLM
 steps:
   - node: fetch_url
+    name: fetch
     params:
       url: "https://example.com/article"
       mode: "text"
   - node: ollama
     params:
       model: "llama3"
-      prompt: "Summarize the key points: {{.steps[0].output}}"
+      prompt: "Summarize the key points: {{step.fetch}}"
       temperature: 0.3
   - node: file_write
     params:
@@ -56,12 +57,13 @@ steps:
         params:
           url: "https://api.stock.example.com/quote/ABC"
   - node: combine
+    name: merged
     params:
       separator: "\n---\n"
   - node: ollama
     params:
       model: "llama3"
-      prompt: "Analyze this combined data and write a daily report: {{.steps[1].output}}"
+      prompt: "Analyze this combined data and write a daily report: {{step.merged}}"
   - node: file_write
     params:
       path: "daily-report.md"
@@ -80,13 +82,14 @@ steps:
       url: "https://github.com/your-username"
       mode: "text"
   - node: transform
+    name: repos
     params:
       operation: regex
       pattern: "([a-zA-Z0-9-]+/[a-zA-Z0-9-]+)"
   - node: ollama
     params:
       model: "llama3"
-      prompt: "Summarize recent GitHub activity: {{.steps[1].output}}"
+      prompt: "Summarize recent GitHub activity: {{step.repos}}"
   - node: file_write
     params:
       path: "github-digest.md"
@@ -104,6 +107,7 @@ steps:
     params:
       command: "git log --oneline --since='2 weeks ago'"
   - node: transform
+    name: commits
     params:
       operation: replace
       find: "feat:"
@@ -111,7 +115,7 @@ steps:
   - node: ollama
     params:
       model: "llama3"
-      prompt: "Organize these commits into release notes by category: {{.steps[1].output}}"
+      prompt: "Organize these commits into release notes by category: {{step.commits}}"
   - node: file_write
     params:
       path: "RELEASE-NOTES.md"
@@ -132,8 +136,8 @@ steps:
     params:
       operation: regex
       pattern: "5\\d{2}"
-  - condition: "{{.steps[1].output}} != ''"
-    node: notify
+  - node: notify
+    condition: "not_empty"
     params:
       channel: stdout
       message: "ALERT: 5xx errors detected in server logs"
@@ -151,12 +155,13 @@ steps:
     params:
       command: "find . -name '*.go' -not -path './vendor/*'"
   - node: execute
+    name: signatures
     params:
       command: "grep -rn 'func \\(.*\\)(' --include='*.go' ."
   - node: ollama
     params:
       model: "llama3"
-      prompt: "Generate API documentation from these function signatures: {{.steps[1].output}}"
+      prompt: "Generate API documentation from these function signatures: {{step.signatures}}"
   - node: file_write
     params:
       path: "API.md"
@@ -222,12 +227,13 @@ steps:
         params:
           command: "git log --author='@my-team.com' --since='1 week ago' --oneline"
   - node: combine
+    name: merged
     params:
       separator: "\n## Commits\n"
   - node: ollama
     params:
       model: "llama3"
-      prompt: "Create a weekly team report from this data: {{.steps[1].output}}"
+      prompt: "Create a weekly team report from this data: {{step.merged}}"
   - node: file_write
     params:
       path: "team-report.md"
@@ -247,16 +253,19 @@ steps:
 
 ### Conditional Branching
 
+The step-level `condition` operates on the step input (previous step output) with operators like `not_empty`, `empty`, `contains:x`, `equals:x`, `regex:x` (prefix with `not ` to negate).
+
 ```yaml
 - node: fetch_url
+  name: fetch
   params:
     url: "https://example.com/api"
 - node: ollama
-  condition: "{{.steps[0].output}} != ''"
+  condition: "not_empty"
   params:
-    prompt: "Analyze: {{.steps[0].output}}"
+    prompt: "Analyze: {{step.fetch}}"
 - node: notify
-  condition: "{{.steps[0].output}} == ''"
+  condition: "empty"
   params:
     channel: stdout
     message: "No data received, skipping analysis"
@@ -268,8 +277,7 @@ steps:
 - node: call
   params:
     workflow: "sub-workflows/parse-data.yaml"
-    vars:
-      input: "{{.steps[0].output}}"
+    vars: "input={{step.fetch}}"
 ```
 
 ### Using Variables
@@ -282,8 +290,8 @@ vars:
 steps:
   - node: fetch_url
     params:
-      url: "{{.vars.target_url}}"
+      url: "{{var.target_url}}"
   - node: file_write
     params:
-      path: "{{.vars.output_file}}"
+      path: "{{var.output_file}}"
 ```

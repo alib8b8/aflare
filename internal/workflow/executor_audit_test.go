@@ -173,6 +173,86 @@ func TestExecutor_AuditLog_RecordsAllSteps(t *testing.T) {
 	}
 }
 
+// TestExecutor_AuditLog_RedactsSecretValuesInOutput verifies that known
+// secret VALUES are scrubbed from flowing audit fields. SanitizeParams masks
+// secret-valued params by key name, but a step that templates
+// {{secret.GROUP.KEY}} into its output (or routes a secret through an
+// innocuous param name) would otherwise leak the cleartext into the
+// tamper-evident audit log.
+func TestExecutor_AuditLog_RedactsSecretValuesInOutput(t *testing.T) {
+	t.Setenv("AFLARE_AUDIT_HMAC_KEY", "test-key")
+	captureAndIsolateAudit(t, t.TempDir())
+
+	// Stub the secret-value loader: no keyring is available in tests.
+	origLoader := auditLoadSecretValues
+	auditLoadSecretValues = func() []string {
+		return []string{"sk-live-abcd1234efgh5678", "ghp_shorter"}
+	}
+	t.Cleanup(func() { auditLoadSecretValues = origLoader })
+
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	wf := &Workflow{
+		Name: "audit-secret-redact",
+		Steps: []WorkflowStep{
+			// output = "sk-live-abcd1234efgh5678 " → must be redacted
+			{Name: "s1", Node: "test", Params: map[string]string{"prefix": "sk-live-abcd1234efgh5678"}},
+			// innocuous param name carrying a secret value → must be redacted
+			{Name: "s2", Node: "test", Params: map[string]string{"prefix": "token is ghp_shorter ok"}},
+		},
+	}
+
+	exec := NewExecutor().WithAuditLog(true, "")
+	if _, _, err := exec.Execute(context.Background(), wf, reg); err != nil {
+		t.Fatalf("workflow failed: %v", err)
+	}
+
+	raw, _ := os.ReadFile(history.GetAuditLogPath())
+	logStr := string(raw)
+	for _, secret := range []string{"sk-live-abcd1234efgh5678", "ghp_shorter"} {
+		if strings.Contains(logStr, secret) {
+			t.Errorf("audit log leaked secret value %q", secret)
+		}
+	}
+	if !strings.Contains(logStr, "[REDACTED]") {
+		t.Error("expected [REDACTED] markers in audit log")
+	}
+
+	// Non-secret content must survive: the second step's plain words.
+	if !strings.Contains(logStr, "token is") {
+		t.Error("expected non-secret param text to be preserved")
+	}
+
+	// The chain must still verify after redaction.
+	valid, brokenAt, verr := history.VerifyAuditChain(history.GetAuditLogPath())
+	if verr != nil {
+		t.Fatalf("VerifyAuditChain error: %v", verr)
+	}
+	if !valid {
+		t.Errorf("expected valid audit chain, broken at line %d", brokenAt)
+	}
+}
+
+// TestAuditRecorder_RedactSecrets_Ordering verifies that when one secret
+// value contains another, the longer value is replaced first so the shorter
+// cannot partially unmask the remainder.
+func TestAuditRecorder_RedactSecrets_Ordering(t *testing.T) {
+	origLoader := auditLoadSecretValues
+	auditLoadSecretValues = func() []string {
+		// Deliberately unsorted: the loader sorts longest-first internally.
+		return []string{"ghp_short", "ghp_short_extended_tail"}
+	}
+	t.Cleanup(func() { auditLoadSecretValues = origLoader })
+
+	ar := &auditRecorder{}
+	got := ar.redactSecrets("value=ghp_short_extended_tail plain=ghp_short")
+	want := "value=[REDACTED] plain=[REDACTED]"
+	if got != want {
+		t.Errorf("redactSecrets = %q, want %q", got, want)
+	}
+}
+
 // TestExecutor_AuditLog_HMACChain runs the same workflow twice and verifies
 // that the second execution's records extend the first execution's hash chain
 // continuously (no broken link across the run boundary).

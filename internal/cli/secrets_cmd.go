@@ -64,6 +64,10 @@ func HandleSecrets(args []string) error {
 		if err := handleSecretList(rest); err != nil {
 			return err
 		}
+	case "delete", "rm", "remove":
+		if err := handleSecretDelete(rest); err != nil {
+			return err
+		}
 	default:
 		fmt.Printf("Unknown secrets subcommand: %s\n\n", subCmd)
 		PrintSecretsUsage()
@@ -210,6 +214,50 @@ func handleSecretList(args []string) error {
 	return nil
 }
 
+// handleSecretDelete removes a secret (or a whole group when the key is
+// omitted). Usage: aflare secrets delete <group> [<key>]
+func handleSecretDelete(args []string) error {
+	if len(args) < 1 || len(args) > 2 {
+		fmt.Println("Usage: aflare secrets delete <group> [<key>]")
+		fmt.Println("  (key omitted → remove the whole group and all its secrets)")
+		return exitErr(1)
+	}
+	group := args[0]
+	key := ""
+	if len(args) == 2 {
+		key = args[1]
+	}
+
+	sm, err := loadSecretsOrFail()
+	if err != nil {
+		return err
+	}
+
+	if err := secretDelete(sm, group, key); err != nil {
+		fmt.Printf("❌ %v\n", err)
+		return exitErr(1)
+	}
+	if err := sm.SaveToFile(secrets.DefaultPath()); err != nil {
+		fmt.Printf("❌ save: %v\n", err)
+		return exitErr(1)
+	}
+	if key != "" {
+		fmt.Printf("✅ deleted %s/%s\n", group, key)
+	} else {
+		fmt.Printf("✅ deleted group %s (and all its secrets)\n", group)
+	}
+	return nil
+}
+
+// secretDelete removes one secret, or the whole group when key is empty.
+// Extracted from handleSecretDelete for testability (no os.Exit, no store open).
+func secretDelete(sm *secrets.SecretManager, group, key string) error {
+	if key == "" {
+		return sm.RemoveGroup(group)
+	}
+	return sm.RemoveSecret(group, key)
+}
+
 // secretList builds the listing text (groups, or secrets in a group, masked).
 // Extracted from handleSecretList for testability.
 func secretList(sm *secrets.SecretManager, args []string) (string, error) {
@@ -257,6 +305,7 @@ func PrintSecretsUsage() {
 	fmt.Println("  set <group> <key> [value]   Store a secret (prompts for value if omitted)")
 	fmt.Println("  get <group> <key> [--raw]   Print a secret (masked, or cleartext with --raw)")
 	fmt.Println("  list [group]                List groups, or secrets in a group (masked)")
+	fmt.Println("  delete <group> [<key>]      Delete a secret, or the whole group when key is omitted")
 	fmt.Println("  -h, --help                  Show this help message")
 	fmt.Println("\nExamples:")
 	fmt.Println("  aflare secrets set openai api_key sk-...")

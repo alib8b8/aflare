@@ -26,7 +26,14 @@ import (
 
 // HandleList handles the "list" command.
 func HandleList() {
-	reg := nodes.NewRegistry()
+	// Use the global registry, not a fresh one: nodes self-register via
+	// init() (agent, memory, files_list, code_interpreter, drone, the
+	// supervisor team, ...) and a private registry built from
+	// RegisterBuiltins alone silently hides them — `aflare list` once
+	// showed 48 of 68 nodes, including none of the connector-aware
+	// files_list. RegisterBuiltins is idempotent on the global registry,
+	// so calling it here only backfills anything missing.
+	reg := nodes.GetGlobalRegistry()
 	nodes.RegisterBuiltins(reg)
 
 	nodeList := reg.ListNodes()

@@ -32,7 +32,7 @@ Key features:
 1. **Generate a workflow**: Describe the task in natural language
 2. **Review the YAML**: The generated workflow is deterministic and editable
 3. **Execute**: Run the workflow with progress tracking
-4. **Chain outputs**: Use `{{.steps[N].output}}` to pass data between steps
+4. **Chain outputs**: Use `{{step.<name>}}` (or `{{step.<N>}}`, 0-based index) to pass data between steps
 
 ### CLI Commands
 
@@ -116,12 +116,13 @@ name: fetch-and-save
 description: Fetch data from API and save to file
 steps:
   - node: fetch_url
+    name: fetch
     params:
       url: "https://api.example.com/data"
   - node: file_write
     params:
       path: "data.txt"
-      content: "{{.steps[0].output}}"
+      content: "{{step.fetch}}"
 ```
 
 **Example 2: Fetch, Parse, and Summarize**
@@ -130,16 +131,18 @@ name: summarize-article
 description: Fetch article and summarize with LLM
 steps:
   - node: fetch_url
+    name: fetch
     params:
       url: "https://example.com/article"
   - node: ollama
+    name: summarize
     params:
       model: "llama3"
-      prompt: "Summarize: {{.steps[0].output}}"
+      prompt: "Summarize: {{step.fetch}}"
   - node: file_write
     params:
       path: "summary.md"
-      content: "{{.steps[1].output}}"
+      content: "{{step.summarize}}"
 ```
 
 **Example 3: Multi-source Aggregation**
@@ -155,12 +158,13 @@ steps:
         params:
           url: "https://api2.example.com"
   - node: combine
+    name: merged
     params:
       separator: "\n"
   - node: ollama
     params:
       model: "llama3"
-      prompt: "Analyze: {{.steps[1].output}}"
+      prompt: "Analyze: {{step.merged}}"
 ```
 
 ## Resources

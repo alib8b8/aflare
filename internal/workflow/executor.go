@@ -158,7 +158,7 @@ func ExecuteWorkflowWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Regi
 		recordWorkflowMetrics(trace, err)
 		return out, results, trace, err
 	}
-	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, "", "", "", DefaultWorkflowTimeout, nil)
+	out, results, trace, err := executeWorkflowSequential(ctx, wf, reg, program, "", "", "", false, DefaultWorkflowTimeout, nil)
 	recordWorkflowMetrics(trace, err)
 	return out, results, trace, err
 }
@@ -203,6 +203,11 @@ type Executor struct {
 	// wfPath is the original workflow file path, used for pause-resume
 	// metadata when a resumable step is paused.
 	wfPath string
+	// safeMode records whether this Executor runs under the strict (safe)
+	// policy. It is metadata only — enforcement happens in PolicyExecutor.
+	// It is stamped into the pause RunMeta so a later resume re-applies the
+	// same policy class the run started under (see ResumeWorkflow).
+	safeMode bool
 	// progressCB (断点13) is an optional CLI progress callback invoked at
 	// each step lifecycle event. nil disables progress output.
 	progressCB StepProgressFunc

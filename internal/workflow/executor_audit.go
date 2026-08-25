@@ -22,10 +22,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/alib8b8/aflare/internal/history"
 	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/secrets"
 )
 
 // Audit log action values for workflow-execution records. These extend the
@@ -50,6 +53,33 @@ const (
 // the audit log so a single huge step payload cannot blow up the audit file.
 const auditMaxFieldLen = 500
 
+// auditSecretRedacted is the placeholder that replaces a known secret value
+// found in a flowing audit field (input/output/error).
+const auditSecretRedacted = "[REDACTED]"
+
+// auditLoadSecretValues returns the cleartext values of all stored secrets,
+// used for value-based redaction of audit fields. SanitizeParams already
+// masks secret-valued step *parameters* by key name, but a step OUTPUT (or
+// input/error) can embed a secret whenever a workflow templates
+// {{secret.GROUP.KEY}} into its data — pattern-based redaction cannot catch
+// arbitrary user-chosen values, so the known values themselves are scrubbed.
+// Package-level variable so tests can stub it without a keyring.
+var auditLoadSecretValues = func() []string {
+	sm, err := secrets.GetSecretManager()
+	if err != nil {
+		return nil
+	}
+	var vals []string
+	for _, v := range sm.GetAllVars() {
+		// Skip trivially short values: redacting e.g. "abc" would corrupt
+		// ordinary audit text for no security gain.
+		if len(v) >= 4 {
+			vals = append(vals, v)
+		}
+	}
+	return vals
+}
+
 // auditRecorder writes tamper-evident audit records for a single workflow
 // execution into the history package's HMAC hash-chain audit log.
 //
@@ -59,10 +89,38 @@ const auditMaxFieldLen = 500
 // internal auditWriteMu, so concurrent runs extend the same chain safely
 // rather than corrupting it.
 type auditRecorder struct {
-	enabled      bool
-	dir          string // when non-empty, overrides the history directory
-	workflowName string
-	steps        []WorkflowStep
+	enabled       bool
+	dir           string // when non-empty, overrides the history directory
+	workflowName  string
+	steps         []WorkflowStep
+	secretValues  []string // known secret values, loaded once per run for redaction
+	secretsLoaded bool
+}
+
+// redactSecrets replaces every occurrence of a known secret value in s with
+// [REDACTED]. Values are loaded lazily on first use (per recorder, i.e. per
+// workflow run) so a secrets-store failure or absence simply disables
+// value-based redaction without affecting the audit chain.
+func (ar *auditRecorder) redactSecrets(s string) string {
+	if s == "" {
+		return s
+	}
+	if !ar.secretsLoaded {
+		ar.secretsLoaded = true
+		ar.secretValues = auditLoadSecretValues()
+		// Longest first: when one secret value contains another, replacing
+		// the longer one first prevents a partial mask that leaks the
+		// remainder (e.g. "ghp_short" inside "ghp_short_tail").
+		sort.Slice(ar.secretValues, func(i, j int) bool {
+			return len(ar.secretValues[i]) > len(ar.secretValues[j])
+		})
+	}
+	for _, v := range ar.secretValues {
+		if strings.Contains(s, v) {
+			s = strings.ReplaceAll(s, v, auditSecretRedacted)
+		}
+	}
+	return s
 }
 
 // newAuditRecorder builds a recorder from the Executor's audit configuration.
@@ -213,10 +271,10 @@ func (ar *auditRecorder) idempotencyDetail(rec IdempotencyRecord, phase string) 
 		"idempotency_key": idempotencyKeyPrefix(rec.Key),
 		"run_id":          rec.RunID,
 		"status":          rec.Status,
-		"final_output":    truncateAudit(rec.FinalOutput),
+		"final_output":    truncateAudit(ar.redactSecrets(rec.FinalOutput)),
 	}
 	if rec.Error != "" {
-		d["error"] = rec.Error
+		d["error"] = ar.redactSecrets(rec.Error)
 	}
 	b, _ := json.Marshal(d)
 	return string(b)
@@ -235,19 +293,21 @@ func idempotencyKeyPrefix(key string) string {
 // step_index/step_name/node_name/input/output/status/error/duration. Step
 // parameters are sanitized via history.SanitizeParams so secrets (keys,
 // tokens, passwords) are masked as "***" before reaching the audit log;
-// flowing input/output strings are truncated to bound the audit log size.
+// flowing input/output/error strings additionally have known secret VALUES
+// redacted (a step that templates {{secret.G.K}} would otherwise leak the
+// cleartext through its output) and are truncated to bound the audit log size.
 func (ar *auditRecorder) appendStep(r StepResult) {
 	detail := map[string]interface{}{
 		"step_index": r.StepIndex,
 		"node_name":  r.NodeName,
-		"input":      truncateAudit(r.Input),
-		"output":     truncateAudit(r.Output),
+		"input":      truncateAudit(ar.redactSecrets(r.Input)),
+		"output":     truncateAudit(ar.redactSecrets(r.Output)),
 		"status":     "success",
 		"duration":   r.Duration.String(),
 	}
 	if r.Error != nil {
 		detail["status"] = "failed"
-		detail["error"] = r.Error.Error()
+		detail["error"] = ar.redactSecrets(r.Error.Error())
 	}
 	// step_index maps to wf.Steps for simple sequential/DAG steps. For
 	// compound-step sub-results (if/loop/map/reduce branches) the StepIndex is
@@ -267,7 +327,16 @@ func (ar *auditRecorder) appendStep(r StepResult) {
 				params[k] = v
 			}
 			// Sanitize params BEFORE writing to the audit log.
-			detail["params"] = history.SanitizeParams(params)
+			sanitized := history.SanitizeParams(params)
+			// Value-based redaction on top of key-name sanitization: a
+			// secret value routed through an innocuous param name is
+			// still scrubbed.
+			for k, v := range sanitized {
+				if s, ok := v.(string); ok {
+					sanitized[k] = ar.redactSecrets(s)
+				}
+			}
+			detail["params"] = sanitized
 		}
 	}
 	data, err := json.Marshal(detail)
@@ -299,7 +368,7 @@ func (ar *auditRecorder) workflowDetail(phase, errMsg string, trace *WorkflowTra
 		"phase":    phase,
 	}
 	if errMsg != "" {
-		d["error"] = errMsg
+		d["error"] = ar.redactSecrets(errMsg)
 	}
 	if trace != nil {
 		d["cost_usd"] = roundCost(trace.TotalCostUSD)
