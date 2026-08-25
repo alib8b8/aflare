@@ -167,57 +167,90 @@ func HandleAgent(args []string) error {
 	fmt.Println()
 
 	// ── Stdin Scanner ───────────────────────────────────────────────────
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1*1024*1024)
+	// stdin reading runs in its own goroutine: the previous inline
+	// scanner.Scan() blocked the loop between lines, so a signal arriving
+	// while stdin was idle was never observed — the daemon could not be
+	// stopped with SIGINT/SIGTERM at all (only SIGKILL worked), hanging
+	// production supervisors past their stop timeout.
+	stdinDone := make(chan struct{})
+	lines := make(chan string, 16)
+	go func() {
+		defer close(stdinDone)
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Buffer(make([]byte, 0, 64*1024), 1*1024*1024)
+		for scanner.Scan() {
+			select {
+			case lines <- scanner.Text():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	running := true
 	for running {
+		fmt.Print("> ")
+
+		var line string
+		var ok bool
 		select {
 		case sig := <-sigCh:
 			fmt.Printf("\nReceived signal %v, shutting down...\n", sig)
 			running = false
+			continue
 
-		default:
-			fmt.Print("> ")
-			if !scanner.Scan() {
+		case <-ctx.Done():
+			running = false
+			continue
+
+		case line, ok = <-lines:
+			if !ok {
 				// Ctrl-D (EOF)
 				fmt.Println()
 				running = false
-				break
-			}
-			line := strings.TrimSpace(scanner.Text())
-			if line == "" {
 				continue
 			}
+		}
 
-			if strings.HasPrefix(line, "/") {
-				handleAgentCommand(line, loop, &running, tq)
-				continue
-			}
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
 
-			replyCh := make(chan agent.AgentOutput, 1)
-			select {
-			case inputs <- agent.AgentInput{
-				Source:  agent.SourceStdin,
-				Message: line,
-				ReplyTo: replyCh,
-			}:
-				// Wait for response
-				out := <-replyCh
-				if out.Error != nil {
-					fmt.Printf("Error: %v\n", out.Error)
-				} else {
-					fmt.Println(out.Response)
-					fmt.Println()
-				}
-			case <-ctx.Done():
-				running = false
+		if strings.HasPrefix(line, "/") {
+			handleAgentCommand(line, loop, &running, tq)
+			continue
+		}
+
+		replyCh := make(chan agent.AgentOutput, 1)
+		select {
+		case inputs <- agent.AgentInput{
+			Source:  agent.SourceStdin,
+			Message: line,
+			ReplyTo: replyCh,
+		}:
+			// Wait for response
+			out := <-replyCh
+			if out.Error != nil {
+				fmt.Printf("Error: %v\n", out.Error)
+			} else {
+				fmt.Println(out.Response)
+				fmt.Println()
 			}
+		case <-ctx.Done():
+			running = false
 		}
 	}
 
 	close(inputs)
 	cancel()
+	// Give the stdin goroutine a moment to observe ctx cancellation so a
+	// blocked send cannot outlive shutdown; it is abandoned either way at
+	// process exit.
+	select {
+	case <-stdinDone:
+	case <-time.After(2 * time.Second):
+	}
 	fmt.Println("Goodbye!")
 	return nil
 }
