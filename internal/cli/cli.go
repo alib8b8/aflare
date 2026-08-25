@@ -291,6 +291,16 @@ func PrintUsage() string {
   aflare watermark <decode|verify|info>  %s
   aflare connector <cmd>                 %s
   aflare mcp                             %s
+  aflare validate <workflow.yaml>        %s
+  aflare list                            %s
+  aflare init                            %s
+  aflare config <cmd>                    %s
+  aflare secrets <cmd>                   %s
+  aflare schedule <cmd>                  %s
+  aflare audit <cmd>                     %s
+  aflare review <workflow.yaml>          %s
+  aflare serve                           %s
+  aflare webui                           %s
   aflare help                            %s
 
 %s:
@@ -327,6 +337,16 @@ func PrintUsage() string {
 		i18n.T("usage.watermark"),
 		i18n.T("usage.connector"),
 		i18n.T("usage.mcp"),
+		i18n.T("usage.validate"),
+		i18n.T("usage.list"),
+		i18n.T("usage.init"),
+		i18n.T("usage.config"),
+		i18n.T("usage.secrets"),
+		i18n.T("usage.schedule"),
+		i18n.T("usage.audit"),
+		i18n.T("usage.review"),
+		i18n.T("usage.serve"),
+		i18n.T("usage.webui"),
 		i18n.T("usage.help"),
 		i18n.T("options"),
 		i18n.T("usage.safe_mode"),

@@ -17,11 +17,6 @@
   "usage.autoupgrade": "管理自动升级设置",
   "usage.help": "显示此帮助信息",
   "usage.safe_mode": "以安全模式运行（禁用执行节点和外部节点）",
-  "usage.template": "列出和使用工作流模板",
-  "usage.secret": "管理秘密和变量",
-  "usage.debug": "使用断点调试工作流",
-  "usage.history": "显示工作流执行历史",
-  "usage.plugin": "管理插件",
   "usage.schedule": "调度工作流执行",
   "safe_mode.enabled": "安全模式已启用 - 执行节点和外部节点已禁用",
   "dry_run.enabled": "试运行模式 - 工作流将被验证但不会执行",
@@ -166,5 +161,14 @@
   "resume.completed": "工作流已恢复并成功完成。",
   "resume.failed": "恢复失败：%v",
   "resume.not_paused": "run %q 未处于暂停状态（状态：%s）",
-  "resume.load_failed": "加载 run %q 失败：%v"
+  "resume.load_failed": "加载 run %q 失败：%v",
+  "usage.validate": "校验工作流文件（不执行）",
+  "usage.list": "列出所有已注册节点",
+  "usage.init": "交互式首次运行向导",
+  "usage.config": "查看或管理配置",
+  "usage.secrets": "管理密钥存储（加密 secrets store）",
+  "usage.audit": "查询与验证审计日志",
+  "usage.review": "AI 审查工作流（优化建议与安全检查）",
+  "usage.serve": "启动 HTTP API 服务器（默认仅绑定本地）",
+  "usage.webui": "启动 Web 界面"
 }
