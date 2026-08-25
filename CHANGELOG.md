@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **README 中英文更新为「个人优先」定位**：头部定位改为「AI 与你的数据之间确定且安全的控制层」，新增 Connector API 优势条目、功能矩阵行、核心能力专节（五类连接器 / 凭据隔离 / 权限天花板 / 根目录遏制示例）与路线图 main 行，文档索引补 connector-api.md 链接
+- **Connector API（命名数据源连接）**：新增 `internal/connector` 包与 `aflare connector add / list / show / remove` 命令——postgres / mysql / sqlite / files / notes 五类数据源注册为命名连接器（配置存 `~/.aflare/config/connectors.yaml`，`AFLARE_CONNECTORS_FILE` 可覆盖），`sql_query` / `file_read` / `file_write` / `files_list` 四节点新增 `connector` 参数，工作流引用连接器名而非内联 DSN 或路径。安全设计：凭据只存引用（加密 secrets store 或环境变量），spec 与 workflow YAML 永不落明文；只读默认（写需连接器显式开启），节点参数只能收紧不能放宽；天花板三件套 `max_rows`（默认 1000）/ `timeout`（默认 30s）/ `max_bytes`（默认 10MB，单文件读取上限）；postgres DSN 经 `url.UserPassword` 构造，密码特殊字符无法改变 DSN 结构；sqlite 拒绝 `file:` 前缀与 `?#` 参数并强制 `mode=ro`；文件连接器以 root 为围栏——`EvalSymlinks` 全链解析、最终组件拒绝符号链接（含悬空，防追加跟走与写入替换）；registry 原子保存（tmp+rename，文件 0600 / 目录 0700，防 tmp 被符号链接栽赃）（#95、#96、#97）
+- **全源码隐形水印与 CI 门禁**：所有 Go 源文件版权行内嵌零宽字符水印（U+200B / U+200C 表比特、U+200D 分片标记），新增 `aflare watermark encode-source --all` / `check-source` / `decode-source` / `strip-source` 命令；CI 增加覆盖门禁——新增源文件无水印直接红叉。与部署水印（payload v2）互补：部署水印标记"哪次部署"，源码水印标记产物来自哪个源码树，用于泄露溯源
+
+### Changed
+- **CodeQL 74 条告警清零**：告警均属 taint tracking 无法建模 aflare 守卫（validateReadPath / validateURL / 命令白名单 / SQLite 标识符转义等）的误报——排除走规则级 query-filters（`.github/codeql-config.yml` 逐条注明理由与对应守卫），不采用行内 `// codeql` 注释（GitHub code scanning 不识别）与路径级过滤（对 Go 不生效，实测 excluded queries 仍会产生告警）；排除 7 条规则后其余全部保持激活，gosec 与 golangci-lint 门禁不受影响
+- **gocritic 存量违例清零并启用 linter**（#57、#91）
+- **workflow 上帝文件拆分**：generator 拆为 generator_llm / generator_parse / generator_validate 等 topical 模块（#84，13 文件，+3022 / -2782），拆分产生的新文件同步补嵌源码水印
+- **CLI os.Exit 收敛为单点 dispatch**，internal/cli 测试覆盖率 21% → 61%
+
+### Removed
+- **内置模板库与内容生态（破坏性变更，#94）**：删除 17 分类 330 个内置技能模板与 `templates/` 目录（-1041 文件 / -71375 行），移除 `internal/{templates,skills,marketplace,badge,packs,agentplugins}` 包及 CLI 命令 `template` / `skills` / `marketplace` / `badge` / `install-pack`；agent 工具 `template_list` / `template_info` 与 MCP 模板工具同步移除。理由：330 个模板零真实使用信号，marketplace / badge 无人需要，维护成本无回报；项目定位收敛为"引擎 + 连接器 + 安全"，内容用户自带。保留：`run` / `create_workflow`、`template_render` 节点（渲染用户自带模板）、`examples/` 示例、用户本地模板目录扫描。迁移：引用内置模板的工作流改为本地模板路径；使用已删命令的脚本需移除
 
 ### Fixed
 - **`aflare connector` 子命令完全不可达（断点，本轮自检发现）**：`HandleConnector` 已实现且 main.go 分发器有 `case "connector"`，但 `cli.knownCommands` 漏列 `"connector"`——`ValidateCommand` 在分发前直接以 unknown command 拒绝，`aflare connector add/list/show/remove` 一律不可用。现补入命令表，并在主 usage（PrintUsage，中/英/俄三语 locale）加 connector 一行
