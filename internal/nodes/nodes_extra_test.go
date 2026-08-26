@@ -18,8 +18,10 @@ package nodes
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -915,6 +917,96 @@ func TestJSONParseNode(t *testing.T) {
 	_, err = node.Execute(ctx, `{"a":1}`, map[string]string{"path": "b"})
 	if err == nil {
 		t.Error("expected error for missing key")
+	}
+}
+
+// TestJSONParseNode_HTTPStatusPrefix pins the http_request → json_parse
+// composition: http_request emits "HTTP <code>\n<body>", and json_parse
+// must strip the status line instead of failing on the leading 'H'.
+func TestJSONParseNode_HTTPStatusPrefix(t *testing.T) {
+	ctx := context.Background()
+	node := &JSONParseNode{}
+
+	// Pretty-print through the prefix
+	output, err := node.Execute(ctx, "HTTP 200\n{\"name\":\"test\"}", map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error on prefixed JSON: %v", err)
+	}
+	if !strings.Contains(output, "name") {
+		t.Errorf("expected pretty JSON from prefixed input, got %q", output)
+	}
+
+	// Path extraction through the prefix
+	output, err = node.Execute(ctx, "HTTP 200\n{\"user\":{\"name\":\"alice\"}}", map[string]string{"path": "user.name"})
+	if err != nil {
+		t.Fatalf("unexpected error on prefixed path extraction: %v", err)
+	}
+	if output != "alice" {
+		t.Errorf("expected alice, got %q", output)
+	}
+
+	// Any status code, CRLF variant
+	output, err = node.Execute(ctx, "HTTP 502\r\n{\"a\":1}", map[string]string{"path": "a"})
+	if err != nil {
+		t.Fatalf("unexpected error on CRLF-prefixed JSON: %v", err)
+	}
+	if output != "1" {
+		t.Errorf("expected 1, got %q", output)
+	}
+
+	// A status-like line inside the body must not be stripped
+	output, err = node.Execute(ctx, "{\"msg\":\"HTTP 200\\nok\"}", map[string]string{"path": "msg"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if output != "HTTP 200\nok" {
+		t.Errorf("embedded status-like line must be preserved, got %q", output)
+	}
+
+	// Non-JSON body behind a prefix still fails
+	_, err = node.Execute(ctx, "HTTP 200\nnot json", map[string]string{})
+	if err == nil {
+		t.Error("expected error for non-JSON body behind status line")
+	}
+}
+
+// TestHTTPRequestThenJSONParse_Composition guards the exact composition
+// reported broken: a real http_request execution feeding json_parse. The
+// httptest server returns JSON; http_request emits "HTTP 200\n{...}";
+// json_parse must extract from the body without a manual trim step.
+func TestHTTPRequestThenJSONParse_Composition(t *testing.T) {
+	allowLoopback(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"status":"success","data":{"amount":42}}`)
+	}))
+	defer srv.Close()
+
+	httpNode := &HTTPRequestNode{}
+	raw, err := httpNode.Execute(context.Background(), "", map[string]string{"url": srv.URL})
+	if err != nil {
+		t.Fatalf("http_request failed: %v", err)
+	}
+	if !strings.HasPrefix(raw, "HTTP 200\n") {
+		t.Fatalf("http_request output format changed: %q", raw)
+	}
+
+	parseNode := &JSONParseNode{}
+	status, err := parseNode.Execute(context.Background(), raw, map[string]string{"path": "status"})
+	if err != nil {
+		t.Fatalf("json_parse failed on http_request output (composition broken): %v", err)
+	}
+	if status != "success" {
+		t.Errorf("expected status=success, got %q", status)
+	}
+
+	amount, err := parseNode.Execute(context.Background(), raw, map[string]string{"path": "data.amount"})
+	if err != nil {
+		t.Fatalf("json_parse nested path failed: %v", err)
+	}
+	if strings.TrimSpace(amount) != "42" {
+		t.Errorf("expected amount=42, got %q", amount)
 	}
 }
 

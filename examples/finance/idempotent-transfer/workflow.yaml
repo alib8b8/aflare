@@ -50,9 +50,10 @@ steps:
       retry_on_status: "429,500,502,503,504"
 
   # ── Step 2: 判断转账是否成功（返回 "true" / "false"）──
-  # http_request 节点输出格式为 "HTTP <code>\n<body>"，body 才是银行返回的 JSON。
-  # 由于 "HTTP 200\n..." 前缀不是合法 JSON，json_parse 会解析失败，因此这里直接用
-  # contains 在原始响应里匹配 "status":"success"，等价于解析 status 字段后比较。
+  # http_request 节点输出格式为 "HTTP <code>\n<body>"，json_parse 已自动剥离
+  # 该状态行前缀，http_request → json_parse → condition 可直接组合。
+  # 此处用 contains 在原始响应里匹配 "status":"success" 是更紧凑的单步写法，
+  # 等价于解析 status 字段后比较。
   - name: check-status
     node: condition
     params:
