@@ -17,7 +17,9 @@
 package httpclient
 
 import (
+	"context"
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -131,5 +133,138 @@ func TestIsReservedIP(t *testing.T) {
 		if got := IsReservedIP(ip); got != c.want {
 			t.Errorf("IsReservedIP(%s) = %v, want %v", c.ip, got, c.want)
 		}
+	}
+}
+
+func TestProxyHostPort(t *testing.T) {
+	cases := []struct {
+		name     string
+		env      map[string]string
+		wantHost string
+		wantPort string
+	}{
+		{
+			name:     "no proxy configured",
+			env:      map[string]string{},
+			wantHost: "",
+			wantPort: "",
+		},
+		{
+			name:     "https proxy with port",
+			env:      map[string]string{"HTTPS_PROXY": "http://127.0.0.1:7890"},
+			wantHost: "127.0.0.1",
+			wantPort: "7890",
+		},
+		{
+			name:     "http proxy without port",
+			env:      map[string]string{"HTTP_PROXY": "http://proxy.internal"},
+			wantHost: "proxy.internal",
+			wantPort: "",
+		},
+		{
+			name:     "ipv6 proxy",
+			env:      map[string]string{"HTTPS_PROXY": "http://[::1]:7890"},
+			wantHost: "::1",
+			wantPort: "7890",
+		},
+		{
+			name:     "https wins over http",
+			env:      map[string]string{"HTTPS_PROXY": "http://127.0.0.1:7890", "HTTP_PROXY": "http://10.0.0.1:8080"},
+			wantHost: "127.0.0.1",
+			wantPort: "7890",
+		},
+		{
+			name:     "lowercase variant honored",
+			env:      map[string]string{"https_proxy": "http://127.0.0.1:7891"},
+			wantHost: "127.0.0.1",
+			wantPort: "7891",
+		},
+		{
+			name:     "invalid url skipped, next key used",
+			env:      map[string]string{"HTTPS_PROXY": "://bad", "HTTP_PROXY": "http://10.0.0.1:8080"},
+			wantHost: "10.0.0.1",
+			wantPort: "8080",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			for _, k := range []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"} {
+				t.Setenv(k, "")
+				if v, ok := c.env[k]; ok {
+					t.Setenv(k, v)
+				}
+			}
+			host, port := proxyHostPort()
+			if host != c.wantHost || port != c.wantPort {
+				t.Errorf("proxyHostPort() = (%q, %q), want (%q, %q)", host, port, c.wantHost, c.wantPort)
+			}
+		})
+	}
+}
+
+// TestDialContext_ProxyBypassesValidation proves the local-proxy fix:
+// dialing the user-configured proxy address (typically loopback, e.g. a
+// Clash/V2Ray instance) must skip IP-class validation — otherwise
+// ValidatePublic rejects every proxied request.
+func TestDialContext_ProxyBypassesValidation(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("cannot listen on loopback: %v", err)
+	}
+	defer ln.Close()
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			c.Close()
+		}
+	}()
+
+	_, port, err := net.SplitHostPort(ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HTTPS_PROXY", "http://127.0.0.1:"+port)
+
+	tr := newTransport(ValidatePublic)
+	conn, err := tr.DialContext(context.Background(), "tcp", "127.0.0.1:"+port)
+	if err != nil {
+		t.Fatalf("dial to configured proxy failed: %v", err)
+	}
+	conn.Close()
+}
+
+// TestDialContext_DirectLoopbackStillRejected proves SSRF protection is
+// unchanged for direct dials: with no proxy configured (or a target that
+// is not the proxy), loopback targets are rejected by the validator
+// before any TCP connect is attempted.
+func TestDialContext_DirectLoopbackStillRejected(t *testing.T) {
+	envs := []struct {
+		name string
+		env  map[string]string
+	}{
+		{"no proxy", nil}, // no proxy at all
+		{"proxy set, different port", map[string]string{"HTTPS_PROXY": "http://127.0.0.1:7890"}},
+	}
+	for _, tc := range envs {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, k := range []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "NO_PROXY"} {
+				t.Setenv(k, "")
+				if v, ok := tc.env[k]; ok {
+					t.Setenv(k, v)
+				}
+			}
+			tr := newTransport(ValidatePublic)
+			conn, err := tr.DialContext(context.Background(), "tcp", "127.0.0.1:1")
+			if err == nil {
+				conn.Close()
+				t.Fatal("dial to loopback succeeded, want validator rejection")
+			}
+			if !strings.Contains(err.Error(), "loopback") {
+				t.Errorf("error = %v, want loopback validation error", err)
+			}
+		})
 	}
 }

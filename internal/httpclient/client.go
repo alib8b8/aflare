@@ -39,6 +39,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -106,6 +109,32 @@ func NewClient(opts Options) *http.Client {
 	}
 }
 
+// proxyHostPort returns the host (and port when specified) of the
+// environment-configured proxy, honoring the same precedence Go's
+// http.ProxyFromEnvironment uses for https then http requests. It is
+// used by the DialContext to tell "dialing the user's proxy" apart from
+// "dialing the request target": when a proxy is configured, net/http
+// dials the *proxy* address, not the destination host.
+func proxyHostPort() (host, port string) {
+	for _, key := range []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"} {
+		v := strings.TrimSpace(os.Getenv(key))
+		if v == "" {
+			continue
+		}
+		u, err := url.Parse(v)
+		if err != nil || u.Host == "" {
+			continue
+		}
+		h, p, err := net.SplitHostPort(u.Host)
+		if err != nil {
+			// No port in the proxy URL (scheme default applies).
+			return strings.Trim(u.Host, "[]"), ""
+		}
+		return strings.Trim(h, "[]"), p
+	}
+	return "", ""
+}
+
 // newTransport returns an *http.Transport that resolves addr's host,
 // runs every resolved IP through validator, and then dials the first
 // surviving IP. This is the SSRF core: validating *after* DNS resolution
@@ -118,6 +147,17 @@ func NewClient(opts Options) *http.Client {
 // and for tests that force a dial failure by pointing the proxy at a closed
 // port. A custom DialContext alone would otherwise bypass the proxy and dial
 // the target host directly, silently defeating both use cases.
+//
+// When the dial target IS the configured proxy (the standard case whenever
+// HTTP(S)_PROXY points at a local Clash/V2Ray instance on 127.0.0.1 or a
+// corporate proxy on a private LAN address), the IP-class validator is
+// skipped for that dial: the proxy is an egress trust anchor the user
+// configured themselves, not an SSRF target. With a proxy in the path the
+// destination host is reached through the proxy's tunnel, so target-side
+// network policy is the proxy operator's responsibility — the same model
+// curl and browsers use. Direct dials (no proxy, or a no_proxy target)
+// still run every IP through the validator, so DNS-rebinding protection
+// is unchanged for the non-proxied path.
 func newTransport(validator Validator) *http.Transport {
 	return &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
@@ -125,6 +165,13 @@ func newTransport(validator Validator) *http.Transport {
 			host, port, err := net.SplitHostPort(addr)
 			if err != nil {
 				return nil, err
+			}
+			// Dialing the user-configured proxy: bypass IP-class checks.
+			// Match on hostname (case-insensitive) plus port when the
+			// proxy URL carries one; a same-host/different-port dial is
+			// treated as a direct target dial and validated normally.
+			if ph, pp := proxyHostPort(); ph != "" && strings.EqualFold(host, ph) && (pp == "" || pp == port) {
+				return (&net.Dialer{}).DialContext(ctx, network, addr)
 			}
 			ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
 			if err != nil {
