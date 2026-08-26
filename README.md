@@ -89,10 +89,9 @@ aflare agent -c reflection,planning,utility
 
 ## 项目状态
 
-aflare 当前 **v0.10.0**，目标用户**先做个人**——个人数据在本机（文件、笔记库、个人 SQLite 库），aflare 做 AI 与这些数据之间「确定且安全」的控制层。
+aflare 当前 **v0.11.0**，目标用户**先做个人**——个人数据在本机（文件、笔记库、个人 SQLite 库），aflare 做 AI 与这些数据之间「确定且安全」的控制层。
 
-- **已交付**：核心 Runtime（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断，CI 验证）；v0.9 国密算法（SM3 审计链 / SM4 密钥存储，opt-in）与 MCP 一键安装；v0.10 MemHarness 记忆批判-重构、步骤级类型化输出契约、水印部署溯源（含一轮安全自检修复）
-- **main 分支预览**：**Connector API**（个人优先主线）——v0.10.0 后已合入 main，随下个版本发布，详见 [CHANGELOG](CHANGELOG.md) 与 [docs/connector-api.md](docs/connector-api.md)
+- **已交付**：核心 Runtime（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断，CI 验证）；v0.9 国密算法（SM3 审计链 / SM4 密钥存储，opt-in）与 MCP 一键安装；v0.10 MemHarness 记忆批判-重构、步骤级类型化输出契约、水印部署溯源（含一轮安全自检修复）；v0.11 **Agent 互联与指挥**（CLI/A2A 双通道，aflare 指挥和监督其他 Agent）、**Connector API**（命名数据源连接）、webhook 事件驱动入口、守护进程稳定性基建（soak + nightly）
 - **边界声明**：国产芯片（昇腾/寒武纪/海光）经 OpenAI 兼容接口接入本地推理（非原生 SDK），持续完善；硬件设备控制（机器人等）不在内置范围，可经自定义节点或 MCP Server 自行接入，数据不出内网
 
 ---
@@ -388,7 +387,8 @@ aflare connector add my-pg --type postgres --host db.example.com --database anal
 | **v0.8.1** | **已完成** | 发布审计修复：国内安装 404、`aflare mcp` 子命令、execute 白名单错误定位、govulncheck 漏洞清零 |
 | **v0.9** | **已完成** | 国密算法支持（SM3/SM4，opt-in）、审计链安全硬化（随机 HMAC 密钥、跨进程锁、bundle 防截断伪造）、`aflare mcp install` 一键安装、供应链场景包、loong64 |
 | **v0.10** | **已完成** | MemHarness 记忆批判-重构、步骤级输出契约与有界预览、水印部署溯源、安全自检修复 |
-| **main** | **进行中** | **Connector API（个人优先主线）**：files/notes/sqlite/mysql/postgres 命名连接器、凭据隔离、权限天花板、根目录遏制；后续：个人笔记软件连接器、Agent 能力深化、国产芯片适配完善 |
+| **v0.11** | **已完成** | **Agent 互联与指挥**（CLI/A2A 双通道、supervisor 真实委派、背压与瞬时重试）、**Connector API**（命名数据源连接）、webhook 事件驱动入口（GitHub HMAC 签名）、守护进程稳定性基建（soak + nightly + goleak）、daemon 信号死锁修复 |
+| **main** | **进行中** | Agent 互联深化（更多通道与监督策略）、个人笔记软件连接器、国产芯片适配完善 |
 | v1.0 | 计划中 | 稳定 API、LTS |
 
 详情见 [CHANGELOG.md](CHANGELOG.md)

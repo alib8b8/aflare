@@ -1,0 +1,49 @@
+# Agent 互联与指挥示例：aflare 作为上位指挥者，调度外部 Agent 干活
+#
+# 前置：在 ~/.config/aflare/config.yaml 注册外部 Agent（示例）：
+#
+#   agents:
+#     codex:                       # 内置预设，装了 codex CLI 即开箱即用
+#       driver: cli
+#       description: 代码实现与工程任务
+#     research:                    # 任意 A2A 协议远程 Agent
+#       driver: a2a
+#       url: http://127.0.0.1:8080/
+#       api_key_env: MY_AGENT_KEY  # Bearer token 从该环境变量读取，不落盘
+#
+# 注册后可用 `aflare agent list` 查看。
+#
+# 运行：aflare run examples/agent-delegation.yaml
+name: Agent Delegation
+
+steps:
+  # 方式一：supervisor 真实委派 —— @ 前缀引用注册的 Agent
+  # LLM 规划子任务 → 并行监督执行（max_parallel 背压）→ 汇总综合
+  - id: orchestrate
+    node: supervisor
+    params:
+      specialists: "@codex,@research"
+      max_parallel: "2"          # 并发委派上限（默认 4，上限 16）
+      output_format: markdown     # 直接返回综合结果文本
+
+  # 方式二：cli_agent 单步委派 —— 精确控制一次外部 Agent 调用
+  # prompt 为上一步输出；支持 model / sandbox / approval_policy / timeout
+  - id: implement
+    node: cli_agent
+    params:
+      agent: codex
+      sandbox: strict             # codex 沙箱等级（默认最严）
+      approval_policy: never      # 非交互运行必须 never
+      timeout: 10m
+
+  # 方式三：a2a_agent 单步委派 —— 调用远程 A2A Agent
+  - id: review
+    node: a2a_agent
+    params:
+      agent: research
+      timeout: 5m
+
+  # 委派结果落盘
+  - node: file_write
+    params:
+      path: agent-delegation-report.md
