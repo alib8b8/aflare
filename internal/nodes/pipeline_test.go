@@ -18,6 +18,7 @@ package nodes
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -102,6 +103,69 @@ func TestParsePipelineConfig_ExplicitFormat(t *testing.T) {
 	}
 	if _, err := parsePipelineConfig(yamlInput, "xml"); err == nil || !strings.Contains(err.Error(), `invalid format "xml"`) {
 		t.Errorf("invalid format value: err = %v, want invalid format", err)
+	}
+}
+
+// TestPipelineNode_DownstreamSkippedOnUpstreamFailure pins standard DAG
+// failure semantics inside the pipeline node: when an upstream step fails,
+// every transitive downstream step is cascade-skipped (not executed with
+// missing input), independent branches still run, and the overall pipeline
+// reports failure with the root cause. Previously a failed step was marked
+// completed and its dependents were scheduled anyway.
+func TestPipelineNode_DownstreamSkippedOnUpstreamFailure(t *testing.T) {
+	output, err := (&PipelineNode{}).Execute(context.Background(), `
+steps:
+  - name: a_bad
+    node: template_render
+    params:
+      template: "{{ broken"
+  - name: b_dependent
+    node: template_render
+    params:
+      template: "should not run"
+    depends_on: [a_bad]
+  - name: c_cascade
+    node: template_render
+    params:
+      template: "should not run either"
+    depends_on: [b_dependent]
+  - name: d_independent
+    node: template_render
+    params:
+      template: "still runs"
+`, map[string]string{})
+	if err != nil {
+		t.Fatalf("pipeline execution failed: %v", err)
+	}
+
+	var pr PipelineResult
+	if err := json.Unmarshal([]byte(output), &pr); err != nil {
+		t.Fatalf("failed to unmarshal pipeline result: %v\n%s", err, output)
+	}
+
+	if pr.Success {
+		t.Errorf("pipeline should report failure")
+	}
+	byName := map[string]PipelineStepResult{}
+	for _, r := range pr.Results {
+		byName[r.Name] = r
+	}
+
+	// Root failure: real error, not a skip.
+	if r := byName["a_bad"]; r.Error == "" || r.Skipped {
+		t.Errorf("a_bad should carry a real error, got %+v", r)
+	}
+	// Direct dependent skipped, blaming the root.
+	if r := byName["b_dependent"]; !r.Skipped || r.Output != "" || r.Error != `skipped: upstream step "a_bad" failed` {
+		t.Errorf("b_dependent should be skipped blaming a_bad, got %+v", r)
+	}
+	// Cascade: skipped transitively, blaming its direct dependency.
+	if r := byName["c_cascade"]; !r.Skipped || r.Output != "" || r.Error != `skipped: upstream step "b_dependent" failed` {
+		t.Errorf("c_cascade should be cascade-skipped blaming b_dependent, got %+v", r)
+	}
+	// Independent branch unaffected.
+	if r := byName["d_independent"]; r.Error != "" || r.Skipped || r.Output != "still runs" {
+		t.Errorf("d_independent should still run successfully, got %+v", r)
 	}
 }
 
