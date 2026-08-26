@@ -1,9 +1,10 @@
 # Node Reference
 
-> Auto-generated from `Schema()` metadata. 68 nodes registered.
+> Auto-generated from `Schema()` metadata. 70 nodes registered.
 
 | Node | Description | Params |
 |------|-------------|--------|
+| [`a2a_agent`](#a2a_agent) | Sends the input as one task to an A2A agent (message/send with tasks/send fallback), polls tasks/get until a terminal... | 4 |
 | [`agent`](#agent) | Autonomous agent node with ReAct reasoning loop and tool use capabilities | 9 |
 | [`anthropic`](#anthropic) | Call Anthropic Claude via an OpenAI-compatible proxy (LiteLLM/one-api). Native api.anthropic.com is NOT OpenAI-compat... | 15 |
 | [`ascend`](#ascend) | Call Ascend LLM API | 15 |
@@ -11,7 +12,8 @@
 | [`call`](#call) | Call another workflow file | 2 |
 | [`cambricon`](#cambricon) | Call Cambricon MLU LLM API | 15 |
 | [`clarify`](#clarify) | Pre-execution ambiguity checker: identifies unclear requirements and generates clarifying questions (ACQUIRE framework) | 8 |
-| [`cli_session`](#cli_session) | äº¤äº’å¼CLIä¼šè¯èŠ‚ç‚¹ã€‚æ”¯æŒä¸Šä¸‹æ–‡ä¿æŒã€å‘½ä»¤åŽ†å²ã€å¿«æ·é”®ã€æµå¼è¾“å‡ºå’Œè‡ªåŠ¨è¡¥å…¨ï¼Œæä¾›ç±»... | 5 |
+| [`cli_agent`](#cli_agent) | Runs one bounded task via an external CLI agent subprocess (codex exec, claude -p, gemini -p, or a generic command) w... | 9 |
+| [`cli_session`](#cli_session) | 交互式CLI会话节点。支持上下文保持、命令历史、快捷键、流式输出和自动补全，提供类... | 5 |
 | [`code_interpreter`](#code_interpreter) | Execute Python/Node.js/Rust code in a sandboxed environment with file I/O | 6 |
 | [`code_knowledge_graph`](#code_knowledge_graph) | Semantic code knowledge graph with vector retrieval, 158 language support, MCP tool exposure, and token-efficient rev... | 13 |
 | [`code_review`](#code_review) | Hybrid code review combining deterministic rule engine (NPE, thread-safety, security) with LLM deep analysis. Inspire... | 11 |
@@ -22,22 +24,22 @@
 | [`coze`](#coze) | Call Coze LLM API | 15 |
 | [`critic`](#critic) | Critic agent that reviews output, identifies issues, and suggests improvements | 8 |
 | [`deepseek`](#deepseek) | Call DeepSeek LLM API | 15 |
-| [`doc_gen`](#doc_gen) | AIè‡ªåŠ¨æ–‡æ¡£ç”ŸæˆèŠ‚ç‚¹ã€‚è‡ªåŠ¨ç”Ÿæˆå’Œæ›´æ–°ä»£ç åº“æ–‡æ¡£ï¼Œæ”¯æŒREADMEã€APIæ–‡æ¡£ã€å‡½æ•°æ³¨é‡Šã€æ¨¡å—æ... | 6 |
+| [`doc_gen`](#doc_gen) | AI自动文档生成节点。自动生成和更新代码库文档，支持README、API文档、函数注释、模块�... | 6 |
 | [`doc_parse`](#doc_parse) | Parse documents (PDF/images/HTML) into text, LaTeX, or HTML table format | 7 |
 | [`drone`](#drone) | Control MAVLink-compatible drones (PX4/ArduPilot) via HTTP bridge. Supports arm/disarm, takeoff, land, RTL, waypoint ... | 17 |
-| [`engineer_skills`](#engineer_skills) | é¢„ç½®å·¥ç¨‹æŠ€èƒ½åŒ…ï¼Œè¦†ç›–å‰ç«¯/åŽç«¯/DevOps/æž¶æž„/å®‰å…¨/æ•°æ®/ä¿¡åˆ›ä¸ƒå¤§é¢†åŸŸå…± 24 é¡¹æŠ€èƒ½ã€‚æ”¯æŒæŠ... | 5 |
+| [`engineer_skills`](#engineer_skills) | 预置工程技能包，覆盖前端/后端/DevOps/架构/安全/数据/信创七大领域共 24 项技能。支持�... | 5 |
 | [`evaluator`](#evaluator) | Evaluator agent that scores output against criteria with structured rubrics | 9 |
 | [`execute`](#execute) | Execute shell commands (disabled in safe mode) | 3 |
 | [`fastgpt`](#fastgpt) | Call FastGPT API | 5 |
 | [`fetch_url`](#fetch_url) | Fetch content from a URL | 3 |
-| [`file_read`](#file_read) | Read content from a file. Automatically redacts secrets (API keys, tokens, .env files) by default for privacy â€” set... | 3 |
+| [`file_read`](#file_read) | Read content from a file. Automatically redacts secrets (API keys, tokens, .env files) by default for privacy — set... | 3 |
 | [`file_watch`](#file_watch) | Polls a file or directory for create/modify/delete events and returns them as JSON. Suitable for log-monitor and file... | 6 |
-| [`file_write`](#file_write) | Write content to a file | 3 |
+| [`file_write`](#file_write) | Write content to a file | 4 |
 | [`files_list`](#files_list) | List files under a files/notes connector root (relative paths + sizes). Skips dotfiles/dot-directories and symlinks. ... | 3 |
 | [`gemini`](#gemini) | Call Google Gemini LLM API | 15 |
 | [`glm`](#glm) | Call GLM LLM API | 15 |
 | [`http_request`](#http_request) | Make HTTP requests with custom method, headers, and body | 12 |
-| [`human_in_loop`](#human_in_loop) | Human approval gate â€” pauses workflow for human review and approval before continuing | 5 |
+| [`human_in_loop`](#human_in_loop) | Human approval gate — pauses workflow for human review and approval before continuing | 5 |
 | [`hygon`](#hygon) | Call Hygon DCU LLM API | 15 |
 | [`ima`](#ima) | Call IMA Copilot LLM API | 15 |
 | [`internlm`](#internlm) | Call InternLM LLM API | 15 |
@@ -66,12 +68,30 @@
 | [`skill_distill`](#skill_distill) | Distill methodologies from books, videos, podcasts, and documents into callable skills. Supports workflow, decision, ... | 6 |
 | [`sql_query`](#sql_query) | Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1)... | 9 |
 | [`structured_output`](#structured_output) | LLM-driven structured output with local JSON Schema validation and self-correction retries | 11 |
-| [`supervisor`](#supervisor) | Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates | 13 |
+| [`supervisor`](#supervisor) | Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates | 14 |
 | [`template_render`](#template_render) | Render Go templates with input data | 2 |
 | [`transform`](#transform) | Transform text using string operations | 1 |
 | [`verify`](#verify) | Agent-as-a-Judge verifier that validates outputs, claims, and results against specified criteria | 10 |
 | [`xverse`](#xverse) | Call XVERSE LLM API | 15 |
 | [`yi`](#yi) | Call Yi LLM API | 15 |
+
+---
+
+## a2a_agent
+
+Sends the input as one task to an A2A agent (message/send with tasks/send fallback), polls tasks/get until a terminal state and returns the artifacts/status text.
+
+- **Input**: string - the task/prompt for the remote agent
+- **Output**: string - the agent's artifacts/status message text
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `agent` | string | No |  | Registered A2A agent name (see `aflare agent list`) |
+| `url` | string | No |  | A2A service endpoint (http/https); required when no agent name is given |
+| `api_key_env` | string | No |  | Environment variable holding the bearer token for the remote agent |
+| `timeout` | string | No |  | Overall step timeout, e.g. 30s, 10m, 1h (default 10m, max 60m) |
 
 ---
 
@@ -252,22 +272,45 @@ Pre-execution ambiguity checker: identifies unclear requirements and generates c
 
 ---
 
-## cli_session
+## cli_agent
 
-äº¤äº’å¼CLIä¼šè¯èŠ‚ç‚¹ã€‚æ”¯æŒä¸Šä¸‹æ–‡ä¿æŒã€å‘½ä»¤åŽ†å²ã€å¿«æ·é”®ã€æµå¼è¾“å‡ºå’Œè‡ªåŠ¨è¡¥å…¨ï¼Œæä¾›ç±»ä¼¼Claude Codeçš„æµç•…CLIä½“éªŒã€‚
+Runs one bounded task via an external CLI agent subprocess (codex exec, claude -p, gemini -p, or a generic command) with timeout, sandbox and audit. Requires the agent CLI installed and authenticated.
 
-- **Input**: string - ç”¨æˆ·è¾“å…¥çš„å‘½ä»¤æˆ–æ¶ˆæ¯
-- **Output**: string - JSONæ ¼å¼çš„ä¼šè¯å“åº”
+- **Input**: string - the task/prompt for the agent
+- **Output**: string - the agent's final answer (stdout)
 
 ### Parameters
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `model` | string | No | auto | ä½¿ç”¨çš„æ¨¡åž‹ï¼ˆé»˜è®¤autoï¼Œç”±è·¯ç”±å±‚é€‰æ‹©ï¼‰ |
-| `session_id` | string | No |  | ä¼šè¯IDï¼ˆè‡ªåŠ¨ç”Ÿæˆæˆ–æŒ‡å®šï¼‰ |
-| `max_history` | int | No | 50 | æœ€å¤§åŽ†å²è®°å½•æ•°ï¼ˆé»˜è®¤50ï¼‰ |
-| `streaming` | bool | No | true | æµå¼è¾“å‡ºï¼ˆé»˜è®¤trueï¼‰ |
-| `theme` | string | No | dark | ä¸»é¢˜ï¼ˆlight/darkï¼Œé»˜è®¤darkï¼‰ |
+| `agent` | string | No |  | Registered agent name (see `aflare agent list`); overrides: binary/profile/model/sandbox can still be set per step |
+| `binary` | string | No |  | Agent executable (bare name or absolute path); required when no agent name is given |
+| `profile` | string | No |  | CLI profile: codex, claude, gemini, generic (default: generic when inline) |
+| `model` | string | No |  | Model the agent should use (forwarded as a validated flag value) |
+| `sandbox` | string | No |  | codex: strict, permissive, danger-full-access (default strict) |
+| `approval_policy` | string | No |  | codex: never, on-failure, on-request, untrusted (default never); claude/generic: only never is supported |
+| `max_turns` | string | No |  | Maximum agent turns, 0 for unlimited (default 0) |
+| `cwd` | string | No |  | Working directory for the agent (must exist) |
+| `timeout` | string | No |  | Overall step timeout, e.g. 30s, 10m, 1h (default 10m, max 60m) |
+
+---
+
+## cli_session
+
+交互式CLI会话节点。支持上下文保持、命令历史、快捷键、流式输出和自动补全，提供类似Claude Code的流畅CLI体验。
+
+- **Input**: string - 用户输入的命令或消息
+- **Output**: string - JSON格式的会话响应
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | auto | 使用的模型（默认auto，由路由层选择） |
+| `session_id` | string | No |  | 会话ID（自动生成或指定） |
+| `max_history` | int | No | 50 | 最大历史记录数（默认50） |
+| `streaming` | bool | No | true | 流式输出（默认true） |
+| `theme` | string | No | dark | 主题（light/dark，默认dark） |
 
 ---
 
@@ -498,21 +541,21 @@ Call DeepSeek LLM API
 
 ## doc_gen
 
-AIè‡ªåŠ¨æ–‡æ¡£ç”ŸæˆèŠ‚ç‚¹ã€‚è‡ªåŠ¨ç”Ÿæˆå’Œæ›´æ–°ä»£ç åº“æ–‡æ¡£ï¼Œæ”¯æŒREADMEã€APIæ–‡æ¡£ã€å‡½æ•°æ³¨é‡Šã€æ¨¡å—æ–‡æ¡£ã€æ›´æ–°æ—¥å¿—ã€æ•™ç¨‹å’Œæž¶æž„æ–‡æ¡£ç­‰å¤šç§ç±»åž‹ï¼Œè®©ä»£ç åº“å¯¹AI Agentæ›´å‹å¥½ã€‚
+AI自动文档生成节点。自动生成和更新代码库文档，支持README、API文档、函数注释、模块文档、更新日志、教程和架构文档等多种类型，让代码库对AI Agent更友好。
 
-- **Input**: string - ä»£ç å†…å®¹æˆ–æ–‡æ¡£ç”ŸæˆæŒ‡ä»¤
-- **Output**: string - ç”Ÿæˆçš„æ–‡æ¡£å†…å®¹ï¼ˆmarkdownæˆ–JSONæ ¼å¼ï¼‰
+- **Input**: string - 代码内容或文档生成指令
+- **Output**: string - 生成的文档内容（markdown或JSON格式）
 
 ### Parameters
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `doc_type` | string | Yes |  | æ–‡æ¡£ç±»åž‹ï¼šreadme/api/function/module/changelog/tutorial/architecture |
-| `path` | string | Yes |  | ä»£ç è·¯å¾„ï¼ˆç›¸å¯¹å·¥ä½œç›®å½•ï¼‰ |
-| `language` | string | No | auto | ä»£ç è¯­è¨€ï¼šgo/python/javascript/typescript/autoï¼ˆé»˜è®¤autoï¼‰ |
-| `output_format` | string | No | markdown | è¾“å‡ºæ ¼å¼ï¼šmarkdown/jsonï¼ˆé»˜è®¤markdownï¼‰ |
-| `depth` | int | No | 3 | æ–‡æ¡£æ·±åº¦1-5ï¼ˆé»˜è®¤3ï¼‰ |
-| `auto_update` | bool | No | false | æ˜¯å¦è‡ªåŠ¨æ›´æ–°çŽ°æœ‰æ–‡æ¡£ï¼ˆé»˜è®¤falseï¼‰ |
+| `doc_type` | string | Yes |  | 文档类型：readme/api/function/module/changelog/tutorial/architecture |
+| `path` | string | Yes |  | 代码路径（相对工作目录） |
+| `language` | string | No | auto | 代码语言：go/python/javascript/typescript/auto（默认auto） |
+| `output_format` | string | No | markdown | 输出格式：markdown/json（默认markdown） |
+| `depth` | int | No | 3 | 文档深度1-5（默认3） |
+| `auto_update` | bool | No | false | 是否自动更新现有文档（默认false） |
 
 ---
 
@@ -570,7 +613,7 @@ Control MAVLink-compatible drones (PX4/ArduPilot) via HTTP bridge. Supports arm/
 
 ## engineer_skills
 
-é¢„ç½®å·¥ç¨‹æŠ€èƒ½åŒ…ï¼Œè¦†ç›–å‰ç«¯/åŽç«¯/DevOps/æž¶æž„/å®‰å…¨/æ•°æ®/ä¿¡åˆ›ä¸ƒå¤§é¢†åŸŸå…± 24 é¡¹æŠ€èƒ½ã€‚æ”¯æŒæŠ€èƒ½åŒ¹é…ã€åº”ç”¨å’Œç‰ˆæœ¬ç®¡ç†ã€‚
+预置工程技能包，覆盖前端/后端/DevOps/架构/安全/数据/信创七大领域共 24 项技能。支持技能匹配、应用和版本管理。
 
 - **Input**: string - task description for skill matching
 - **Output**: string - JSON with skills information
@@ -665,7 +708,7 @@ Fetch content from a URL
 
 ## file_read
 
-Read content from a file. Automatically redacts secrets (API keys, tokens, .env files) by default for privacy â€” set redact=false to disable. With a `connector` (files/notes) the path is resolved inside the connector's root and its include/max_bytes ceilings apply.
+Read content from a file. Automatically redacts secrets (API keys, tokens, .env files) by default for privacy — set redact=false to disable. With a `connector` (files/notes) the path is resolved inside the connector's root and its include/max_bytes ceilings apply.
 
 - **Input**: string - not used
 - **Output**: string - file content (with secrets redacted by default)
@@ -691,12 +734,12 @@ Polls a file or directory for create/modify/delete events and returns them as JS
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `path` | string | Yes |  | è¦ç›‘æŽ§çš„æ–‡ä»¶æˆ–ç›®å½•è·¯å¾„ |
-| `duration` | string | No | 30s | ç›‘æŽ§æŒç»­æ—¶é—´ï¼ˆå¦‚ 30s, 5mï¼‰ |
-| `interval` | string | No | 1s | è½®è¯¢é—´éš”ï¼ˆå¦‚ 1s, 500msï¼‰ |
-| `events` | string | No | create,modify,delete | å…³æ³¨çš„äº‹ä»¶ç±»åž‹ï¼Œé€—å·åˆ†éš”ï¼šcreate,modify,delete |
-| `pattern` | string | No | * | æ–‡ä»¶å glob åŒ¹é…æ¨¡å¼ |
-| `max_events` | string | No | 1000 | æœ€å¤§æ”¶é›†äº‹ä»¶æ•°ï¼ˆé˜² DoSï¼‰ |
+| `path` | string | Yes |  | 要监控的文件或目录路径 |
+| `duration` | string | No | 30s | 监控持续时间（如 30s, 5m） |
+| `interval` | string | No | 1s | 轮询间隔（如 1s, 500ms） |
+| `events` | string | No | create,modify,delete | 关注的事件类型，逗号分隔：create,modify,delete |
+| `pattern` | string | No | * | 文件名 glob 匹配模式 |
+| `max_events` | string | No | 1000 | 最大收集事件数（防 DoS） |
 
 ---
 
@@ -712,6 +755,7 @@ Write content to a file
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `path` | string | Yes |  | File path to write to. Relative to the working directory, or relative to the connector root when `connector` is set. |
+| `content` | string | No |  | Content to write; defaults to the step input (previous step output). Expressions like {{var.x}} are evaluated before the node runs. |
 | `connector` | string | No |  | Named files/notes connector. Must be registered with --writable; paths resolve inside its root and its include allowlist applies. |
 | `mode` | string | No | write | Write mode: write (default) or append |
 
@@ -797,7 +841,7 @@ Call GLM LLM API
 Make HTTP requests with custom method, headers, and body
 
 - **Input**: string - request body (overrides body param)
-- **Output**: string - `HTTP <status>\n<body>` on success (2xx); non-2xx fails the step. Downstream `json_parse` tolerates and strips the status line automatically.
+- **Output**: string - response body
 
 ### Parameters
 
@@ -820,7 +864,7 @@ Make HTTP requests with custom method, headers, and body
 
 ## human_in_loop
 
-Human approval gate â€” pauses workflow for human review and approval before continuing
+Human approval gate — pauses workflow for human review and approval before continuing
 
 - **Input**: string - the content/data to present for human review
 - **Output**: string - approved content (or original if approved)
@@ -830,7 +874,7 @@ Human approval gate â€” pauses workflow for human review and approval befor
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `mode` | string | No | file | Approval mode: file, env, stdin, auto_approve (default: file) |
-| `approval_file` | string | No | aflare-approval | Path to approval flag file (mode=file). Must not be a dotfile or carry a forbidden extension â€” the path goes through the standard write-path security validation. |
+| `approval_file` | string | No | aflare-approval | Path to approval flag file (mode=file). Must not be a dotfile or carry a forbidden extension — the path goes through the standard write-path security validation. |
 | `approval_env` | string | No | AFLARE_APPROVED | Environment variable to check for approval (mode=env) |
 | `prompt` | string | No |  | Custom prompt message for the human reviewer |
 | `on_approve` | string | No | original | What to output on approve: original, modified, passthrough (default: original) |
@@ -928,7 +972,7 @@ Call InternLM LLM API
 
 Parse and extract JSON data
 
-- **Input**: string - JSON string to parse (a leading `HTTP <status>\n` line, as emitted by http_request, is stripped automatically)
+- **Input**: string - JSON string to parse (a leading "HTTP <code>\n" status line, as emitted by http_request, is tolerated and stripped)
 - **Output**: string - extracted value or pretty-printed JSON
 
 ### Parameters
@@ -1248,8 +1292,8 @@ Call OpenAI LLM API
 
 Dependency-based parallel workflow executor: steps run as soon as their dependencies are met, no global barriers (Tunix-inspired async rollout)
 
-- **Input**: string - YAML or JSON pipeline configuration with steps and dependencies
-- **Output**: string - JSON with execution results, timings, and errors
+- **Input**: string - YAML or JSON pipeline configuration with steps and dependencies. Step fields: name, node, input, params, depends_on (list), input_from (list). If a step fails, all transitive downstream steps are cascade-skipped (results carry skipped: true); independent branches still run
+- **Output**: string - JSON with execution results, timings, and errors; skipped steps appear with skipped: true and error "skipped: upstream step ... failed"
 
 ### Parameters
 
@@ -1465,7 +1509,7 @@ Distill methodologies from books, videos, podcasts, and documents into callable 
 
 ## sql_query
 
-Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1) to prevent SQL injection. Read-only by default (SELECT/SHOW/EXPLAIN/PRAGMA only); set read_only=false to allow DML/DDL. Supports a 'schema' action that lists tables and columns. Prefer the `connector` param (named connection from `aflare connector add`) over inline driver/dsn â€” connectors keep credentials out of workflow files and enforce their own read_only/max_rows/timeout ceilings.
+Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1) to prevent SQL injection. Read-only by default (SELECT/SHOW/EXPLAIN/PRAGMA only); set read_only=false to allow DML/DDL. Supports a 'schema' action that lists tables and columns. Prefer the `connector` param (named connection from `aflare connector add`) over inline driver/dsn — connectors keep credentials out of workflow files and enforce their own read_only/max_rows/timeout ceilings.
 
 - **Input**: string - SQL query (when action=query and no `sql` param, input is used as the query)
 - **Output**: string - JSON array of rows (query), or schema description (schema action)
@@ -1526,7 +1570,8 @@ Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain spec
 | `model` | string | No | llama3 | Model name (default: llama3) |
 | `api_key` | string | No |  | API key for cloud providers |
 | `endpoint` | string | No |  | API endpoint URL |
-| `specialists` | string | No | planner,researcher,critic,evaluator | Comma-separated list of specialist agents: planner,researcher,critic,code_review,evaluator,reflector,legal_expert,medical_expert,educational_expert,financial_expert,creative_writer,data_analyst |
+| `specialists` | string | No | planner,researcher,critic,evaluator | Comma-separated specialists. Persona roles: planner,researcher,critic,code_review,evaluator,reflector,legal_expert,medical_expert,educational_expert,financial_expert,creative_writer,data_analyst. Registered external agents: prefix with @ (e.g. @codex,@claude,@my-a2a-agent) for real delegation |
+| `max_parallel` | string | No | 4 | Max concurrent external-agent delegations; excess subtasks queue (default: 4, max: 16) |
 | `strategy` | string | No | sequential | Strategy: sequential, parallel, hierarchical, mindsearch, moe, agency, swarm (default: sequential) |
 | `output_format` | string | No | json | Output format: json, markdown, summary (default: json) |
 | `domain` | string | No | general | Domain specialization: general,legal,medical,education,finance,creative,tech,business (default: general) |

@@ -1,6 +1,6 @@
 # aflare Node Reference
 
-Quick reference for the most common built-in nodes (a curated subset — run `aflare list` for the full catalog of 68 registered nodes, and see the generated `docs/nodes-reference.md` in the repository for complete parameter schemas).
+Quick reference for the most common built-in nodes (a curated subset — run `aflare list` for the full catalog of 70 registered nodes, and see the generated `docs/nodes-reference.md` in the repository for complete parameter schemas).
 
 ## Utility Nodes
 

@@ -31,6 +31,28 @@ import (
 	"time"
 )
 
+// TestSkillMetadataVersionSync pins that the skill manifest version tracks
+// the binary version. The skill (skills/aflare/SKILL.md) is what skill
+// marketplaces surface; when it drifts behind meta.Version (as happened:
+// skill said 0.10.0 while the binary was 0.11.0), listings advertise a
+// stale release. Bump both together.
+func TestSkillMetadataVersionSync(t *testing.T) {
+	data, err := os.ReadFile("../../skills/aflare/SKILL.md")
+	if err != nil {
+		t.Skipf("skill manifest not found (expected in repo checkout): %v", err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "version: ") {
+			got := strings.TrimSpace(strings.TrimPrefix(line, "version: "))
+			if got != Version {
+				t.Errorf("skills/aflare/SKILL.md version = %q, want %q (bump the skill manifest together with internal/meta/version.go)", got, Version)
+			}
+			return
+		}
+	}
+	t.Error("skills/aflare/SKILL.md has no `version:` field in its frontmatter")
+}
+
 func TestGetVersion(t *testing.T) {
 	oldVersion := Version
 	defer func() { Version = oldVersion }()

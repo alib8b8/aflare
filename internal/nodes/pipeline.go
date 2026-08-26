@@ -48,6 +48,7 @@ type PipelineStepResult struct {
 	Node     string        `json:"node"`
 	Output   string        `json:"output"`
 	Error    string        `json:"error,omitempty"`
+	Skipped  bool          `json:"skipped,omitempty"`
 	Duration time.Duration `json:"duration_ms"`
 	Started  time.Time     `json:"started_at"`
 	Finished time.Time     `json:"finished_at"`
@@ -78,8 +79,8 @@ func (n *PipelineNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "pipeline",
 		Description: "Dependency-based parallel workflow executor: steps run as soon as their dependencies are met, no global barriers (Tunix-inspired async rollout)",
-		Input:       "string - YAML or JSON pipeline configuration with steps and dependencies",
-		Output:      "string - JSON with execution results, timings, and errors",
+		Input:       "string - YAML or JSON pipeline configuration with steps and dependencies. Step fields: name, node, input, params, depends_on (list), input_from (list). If a step fails, all transitive downstream steps are cascade-skipped (results carry skipped: true); independent branches still run",
+		Output:      "string - JSON with execution results, timings, and errors; skipped steps appear with skipped: true and error \"skipped: upstream step ... failed\"",
 		Params: []ParamSchema{
 			{Name: "timeout", Type: "string", Description: "Timeout in seconds (default: 300)", Required: false, Default: "300"},
 			{Name: "format", Type: "string", Description: "Input format: json|yaml|auto (default: auto)", Required: false, Default: "auto"},
@@ -196,18 +197,54 @@ func runPipeline(ctx context.Context, config PipelineConfig, timeoutSeconds int,
 		startedMu.Lock()
 		completedMu.Lock()
 
+		now := time.Now()
 		var toStart []*PipelineStep
+		var toSkip []*PipelineStepResult
 		for name, step := range stepMap {
 			if started[name] || completed[name] {
 				continue
 			}
 
 			depsMet := true
+			badDep := ""
 			for _, dep := range step.DependsOn {
 				if !completed[dep] {
 					depsMet = false
 					break
 				}
+				// completed[dep] is set only after results[dep] is
+				// written, so the result (if any) is visible here.
+				resultsMu.Lock()
+				r, ok := results[dep]
+				resultsMu.Unlock()
+				if ok && r.Error != "" {
+					badDep = dep
+					break
+				}
+			}
+
+			if badDep != "" {
+				// Upstream failed (or was itself cascade-skipped):
+				// skip this step instead of running it on missing
+				// input. Marked completed so the dispatcher makes
+				// progress; the skip result is written under the
+				// same lock section so later steps in THIS pass see
+				// it and cascade correctly.
+				skip := &PipelineStepResult{
+					Name:     name,
+					Node:     step.Node,
+					Error:    fmt.Sprintf("skipped: upstream step %q failed", badDep),
+					Skipped:  true,
+					Started:  now,
+					Finished: now,
+				}
+				started[name] = true
+				completed[name] = true
+				resultsMu.Lock()
+				results[name] = skip
+				resultsMu.Unlock()
+				toSkip = append(toSkip, skip)
+				continue
 			}
 
 			if depsMet {
@@ -216,8 +253,12 @@ func runPipeline(ctx context.Context, config PipelineConfig, timeoutSeconds int,
 			}
 		}
 
-		startedMu.Unlock()
 		completedMu.Unlock()
+		startedMu.Unlock()
+
+		for _, r := range toSkip {
+			logger.Info("pipeline step skipped: upstream failed", "step", r.Name, "node", r.Node)
+		}
 
 		for _, step := range toStart {
 			wg.Add(1)
@@ -227,7 +268,7 @@ func runPipeline(ctx context.Context, config PipelineConfig, timeoutSeconds int,
 			}(step)
 		}
 
-		return len(toStart) > 0
+		return len(toStart) > 0 || len(toSkip) > 0
 	}
 
 	done := make(chan bool)

@@ -3,7 +3,7 @@ name: aflare
 description: Generate and execute terminal workflows using aflare. Use when the user wants to automate multi-step terminal tasks, chain commands, fetch URLs, process data, create reusable pipelines, or build CI/CD-like automation locally.
 invocation: both
 allowed-tools: Read, Edit, Write, Bash, Glob, Grep, WebFetch
-version: 0.10.0
+version: 0.11.0
 author: aflare
 license: AGPL-3.0
 compatibility: claude-code >= 0.7.0
@@ -12,11 +12,11 @@ tags: [workflow, automation, cli, pipeline, terminal]
 
 ## Overview
 
-aflare is an AI-powered terminal workflow engine that generates and executes multi-step automation pipelines from natural language descriptions. It supports 45+ agent nodes including LLM providers, code analysis, file operations, web fetching, and system integrations. Workflows are defined as deterministic YAML files that can be version-controlled and reused.
+aflare is an AI-powered terminal workflow engine that generates and executes multi-step automation pipelines from natural language descriptions. It supports 70 built-in agent nodes including LLM providers, code analysis, file operations, web fetching, and system integrations. Workflows are defined as deterministic YAML files that can be version-controlled and reused.
 
 Key features:
 - Natural language to YAML workflow generation
-- 45+ built-in nodes (LLM, fetch, execute, transform, etc.)
+- 70 built-in nodes (LLM, fetch, execute, transform, etc.)
 - MCP protocol support for external tool integration
 - Security-hardened with SSRF protection, path traversal prevention, and resource limits
 - On-device LLM inference support (1B-8B models)
