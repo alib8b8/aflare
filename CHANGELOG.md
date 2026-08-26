@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **`http_request` → `json_parse` 生态组合断裂（用户报告）**：文档声称 http_request 输出 "response body"，实际输出 `HTTP <code>\n<body>`（状态行前缀拼接，单测锁定）——最自然的 `http_request → json_parse` 组合开箱即断（`HTTP` 开头不是合法 JSON，json_parse 直接失败），仓库自己的 examples/finance/idempotent-transfer/workflow.yaml 注释承认该问题并用 `contains` 字符串匹配绕过。根因修复：json_parse 解析前自动剥离行首 `HTTP <status>\n` 状态行（合法 JSON 不可能以 `H` 开头，剥离无歧义；锚定行首、容忍 CRLF，body 内部状态样式文本不受影响）；http_request 输出格式保持不变（向后兼容既有 `contains:"HTTP 200"` 类判断）。文档同步：nodes-reference.md 的 http_request Output 改为如实描述 `HTTP <status>\n<body>`（并注明 json_parse 自动剥离）、json_parse Input 注明容忍状态行；example 注释更正。回归测试覆盖前缀剥离（pretty-print / path 提取 / 任意状态码 / CRLF）、body 内嵌状态样式文本不被误剥、非 JSON body 仍报错
 - **Ollama 流式输出多字节 rune 损坏（本轮全量安全与代码质量审计发现）**：流式 JSON 过滤器 `ollamaStreamFilter` 的前缀匹配把 rune 截断为 byte——中文等非 ASCII 内容的低字节可能碰巧匹配 `"thought": "` 前缀字节而误入字段模式，把无关 JSON 值当作思考内容流给用户（如 U+0174 截断为 't'，`"ŴhoughŴ": "` 在截断语义下拼出前缀）；同时过滤器内嵌只写不读的 `strings.Builder` 缓冲区随输出无界增长（死代码 + 长流内存浪费）。修复：非 ASCII rune 直接重置匹配状态（前缀为纯 ASCII，多字节 rune 不可能合法延续匹配）并删除死缓冲区；新增两条回归测试——CJK 内容原样流出、低字节碰撞序列不得误触发字段模式
 - **`aflare validate` 对纯建议性警告返回退出码 1（本轮全量审计发现）**：`Consider adding a file_write step` 这类建议（工作流照常可跑）与 unknown node 这类硬错误（跑到该步必炸）此前同走 `exit 1`——CI 里 `aflare validate wf.yaml && ...` 会被纯建议卡死，仓库自带 3 个 examples（devops-deploy / file-organizer / log-monitor）即受害者。现区分严重度：unknown node、空 steps、YAML/加载错误保持退出 1；缺 name / 缺 file_write 等纯建议退出 0（警告照常打印）。新增退出码契约测试
 

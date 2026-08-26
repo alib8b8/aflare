@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -41,7 +42,7 @@ func (n *JSONParseNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "json_parse",
 		Description: "Parse and extract JSON data",
-		Input:       "string - JSON string to parse",
+		Input:       "string - JSON string to parse (a leading \"HTTP <code>\\n\" status line, as emitted by http_request, is tolerated and stripped)",
 		Output:      "string - extracted value or pretty-printed JSON",
 		Params: []ParamSchema{
 			{Name: "path", Type: "string", Description: "Dot-notation path to extract (e.g. data.items.[0].name). If omitted, pretty-prints entire JSON.", Required: false},
@@ -49,11 +50,28 @@ func (n *JSONParseNode) Schema() NodeSchema {
 	}
 }
 
+// httpStatusLineRe matches the "HTTP <code>\n" status-line prefix that the
+// http_request node prepends to its response bodies. The pattern is anchored
+// to the start of the input (no (?m)), so status-like lines inside the body
+// are never touched. Valid JSON cannot begin with 'H', so the strip is
+// unambiguous.
+var httpStatusLineRe = regexp.MustCompile(`^HTTP \d{3}\r?\n`)
+
+// stripHTTPStatusLine removes the leading http_request status line so the
+// natural http_request → json_parse composition parses the body directly.
+func stripHTTPStatusLine(input string) string {
+	return httpStatusLineRe.ReplaceAllString(input, "")
+}
+
 func (n *JSONParseNode) Execute(ctx context.Context, input string, params map[string]string) (string, error) {
 	// Limit input size to prevent OOM
 	if len(input) > maxHTTPResponseSize {
 		return "", fmt.Errorf("input too large for JSON parsing (max %d bytes)", maxHTTPResponseSize)
 	}
+
+	// http_request emits "HTTP <code>\n<body>"; strip the status line so
+	// the body parses without a manual trim step in between.
+	input = stripHTTPStatusLine(input)
 
 	var data interface{}
 	if err := json.Unmarshal([]byte(input), &data); err != nil {
