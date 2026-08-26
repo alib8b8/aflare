@@ -26,20 +26,21 @@ import (
 	"time"
 
 	"github.com/alib8b8/aflare/internal/logger"
+	"gopkg.in/yaml.v3"
 )
 
 type PipelineStep struct {
-	Name      string            `json:"name"`
-	Node      string            `json:"node"`
-	Input     string            `json:"input,omitempty"`
-	Params    map[string]string `json:"params,omitempty"`
-	DependsOn []string          `json:"depends_on,omitempty"`
-	InputFrom []string          `json:"input_from,omitempty"`
+	Name      string            `json:"name" yaml:"name"`
+	Node      string            `json:"node" yaml:"node"`
+	Input     string            `json:"input,omitempty" yaml:"input,omitempty"`
+	Params    map[string]string `json:"params,omitempty" yaml:"params,omitempty"`
+	DependsOn []string          `json:"depends_on,omitempty" yaml:"depends_on,omitempty"`
+	InputFrom []string          `json:"input_from,omitempty" yaml:"input_from,omitempty"`
 }
 
 type PipelineConfig struct {
-	Steps          []PipelineStep `json:"steps"`
-	TimeoutSeconds int            `json:"timeout_seconds,omitempty"`
+	Steps          []PipelineStep `json:"steps" yaml:"steps"`
+	TimeoutSeconds int            `json:"timeout_seconds,omitempty" yaml:"timeout_seconds,omitempty"`
 }
 
 type PipelineStepResult struct {
@@ -97,7 +98,7 @@ func (n *PipelineNode) Execute(ctx context.Context, input string, params map[str
 		// keep default value on parse failure
 	}
 
-	config, err := parsePipelineConfig(input)
+	config, err := parsePipelineConfig(input, getParam(params, "format", "auto"))
 	if err != nil {
 		return "", fmt.Errorf("failed to parse pipeline config: %w", err)
 	}
@@ -118,18 +119,44 @@ func (n *PipelineNode) Execute(ctx context.Context, input string, params map[str
 	return runPipeline(pipelineCtx, config, timeoutSeconds, reg)
 }
 
-func parsePipelineConfig(input string) (PipelineConfig, error) {
+// parsePipelineConfig parses a pipeline configuration in JSON or YAML.
+// format is the documented `format` param: "auto" (default) sniffs the
+// payload — a `{`/`[` prefix means JSON, anything else is tried as YAML —
+// while "json" and "yaml" force their parser for precise error messages.
+// An unrecognized format value fails fast instead of being ignored
+// (previously the param was documented but never read, and non-JSON input
+// always died with "unsupported format, use JSON").
+func parsePipelineConfig(input string, format string) (PipelineConfig, error) {
 	input = strings.TrimSpace(input)
 
-	if strings.HasPrefix(input, "{") || strings.HasPrefix(input, "[") {
+	parseJSON := func() (PipelineConfig, error) {
 		var config PipelineConfig
 		if err := json.Unmarshal([]byte(input), &config); err != nil {
 			return PipelineConfig{}, fmt.Errorf("invalid JSON: %w", err)
 		}
 		return config, nil
 	}
+	parseYAML := func() (PipelineConfig, error) {
+		var config PipelineConfig
+		if err := yaml.Unmarshal([]byte(input), &config); err != nil {
+			return PipelineConfig{}, fmt.Errorf("invalid YAML: %w", err)
+		}
+		return config, nil
+	}
 
-	return PipelineConfig{}, fmt.Errorf("unsupported format, use JSON")
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "", "auto":
+		if strings.HasPrefix(input, "{") || strings.HasPrefix(input, "[") {
+			return parseJSON()
+		}
+		return parseYAML()
+	case "json":
+		return parseJSON()
+	case "yaml", "yml":
+		return parseYAML()
+	default:
+		return PipelineConfig{}, fmt.Errorf("invalid format %q (supported: json, yaml, auto)", format)
+	}
 }
 
 func runPipeline(ctx context.Context, config PipelineConfig, timeoutSeconds int, reg *Registry) (string, error) {
