@@ -100,6 +100,7 @@ func ParseWorkflow(path string) (*Workflow, error) {
 	if err := yaml.Unmarshal(data, &wf); err != nil {
 		return nil, aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to parse workflow YAML")
 	}
+	normalizeStepIDs(wf.Steps)
 
 	return &wf, nil
 }
@@ -114,6 +115,7 @@ func ParseWorkflowFromContent(content string) (*Workflow, error) {
 	if err := yaml.Unmarshal([]byte(content), &wf); err != nil {
 		return nil, aferrors.Wrap(err, aferrors.CodeWorkflowParseError, "failed to parse workflow YAML")
 	}
+	normalizeStepIDs(wf.Steps)
 
 	return &wf, nil
 }

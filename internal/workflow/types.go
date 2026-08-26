@@ -16,7 +16,12 @@
 
 package workflow
 
-import "time"
+import (
+	"fmt"
+	"time"
+
+	"gopkg.in/yaml.v3"
+)
 
 type Workflow struct {
 	Name           string            `yaml:"name,omitempty"`
@@ -56,6 +61,7 @@ type InputField struct {
 type WorkflowStep struct {
 	Node            string            `yaml:"node,omitempty"`
 	Name            string            `yaml:"name,omitempty"` // optional step name for {{step.name}} reference
+	ID              string            `yaml:"id,omitempty"`   // alias for name (docs/dataflow.md); normalized into Name at parse time
 	Params          map[string]string `yaml:"params,omitempty"`
 	Condition       string            `yaml:"condition,omitempty"`
 	Retry           int               `yaml:"retry,omitempty"`
@@ -69,6 +75,13 @@ type WorkflowStep struct {
 	MaxFailures     int               `yaml:"max_failures,omitempty"`
 	If              *IfConfig         `yaml:"if,omitempty"`
 	Map             *MapConfig        `yaml:"map,omitempty"`
+	// Input explicitly overrides the step's input (default: the previous
+	// step's output). It accepts a template string or a list of template
+	// strings (rendered individually and joined with "\n---\n"). Templates
+	// are evaluated with the same engine as params, so {{step.*}},
+	// {{var.*}}, {{input}}, {{env.*}} and {{secret.*}} all resolve inside
+	// an input expression. Documented in docs/dataflow.md.
+	Input *StepInput `yaml:"input,omitempty"`
 	// Reduce folds a list (`over`) into a single accumulated value by running
 	// a sub-workflow per item with access to the running accumulator via
 	// {{loop.acc}}. The sub-workflow's final output becomes the accumulator
@@ -319,6 +332,84 @@ func (s *WorkflowStep) IsSaga() bool {
 // HasCaptureError reports whether this step declares a capture_error branch.
 func (s *WorkflowStep) HasCaptureError() bool {
 	return len(s.CaptureError) > 0
+}
+
+// StepInput is a step-level `input:` override. YAML accepts either form:
+//
+//	input: "Users: {{step.fetch_users}}"       # template string
+//	input:                                     # list of templates, joined
+//	  - "{{step.fetch_users}}"                 # with "\n---\n" after
+//	  - "{{step.fetch_products}}"              # rendering
+//
+// Both forms go through the expression engine, so all placeholders
+// ({{step.*}}, {{var.*}}, {{input}}, {{env.*}}, {{secret.*}}) resolve.
+type StepInput struct {
+	parts []string
+}
+
+// UnmarshalYAML implements yaml.v3's unmarshaler interface, accepting a
+// scalar string or a sequence of strings.
+func (si *StepInput) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.ScalarNode:
+		si.parts = []string{node.Value}
+		return nil
+	case yaml.SequenceNode:
+		parts := make([]string, 0, len(node.Content))
+		for _, item := range node.Content {
+			if item.Kind != yaml.ScalarNode {
+				return fmt.Errorf("input list items must be strings (line %d)", item.Line)
+			}
+			parts = append(parts, item.Value)
+		}
+		si.parts = parts
+		return nil
+	default:
+		return fmt.Errorf("input must be a string or a list of strings (line %d)", node.Line)
+	}
+}
+
+// Parts returns the raw template parts (nil when unset).
+func (si *StepInput) Parts() []string {
+	if si == nil {
+		return nil
+	}
+	return si.parts
+}
+
+// normalizeStepIDs promotes the documented `id:` alias to `name:` so
+// {{step.<id>}} references, traces, and WAL records all resolve. Runs
+// recursively through compound-step sub-workflows. `name:` wins when both
+// are present (it is the canonical field).
+func normalizeStepIDs(steps []WorkflowStep) {
+	for i := range steps {
+		normalizeStepID(&steps[i])
+	}
+}
+
+func normalizeStepID(s *WorkflowStep) {
+	if s.Name == "" && s.ID != "" {
+		s.Name = s.ID
+	}
+	if s.If != nil {
+		normalizeStepIDs(s.If.Then)
+		normalizeStepIDs(s.If.Else)
+	}
+	if s.Map != nil {
+		normalizeStepIDs(s.Map.Steps)
+	}
+	if s.Reduce != nil {
+		normalizeStepIDs(s.Reduce.Steps)
+	}
+	if s.Saga != nil {
+		for j := range s.Saga.Steps {
+			normalizeStepID(&s.Saga.Steps[j].Forward)
+			if s.Saga.Steps[j].Compensate != nil {
+				normalizeStepID(s.Saga.Steps[j].Compensate)
+			}
+		}
+	}
+	normalizeStepIDs(s.CaptureError)
 }
 
 // IsResumable reports whether this step is marked as resumable.

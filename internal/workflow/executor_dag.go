@@ -61,10 +61,19 @@ type dagExecResult struct {
 // node.Execute to a worker goroutine.
 func prepareDAGStep(stepIdx int, wf *Workflow, graph *depGraph, resolver *stepInputResolver, initialInput string, engine *ExpressionEngine) dagPreparedStep {
 	wStep := wf.Steps[stepIdx]
-	input := graph.resolveInput(stepIdx, resolver, initialInput)
-	ps := dagPreparedStep{idx: stepIdx, wStep: wStep, input: input}
-
 	evalStart := time.Now()
+	input := graph.resolveInput(stepIdx, resolver, initialInput)
+	if wStep.Input != nil {
+		override, err := ResolveStepInput(wStep, input, engine)
+		if err != nil {
+			ps := dagPreparedStep{idx: stepIdx, wStep: wStep, input: input}
+			ps.evalErr = err
+			ps.evalDuration = time.Since(evalStart)
+			return ps
+		}
+		input = override
+	}
+	ps := dagPreparedStep{idx: stepIdx, wStep: wStep, input: input}
 	if wStep.Condition != "" {
 		pass, err := evaluateCondition(wStep.Condition, input, engine)
 		if err != nil {

@@ -97,6 +97,36 @@ steps:
 
 **Setup**: Assign names using the `id` field in your step definition.
 
+### Step-Level `input:` Override
+
+Any step (including sub-steps inside `if` / `map` / `reduce` / `saga` branches)
+can replace its incoming data — the previous step's output — with an explicit
+`input:` field. It accepts a template string or a list of template strings:
+
+```yaml
+steps:
+  - node: http_request
+    id: fetch_users
+    params:
+      url: "https://api.example.com/users"
+
+  - node: agent
+    input: "Users: {{step.fetch_users}}"   # scalar template
+    params:
+      model: gpt-4o
+
+  - node: combine
+    input:                                 # list of templates
+      - "{{step.fetch_users}}"
+      - "static tail"
+```
+
+**Behavior**:
+- The override is evaluated before the step's `condition` and `params`, so `{{input}}` inside them resolves to the overridden value
+- List items are rendered individually and joined with `\n---\n`
+- All placeholders (`{{step.*}}`, `{{var.*}}`, `{{input}}`, `{{env.*}}`, `{{secret.*}}`) resolve inside the templates
+- When a step is skipped by its `condition`, the override does not leak: the next step still receives the original upstream output
+
 ### `{{var.NAME}}` - Workflow Variables
 
 Define and reference workflow-level variables:
