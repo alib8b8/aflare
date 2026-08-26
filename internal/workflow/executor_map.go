@@ -322,6 +322,16 @@ func executeSubStep(ctx context.Context, baseIdx int, subStep WorkflowStep, inpu
 		return results, out, err
 	}
 
+	// Step-level `input:` override first (same ordering as DAG mode): the
+	// condition and params below evaluate against the overridden value.
+	if subStep.Input != nil {
+		override, rerr := ResolveStepInput(subStep, input, engine)
+		if rerr != nil {
+			return nil, "", fmt.Errorf("sub-step input eval failed: %w", rerr)
+		}
+		input = override
+	}
+
 	// Condition check.
 	if subStep.Condition != "" {
 		pass, err := evaluateCondition(subStep.Condition, input, engine)

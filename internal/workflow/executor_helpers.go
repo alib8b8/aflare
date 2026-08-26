@@ -30,6 +30,28 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// ResolveStepInput applies a step's explicit `input:` override to its
+// default input (the previous step's output). The override is a template
+// string, or a list of templates joined with "\n---\n", evaluated with the
+// same engine as params — {{step.*}}, {{var.*}}, {{input}}, {{env.*}} and
+// {{secret.*}} all resolve inside it. When the step declares no override,
+// defaultInput passes through unchanged.
+func ResolveStepInput(wStep WorkflowStep, defaultInput string, engine *ExpressionEngine) (string, error) {
+	parts := wStep.Input.Parts()
+	if len(parts) == 0 {
+		return defaultInput, nil
+	}
+	rendered := make([]string, len(parts))
+	for i, part := range parts {
+		value, err := engine.Evaluate(part, defaultInput)
+		if err != nil {
+			return "", fmt.Errorf("step input evaluation failed: %w", err)
+		}
+		rendered[i] = value
+	}
+	return strings.Join(rendered, "\n---\n"), nil
+}
+
 // evaluateCondition evaluates a condition expression against the current input.
 // Syntax is the same as the condition node, but the comparison value is evaluated
 // through the expression engine so {{step.0}}, {{var.name}} etc. work.

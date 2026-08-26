@@ -56,6 +56,269 @@ func (n *testNode) Execute(ctx context.Context, input string, params map[string]
 	return "processed: " + input, nil
 }
 
+// TestParseWorkflowFromContent_InputField pins the documented `input:`
+// step field (docs/dataflow.md): scalar template and list-of-templates
+// forms both parse. Before this field existed, yaml.Unmarshal silently
+// dropped it and nodes received empty input.
+func TestParseWorkflowFromContent_InputField(t *testing.T) {
+	wf, err := ParseWorkflowFromContent(`
+name: input-parse
+steps:
+  - node: a
+    id: first
+  - node: b
+    input: "fixed: {{step.first}}"
+  - node: c
+    input:
+      - "{{step.first}}"
+      - "tail"
+`)
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if got := wf.Steps[1].Input.Parts(); len(got) != 1 || got[0] != "fixed: {{step.first}}" {
+		t.Errorf("scalar input = %v, want [fixed: {{step.first}}]", got)
+	}
+	if got := wf.Steps[2].Input.Parts(); len(got) != 2 || got[0] != "{{step.first}}" || got[1] != "tail" {
+		t.Errorf("list input = %v, want [{{step.first}} tail]", got)
+	}
+	if wf.Steps[0].Input != nil {
+		t.Errorf("unset input should stay nil, got %v", wf.Steps[0].Input.Parts())
+	}
+}
+
+// TestParseWorkflowFromContent_InputInvalidType ensures a malformed input
+// (mapping instead of string/list) is a load-time error, not a silent drop.
+func TestParseWorkflowFromContent_InputInvalidType(t *testing.T) {
+	_, err := ParseWorkflowFromContent(`
+name: bad-input
+steps:
+  - node: a
+    input:
+      template: "{{step.x}}"
+`)
+	if err == nil {
+		t.Fatal("expected error for mapping-form input")
+	}
+}
+
+// TestParseWorkflowFromContent_IDAlias pins the documented `id:` naming
+// alias (docs/dataflow.md "Assign names using the id field"): it is
+// promoted to the canonical Name at parse time, recursively through
+// compound sub-workflows, and `name:` wins when both are present.
+func TestParseWorkflowFromContent_IDAlias(t *testing.T) {
+	wf, err := ParseWorkflowFromContent(`
+name: id-alias
+steps:
+  - node: a
+    id: by_id
+  - node: b
+    name: by_name
+    id: shadowed
+  - node: c
+    id: container
+    if:
+      condition: "{{step.by_id}} != ''"
+      then:
+        - node: d
+          id: nested_id
+      else:
+        - node: e
+    map:
+      over: "[1]"
+      steps:
+        - node: f
+          id: map_id
+`)
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if wf.Steps[0].Name != "by_id" {
+		t.Errorf("id should promote to name: got %q", wf.Steps[0].Name)
+	}
+	if wf.Steps[1].Name != "by_name" {
+		t.Errorf("name should win over id: got %q", wf.Steps[1].Name)
+	}
+	if n := wf.Steps[2].If.Then[0].Name; n != "nested_id" {
+		t.Errorf("nested if-branch id should promote: got %q", n)
+	}
+	if n := wf.Steps[2].Map.Steps[0].Name; n != "map_id" {
+		t.Errorf("map sub-step id should promote: got %q", n)
+	}
+}
+
+// TestExecuteWorkflow_InputOverride verifies the runtime half of the
+// documented behavior: input: replaces the default previous-step output,
+// with {{step.*}}, {{var.*}} and {{input}} all resolving inside it.
+func TestExecuteWorkflow_InputOverride(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	wf := &Workflow{
+		Name: "input-override",
+		Vars: map[string]string{"suffix": "VAR"},
+		Steps: []WorkflowStep{
+			{Node: "test", Name: "first"},
+			{Node: "test", Name: "second", Params: map[string]string{"prefix": ""}, Input: &StepInput{parts: []string{"step1={{step.first}} var={{var.suffix}} prev={{input}}"}}},
+		},
+	}
+
+	output, _, err := ExecuteWorkflow(context.Background(), wf, reg)
+	if err != nil {
+		t.Fatalf("execution failed: %v", err)
+	}
+	// testNode: prefix + " " + input; empty prefix → " " + input
+	want := " step1=processed:  var=VAR prev=processed: "
+	if output != want {
+		t.Errorf("output = %q, want %q", output, want)
+	}
+}
+
+// TestExecuteWorkflow_InputListJoin pins the list form's join semantics:
+// each template renders individually, parts join with "\n---\n".
+func TestExecuteWorkflow_InputListJoin(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	wf := &Workflow{
+		Name: "input-list",
+		Steps: []WorkflowStep{
+			{Node: "test", Name: "a", Params: map[string]string{"prefix": "A"}},
+			{Node: "test", Name: "b", Params: map[string]string{"prefix": ""}, Input: &StepInput{parts: []string{"{{step.a}}", "static"}}},
+		},
+	}
+
+	output, _, err := ExecuteWorkflow(context.Background(), wf, reg)
+	if err != nil {
+		t.Fatalf("execution failed: %v", err)
+	}
+	// step a output: "A " + "" → "A "; list join: "A \n---\nstatic"; step b: " " + that
+	want := " A \n---\nstatic"
+	if output != want {
+		t.Errorf("output = %q, want %q", output, want)
+	}
+}
+
+// TestExecuteWorkflow_InputOverrideDAG verifies input: also applies in
+// DAG scheduling mode (depends_on).
+func TestExecuteWorkflow_InputOverrideDAG(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	wf := &Workflow{
+		Name: "input-dag",
+		Steps: []WorkflowStep{
+			{Node: "test", Name: "src"},
+			{Node: "test", Name: "sink", DependsOn: []string{"src"}, Params: map[string]string{"prefix": ""}, Input: &StepInput{parts: []string{"[{{step.src}}]"}}},
+		},
+	}
+
+	output, _, err := ExecuteWorkflow(context.Background(), wf, reg)
+	if err != nil {
+		t.Fatalf("execution failed: %v", err)
+	}
+	want := " [processed: ]"
+	if output != want {
+		t.Errorf("output = %q, want %q", output, want)
+	}
+}
+
+// TestExecuteWorkflow_InputOverrideParamsSeesOverride pins cross-mode
+// consistency: {{input}} inside params resolves to the OVERRIDDEN input in
+// sequential mode, matching DAG-mode ordering (override → condition →
+// params → node).
+func TestExecuteWorkflow_InputOverrideParamsSeesOverride(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	wf := &Workflow{
+		Name: "input-params",
+		Steps: []WorkflowStep{
+			{Node: "test", Name: "src", Params: map[string]string{"prefix": "S"}},
+			{Node: "test", Name: "sink", Input: &StepInput{parts: []string{"OVERRIDE"}}, Params: map[string]string{"prefix": "P:{{input}}"}},
+		},
+	}
+
+	output, _, err := ExecuteWorkflow(context.Background(), wf, reg)
+	if err != nil {
+		t.Fatalf("execution failed: %v", err)
+	}
+	// src → "S "; sink input overridden to "OVERRIDE", params prefix
+	// rendered against it → "P:OVERRIDE" + " " + "OVERRIDE".
+	want := "P:OVERRIDE OVERRIDE"
+	if output != want {
+		t.Errorf("output = %q, want %q", output, want)
+	}
+}
+
+// TestExecuteWorkflow_InputOverrideSubStep pins input: on a sub-step inside
+// an if branch (the executeSubStep path shared by if/map/reduce/saga): the
+// override applies BEFORE the sub-step's condition evaluation.
+func TestExecuteWorkflow_InputOverrideSubStep(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	wf := &Workflow{
+		Name: "input-substep",
+		Steps: []WorkflowStep{
+			{Node: "test", Name: "src", Params: map[string]string{"prefix": "S"}},
+			{
+				Node: "test", Name: "branch",
+				If: &IfConfig{
+					Condition: "not_empty",
+					Then: []WorkflowStep{
+						{
+							Node: "test", Name: "inner",
+							Input:     &StepInput{parts: []string{"GO"}},
+							Condition: "equals:GO",
+							Params:    map[string]string{"prefix": ""},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	output, _, err := ExecuteWorkflow(context.Background(), wf, reg)
+	if err != nil {
+		t.Fatalf("execution failed: %v", err)
+	}
+	// The condition "equals:GO" only passes because the override was
+	// applied before condition evaluation; inner then outputs " GO".
+	want := " GO"
+	if output != want {
+		t.Errorf("output = %q, want %q", output, want)
+	}
+}
+
+// TestExecuteWorkflow_InputOverrideConditionSkipRestore pins that a
+// condition-skipped step's input: override does NOT leak into the next
+// step: skip still passes the original upstream value through.
+func TestExecuteWorkflow_InputOverrideConditionSkipRestore(t *testing.T) {
+	reg := nodes.NewRegistry()
+	reg.Register(&testNode{name: "test"})
+
+	wf := &Workflow{
+		Name: "input-skip-restore",
+		Steps: []WorkflowStep{
+			{Node: "test", Name: "src", Params: map[string]string{"prefix": "S"}},
+			{Node: "test", Name: "skipped", Input: &StepInput{parts: []string{"LEAK"}}, Condition: "empty"},
+			{Node: "test", Name: "after", Params: map[string]string{"prefix": ""}},
+		},
+	}
+
+	output, _, err := ExecuteWorkflow(context.Background(), wf, reg)
+	if err != nil {
+		t.Fatalf("execution failed: %v", err)
+	}
+	// "LEAK" is not empty → skipped; upstream "S " passes through (the
+	// override is restored); after → " S ".
+	want := " S "
+	if output != want {
+		t.Errorf("output = %q, want %q", output, want)
+	}
+}
+
 func TestExecuteWorkflow_Simple(t *testing.T) {
 	reg := nodes.NewRegistry()
 	reg.Register(&testNode{name: "test"})

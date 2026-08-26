@@ -284,10 +284,11 @@ func (s *seqExecState) executeRegularStep(i int, wStep WorkflowStep, stepStart t
 	// Bounded preview (pass-by-reference for LLM steps): when the step opts
 	// in via preview_input and the incoming payload exceeds PreviewMaxBytes,
 	// the node sees a head/tail sample while the full value stays in
-	// workflow state for every other step.
+	// workflow state for every other step. s.data already carries the
+	// step-level `input:` override applied by the sequential loop.
 	stepInput := s.data
 	if wStep.PreviewInput {
-		stepInput = BoundedPreview(s.data, PreviewMaxBytes)
+		stepInput = BoundedPreview(stepInput, PreviewMaxBytes)
 	}
 
 	// Retry loop.

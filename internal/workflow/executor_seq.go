@@ -269,6 +269,21 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		}
 		stepStart := time.Now()
 
+		// Step-level `input:` override (docs/dataflow.md): replaces the
+		// default incoming data (previous step's output) before any
+		// dispatch — condition, compound and regular handling all see the
+		// overridden value, mirroring DAG-mode semantics. When the step is
+		// skipped by its condition, the original upstream value is restored
+		// so skip still means pass-through.
+		prevData := state.data
+		if wStep.Input != nil {
+			override, rerr := ResolveStepInput(wStep, state.data, state.engine)
+			if rerr != nil {
+				return "", state.results, state.trace, fmt.Errorf("step %d (%s) input evaluation failed: %w", i, wStep.Node, rerr)
+			}
+			state.data = override
+		}
+
 		// Compound steps: if/loop/map/reduce/parallel/saga.
 		if handled, err := state.handleCompoundStep(i, wStep, stepStart); handled {
 			if err != nil {
@@ -281,6 +296,9 @@ func executeWorkflowSequential(ctx context.Context, wf *Workflow, reg *nodes.Reg
 		if handled, err := state.handleStepCondition(i, wStep, stepStart); handled {
 			if err != nil {
 				return "", state.results, state.trace, err
+			}
+			if wStep.Input != nil {
+				state.data = prevData
 			}
 			continue
 		}
