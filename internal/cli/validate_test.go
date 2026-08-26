@@ -116,6 +116,48 @@ steps:
 	}
 }
 
+// TestValidateCmd_AdvisoryWarningExitsZero pins the exit-code contract:
+// advisory suggestions (missing file_write) keep the pipeline green —
+// only hard failures (unknown node, no steps, bad YAML) exit non-zero.
+func TestValidateCmd_AdvisoryWarningExitsZero(t *testing.T) {
+	i18n.Init("en")
+	wf := writeValidateFixture(t, "advisory.yaml", `name: advisory-demo
+steps:
+  - node: ollama
+    params:
+      prompt: hello
+`)
+
+	var err error
+	out := captureOutput(func() {
+		err = HandleValidate([]string{wf})
+	})
+	if code := exitCodeForErr(err); code != 0 {
+		t.Errorf("expected exit code 0 for advisory-only warnings, got %d (err=%v)", code, err)
+	}
+	if !strings.Contains(out, "Consider adding a file_write step") {
+		t.Errorf("expected file_write suggestion in output, got: %s", out)
+	}
+}
+
+func TestValidateCmd_NoStepsExitsNonZero(t *testing.T) {
+	i18n.Init("en")
+	wf := writeValidateFixture(t, "no-steps.yaml", `name: no-steps-demo
+steps: []
+`)
+
+	var err error
+	out := captureOutput(func() {
+		err = HandleValidate([]string{wf})
+	})
+	if code := exitCodeForErr(err); code != 1 {
+		t.Errorf("expected exit code 1 for workflow with no steps, got %d (err=%v)", code, err)
+	}
+	if !strings.Contains(out, "Workflow has no steps") {
+		t.Errorf("expected no-steps warning in output, got: %s", out)
+	}
+}
+
 func TestValidateCmd_MissingFile(t *testing.T) {
 	i18n.Init("en")
 	missing := filepath.Join(t.TempDir(), "does-not-exist.yaml")
