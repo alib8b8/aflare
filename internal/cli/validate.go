@@ -38,12 +38,20 @@ func HandleValidate(args []string) error {
 
 	warnings := workflow.ValidateWorkflow(wf)
 
+	// Hard failures make the workflow unrunnable and must fail CI: a
+	// workflow with no steps is a no-op, and an unknown node aborts
+	// execution at that step. Pure suggestions (missing name, missing
+	// file_write) are advisory — the workflow still runs, so exit 0 and
+	// let `aflare validate && ...` pipelines proceed.
+	hardFailure := len(wf.Steps) == 0
+
 	for i, step := range wf.Steps {
 		if step.IsIf() || step.IsLoop() || step.IsMap() || step.IsReduce() || step.IsParallel() || step.IsSaga() || step.HasCaptureError() {
 			continue
 		}
 		if _, ok := reg.Get(step.Node); !ok {
 			warnings = append(warnings, fmt.Sprintf("Step %d: unknown node '%s'", i+1, step.Node))
+			hardFailure = true
 		}
 	}
 
@@ -54,7 +62,9 @@ func HandleValidate(args []string) error {
 		for _, warning := range warnings {
 			fmt.Printf("  - %s\n", warning)
 		}
-		return exitErr(1)
+		if hardFailure {
+			return exitErr(1)
+		}
 	}
 	return nil
 }

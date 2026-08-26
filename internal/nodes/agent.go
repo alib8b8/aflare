@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alib8b8/aflare/internal/metrics"
 	"github.com/alib8b8/aflare/internal/nodes/core"
@@ -653,7 +654,6 @@ func (a *ReActAgent) callOllama(ctx context.Context, messages []LLMMessage) (str
 // characters and field names are suppressed.
 
 type ollamaStreamFilter struct {
-	buf     strings.Builder
 	onChunk func(string)
 
 	// Streaming state
@@ -677,14 +677,20 @@ const jsonAnswerPrefix = `"final_answer": "`
 
 func (f *ollamaStreamFilter) feed(chunk string) {
 	for _, c := range chunk {
-		f.buf.WriteByte(byte(c))
-
 		if f.inField {
 			f.handleFieldChar(c)
 			continue
 		}
 
-		// Looking for field prefixes — match both simultaneously
+		// Looking for field prefixes — match both simultaneously.
+		// Prefixes are pure ASCII, so multi-byte runes can never extend a
+		// match; reset instead of truncating the rune to a byte (a rune
+		// whose low byte matches would otherwise spuriously advance).
+		if c >= utf8.RuneSelf {
+			f.posThought = 0
+			f.posAnswer = 0
+			continue
+		}
 		f.posThought = advancePrefix(f.posThought, jsonThoughtPrefix, byte(c))
 		f.posAnswer = advancePrefix(f.posAnswer, jsonAnswerPrefix, byte(c))
 

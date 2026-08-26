@@ -129,6 +129,41 @@ func TestOllamaStreamFilter_PartialPrefix(t *testing.T) {
 	}
 }
 
+func TestOllamaStreamFilter_MultibyteRuneContent(t *testing.T) {
+	var chunks []string
+	f := newOllamaStreamFilter(func(s string) { chunks = append(chunks, s) })
+
+	// Non-ASCII (CJK) content must stream through unmodified — regression
+	// test for the rune→byte truncation that previously corrupted it.
+	f.feed(`{"thought": "`)
+	f.feed(`我需要搜索天气数据`)
+	f.feed(`"`)
+	f.feed(`,"final_answer": "今天晴，22 度"}`)
+
+	got := strings.Join(chunks, "")
+	want := "我需要搜索天气数据今天晴，22 度"
+	if got != want {
+		t.Errorf("multibyte = %q, want %q", got, want)
+	}
+}
+
+func TestOllamaStreamFilter_MultibyteRuneNoFalsePrefix(t *testing.T) {
+	var chunks []string
+	f := newOllamaStreamFilter(func(s string) { chunks = append(chunks, s) })
+
+	// U+0174 (Ŵ) truncates to byte 0x74 ('t'). The sequence `"ŴhoughŴ": "`
+	// spells `"thought": "` under that truncation — a naive rune→byte cast
+	// in the prefix matcher would falsely enter field mode and stream the
+	// value ("LEAK") as thought content.
+	f.feed(`{"note": "ŴhoughŴ": "LEAK"`)
+	f.feed(`, "final_answer": "ok"}`)
+
+	got := strings.Join(chunks, "")
+	if got != "ok" {
+		t.Errorf("low-byte collision = %q, want %q", got, "ok")
+	}
+}
+
 func TestOllamaStreamFilter_Flush(t *testing.T) {
 	var chunks []string
 	f := newOllamaStreamFilter(func(s string) { chunks = append(chunks, s) })
