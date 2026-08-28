@@ -1,0 +1,48 @@
+Build  : 2.4.0-f0e6b5e
+Exec   : foamRun -parallel
+nProcs : 16
+Mesh stats
+    points:           2457600
+    cells:            2359296
+    faces:            7077888
+Reading field p
+Reading field U
+smoothSolver:  Solving for p, Initial residual = 1, Final residual = 0.1, No Iterations 5
+smoothSolver:  Solving for Ux, Initial residual = 0.98, Final residual = 0.09, No Iterations 4
+CourantNumber mean: 0.012 max: 0.11
+deltaT = 0.001
+Time = 0.001
+smoothSolver:  Solving for p, Initial residual = 0.8, Final residual = 0.05, No Iterations 6
+smoothSolver:  Solving for Ux, Initial residual = 0.7, Final residual = 0.04, No Iterations 5
+CourantNumber mean: 0.015 max: 0.14
+Time = 0.002
+smoothSolver:  Solving for p, Initial residual = 0.6, Final residual = 0.03, No Iterations 5
+smoothSolver:  Solving for Ux, Initial residual = 0.5, Final residual = 0.02, No Iterations 4
+CourantNumber mean: 0.018 max: 0.19
+Time = 0.003
+smoothSolver:  Solving for p, Initial residual = 0.45, Final residual = 0.02, No Iterations 5
+smoothSolver:  Solving for Ux, Initial residual = 0.38, Final residual = 0.015, No Iterations 4
+CourantNumber mean: 0.021 max: 0.23
+Time = 0.004
+smoothSolver:  Solving for p, Initial residual = 0.35, Final residual = 0.018, No Iterations 6
+CourantNumber mean: 0.026 max: 0.28
+Time = 0.005
+smoothSolver:  Solving for p, Initial residual = 0.22, Final residual = 0.012, No Iterations 5
+smoothSolver:  Solving for Ux, Initial residual = 0.18, Final residual = 0.009, No Iterations 4
+CourantNumber mean: 0.031 max: 0.33
+Time = 0.006
+smoothSolver:  Solving for p, Initial residual = 0.14, Final residual = 0.008, No Iterations 5
+CourantNumber mean: 0.034 max: 0.36
+Time = 0.007
+smoothSolver:  Solving for p, Initial residual = 0.09, Final residual = 0.005, No Iterations 5
+smoothSolver:  Solving for Ux, Initial residual = 0.06, Final residual = 0.003, No Iterations 4
+CourantNumber mean: 0.036 max: 0.38
+Time = 0.008
+smoothSolver:  Solving for p, Initial residual = 0.05, Final residual = 0.002, No Iterations 5
+CourantNumber mean: 0.035 max: 0.35
+Time = 0.009
+smoothSolver:  Solving for p, Initial residual = 0.03, Final residual = 0.0015, No Iterations 4
+smoothSolver:  Solving for Ux, Initial residual = 0.02, Final residual = 0.001, No Iterations 4
+CourantNumber mean: 0.033 max: 0.31
+Time = 0.01
+ExecutionTime = 482.3 s  ClockTime = 482 s

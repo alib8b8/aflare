@@ -1,0 +1,59 @@
+Build  : 2.4.0-f0e6b5e
+Exec   : foamRun -parallel
+nProcs : 16
+Mesh stats
+    points:           2457600
+    cells:            2359296
+    faces:            7077888
+Reading field p
+Reading field U
+smoothSolver:  Solving for p, Initial residual = 1, Final residual = 0.1, No Iterations 5
+smoothSolver:  Solving for Ux, Initial residual = 0.98, Final residual = 0.09, No Iterations 4
+CourantNumber mean: 0.012 max: 0.11
+deltaT = 0.001
+Time = 0.001
+smoothSolver:  Solving for p, Initial residual = 0.8, Final residual = 0.05, No Iterations 6
+smoothSolver:  Solving for Ux, Initial residual = 0.7, Final residual = 0.04, No Iterations 5
+CourantNumber mean: 0.015 max: 0.14
+Time = 0.002
+smoothSolver:  Solving for p, Initial residual = 0.6, Final residual = 0.03, No Iterations 5
+CourantNumber mean: 0.024 max: 0.22
+Time = 0.003
+smoothSolver:  Solving for p, Initial residual = 0.55, Final residual = 0.09, No Iterations 12
+smoothSolver:  Solving for Ux, Initial residual = 0.5, Final residual = 0.08, No Iterations 10
+CourantNumber mean: 0.089 max: 0.44
+Time = 0.004
+smoothSolver:  Solving for p, Initial residual = 0.62, Final residual = 0.18, No Iterations 15
+smoothSolver:  Solving for Ux, Initial residual = 0.58, Final residual = 0.15, No Iterations 12
+CourantNumber mean: 0.23 max: 0.71
+Time = 0.005
+smoothSolver:  Solving for p, Initial residual = 0.78, Final residual = 0.32, No Iterations 18
+smoothSolver:  Solving for Ux, Initial residual = 0.74, Final residual = 0.28, No Iterations 15
+CourantNumber mean: 0.41 max: 1.13
+Time = 0.006
+smoothSolver:  Solving for p, Initial residual = 0.91, Final residual = 0.55, No Iterations 22
+smoothSolver:  Solving for Ux, Initial residual = 0.89, Final residual = 0.51, No Iterations 18
+CourantNumber mean: 0.67 max: 1.94
+Time = 0.007
+smoothSolver:  Solving for p, Initial residual = 0.99, Final residual = 0.87, No Iterations 25
+smoothSolver:  Solving for Ux, Initial residual = 0.98, Final residual = 0.84, No Iterations 21
+CourantNumber mean: 0.88 max: 2.67
+Time = 0.008
+smoothSolver:  Solving for p, Initial residual = 0.99, Final residual = 0.95, No Iterations 28
+CourantNumber mean: 1.42 max: 3.89
+Time = 0.009
+smoothSolver:  Solving for p, Initial residual = 0.99, Final residual = 0.99, No Iterations 30
+CourantNumber mean: 2.31 max: 6.04
+Time = 0.01
+[1] ## ##
+[3] ## ##
+[5] ## ##
+[7] ## ##
+[11] ## ##
+[13] ## ##
+Floating point exception
+--> FOAM FATAL ERROR:
+Continuity errors cannot be removed.  To debug, set the environmental variable FOAM_SIGFPE to abort.
+    From function function::execute()
+    in file continuityErrs.C at line 96.
+FOAM exiting

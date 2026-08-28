@@ -29,6 +29,10 @@ build/
 maintenance_report_*.txt
 __pycache__/
 
+# Example run artifacts (openfoam-watchdog, generated in repo root)
+/watchdog-report.md
+/watchdog-triage.md
+
 # AI dev-loop internal state (maintained locally, never committed)
 /LOOP.md
 /STATE.md
