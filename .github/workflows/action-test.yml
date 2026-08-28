@@ -1,0 +1,74 @@
+name: action-test
+
+# Dogfoods the composite action in action/ — the same entry point users get
+# from the GitHub Marketplace. Runs the zero-config example end to end on
+# every change to the action scripts, plus a pinned-version install check.
+on:
+  push:
+    branches: [main]
+    paths: ['action/**', '.github/workflows/action-test.yml']
+  pull_request:
+    paths: ['action/**', '.github/workflows/action-test.yml']
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run workflow via action (latest release)
+        uses: ./action
+        with:
+          workflow: examples/content-processor.yaml
+
+      # Second invocation: pinned version + validate-only + params.
+      - uses: ./action
+        id: pinned
+        with:
+          version: v0.11.0
+          workflow: examples/content-processor.yaml
+          validate-only: true
+
+      - name: Assert pinned install
+        shell: bash
+        run: |
+          test "${{ steps.pinned.outputs.version }}" = "v0.11.0" \
+            || { echo "version output mismatch: ${{ steps.pinned.outputs.version }}"; exit 1; }
+          aflare version
+
+      # Third invocation: safe-mode + --set param forwarding, asserted via
+      # the extracted final output.
+      - name: Write param workflow
+        shell: bash
+        run: |
+          mkdir -p /tmp/aflare-e2e
+          cat > /tmp/aflare-e2e/param.yaml <<'EOF'
+          name: Param Test
+          input_schema:
+            - name: city
+              type: string
+              required: true
+          steps:
+            - node: template_render
+              params:
+                template: "City is {{var.city}}"
+          EOF
+
+      - uses: ./action
+        id: param
+        with:
+          workflow: param.yaml
+          working-directory: /tmp/aflare-e2e
+          safe-mode: true
+          set: city=Paris
+
+      - name: Assert param output
+        shell: bash
+        run: |
+          test "${{ steps.param.outputs.output }}" = "City is Paris" \
+            || { echo "output mismatch: '${{ steps.param.outputs.output }}'"; exit 1; }

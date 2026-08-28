@@ -1,0 +1,65 @@
+name: 'aflare'
+description: 'Run aflare AI workflows in CI — deterministic YAML pipelines with 70 built-in nodes, LLM steps, SSRF protection, and audit trails. Self-hosted by design: your data never leaves the runner.'
+branding:
+  icon: 'zap'
+  color: 'purple'
+
+inputs:
+  version:
+    description: 'aflare version to install (e.g. v0.11.0). Default: latest release'
+    required: false
+    default: 'latest'
+  workflow:
+    description: 'Path to the workflow YAML to run (relative to working-directory). Omit to only install the CLI for later steps.'
+    required: false
+    default: ''
+  set:
+    description: 'Workflow parameters, one KEY=VALUE per line (forwarded as --set)'
+    required: false
+    default: ''
+  safe-mode:
+    description: 'Run in safe mode (disables execute and external nodes)'
+    required: false
+    default: 'false'
+  validate-only:
+    description: 'Validate the workflow without executing it (aflare validate)'
+    required: false
+    default: 'false'
+  working-directory:
+    description: 'Working directory for the workflow run'
+    required: false
+    default: '.'
+  token:
+    description: 'GitHub token used to resolve the latest release (avoids API rate limits)'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  version:
+    description: 'Installed aflare version'
+    value: ${{ steps.install.outputs.version }}
+  output:
+    description: 'Final output of the workflow run (empty when validate-only or install-only)'
+    value: ${{ steps.run.outputs.output }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Install aflare'
+      id: install
+      shell: bash
+      env:
+        AFLARE_VERSION: ${{ inputs.version }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+      run: ${{ github.action_path }}/install.sh
+
+    - name: 'Run aflare workflow'
+      id: run
+      shell: bash
+      env:
+        AFLARE_WORKFLOW: ${{ inputs.workflow }}
+        AFLARE_SET: ${{ inputs.set }}
+        AFLARE_SAFE_MODE: ${{ inputs.safe-mode }}
+        AFLARE_VALIDATE_ONLY: ${{ inputs.validate-only }}
+        AFLARE_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: ${{ github.action_path }}/run.sh
