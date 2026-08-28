@@ -1,0 +1,122 @@
+name: OpenFOAM Watchdog
+description: |
+  Monitor a running OpenFOAM case for divergence: read the solver log,
+  detect divergence and high Courant number with deterministic condition
+  regexes, extract error lines as evidence, and branch with if/else — on
+  divergence, draft an LLM triage note (numbers come from deterministic
+  extraction, the LLM writes prose only) and alert the channel; on a
+  healthy run, report quietly. The alert never depends on LLM availability:
+  the triage step degrades to a fallback note when no provider is reachable.
+  Swap the file_read source for a real case directory (e.g. via execute +
+  tail) to use in production.
+
+vars:
+  log_path: examples/real-world/openfoam-watchdog/sample-diverged.log
+  report_path: watchdog-report.md
+  triage_path: watchdog-triage.md
+  alert_channel: stdout
+  provider: ollama
+  model: llama3
+
+steps:
+  # --- 1. Read the solver log ---------------------------------------------
+  - node: file_read
+    name: read_log
+    params:
+      path: "{{var.log_path}}"
+
+  # --- 2. Divergence check (deterministic regex over the whole log) --------
+  # input: override keeps both conditions evaluating against the log itself
+  # instead of the previous step's "true"/"false" output.
+  - node: condition
+    name: diverged
+    input: "{{step.read_log}}"
+    params:
+      expr: 'regex:FATAL|Floating point|\bnan\b'
+
+  # --- 3. High Courant check (mean >= 0.2) ---------------------------------
+  - node: condition
+    name: courant_high
+    input: "{{step.read_log}}"
+    params:
+      expr: 'regex:CourantNumber mean: 0\.[2-9]|CourantNumber mean: [1-9]'
+
+  # --- 4. Error-line evidence (deterministic filter, zero LLM cost) --------
+  - node: transform
+    name: error_lines
+    input: "{{step.read_log}}"
+    params:
+      operation: filter_errors
+
+  # --- 5. Evidence report (always written) ----------------------------------
+  - node: template_render
+    name: report
+    params:
+      template: |
+        # OpenFOAM Watchdog Report
+
+        **Log file:** {{var.log_path}}
+        **Diverged:** {{step.diverged}}
+        **High Courant (mean >= 0.2):** {{step.courant_high}}
+
+        ## Error lines (filter_errors)
+
+        ```
+        {{step.error_lines}}
+        ```
+
+  - node: file_write
+    name: save_report
+    params:
+      path: "{{var.report_path}}"
+
+  # --- 6. LLM prompt assembled BEFORE the branch (data-flow fidelity) ------
+  # Branch sub-workflows do not inherit parent step outputs, so every
+  # {{step.*}} reference lives in the parent flow.
+  - node: template_render
+    name: triage_prompt
+    params:
+      template: |
+        You are a CFD triage engineer. A divergence watchdog fired on an
+        OpenFOAM run. Using ONLY the error evidence below, write a short
+        Markdown triage note with three sections: What happened, Likely
+        causes (ranked), Next actions. Do not invent numbers — use exactly
+        the values present in the evidence.
+
+        Error evidence:
+        {{step.error_lines}}
+
+  # --- 7. Branch: alert or quiet report ------------------------------------
+  - if:
+      condition: "{{step.diverged}}"
+      then:
+        - node: agent
+          name: triage
+          # The alert must fire even when no LLM is reachable: on failure
+          # the step degrades to the fallback note and execution continues.
+          fallback: "LLM triage unavailable (provider offline or not configured). Deterministic evidence: {{var.report_path}}."
+          params:
+            provider: "{{var.provider}}"
+            model: "{{var.model}}"
+            max_iterations: "5"
+        - node: file_write
+          name: save_triage
+          params:
+            path: "{{var.triage_path}}"
+        - node: notify
+          name: alert
+          params:
+            channel: "{{var.alert_channel}}"
+            message: "ALERT: OpenFOAM case diverged ({{var.log_path}}). Triage note: {{var.triage_path}}. Evidence report: {{var.report_path}}."
+      else:
+        - node: notify
+          name: all_clear
+          params:
+            channel: "{{var.alert_channel}}"
+            message: "OK: OpenFOAM case healthy, residuals decreasing ({{var.log_path}})."
+
+  - node: notify
+    name: scan_done
+    params:
+      channel: "{{var.alert_channel}}"
+      message: "Watchdog scan complete. diverged={{step.diverged}}, courant_high={{step.courant_high}}. Report: {{var.report_path}}."

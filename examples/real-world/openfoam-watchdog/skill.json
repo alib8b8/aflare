@@ -1,0 +1,60 @@
+{
+  "id": "real-world/openfoam-watchdog",
+  "name": "openfoam-watchdog",
+  "version": "1.0.0",
+  "description": "Monitor an OpenFOAM run for divergence: read solver log, detect divergence/high Courant via deterministic condition regexes, extract error lines as evidence, branch with if/else — LLM triage note on divergence (with offline fallback), quiet report when healthy.",
+  "author": "aflare community",
+  "category": "industrial-monitoring",
+  "tags": [
+    "industrial-monitoring",
+    "cfd",
+    "openfoam",
+    "condition",
+    "workflow",
+    "real-world"
+  ],
+  "keywords": [
+    "openfoam",
+    "cfd",
+    "divergence",
+    "watchdog",
+    "simulation-monitoring"
+  ],
+  "inputs": [
+    {
+      "name": "log_path",
+      "type": "string",
+      "required": false,
+      "default": "examples/real-world/openfoam-watchdog/sample-diverged.log"
+    },
+    {
+      "name": "report_path",
+      "type": "string",
+      "required": false,
+      "default": "watchdog-report.md"
+    },
+    {
+      "name": "triage_path",
+      "type": "string",
+      "required": false,
+      "default": "watchdog-triage.md"
+    },
+    {
+      "name": "alert_channel",
+      "type": "string",
+      "required": false,
+      "default": "stdout"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "report",
+      "type": "string"
+    },
+    {
+      "name": "triage",
+      "type": "string"
+    }
+  ],
+  "dependencies": null
+}
