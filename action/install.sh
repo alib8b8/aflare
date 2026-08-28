@@ -32,11 +32,15 @@ if [[ "$VERSION" == "latest" ]]; then
   if [[ -n "${GITHUB_TOKEN:-}" ]]; then
     AUTH=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
   fi
-  VERSION="$(curl -fsSL --connect-timeout 15 "${AUTH[@]}" \
-    "https://api.github.com/repos/${REPO}/releases/latest" \
-    | grep -m1 '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')" \
+  # Capture the response before parsing: piping curl into `grep -m1` makes
+  # grep exit early, curl dies with SIGPIPE (exit 23), and `pipefail`
+  # turns that into a spurious resolution failure.
+  RESPONSE="$(curl -fsSL --connect-timeout 15 "${AUTH[@]}" \
+    "https://api.github.com/repos/${REPO}/releases/latest")" \
     || fail "could not resolve latest release (API rate limit? pin 'version:' or pass a 'token:')"
+  VERSION="$(printf '%s' "$RESPONSE" | sed -nE 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/p' | head -1)"
   [[ -n "$VERSION" && "$VERSION" != "null" ]] || fail "latest release lookup returned empty"
+  unset RESPONSE
 fi
 log "installing aflare ${VERSION} (${OS}/${ARCH})"
 
@@ -57,7 +61,15 @@ curl -fsSL --connect-timeout 15 --max-time 60 \
 
 EXPECTED="$(grep " ${ARCHIVE}\$" "${TMP_DIR}/checksums.txt" | awk '{print $1}')"
 [[ -n "$EXPECTED" ]] || fail "no checksum entry for ${ARCHIVE} in checksums.txt"
-echo "${EXPECTED}  ${TMP_DIR}/${ARCHIVE}" | sha256sum --check --strict - \
+# macOS runners ship `shasum -a 256`, not sha256sum.
+if command -v sha256sum >/dev/null 2>&1; then
+  SHA_CMD=(sha256sum)
+elif command -v shasum >/dev/null 2>&1; then
+  SHA_CMD=(shasum -a 256)
+else
+  fail "neither sha256sum nor shasum found on this runner"
+fi
+echo "${EXPECTED}  ${TMP_DIR}/${ARCHIVE}" | "${SHA_CMD[@]}" --check --strict - \
   || fail "checksum mismatch for ${ARCHIVE}"
 log "checksum verified (sha256)"
 
