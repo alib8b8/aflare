@@ -371,6 +371,15 @@ func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Resolve the workflow BEFORE accepting the task: a request for a
+	// nonexistent workflow can never succeed, so answering 404 up front
+	// (instead of 202 + an async "not found" task) keeps the API honest
+	// and spares clients a pointless status-poll round trip.
+	if _, err := s.findWorkflowPath(workflowName); err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
 	// Acquire semaphore to limit concurrent executions
 	select {
 	case s.sem <- struct{}{}:

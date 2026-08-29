@@ -6,7 +6,6 @@
   </p>
   <p><strong>AI Beyond Chat — Get Things Done</strong></p>
   <p><em>Local-first · Data Stays Local · Connect Your Own LLM / Files / Notes / Databases</em></p>
-  <p>The deterministic and secure control layer between AI and your data</p>
 
   <p>
     <a href="https://github.com/alib8b8/aflare/actions/workflows/ci.yml">
@@ -28,22 +27,20 @@
 
 ## Quick Start
 
-### Install
-
-**macOS / Linux** — one-line install (auto-detects OS & arch, verifies checksum):
+**macOS / Linux:**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh | bash
 ```
 
-**Windows** — PowerShell one-line install (auto-detects arch, adds to user PATH):
+**Windows (PowerShell):**
 
 ```powershell
 irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 | iex
 ```
 
 <details>
-<summary><b>Other install methods</b> (manual download / deb · rpm)</summary>
+<summary><b>Other install methods</b> (manual download / deb · rpm / GitHub Action)</summary>
 
 ```bash
 # Manual binary download
@@ -54,384 +51,70 @@ irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 | iex
 - `deb` / `rpm` packages are attached to each Release.
 - The install script auto-switches to mirror-accelerated downloads on CN networks.
 
-</details>
-
-**GitHub Actions (CI)** — run aflare workflows as CI steps. Installs the prebuilt release binary (checksum-verified) in seconds; no Docker build, no compilation:
+Run aflare workflows as CI steps (checksum-verified binary, no Docker build):
 
 ```yaml
 - uses: alib8b8/aflare/action@v0.11.0
   with:
     workflow: .aflare/pr-review.yaml
-    set: |
-      pr_number=${{ github.event.pull_request.number }}
 ```
 
-Supports `set` params, `safe-mode`, `validate-only`, and exposes the final output — see [action/README.md](action/README.md).
+See [action/README.md](action/README.md).
 
-> **Optional**: install bubblewrap for full sandbox isolation (required by `code_interpreter` node)
-> - Ubuntu/Debian: `sudo apt install bubblewrap`
-> - macOS:        `brew install bubblewrap`
-> - Fedora:       `sudo dnf install bubblewrap`
+</details>
+
+**Try it in 60 seconds:**
 
 ```bash
-# 1. Environment self-check (zero-config, runs immediately)
-aflare doctor
+aflare doctor                      # environment self-check (zero-config)
+aflare run examples/content-processor.yaml   # read post.md → HTML → write post.html
+aflare init                        # configure an LLM (local Ollama or cloud provider)
 
-# 2. Zero-config example: read post.md → convert to HTML → write post.html
-aflare run examples/content-processor.yaml
+aflare create "monitor BTC price, alert via Telegram when > 70000"
+aflare run btc-monitor.yaml        # generate a workflow from keywords (add --ai for LLM generation)
 
-# 3. Configure an LLM (interactive wizard: local Ollama or cloud provider)
-aflare init
-
-# 4. Generate a workflow from keywords (no LLM needed, pure template match; add --ai for LLM-generated complex ones)
-aflare create "monitor BTC price every 10 minutes, alert via Telegram when > 70000"
-aflare run btc-monitor.yaml
-
-# 5. Interactive AI Agent chat (ReAct Agent)
-aflare chat
-# Or: aflare chat -p deepseek -m deepseek-chat
-
-# Daemon-mode Agent (stdin + scheduler fusion) + pluggable capabilities
-aflare agent -c reflection,planning,utility
+aflare chat                        # interactive ReAct Agent chat
 ```
 
-> Market data in generated monitoring workflows comes from public quote APIs (CoinGecko / Tencent) with possible delays — for personal research only, not investment advice.
+> Optional: install bubblewrap for full sandbox isolation (`code_interpreter` node) — `sudo apt install bubblewrap` / `brew install bubblewrap`.
+>
+> Market data in generated monitoring workflows comes from public quote APIs — for personal research only, not investment advice.
 
 ---
 
-## Project Status
+## What is aflare?
 
-aflare is currently at **v0.11.0**, with **local users as the first target** — local data lives on your machine (files, note libraries, local SQLite databases), and aflare is the deterministic and secure control layer between AI and that data.
+A **local-first automation Agent** and a **deterministic workflow engine** in a single binary. You explicitly grant access to your data (directories, note libraries, local databases), and the AI works deterministically inside the permission ceiling you define.
 
-- **Shipped**: core Runtime (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking, CI-verified); v0.9 Chinese national cryptography (SM3 audit chain / SM4 secrets, opt-in) and one-command MCP install; v0.10 MemHarness memory critique-reconstruction, step-level typed output contracts, watermark deployment tracing (plus a security self-audit round); v0.11 **Agent interconnection & commanding** (CLI/A2A dual channel — aflare directs and supervises other agents), **Connector API** (named data-source connections), webhook event-driven entry, daemon stability infrastructure (soak + nightly)
-- **Recently landed on main**: the **aflare GitHub Action** (run workflows in CI) and **real-world workflow packs** — industrial monitoring included (OpenFOAM divergence watchdog, similarity-RAG incident triage); see [Real-World Workflow Packs](#real-world-workflow-packs)
-- **Boundaries**: local inference on domestic chips (Ascend/Cambricon/Hygon) goes through OpenAI-compatible endpoints (no native SDK), still improving; hardware device control (robots etc.) is not built in — integrate via custom nodes or MCP Server, data stays on your intranet
+```
+aflare chat / agent          aflare create
+  ReAct Agent                  → YAML workflow
+  (conversational)               ↓
+       ↓                    DAG scheduled execution
+  node tools                (WAL recovery · Saga · retry · audit)
+```
+
+Currently at **v0.11.0**, targeting local users first — local data lives on your machine, aflare is the deterministic and secure control layer between AI and that data.
 
 ---
 
-## What is this?
-
-aflare is both a **local-first automation Agent** and a **deterministic workflow execution engine** — and above all, **the deterministic and secure control layer between AI and your data**: you explicitly grant access to specific data (directories, note libraries, local databases), and the AI works deterministically inside the permission ceiling you define. Two modes, one core:
-
-```
-Conversational Agent             Declarative Workflow
-─────────────────              ─────────────────
-aflare chat                    aflare create
-  ↓                              ↓
-ReAct Agent reasoning          Keyword matching generation
-  ↓                              ↓
-Invoke node tools               YAML workflow
-  ↓                              ↓
-Tool execution → Reflect →      DAG scheduled execution
-  Optimize
-```
-
-**Agent Mode**: Launch via `aflare chat` or `aflare agent`. Built-in ReAct reasoning loop with 6 pluggable capability types (reflection, human-in-the-loop, utility-driven optimization, memory, etc.).
-
-**Workflow Mode**: `aflare create` converts descriptions into YAML workflows via keyword matching. The YAML defines exactly what each step does, its dependencies, and failure handling. The Runtime handles DAG scheduling, WAL crash recovery, Saga transaction compensation, circuit breaking, and auditing — every operation is traceable, replayable, and verifiable.
-
----
-
-## Three-Layer Model
-
-```
-L0: Agent        —  "Watch my OpenFOAM run; alert me if it diverges"
-                    ├── ReAct reasoning loop (think → call tool → observe → answer)
-                    └── 6 pluggable capabilities (reflection/HITL/utility etc.)
-                       ↓
-L1: Workflow     —  YAML deterministic workflow (schedule → read_log → condition → notify)
-                       ↓
-L2: Runtime      —  Execution layer
-                    ├── DAG parallel scheduling
-                    ├── Checkpoint / Resume (WAL crash recovery)
-                    ├── Session persistence (cross-turn context)
-                    ├── Saga transaction compensation
-                    ├── Idempotency
-                    ├── Retry / Rate Limit / Circuit Breaker
-                    ├── HMAC audit chain
-                    └── Secret redaction
-```
-
----
-
-## Project Strengths
-
-aflare puts **local users first** (intranet / enterprise scenarios are equally supported), serving anyone sensitive about data privacy and security. Core strengths:
-
-**Local data connectors (Connector API)** — Explicitly authorize local directories, note libraries and local databases via `aflare connector add`; workflows reference only the connector name. `files` / `notes` directory connectors apply the workdir sandbox's containment rules (no absolute paths, no traversal, unconditional symlink-escape rejection, extension allowlists, byte limits) to roots you grant like `~/notes` or `~/Documents`; `sqlite` / `mysql` / `postgres` database connectors keep credentials exclusively in the secrets store / environment variables, with SQLite read-only defense-in-depth (DSN forced to `mode=ro`). Permission ceilings declared on the connector (read-only, rows, bytes) can only be tightened by nodes, never loosened — you define the AI's capability boundary.
-
-**Local-first, data stays on local disk** — Single binary with zero runtime deps, runs in ~10–30MB RAM; workflows, execution history, memory and secrets all stay on local disk; API keys are injected via environment variables or the OS keyring, never written in cleartext to `config.yaml`; fully offline-capable (offline install, `aflare doctor --offline`, WebUI Mermaid offline fallback).
-
-**Connect your own LLM** — Ollama / vLLM / LM Studio / local DeepSeek / any OpenAI-compatible endpoint, with loopback addresses (127.0.0.1 / localhost) requiring no API key. With a local LLM, the LLM drives intent understanding and dynamic workflow generation (`--ai` / `chat`); without one, keyword matching falls back so offline use still works.
-
-**Connect your own databases and knowledge bases** — SQL Query node connects directly to your database, RAG node + vector store + document parsing hook into your knowledge base, MCP protocol bridges external services, and custom nodes let you write any integration in Go. Data is sent only to the endpoints you explicitly configure (your LLM, your databases) — no other network calls; there is no usage telemetry, and OTel tracing stays inert until you configure an endpoint. Your data stays yours.
-
-**Deterministic execution guarantees** — YAML declarative workflows: every step's action, dependencies and failure handling are fully determined. DAG parallel scheduling (TLA+ formally verified), WAL crash recovery + checkpoint (`--resume` from the interruption point), cross-turn session persistence, Saga transactional compensation, idempotency (Idempotency-Key + cross-process lock), retry / rate limit / circuit breaker. Every operation is traceable, replayable, verifiable.
-
-**Dual Agent + Workflow mode** — Conversational Agent (`aflare chat`, ReAct reasoning loop) and daemon Agent (`aflare agent`, multi-source fusion of stdin + scheduled tasks + file watching) share one core; 6 pluggable capabilities (reflection / human-in-loop / utility-driven / memory / planning / workflow); an Agent can degrade into a deterministic workflow, combining flexibility with determinism.
-
-**Security & compliance** — HMAC hash-chain audit log (tamper-evident), AES-GCM encryption + PBKDF2 (600K iterations), automatic secret redaction (10+ patterns: AWS/GitHub/JWT/private keys), SSRF / path-traversal / command-injection whitelisting, outbound-data anomaly monitoring + automatic circuit-breaker isolation, four security levels (L0-L3) tightened on demand.
-
-**One-command onboarding, smooth offline** — `aflare doctor` environment self-check, `aflare init` interactive setup wizard, smart unknown-command hints (did-you-mean), zero-config examples ready to run immediately.
-
-**Extensible ecosystem** — Custom nodes (Go), MCP Server / Client (`aflare mcp install` for built-in community servers), plugin system (community `.so`), and a [GitHub Action](action/README.md) running workflows in CI with checksum-verified binary install.
-
-**Engineering quality** — Expression engine (bytecode IR + vectorized batch evaluation), Prometheus metrics endpoint, CI dual-architecture verification (x86-64 + ARM64), domestic-chip local inference via OpenAI-compatible endpoints (Ascend / Cambricon / Hygon).
-
----
-
-## Core Capabilities
-
-### Feature Matrix
-
-| Feature | Status | Verification |
-|---------|--------|-------------|
-| **ReAct Agent Chat** (`aflare chat`) | ✅ | Tested |
-| **Daemon-mode Agent** (`aflare agent`) | ✅ | Tested |
-| **Agent Interconnection & Commanding** (`@agent` real delegation / `cli_agent` / `a2a_agent` nodes) | ✅ | Tested |
-| **6 Pluggable Capabilities** (reflection/HITL/utility etc.) | ✅ | Tested |
-| **Multi-source Input Fusion** (stdin + scheduler + filewatch) | ✅ | Tested |
-| DAG Parallel Scheduling | ✅ | Tested + TLA+ formal verification |
-| WAL Crash Recovery + Session Persistence | ✅ | Tested |
-| Saga Transaction Compensation | ✅ | Tested |
-| Idempotency | ✅ | Tested |
-| Retry / Rate Limit / Circuit Breaker | ✅ | Tested |
-| HMAC Audit Chain | ✅ | Tested |
-| Secret Redaction | ✅ | Tested |
-| Expression Engine (bytecode IR + vectorized) | ✅ | Tested |
-| Keyword-based Workflow Generation | ✅ | Tested |
-| MCP Protocol Support (Server/Client) | ✅ | Tested |
-| **MemHarness Memory Critique-Reconstruction** (`harness_search` + session critique injection) | ✅ | Tested |
-| **Connector API** (`files`/`notes`/`sqlite`/`mysql`/`postgres` named connectors, credential isolation + permission ceilings + root containment) | ✅ | Tested |
-| **Step-level Output Contracts** (`output_schema`) | ✅ | Tested |
-| **Bounded Preview Inputs** (`preview_input`, 16KiB) | ✅ | Tested |
-| LLM Nodes (20+ built-in providers, any OpenAI-compatible model usable) | ✅ | Tested |
-| Security Levels (L0-L3) | ✅ | Tested |
-
-> See [Experimental](#experimental) below for experimental features.
-
-### Agent Capabilities (Conversational + Daemon)
-
-- **ReAct Reasoning Loop** — Think → Call Tool → Observe → Answer, with native function calling and JSON fallback
-- **Unified Event Loop** — Conversational (`aflare chat`) and daemon (`aflare agent`) share the same `AgentLoop` core, supporting stdin / scheduler / filewatch multi-source input fusion
-- **6 Pluggable Capabilities** — Enable on demand, mapping the complete Agent type taxonomy:
-
-| Capability | Type | Description |
-|------------|------|-------------|
-| `reflection` | Self-Critique | Auto-evaluate output quality after each turn, trigger self-correction |
-| `human-in-loop` | Human-in-the-Loop | Pause at critical decisions, request human confirmation |
-| `utility` | Utility-Driven | 6-dimension scoring (correctness/completeness/efficiency/safety/clarity/actionability), optimize decisions |
-| `memory` | Stateful | Cross-session long-term memory + MemHarness critique injection: memories carry source-state annotations (recorded date/category), auto-dropped after 30 days unused, and the model judges applicability before use |
-| `planning` | Planning | Generate plans before acting, execute step by step |
-| `workflow` | Workflow/Pipeline | Prioritize existing templates, stable and predictable |
-
-### Agent Interconnection & Commanding (aflare as the supervisor)
-
-aflare does not embed itself into other agents as a skill / plugin — it's the other way around: **once you install aflare, aflare directs and supervises other agents**. Two interconnection channels:
-
-- **CLI channel** — run local agent CLIs (`codex` / `claude` / `gemini` built-in presets, or any generic CLI) as managed subprocesses: argument whitelist validation, timeout control, output capture
-- **A2A channel** — connect remote agents via the [A2A protocol](https://a2a-protocol.org/): Agent Card auto-discovery, task submission, status polling, Bearer auth (keys via environment variables, never on disk)
-
-**Register external agents** (`~/.config/aflare/config.yaml`):
-
-```yaml
-agents:
-  codex:                      # built-in preset, works out of the box
-    driver: cli
-    description: Code implementation & engineering tasks
-  research-a2a:               # any A2A remote agent
-    driver: a2a
-    url: http://127.0.0.1:8080/
-    api_key_env: MY_AGENT_KEY # Bearer token read from this env var
-    description: Deep research
-  my-tool:                    # any generic CLI
-    driver: cli
-    profile: generic
-    binary: /usr/local/bin/my-agent
-    args: ["--json"]
-```
-
-```bash
-aflare agent list    # view registered, commandable external agents
-```
-
-**Commanding modes** (all supervised):
-
-1. **Real delegation via the supervisor node** — reference registered agents with the `@` prefix in `specialists`; aflare uses the LLM to plan subtasks, delegate in parallel (`max_parallel` backpressure, default 4 / cap 16), and aggregate results:
-
-```yaml
-- id: orchestrate
-  node: supervisor
-  params:
-    specialists: "@codex,@research-a2a"   # mix CLI and A2A agents
-    max_parallel: "2"                      # backpressure: delegation concurrency cap
-```
-
-2. **`cli_agent` / `a2a_agent` nodes** — single-step delegation inside workflows: `cli_agent` supports `model` / `sandbox` / `approval_policy` / `max_turns` / `timeout`, `a2a_agent` supports `agent` / `url` / `api_key_env` / `timeout`
-3. **Failure isolation** — a single agent failure only records that result, never sinking the whole batch; A2A polling auto-retries transient 5xx/network jitter (the submit stage retries only "undelivered" connection errors, avoiding duplicate execution)
-
-> Security constraints: every delegation passes a fail-closed audit hook (audit failure refuses execution), prompt length caps, hard timeout bounds; CLI agent prompts are always passed as a single argv argument, never participating in flag parsing — no command injection.
-
-### Runtime Guarantees (Deterministic Execution)
-- **DAG Parallel Scheduling** — topological sort dependency scheduling, independent steps run concurrently
-- **WAL Crash Recovery + Session Persistence** — append-only persistence + CRC32, `--resume` recovers from interruption; Session preserves context across turns
-- **Saga Transaction Compensation** — multi-step write failures auto-rolled-back in reverse
-- **Idempotency** — Idempotency-Key + atomic placeholder + cross-process lock, prevents duplicate execution
-- **Retry / Rate Limit / Circuit Breaker** — exponential backoff + token bucket + breaker state machine
-
-### Security & Compliance
-- HMAC hash-chain audit log (tamper-evident)
-- AES-GCM encryption + PBKDF2 (600K iterations)
-- Auto secret redaction (10+ patterns: AWS/GitHub/JWT/private keys)
-- SSRF protection / Path Traversal / Command Injection whitelist
-- Outbound data volume anomaly monitor + circuit breaker auto-isolation
-
-### Workflow Generation
-- Keyword-based YAML workflow generation (`aflare create`, see [`generator.go`](internal/workflow/generator.go))
-
-### LLM Nodes (call LLM APIs within workflows)
-- 20+ built-in providers (OpenAI / DeepSeek / Qwen / GLM / Kimi / Anthropic / Gemini / Mistral / Ollama, etc.), any OpenAI-compatible model usable
-- Fully offline capable (Ollama local LLM)
-- LLM smart routing (EWMA latency prediction + Pareto cost sorting)
-
-### MCP Protocol Support
-- Built-in MCP Server, connectable by any MCP client (Claude, VS Code, Cursor, etc.)
-- Provides workflow execution, validation, node query, code graph, and other tools
-- Built-in MCP Client, workflows can call external MCP services directly
-- `aflare mcp install <name>` one-command install of 8 built-in community servers
-- Expose aflare tools to the DSH agent via the [DeepSeek Harness (DSH) integration](docs/dsh.md) (zero-code MCP bridging, or the native [Cordis plugin](integrations/dsh-plugin))
-
-### Connector API (local-data track)
-
-A named connector = a data source you explicitly authorize + a policy ceiling. Workflows reference only the connector name; credentials never enter YAML:
-
-```bash
-# Grant a notes directory (read-only by default, symlink escape unconditionally rejected)
-aflare connector add my-notes --type notes --root ~/notes
-
-# Grant a documents directory (md/txt only, writes explicitly enabled)
-aflare connector add my-docs --type files --root ~/Documents --include '*.md' --include '*.txt' --writable
-
-# Local SQLite library (DSN forced to mode=ro)
-aflare connector add my-library --type sqlite --database ~/calibre/metadata.db
-
-# Remote database (credentials in the secrets store, spec holds only a reference)
-aflare connector add my-pg --type postgres --host db.example.com --database analytics \
-  --username readonly --credential-group connectors
-```
-
-- **Five connector types**: `files` / `notes` (directories, used by `file_read`/`file_write`/`files_list` nodes) + `sqlite` / `mysql` / `postgres` (databases, used by the `sql_query` node)
-- **Credential isolation**: workflows reference only the connector name; credentials live exclusively in the secrets store (`aflare secrets set`) or environment variables
-- **Permission ceilings**: connectors declare read-only / max_rows / max_bytes / extension allowlists / timeouts — node parameters can only tighten, never loosen
-- **Root containment**: the workdir sandbox's rules (no absolute paths, no traversal) apply to authorized roots, with **unconditional** symlink-escape rejection; SQLite read-only defense-in-depth
-- Full design at [docs/connector-api.md](docs/connector-api.md)
-
-### Memory Critique-Reconstruction (MemHarness mode)
-- memory node `harness_search` operation: retrieves candidates with full source state (type/level/confidence/recorded-at/score) and emits a self-contained critique prompt; the LLM critique (keep/rewrite/discard) runs as an explicit, retryable workflow step, outputting `<EMPTY>` instead of inventing when nothing applies
-- Agent session injection runs a deterministic critique: stale never-reused memories are dropped, survivors injected with source-state annotations
-- Full example at `examples/real-world/memharness-critique/`
-
-### Step-level Typed Output Contracts & Bounded Preview
-- `output_schema`: any node's output is validated against a JSON Schema (draft-07 subset); violations fail the step with the first violation location and flow into retry / on_error / capture_error
-- `preview_input: true`: inputs over 16KiB are replaced by a bounded head/tail preview while the full value stays in workflow state and is passed untouched to other steps — LLMs see samples, deterministic nodes operate on complete data
-
-### Real-World Workflow Packs
-
-Ready-to-run scenario workflows under [`examples/real-world/`](examples/real-world/) — each pack is a self-contained directory with the workflow YAML, sample data, and a README:
-
-- **Industrial monitoring** — [`openfoam-watchdog`](examples/real-world/openfoam-watchdog/) watches a running CFD simulation for divergence: deterministic regex detection over the solver log, if/else branching, an LLM triage note that degrades via fallback — alerts never depend on model availability; [`log-similarity-rag`](examples/real-world/log-similarity-rag/) retrieves the most similar historical incidents for a new failure (keyword-overlap matching offline, or semantic matching through any OpenAI-compatible embeddings endpoint such as vLLM serving WeMM-Embedding) and has the LLM triage cite real precedents instead of reasoning from zero; [`log-anomaly-detector`](examples/real-world/log-anomaly-detector/) filters error lines and branches on critical patterns
-- **DevOps / CI** — nightly CI fixing, PR review gating, code review pipelines (pairs naturally with the [GitHub Action](action/README.md))
-- **Research & knowledge** — multi-agent research, knowledge curation, MemHarness memory critique
-- **Batch processing & more** — URL batch processing, document extraction, TDD loops
-
-The industrial packs demonstrate the core pattern for production AI: **deterministic detection first, LLM prose second, fallback on every LLM step** — the alert path survives model outages, and every number in the output comes from deterministic extraction, not model imagination.
-
-### Engineering
-- Expression engine: bytecode IR + vectorized batch evaluation
-- DAG scheduler formally verified with TLA+ (spec at [`docs/tla/dag_scheduler.tla`](docs/tla/dag_scheduler.tla), bounded model-checking via `dag_formal_test.go`)
-- Prometheus metrics endpoint
-- Single binary, zero runtime dependencies
-- CI validates both architectures (x86-64 + ARM64)
-
-### Experimental
-- Local inference services on Ascend / Cambricon / Hygon chips via OpenAI-compatible endpoints (no native SDK integration)
-- Hardware device control via custom nodes / MCP Server (no built-in drivers, avoiding vendor lock-in)
-
----
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────┐
-│                    aflare                             │
-│                                                       │
-│  ┌──────────────────────────────────────────────────┐ │
-│  │ Agent Layer (L0)                                  │ │
-│  │                                                    │ │
-│  │  aflare chat / aflare agent                       │ │
-│  │  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │ │
-│  │  │ ReAct    │  │ Node     │  │ 6 Pluggable    │  │ │
-│  │  │ Reasoning│  │ Tools    │  │ Capabilities   │  │ │
-│  │  └──────────┘  └──────────┘  └────────────────┘  │ │
-│  │                                                    │ │
-│  │  ┌──────────────────────────────────────────────┐ │ │
-│  │  │ AgentLoop Unified Event Loop                   │ │ │
-│  │  │ stdin · scheduler · filewatch · MCP · HTTP   │ │ │
-│  │  └──────────────────────────────────────────────┘ │ │
-│  └──────────────────────────────────────────────────┘ │
-│                        ↓                               │
-│  ┌──────────┐   ┌──────────┐   ┌──────────────────┐  │
-│  │ Intent   │──▶│ Workflow │──▶│ Deterministic     │  │
-│  │ (desc.)  │   │ (YAML)   │   │ Executor          │  │
-│  └──────────┘   └──────────┘   │                    │  │
-│                                 │ • DAG Scheduler   │  │
-│                                 │ • WAL / Checkpoint│  │
-│                                 │ • Session Persist │  │
-│                                 │ • Saga / Retry    │  │
-│                                 │ • Circuit Breaker │  │
-│                                 │ • Audit / HMAC    │  │
-│                                 └──────────────────┘  │
-│                                                       │
-│  ┌──────────────────────────────────────────────────┐ │
-│  │ Execution Targets                                 │ │
-│  │ Software (API/Web/DB/Files)                       │ │
-│  │ External devices (custom nodes/MCP, experimental) │ │
-│  └──────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────┘
-```
-
----
-
-## Roadmap
-
-| Version | Status | Focus |
-|---------|--------|-------|
-| v0.6 | Done | Agent memory infrastructure, voice AI toolchain, WAL persistence, TLA+ verification |
-| v0.7 | Done | Financial scenario enhancement (Saga / Idempotency / Audit chain), ReAct Agent chat, 6 pluggable capabilities, Agent unified event loop |
-| v0.8 | Done | Offline/intranet-first experience, privacy/security hardening, smooth local-LLM onboarding, CLI UX improvements (smart command hints), CI speedup |
-| **v0.8.1** | **Done** | Release audit fixes: CN install 404, `aflare mcp` subcommand, execute allowlist error pinpointing, govulncheck zero vulns |
-| **v0.9** | **Done** | National cryptography support (SM3/SM4, opt-in), audit-chain security hardening (random HMAC key, cross-process lock, bundle truncation-forgery defense), `aflare mcp install`, supply-chain scenario pack, loong64 |
-| **v0.10** | **Done** | MemHarness memory critique-reconstruction, step-level output contracts & bounded preview, watermark deployment tracing, security self-audit fixes |
-| **v0.11** | **Done** | **Agent interconnection & commanding** (CLI/A2A dual channel, supervisor real delegation, backpressure & transient retries), **Connector API** (named data-source connections), webhook event-driven entry (GitHub HMAC signatures), daemon stability infrastructure (soak + nightly + goleak), daemon signal deadlock fix |
-| **main** | **In progress** | GitHub Action for CI, real-world workflow packs (industrial monitoring: OpenFOAM watchdog + similarity-RAG triage), Agent interconnection deepening (more channels & supervision policies), personal note-app connectors, domestic chip support refinement |
-| v1.0 | Planned | Stable API, LTS |
-
-See [CHANGELOG.md](CHANGELOG.md) for details.
+## Key Features
+
+- **Local-first, data stays local** — single binary, zero runtime deps, ~10–30MB RAM; workflows, history, memory and secrets all stay on local disk; fully offline-capable; no usage telemetry.
+- **Connect your own LLM** — Ollama / vLLM / LM Studio / any OpenAI-compatible endpoint; loopback needs no API key; without an LLM, keyword matching keeps everything working offline.
+- **Local data connectors** — named, explicitly-authorized connectors for directories and databases (`files` / `notes` / `sqlite` / `mysql` / `postgres`); credentials live only in the secrets store, permission ceilings can be tightened but never loosened. See [Connector API](docs/connector-api.md).
+- **Deterministic runtime** — DAG parallel scheduling (TLA+ formally verified), WAL crash recovery + `--resume`, Saga transaction compensation, idempotency, retry / rate limit / circuit breaker. Every operation is traceable, replayable, verifiable.
+- **Dual Agent + Workflow mode** — conversational ReAct Agent (`aflare chat`) and daemon Agent (`aflare agent`) share one core; 6 pluggable capabilities (reflection / human-in-the-loop / utility / memory / planning / workflow).
+- **Agent interconnection & commanding** — aflare directs and supervises other agents: CLI channel (`codex` / `claude` / `gemini` or any generic CLI) and A2A protocol channel, with real delegation via the `supervisor` node and failure isolation per agent.
+- **Security built in** — HMAC tamper-evident audit chain, AES-GCM encrypted secrets, automatic secret redaction, SSRF / path-traversal / command-injection defenses, outbound anomaly monitoring + auto circuit-break, four security levels (L0–L3).
+- **Extensible ecosystem** — MCP Server / Client, custom nodes in Go, community plugins, [GitHub Action](action/README.md) for CI, 20+ built-in LLM providers.
+- **Ready-to-run examples** — real-world workflow packs under [`examples/real-world/`](examples/real-world/): industrial monitoring (OpenFOAM divergence watchdog, similarity-RAG incident triage), DevOps CI pipelines, research, batch processing.
 
 ---
 
 ## Security
 
-aflare has built-in multi-layer security with four security levels (`--security-level`):
-
-| Level | Description |
-|-------|-------------|
-| **L0** | Relaxed: all nodes allowed, sandbox degradation only warns |
-| **L1** | Standard: warn on sandbox degradation, heuristic blocking |
-| **L2** | Strict: refuse code_interpreter execution without bwrap sandbox, command whitelist validation |
-| **L3** | Maximum: disable code_interpreter nodes, strictest security policy |
-
-Additional protections: SSRF protection, Path Traversal defense, Command Injection whitelist, AES-GCM encryption, Secret redaction, HMAC audit chain, circuit breakers, outbound monitoring. CI auto-runs `gofmt` / `go vet` / `gosec` / `govulncheck`.
+Four security levels (`--security-level`): **L0** relaxed → **L3** maximum (L2 refuses unsandboxed `code_interpreter`; L3 disables it). CI runs `gofmt` / `go vet` / `gosec` / `govulncheck` on every PR.
 
 [Security Guide →](SECURITY.md)
 
@@ -444,15 +127,13 @@ Additional protections: SSRF protection, Path Traversal defense, Command Injecti
 - [Web UI](docs/webui.md) · [Visualizer](docs/visualizer.md) · [Custom Nodes](docs/custom-nodes.md)
 - [API Reference](docs/api.md) · [Nodes Reference](docs/nodes-reference.md)
 - [Deployment](docs/deployment.md) · [Docker](docs/docker.md) · [Multi-Tenancy](docs/tenants.md)
-- [Troubleshooting](docs/troubleshooting.md)
+- [Troubleshooting](docs/troubleshooting.md) · [Changelog](CHANGELOG.md)
 
 ---
 
 ## Contributing
 
-We welcome contributions!
-
-[Contributing →](CONTRIBUTING.md)
+We welcome contributions! [Contributing →](CONTRIBUTING.md)
 
 ---
 

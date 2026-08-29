@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/alib8b8/aflare/internal/history"
+	"github.com/alib8b8/aflare/internal/i18n"
 	"github.com/alib8b8/aflare/internal/secrets"
 )
 
@@ -83,10 +84,10 @@ func TestCheckCryptoCompat_AllDefault(t *testing.T) {
 	if len(problems) != 0 {
 		t.Fatalf("expected no problems on default data, got %d: %+v", len(problems), problems)
 	}
-	if !strings.Contains(out, "2 条记录，全部为 SHA-256") {
+	if !strings.Contains(out, i18n.T("doctor.crypto.audit_sha256", 2)) {
 		t.Errorf("output should report 2 sha256 records, got:\n%s", out)
 	}
-	if !strings.Contains(out, "尚无 secrets 存储") {
+	if !strings.Contains(out, i18n.T("doctor.crypto.secrets_none")) {
 		t.Errorf("output should report no secrets store, got:\n%s", out)
 	}
 }
@@ -105,10 +106,10 @@ func TestCheckCryptoCompat_SM3RecordsFlagsProblem(t *testing.T) {
 	if len(problems) != 1 {
 		t.Fatalf("expected 1 problem for SM3 records, got %d: %+v", len(problems), problems)
 	}
-	if problems[0].category != "兼容性" || !strings.Contains(problems[0].desc, "SM3") {
+	if problems[0].category != i18n.T("doctor.cat.compat") || !strings.Contains(problems[0].desc, "SM3") {
 		t.Errorf("unexpected problem: %+v", problems[0])
 	}
-	if !strings.Contains(out, "SM3 签名") || !strings.Contains(out, "⚠") {
+	if !strings.Contains(out, "SM3") || !strings.Contains(out, "⚠") {
 		t.Errorf("output should flag SM3 and warn about the env var, got:\n%s", out)
 	}
 }

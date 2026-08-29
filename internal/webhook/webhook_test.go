@@ -294,28 +294,26 @@ func TestWebhookServer_WorkflowNotFound(t *testing.T) {
 	ts := httptest.NewServer(srv.handler())
 	defer ts.Close()
 
+	// A trigger for a workflow that does not exist is rejected
+	// synchronously with 404 — the request can never succeed, so
+	// accepting it as a task (202) would only force the client to
+	// poll the status endpoint to discover the same failure.
 	resp, err := http.Post(ts.URL+"/webhook/missing", "application/json", strings.NewReader("{}"))
 	if err != nil {
 		t.Fatalf("webhook request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusAccepted {
-		t.Errorf("expected status 202, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status 404, got %d", resp.StatusCode)
 	}
 
-	var triggerResp map[string]string
-	if err := json.NewDecoder(resp.Body).Decode(&triggerResp); err != nil {
-		t.Fatalf("failed to decode trigger response: %v", err)
-	}
-	taskID := triggerResp["task_id"]
-
-	task := waitForTask(t, srv, taskID)
-	if task.Status != TaskFailed {
-		t.Errorf("expected task failed, got %s", task.Status)
-	}
-	if task.Error == "" {
-		t.Error("expected error message for missing workflow")
+	// No task should have been recorded for the rejected trigger.
+	srv.mu.RLock()
+	count := len(srv.tasks)
+	srv.mu.RUnlock()
+	if count != 0 {
+		t.Errorf("expected 0 tasks after rejected trigger, got %d", count)
 	}
 }
 
