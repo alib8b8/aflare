@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -362,6 +363,259 @@ func TestContains(t *testing.T) {
 	}
 	if contains(slice, 4) {
 		t.Error("expected not contains 4")
+	}
+}
+
+// ─── Retry tasks ────────────────────────────────────────────────────────────
+
+// forceDue makes a registered task due immediately so the next 1s scheduler
+// tick fires it without waiting for the minute boundary.
+func forceDue(s *Scheduler, id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if task, ok := s.tasks[id]; ok {
+		task.nextRun = time.Now().Add(-time.Second)
+	}
+}
+
+func TestAddRetryingTask_Validation(t *testing.T) {
+	s := New()
+
+	if err := s.AddRetryingTask("nil", "* * * * *", nil, RetryPolicy{}); err == nil {
+		t.Error("expected error for nil function")
+	}
+
+	if err := s.AddRetryingTask("bad", "invalid", func(context.Context) error { return nil }, RetryPolicy{}); err == nil {
+		t.Error("expected error for invalid cron")
+	}
+
+	// Duplicate ID (against both AddTask and AddRetryingTask).
+	_ = s.AddTask("dup", "* * * * *", func(context.Context) {})
+	if err := s.AddRetryingTask("dup", "* * * * *", func(context.Context) error { return nil }, RetryPolicy{}); err == nil {
+		t.Error("expected error for duplicate id")
+	}
+
+	// Policy clamping: negative → 0, over-cap → MaxTaskRetries, delay ≤0 → default.
+	err := s.AddRetryingTask("clamp", "* * * * *", func(context.Context) error { return nil },
+		RetryPolicy{MaxRetries: -5, Delay: -time.Second})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	s.mu.RLock()
+	task := s.tasks["clamp"]
+	s.mu.RUnlock()
+	if task.Retry.MaxRetries != 0 {
+		t.Errorf("MaxRetries = %d, want 0", task.Retry.MaxRetries)
+	}
+	if task.Retry.Delay != DefaultTaskRetryDelay {
+		t.Errorf("Delay = %v, want default %v", task.Retry.Delay, DefaultTaskRetryDelay)
+	}
+
+	err = s.AddRetryingTask("clamp2", "* * * * *", func(context.Context) error { return nil },
+		RetryPolicy{MaxRetries: MaxTaskRetries + 100, Delay: time.Millisecond})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	s.mu.RLock()
+	task2 := s.tasks["clamp2"]
+	s.mu.RUnlock()
+	if task2.Retry.MaxRetries != MaxTaskRetries {
+		t.Errorf("MaxRetries = %d, want clamp to %d", task2.Retry.MaxRetries, MaxTaskRetries)
+	}
+}
+
+func TestAddRetryingTask_FailsThenSucceeds(t *testing.T) {
+	s := New()
+
+	var calls atomic.Int64
+	err := s.AddRetryingTask("flaky", "* * * * *", func(context.Context) error {
+		// Fail the first two attempts, succeed on the third.
+		if calls.Add(1) <= 2 {
+			return errors.New("transient failure")
+		}
+		return nil
+	}, RetryPolicy{MaxRetries: 3, Delay: time.Millisecond})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	forceDue(s, "flaky")
+	s.Start()
+	defer s.Stop()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if calls.Load() >= 3 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("task did not reach 3 attempts, got %d", calls.Load())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := calls.Load(); got != 3 {
+		t.Errorf("calls = %d, want exactly 3 (no retry after success)", got)
+	}
+}
+
+func TestAddRetryingTask_ExhaustsRetries(t *testing.T) {
+	s := New()
+
+	var calls atomic.Int64
+	err := s.AddRetryingTask("always-fails", "* * * * *", func(context.Context) error {
+		calls.Add(1)
+		return errors.New("permanent failure")
+	}, RetryPolicy{MaxRetries: 2, Delay: time.Millisecond})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	forceDue(s, "always-fails")
+	s.Start()
+	defer s.Stop()
+
+	// MaxRetries=2 → initial attempt + 2 retries = 3 calls total.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if calls.Load() >= 3 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("task did not reach 3 attempts, got %d", calls.Load())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	// Allow a grace period to catch a spurious 4th attempt.
+	time.Sleep(100 * time.Millisecond)
+	if got := calls.Load(); got != 3 {
+		t.Errorf("calls = %d, want 3 (MaxRetries=2 must stop after 3 attempts)", got)
+	}
+}
+
+func TestAddRetryingTask_NoRetryByDefault(t *testing.T) {
+	s := New()
+
+	var calls atomic.Int64
+	err := s.AddRetryingTask("once", "* * * * *", func(context.Context) error {
+		calls.Add(1)
+		return errors.New("failure is not retried")
+	}, RetryPolicy{}) // MaxRetries=0 → execute once, historical behaviour
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	forceDue(s, "once")
+	s.Start()
+	defer s.Stop()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if calls.Load() >= 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("task did not run, calls = %d", calls.Load())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if got := calls.Load(); got != 1 {
+		t.Errorf("calls = %d, want 1 (MaxRetries=0 must not retry)", got)
+	}
+}
+
+func TestAddRetryingTask_PanicIsRetried(t *testing.T) {
+	s := New()
+
+	var calls atomic.Int64
+	err := s.AddRetryingTask("panicky", "* * * * *", func(context.Context) error {
+		if calls.Add(1) == 1 {
+			panic("boom on first attempt")
+		}
+		return nil
+	}, RetryPolicy{MaxRetries: 2, Delay: time.Millisecond})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	forceDue(s, "panicky")
+	s.Start()
+	defer s.Stop()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if calls.Load() >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("task did not reach 2 attempts (panic not retried?), got %d", calls.Load())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if got := calls.Load(); got != 2 {
+		t.Errorf("calls = %d, want 2 (panic must be converted to a retryable failure)", got)
+	}
+}
+
+// TestAddRetryingTask_StopAbortsRetry verifies that scheduler shutdown aborts
+// the retry loop instead of blocking Stop() for the full backoff delay.
+func TestAddRetryingTask_StopAbortsRetry(t *testing.T) {
+	s := New()
+
+	var calls atomic.Int64
+	first := make(chan struct{})
+	err := s.AddRetryingTask("long-backoff", "* * * * *", func(context.Context) error {
+		if calls.Add(1) == 1 {
+			close(first)
+		}
+		return errors.New("keep failing")
+	}, RetryPolicy{MaxRetries: 5, Delay: 10 * time.Second}) // backoff >> Stop tolerance
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	forceDue(s, "long-backoff")
+	s.Start()
+
+	select {
+	case <-first:
+	case <-time.After(3 * time.Second):
+		t.Fatal("task did not start in time")
+	}
+
+	// Stop must return well before the 10s backoff elapses.
+	stopDone := make(chan struct{})
+	go func() {
+		s.Stop()
+		close(stopDone)
+	}()
+	select {
+	case <-stopDone:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Stop blocked on retry backoff instead of aborting")
+	}
+}
+
+func TestRetryDelay(t *testing.T) {
+	base := 100 * time.Millisecond
+	cases := []struct {
+		attempt int
+		want    time.Duration
+	}{
+		{0, 100 * time.Millisecond},
+		{1, 200 * time.Millisecond},
+		{2, 400 * time.Millisecond},
+		{3, 800 * time.Millisecond},
+	}
+	for _, tc := range cases {
+		if got := retryDelay(base, tc.attempt); got != tc.want {
+			t.Errorf("retryDelay(base, %d) = %v, want %v", tc.attempt, got, tc.want)
+		}
+	}
+	// Capped at MaxTaskRetryDelay for large attempts.
+	if got := retryDelay(MaxTaskRetryDelay, 5); got != MaxTaskRetryDelay {
+		t.Errorf("retryDelay(max, 5) = %v, want cap %v", got, MaxTaskRetryDelay)
 	}
 }
 

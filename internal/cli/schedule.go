@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -75,8 +76,10 @@ func HandleSchedule(args []string) error {
 func HandleScheduleAdd(args []string) error {
 	var cronExpr, taskID, wfPath, desc string
 	var autoParse string
+	var maxRetries int
+	var retryDelay string
 
-	if err := parseScheduleAddArgs(args, &cronExpr, &taskID, &wfPath, &desc, &autoParse); err != nil {
+	if err := parseScheduleAddArgs(args, &cronExpr, &taskID, &wfPath, &desc, &autoParse, &maxRetries, &retryDelay); err != nil {
 		return err
 	}
 
@@ -159,6 +162,8 @@ func HandleScheduleAdd(args []string) error {
 		Cron:         cronExpr,
 		WorkflowPath: wfPath,
 		Description:  desc,
+		MaxRetries:   maxRetries,
+		RetryDelay:   retryDelay,
 	})
 	if err := scheduler.SaveSchedules(path, entries); err != nil {
 		fmt.Printf("❌ Failed to save schedule: %v\n", err)
@@ -173,11 +178,18 @@ func HandleScheduleAdd(args []string) error {
 	if wfPath != "" {
 		fmt.Printf("   Workflow: %s\n", wfPath)
 	}
+	if maxRetries > 0 {
+		delay := retryDelay
+		if delay == "" {
+			delay = "30s"
+		}
+		fmt.Printf("   Retry:    up to %d attempts after failure (base delay %s, exponential)\n", maxRetries, delay)
+	}
 	return nil
 }
 
 // parseScheduleAddArgs parses the command-line arguments for schedule add.
-func parseScheduleAddArgs(args []string, cronExpr, taskID, wfPath, desc, autoParse *string) error {
+func parseScheduleAddArgs(args []string, cronExpr, taskID, wfPath, desc, autoParse *string, maxRetries *int, retryDelay *string) error {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--cron":
@@ -208,6 +220,30 @@ func parseScheduleAddArgs(args []string, cronExpr, taskID, wfPath, desc, autoPar
 			}
 			*autoParse = args[i+1]
 			i++
+		case "--retry":
+			if i+1 >= len(args) {
+				fmt.Println("❌ --retry requires a value (0-" + strconv.Itoa(scheduler.MaxTaskRetries) + ")")
+				return exitErr(1)
+			}
+			n, err := strconv.Atoi(args[i+1])
+			if err != nil || n < 0 || n > scheduler.MaxTaskRetries {
+				fmt.Printf("❌ --retry must be an integer between 0 and %d, got %q\n", scheduler.MaxTaskRetries, args[i+1])
+				return exitErr(1)
+			}
+			*maxRetries = n
+			i++
+		case "--retry-delay":
+			if i+1 >= len(args) {
+				fmt.Println("❌ --retry-delay requires a value (e.g. 30s, 1m)")
+				return exitErr(1)
+			}
+			d, err := time.ParseDuration(args[i+1])
+			if err != nil || d <= 0 || d > scheduler.MaxTaskRetryDelay {
+				fmt.Printf("❌ --retry-delay must be a positive duration at most %s, got %q\n", scheduler.MaxTaskRetryDelay, args[i+1])
+				return exitErr(1)
+			}
+			*retryDelay = args[i+1]
+			i++
 		case "--help", "-h":
 			PrintScheduleUsage()
 			return nil
@@ -221,6 +257,21 @@ func parseScheduleAddArgs(args []string, cronExpr, taskID, wfPath, desc, autoPar
 				*desc = strings.TrimPrefix(args[i], "--desc=")
 			case strings.HasPrefix(args[i], "--add="):
 				*autoParse = strings.TrimPrefix(args[i], "--add=")
+			case strings.HasPrefix(args[i], "--retry="):
+				n, err := strconv.Atoi(strings.TrimPrefix(args[i], "--retry="))
+				if err != nil || n < 0 || n > scheduler.MaxTaskRetries {
+					fmt.Printf("❌ --retry must be an integer between 0 and %d, got %q\n", scheduler.MaxTaskRetries, strings.TrimPrefix(args[i], "--retry="))
+					return exitErr(1)
+				}
+				*maxRetries = n
+			case strings.HasPrefix(args[i], "--retry-delay="):
+				v := strings.TrimPrefix(args[i], "--retry-delay=")
+				d, err := time.ParseDuration(v)
+				if err != nil || d <= 0 || d > scheduler.MaxTaskRetryDelay {
+					fmt.Printf("❌ --retry-delay must be a positive duration at most %s, got %q\n", scheduler.MaxTaskRetryDelay, v)
+					return exitErr(1)
+				}
+				*retryDelay = v
 			case !strings.HasPrefix(args[i], "-") && *wfPath == "":
 				*wfPath = args[i]
 			default:
@@ -319,16 +370,26 @@ func HandleScheduleStart() error {
 				fmt.Printf("❌ Failed to prepare workflow %q: %v\n", entry.WorkflowPath, err)
 				return exitErr(1)
 			}
-			taskFunc := func(ctx context.Context) {
-				if _, _, err := workflow.ExecuteWorkflow(ctx, wf, reg); err != nil {
+			taskFunc := func(ctx context.Context) error {
+				_, _, err := workflow.ExecuteWorkflow(ctx, wf, reg)
+				if err != nil {
 					log.Printf("scheduled workflow %q execution failed: %v", entry.ID, err)
 				}
+				return err
 			}
-			if err := sched.AddTask(entry.ID, entry.Cron, taskFunc); err != nil {
+			policy := scheduler.RetryPolicy{
+				MaxRetries: entry.MaxRetries,
+				Delay:      entry.RetryDelayDuration(),
+			}
+			if err := sched.AddRetryingTask(entry.ID, entry.Cron, taskFunc, policy); err != nil {
 				fmt.Printf("❌ Failed to add task %q: %v\n", entry.ID, err)
 				return exitErr(1)
 			}
-			fmt.Printf("📋 Loaded workflow task %q (%s -> %s)\n", entry.ID, entry.Cron, entry.WorkflowPath)
+			if entry.MaxRetries > 0 {
+				fmt.Printf("📋 Loaded workflow task %q (%s -> %s, retry ≤%d)\n", entry.ID, entry.Cron, entry.WorkflowPath, entry.MaxRetries)
+			} else {
+				fmt.Printf("📋 Loaded workflow task %q (%s -> %s)\n", entry.ID, entry.Cron, entry.WorkflowPath)
+			}
 		} else {
 			// Description-based task (placeholder — executed by agent daemon, not here)
 			// The standalone scheduler can't execute description-based tasks;
@@ -362,12 +423,16 @@ func PrintScheduleUsage() {
 	fmt.Println("\nSchedule tasks to run at specified times using cron expressions.")
 	fmt.Println("Supports both workflow-based and natural language description-based tasks.")
 	fmt.Println("\nCommands:")
-	fmt.Println("  add --cron \"<expr>\" [--id <id>] [--desc \"<task>\"] [<workflow.yaml>]")
+	fmt.Println("  add --cron \"<expr>\" [--id <id>] [--desc \"<task>\"] [--retry <n>] [--retry-delay <dur>] [<workflow.yaml>]")
 	fmt.Println("  add --add \"<natural language schedule>\"                     Auto-parse schedule")
 	fmt.Println("  list                                                         List all scheduled tasks")
 	fmt.Println("  remove <id>                                                  Remove a scheduled task")
 	fmt.Println("  start                                                        Start the scheduler (foreground)")
 	fmt.Println("  -h, --help                                                   Show this help message")
+	fmt.Println("\nRetry options (workflow tasks only):")
+	fmt.Println("  --retry <n>           Retry a failed workflow up to <n> extra times (0-" + strconv.Itoa(scheduler.MaxTaskRetries) + ", default 0)")
+	fmt.Println("  --retry-delay <dur>   Base backoff delay between retries (e.g. 30s, 1m; default 30s)")
+	fmt.Println("                        Retries back off exponentially: delay, 2×delay, 4×delay, ... capped at " + scheduler.MaxTaskRetryDelay.String())
 	fmt.Println("\nCron expression (5 fields): minute hour day-of-month month day-of-week")
 	fmt.Println("  e.g. \"0 9 * * *\"      - daily at 09:00")
 	fmt.Println("       \"*/15 * * * *\"   - every 15 minutes")
@@ -380,7 +445,7 @@ func PrintScheduleUsage() {
 	fmt.Println("  aflare schedule add --cron \"0 9 * * *\" my-workflow.yaml")
 	fmt.Println("  aflare schedule add --cron \"0 9 * * *\" --desc \"Check git repo status\"")
 	fmt.Println("  aflare schedule add --add \"每天9点检查git仓库状态\"")
-	fmt.Println("  aflare schedule add --id daily-report --cron \"0 9 * * *\" report.yaml")
+	fmt.Println("  aflare schedule add --id daily-report --cron \"0 9 * * *\" --retry 3 --retry-delay 1m report.yaml")
 	fmt.Println("  aflare schedule list")
 	fmt.Println("  aflare schedule remove daily-report")
 	fmt.Println("  aflare schedule start")

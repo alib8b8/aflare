@@ -19,8 +19,10 @@ package cli
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/alib8b8/aflare/internal/mcp"
@@ -38,11 +40,22 @@ func HandleMCP() error {
 
 // HandleMCPCommand dispatches `aflare mcp` subcommands. With no arguments it
 // starts the stdio MCP server, exactly matching the historical bare
-// `aflare mcp` / `--mcp-server` behavior.
+// `aflare mcp` / `--mcp-server` behavior. HTTP mode is selected by transport
+// flags: `aflare mcp --port 8082 [--host 127.0.0.1] [--token <token>]`.
 func HandleMCPCommand(args []string) error {
 	if len(args) == 0 {
 		return HandleMCP()
 	}
+
+	// Transport flags select HTTP mode before subcommand dispatch, so
+	// `aflare mcp --port 8082` works without a `serve` verb.
+	if port, host, token, rest, err := parseMCPTransportFlags(args); err != nil {
+		fmt.Fprintf(os.Stderr, "❌ %v\n", err)
+		return exitErr(1)
+	} else if port != "" {
+		return handleMCPServeHTTP(port, host, token, rest)
+	}
+
 	switch args[0] {
 	case "install":
 		return handleMCPInstall(args[1:])
@@ -53,12 +66,86 @@ func HandleMCPCommand(args []string) error {
 		return nil
 	default:
 		fmt.Fprintf(os.Stderr, "❌ 未知的 mcp 子命令：%s\n", args[0])
-		if suggestions := suggestSubcommand(args[0], []string{"install", "list"}); len(suggestions) > 0 {
+		if suggestions := suggestSubcommand(args[0], []string{"install", "list", "serve"}); len(suggestions) > 0 {
 			fmt.Fprintf(os.Stderr, "你是不是想输入：%s\n", strings.Join(suggestions, ", "))
 		}
 		fmt.Fprint(os.Stderr, mcpHelpText())
 		return exitErr(1)
 	}
+}
+
+// handleMCPServeHTTP starts the MCP server in HTTP mode. A token is required
+// (flag or AFLARE_MCP_TOKEN): an HTTP listener is a network surface, unlike
+// loopback stdio.
+func handleMCPServeHTTP(port, host, token string, rest []string) error {
+	if len(rest) > 0 {
+		fmt.Fprintf(os.Stderr, "❌ HTTP 模式不支持子命令：%s\n", strings.Join(rest, " "))
+		return exitErr(1)
+	}
+	if token == "" {
+		token = os.Getenv("AFLARE_MCP_TOKEN")
+	}
+	if token == "" {
+		fmt.Fprint(os.Stderr, "❌ HTTP 模式必须提供 token：--token <token> 或环境变量 AFLARE_MCP_TOKEN\n")
+		return exitErr(1)
+	}
+	if host == "" {
+		// Default to loopback: an empty host in JoinHostPort listens on all
+		// interfaces, which would silently expose the MCP server to the
+		// network. Opting into a wider bind must be explicit (--host 0.0.0.0).
+		host = "127.0.0.1"
+	}
+	addr := net.JoinHostPort(host, port)
+	fmt.Printf("🚀 MCP HTTP server listening on http://%s\n", addr)
+	fmt.Printf("   端点：POST /mcp（JSON-RPC 2.0）、POST /v1/call（简化调用）\n")
+	fmt.Printf("   认证：请求头 %s\n", "X-MCP-Token")
+	if err := mcp.ServeHTTPMode(addr, token); err != nil {
+		fmt.Fprintf(os.Stderr, "❌ MCP HTTP server exited: %v\n", err)
+		return exitErr(1)
+	}
+	return nil
+}
+
+// parseMCPTransportFlags scans args for HTTP-mode flags. It returns
+// (port, host, token, remainingArgs, error). port is empty when no transport
+// flag is present (stdio mode). Unknown flags are left in rest for the
+// subcommand dispatch to reject.
+func parseMCPTransportFlags(args []string) (port, host, token string, rest []string, err error) {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--port" || arg == "--host" || arg == "--token":
+			if i+1 >= len(args) {
+				return "", "", "", nil, fmt.Errorf("%s 需要一个值", arg)
+			}
+			value := args[i+1]
+			i++
+			switch arg {
+			case "--port":
+				if _, perr := strconv.Atoi(value); perr != nil {
+					return "", "", "", nil, fmt.Errorf("--port 必须是端口号，收到 %q", value)
+				}
+				port = value
+			case "--host":
+				host = value
+			case "--token":
+				token = value
+			}
+		case strings.HasPrefix(arg, "--port="):
+			value := strings.TrimPrefix(arg, "--port=")
+			if _, perr := strconv.Atoi(value); perr != nil {
+				return "", "", "", nil, fmt.Errorf("--port 必须是端口号，收到 %q", value)
+			}
+			port = value
+		case strings.HasPrefix(arg, "--host="):
+			host = strings.TrimPrefix(arg, "--host=")
+		case strings.HasPrefix(arg, "--token="):
+			token = strings.TrimPrefix(arg, "--token=")
+		default:
+			rest = append(rest, arg)
+		}
+	}
+	return port, host, token, rest, nil
 }
 
 // defaultMCPConfigPath returns the project-level .mcp.json in the current
@@ -195,10 +282,14 @@ func mcpHelpText() string {
 	b.WriteString("aflare mcp — MCP Server 模式与内置 server 安装\n\n")
 	b.WriteString("用法：\n")
 	b.WriteString("  aflare mcp                    以 stdio MCP Server 模式启动（等价 --mcp-server）\n")
+	b.WriteString("  aflare mcp --port 8082        以 HTTP 模式启动（需 --token 或 AFLARE_MCP_TOKEN）\n")
+	b.WriteString("                                HTTP 选项：--host <host>（默认 127.0.0.1）、--port、--token\n")
 	b.WriteString("  aflare mcp install <name>     安装内置 MCP server 到当前目录 .mcp.json\n")
 	b.WriteString("  aflare mcp list               列出内置 MCP server 及安装状态\n")
 	b.WriteString("  aflare mcp help               显示本帮助\n\n")
 	b.WriteString("说明：\n")
+	b.WriteString("  - HTTP 模式端点：POST /mcp（JSON-RPC 2.0）、POST /v1/call（简化调用 {\"name\",\"arguments\"}）\n")
+	b.WriteString("  - HTTP 模式认证：请求头 X-MCP-Token，token 为必填（HTTP 是网络暴露面，不支持免认证）\n")
 	b.WriteString("  - install 幂等：重复安装会提示已存在，不会覆盖 .mcp.json 中的本地修改\n")
 	b.WriteString("  - 内置 server 除 fetch（官方 Python 实现，需 uvx）外均经 npx -y 启动（需 Node.js）\n")
 	b.WriteString("  - 可用名称见 aflare mcp list；信创专用连接器见 mcp/xinchuang/README.md（规划中）\n")
