@@ -157,6 +157,128 @@ func TestHandleConnector_AddErrors(t *testing.T) {
 	}
 }
 
+func TestHandleConnector_AddHTTP(t *testing.T) {
+	connectorTestFile(t)
+	err := HandleConnector([]string{
+		"add", "my-api", "--type", "http",
+		"--base-url", "https://api.example.com/v1",
+		"--auth", "bearer", "--credential-group", "connectors",
+		"--timeout", "15",
+	})
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	reg, err := connector.LoadDefaultRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, ok := reg.Get("my-api")
+	if !ok {
+		t.Fatal("my-api not registered")
+	}
+	if !spec.IsHTTPConnector() {
+		t.Fatalf("expected http connector, got type %q", spec.Type)
+	}
+	if spec.BaseURL != "https://api.example.com/v1" {
+		t.Errorf("base_url mismatch: %q", spec.BaseURL)
+	}
+	if spec.AuthType != connector.AuthTypeBearer {
+		t.Errorf("auth_type mismatch: %q", spec.AuthType)
+	}
+	if !spec.IsReadOnly() {
+		t.Error("http connector must be read-only by default")
+	}
+	if spec.EffectiveTimeoutSec() != 15 {
+		t.Errorf("timeout mismatch: %d", spec.EffectiveTimeoutSec())
+	}
+	if spec.Credential == nil || spec.Credential.Kind != connector.CredentialKindSecret ||
+		spec.Credential.Group != "connectors" || spec.Credential.Key != "my-api" {
+		t.Errorf("credential ref mismatch: %+v", spec.Credential)
+	}
+
+	// list / show must render the http connector without errors.
+	if err := HandleConnector([]string{"list"}); err != nil {
+		t.Errorf("list: %v", err)
+	}
+	if err := HandleConnector([]string{"show", "my-api"}); err != nil {
+		t.Errorf("show: %v", err)
+	}
+}
+
+func TestHandleConnector_AddHTTPHeaderAuth(t *testing.T) {
+	connectorTestFile(t)
+	err := HandleConnector([]string{
+		"add", "keyed-api", "--type", "http", "--base-url", "https://api.example.com",
+		"--auth", "header", "--auth-header", "X-API-Key", "--credential-env", "API_KEY",
+		"--writable",
+	})
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	reg, err := connector.LoadDefaultRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, ok := reg.Get("keyed-api")
+	if !ok {
+		t.Fatal("keyed-api not registered")
+	}
+	if spec.AuthType != connector.AuthTypeHeader || spec.AuthHeader != "X-API-Key" {
+		t.Errorf("auth mismatch: %q / %q", spec.AuthType, spec.AuthHeader)
+	}
+	if spec.IsReadOnly() {
+		t.Error("--writable should produce a writable http connector")
+	}
+}
+
+func TestHandleConnector_AddHTTPBasicAuth(t *testing.T) {
+	connectorTestFile(t)
+	err := HandleConnector([]string{
+		"add", "basic-api", "--type", "http", "--base-url", "https://api.example.com",
+		"--auth", "basic", "--username", "svc", "--credential-env", "API_PASS",
+	})
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	reg, err := connector.LoadDefaultRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, ok := reg.Get("basic-api")
+	if !ok {
+		t.Fatal("basic-api not registered")
+	}
+	if spec.AuthType != connector.AuthTypeBasic || spec.Username != "svc" {
+		t.Errorf("basic auth mismatch: %q / %q", spec.AuthType, spec.Username)
+	}
+}
+
+func TestHandleConnector_AddHTTPErrors(t *testing.T) {
+	connectorTestFile(t)
+
+	cases := [][]string{
+		// http without base_url
+		{"add", "x", "--type", "http"},
+		// http with a non-http scheme
+		{"add", "x", "--type", "http", "--base-url", "ftp://api.example.com"},
+		// http with a database-only field
+		{"add", "x", "--type", "http", "--base-url", "https://api.example.com", "--host", "h"},
+		// auth without a credential
+		{"add", "x", "--type", "http", "--base-url", "https://api.example.com", "--auth", "bearer"},
+		// header auth without auth-header
+		{"add", "x", "--type", "http", "--base-url", "https://api.example.com",
+			"--auth", "header", "--credential-env", "K"},
+		// unknown auth mode
+		{"add", "x", "--type", "http", "--base-url", "https://api.example.com",
+			"--auth", "digest", "--credential-env", "K"},
+	}
+	for i, args := range cases {
+		if err := HandleConnector(args); err == nil {
+			t.Errorf("case %d: expected error for %v", i, args)
+		}
+	}
+}
+
 func TestHandleConnector_DuplicateAdd(t *testing.T) {
 	connectorTestFile(t)
 	addArgs := []string{"add", "dup", "--type", "sqlite", "--database", "/tmp/dup.db"}

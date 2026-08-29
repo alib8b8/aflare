@@ -19,6 +19,7 @@ package nodes
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alib8b8/aflare/internal/connector"
 	"github.com/alib8b8/aflare/internal/logger"
 )
 
@@ -50,7 +52,8 @@ func (n *HTTPRequestNode) Schema() NodeSchema {
 		Input:       "string - request body (overrides body param)",
 		Output:      "string - response body",
 		Params: []ParamSchema{
-			{Name: "url", Type: "string", Description: "Target URL", Required: true},
+			{Name: "url", Type: "string", Description: "Target URL (with connector: path relative to the connector's base URL)", Required: true},
+			{Name: "connector", Type: "string", Description: "Named http connector (aflare connector add --type http): pins the base URL and injects auth", Required: false},
 			{Name: "method", Type: "string", Description: "HTTP method: GET, POST, PUT, DELETE, PATCH", Required: false, Default: "GET"},
 			{Name: "headers", Type: "string", Description: "JSON-encoded headers", Required: false},
 			{Name: "body", Type: "string", Description: "Request body", Required: false},
@@ -80,10 +83,6 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 		return "", fmt.Errorf("url parameter is required")
 	}
 
-	if err := validateURL(url); err != nil {
-		return "", fmt.Errorf("URL validation failed: %w", err)
-	}
-
 	method, ok := params["method"]
 	if !ok || method == "" {
 		method = "GET"
@@ -104,6 +103,43 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 		body = customBody
 	}
 
+	// Connector mode: resolve the named http connector, rewrite url to
+	// base_url + path, enforce the connector's method policy, prepare
+	// auth headers and the timeout ceiling. url is validated after the
+	// rewrite so the check applies to the joined URL.
+	connHeaders := http.Header{}
+	var timeoutCeiling time.Duration
+	if connName := params["connector"]; connName != "" {
+		spec, err := resolveHTTPConnectorSpec(connName)
+		if err != nil {
+			return "", err
+		}
+		// Read-only connectors (the default) admit safe methods only;
+		// POST/PUT/PATCH/DELETE require a --writable connector.
+		if spec.IsReadOnly() && method != "GET" && method != "HEAD" {
+			return "", fmt.Errorf("connector %q is read-only and rejects %s requests (GET/HEAD only); re-register the connector with --writable to allow write methods", connName, method)
+		}
+		url, err = joinBaseURL(spec.BaseURL, url)
+		if err != nil {
+			return "", fmt.Errorf("connector %q: %w", connName, err)
+		}
+		if spec.Credential != nil {
+			secret, err := connector.DefaultResolver().Resolve(*spec.Credential)
+			if err != nil {
+				return "", fmt.Errorf("connector %q credential: %w", connName, err)
+			}
+			connHeaders, err = httpAuthHeaders(spec, secret)
+			if err != nil {
+				return "", fmt.Errorf("connector %q: %w", connName, err)
+			}
+		}
+		timeoutCeiling = time.Duration(spec.EffectiveTimeoutSec()) * time.Second
+	}
+
+	if err := validateURL(url); err != nil {
+		return "", fmt.Errorf("URL validation failed: %w", err)
+	}
+
 	// Build headers once up front. This validates CRLF injection and the
 	// sensitive-header policy a single time rather than on every retry
 	// attempt, and produces an immutable http.Header we clone onto each
@@ -113,13 +149,28 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 	if err != nil {
 		return "", err
 	}
+	// Connector-injected headers cannot be overridden from workflow
+	// params: an explicit Authorization (or auth_header) alongside a
+	// connector that injects it is rejected rather than silently ignored.
+	for key := range connHeaders {
+		if headers.Get(key) != "" {
+			return "", fmt.Errorf("workflow headers set %q but the connector injects it; remove the inline header or drop the connector param", key)
+		}
+	}
+	for key, values := range connHeaders {
+		headers[key] = values
+	}
 
-	// Parse timeout: accept both "30" (seconds) and "30s" (duration)
+	// Parse timeout: accept both "30" (seconds) and "30s" (duration).
+	// A connector caps the effective timeout at its own ceiling.
 	timeout := 30 * time.Second
 	if timeoutStr, ok := params["timeout"]; ok && timeoutStr != "" {
 		if t, err := time.ParseDuration(timeoutStr); err == nil && t > 0 && t <= 5*time.Minute {
 			timeout = t
 		}
+	}
+	if timeoutCeiling > 0 && timeout > timeoutCeiling {
+		timeout = timeoutCeiling
 	}
 
 	// Use safeHTTPClient with DNS rebinding protection, custom timeout and redirect validation
@@ -238,6 +289,63 @@ func (n *HTTPRequestNode) Execute(ctx context.Context, input string, params map[
 		return "", fmt.Errorf("HTTP request failed: %w", lastErr)
 	}
 	return "", fmt.Errorf("HTTP request failed without a response")
+}
+
+// resolveHTTPConnectorSpec loads the named connector from the default
+// registry and verifies it routes to http_request (not a database or
+// file connector).
+func resolveHTTPConnectorSpec(name string) (connector.Spec, error) {
+	reg, err := connector.LoadDefaultRegistry()
+	if err != nil {
+		return connector.Spec{}, fmt.Errorf("failed to load connectors registry: %w", err)
+	}
+	spec, ok := reg.Get(name)
+	if !ok {
+		return connector.Spec{}, fmt.Errorf("connector %q is not registered (register it with: aflare connector add)", name)
+	}
+	if !spec.IsHTTPConnector() {
+		return connector.Spec{}, fmt.Errorf("connector %q is a %s connector; http_request expects an http connector (aflare connector add --type http)", name, spec.Type)
+	}
+	return spec, nil
+}
+
+// joinBaseURL resolves the request path against the connector's base
+// URL. The path must be relative (no scheme, no protocol-relative
+// //host form) so a workflow cannot redirect the connector's requests
+// to a different origin; the joined URL still passes validateURL.
+func joinBaseURL(baseURL, path string) (string, error) {
+	if path == "" {
+		return baseURL, nil
+	}
+	if strings.Contains(path, "://") || strings.HasPrefix(path, "//") {
+		return "", fmt.Errorf("connector mode requires a relative path, got absolute URL %q", path)
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return strings.TrimSuffix(baseURL, "/") + path, nil
+}
+
+// httpAuthHeaders renders the connector's credential into the request
+// headers per its auth_type. The secret never appears in workflow files
+// or logs — only the injected header value on the outgoing request.
+func httpAuthHeaders(spec connector.Spec, secret string) (http.Header, error) {
+	h := http.Header{}
+	switch spec.AuthType {
+	case connector.AuthTypeBearer:
+		h.Set("Authorization", "Bearer "+secret)
+	case connector.AuthTypeBasic:
+		h.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(spec.Username+":"+secret)))
+	case connector.AuthTypeHeader:
+		h.Set(spec.AuthHeader, secret)
+	default:
+		// Spec validation requires a credential to carry an auth_type,
+		// so an empty auth_type with a resolved credential means a
+		// hand-edited registry entry; refuse rather than send a request
+		// whose auth posture is unknown.
+		return nil, fmt.Errorf("spec carries a credential but no auth_type (re-register the connector)")
+	}
+	return h, nil
 }
 
 // buildRequestHeaders parses the optional "headers" and "content_type"

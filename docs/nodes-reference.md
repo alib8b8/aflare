@@ -38,7 +38,7 @@
 | [`files_list`](#files_list) | List files under a files/notes connector root (relative paths + sizes). Skips dotfiles/dot-directories and symlinks. ... | 3 |
 | [`gemini`](#gemini) | Call Google Gemini LLM API | 15 |
 | [`glm`](#glm) | Call GLM LLM API | 15 |
-| [`http_request`](#http_request) | Make HTTP requests with custom method, headers, and body | 12 |
+| [`http_request`](#http_request) | Make HTTP requests with custom method, headers, and body | 13 |
 | [`human_in_loop`](#human_in_loop) | Human approval gate — pauses workflow for human review and approval before continuing | 5 |
 | [`hygon`](#hygon) | Call Hygon DCU LLM API | 15 |
 | [`ima`](#ima) | Call IMA Copilot LLM API | 15 |
@@ -847,7 +847,8 @@ Make HTTP requests with custom method, headers, and body
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `url` | string | Yes |  | Target URL |
+| `url` | string | Yes |  | Target URL (with connector: path relative to the connector's base URL) |
+| `connector` | string | No |  | Named http connector (aflare connector add --type http): pins the base URL and injects auth |
 | `method` | string | No | GET | HTTP method: GET, POST, PUT, DELETE, PATCH |
 | `headers` | string | No |  | JSON-encoded headers |
 | `body` | string | No |  | Request body |

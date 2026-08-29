@@ -210,8 +210,8 @@ func resolveConnector(name string) (driver, dsn string, spec connector.Spec, err
 	if err != nil {
 		return "", "", spec, err
 	}
-	if spec.IsFileConnector() {
-		return "", "", spec, fmt.Errorf("connector %q is a %s connector; sql_query expects database connectors (postgres/mysql/sqlite) — file connectors are used by the file_read/file_write/files_list nodes", name, spec.Type)
+	if spec.IsFileConnector() || spec.IsHTTPConnector() {
+		return "", "", spec, fmt.Errorf("connector %q is a %s connector; sql_query expects database connectors (postgres/mysql/sqlite) — file connectors are used by the file_read/file_write/files_list nodes, http connectors by http_request", name, spec.Type)
 	}
 	password := ""
 	if spec.Credential != nil {

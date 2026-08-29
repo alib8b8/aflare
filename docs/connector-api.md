@@ -1,6 +1,6 @@
 # Connector API 设计
 
-> 状态：已实现并合入 main（数据库 + 文件/笔记，含安全加固），随下个版本发布，见文末 Roadmap
+> 状态：已实现并合入 main（数据库 + 文件/笔记 + HTTP API，含安全加固），见文末 Roadmap
 > 定位：aflare 是 AI 与用户数据之间「确定且安全」的控制层。Connector API
 > 是这个控制层的数据源接入标准 —— 用户自带数据源，aflare 只负责命名连
 > 接、凭据隔离与权限控制。
@@ -81,10 +81,31 @@ connectors:
     read_only: true
     max_rows: 1000            # 默认 1000
     timeout: 30               # 默认 30s
+
+  # —— HTTP API（自有云盘/内网 API，http_request 节点）——
+  - name: my-api
+    type: http
+    base_url: https://api.example.com/v1   # 绝对 http(s) URL，可带路径前缀；禁 userinfo/query/fragment
+    auth_type: bearer          # bearer | basic | header；缺省=不注入认证
+    credential:
+      kind: secret
+      group: connectors
+      key: my-api
+    read_only: true            # 默认 true：仅 GET/HEAD；POST/PUT/DELETE/PATCH 需 --writable
+    timeout: 30                # 节点超时上限，默认 30s
+  - name: keyed-api            # 自定义 header 认证示例
+    type: http
+    base_url: https://api.example.com
+    auth_type: header
+    auth_header: X-API-Key     # 仅字母/数字/连字符；Host 等敏感 header 被拒绝
+    credential:
+      kind: env
+      key: API_KEY
 ```
 
 类型与节点的路由：`files`/`notes` → file_read / file_write / files_list；
-`postgres`/`mysql`/`sqlite` → sql_query。用错节点会得到指路的报错。
+`postgres`/`mysql`/`sqlite` → sql_query；`http` → http_request。用错节点会得到
+指路的报错。
 
 ### 2.2 文件连接器的权限模型
 
@@ -116,7 +137,24 @@ files/notes 连接器把「workdir 沙箱」的规则**原样搬到授权目录�
 `?`/`#` 参数，防止注入自定义 `mode=` 参数绕过只读（DSN 由 aflare
 确定性构建）。
 
-### 2.4 CredentialResolver —— 部署 profile 的抽象点
+### 2.4 HTTP/API 连接器的权限模型
+
+`http_request` 通过 `connector: <name>` 引用连接器后：
+
+| 维度 | 规则 |
+|---|---|
+| origin 锁定 | `url` 参数变为相对 base_url 的路径（自动补 `/` 前缀）；绝对 URL 与 `//host` 协议相对形式直接拒绝 —— 工作流无法把连接器当跳板访问其它源 |
+| `read_only` | 默认 true：仅允许 GET/HEAD；POST/PUT/DELETE/PATCH 需 `--writable` 连接器 |
+| 认证注入 | `auth_type=bearer` → `Authorization: Bearer <凭据>`；`basic` → `Authorization: Basic base64(username:凭据)`；`header` → `auth_header: <凭据>`；凭据运行时经 CredentialResolver 解析，workflow 文件与日志零泄漏 |
+| header 冲突 | 工作流 params 显式设置连接器注入的同一 header 时**报错**（不静默覆盖、不静默忽略） |
+| `timeout` | 连接器 `timeout`（默认 30s）是节点超时的天花板（节点自身上限 5min 不变） |
+
+拼接后的完整 URL 仍走 `http_request` 原有 SSRF 校验
+（`validateURL`：协议/userinfo/环回/保留 IP 检查）、DNS 重绑定防护
+与重定向复检 —— connector 模式只收紧、不放宽既有安全边界。基础
+设施的环回例外（`AFLARE_ALLOW_LOOPBACK`）不受连接器影响。
+
+### 2.5 CredentialResolver —— 部署 profile 的抽象点
 
 `internal/connector.CredentialResolver` 接口是本地版与企业版的分界：
 
@@ -128,7 +166,7 @@ files/notes 连接器把「workdir 沙箱」的规则**原样搬到授权目录�
 统一代码库、不同部署 profile：引擎不感知 profile，只感知 Resolver 接口。
 files/notes 连接器本地文件无需凭据，spec 直接拒绝 credential 字段。
 
-### 2.5 DSN 构建
+### 2.6 DSN 构建
 
 `connector.BuildDSN(spec, password)` 按类型渲染 DSN：
 
@@ -162,6 +200,11 @@ aflare connector show my-notes
 aflare secrets set connectors my-pg
 aflare connector add my-pg --type postgres --host db.internal \
   --database analytics --username readonly_user --credential-group connectors
+
+# 6) HTTP API —— Bearer 注入，默认只读（仅 GET/HEAD）
+aflare secrets set connectors my-api
+aflare connector add my-api --type http --base-url https://api.example.com/v1 \
+  --auth bearer --credential-group connectors
 ```
 
 ```yaml
@@ -180,6 +223,10 @@ steps:
       connector: my-library
       sql: "SELECT title FROM books WHERE author = $1"
       args: '["鲁迅"]'
+  - node: http_request
+    params:
+      connector: my-api
+      url: "/stats"            # 相对路径，自动拼到 base_url 后
 ```
 
 内联 `driver/dsn` 与 `connector` 互斥（同时出现报错）。旧的内联写法保持
@@ -194,8 +241,12 @@ steps:
 - 文件连接器：root 遏制（绝对路径/穿越/symlink）、include 白名单、
   max_bytes 上限、敏感扩展名黑名单、dotfile 跳过全部生效。
 - SQLite 只读连接器在 DSN 层强制 `mode=ro`（驱动层纵深防御）。
-- 名称/端点/root/白名单字段全量校验（null 字节、端口范围、glob 语法、
-  绝对路径、文件类型互斥字段）。
+- HTTP 连接器：origin 锁定（url 只能是相对路径）、只读=仅 GET/HEAD、
+  Bearer/Basic/自定义 header 注入、连接器 timeout 天花板；拼接后的 URL
+  仍过原有 SSRF/DNS 重绑定/重定向校验。
+- 名称/端点/root/白名单/base_url/auth 字段全量校验（null 字节、端口范
+  围、glob 语法、绝对路径、URL 形态、auth_type 与凭据/用户名/header 的
+  一致性、auth_header 字符集与敏感 header 黑名单、类型互斥字段）。
 - 注册表加载时逐条校验，坏数据**报错拒绝**而非静默丢弃。
 - 0600 原子写（tmp+rename，防 symlink 替换攻击）。
 
@@ -205,8 +256,8 @@ steps:
 |---|---|---|
 | PR #95 | 数据库连接器骨架：Spec/Registry/Resolver/DSN + sql_query 接入 + CLI | ✅ 已合并 |
 | #96 | **文件/笔记/本地库**：files/notes 类型 + file_read/file_write/files_list 接入 + sqlite mode=ro | ✅ 已合并 |
+| 本 PR | **HTTP/API 连接器**：http 类型 + http_request 接入（origin 锁定 + Bearer/Basic/header 注入 + 只读=GET/HEAD） | ✅ |
 | 下一步（本地） | 笔记搜索：frontmatter/tags/全文检索节点（notes 专属，走 connector root）；连接器级审计事件 | 计划 |
-| 之后（本地→通用） | HTTP/API 连接器（http_request 接 `connector`，Bearer/Basic 注入）——自有云盘/API 与企业内网 API 复用 | 计划 |
 | 最后（企业） | 企业 profile：Vault/SSO Resolver、内网 allowlist 与策略引擎联动、按连接器名的连接池缓存 | 计划 |
 
 ## 6. 与项目定位的关系
