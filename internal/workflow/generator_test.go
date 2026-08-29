@@ -159,6 +159,66 @@ func TestGenerateWorkflow_ExtractFilePath(t *testing.T) {
 	}
 }
 
+// TestGenerateWorkflow_ReadFileIntent verifies "read <file>" / "读取 <文件>"
+// descriptions produce a file_read step. Regression test: before this fix,
+// "every 10 minutes read cpu.log and alert via webhook" generated only a
+// notify step and silently dropped the read intent.
+func TestGenerateWorkflow_ReadFileIntent(t *testing.T) {
+	tests := []struct {
+		name string
+		desc string
+		file string
+	}{
+		{"english log", "every 10 minutes read cpu.log and alert via webhook when error found", "cpu.log"},
+		{"english md", "read notes.md and summarize", "notes.md"},
+		{"chinese log", "每 10 分钟读取 app.log 并告警", "app.log"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wf, err := GenerateWorkflow(tt.desc)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			found := false
+			for _, step := range wf.Steps {
+				if step.Node == "file_read" {
+					found = true
+					if step.Params["path"] != tt.file {
+						t.Errorf("expected path %s, got %s", tt.file, step.Params["path"])
+					}
+				}
+			}
+			if !found {
+				t.Errorf("expected file_read step for %q, got steps %v", tt.desc, wf.Steps)
+			}
+		})
+	}
+}
+
+// TestGenerateWorkflow_ReadThenWrite verifies a description with both read
+// and save intent yields file_read BEFORE file_write (data flows read→write).
+func TestGenerateWorkflow_ReadThenWrite(t *testing.T) {
+	wf, err := GenerateWorkflow("read input.log and save to output.txt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	readIdx, writeIdx := -1, -1
+	for i, step := range wf.Steps {
+		if step.Node == "file_read" && readIdx == -1 {
+			readIdx = i
+		}
+		if step.Node == "file_write" && writeIdx == -1 {
+			writeIdx = i
+		}
+	}
+	if readIdx == -1 || writeIdx == -1 {
+		t.Fatalf("expected both file_read and file_write, got %v", wf.Steps)
+	}
+	if readIdx > writeIdx {
+		t.Errorf("file_read (idx %d) must precede file_write (idx %d)", readIdx, writeIdx)
+	}
+}
+
 func TestGenerateWorkflow_SummarizeAction(t *testing.T) {
 	wf, err := GenerateWorkflow("summarize this article")
 	if err != nil {

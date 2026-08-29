@@ -416,5 +416,12 @@ func SummarizeCommand(command string, args []string) string {
 	if len(args) == 0 {
 		return command
 	}
-	return fmt.Sprintf("%s %s", command, strings.Join(args, " "))
+	joined := strings.Join(args, " ")
+	if command == "" {
+		// Empty command must not contribute a leading space — the joined
+		// string becomes the workflow description in `aflare create`, and a
+		// leading space leaks into the generated YAML.
+		return joined
+	}
+	return command + " " + joined
 }

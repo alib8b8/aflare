@@ -27,6 +27,12 @@ var (
 	urlRegex    = regexp.MustCompile(`(https?://[^\s]+)`)
 	domainRegex = regexp.MustCompile(`\b([a-zA-Z0-9][-a-zA-Z0-9]*\.(?:com|org|net|io|edu|gov|me|dev|ai|app|xyz|co|info)\S*)\b`)
 	fileRegex   = regexp.MustCompile(`(save|write|to)\s+([a-zA-Z0-9_-]+\.(txt|md|yaml|json|html|csv|xml))`)
+	// readFileRegex matches "read notes.md" / "读取 cpu.log" / "open data.csv"
+	// intent and emits a file_read step. Without it, "every 10 minutes read
+	// cpu.log and alert via webhook" silently dropped the read step and the
+	// generated workflow only contained notify. `log` is included here (but
+	// not in fileRegex) because log files are a read-side staple.
+	readFileRegex = regexp.MustCompile(`(?:read|读取|打开|open|load)\s+([a-zA-Z0-9_/-]+\.(?:txt|md|markdown|yaml|yml|json|html|csv|xml|log))`)
 	// saveFileFallbackRegex matches "save to file" / "write file" / "export to
 	// file" when no concrete filename was given. The generator then defaults to
 	// output.txt so the user's save intent isn't silently dropped.
