@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/alib8b8/aflare/internal/config"
 	"github.com/alib8b8/aflare/internal/nodes"
@@ -109,6 +110,11 @@ type Server struct {
 	scanner      *bufio.Scanner
 	authToken    string // required when network-bound
 	networkBound bool   // true if AFLARE_MCP_BIND is set
+
+	// HTTP transport: in-flight request cap. Lazily initialized so servers
+	// constructed directly (tests) work without a setup call.
+	httpSem     chan struct{}
+	httpSemOnce sync.Once
 }
 
 // NewServer creates a new MCP server reading from stdin and writing to stdout

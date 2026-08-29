@@ -1,5 +1,5 @@
 name: 'aflare'
-description: 'Run aflare AI workflows in CI — deterministic YAML pipelines with 70 built-in nodes, LLM steps, SSRF protection, and audit trails. Self-hosted by design: your data never leaves the runner.'
+description: 'Run aflare AI workflows in CI — deterministic YAML pipelines with dozens of built-in nodes, LLM steps, SSRF protection, and audit trails. Self-hosted by design: your data never leaves the runner.'
 branding:
   icon: 'zap'
   color: 'purple'

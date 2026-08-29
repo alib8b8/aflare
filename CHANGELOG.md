@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **email_send 节点（SMTP 通知）**：465 隐式 TLS / 其余端口 STARTTLS，明文仅限回环中继（AFLARE_ALLOW_LOOPBACK 门控）；AUTH PLAIN + LOGIN 回退；凭据走 password_env，内联 password 永不落日志；拨号时 Control hook IP 校验（与 HTTP 节点同 SSRF 策略，封 DNS-rebinding TOCTOU）；from/to/cc/subject 经 net/mail 解析并拒 CR/LF 防头注入，subject Q-encoding；收件人 ≤50、正文 ≤100KB、超时 ≤120s；21 条测试（fake SMTP server）
+- **HTTP/API 连接器**：http_request 可引用命名 http 连接器——base_url 源固定（绝对/协议相对 URL 拒绝）、bearer/basic/header 凭据经 CredentialResolver 运行时解析（不落 YAML）、read_only 默认仅 GET/HEAD、timeout 天花板；连接器注入的认证头与内联头冲突报错不静默覆盖
+- **MCP Server HTTP 传输（token 必须）**：`aflare mcp --port 8082`，POST /mcp（JSON-RPC 2.0）+ POST /v1/call（简化直调）；X-MCP-Token 常数时间比较，无免认证模式；请求体上限 1MiB；默认绑 127.0.0.1，非回环须显式 --host
+- **定时工作流失败重试（指数退避）**：`schedule add --retry N（0–10）--retry-delay 30s`，退避封顶 5m；panic 计为失败；停机中止等待中的重试；步级 retry 优先且独立
+- **aflare-action（复合 GitHub Action）**：action/ 目录——sha256 校验的预编译二进制安装 + 运行工作流（秒级，非 Docker 源码构建）；支持版本 pin、--set、safe-mode、validate-only；macOS shasum 兼容
+- **examples/real-world/ 工业案例**：OpenFOAM 发散监视、log-similarity-RAG 事故分诊
+
+### Changed
+
+- **README 重构为英文主文档（README.zh.md 中文镜像）**：定位 personal-first → local-first，tagline "AI Beyond Chat — Get Things Done"；470 行精简至约 155 行（砍特性矩阵/路线图，指向 docs/）
+- **webhook 对不存在的工作流提前返回 404**（原 202 + 异步失败任务）
+
 ### Fixed
 - **技能文档版本漂移（用户报告）**：skills/aflare/SKILL.md 写 `version: 0.10.0`、两处宣传 "45+ nodes"，实际二进制 v0.11.0、注册节点 70 个（`aflare list` 实测）；skills/aflare/nodes-reference.md 也停留在 "68 registered nodes"。上架技能市场前需同步刷新元数据——现已全部对齐（0.11.0 / 70），并新增 `TestSkillMetadataVersionSync` 防复发测试：SKILL.md frontmatter 版本必须与 `internal/meta` 的 `Version` 常量一致，下次发版漏更会直接红 CI。docs/nodes-reference.md 一并重新生成（70 nodes，含 pipeline 失败语义说明）
 - **pipeline 节点 DAG 依赖失败后下游仍执行（用户报告）**：`tryStart` 只检查 `completed[dep]`，而失败步骤（含 panic 路径）同样被标记 completed——a1/a2 失败后依赖它们的 b1 照常调度，拿着缺失/错误的 input 运行，语义与多数 DAG 系统"依赖失败则跳过"直觉不符且文档未说明。现实现标准级联跳过语义：步骤失败后，其全部传递下游被标记 `skipped: true`（error 注明根因 `skipped: upstream step "<name>" failed`），不再执行；独立分支不受影响照常运行；整体 `success: false` 由根因错误决定（级联跳过不重复计入 errors）。实现要点：skip 结果在同一锁区段内写入（否则同轮 map 遍历顺序下传递下游读不到直接父级的失败结果，级联断裂——首轮测试实测踩中）。Schema Input/Output 补失败语义说明并重新生成 docs；新增测试钉死：根因报错非跳过、直接下游跳过指认根因、传递下游级联跳过指认直接依赖、独立分支照跑
@@ -15,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`http_request` → `json_parse` 生态组合断裂（用户报告）**：文档声称 http_request 输出 "response body"，实际输出 `HTTP <code>\n<body>`（状态行前缀拼接，单测锁定）——最自然的 `http_request → json_parse` 组合开箱即断（`HTTP` 开头不是合法 JSON，json_parse 直接失败），仓库自己的 examples/finance/idempotent-transfer/workflow.yaml 注释承认该问题并用 `contains` 字符串匹配绕过。根因修复：json_parse 解析前自动剥离行首 `HTTP <status>\n` 状态行（合法 JSON 不可能以 `H` 开头，剥离无歧义；锚定行首、容忍 CRLF，body 内部状态样式文本不受影响）；http_request 输出格式保持不变（向后兼容既有 `contains:"HTTP 200"` 类判断）。文档同步：nodes-reference.md 的 http_request Output 改为如实描述 `HTTP <status>\n<body>`（并注明 json_parse 自动剥离）、json_parse Input 注明容忍状态行；example 注释更正。回归测试覆盖前缀剥离（pretty-print / path 提取 / 任意状态码 / CRLF）、body 内嵌状态样式文本不被误剥、非 JSON body 仍报错
 - **Ollama 流式输出多字节 rune 损坏（本轮全量安全与代码质量审计发现）**：流式 JSON 过滤器 `ollamaStreamFilter` 的前缀匹配把 rune 截断为 byte——中文等非 ASCII 内容的低字节可能碰巧匹配 `"thought": "` 前缀字节而误入字段模式，把无关 JSON 值当作思考内容流给用户（如 U+0174 截断为 't'，`"ŴhoughŴ": "` 在截断语义下拼出前缀）；同时过滤器内嵌只写不读的 `strings.Builder` 缓冲区随输出无界增长（死代码 + 长流内存浪费）。修复：非 ASCII rune 直接重置匹配状态（前缀为纯 ASCII，多字节 rune 不可能合法延续匹配）并删除死缓冲区；新增两条回归测试——CJK 内容原样流出、低字节碰撞序列不得误触发字段模式
 - **`aflare validate` 对纯建议性警告返回退出码 1（本轮全量审计发现）**：`Consider adding a file_write step` 这类建议（工作流照常可跑）与 unknown node 这类硬错误（跑到该步必炸）此前同走 `exit 1`——CI 里 `aflare validate wf.yaml && ...` 会被纯建议卡死，仓库自带 3 个 examples（devops-deploy / file-organizer / log-monitor）即受害者。现区分严重度：unknown node、空 steps、YAML/加载错误保持退出 1；缺 name / 缺 file_write 等纯建议退出 0（警告照常打印）。新增退出码契约测试
+- **SSRF 拨号路径尊重本地出站代理**；examples 全部改用开放数据源
+- **用户视角硬化**：doctor/create 输出迁移 i18n（--lang 端到端生效）；secrets keyring 缓存不可用日志降为 debug（无头环境预期）；validate 空 node 名报 missing 'node' field；aflare create 保留 read-file intent
 
 ## [0.11.0] - 2026-08-25
 

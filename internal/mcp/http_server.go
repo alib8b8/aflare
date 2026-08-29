@@ -45,6 +45,16 @@ const (
 	// httpMaxBodyBytes bounds the request body (guards the JSON decoder
 	// against unbounded reads).
 	httpMaxBodyBytes = 1 << 20 // 1 MiB
+	// httpMaxConcurrent caps in-flight requests. Each accepted request may
+	// execute a full workflow tool call, so without a cap a burst of
+	// clients pins unbounded resources — the same pattern (and limit) as
+	// the webhook server's task semaphore.
+	httpMaxConcurrent = 100
+	// httpReadTimeout bounds reading one full request (headers plus a
+	// ≤1MiB body). Legitimate payloads arrive in milliseconds; without a
+	// bound a trickling client can hold a connection open indefinitely.
+	// Generous on purpose so slow-but-honest remote clients still fit.
+	httpReadTimeout = 5 * time.Minute
 )
 
 // httpError writes a plain-text error with the given status code. Errors are
@@ -77,10 +87,40 @@ func ServeHTTPMode(addr, token string) error {
 		Addr:              addr,
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       0, // tool calls may stream long-running workflows
-		WriteTimeout:      0,
+		// Bound the body read: legit payloads (≤1MiB) arrive in
+		// milliseconds, so a trickling client cannot hold a connection
+		// open indefinitely. WriteTimeout stays 0 — tool calls run whole
+		// workflows, so responses may legitimately take minutes.
+		ReadTimeout:  httpReadTimeout,
+		WriteTimeout: 0,
 	}
 	return srv.ListenAndServe()
+}
+
+// httpSemaphore lazily creates the in-flight request cap.
+func (s *Server) httpSemaphore() chan struct{} {
+	s.httpSemOnce.Do(func() {
+		s.httpSem = make(chan struct{}, httpMaxConcurrent)
+	})
+	return s.httpSem
+}
+
+// acquireHTTPSlot enforces the in-flight request cap; when the server is at
+// capacity it answers 503 itself and returns false. Called AFTER
+// authorization so that unauthenticated floods cannot exhaust the slots.
+func (s *Server) acquireHTTPSlot(w http.ResponseWriter) bool {
+	select {
+	case s.httpSemaphore() <- struct{}{}:
+		return true
+	default:
+		httpError(w, http.StatusServiceUnavailable, "server busy: too many concurrent requests, retry later")
+		return false
+	}
+}
+
+// releaseHTTPSlot frees one in-flight slot.
+func (s *Server) releaseHTTPSlot() {
+	<-s.httpSemaphore()
 }
 
 // handleMCPJSONRPC serves POST /mcp: one JSON-RPC 2.0 request per POST body,
@@ -94,6 +134,10 @@ func (s *Server) handleMCPJSONRPC(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeHTTP(w, r) {
 		return
 	}
+	if !s.acquireHTTPSlot(w) {
+		return
+	}
+	defer s.releaseHTTPSlot()
 
 	body, ok := s.readBody(w, r)
 	if !ok {
@@ -135,6 +179,10 @@ func (s *Server) handleV1Call(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeHTTP(w, r) {
 		return
 	}
+	if !s.acquireHTTPSlot(w) {
+		return
+	}
+	defer s.releaseHTTPSlot()
 
 	body, ok := s.readBody(w, r)
 	if !ok {

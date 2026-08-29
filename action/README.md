@@ -1,6 +1,6 @@
 # aflare-action
 
-Run [aflare](https://github.com/alib8b8/aflare) AI workflows in GitHub Actions — deterministic YAML pipelines with 70 built-in nodes, LLM steps, SSRF protection, and tamper-evident audit trails. Installs the prebuilt release binary (checksum-verified) in seconds; no Docker build, no compilation.
+Run [aflare](https://github.com/alib8b8/aflare) AI workflows in GitHub Actions — deterministic YAML pipelines with dozens of built-in nodes, LLM steps, SSRF protection, and tamper-evident audit trails. Installs the prebuilt release binary (checksum-verified) in seconds; no Docker build, no compilation.
 
 ## Usage
 

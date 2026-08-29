@@ -12,11 +12,11 @@ tags: [workflow, automation, cli, pipeline, terminal]
 
 ## Overview
 
-aflare is an AI-powered terminal workflow engine that generates and executes multi-step automation pipelines from natural language descriptions. It supports 70 built-in agent nodes including LLM providers, code analysis, file operations, web fetching, and system integrations. Workflows are defined as deterministic YAML files that can be version-controlled and reused.
+aflare is an AI-powered terminal workflow engine that generates and executes multi-step automation pipelines from natural language descriptions. It supports a broad catalog of built-in agent nodes (run `aflare list` for the full set), including LLM providers, code analysis, file operations, web fetching, and system integrations. Workflows are defined as deterministic YAML files that can be version-controlled and reused.
 
 Key features:
 - Natural language to YAML workflow generation
-- 70 built-in nodes (LLM, fetch, execute, transform, etc.)
+- Built-in nodes covering LLM, fetch, execute, transform and more (`aflare list` shows the full catalog)
 - MCP protocol support for external tool integration
 - Security-hardened with SSRF protection, path traversal prevention, and resource limits
 - On-device LLM inference support (1B-8B models)

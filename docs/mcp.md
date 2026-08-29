@@ -290,9 +290,18 @@ curl -X POST http://localhost:8082/v1/call \
 Notes:
 
 - Request bodies are capped at 1 MiB; oversized bodies get `413`.
+- In-flight requests are capped at 100 concurrent executions (the same
+  cap the webhook server enforces); excess requests get `503` with a
+  retry hint.
+- Request reads time out after 5 minutes — a trickling client cannot
+  hold a connection open indefinitely (tool responses are not affected:
+  they may legitimately take minutes to produce).
+- For production, prefer `AFLARE_MCP_TOKEN` over `--token`: command-line
+  arguments are visible to every local user via `ps` / `/proc/<pid>/cmdline`,
+  while the environment is only readable by the same user.
 - Tool-level failures return HTTP 200 with a JSON-RPC error object (so
   clients can parse errors uniformly); transport failures use 4xx status
-  codes (401 unauthorized, 405 wrong method, 400 malformed body).
+  codes (401 unauthorized, 405 wrong method, 400 malformed body, 503 busy).
 
 ## Security
 
