@@ -1,0 +1,84 @@
+/*---------------------------------------------------------------------------*\
+| =========                 |                                                |
+| \\      /  F ield         | motorBike-scale transient run (diverged)     |
+|  \\    /   O peration     |                                                |
+|   \\  /    A nd           |                                                |
+|    \\/     M anipulation  |                                                |
+\*---------------------------------------------------------------------------*/
+Build  : 2.4.x-cc2ff3c4e
+Exec   : foamRun (mpiexec -np 8)
+Date   : Aug 29 2026
+Time   : 03:12:41
+Host   : cfd-node-04
+PID    : 18422
+Case   : /srv/sim/motorBike-turb
+nProcs : 8
+\*---------------------------------------------------------------------------*/
+Create mesh for time = 0.04
+
+PIMPLE: convergence tolerance = 1e-6
+PIMPLE: no outer correctors left
+CourantNumber mean: 0.0031 max: 0.28
+
+Starting time loop
+
+Time = 0.0405
+deltaT = 0.001
+PIMPLE: iteration 1
+smoothSolver:  Solving for p, Initial residual = 2.4e-05, Final residual = 9.8e-07, No Iterations 4
+smoothSolver:  Solving for Ux, Initial residual = 1.1e-05, Final residual = 8.2e-07, No Iterations 3
+CourantNumber mean: 0.0034 max: 0.33
+
+Time = 0.041
+deltaT = 0.001
+PIMPLE: iteration 1
+smoothSolver:  Solving for p, Initial residual = 3.7e-05, Final residual = 2.1e-06, No Iterations 5
+CourantNumber mean: 0.0061 max: 0.58
+
+Time = 0.0415
+deltaT = 0.001
+PIMPLE: iteration 1
+smoothSolver:  Solving for p, Initial residual = 9.2e-04, Final residual = 4.6e-05, No Iterations 8
+CourantNumber mean: 0.018 max: 1.42
+
+Time = 0.042
+deltaT = 0.001
+PIMPLE: iteration 1
+smoothSolver:  Solving for p, Initial residual = 4.4e-02, Final residual = 2.2e-03, No Iterations 14
+continuity errors: sum local = 0.0042, global = 1.8e-05, cumulative = 3.7e-05
+CourantNumber mean: 0.055 max: 2.87
+
+Time = 0.0425
+deltaT = 0.001
+PIMPLE: iteration 1
+smoothSolver:  Solving for p, Initial residual = 1.7e+00, Final residual = 8.4e-02, No Iterations 22
+continuity errors: sum local = 0.031, global = 6.9e-04, cumulative = 7.3e-04
+CourantNumber mean: 0.14 max: 4.91
+
+Time = 0.043
+deltaT = 0.001
+PIMPLE: iteration 1
+smoothSolver:  Solving for p, Initial residual = 3.2e+01, Final residual = 1.6e+00, No Iterations 31
+continuity errors: sum local = 0.41, global = 8.8e-03, cumulative = 9.5e-03
+CourantNumber mean: 0.29 max: 6.04
+
+Time = 0.0435
+deltaT = 0.001
+PIMPLE: iteration 1
+smoothSolver:  Solving for p, Initial residual = 6.8e+02, Final residual = 3.4e+01, No Iterations 40
+continuity errors: sum local = 3.9, global = 0.12, cumulative = 0.13
+CourantNumber mean: 0.61 max: 11.8
+
+Time = 0.044
+deltaT = 0.001
+PIMPLE: iteration 1
+Floating point exception
+
+--> FOAM FATAL ERROR:
+Continuity errors cannot be removed.  To debug, set the environmental variable FOAM_SIGFPE to abort.
+
+
+    From function void Foam::pimpleControl::pimpleLoop()
+    in file controls/pimpleControl/pimpleControl.C at line 174.
+
+FOAM exiting
