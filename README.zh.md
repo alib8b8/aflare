@@ -54,7 +54,7 @@ irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 | iex
 把 aflare 工作流作为 CI 步骤运行（预编译二进制，无需 Docker 构建）：
 
 ```yaml
-- uses: alib8b8/aflare/action@v0.11.0
+- uses: alib8b8/aflare/action@main
   with:
     workflow: .aflare/pr-review.yaml
 ```

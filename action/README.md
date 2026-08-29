@@ -5,12 +5,14 @@ Run [aflare](https://github.com/alib8b8/aflare) AI workflows in GitHub Actions â
 ## Usage
 
 ```yaml
-- uses: alib8b8/aflare/action@v0.11.0
+- uses: alib8b8/aflare/action@main
   with:
     workflow: .aflare/pr-review.yaml
     set: |
       pr_number=${{ github.event.pull_request.number }}
 ```
+
+> **Why `@main`?** The `action/` directory landed after the `v0.11.0` tag, so `@v0.11.0` fails with "Can't find action.yml". Pin to the first release tag that ships the action (v0.12.0+) once available â€” pinning the `version` input (below) keeps the installed CLI reproducible in the meantime.
 
 ### Inputs
 
@@ -46,7 +48,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: alib8b8/aflare/action@v0.11.0
+      - uses: alib8b8/aflare/action@main
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         with:
@@ -59,7 +61,7 @@ jobs:
 **Install the CLI only**, then run several workflows in later steps:
 
 ```yaml
-- uses: alib8b8/aflare/action@v0.11.0
+- uses: alib8b8/aflare/action@main
 - run: aflare validate .aflare/deploy.yaml
 - run: aflare --safe-mode run .aflare/audit.yaml
 ```
@@ -75,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: alib8b8/aflare/action@v0.11.0
+      - uses: alib8b8/aflare/action@main
         with:
           version: v0.11.0
           workflow: .aflare/daily-digest.yaml
