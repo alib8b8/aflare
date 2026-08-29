@@ -31,12 +31,47 @@ import (
 // TaskFunc is the body of a scheduled task. The context is cancelled when the
 // scheduler stops, so long-running tasks can abort promptly on shutdown
 // rather than blocking Stop() indefinitely.
+//
+// TaskFunc cannot report failure (no error return), so tasks registered via
+// AddTask are executed once per scheduled time with no retry. Prefer
+// AddRetryingTask with a RetryTaskFunc when failures should be retried.
 type TaskFunc func(context.Context)
 
+// RetryTaskFunc is a task body that reports failure. A non-nil error (or a
+// panic) triggers the task's RetryPolicy; context cancellation aborts the
+// retry loop without counting as a failure.
+type RetryTaskFunc func(context.Context) error
+
+// RetryPolicy controls automatic retries of a failing scheduled task.
+// MaxRetries is the number of retries AFTER the initial attempt
+// (0 = no retry, matching the historical execute-once behaviour).
+// Delay is the base backoff delay; retries use Delay, 2×Delay, 4×Delay, ...
+// capped at MaxTaskRetryDelay.
+type RetryPolicy struct {
+	MaxRetries int
+	Delay      time.Duration
+}
+
+// Bounds for RetryPolicy. MaxTaskRetries mirrors the workflow executor's
+// step-retry cap; MaxTaskRetryDelay keeps a wedged task from blocking
+// scheduler shutdown for unbounded time.
+const (
+	MaxTaskRetries    = 10
+	MaxTaskRetryDelay = 5 * time.Minute
+
+	// DefaultTaskRetryDelay is used when RetryPolicy.Delay is unset.
+	DefaultTaskRetryDelay = 30 * time.Second
+)
+
 type Task struct {
-	ID       string
-	Expr     string
-	Func     TaskFunc
+	ID   string
+	Expr string
+	Func TaskFunc
+	// ErrFunc, when set, takes precedence over Func and enables retry on
+	// failure per Retry.
+	ErrFunc RetryTaskFunc
+	Retry   RetryPolicy
+
 	schedule *cronSchedule
 	nextRun  time.Time
 }
@@ -98,6 +133,47 @@ func (s *Scheduler) AddTask(id string, expr string, fn TaskFunc) error {
 		nextRun:  nextRunTime(schedule, now),
 	}
 	s.tasks[id] = task
+	return nil
+}
+
+// AddRetryingTask registers a scheduled task whose failures are automatically
+// retried per policy. MaxRetries is clamped to [0, MaxTaskRetries]; a
+// non-positive Delay falls back to DefaultTaskRetryDelay.
+func (s *Scheduler) AddRetryingTask(id string, expr string, fn RetryTaskFunc, policy RetryPolicy) error {
+	if fn == nil {
+		return fmt.Errorf("task %q: retry task function must not be nil", id)
+	}
+	if policy.MaxRetries < 0 {
+		policy.MaxRetries = 0
+	}
+	if policy.MaxRetries > MaxTaskRetries {
+		policy.MaxRetries = MaxTaskRetries
+	}
+	if policy.Delay <= 0 {
+		policy.Delay = DefaultTaskRetryDelay
+	}
+
+	schedule, err := parseCronExpr(expr)
+	if err != nil {
+		return fmt.Errorf("invalid cron expression: %w", err)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.tasks[id]; exists {
+		return fmt.Errorf("task with id %q already exists", id)
+	}
+
+	now := time.Now()
+	s.tasks[id] = &Task{
+		ID:       id,
+		Expr:     expr,
+		ErrFunc:  fn,
+		Retry:    policy,
+		schedule: schedule,
+		nextRun:  nextRunTime(schedule, now),
+	}
 	return nil
 }
 
@@ -215,6 +291,10 @@ func (s *Scheduler) checkAndRunTasks(now time.Time, taskCtx context.Context) {
 		s.taskWg.Add(1)
 		go func(t *Task) {
 			defer s.taskWg.Done()
+			if t.ErrFunc != nil {
+				s.runTaskWithRetry(taskCtx, t)
+				return
+			}
 			defer func() {
 				if r := recover(); r != nil {
 					logger.Error("scheduled task panicked",
@@ -233,6 +313,70 @@ func (s *Scheduler) checkAndRunTasks(now time.Time, taskCtx context.Context) {
 		}
 		s.mu.Unlock()
 	}
+}
+
+// runTaskWithRetry executes t.ErrFunc and retries failures per t.Retry with
+// exponential backoff. Panics are converted to errors so a crashing task body
+// is retried like any other failure. Context cancellation aborts the loop:
+// the pending attempt is abandoned and NOT counted as a failure, because
+// shutdown is not the task's fault.
+func (s *Scheduler) runTaskWithRetry(ctx context.Context, t *Task) {
+	for attempt := 0; ; attempt++ {
+		err := callTaskFunc(ctx, t)
+		if err == nil {
+			return
+		}
+
+		if attempt >= t.Retry.MaxRetries {
+			logger.Error("scheduled task failed permanently",
+				"task_id", t.ID,
+				"cron", t.Expr,
+				"attempts", attempt+1,
+				"error", err,
+			)
+			return
+		}
+
+		delay := retryDelay(t.Retry.Delay, attempt)
+		logger.Warn("scheduled task failed, retrying",
+			"task_id", t.ID,
+			"cron", t.Expr,
+			"attempt", attempt+1,
+			"max_attempts", t.Retry.MaxRetries+1,
+			"error", err,
+			"retry_in", delay.String(),
+		)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+	}
+}
+
+// callTaskFunc invokes t.ErrFunc, converting a panic into an error (with the
+// stack in the message) so the retry loop can treat it as a retryable
+// failure instead of losing the task silently.
+func callTaskFunc(ctx context.Context, t *Task) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("task panicked: %v\n%s", r, debug.Stack())
+		}
+	}()
+	return t.ErrFunc(ctx)
+}
+
+// retryDelay returns the backoff before retry number `attempt` (0-based):
+// delay × 2^attempt, capped at MaxTaskRetryDelay.
+func retryDelay(base time.Duration, attempt int) time.Duration {
+	d := base
+	for i := 0; i < attempt && d < MaxTaskRetryDelay; i++ {
+		d *= 2
+	}
+	if d > MaxTaskRetryDelay {
+		return MaxTaskRetryDelay
+	}
+	return d
 }
 
 func parseCronExpr(expr string) (*cronSchedule, error) {

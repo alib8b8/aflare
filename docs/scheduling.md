@@ -82,6 +82,8 @@ aflare uses standard 5-field cron expressions:
 |--------|-------------|----------|
 | `--cron` | Cron expression | Yes |
 | `--id` | Unique task identifier | No (auto-generated) |
+| `--retry` | Retry a failed workflow up to N extra times (0–10, default 0) | No |
+| `--retry-delay` | Base backoff delay between retries (default `30s`) | No |
 | `--list` | List all scheduled tasks | No |
 | `--info` | Show task details | No |
 | `--remove` | Remove a task by ID | No |
@@ -241,11 +243,37 @@ steps:
     continue_on_error: true
 ```
 
+## Failure Retry
+
+By default a scheduled workflow runs once per trigger and a failure is only
+logged (historical behaviour). Workflow-based tasks can opt into automatic
+retries with exponential backoff:
+
+```bash
+# Retry a failed run up to 3 extra times, starting at 1m backoff
+# (1m → 2m → 4m, capped at 5m)
+aflare schedule add --cron "0 9 * * *" --retry 3 --retry-delay 1m my-workflow.yaml
+```
+
+| Option | Description |
+|--------|-------------|
+| `--retry <n>` | Retry a failed workflow up to `<n>` extra times (0–10, default 0 = no retry) |
+| `--retry-delay <dur>` | Base backoff delay (default `30s`); retries back off exponentially, capped at `5m` |
+
+Behaviour details:
+
+- A panic in the task body counts as a failure and is retried like an error.
+- Retries apply to the whole workflow execution; per-step retries inside the
+  workflow (`retry` on a step) run first and are independent.
+- Scheduler shutdown aborts pending retries (the in-flight attempt's context
+  is cancelled) — stopping the scheduler is never blocked by a backoff wait.
+- Description-based tasks (executed by `aflare agent`, not the standalone
+  scheduler) do not retry; the agent loop owns their failure handling.
+
 ## Limitations
 
 - Scheduler must remain running for tasks to execute
 - No built-in high availability (consider process managers like systemd)
-- Tasks execute once per scheduled time (no retry on failure)
 - Time zone is determined by the scheduler's host system
 
 ## Systemd Integration

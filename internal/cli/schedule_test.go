@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alib8b8/aflare/internal/scheduler"
 )
@@ -210,8 +211,10 @@ func TestScheduleParseAddArgs(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var cronExpr, taskID, wfPath, desc, autoParse string
+			var maxRetries int
+			var retryDelay string
 			out, err := runScheduleCmd(func() error {
-				return parseScheduleAddArgs(tc.args, &cronExpr, &taskID, &wfPath, &desc, &autoParse)
+				return parseScheduleAddArgs(tc.args, &cronExpr, &taskID, &wfPath, &desc, &autoParse, &maxRetries, &retryDelay)
 			})
 			if tc.wantErr {
 				if code := ExitCode(err); code != 1 {
@@ -635,5 +638,110 @@ func TestScheduleGenerateTaskID(t *testing.T) {
 	// Distinct descriptions yield distinct ids.
 	if generateTaskID("alpha task") == generateTaskID("beta task") {
 		t.Error("expected distinct ids for distinct descriptions")
+	}
+}
+
+// ─── Retry options ──────────────────────────────────────────────────────────
+
+func TestScheduleAddRetryOptions(t *testing.T) {
+	storePath := setupSchedulesStore(t)
+
+	wfPath := filepath.Join(t.TempDir(), "retry-job.yaml")
+	if err := os.WriteFile(wfPath, []byte("steps: []\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runScheduleCmd(func() error {
+		return HandleScheduleAdd([]string{
+			"--id", "retry-job",
+			"--cron", "0 9 * * *",
+			"--retry", "3",
+			"--retry-delay", "45s",
+			wfPath,
+		})
+	})
+	if ExitCode(err) != 0 {
+		t.Fatalf("schedule add with retry failed: %v", err)
+	}
+	if !strings.Contains(out, "Retry:") || !strings.Contains(out, "45s") {
+		t.Errorf("add output missing retry summary, got: %s", out)
+	}
+
+	entries, lerr := scheduler.LoadSchedules(storePath)
+	if lerr != nil || len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d (err=%v)", len(entries), lerr)
+	}
+	if entries[0].MaxRetries != 3 {
+		t.Errorf("MaxRetries = %d, want 3", entries[0].MaxRetries)
+	}
+	if entries[0].RetryDelay != "45s" {
+		t.Errorf("RetryDelay = %q, want %q", entries[0].RetryDelay, "45s")
+	}
+}
+
+func TestScheduleAddRetryDefaultsOmitted(t *testing.T) {
+	storePath := setupSchedulesStore(t)
+
+	_, err := runScheduleCmd(func() error {
+		return HandleScheduleAdd([]string{"--cron", "0 9 * * *", "--desc", "no retry"})
+	})
+	if ExitCode(err) != 0 {
+		t.Fatalf("schedule add without retry failed: %v", err)
+	}
+
+	entries, lerr := scheduler.LoadSchedules(storePath)
+	if lerr != nil || len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d (err=%v)", len(entries), lerr)
+	}
+	if entries[0].MaxRetries != 0 || entries[0].RetryDelay != "" {
+		// omitempty keeps the store byte-compatible with older versions.
+		t.Errorf("default entry must keep retry fields zero, got %+v", entries[0])
+	}
+}
+
+func TestScheduleAddRetryValidation(t *testing.T) {
+	cases := []struct {
+		name   string
+		args   []string
+		wantIn string
+	}{
+		{"negative retry", []string{"--cron", "0 9 * * *", "--desc", "d", "--retry", "-1"}, "--retry must be an integer"},
+		{"retry over cap", []string{"--cron", "0 9 * * *", "--desc", "d", "--retry", "99"}, "--retry must be an integer"},
+		{"retry not a number", []string{"--cron", "0 9 * * *", "--desc", "d", "--retry", "abc"}, "--retry must be an integer"},
+		{"missing retry value", []string{"--cron", "0 9 * * *", "--desc", "d", "--retry"}, "--retry requires a value"},
+		{"bad delay", []string{"--cron", "0 9 * * *", "--desc", "d", "--retry", "1", "--retry-delay", "nope"}, "--retry-delay must be a positive duration"},
+		{"delay over cap", []string{"--cron", "0 9 * * *", "--desc", "d", "--retry", "1", "--retry-delay", "10m"}, "--retry-delay must be a positive duration"},
+		{"missing delay value", []string{"--cron", "0 9 * * *", "--desc", "d", "--retry-delay"}, "--retry-delay requires a value"},
+		{"equals form bad retry", []string{"--cron", "0 9 * * *", "--desc", "d", "--retry=xyz"}, "--retry must be an integer"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := runScheduleCmd(func() error { return HandleScheduleAdd(tc.args) })
+			if code := ExitCode(err); code != 1 {
+				t.Errorf("exit code = %d, want 1 (err=%v)", code, err)
+			}
+			if !strings.Contains(out, tc.wantIn) {
+				t.Errorf("output %q does not contain %q", out, tc.wantIn)
+			}
+		})
+	}
+}
+
+func TestScheduleEntryRetryDelayDuration(t *testing.T) {
+	cases := []struct {
+		entry scheduler.ScheduleEntry
+		want  time.Duration
+	}{
+		{scheduler.ScheduleEntry{}, scheduler.DefaultTaskRetryDelay},
+		{scheduler.ScheduleEntry{RetryDelay: ""}, scheduler.DefaultTaskRetryDelay},
+		{scheduler.ScheduleEntry{RetryDelay: "45s"}, 45 * time.Second},
+		{scheduler.ScheduleEntry{RetryDelay: "1m"}, time.Minute},
+		{scheduler.ScheduleEntry{RetryDelay: "garbage"}, scheduler.DefaultTaskRetryDelay},
+		{scheduler.ScheduleEntry{RetryDelay: "-5s"}, scheduler.DefaultTaskRetryDelay},
+	}
+	for _, tc := range cases {
+		if got := tc.entry.RetryDelayDuration(); got != tc.want {
+			t.Errorf("RetryDelayDuration(%q) = %v, want %v", tc.entry.RetryDelay, got, tc.want)
+		}
 	}
 }

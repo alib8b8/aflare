@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/alib8b8/aflare/internal/meta"
 )
@@ -36,6 +37,26 @@ type ScheduleEntry struct {
 	Cron         string `json:"cron"`
 	WorkflowPath string `json:"workflow_path,omitempty"`
 	Description  string `json:"description,omitempty"` // natural language task description
+	// MaxRetries is the number of retries after a failed workflow execution
+	// (0 = execute once, historical behaviour). Only workflow-based tasks
+	// retry; description-based tasks are handled by the agent loop.
+	MaxRetries int `json:"max_retries,omitempty"`
+	// RetryDelay is the base backoff delay as a duration string ("30s").
+	// Empty means DefaultTaskRetryDelay.
+	RetryDelay string `json:"retry_delay,omitempty"`
+}
+
+// RetryDelayDuration returns RetryDelay parsed as a duration, falling back to
+// DefaultTaskRetryDelay when unset or unparseable.
+func (e ScheduleEntry) RetryDelayDuration() time.Duration {
+	if e.RetryDelay == "" {
+		return DefaultTaskRetryDelay
+	}
+	d, err := time.ParseDuration(e.RetryDelay)
+	if err != nil || d <= 0 {
+		return DefaultTaskRetryDelay
+	}
+	return d
 }
 
 // DefaultSchedulesPath returns the default path to the schedules store file
