@@ -160,11 +160,11 @@ aflare puts **local users first** (intranet / enterprise scenarios are equally s
 
 **Local data connectors (Connector API)** — Explicitly authorize local directories, note libraries and local databases via `aflare connector add`; workflows reference only the connector name. `files` / `notes` directory connectors apply the workdir sandbox's containment rules (no absolute paths, no traversal, unconditional symlink-escape rejection, extension allowlists, byte limits) to roots you grant like `~/notes` or `~/Documents`; `sqlite` / `mysql` / `postgres` database connectors keep credentials exclusively in the secrets store / environment variables, with SQLite read-only defense-in-depth (DSN forced to `mode=ro`). Permission ceilings declared on the connector (read-only, rows, bytes) can only be tightened by nodes, never loosened — you define the AI's capability boundary.
 
-**Local-first, data never leaves your machine** — Single binary with zero runtime deps, runs in ~10–30MB RAM; workflows, execution history, memory and secrets all stay on local disk; API keys are injected via environment variables or the OS keyring, never written in cleartext to `config.yaml`; fully offline-capable (offline install, `aflare doctor --offline`, WebUI Mermaid offline fallback).
+**Local-first, data stays on local disk** — Single binary with zero runtime deps, runs in ~10–30MB RAM; workflows, execution history, memory and secrets all stay on local disk; API keys are injected via environment variables or the OS keyring, never written in cleartext to `config.yaml`; fully offline-capable (offline install, `aflare doctor --offline`, WebUI Mermaid offline fallback).
 
 **Connect your own LLM** — Ollama / vLLM / LM Studio / local DeepSeek / any OpenAI-compatible endpoint, with loopback addresses (127.0.0.1 / localhost) requiring no API key. With a local LLM, the LLM drives intent understanding and dynamic workflow generation (`--ai` / `chat`); without one, keyword matching falls back so offline use still works.
 
-**Connect your own databases and knowledge bases** — SQL Query node connects directly to your database, RAG node + vector store + document parsing hook into your knowledge base, MCP protocol bridges external services, and custom nodes let you write any integration in Go. aflare never exfiltrates your data and telemetry is opt-out — it only does the work; your data stays yours.
+**Connect your own databases and knowledge bases** — SQL Query node connects directly to your database, RAG node + vector store + document parsing hook into your knowledge base, MCP protocol bridges external services, and custom nodes let you write any integration in Go. Data is sent only to the endpoints you explicitly configure (your LLM, your databases) — no other network calls; there is no usage telemetry, and OTel tracing stays inert until you configure an endpoint. Your data stays yours.
 
 **Deterministic execution guarantees** — YAML declarative workflows: every step's action, dependencies and failure handling are fully determined. DAG parallel scheduling (TLA+ formally verified), WAL crash recovery + checkpoint (`--resume` from the interruption point), cross-turn session persistence, Saga transactional compensation, idempotency (Idempotency-Key + cross-process lock), retry / rate limit / circuit breaker. Every operation is traceable, replayable, verifiable.
 
@@ -205,7 +205,7 @@ aflare puts **local users first** (intranet / enterprise scenarios are equally s
 | **Connector API** (`files`/`notes`/`sqlite`/`mysql`/`postgres` named connectors, credential isolation + permission ceilings + root containment) | ✅ | Tested |
 | **Step-level Output Contracts** (`output_schema`) | ✅ | Tested |
 | **Bounded Preview Inputs** (`preview_input`, 16KiB) | ✅ | Tested |
-| LLM Nodes (18 built-in providers, any OpenAI-compatible model usable) | ✅ | Tested |
+| LLM Nodes (20+ built-in providers, any OpenAI-compatible model usable) | ✅ | Tested |
 | Security Levels (L0-L3) | ✅ | Tested |
 
 > See [Experimental](#experimental) below for experimental features.
@@ -280,7 +280,7 @@ aflare agent list    # view registered, commandable external agents
 - **Retry / Rate Limit / Circuit Breaker** — exponential backoff + token bucket + breaker state machine
 
 ### Security & Compliance
-- HMAC hash-chain audit log (tamper-proof)
+- HMAC hash-chain audit log (tamper-evident)
 - AES-GCM encryption + PBKDF2 (600K iterations)
 - Auto secret redaction (10+ patterns: AWS/GitHub/JWT/private keys)
 - SSRF protection / Path Traversal / Command Injection whitelist
@@ -290,7 +290,7 @@ aflare agent list    # view registered, commandable external agents
 - Keyword-based YAML workflow generation (`aflare create`, see [`generator.go`](internal/workflow/generator.go))
 
 ### LLM Nodes (call LLM APIs within workflows)
-- 18 built-in providers (OpenAI / DeepSeek / Qwen / GLM / Kimi / Anthropic / Gemini / Mistral / Ollama, etc.), any OpenAI-compatible model usable
+- 20+ built-in providers (OpenAI / DeepSeek / Qwen / GLM / Kimi / Anthropic / Gemini / Mistral / Ollama, etc.), any OpenAI-compatible model usable
 - Fully offline capable (Ollama local LLM)
 - LLM smart routing (EWMA latency prediction + Pareto cost sorting)
 

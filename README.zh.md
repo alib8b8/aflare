@@ -159,17 +159,17 @@ aflare 面向本地用户优先（企业内网等场景同样适用），服务�
 
 **本地数据连接器（Connector API）** — 用 `aflare connector add` 显式授权本地目录、笔记库、本地数据库，工作流只引用连接器名：`files` / `notes` 目录连接器把 workdir 沙箱的遏制规则（禁绝对路径、禁穿越、symlink 逃逸无条件拒绝、扩展名白名单、字节数上限）应用到 `~/notes`、`~/Documents` 等你授权的根；`sqlite` / `mysql` / `postgres` 数据库连接器凭据只存 secrets store / 环境变量，SQLite 只读模式纵深防御（DSN 强制 `mode=ro`）。连接器声明的权限天花板（只读、行数、字节）节点只能收紧、不能放宽——AI 的能力边界由你定义。
 
-**本地优先，数据不出本地** — 单二进制零运行时依赖，约 10–30MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退）。
+**本地优先，数据存于本地磁盘** — 单二进制零运行时依赖，约 10–30MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退）。
 
 **连接你自己的 LLM** — Ollama / vLLM / LM Studio / DeepSeek 本地部署 / 任何 OpenAI 兼容 endpoint，loopback 地址（127.0.0.1 / localhost）免 API Key 接入。有本地 LLM 时由 LLM 做意图理解与动态生成工作流（`--ai` / `chat`），无 LLM 时关键词匹配兜底，离线仍可用。
 
-**连接你自己的数据库与知识库** — SQL Query 节点直连你的数据库，RAG 节点 + 向量存储 + 文档解析接入你的知识库，MCP 协议连接外部服务，自定义节点用 Go 写任意集成。aflare 不回传你的数据，遥测可关闭——只干活，不外传。
+**连接你自己的数据库与知识库** — SQL Query 节点直连你的数据库，RAG 节点 + 向量存储 + 文档解析接入你的知识库，MCP 协议连接外部服务，自定义节点用 Go 写任意集成。数据只发送到你显式配置的 endpoint（你的 LLM、你的数据库），此外无任何网络外发；无使用情况遥测，OTel 追踪在未配置 endpoint 前完全不起作用。数据归你。
 
 **确定性执行保障** — YAML 声明式工作流：每一步做什么、依赖谁、失败怎么办全部确定。DAG 并行调度（TLA+ 形式化验证）、WAL 崩溃恢复 + Checkpoint（`--resume` 从中断处恢复）、Session 跨轮次持久化、Saga 事务补偿、幂等（Idempotency-Key + 跨进程锁）、重试 / 限流 / 熔断。所有操作可追溯、可回放、可验证。
 
 **Agent 与工作流双模式** — 对话式 Agent（`aflare chat`，ReAct 推理循环）与守护进程式 Agent（`aflare agent`，stdin + 定时任务 + 文件监听多源融合）共用同一核心；6 类可插拔能力（反思 / 人机协同 / 效用驱动 / 记忆 / 规划 / 工作流）；Agent 可降级为确定性工作流，灵活性与确定性兼得。
 
-**安全合规** — HMAC 哈希链审计日志（防篡改）、AES-GCM 加密 + PBKDF2（600K 迭代）、Secret 自动脱敏（10+ 种模式：AWS/GitHub/JWT/私钥）、SSRF 防护 / Path Traversal / Command Injection 白名单、出站数据量异常监控 + 熔断器自动隔离、四级安全等级（L0-L3）按需收紧。
+**安全合规** — HMAC 哈希链审计日志（篡改可检测）、AES-GCM 加密 + PBKDF2（600K 迭代）、Secret 自动脱敏（10+ 种模式：AWS/GitHub/JWT/私钥）、SSRF 防护 / Path Traversal / Command Injection 白名单、出站数据量异常监控 + 熔断器自动隔离、四级安全等级（L0-L3）按需收紧。
 
 **一键上手，离线丝滑** — `aflare doctor` 环境自检、`aflare init` 交互式配置向导、未知命令智能提示（did-you-mean）、零配置示例立即可跑。
 
@@ -204,7 +204,7 @@ aflare 面向本地用户优先（企业内网等场景同样适用），服务�
 | **Connector API**（`files`/`notes`/`sqlite`/`mysql`/`postgres` 命名连接器，凭据隔离 + 权限天花板 + 根目录遏制） | ✅ | 有测试 |
 | **步骤级输出契约 `output_schema`** | ✅ | 有测试 |
 | **有界预览输入 `preview_input`**（16KiB） | ✅ | 有测试 |
-| LLM 节点（18 家内置提供商，任意 OpenAI 兼容模型可用） | ✅ | 有测试 |
+| LLM 节点（20+ 家内置提供商，任意 OpenAI 兼容模型可用） | ✅ | 有测试 |
 | 安全等级（L0-L3） | ✅ | 有测试 |
 
 > 实验性功能见下方 [实验性支持](#实验性支持) 章节。
@@ -279,7 +279,7 @@ aflare agent list    # 查看已注册、可指挥的外部 Agent
 - **Retry / Rate Limit / Circuit Breaker** — 指数退避 + 令牌桶 + 熔断器状态机
 
 ### 安全与合规
-- HMAC 哈希链审计日志（防篡改）
+- HMAC 哈希链审计日志（篡改可检测）
 - AES-GCM 加密 + PBKDF2（600K 迭代）
 - Secret 自动脱敏（10+ 种模式：AWS/GitHub/JWT/私钥）
 - SSRF 防护 / Path Traversal / Command Injection 白名单
@@ -289,7 +289,7 @@ aflare agent list    # 查看已注册、可指挥的外部 Agent
 - 关键词匹配生成 YAML 工作流（`aflare create`，见 [`generator.go`](internal/workflow/generator.go)）
 
 ### LLM 节点（工作流中调用 LLM API）
-- 18 家内置提供商（OpenAI / DeepSeek / Qwen / GLM / Kimi / Anthropic / Gemini / Mistral / Ollama 等），任意 OpenAI 兼容模型可用
+- 20+ 家内置提供商（OpenAI / DeepSeek / Qwen / GLM / Kimi / Anthropic / Gemini / Mistral / Ollama 等），任意 OpenAI 兼容模型可用
 - 完全离线运行（Ollama 本地 LLM）
 - LLM 智能路由（EWMA 延迟预测 + 帕累托成本排序）
 
