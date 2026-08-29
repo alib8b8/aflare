@@ -356,8 +356,9 @@ func TestSummarizeCommand_EmptyArgs(t *testing.T) {
 
 func TestSummarizeCommand_NoCommand(t *testing.T) {
 	result := SummarizeCommand("", []string{"hello", "world"})
-	if result != " hello world" {
-		t.Errorf("expected ' hello world', got %q", result)
+	if result != "hello world" {
+		t.Errorf("expected 'hello world' (no leading space — this string "+
+			"becomes the workflow description in `aflare create`), got %q", result)
 	}
 }
 

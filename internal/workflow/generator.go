@@ -94,6 +94,17 @@ func GenerateWorkflow(description string) (*Workflow, error) {
 		wf.Steps = append(wf.Steps, step)
 	}
 
+	// Read intent: "read cpu.log" / "读取 notes.md" → file_read step, so the
+	// monitor-style descriptions produce real input steps instead of only a
+	// notify step. Matched before the write branch; both may coexist
+	// ("read a.log and save to out.txt" → read then write).
+	if m := readFileRegex.FindStringSubmatch(desc); len(m) >= 2 {
+		wf.Steps = append(wf.Steps, WorkflowStep{
+			Node:   "file_read",
+			Params: map[string]string{"path": m[1]},
+		})
+	}
+
 	// Try to extract file path (only allow simple filenames, not paths)
 	fileMatch := fileRegex.FindStringSubmatch(desc)
 	if len(fileMatch) >= 3 {

@@ -68,12 +68,12 @@ func GetSuggestedFilename(description string) string {
 	var keywords []string
 	for _, word := range words {
 		// Skip common words
-		if slices.Contains([]string{"the", "a", "an", "to", "and", "or", "fetch", "save", "write", "run", "from"}, word) {
+		if slices.Contains([]string{"the", "a", "an", "to", "and", "or", "fetch", "save", "write", "run", "from", "every", "each", "when"}, word) {
 			continue
 		}
 		// Clean word - keep alphanumeric, dots, hyphens, underscores
 		word = cleanCharRegex.ReplaceAllString(word, "")
-		if len(word) > 2 {
+		if len(word) >= 2 {
 			keywords = append(keywords, word)
 		}
 	}
@@ -99,7 +99,9 @@ func generateWorkflowName(description string) string {
 	for _, word := range words {
 		// Remove all non-alphanumeric characters except spaces and dots
 		word = cleanNameRegex.ReplaceAllString(word, "")
-		if len(word) > 3 && !slices.Contains([]string{"the", "a", "an", "to", "and", "or", "fetch", "save", "write", "run", "from", "with"}, word) {
+		// Keep short numeric words like "10" ("every 10 minutes" →
+		// "10 Minutes Read", not "Minutes Read"); drop only 1-char noise.
+		if len(word) >= 2 && !slices.Contains([]string{"the", "a", "an", "to", "and", "or", "fetch", "save", "write", "run", "from", "with", "every", "each", "when"}, word) {
 			// Simple title case: capitalize first letter
 			if len(word) > 0 {
 				word = strings.ToUpper(word[:1]) + word[1:]
