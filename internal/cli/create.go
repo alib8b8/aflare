@@ -93,9 +93,9 @@ func HandleCreate(args []string, aiMode bool) error {
 	// 避免用户不知道关键词匹配之外还有 LLM 生成 / 交互式 chat 可用。
 	if !aiMode && detectLLMConfig() {
 		fmt.Println()
-		fmt.Println("💡 已配置 LLM，可用更强大的生成方式：")
-		fmt.Println("   aflare --ai create \"你的需求\"   # 强制用 LLM 生成（适合复杂需求）")
-		fmt.Println("   aflare chat                       # 交互式对话生成/调整工作流")
+		fmt.Println("💡 " + i18n.T("create.llm_hint.title"))
+		fmt.Println("   aflare --ai create \"" + i18n.T("create.llm_hint.needs") + "\"   # " + i18n.T("create.llm_hint.ai_desc"))
+		fmt.Println("   aflare chat                       # " + i18n.T("create.llm_hint.chat_desc"))
 	}
 
 	if interactive {

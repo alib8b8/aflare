@@ -26,7 +26,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -674,9 +673,12 @@ func GetMasterPassword() (string, error) {
 
 	// 2. Try environment variable
 	if password := os.Getenv("AFLARE_SECRETS_PASSWORD"); password != "" {
-		// Store in keyring for future use (best-effort)
+		// Store in keyring for future use (best-effort). Headless
+		// environments (Docker/CI) have no keyring — that is an
+		// expected condition, so only surface it at debug level
+		// instead of scaring the user on every secrets command.
 		if err := keyring.Set(keyringService, "master", password); err != nil {
-			log.Printf("[secrets] failed to cache master password in keyring: %v", err)
+			logger.Debug("secrets: keyring cache unavailable (headless env?)", "error", err)
 		}
 		return password, nil
 	}
@@ -692,9 +694,10 @@ func GetMasterPassword() (string, error) {
 		if len(password) == 0 {
 			return "", errors.New("master password cannot be empty")
 		}
-		// Store in keyring for future use (best-effort)
+		// Store in keyring for future use (best-effort; see env branch
+		// above for why failures stay at debug level).
 		if err := keyring.Set(keyringService, "master", string(password)); err != nil {
-			log.Printf("[secrets] failed to cache master password in keyring: %v", err)
+			logger.Debug("secrets: keyring cache unavailable (headless env?)", "error", err)
 		}
 		return string(password), nil
 	}

@@ -27,6 +27,7 @@ import (
 
 	"github.com/alib8b8/aflare/internal/config"
 	"github.com/alib8b8/aflare/internal/history"
+	"github.com/alib8b8/aflare/internal/i18n"
 	"github.com/alib8b8/aflare/internal/meta"
 	"github.com/alib8b8/aflare/internal/registry"
 	"github.com/alib8b8/aflare/internal/secrets"
@@ -51,9 +52,9 @@ func HandleDoctor(args []string) error {
 		}
 	}
 
-	fmt.Println("环境检查：")
+	fmt.Println(i18n.T("doctor.title"))
 	if offline {
-		fmt.Println("（--offline：已跳过外网连通性检查，仅检查本地环境）")
+		fmt.Println(i18n.T("doctor.offline_note"))
 	}
 	fmt.Println()
 
@@ -67,25 +68,25 @@ func HandleDoctor(args []string) error {
 
 	// 3. bubblewrap.
 	if bwrapPath, ok := detectCommand("bwrap"); ok {
-		fmt.Printf("  ✓ bubblewrap 已安装 (%s)\n", bwrapPath)
+		fmt.Println(i18n.T("doctor.bwrap_installed", bwrapPath))
 	} else {
-		fmt.Println("  ✗ bubblewrap 未安装（部分模板需要沙箱执行代码）")
+		fmt.Println(i18n.T("doctor.bwrap_missing"))
 		problems = append(problems, doctorProblem{
-			category: "依赖",
-			desc:     "bubblewrap 未安装",
+			category: i18n.T("doctor.cat.dep"),
+			desc:     i18n.T("doctor.bwrap_missing"),
 			hint:     bwrapInstallHint(),
 		})
 	}
 
 	// 4. Config file.
 	if cfgPath := findConfigFile(); cfgPath != "" {
-		fmt.Printf("  ✓ 配置文件 %s\n", cfgPath)
+		fmt.Println(i18n.T("doctor.config_found", cfgPath))
 	} else {
-		fmt.Println("  ✗ 配置文件未找到（运行 aflare init 创建）")
+		fmt.Println(i18n.T("doctor.config_missing"))
 		problems = append(problems, doctorProblem{
-			category: "配置",
-			desc:     "配置文件未找到",
-			hint:     "运行 aflare init 创建配置文件",
+			category: i18n.T("doctor.cat.config"),
+			desc:     i18n.T("doctor.config_missing"),
+			hint:     i18n.T("doctor.config_missing_hint"),
 		})
 	}
 
@@ -111,18 +112,15 @@ func HandleDoctor(args []string) error {
 	// github.com probe just times out and would be reported as a "problem"
 	// even though the user's setup is intentionally offline.
 	if offline {
-		fmt.Println("  ⊘ 网络连通性检查已跳过（--offline）")
+		fmt.Println(i18n.T("doctor.net_skipped"))
 	} else if netOK, netDetail := checkNetworkConnectivity(); netOK {
-		fmt.Printf("  ✓ 网络连接正常%s\n", netDetail)
+		fmt.Println(i18n.T("doctor.net_ok", netDetail))
 	} else {
-		fmt.Println("  ✗ 网络连接异常" + netDetail)
+		fmt.Println(i18n.T("doctor.net_fail", netDetail))
 		problems = append(problems, doctorProblem{
-			category: "网络",
-			desc:     "网络连接异常",
-			hint: "部分模板需要访问外部 API，检查代理或网络设置\n" +
-				"  - 如果使用代理：export HTTPS_PROXY=http://127.0.0.1:7890\n" +
-				"  - 如果不需要外网：使用本地模板（aflare list 查看 easy 模板）\n" +
-				"  - 内网/离线环境：运行 aflare doctor --offline 跳过此项",
+			category: i18n.T("doctor.cat.net"),
+			desc:     i18n.T("doctor.net_fail", netDetail),
+			hint:     i18n.T("doctor.net.hint"),
 		})
 	}
 
@@ -130,17 +128,15 @@ func HandleDoctor(args []string) error {
 	// uses raw.githubusercontent.com by default, or AFLARE_REGISTRY_URL).
 	// Skipped in --offline mode for the same reason as step 8.
 	if offline {
-		fmt.Println("  ⊘ 节点注册表可达性检查已跳过（--offline）")
+		fmt.Println(i18n.T("doctor.registry_skipped"))
 	} else if regOK, regDetail := checkRegistryReachability(); regOK {
-		fmt.Printf("  ✓ 节点注册表可达%s\n", regDetail)
+		fmt.Println(i18n.T("doctor.registry_ok", regDetail))
 	} else {
-		fmt.Println("  ✗ 节点注册表不可达" + regDetail)
+		fmt.Println(i18n.T("doctor.registry_fail", regDetail))
 		problems = append(problems, doctorProblem{
-			category: "网络",
-			desc:     "节点注册表不可达",
-			hint: "aflare registry sync 需要访问注册表源\n" +
-				"  - 内网用户：export AFLARE_REGISTRY_URL=https://内网镜像/registry.json\n" +
-				"  - 或使用代理：export HTTPS_PROXY=http://内网代理:端口",
+			category: i18n.T("doctor.cat.net"),
+			desc:     i18n.T("doctor.registry_fail", regDetail),
+			hint:     i18n.T("doctor.registry.hint"),
 		})
 	}
 
@@ -150,17 +146,17 @@ func HandleDoctor(args []string) error {
 	// Summary.
 	fmt.Println()
 	if len(problems) == 0 {
-		fmt.Println("✅ 所有检查通过，aflare 环境正常。")
+		fmt.Println(i18n.T("doctor.all_ok"))
 		return nil
 	}
 
-	fmt.Printf("发现 %d 个问题：\n", len(problems))
+	fmt.Println(i18n.T("doctor.problems_found", len(problems)))
 	for i, p := range problems {
 		fmt.Printf("  %d. %s — %s\n", i+1, p.category, p.desc)
 	}
 
 	fmt.Println()
-	fmt.Println("建议：")
+	fmt.Println(i18n.T("doctor.suggestions"))
 	for i, p := range problems {
 		fmt.Printf("  %d. [%s] %s\n", i+1, p.category, p.desc)
 		for _, line := range strings.Split(p.hint, "\n") {
@@ -184,43 +180,39 @@ type doctorProblem struct {
 // does not, the operator gets the exact upgrade/rollback steps.
 func checkCryptoCompat(problems *[]doctorProblem, secretsPath string) {
 	fmt.Println()
-	fmt.Println("加密与审计兼容性（混布版本检查）：")
+	fmt.Println(i18n.T("doctor.crypto.title"))
 
 	// Audit HMAC key strength: the public default key is forgeable by anyone
 	// who reads the source, which voids the tamper-evidence guarantee.
 	configured, keyFileExists, usingDefault := history.AuditKeyStatus()
 	if usingDefault {
-		fmt.Println("  ✗ 审计链正在使用公开的默认 HMAC 密钥（任何读过源码的人都能伪造审计记录）")
+		fmt.Println(i18n.T("doctor.crypto.audit_default_key"))
 		*problems = append(*problems, doctorProblem{
-			category: "安全",
-			desc:     "审计链使用公开默认 HMAC 密钥，可被伪造",
-			hint: "迁移到独立随机密钥（会开启新链，先归档现有链）：\n" +
-				"  1. aflare audit export --out archive.json（在密钥变更前导出并妥善保存旧链）\n" +
-				"  2. 备份并移走现有审计日志文件\n" +
-				"  3. 新链首次写入时会自动生成随机密钥文件（audit-hmac.key）\n" +
-				"  或统一配置环境密钥：export AFLARE_AUDIT_HMAC_KEY=$(openssl rand -hex 32)",
+			category: i18n.T("doctor.cat.security"),
+			desc:     i18n.T("doctor.crypto.audit_default_key_desc"),
+			hint:     i18n.T("doctor.crypto.audit_default_key_hint"),
 		})
 	} else if configured {
 		if keyFileExists {
-			fmt.Println("  ✓ 审计 HMAC 密钥：每安装随机密钥文件（audit-hmac.key）")
+			fmt.Println(i18n.T("doctor.crypto.audit_key_file"))
 		} else {
-			fmt.Println("  ✓ 审计 HMAC 密钥：已通过环境变量配置")
+			fmt.Println(i18n.T("doctor.crypto.audit_key_env"))
 		}
 	}
 
 	// Audit chain algorithm mix.
 	if auditPath := history.AuditLogPath(); auditPath == "" {
-		fmt.Println("  ⊘ 审计日志未启用（无历史目录）")
+		fmt.Println(i18n.T("doctor.crypto.audit_disabled"))
 	} else if records, err := history.ReadAuditLogFile(auditPath); err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Printf("  ✗ 审计日志读取失败：%v\n", err)
+			fmt.Println(i18n.T("doctor.crypto.audit_read_fail", err))
 			*problems = append(*problems, doctorProblem{
-				category: "兼容性",
-				desc:     "审计日志读取失败",
-				hint:     fmt.Sprintf("检查文件权限与格式：%s", auditPath),
+				category: i18n.T("doctor.cat.compat"),
+				desc:     i18n.T("doctor.crypto.audit_read_fail_desc"),
+				hint:     i18n.T("doctor.crypto.audit_read_fail_hint", auditPath),
 			})
 		} else {
-			fmt.Println("  ⊘ 尚无审计日志（运行工作流后生成）")
+			fmt.Println(i18n.T("doctor.crypto.audit_none"))
 		}
 	} else {
 		sm3Count := 0
@@ -230,15 +222,13 @@ func checkCryptoCompat(problems *[]doctorProblem, secretsPath string) {
 			}
 		}
 		if sm3Count == 0 {
-			fmt.Printf("  ✓ 审计链 %d 条记录，全部为 SHA-256（0.9.0 之前版本可验证）\n", len(records))
+			fmt.Println(i18n.T("doctor.crypto.audit_sha256", len(records)))
 		} else {
-			fmt.Printf("  ✗ 审计链 %d 条记录中有 %d 条为 SM3 签名，0.9.0 之前的二进制无法验证\n", len(records), sm3Count)
+			fmt.Println(i18n.T("doctor.crypto.audit_sm3", len(records), sm3Count))
 			*problems = append(*problems, doctorProblem{
-				category: "兼容性",
-				desc:     fmt.Sprintf("审计链含 %d 条 SM3 记录，旧版本二进制无法验证", sm3Count),
-				hint: "SM3 记录无法逆转（审计链只增不改），混布环境处理方式：\n" +
-					"  - 升级所有机器到 0.9.0+（aflare self-update），旧二进制仅无法验证，追加写入仍安全\n" +
-					"  - 新记录切回默认：unset AFLARE_AUDIT_HMAC_ALGO",
+				category: i18n.T("doctor.cat.compat"),
+				desc:     i18n.T("doctor.crypto.audit_sm3_desc", sm3Count),
+				hint:     i18n.T("doctor.crypto.audit_sm3_hint"),
 			})
 		}
 	}
@@ -247,39 +237,35 @@ func checkCryptoCompat(problems *[]doctorProblem, secretsPath string) {
 	cipherName, legacy, err := secrets.InspectFile(secretsPath)
 	switch {
 	case err != nil:
-		fmt.Printf("  ✗ secrets 存储检查失败：%v\n", err)
+		fmt.Println(i18n.T("doctor.crypto.secrets_check_fail", err))
 		*problems = append(*problems, doctorProblem{
-			category: "兼容性",
-			desc:     "secrets 存储检查失败",
+			category: i18n.T("doctor.cat.compat"),
+			desc:     i18n.T("doctor.crypto.secrets_check_fail_desc"),
 			hint:     err.Error(),
 		})
 	case cipherName == "":
-		fmt.Println("  ⊘ 尚无 secrets 存储（首次保存后生成）")
-	case legacy || cipherName == secrets.CipherAESGCM:
-		legacyNote := "（v1 格式，0.9.0 之前版本无法读取）"
-		if legacy {
-			legacyNote = "（传统格式，0.9.0 之前版本可读取）"
-		}
-		fmt.Println("  ✓ secrets 存储为 AES-256-GCM" + legacyNote)
+		fmt.Println(i18n.T("doctor.crypto.secrets_none"))
+	case legacy:
+		fmt.Println(i18n.T("doctor.crypto.secrets_aes_legacy"))
+	case cipherName == secrets.CipherAESGCM:
+		fmt.Println(i18n.T("doctor.crypto.secrets_aes_v1"))
 	case cipherName == secrets.CipherSM4GCM:
-		fmt.Println("  ✗ secrets 存储为 SM4-GCM，0.9.0 之前的二进制无法读取")
+		fmt.Println(i18n.T("doctor.crypto.secrets_sm4"))
 		*problems = append(*problems, doctorProblem{
-			category: "兼容性",
-			desc:     "secrets 存储为 SM4-GCM，旧版本二进制无法读取",
-			hint: "如需回滚到旧版本可读：\n" +
-				"  1. export AFLARE_SECRETS_CIPHER=aes-gcm\n" +
-				"  2. 任意触发一次保存（如 aflare secrets set 同名值）即可重写为传统格式",
+			category: i18n.T("doctor.cat.compat"),
+			desc:     i18n.T("doctor.crypto.secrets_sm4_desc"),
+			hint:     i18n.T("doctor.crypto.secrets_sm4_hint"),
 		})
 	default:
-		fmt.Printf("  ? secrets 存储使用未知算法 %q\n", cipherName)
+		fmt.Println(i18n.T("doctor.crypto.secrets_unknown", cipherName))
 	}
 
 	// Explicit opt-in env vars: warn even before any data is written.
 	if v := os.Getenv("AFLARE_AUDIT_HMAC_ALGO"); strings.EqualFold(strings.TrimSpace(v), "sm3") {
-		fmt.Println("  ⚠ AFLARE_AUDIT_HMAC_ALGO=sm3 已设置：新审计记录将以 SM3 签名（先升级全部二进制再启用）")
+		fmt.Println(i18n.T("doctor.crypto.warn_hmac_sm3"))
 	}
 	if v := os.Getenv("AFLARE_SECRETS_CIPHER"); strings.EqualFold(strings.TrimSpace(v), "sm4-gcm") {
-		fmt.Println("  ⚠ AFLARE_SECRETS_CIPHER=sm4-gcm 已设置：下次保存将重加密为 SM4-GCM（旧版本二进制无法读取）")
+		fmt.Println(i18n.T("doctor.crypto.warn_cipher_sm4"))
 	}
 }
 
@@ -287,20 +273,20 @@ func checkCryptoCompat(problems *[]doctorProblem, secretsPath string) {
 func bwrapInstallHint() string {
 	switch runtime.GOOS {
 	case "darwin":
-		return "安装命令：brew install bubblewrap"
+		return i18n.T("doctor.bwrap.install_brew")
 	case "linux":
 		if _, ok := detectCommand("apt"); ok {
-			return "安装命令：sudo apt install bubblewrap"
+			return i18n.T("doctor.bwrap.install_apt")
 		}
 		if _, ok := detectCommand("dnf"); ok {
-			return "安装命令：sudo dnf install bubblewrap"
+			return i18n.T("doctor.bwrap.install_dnf")
 		}
 		if _, ok := detectCommand("pacman"); ok {
-			return "安装命令：sudo pacman -S bubblewrap"
+			return i18n.T("doctor.bwrap.install_pacman")
 		}
-		return "请使用你的包管理器安装 bubblewrap"
+		return i18n.T("doctor.bwrap.install_generic")
 	default:
-		return "请参考 bubblewrap 官方文档安装"
+		return i18n.T("doctor.bwrap.install_docs")
 	}
 }
 
@@ -323,10 +309,10 @@ func findConfigFile() string {
 func checkLLMStatus() (string, doctorProblem) {
 	cfg, err := config.LoadConfig()
 	if err != nil || cfg == nil || len(cfg.Providers) == 0 {
-		return "  ⊘ LLM 未配置（运行 aflare init 配置 LLM）", doctorProblem{
-			category: "LLM",
-			desc:     "LLM 未配置",
-			hint:     "运行 aflare init 配置 LLM（本地优先推荐 Ollama）",
+		return i18n.T("doctor.llm.not_configured"), doctorProblem{
+			category: i18n.T("doctor.cat.llm"),
+			desc:     i18n.T("doctor.llm.not_configured_desc"),
+			hint:     i18n.T("doctor.llm.not_configured_hint"),
 		}
 	}
 
@@ -346,44 +332,43 @@ func checkLLMStatus() (string, doctorProblem) {
 		client := &http.Client{Timeout: 3 * time.Second}
 		resp, err := client.Get(ep + "/api/tags")
 		if err != nil {
-			line := fmt.Sprintf("  ✗ Ollama 不可达 (%s)", ep)
-			return line, doctorProblem{
-				category: "LLM",
-				desc:     "Ollama 服务未运行",
-				hint:     "启动 Ollama：ollama serve\n拉取模型：ollama pull " + pcfg.Model,
+			return i18n.T("doctor.llm.ollama_unreachable", ep), doctorProblem{
+				category: i18n.T("doctor.cat.llm"),
+				desc:     i18n.T("doctor.llm.ollama_unreachable_desc"),
+				hint:     i18n.T("doctor.llm.ollama_start_hint", pcfg.Model),
 			}
 		}
 		resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return fmt.Sprintf("  ✗ Ollama 返回状态 %d", resp.StatusCode), doctorProblem{
-				category: "LLM",
-				desc:     "Ollama 服务异常",
-				hint:     "重启 Ollama：ollama serve",
+			return i18n.T("doctor.llm.ollama_bad_status", resp.StatusCode), doctorProblem{
+				category: i18n.T("doctor.cat.llm"),
+				desc:     i18n.T("doctor.llm.ollama_bad_status_desc"),
+				hint:     i18n.T("doctor.llm.ollama_restart_hint"),
 			}
 		}
 		model := pcfg.Model
 		if model == "" {
-			model = "未指定"
+			model = i18n.T("doctor.llm.model_unspecified")
 		}
-		return fmt.Sprintf("  ✓ Ollama 已运行 (模型: %s)", model), doctorProblem{}
+		return i18n.T("doctor.llm.ollama_running", model), doctorProblem{}
 	}
 
 	// Cloud providers: check API key presence (config or env).
 	if pcfg.APIKey == "" {
 		envKey := strings.ToUpper(name) + "_API_KEY"
 		if os.Getenv(envKey) == "" {
-			return fmt.Sprintf("  ✗ %s API Key 未配置", name), doctorProblem{
-				category: "LLM",
-				desc:     name + " API Key 未配置",
-				hint:     fmt.Sprintf("设置环境变量：export %s=your-api-key\n或运行 aflare init 重新配置", envKey),
+			return i18n.T("doctor.llm.api_key_missing", name), doctorProblem{
+				category: i18n.T("doctor.cat.llm"),
+				desc:     i18n.T("doctor.llm.api_key_missing_desc", name),
+				hint:     i18n.T("doctor.llm.api_key_hint", envKey),
 			}
 		}
 	}
 	model := pcfg.Model
 	if model == "" {
-		model = "未指定"
+		model = i18n.T("doctor.llm.model_unspecified")
 	}
-	return fmt.Sprintf("  ✓ %s 已配置 (模型: %s)", name, model), doctorProblem{}
+	return i18n.T("doctor.llm.provider_configured", name, model), doctorProblem{}
 }
 
 // checkNetworkConnectivity tests outbound HTTPS to a well-known host.
@@ -392,13 +377,13 @@ func checkNetworkConnectivity() (bool, string) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Get("https://github.com")
 	if err != nil {
-		return false, "（github.com 不可达）"
+		return false, i18n.T("doctor.net.github_unreachable")
 	}
 	resp.Body.Close()
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
-		return true, "（github.com 可达）"
+		return true, i18n.T("doctor.net.github_ok")
 	}
-	return false, fmt.Sprintf("（github.com 返回状态 %d）", resp.StatusCode)
+	return false, i18n.T("doctor.net.github_status", resp.StatusCode)
 }
 
 // checkOllamaEnvironment probes the local Ollama setup independent of config:
@@ -409,19 +394,19 @@ func checkOllamaEnvironment(problems *[]doctorProblem) {
 	portOK := probeOllamaPort("http://localhost:11434")
 	switch {
 	case binOK && portOK:
-		fmt.Printf("  ✓ Ollama 已安装且服务在运行 (%s)\n", binPath)
+		fmt.Println(i18n.T("doctor.ollama.installed_running", binPath))
 	case binOK && !portOK:
-		fmt.Println("  → Ollama 已安装但服务未运行（ollama serve 启动）")
+		fmt.Println(i18n.T("doctor.ollama.installed_not_running"))
 		*problems = append(*problems, doctorProblem{
-			category: "LLM",
-			desc:     "Ollama 服务未运行",
-			hint:     "启动 Ollama：ollama serve\n拉取模型：ollama pull llama3",
+			category: i18n.T("doctor.cat.llm"),
+			desc:     i18n.T("doctor.llm.ollama_unreachable_desc"),
+			hint:     i18n.T("doctor.ollama.start_hint"),
 		})
 	case !binOK && portOK:
 		// Port responds but binary not on PATH (e.g. installed elsewhere).
-		fmt.Println("  → Ollama 服务在运行（11434 端口可达），但 ollama 命令不在 PATH")
+		fmt.Println(i18n.T("doctor.ollama.running_no_bin"))
 	default:
-		fmt.Println("  ⊘ 未检测到 Ollama（本地优先推荐安装）")
+		fmt.Println(i18n.T("doctor.ollama.not_detected"))
 	}
 }
 
@@ -444,7 +429,7 @@ func checkProxyEnv() {
 	httpsProxy := os.Getenv("HTTPS_PROXY")
 	noProxy := os.Getenv("NO_PROXY")
 	if httpProxy == "" && httpsProxy == "" && noProxy == "" {
-		fmt.Println("  ⊘ 未设置代理环境变量（HTTP_PROXY/HTTPS_PROXY/NO_PROXY）")
+		fmt.Println(i18n.T("doctor.proxy.none"))
 		return
 	}
 	if httpsProxy != "" {
@@ -468,7 +453,7 @@ func checkRegistryReachability() (bool, string) {
 	client.Timeout = 5 * time.Second
 	resp, err := client.Get(srcURL)
 	if err != nil {
-		return false, "（注册表源不可达）"
+		return false, i18n.T("doctor.registry.src_unreachable")
 	}
 	resp.Body.Close()
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
@@ -476,7 +461,7 @@ func checkRegistryReachability() (bool, string) {
 		if u, perr := neturl.Parse(srcURL); perr == nil {
 			host = u.Host
 		}
-		return true, fmt.Sprintf("（%s 可达）", host)
+		return true, i18n.T("doctor.registry.src_ok", host)
 	}
-	return false, fmt.Sprintf("（注册表源返回状态 %d）", resp.StatusCode)
+	return false, i18n.T("doctor.registry.src_status", resp.StatusCode)
 }

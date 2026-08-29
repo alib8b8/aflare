@@ -163,6 +163,17 @@ func ValidateWorkflow(wf *Workflow) []string {
 	return suggestions
 }
 
+// NodeWarning returns the validation warning for a step whose node name does
+// not resolve in the registry. An empty node name means the step is missing
+// its `node` field (e.g. it was written as `action:` by mistake) — saying
+// that explicitly is far more actionable than "unknown node ”".
+func NodeWarning(stepIndex int, nodeName string) string {
+	if nodeName == "" {
+		return fmt.Sprintf("Step %d: missing 'node' field (each step needs `node: <name>`)", stepIndex)
+	}
+	return fmt.Sprintf("Step %d: unknown node '%s'", stepIndex, nodeName)
+}
+
 // hasFileWriteStep reports whether any step uses the file_write node, recursing
 // into compound steps (if/then/else, parallel, map, reduce, saga,
 // capture_error, on_error) so that file_write steps nested inside branches are

@@ -198,7 +198,7 @@ func (s *Server) toolWorkflowValidate(args map[string]interface{}) (*toolCallRes
 			continue
 		}
 		if _, ok := reg.Get(step.Node); !ok {
-			warnings = append(warnings, fmt.Sprintf("Step %d: unknown node '%s'", i+1, step.Node))
+			warnings = append(warnings, workflow.NodeWarning(i+1, step.Node))
 		}
 	}
 
