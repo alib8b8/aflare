@@ -117,6 +117,7 @@ func RegisterBuiltins(reg *Registry) {
 	reg.Register(&CombineNode{})
 	reg.Register(&TransformNode{})
 	reg.Register(&NotifyNode{})
+	reg.Register(&EmailSendNode{})
 	reg.Register(&OllamaNode{})
 	reg.Register(&CallNode{})
 

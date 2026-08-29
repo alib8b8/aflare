@@ -1,6 +1,6 @@
 # Node Reference
 
-> Auto-generated from `Schema()` metadata. 70 nodes registered.
+> Auto-generated from `Schema()` metadata. 71 nodes registered.
 
 | Node | Description | Params |
 |------|-------------|--------|
@@ -27,6 +27,7 @@
 | [`doc_gen`](#doc_gen) | AI自动文档生成节点。自动生成和更新代码库文档，支持README、API文档、函数注释、模块�... | 6 |
 | [`doc_parse`](#doc_parse) | Parse documents (PDF/images/HTML) into text, LaTeX, or HTML table format | 7 |
 | [`drone`](#drone) | Control MAVLink-compatible drones (PX4/ArduPilot) via HTTP bridge. Supports arm/disarm, takeoff, land, RTL, waypoint ... | 17 |
+| [`email_send`](#email_send) | Send an email over SMTP (implicit TLS on port 465, STARTTLS elsewhere; plaintext only for loopback relays) | 12 |
 | [`engineer_skills`](#engineer_skills) | 预置工程技能包，覆盖前端/后端/DevOps/架构/安全/数据/信创七大领域共 24 项技能。支持�... | 5 |
 | [`evaluator`](#evaluator) | Evaluator agent that scores output against criteria with structured rubrics | 9 |
 | [`execute`](#execute) | Execute shell commands (disabled in safe mode) | 3 |
@@ -608,6 +609,32 @@ Control MAVLink-compatible drones (PX4/ArduPilot) via HTTP bridge. Supports arm/
 | `max_flight_time_s` | string | No | 300 | Maximum flight time in seconds (default: 300) |
 | `geofence_radius_m` | float | No | 200 | Geofence radius in meters (default: 200) |
 | `timeout` | string | No | 15 | HTTP request timeout in seconds (default: 15) |
+
+---
+
+## email_send
+
+Send an email over SMTP (implicit TLS on port 465, STARTTLS elsewhere; plaintext only for loopback relays)
+
+- **Input**: string - email body (used when the body param is empty)
+- **Output**: string - delivery summary (host, recipients, subject)
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `host` | string | Yes |  | SMTP server hostname or IP (e.g. smtp.gmail.com) |
+| `port` | int | No | 587 | SMTP port (465=implicit TLS, 587=STARTTLS; default 587) |
+| `from` | string | Yes |  | Sender address (plain email; display names are stripped) |
+| `to` | string | Yes |  | Comma-separated recipient addresses (max 50 incl. cc) |
+| `cc` | string | No |  | Comma-separated CC addresses (optional) |
+| `subject` | string | No | aflare notification | Subject line (default 'aflare notification') |
+| `body` | string | No |  | Email body (overrides the node input) |
+| `username` | string | No |  | SMTP AUTH username (omit for unauthenticated local relays) |
+| `password` | string | No |  | SMTP password. Prefer password_env so secrets stay out of workflow files |
+| `password_env` | string | No |  | Environment variable holding the SMTP password (e.g. AFLARE_SMTP_PASSWORD) |
+| `tls_mode` | string | No | auto | TLS strategy: auto (465=implicit TLS, else STARTTLS), starttls (always require STARTTLS), tls (always implicit TLS) |
+| `timeout` | int | No | 30 | Dial+dialogue timeout in seconds (default 30, max 120) |
 
 ---
 
