@@ -102,7 +102,7 @@ aflare chat / agent          aflare create
 
 - **本地优先，数据不出本地** —— 单二进制、零运行时依赖、内存约 10–30MB；工作流、执行历史、记忆和密钥全部留在本地磁盘；完全支持离线；无使用遥测。
 - **接入你自己的 LLM** —— Ollama / vLLM / LM Studio / 任何 OpenAI 兼容接口；回环地址无需 API Key；没有 LLM 时关键词匹配兜底，离线照样能用。
-- **本地数据连接器** —— 命名、显式授权的目录与数据库连接器（`files` / `notes` / `sqlite` / `mysql` / `postgres`）；凭据只存于加密密钥库，权限上限只能收紧、不能放宽。见 [Connector API](docs/connector-api.md)。
+- **本地数据与 API 连接器** —— 命名、显式授权的目录、数据库与 HTTP API 连接器（`files` / `notes` / `sqlite` / `mysql` / `postgres` / `http`）；凭据只存于加密密钥库，权限上限只能收紧、不能放宽。见 [Connector API](docs/connector-api.md)。
 - **确定性运行时** —— DAG 并行调度（TLA+ 形式化验证）、WAL 崩溃恢复 + `--resume` 断点续跑、Saga 事务补偿、幂等、重试/限流/熔断。每个操作可追溯、可重放、可验证。
 - **Agent + 工作流双模式** —— 对话式 ReAct Agent（`aflare chat`）与守护进程 Agent（`aflare agent`）共用一个内核；6 种可插拔能力（反思 / 人工介入 / 效用驱动 / 记忆 / 规划 / 工作流）。
 - **Agent 互联与指挥** —— aflare 指挥和监督其他 Agent：CLI 通道（`codex` / `claude` / `gemini` 或任意通用 CLI）与 A2A 协议通道，`supervisor` 节点真实委派，单 Agent 失败不拖垮整批。

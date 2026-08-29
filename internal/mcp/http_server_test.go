@@ -260,3 +260,36 @@ func TestServeHTTPMode_RequiresTokenAndAddr(t *testing.T) {
 		t.Error("expected error for empty address")
 	}
 }
+
+func TestHTTPMCP_ConcurrencyCap(t *testing.T) {
+	s := &Server{authToken: "secret"}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/mcp", s.handleMCPJSONRPC)
+	mux.HandleFunc("/v1/call", s.handleV1Call)
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	// Saturate every in-flight slot, then prove the next request gets 503.
+	sem := s.httpSemaphore()
+	for i := 0; i < httpMaxConcurrent; i++ {
+		sem <- struct{}{}
+	}
+	resp := postJSON(t, ts.URL+"/mcp", "secret", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("/mcp status = %d, want 503 when saturated", resp.StatusCode)
+	}
+
+	// Unauthorized requests must not consume slots: they are rejected at
+	// the auth check, before the semaphore is consulted.
+	resp = postJSON(t, ts.URL+"/v1/call", "wrong", `{"name":"node_list"}`)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("/v1/call status = %d, want 401 even when saturated", resp.StatusCode)
+	}
+
+	// Free one slot and the very same request succeeds again.
+	<-sem
+	resp = postJSON(t, ts.URL+"/mcp", "secret", `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/mcp status = %d, want 200 after releasing a slot", resp.StatusCode)
+	}
+}
