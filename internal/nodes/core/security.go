@@ -367,6 +367,13 @@ func loopbackAllowed() bool {
 	return v == "1" || v == "true" || v == "yes"
 }
 
+// LoopbackAllowed re-exports loopbackAllowed for node implementations
+// outside core (e.g. email_send) that enforce the same dial-time IP policy
+// as the HTTP nodes.
+func LoopbackAllowed() bool {
+	return loopbackAllowed()
+}
+
 // llmAllowNoKey reports whether the OpenAI-compatible node should skip its
 // mandatory api_key check for loopback endpoints. Local LLM servers (vLLM,
 // LM Studio, Ollama's OpenAI-compatible /v1 port, text-embeddings-inference,

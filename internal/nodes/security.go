@@ -94,6 +94,14 @@ func validateURL(rawURL string) error {
 	return core.ValidateURL(rawURL)
 }
 
+// loopbackAllowed reports whether AFLARE_ALLOW_LOOPBACK=1 permits
+// loopback connections (local dev/demo only). Non-HTTP nodes (e.g.
+// email_send) consult it to pick the same dial-time IP validator as the
+// HTTP nodes.
+func loopbackAllowed() bool {
+	return core.LoopbackAllowed()
+}
+
 // validateIP reports whether ip is safe to connect to.
 func validateIP(ip net.IP, displayHost string) error {
 	return core.ValidateIP(ip, displayHost)
