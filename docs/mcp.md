@@ -15,16 +15,20 @@ MCP allows aflare to act as a tool server that can be called by AI agents. This 
 ### Start MCP Server
 
 ```bash
-# Start MCP server (stdio transport; the only transport currently supported)
+# Start MCP server (stdio transport, the default)
 aflare mcp
 
 # Equivalent flag form
 aflare --mcp-server
+
+# HTTP transport (token required) — see "HTTP Mode" below
+aflare mcp --port 8082 --token "$MCP_TOKEN"
 ```
 
 ### Connect from AI Agent
 
-The MCP server follows the JSON-RPC 2.0 protocol over stdin/stdout (stdio transport).
+The MCP server follows the JSON-RPC 2.0 protocol over stdin/stdout (stdio
+transport) or HTTP (see "HTTP Mode" below).
 
 ## Protocol Specification
 
@@ -238,23 +242,57 @@ assistant = client.beta.assistants.create(
 )
 ```
 
-### HTTP Mode (planned)
+### HTTP Mode
 
-> Not implemented yet. The current server is stdio-only; HTTP transport is on
-> the roadmap. The block below describes the target design.
+The MCP server can also run over HTTP instead of stdio. HTTP mode is
+**token-required**: the listener is a network surface, so unlike loopback
+stdio there is no auth-free mode.
 
 ```bash
-# Start MCP server in HTTP mode (planned)
-aflare mcp --port 8082
+# Start MCP server in HTTP mode (binds 127.0.0.1 by default)
+aflare mcp --port 8082 --token "$MCP_TOKEN"
 
-# Call via HTTP (planned)
+# Or take the token from the environment
+AFLARE_MCP_TOKEN=... aflare mcp --port 8082
+```
+
+| Flag | Description |
+|------|-------------|
+| `--port <port>` | Enable HTTP mode and listen on this port |
+| `--host <host>` | Bind address (default `127.0.0.1`; `0.0.0.0` must be explicit) |
+| `--token <token>` | Required auth token (or `AFLARE_MCP_TOKEN`) |
+
+Every request must carry the token in the `X-MCP-Token` header.
+
+**Endpoint 1: `POST /mcp`** — standard JSON-RPC 2.0, the same message format
+the stdio transport accepts (one request per POST, one response per request):
+
+```bash
+curl -X POST http://localhost:8082/mcp \
+  -H "Content-Type: application/json" \
+  -H "X-MCP-Token: $MCP_TOKEN" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+**Endpoint 2: `POST /v1/call`** — simplified direct tool call without the
+JSON-RPC envelope; the response body is the tool result:
+
+```bash
 curl -X POST http://localhost:8082/v1/call \
   -H "Content-Type: application/json" \
+  -H "X-MCP-Token: $MCP_TOKEN" \
   -d '{
     "name": "workflow_run",
     "arguments": {"file": "test.yaml"}
   }'
 ```
+
+Notes:
+
+- Request bodies are capped at 1 MiB; oversized bodies get `413`.
+- Tool-level failures return HTTP 200 with a JSON-RPC error object (so
+  clients can parse errors uniformly); transport failures use 4xx status
+  codes (401 unauthorized, 405 wrong method, 400 malformed body).
 
 ## Security
 
