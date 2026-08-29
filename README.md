@@ -54,7 +54,7 @@ irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 | iex
 Run aflare workflows as CI steps (checksum-verified binary, no Docker build):
 
 ```yaml
-- uses: alib8b8/aflare/action@v0.11.0
+- uses: alib8b8/aflare/action@main
   with:
     workflow: .aflare/pr-review.yaml
 ```
