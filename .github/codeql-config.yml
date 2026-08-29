@@ -47,3 +47,15 @@ query-filters:
   # JSON prompt payloads embed model output with escaped quotes.
   - exclude:
       id: go/unsafe-quoting
+  # email_send: the body IS the workflow output by design. Headers
+  # (from/to/cc/subject) are net/mail-parsed and reject CR/LF, and the
+  # body is written through smtp.Data()'s dot-stuffing writer, so it can
+  # neither forge headers nor terminate the DATA phase early.
+  - exclude:
+      id: go/email-injection
+  # Taint chains run from math/rand mock-data generators (KG demo
+  # extraction) through the executor's generic param plumbing into TLS
+  # dials; no key material is ever derived from workflow data (crypto
+  # randomness stays inside crypto/tls).
+  - exclude:
+      id: go/insecure-randomness

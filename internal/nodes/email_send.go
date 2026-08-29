@@ -379,7 +379,7 @@ func deliverEmail(ctx context.Context, host string, port int, implicitTLS, requi
 	var err error
 	if implicitTLS {
 		d := &tls.Dialer{NetDialer: smtpDialer(timeout), Config: emailTLSConfig(host)}
-		conn, err = d.DialContext(ctx, "tcp", addr)
+		conn, err = d.DialContext(ctx, "tcp", addr) // codeql[go/insecure-randomness] -- ServerName is a format-validated hostname (validateSMTPHost); all TLS randomness (keys, client hello) stays inside crypto/tls, never derived from workflow data
 	} else {
 		conn, err = smtpDialer(timeout).DialContext(ctx, "tcp", addr)
 	}
@@ -426,7 +426,7 @@ func deliverEmail(ctx context.Context, host string, port int, implicitTLS, requi
 	if err != nil {
 		return fmt.Errorf("DATA failed: %w", err)
 	}
-	if _, err := w.Write(msg); err != nil {
+	if _, err := w.Write(msg); err != nil { // codeql[go/email-injection] -- the body is workflow output by design; headers are net/mail-parsed with CR/LF rejected (parseEmailAddresses), and this writer is smtp.Data()'s dot-stuffer, so body content can neither forge headers nor terminate the DATA phase early
 		_ = w.Close()
 		return fmt.Errorf("writing message body failed: %w", err)
 	}
