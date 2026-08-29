@@ -4,8 +4,8 @@
 > 定位：aflare 是 AI 与用户数据之间「确定且安全」的控制层。Connector API
 > 是这个控制层的数据源接入标准 —— 用户自带数据源，aflare 只负责命名连
 > 接、凭据隔离与权限控制。
-> **目标用户：先做个人。** 个人用户的数据在本机：文件、笔记库、个人数据
-> 库（SQLite）。文件/笔记/个人库连接器是第一优先级；企业 profile
+> **目标用户：先做本地。** 本地用户的数据在本机：文件、笔记库、本地数据
+> 库（SQLite）。文件/笔记/本地库连接器是第一优先级；企业 profile
 > （Vault/SSO/内网系统）走同一套接口，排在后面。
 
 ## 1. 解决什么问题
@@ -15,7 +15,7 @@ YAML 里，凭据随日志/分享/版本管理扩散，且没有「这个数据�
 么」的策略声明。
 
 **文件**：现状（`file_read`/`file_write`）把 AI 关进**工作目录**沙箱 ——
-安全，但个人用户的数据（`~/notes`、`~/Documents`）都在沙箱外。要么放弃
+安全，但本地用户的数据（`~/notes`、`~/Documents`）都在沙箱外。要么放弃
 访问，要么放开整个文件系统。缺一个「用户显式授权某个目录根 + 带策略上
 限」的中间层。
 
@@ -36,7 +36,7 @@ workflow (AI 生成)          aflare 控制层                     用户数据
 ┌───────────────┐   ┌──────────────────────────┐   ┌──────────────────────┐
 │ file_read     │   │ Connector Registry       │   │ ~/notes (markdown)   │
 │ file_write    │   │ Spec(命名+root/端点+上限) │   │ ~/Documents          │
-│ files_list ──────▶ root 遏制 + include 白名单 │   │ 个人 SQLite 库        │
+│ files_list ──────▶ root 遏制 + include 白名单 │   │ 本地 SQLite 库        │
 │ sql_query ──────▶ CredentialResolver + DSN   │   │ PostgreSQL / MySQL   │
 └───────────────┘   │ 权限天花板合并            │   │ (企业内网，后续)      │
                     └──────────────────────────┘   └──────────────────────┘
@@ -50,7 +50,7 @@ workflow (AI 生成)          aflare 控制层                     用户数据
 ```yaml
 version: 1
 connectors:
-  # —— 文件/笔记（个人优先主线）——
+  # —— 文件/笔记（本地优先主线）——
   - name: my-notes            # ^[a-z][a-z0-9-]{0,63}$
     type: notes               # notes = markdown 库（include 默认 *.md）
     root: /Users/me/notes     # 绝对路径；节点 path 相对它解析，逃逸即拒绝
@@ -62,12 +62,12 @@ connectors:
     read_only: false          # --writable 显式开启
     include: ["*.md", "*.txt"]  # 扩展名白名单（glob，匹配文件名）
 
-  # —— 个人库（SQLite 文件）——
+  # —— 本地库（SQLite 文件）——
   - name: my-library
     type: sqlite
     database: /Users/me/calibre/metadata.db
 
-  # —— 数据库（个人自建/远程，企业复用同一套）——
+  # —— 数据库（本地自建/远程，企业复用同一套）——
   - name: my-pg
     type: postgres
     host: db.internal.example.com
@@ -118,11 +118,11 @@ files/notes 连接器把「workdir 沙箱」的规则**原样搬到授权目录�
 
 ### 2.4 CredentialResolver —— 部署 profile 的抽象点
 
-`internal/connector.CredentialResolver` 接口是个人版与企业版的分界：
+`internal/connector.CredentialResolver` 接口是本地版与企业版的分界：
 
 | Profile | kind=secret 实现 | kind=env 实现 |
 |---|---|---|
-| 个人（默认） | `secrets.SecretManager`（AES-256-GCM/SM4 加密 + 系统钥匙串托管主密码） | 进程环境变量 |
+| 本地（默认） | `secrets.SecretManager`（AES-256-GCM/SM4 加密 + 系统钥匙串托管主密码） | 进程环境变量 |
 | 企业（Roadmap） | Vault / SSO 短期凭据（同接口实现，启动时注入） | 内网注入的环境变量 |
 
 统一代码库、不同部署 profile：引擎不感知 profile，只感知 Resolver 接口。
@@ -141,7 +141,7 @@ files/notes 连接器本地文件无需凭据，spec 直接拒绝 credential 字
 
 驱动本身仍由宿主程序注册（`sql_query` 不引入第三方/CGO 依赖）。
 
-## 3. 使用方式（个人场景）
+## 3. 使用方式（本地场景）
 
 ```bash
 # 1) 笔记库（Obsidian/Logseq 式 markdown 目录）—— 默认只读、只许 *.md
@@ -151,7 +151,7 @@ aflare connector add my-notes --type notes --root ~/notes
 aflare connector add my-docs --type files --root ~/Documents \
   --writable --include '*.md' --include '*.txt' --max-bytes 1048576
 
-# 3) 个人 SQLite 库（Calibre/浏览器历史/自建库）—— 默认只读（驱动层 mode=ro）
+# 3) 本地 SQLite 库（Calibre/浏览器历史/自建库）—— 默认只读（驱动层 mode=ro）
 aflare connector add my-library --type sqlite --database ~/calibre/metadata.db
 
 # 4) 查看
@@ -184,7 +184,7 @@ steps:
 
 内联 `driver/dsn` 与 `connector` 互斥（同时出现报错）。旧的内联写法保持
 兼容，但文档推荐 connector 模式。file_read 的密钥脱敏（redact，默认开）
-在 connector 模式同样生效 —— 个人数据的隐私优先。
+在 connector 模式同样生效 —— 本地数据的隐私优先。
 
 ## 4. 安全边界（已实现）
 
@@ -199,14 +199,14 @@ steps:
 - 注册表加载时逐条校验，坏数据**报错拒绝**而非静默丢弃。
 - 0600 原子写（tmp+rename，防 symlink 替换攻击）。
 
-## 5. Roadmap（个人优先）
+## 5. Roadmap（本地优先）
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | PR #95 | 数据库连接器骨架：Spec/Registry/Resolver/DSN + sql_query 接入 + CLI | ✅ 已合并 |
-| #96 | **文件/笔记/个人库**：files/notes 类型 + file_read/file_write/files_list 接入 + sqlite mode=ro | ✅ 已合并 |
-| 下一步（个人） | 笔记搜索：frontmatter/tags/全文检索节点（notes 专属，走 connector root）；连接器级审计事件 | 计划 |
-| 之后（个人→通用） | HTTP/API 连接器（http_request 接 `connector`，Bearer/Basic 注入）——个人云盘/API 与企业内网 API 复用 | 计划 |
+| #96 | **文件/笔记/本地库**：files/notes 类型 + file_read/file_write/files_list 接入 + sqlite mode=ro | ✅ 已合并 |
+| 下一步（本地） | 笔记搜索：frontmatter/tags/全文检索节点（notes 专属，走 connector root）；连接器级审计事件 | 计划 |
+| 之后（本地→通用） | HTTP/API 连接器（http_request 接 `connector`，Bearer/Basic 注入）——自有云盘/API 与企业内网 API 复用 | 计划 |
 | 最后（企业） | 企业 profile：Vault/SSO Resolver、内网 allowlist 与策略引擎联动、按连接器名的连接池缓存 | 计划 |
 
 ## 6. 与项目定位的关系
@@ -215,6 +215,6 @@ steps:
 还是用户自部署的模型，接入 aflare 后，用户把自己的数据源通过 Connector
 接入，由 aflare 让 AI 确定且安全地运行。**
 
-目标用户先个人：个人用户「开箱即用」的数据就是本机文件、笔记库、
-SQLite 个人库 —— Connector API 让这三类零凭据、零配置地接入同一个安全模型。
+目标用户先本地：本地用户「开箱即用」的数据就是本机文件、笔记库、
+SQLite 本地库 —— Connector API 让这三类零凭据、零配置地接入同一个安全模型。
 企业内网系统走同一套 Spec/Resolver/天花板抽象，后续按 Roadmap 落地。

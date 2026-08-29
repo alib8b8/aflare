@@ -5,7 +5,7 @@
     <a href="README.zh.md">简体中文</a>
   </p>
   <p><strong>AI Beyond Chat — Get Things Done</strong></p>
-  <p><em>Personal-first · Data Stays Local · Connect Your Own LLM / Files / Notes / Databases</em></p>
+  <p><em>Local-first · Data Stays Local · Connect Your Own LLM / Files / Notes / Databases</em></p>
   <p>The deterministic and secure control layer between AI and your data</p>
 
   <p>
@@ -101,7 +101,7 @@ aflare agent -c reflection,planning,utility
 
 ## Project Status
 
-aflare is currently at **v0.11.0**, with **personal users as the first target** — personal data lives on your machine (files, note libraries, personal SQLite databases), and aflare is the deterministic and secure control layer between AI and that data.
+aflare is currently at **v0.11.0**, with **local users as the first target** — local data lives on your machine (files, note libraries, local SQLite databases), and aflare is the deterministic and secure control layer between AI and that data.
 
 - **Shipped**: core Runtime (DAG scheduling, WAL crash recovery, Saga transaction compensation, idempotency, retry/circuit-breaking, CI-verified); v0.9 Chinese national cryptography (SM3 audit chain / SM4 secrets, opt-in) and one-command MCP install; v0.10 MemHarness memory critique-reconstruction, step-level typed output contracts, watermark deployment tracing (plus a security self-audit round); v0.11 **Agent interconnection & commanding** (CLI/A2A dual channel — aflare directs and supervises other agents), **Connector API** (named data-source connections), webhook event-driven entry, daemon stability infrastructure (soak + nightly)
 - **Recently landed on main**: the **aflare GitHub Action** (run workflows in CI) and **real-world workflow packs** — industrial monitoring included (OpenFOAM divergence watchdog, similarity-RAG incident triage); see [Real-World Workflow Packs](#real-world-workflow-packs)
@@ -111,7 +111,7 @@ aflare is currently at **v0.11.0**, with **personal users as the first target** 
 
 ## What is this?
 
-aflare is both a **local-first automation Agent** and a **deterministic workflow execution engine** — and above all, **the deterministic and secure control layer between AI and your data**: you explicitly grant access to specific data (directories, note libraries, personal databases), and the AI works deterministically inside the permission ceiling you define. Two modes, one core:
+aflare is both a **local-first automation Agent** and a **deterministic workflow execution engine** — and above all, **the deterministic and secure control layer between AI and your data**: you explicitly grant access to specific data (directories, note libraries, local databases), and the AI works deterministically inside the permission ceiling you define. Two modes, one core:
 
 ```
 Conversational Agent             Declarative Workflow
@@ -156,9 +156,9 @@ L2: Runtime      —  Execution layer
 
 ## Project Strengths
 
-aflare puts **personal users first** (intranet / local-first enterprise scenarios are equally supported), serving anyone sensitive about data privacy and security. Core strengths:
+aflare puts **local users first** (intranet / enterprise scenarios are equally supported), serving anyone sensitive about data privacy and security. Core strengths:
 
-**Personal data connectors (Connector API)** — Explicitly authorize local directories, note libraries and personal databases via `aflare connector add`; workflows reference only the connector name. `files` / `notes` directory connectors apply the workdir sandbox's containment rules (no absolute paths, no traversal, unconditional symlink-escape rejection, extension allowlists, byte limits) to roots you grant like `~/notes` or `~/Documents`; `sqlite` / `mysql` / `postgres` database connectors keep credentials exclusively in the secrets store / environment variables, with SQLite read-only defense-in-depth (DSN forced to `mode=ro`). Permission ceilings declared on the connector (read-only, rows, bytes) can only be tightened by nodes, never loosened — you define the AI's capability boundary.
+**Local data connectors (Connector API)** — Explicitly authorize local directories, note libraries and local databases via `aflare connector add`; workflows reference only the connector name. `files` / `notes` directory connectors apply the workdir sandbox's containment rules (no absolute paths, no traversal, unconditional symlink-escape rejection, extension allowlists, byte limits) to roots you grant like `~/notes` or `~/Documents`; `sqlite` / `mysql` / `postgres` database connectors keep credentials exclusively in the secrets store / environment variables, with SQLite read-only defense-in-depth (DSN forced to `mode=ro`). Permission ceilings declared on the connector (read-only, rows, bytes) can only be tightened by nodes, never loosened — you define the AI's capability boundary.
 
 **Local-first, data never leaves your machine** — Single binary with zero runtime deps, runs in ~10–30MB RAM; workflows, execution history, memory and secrets all stay on local disk; API keys are injected via environment variables or the OS keyring, never written in cleartext to `config.yaml`; fully offline-capable (offline install, `aflare doctor --offline`, WebUI Mermaid offline fallback).
 
@@ -301,7 +301,7 @@ aflare agent list    # view registered, commandable external agents
 - `aflare mcp install <name>` one-command install of 8 built-in community servers
 - Expose aflare tools to the DSH agent via the [DeepSeek Harness (DSH) integration](docs/dsh.md) (zero-code MCP bridging, or the native [Cordis plugin](integrations/dsh-plugin))
 
-### Connector API (personal-data track)
+### Connector API (local-data track)
 
 A named connector = a data source you explicitly authorize + a policy ceiling. Workflows reference only the connector name; credentials never enter YAML:
 
@@ -312,7 +312,7 @@ aflare connector add my-notes --type notes --root ~/notes
 # Grant a documents directory (md/txt only, writes explicitly enabled)
 aflare connector add my-docs --type files --root ~/Documents --include '*.md' --include '*.txt' --writable
 
-# Personal SQLite library (DSN forced to mode=ro)
+# Local SQLite library (DSN forced to mode=ro)
 aflare connector add my-library --type sqlite --database ~/calibre/metadata.db
 
 # Remote database (credentials in the secrets store, spec holds only a reference)

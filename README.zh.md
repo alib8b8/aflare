@@ -5,7 +5,7 @@
     <strong>简体中文</strong>
   </p>
   <p><strong>让 AI 告别聊天，开始执行</strong></p>
-  <p><em>个人优先 · 数据不出本地 · 连接你自己的 LLM / 文件 / 笔记 / 数据库</em></p>
+  <p><em>本地优先 · 数据不出本地 · 连接你自己的 LLM / 文件 / 笔记 / 数据库</em></p>
   <p>AI 与你的数据之间「确定且安全」的控制层</p>
 
   <p>
@@ -101,7 +101,7 @@ aflare agent -c reflection,planning,utility
 
 ## 项目状态
 
-aflare 当前 **v0.11.0**，目标用户**先做个人**——个人数据在本机（文件、笔记库、个人 SQLite 库），aflare 做 AI 与这些数据之间「确定且安全」的控制层。
+aflare 当前 **v0.11.0**，目标用户**先做本地**——本地数据在本机（文件、笔记库、本地 SQLite 库），aflare 做 AI 与这些数据之间「确定且安全」的控制层。
 
 - **已交付**：核心 Runtime（DAG 调度、WAL 崩溃恢复、Saga 事务补偿、幂等、重试/熔断，CI 验证）；v0.9 国密算法（SM3 审计链 / SM4 密钥存储，opt-in）与 MCP 一键安装；v0.10 MemHarness 记忆批判-重构、步骤级类型化输出契约、水印部署溯源（含一轮安全自检修复）；v0.11 **Agent 互联与指挥**（CLI/A2A 双通道，aflare 指挥和监督其他 Agent）、**Connector API**（命名数据源连接）、webhook 事件驱动入口、守护进程稳定性基建（soak + nightly）
 - **近期已落 main**：**aflare GitHub Action**（在 CI 中运行工作流）与**真实场景工作流包**——含工业监控（OpenFOAM 发散看门狗、相似案例 RAG 分诊），见[真实场景工作流包](#真实场景工作流包)
@@ -111,7 +111,7 @@ aflare 当前 **v0.11.0**，目标用户**先做个人**——个人数据在本
 
 ## 这是什么？
 
-aflare 是一个**本地优先的自动化 Agent**，也是**确定性工作流执行引擎**，更是 **AI 与你的数据之间「确定且安全」的控制层**——你显式授权哪些数据（目录、笔记库、个人数据库），AI 在权限天花板内确定性地干活。两种模式共用同一核心：
+aflare 是一个**本地优先的自动化 Agent**，也是**确定性工作流执行引擎**，更是 **AI 与你的数据之间「确定且安全」的控制层**——你显式授权哪些数据（目录、笔记库、本地数据库），AI 在权限天花板内确定性地干活。两种模式共用同一核心：
 
 ```
 对话式 Agent                    声明式工作流
@@ -155,9 +155,9 @@ L2: Runtime      —  确定性执行层
 
 ## 项目优势
 
-aflare 面向个人用户优先（企业内网 / 本地优先场景同样适用），服务对数据隐私与安全敏感的你。核心优势：
+aflare 面向本地用户优先（企业内网等场景同样适用），服务对数据隐私与安全敏感的你。核心优势：
 
-**个人数据连接器（Connector API）** — 用 `aflare connector add` 显式授权本地目录、笔记库、个人数据库，工作流只引用连接器名：`files` / `notes` 目录连接器把 workdir 沙箱的遏制规则（禁绝对路径、禁穿越、symlink 逃逸无条件拒绝、扩展名白名单、字节数上限）应用到 `~/notes`、`~/Documents` 等你授权的根；`sqlite` / `mysql` / `postgres` 数据库连接器凭据只存 secrets store / 环境变量，SQLite 只读模式纵深防御（DSN 强制 `mode=ro`）。连接器声明的权限天花板（只读、行数、字节）节点只能收紧、不能放宽——AI 的能力边界由你定义。
+**本地数据连接器（Connector API）** — 用 `aflare connector add` 显式授权本地目录、笔记库、本地数据库，工作流只引用连接器名：`files` / `notes` 目录连接器把 workdir 沙箱的遏制规则（禁绝对路径、禁穿越、symlink 逃逸无条件拒绝、扩展名白名单、字节数上限）应用到 `~/notes`、`~/Documents` 等你授权的根；`sqlite` / `mysql` / `postgres` 数据库连接器凭据只存 secrets store / 环境变量，SQLite 只读模式纵深防御（DSN 强制 `mode=ro`）。连接器声明的权限天花板（只读、行数、字节）节点只能收紧、不能放宽——AI 的能力边界由你定义。
 
 **本地优先，数据不出本地** — 单二进制零运行时依赖，约 10–30MB 内存即可运行；工作流、执行历史、记忆、密钥均落本地磁盘；API Key 走环境变量或系统 keyring 注入，`config.yaml` 不存明文；离线全链路可用（离线安装、`aflare doctor --offline` 离线自检、WebUI Mermaid 离线回退）。
 
@@ -300,7 +300,7 @@ aflare agent list    # 查看已注册、可指挥的外部 Agent
 - `aflare mcp install <name>` 一键安装 8 个内置社区 server
 - 也可通过 [DeepSeek Harness (DSH) 集成](docs/dsh.md) 将 aflare 工具暴露给 DSH 智能体（MCP 桥接零代码接入，或原生 [Cordis 插件](integrations/dsh-plugin)）
 
-### Connector API（个人数据接入主线）
+### Connector API（本地数据接入主线）
 
 命名连接器 = 你显式授权的数据源 + 策略天花板。工作流只写连接器名，凭据永不进 YAML：
 
@@ -311,7 +311,7 @@ aflare connector add my-notes --type notes --root ~/notes
 # 授权文档目录（只允许 md/txt，显式开启写入）
 aflare connector add my-docs --type files --root ~/Documents --include '*.md' --include '*.txt' --writable
 
-# 个人 SQLite 库（DSN 强制 mode=ro 只读）
+# 本地 SQLite 库（DSN 强制 mode=ro 只读）
 aflare connector add my-library --type sqlite --database ~/calibre/metadata.db
 
 # 远程数据库（凭据存 secrets store，spec 只有引用）
