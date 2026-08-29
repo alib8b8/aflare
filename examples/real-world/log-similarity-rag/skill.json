@@ -1,0 +1,71 @@
+{
+  "id": "real-world/log-similarity-rag",
+  "name": "log-similarity-rag",
+  "version": "1.0.0",
+  "description": "Retrieve the most similar historical divergence cases for a new failing solver log (keyword overlap offline, or WeMM-Embedding semantic matching), then have an LLM write a triage note citing those precedents. Retrieval and LLM both degrade via fallback.",
+  "author": "aflare community",
+  "category": "industrial-monitoring",
+  "tags": [
+    "industrial-monitoring",
+    "cfd",
+    "openfoam",
+    "rag",
+    "embedding",
+    "similarity-search",
+    "real-world"
+  ],
+  "keywords": [
+    "openfoam",
+    "cfd",
+    "divergence",
+    "rag",
+    "case-retrieval",
+    "embedding",
+    "triage"
+  ],
+  "inputs": [
+    {
+      "name": "log_path",
+      "type": "string",
+      "required": false,
+      "default": "examples/real-world/log-similarity-rag/sample-new-divergence.log"
+    },
+    {
+      "name": "library_path",
+      "type": "string",
+      "required": false,
+      "default": "examples/real-world/log-similarity-rag/case-library.jsonl"
+    },
+    {
+      "name": "top_k",
+      "type": "string",
+      "required": false,
+      "default": "2"
+    },
+    {
+      "name": "embed_args",
+      "type": "string",
+      "required": false,
+      "default": "--offline"
+    },
+    {
+      "name": "triage_path",
+      "type": "string",
+      "required": false,
+      "default": "rag-triage.md"
+    },
+    {
+      "name": "alert_channel",
+      "type": "string",
+      "required": false,
+      "default": "stdout"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "triage",
+      "type": "string"
+    }
+  ],
+  "dependencies": "python3 (stdlib only); optional: an OpenAI-compatible embeddings endpoint (e.g. vLLM serving tencent/WeMM-Embedding-2B); optional: ollama for LLM triage"
+}

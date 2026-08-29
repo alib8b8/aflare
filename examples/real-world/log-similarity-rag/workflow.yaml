@@ -1,0 +1,102 @@
+name: Log Similarity RAG
+description: |
+  Retrieve the most similar historical divergence cases for a new failing
+  solver log, then have an LLM write a triage note that cites those real
+  precedents (root causes and fixes that worked on past incidents) instead
+  of reasoning from zero. Deterministic error-line extraction and case
+  retrieval run before the LLM is ever invoked, and both the retrieval
+  step and the LLM step degrade via fallback so a triage note always
+  reaches the channel. Mock keyword mode runs fully offline and
+  deterministically; point var.embed_args at an OpenAI-compatible
+  embeddings endpoint (e.g. vLLM/SGLang serving
+  tencent/WeMM-Embedding-2B) for semantic retrieval in production.
+
+vars:
+  log_path: examples/real-world/log-similarity-rag/sample-new-divergence.log
+  library_path: examples/real-world/log-similarity-rag/case-library.jsonl
+  top_k: "2"
+  # "--offline" = keyword-overlap mock mode (deterministic, no services).
+  # For semantic retrieval with WeMM-Embedding:
+  #   --set 'embed_args=--endpoint http://localhost:8000/v1/embeddings --model tencent/WeMM-Embedding-2B'
+  embed_args: "--offline"
+  triage_path: rag-triage.md
+  alert_channel: stdout
+  provider: ollama
+  model: llama3
+
+steps:
+  # --- 1. Read the new failing log ------------------------------------------
+  - node: file_read
+    name: read_log
+    params:
+      path: "{{var.log_path}}"
+      redact: "false"
+
+  # --- 2. Deterministic error-line extraction --------------------------------
+  - node: transform
+    name: error_lines
+    params:
+      operation: filter_errors
+
+  # --- 3. Retrieve similar historical cases ----------------------------------
+  # search.py ranks the incident library against the new log: keyword
+  # overlap by default (offline, deterministic, CI-friendly), or cosine
+  # similarity over embeddings when --endpoint is passed via embed_args.
+  # Needs AFLARE_EXECUTE_UNSAFE=1 because python3 is intentionally not in
+  # the execute allowlist (arbitrary interpreters are not read-only).
+  # On any failure the step degrades to an empty result set, so the
+  # workflow falls back to zero-precedent triage instead of dying.
+  - node: execute
+    name: search_similar
+    fallback: "[]"
+    params:
+      command: "python3 examples/real-world/log-similarity-rag/search.py --library {{var.library_path}} --query-file {{var.log_path}} --top-k {{var.top_k}} {{var.embed_args}}"
+      timeout: 1m
+
+  # --- 4. Assemble the RAG triage prompt -------------------------------------
+  # Assembled before any branching so every {{step.*}} reference resolves
+  # in the parent flow: the prompt embeds the deterministic error lines
+  # plus the retrieved cases, and instructs the model to cite them.
+  - node: template_render
+    name: triage_prompt
+    params:
+      template: |
+        You are a CFD triage engineer. A divergence watchdog fired on an
+        OpenFOAM run. Below are (a) the error evidence extracted from the
+        new log and (b) the most similar historical cases from the
+        incident library, each with its root cause and the fix that
+        worked. Write a short Markdown triage note with three sections:
+        What happened; Likely causes (ranked — cite the matching case ids
+        and say why they apply); Next actions (prefer fixes that worked
+        in the cited cases, adapt them to the values below). Do not
+        invent numbers — use exactly the values present below.
+
+        (a) Error evidence from the new log:
+        {{step.error_lines}}
+
+        (b) Similar historical cases (JSON, may be empty):
+        {{step.search_similar}}
+
+  # --- 5. LLM triage with fallback -------------------------------------------
+  # Cites real precedents when retrieval returned cases; degrades to a
+  # placeholder that still carries the retrieved JSON when no LLM is
+  # reachable, so the alert path never depends on model availability.
+  - node: agent
+    name: triage
+    fallback: "LLM triage unavailable (provider offline or not configured). Retrieved cases: {{step.search_similar}}"
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      max_iterations: "5"
+
+  # --- 6. Save and alert ------------------------------------------------------
+  - node: file_write
+    name: save_triage
+    params:
+      path: "{{var.triage_path}}"
+
+  - node: notify
+    name: alert
+    params:
+      channel: "{{var.alert_channel}}"
+      message: "TRIAGE: divergence analyzed against the incident library ({{var.log_path}}). Note: {{var.triage_path}}"
