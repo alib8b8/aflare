@@ -101,14 +101,14 @@ aflare chat / agent          aflare create
 ## 核心特性
 
 - **本地优先，数据不出本地** —— 单二进制、零运行时依赖、内存约 10–30MB；工作流、执行历史、记忆和密钥全部留在本地磁盘；完全支持离线；无使用遥测。
-- **接入你自己的 LLM** —— Ollama / vLLM / LM Studio / 任何 OpenAI 兼容接口；回环地址无需 API Key；没有 LLM 时关键词匹配兜底，离线照样能用。
+- **接入你自己的 LLM** —— Ollama / vLLM / LM Studio / 任何 OpenAI 兼容接口；回环地址无需 API Key；没有 LLM 时关键词匹配兜底，离线照样能用。多厂商路由降成本、防锁定：OpenRouter 一个端点通吃各家模型，或用原生 `llm_router` 节点按成本/延迟路由并自动降级。见 [LLM 路由](docs/openrouter.md)。
 - **本地数据与 API 连接器** —— 命名、显式授权的目录、数据库与 HTTP API 连接器（`files` / `notes` / `sqlite` / `mysql` / `postgres` / `http`）；凭据只存于加密密钥库，权限上限只能收紧、不能放宽。见 [Connector API](docs/connector-api.md)。
 - **确定性运行时** —— DAG 并行调度（TLA+ 形式化验证）、WAL 崩溃恢复 + `--resume` 断点续跑、Saga 事务补偿、幂等、重试/限流/熔断。每个操作可追溯、可重放、可验证。
 - **Agent + 工作流双模式** —— 对话式 ReAct Agent（`aflare chat`）与守护进程 Agent（`aflare agent`）共用一个内核；6 种可插拔能力（反思 / 人工介入 / 效用驱动 / 记忆 / 规划 / 工作流）。
 - **Agent 互联与指挥** —— aflare 指挥和监督其他 Agent：CLI 通道（`codex` / `claude` / `gemini` 或任意通用 CLI）与 A2A 协议通道，`supervisor` 节点真实委派，单 Agent 失败不拖垮整批。
 - **安全内建** —— HMAC 防篡改审计链、AES-GCM 加密密钥库、自动密钥脱敏、SSRF / 路径穿越 / 命令注入防御、出站异常监控 + 自动熔断隔离，四个安全等级（L0–L3）。
-- **可扩展生态** —— MCP Server / Client、Go 自定义节点、社区插件、CI 用的 [GitHub Action](action/README.md)、20+ 内置 LLM 供应商。
-- **开箱即用的示例** —— [`examples/real-world/`](examples/real-world/) 真实场景工作流包：工业监控（OpenFOAM 发散看门狗、相似案例 RAG 分诊）、DevOps CI 流水线、研究、批量处理。
+- **可扩展生态** —— MCP Server / Client、Go 自定义节点、社区插件、CI 用的 [GitHub Action](action/README.md)、20+ 内置 LLM 供应商、面向 OpenClaw 生态的 [OpenClaw 插件](contrib/openclaw/README.md)。
+- **开箱即用的示例** —— [`examples/real-world/`](examples/real-world/) 真实场景工作流包：工业监控（OpenFOAM 发散看门狗、相似案例 RAG 分诊）、DevOps CI 流水线、研究、批量处理，以及多智能体角色流水线（分析师→研究员→交易员→风控的交易团队、数字公司市场部与销售部）。
 
 ---
 

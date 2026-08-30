@@ -101,14 +101,14 @@ Currently at **v0.12.0**, targeting local users first — local data lives on yo
 ## Key Features
 
 - **Local-first, data stays local** — single binary, zero runtime deps, ~10–30MB RAM; workflows, history, memory and secrets all stay on local disk; fully offline-capable; no usage telemetry.
-- **Connect your own LLM** — Ollama / vLLM / LM Studio / any OpenAI-compatible endpoint; loopback needs no API key; without an LLM, keyword matching keeps everything working offline.
+- **Connect your own LLM** — Ollama / vLLM / LM Studio / any OpenAI-compatible endpoint; loopback needs no API key; without an LLM, keyword matching keeps everything working offline. Multi-provider routing cuts spend and avoids lock-in: one OpenRouter endpoint for every vendor's models, or the native `llm_router` node routing by cost / latency with automatic fallback. See [LLM Routing](docs/openrouter.md).
 - **Local data & API connectors** — named, explicitly-authorized connectors for directories, databases and HTTP APIs (`files` / `notes` / `sqlite` / `mysql` / `postgres` / `http`); credentials live only in the secrets store, permission ceilings can be tightened but never loosened. See [Connector API](docs/connector-api.md).
 - **Deterministic runtime** — DAG parallel scheduling (TLA+ formally verified), WAL crash recovery + `--resume`, Saga transaction compensation, idempotency, retry / rate limit / circuit breaker. Every operation is traceable, replayable, verifiable.
 - **Dual Agent + Workflow mode** — conversational ReAct Agent (`aflare chat`) and daemon Agent (`aflare agent`) share one core; 6 pluggable capabilities (reflection / human-in-the-loop / utility / memory / planning / workflow).
 - **Agent interconnection & commanding** — aflare directs and supervises other agents: CLI channel (`codex` / `claude` / `gemini` or any generic CLI) and A2A protocol channel, with real delegation via the `supervisor` node and failure isolation per agent.
 - **Security built in** — HMAC tamper-evident audit chain, AES-GCM encrypted secrets, automatic secret redaction, SSRF / path-traversal / command-injection defenses, outbound anomaly monitoring + auto circuit-break, four security levels (L0–L3).
-- **Extensible ecosystem** — MCP Server / Client, custom nodes in Go, community plugins, [GitHub Action](action/README.md) for CI, 20+ built-in LLM providers.
-- **Ready-to-run examples** — real-world workflow packs under [`examples/real-world/`](examples/real-world/): industrial monitoring (OpenFOAM divergence watchdog, similarity-RAG incident triage), DevOps CI pipelines, research, batch processing.
+- **Extensible ecosystem** — MCP Server / Client, custom nodes in Go, community plugins, [GitHub Action](action/README.md) for CI, 20+ built-in LLM providers, [OpenClaw plugin](contrib/openclaw/README.md) for the OpenClaw ecosystem.
+- **Ready-to-run examples** — real-world workflow packs under [`examples/real-world/`](examples/real-world/): industrial monitoring (OpenFOAM divergence watchdog, similarity-RAG incident triage), DevOps CI pipelines, research, batch processing, and multi-agent role pipelines (analyst→researcher→trader→risk trading crew, digital-company marketing & sales departments).
 
 ---
 
