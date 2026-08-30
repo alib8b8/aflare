@@ -12,7 +12,7 @@ import { describeWorkflow } from './tools/describe_workflow.js';
 
 const plugin: Plugin = {
   name: 'openclaw-aflare',
-  version: '1.0.0',
+  version: '1.2.0',
 
   tools: [
     {

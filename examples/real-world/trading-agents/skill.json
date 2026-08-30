@@ -1,0 +1,66 @@
+{
+  "id": "real-world/trading-agents",
+  "name": "trading-agents",
+  "version": "1.0.0",
+  "description": "Role-specialized trading desk: analyst structures the snapshot, researcher gathers open-source context, trader decides BUY/SELL/HOLD, risk manager reviews — trade memo filed.",
+  "author": "aflare community",
+  "category": "multi-agent-finance",
+  "tags": [
+    "multi-agent",
+    "finance",
+    "trading",
+    "role-orchestration",
+    "real-world"
+  ],
+  "keywords": [
+    "trading-agents",
+    "multi-agent",
+    "decision-pipeline",
+    "risk-review"
+  ],
+  "inputs": [
+    {
+      "name": "symbol",
+      "type": "string",
+      "required": false,
+      "default": "EUR/USD"
+    },
+    {
+      "name": "market_snapshot",
+      "type": "string",
+      "required": false,
+      "default": "raw market snapshot text the analyst structures"
+    },
+    {
+      "name": "news_urls",
+      "type": "string",
+      "required": false,
+      "default": "https://api.frankfurter.app/latest?from=USD&to=EUR,https://www.ecb.europa.eu/stats/eurofxref/eurofxref-generic.html"
+    },
+    {
+      "name": "provider",
+      "type": "string",
+      "required": false,
+      "default": "ollama"
+    },
+    {
+      "name": "model",
+      "type": "string",
+      "required": false,
+      "default": "llama3"
+    },
+    {
+      "name": "memo_path",
+      "type": "string",
+      "required": false,
+      "default": "trade-memo.md"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "memo",
+      "type": "string"
+    }
+  ],
+  "dependencies": null
+}

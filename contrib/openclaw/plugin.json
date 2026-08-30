@@ -1,7 +1,7 @@
 {
   "id": "openclaw-aflare",
   "name": "aflare Workflow Integration",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Invoke aflare workflows as tools in OpenClaw conversations",
   "main": "./dist/index.js",
   "configSchema": {

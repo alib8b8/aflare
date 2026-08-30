@@ -9,14 +9,23 @@ import { spawn } from 'child_process';
 import type { RunWorkflowResult, StepResult } from './types.js';
 
 /**
+ * Options for workflow execution.
+ */
+export interface RunWorkflowOptions {
+  /** Path to the aflare binary (default: "aflare", resolved via PATH). */
+  aflarePath?: string;
+}
+
+/**
  * Execute an aflare workflow
  */
 export async function runWorkflow(
   workflowFile: string,
-  input: string = ''
+  input: string = '',
+  options: RunWorkflowOptions = {}
 ): Promise<RunWorkflowResult> {
   const startTime = Date.now();
-  
+
   // Validate workflow filename
   if (!workflowFile.endsWith('.yaml') && !workflowFile.endsWith('.yml')) {
     return {
@@ -29,15 +38,21 @@ export async function runWorkflow(
     };
   }
 
-  // Build the command
-  // aflare run <workflow_file> [--input <input_text>]
+  // Build the command.
+  // aflare run <workflow_file> [--set input=<input_text>]
+  //
+  // The input is passed via --set so it lands in the workflow's vars as
+  // "input", which both {{input}} and {{var.input}} resolve to (a variable
+  // named "input" shadows the {{input}} token). Each --set value is exactly
+  // one argv element, so inputs containing spaces or shell metacharacters
+  // survive verbatim.
   const args = ['run', workflowFile];
   if (input) {
-    args.push('--input', input);
+    args.push('--set', `input=${input}`);
   }
 
   try {
-    const output = await executeCommand('aflare', args);
+    const output = await executeCommand(options.aflarePath || 'aflare', args);
     
     return {
       workflow: workflowFile,
@@ -59,12 +74,16 @@ export async function runWorkflow(
 }
 
 /**
- * Execute a shell command and return the output
+ * Execute a command and return the output.
+ *
+ * spawn is used WITHOUT a shell: args are passed as discrete argv elements,
+ * so workflow input containing spaces or shell metacharacters (`;`, `$()`,
+ * backticks, ...) is delivered verbatim to aflare instead of being
+ * word-split or interpreted by a shell.
  */
 function executeCommand(command: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn(command, args, {
-      shell: true,
       stdio: 'pipe',
     });
 

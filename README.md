@@ -123,7 +123,7 @@ Four security levels (`--security-level`): **L0** relaxed → **L3** maximum (L2
 ## Documentation
 
 - [Getting Started](docs/getting-started.md) · [Tutorial](docs/tutorial.md) · [YAML Syntax](docs/getting-started.md#step-2-create-your-first-workflow)
-- [Dataflow](docs/dataflow.md) · [Scheduling](docs/scheduling.md) · [MCP](docs/mcp.md) · [Plugins](docs/plugins.md) · [Connectors](docs/connector-api.md)
+- [Dataflow](docs/dataflow.md) · [Scheduling](docs/scheduling.md) · [MCP](docs/mcp.md) · [Plugins](docs/plugins.md) · [Connectors](docs/connector-api.md) · [LLM Routing](docs/openrouter.md)
 - [Web UI](docs/webui.md) · [Visualizer](docs/visualizer.md) · [Custom Nodes](docs/custom-nodes.md)
 - [API Reference](docs/api.md) · [Nodes Reference](docs/nodes-reference.md)
 - [Deployment](docs/deployment.md) · [Docker](docs/docker.md) · [Multi-Tenancy](docs/tenants.md)

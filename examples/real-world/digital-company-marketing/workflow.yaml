@@ -1,0 +1,134 @@
+name: Digital Company Marketing Department
+description: |
+  A role-specialized marketing department (OpenExecutive-style blueprint):
+  the Market Intelligence Analyst scans open sources for category signals,
+  the GTM Strategist turns them into a structured positioning brief, the
+  Campaign Copy Lead composes the outbound campaign in one consistent brand
+  voice, and the Brand Guardian independently reviews it before the weekly
+  brief is filed.
+
+vars:
+  category: "workflow automation"
+  research_urls: "https://hn.algolia.com/api/v1/search?query=workflow%20automation&tags=story&hitsPerPage=15,https://hn.algolia.com/api/v1/search_by_date?query=AI%20agents&tags=story&hitsPerPage=15"
+  brief_path: marketing-brief.md
+  provider: ollama
+  model: llama3
+
+steps:
+  # 1. Market Intelligence Analyst — scan open, key-free sources for
+  #    category and competitor signals (OpenExecutive CSO: competitive
+  #    analysis, market positioning).
+  - node: researcher
+    name: intelligence
+    input: "Competitive and market signals for the {{var.category}} category: who is shipping what, what users complain about, where demand is heading."
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      urls: "{{var.research_urls}}"
+      depth: detailed
+      output_format: summary
+
+  # 2. GTM Strategist — turn raw intelligence into a structured positioning
+  #    brief. Deliverable is a JSON contract, not prose (OpenExecutive CMO:
+  #    GTM strategy; hand-off discipline between roles).
+  - node: structured_output
+    name: strategy
+    input: "MARKET INTELLIGENCE:\n{{step.intelligence}}\n\nCategory: {{var.category}}"
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      schema_name: gtm_positioning_brief
+      schema: |
+        {
+          "type": "object",
+          "properties": {
+            "category": {"type": "string", "description": "market category under analysis"},
+            "market_signals": {"type": "array", "items": {"type": "string"}, "description": "concrete signals observed in the intelligence input"},
+            "target_segment": {"type": "string", "description": "the primary customer segment to win"},
+            "positioning": {"type": "string", "description": "one-sentence positioning statement"},
+            "key_message": {"type": "string", "description": "the single message all outbound material must reinforce"},
+            "channels": {"type": "array", "items": {"type": "string"}, "description": "prioritized channels for this segment"},
+            "competitor_gaps": {"type": "array", "items": {"type": "string"}, "description": "gaps competitors leave open"},
+            "risks": {"type": "array", "items": {"type": "string"}, "description": "risks to this positioning"}
+          },
+          "required": ["category", "market_signals", "target_segment", "positioning", "key_message", "channels", "competitor_gaps", "risks"]
+        }
+
+  # 3. Campaign Copy Lead — compose the campaign in ONE consistent brand
+  #    voice from the strategist's brief (OpenExecutive: single coherent
+  #    external voice; internal role structure never shows in the output).
+  - node: agent
+    name: copy
+    input:
+      - "MARKET INTELLIGENCE:\n{{step.intelligence}}"
+      - "POSITIONING BRIEF:\n{{step.strategy}}"
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      system: |
+        You are the campaign copy lead of a marketing department. Using the
+        positioning brief, produce outbound campaign material for the
+        {{var.category}} category. All material must speak in one consistent
+        brand voice and never mention internal roles, agents, or how this
+        brief was produced. Respond with exactly this structure:
+        HEADLINE: one attention-grabbing line
+        ONE-LINER: the value proposition in a single sentence
+        LAUNCH POST: a 120-word channel-ready post
+        EMAIL SUBJECT OPTIONS: 3 variants, under 60 characters each
+        CTA: the single call to action
+      max_iterations: "5"
+      enable_thinking: "false"
+      show_thinking: "false"
+
+  # 4. Brand Guardian — independent review of the campaign before it ships
+  #    (OpenExecutive: one voice, compliance, no role leakage).
+  - node: critic
+    name: review
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      role: writing
+      criteria: "brand_consistency,single_voice,factual_claims,channel_fit,compliance,no_internal_role_leakage"
+      output_format: markdown
+      suggest_improvements: "true"
+
+  # 5. File the weekly marketing brief.
+  - node: template_render
+    name: brief
+    params:
+      template: |
+        # Marketing Brief — {{var.category}}
+
+        ---
+
+        ## 1. Market Intelligence (Analyst)
+
+        {{step.intelligence}}
+
+        ## 2. Positioning Brief (Strategist)
+
+        {{step.strategy}}
+
+        ## 3. Campaign Material (Copy Lead)
+
+        {{step.copy}}
+
+        ## 4. Brand Review (Guardian)
+
+        {{step.review}}
+
+        ---
+
+        _Generated by digital-company-marketing skill ({{var.provider}}/{{var.model}}).
+        Blueprint after OpenExecutive's single-voice executive pattern._
+
+  - node: file_write
+    name: save
+    params:
+      path: "{{var.brief_path}}"
+
+  - node: notify
+    name: notify
+    params:
+      channel: stdout
+      message: "Marketing brief for {{var.category}} written to {{var.brief_path}}."

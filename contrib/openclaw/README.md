@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/alib8b8/aflare">
-    <img src="https://img.shields.io/badge/aflare-v0.11.0-blue" alt="aflare"/>
+    <img src="https://img.shields.io/badge/aflare-v0.12.0-blue" alt="aflare"/>
   </a>
   <a href="https://github.com/alib8b8/openclaw-aflare">
     <img src="https://img.shields.io/badge/OpenClaw-Plugin-green" alt="OpenClaw Plugin"/>
@@ -29,9 +29,10 @@ This plugin integrates **aflare** with **OpenClaw**, allowing you to invoke afla
 ## Features
 
 - **Workflow Discovery** - List all available aflare workflows in your configured directory
-- **Workflow Execution** - Execute any workflow by name with optional input parameters
+- **Workflow Execution** - Execute any workflow by name with optional input parameters (passed as `{{input}}`)
 - **Workflow Inspection** - Get detailed descriptions of what each workflow does
-- **Multi-Provider Support** - Leverage 20+ LLM providers through aflare (Ollama, Kimi, DeepSeek, Qwen, etc.)
+- **Multi-Provider Support** - Leverage 20+ LLM providers through aflare (Ollama, Kimi, DeepSeek, Qwen, etc.), or a single OpenRouter endpoint for every hosted model
+- **Cost-Aware Routing** - Workflows can declare `llm_router` to pick the cheapest/fallback provider per step, no plugin changes needed
 
 ## How It Works
 
@@ -142,20 +143,25 @@ Get detailed information about a specific workflow.
 
 **Example:**
 ```
-User: What does the deepseek_coder workflow do?
+User: What does the code_review workflow do?
 
 Agent calls aflare_describe_workflow:
-→ {"workflow": "deepseek_coder.yaml", "name": "deepseek_coder", 
-   "description": "Code review and fix workflow using DeepSeek Coder",
+→ {"workflow": "code_review.yaml", "name": "code_review",
+   "description": "Review code for bugs and improvements",
    "steps": [
-     {"step": 1, "node": "fetch_url", "params": {"url": "{{input}}"}},
-     {"step": 2, "node": "deepseek", "params": {"model": "deepseek-coder", "prompt": "Review this code..."}}
+     {"step": 1, "node": "file_read", "params": {"path": "{{input}}"}},
+     {"step": 2, "node": "deepseek", "params": {"model": "deepseek-chat"}}
    ]}
 ```
 
 ## Creating Workflows for OpenClaw
 
-Here are some workflow patterns that work great with OpenClaw:
+Here are some workflow patterns that work great with OpenClaw.
+
+> **Syntax notes** (aflare ≥ v0.10): LLM nodes take the user message via the
+> step's `input:` field — there is no `prompt` param. Reference earlier steps
+> by name with `{{step.<name>}}` (steps need a `name:`). The plugin passes
+> your input as the `input` variable, so `{{input}}` works in any step.
 
 ### 1. Simple URL Processing
 
@@ -165,12 +171,14 @@ name: URL Summarizer
 description: Fetch a URL and summarize its content
 steps:
   - node: fetch_url
+    name: fetch
     params:
       url: "{{input}}"
   - node: deepseek
+    name: summarize
+    input: "Summarize the following content in 3 bullet points:\n\n{{step.fetch}}"
     params:
       model: deepseek-chat
-      prompt: "Summarize the following content in 3 bullet points:\n\n{{output}}"
 ```
 
 ### 2. Multi-Provider Pipeline
@@ -181,16 +189,17 @@ name: Research Assistant
 description: Research a topic using multiple sources
 steps:
   - node: fetch_url
+    name: fetch
     params:
       url: "{{input}}"
   - node: ollama
+    name: extract
+    input: "Extract the key facts from:\n\n{{step.fetch}}"
     params:
       model: llama3
-      prompt: "Extract key information from: {{output}}"
   - node: kimi
-    params:
-      model: moonshot-v1-128k
-      prompt: "Format the following research notes:\n\n{{output}}"
+    name: brief
+    input: "Format the following research notes into a one-page brief:\n\n{{step.extract}}"
 ```
 
 ### 3. Code Review
@@ -201,12 +210,12 @@ name: Code Review
 description: Review code for bugs and improvements
 steps:
   - node: file_read
+    name: read
     params:
       path: "{{input}}"
   - node: deepseek
-    params:
-      model: deepseek-coder
-      prompt: "Review this code for:\n1. Bugs\n2. Security issues\n3. Performance improvements\n\nCode:\n{{output}}"
+    name: review
+    input: "Review this code for:\n1. Bugs\n2. Security issues\n3. Performance improvements\n\nCode:\n{{step.read}}"
 ```
 
 ## Example Usage

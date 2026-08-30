@@ -1,0 +1,62 @@
+{
+  "id": "real-world/digital-company-marketing",
+  "name": "digital-company-marketing",
+  "version": "1.0.0",
+  "description": "Role-specialized marketing department: intelligence analyst scans open sources, strategist produces a structured GTM brief, copy lead composes the campaign in one brand voice, brand guardian reviews — weekly brief filed.",
+  "author": "aflare community",
+  "category": "multi-agent-business",
+  "tags": [
+    "multi-agent",
+    "marketing",
+    "gtm",
+    "role-orchestration",
+    "digital-company",
+    "real-world"
+  ],
+  "keywords": [
+    "openexecutive",
+    "marketing-department",
+    "positioning",
+    "brand-voice",
+    "campaign"
+  ],
+  "inputs": [
+    {
+      "name": "category",
+      "type": "string",
+      "required": false,
+      "default": "workflow automation"
+    },
+    {
+      "name": "research_urls",
+      "type": "string",
+      "required": false,
+      "default": "https://hn.algolia.com/api/v1/search?query=workflow%20automation&tags=story&hitsPerPage=15,https://hn.algolia.com/api/v1/search_by_date?query=AI%20agents&tags=story&hitsPerPage=15"
+    },
+    {
+      "name": "provider",
+      "type": "string",
+      "required": false,
+      "default": "ollama"
+    },
+    {
+      "name": "model",
+      "type": "string",
+      "required": false,
+      "default": "llama3"
+    },
+    {
+      "name": "brief_path",
+      "type": "string",
+      "required": false,
+      "default": "marketing-brief.md"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "brief",
+      "type": "string"
+    }
+  ],
+  "dependencies": null
+}

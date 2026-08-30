@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/alib8b8/aflare/internal/config"
+	"github.com/alib8b8/aflare/internal/nodes/providers"
 	"gopkg.in/yaml.v3"
 )
 
@@ -146,6 +147,45 @@ func TestDetectLLMConfig(t *testing.T) {
 	}
 	if !detectLLMConfig() {
 		t.Error("expected true with ollama configured")
+	}
+}
+
+// TestDetectLLMConfig_EnvVarOnly pins the env-var detection path: exporting a
+// provider API key (e.g. OPENAI_API_KEY) is the documented zero-config setup
+// (docs/openrouter.md), and the preflight must not block those runs with
+// "no LLM provider configured" while its own hint text tells users to
+// "配置 DeepSeek/OpenAI API Key".
+func TestDetectLLMConfig_EnvVarOnly(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("AFLARE_CONFIG", filepath.Join(dir, "config.yaml"))
+
+	// Inject an EMPTY config (mirrors "no config file present"). SetConfig(nil)
+	// is not enough: once configOnce has fired in an earlier test, LoadConfig
+	// keeps returning nil for the rest of the process and detectLLMConfig
+	// never reaches the env-var branch — the test would pass alone and fail
+	// in a combined run.
+	emptyCfg := &config.Config{Providers: map[string]config.LLMProviderConfig{}}
+	config.SetConfig(emptyCfg)
+	t.Cleanup(func() { config.SetConfig(nil) })
+
+	// Neutralize any provider keys inherited from the host environment so
+	// the negative assertion below is deterministic (t.Setenv restores the
+	// original values on cleanup).
+	for _, pcfg := range providers.OpenAICompatibleConfigs() {
+		if pcfg.EnvAPIKey != "" {
+			t.Setenv(pcfg.EnvAPIKey, "")
+		}
+	}
+
+	// No config entries, no env key → false.
+	if detectLLMConfig() {
+		t.Fatal("expected false with no config and no env key")
+	}
+
+	// Env key alone → true.
+	t.Setenv("OPENAI_API_KEY", "sk-test-dummy")
+	if !detectLLMConfig() {
+		t.Error("expected true with OPENAI_API_KEY set and no config file")
 	}
 }
 

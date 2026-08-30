@@ -123,7 +123,7 @@ aflare chat / agent          aflare create
 ## 文档
 
 - [快速上手](docs/getting-started.md) · [教程](docs/tutorial.md) · [YAML 语法](docs/getting-started.md#step-2-create-your-first-workflow)
-- [数据流](docs/dataflow.md) · [调度](docs/scheduling.md) · [MCP](docs/mcp.md) · [插件](docs/plugins.md) · [连接器](docs/connector-api.md)
+- [数据流](docs/dataflow.md) · [调度](docs/scheduling.md) · [MCP](docs/mcp.md) · [插件](docs/plugins.md) · [连接器](docs/connector-api.md) · [LLM 路由](docs/openrouter.md)
 - [Web UI](docs/webui.md) · [可视化](docs/visualizer.md) · [自定义节点](docs/custom-nodes.md)
 - [API 参考](docs/api.md) · [节点参考](docs/nodes-reference.md)
 - [部署](docs/deployment.md) · [Docker](docs/docker.md) · [多租户](docs/tenants.md)

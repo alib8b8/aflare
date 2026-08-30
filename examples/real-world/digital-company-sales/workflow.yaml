@@ -1,0 +1,137 @@
+name: Digital Company Sales Department
+description: |
+  A role-specialized sales department (OpenExecutive-style blueprint):
+  the Account Researcher gathers open-source intelligence on the target
+  account, the Sales Analyst scores ICP fit into a structured dossier,
+  the Account Executive drafts the outreach sequence in one consistent
+  voice, and the Sales Ops Review independently checks pricing discipline
+  and promise compliance before the dossier is filed.
+
+vars:
+  target_company: "Supabase"
+  offering: "a local-first AI workflow engine for developers"
+  research_urls: "https://hn.algolia.com/api/v1/search?query=Supabase&tags=story&hitsPerPage=15,https://hn.algolia.com/api/v1/search_by_date?query=Supabase&tags=comment&hitsPerPage=15"
+  dossier_path: sales-dossier.md
+  provider: ollama
+  model: llama3
+
+steps:
+  # 1. Account Researcher — open-source intelligence on the target account:
+  #    what they ship, what their users say, where friction shows up
+  #    (OpenExecutive CSO: competitive analysis feeding commercial motion).
+  - node: researcher
+    name: research
+    input: "Account intelligence on {{var.target_company}} for selling {{var.offering}}: product footprint, public user sentiment, recurring complaints, hiring signals, and anything indicating automation or workflow needs."
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      urls: "{{var.research_urls}}"
+      depth: detailed
+      output_format: summary
+
+  # 2. Sales Analyst — score the account into a structured dossier. The
+  #    deliverable is a JSON contract the AE works from (OpenExecutive:
+  #    hand-off discipline between specialist roles).
+  - node: structured_output
+    name: scoring
+    input: "ACCOUNT RESEARCH:\n{{step.research}}\n\nTarget company: {{var.target_company}}\nOur offering: {{var.offering}}"
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      schema_name: lead_scoring_dossier
+      schema: |
+        {
+          "type": "object",
+          "properties": {
+            "company": {"type": "string", "description": "target account name"},
+            "signals": {"type": "array", "items": {"type": "string"}, "description": "concrete public signals observed in the research"},
+            "icp_fit_score": {"type": "integer", "description": "0-100 fit score for our offering"},
+            "fit_reasons": {"type": "array", "items": {"type": "string"}, "description": "why this score"},
+            "pain_points": {"type": "array", "items": {"type": "string"}, "description": "recurring friction the offering can remove"},
+            "trigger_events": {"type": "array", "items": {"type": "string"}, "description": "timing hooks worth acting on"},
+            "recommended_angle": {"type": "string", "description": "the outreach angle most likely to land"},
+            "risks": {"type": "array", "items": {"type": "string"}, "description": "objections to prepare for"}
+          },
+          "required": ["company", "signals", "icp_fit_score", "fit_reasons", "pain_points", "trigger_events", "recommended_angle", "risks"]
+        }
+
+  # 3. Account Executive — draft the outreach sequence in ONE consistent
+  #    voice, grounded in the analyst's dossier (OpenExecutive: single
+  #    coherent external voice; internal role structure never shows).
+  - node: agent
+    name: outreach
+    input:
+      - "ACCOUNT RESEARCH:\n{{step.research}}"
+      - "LEAD SCORING DOSSIER:\n{{step.scoring}}"
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      system: |
+        You are the account executive for {{var.offering}}. Using the lead
+        scoring dossier, draft the outreach sequence for {{var.target_company}}.
+        Speak in one consistent voice, make only claims the dossier supports,
+        and never mention internal roles, agents, or how this sequence was
+        produced. Respond with exactly this structure:
+        VALUE PROPOSITION: one sentence anchored on their documented pain points
+        FIRST EMAIL: subject line plus a 120-word body
+        FOLLOW-UP CADENCE: 3 touchpoints with day offsets and one-line angles
+        OBJECTION PREP: the top risk from the dossier and the honest answer
+        CTA: the single low-friction ask
+      max_iterations: "5"
+      enable_thinking: "false"
+      show_thinking: "false"
+
+  # 4. Sales Ops Review — independent gate before anything ships: pricing
+  #    discipline, promise compliance, factual grounding (OpenExecutive:
+  #    compliance + single-voice discipline).
+  - node: critic
+    name: review
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      role: general
+      criteria: "pricing_discipline,promise_compliance,factual_accuracy,single_voice,spam_sensitivity,no_internal_role_leakage"
+      output_format: markdown
+      suggest_improvements: "true"
+
+  # 5. File the account dossier.
+  - node: template_render
+    name: dossier
+    params:
+      template: |
+        # Sales Dossier — {{var.target_company}}
+
+        ---
+
+        ## 1. Account Research (Researcher)
+
+        {{step.research}}
+
+        ## 2. Lead Scoring (Analyst)
+
+        {{step.scoring}}
+
+        ## 3. Outreach Sequence (Account Executive)
+
+        {{step.outreach}}
+
+        ## 4. Sales Ops Review
+
+        {{step.review}}
+
+        ---
+
+        _Generated by digital-company-sales skill ({{var.provider}}/{{var.model}}).
+        Blueprint after OpenExecutive's single-voice executive pattern.
+        Draft outreach — human review required before sending._
+
+  - node: file_write
+    name: save
+    params:
+      path: "{{var.dossier_path}}"
+
+  - node: notify
+    name: notify
+    params:
+      channel: stdout
+      message: "Sales dossier for {{var.target_company}} written to {{var.dossier_path}}."

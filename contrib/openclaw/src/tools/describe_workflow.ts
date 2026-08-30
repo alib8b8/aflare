@@ -28,7 +28,8 @@ export interface WorkflowStepDescription {
  * Get detailed information about a specific workflow
  */
 export async function describeWorkflow(
-  workflowFile: string
+  workflowFile: string,
+  workflowDir: string = './workflows'
 ): Promise<DescribeWorkflowResult> {
   // Validate filename
   if (!workflowFile.endsWith('.yaml') && !workflowFile.endsWith('.yml')) {
@@ -40,9 +41,9 @@ export async function describeWorkflow(
   }
 
   try {
-    // Try to read from default workflows directory
+    // Try to read from the configured workflows directory, then the raw path
     const paths = [
-      `./workflows/${workflowFile}`,
+      `${workflowDir}/${workflowFile}`,
       workflowFile,
     ];
 

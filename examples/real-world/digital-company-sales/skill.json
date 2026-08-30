@@ -1,0 +1,68 @@
+{
+  "id": "real-world/digital-company-sales",
+  "name": "digital-company-sales",
+  "version": "1.0.0",
+  "description": "Role-specialized sales department: account researcher gathers open-source intelligence, sales analyst scores ICP fit into a structured dossier, account executive drafts outreach in one voice, sales ops reviews — dossier filed.",
+  "author": "aflare community",
+  "category": "multi-agent-business",
+  "tags": [
+    "multi-agent",
+    "sales",
+    "outreach",
+    "role-orchestration",
+    "digital-company",
+    "real-world"
+  ],
+  "keywords": [
+    "openexecutive",
+    "sales-department",
+    "lead-scoring",
+    "outreach",
+    "account-research"
+  ],
+  "inputs": [
+    {
+      "name": "target_company",
+      "type": "string",
+      "required": false,
+      "default": "Supabase"
+    },
+    {
+      "name": "offering",
+      "type": "string",
+      "required": false,
+      "default": "a local-first AI workflow engine for developers"
+    },
+    {
+      "name": "research_urls",
+      "type": "string",
+      "required": false,
+      "default": "https://hn.algolia.com/api/v1/search?query=Supabase&tags=story&hitsPerPage=15,https://hn.algolia.com/api/v1/search_by_date?query=Supabase&tags=comment&hitsPerPage=15"
+    },
+    {
+      "name": "provider",
+      "type": "string",
+      "required": false,
+      "default": "ollama"
+    },
+    {
+      "name": "model",
+      "type": "string",
+      "required": false,
+      "default": "llama3"
+    },
+    {
+      "name": "dossier_path",
+      "type": "string",
+      "required": false,
+      "default": "sales-dossier.md"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "dossier",
+      "type": "string"
+    }
+  ],
+  "dependencies": null
+}

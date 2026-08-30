@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/alib8b8/aflare/internal/config"
+	"github.com/alib8b8/aflare/internal/nodes/providers"
 	"gopkg.in/yaml.v3"
 )
 
@@ -292,6 +293,16 @@ func detectLLMConfig() bool {
 			return true
 		}
 		if pcfg.APIKey != "" {
+			return true
+		}
+	}
+	// Env-var-only configuration counts too. "export OPENAI_API_KEY=..." is
+	// the documented zero-config path (docs/openrouter.md), but this check
+	// used to read only the config file and blocked such runs at preflight
+	// with "no LLM provider configured" — contradicting its own hint text
+	// ("配置 DeepSeek/OpenAI API Key").
+	for _, pcfg := range providers.OpenAICompatibleConfigs() {
+		if pcfg.EnvAPIKey != "" && os.Getenv(pcfg.EnvAPIKey) != "" {
 			return true
 		}
 	}
