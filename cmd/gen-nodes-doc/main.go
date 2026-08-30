@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/alib8b8/aflare/internal/nodes"
+	"github.com/alib8b8/aflare/internal/strutil"
 )
 
 func main() {
@@ -46,7 +47,10 @@ func main() {
 		schema := node.Schema()
 		desc := strings.ReplaceAll(schema.Description, "\n", " ")
 		if len(desc) > 120 {
-			desc = desc[:117] + "..."
+			// Byte-level s[:117] tears CJK runes and ships invalid UTF-8
+			// to the doc (doc_gen / engineer_skills rows did) — cut on a
+			// rune boundary instead.
+			desc = strutil.Truncate(desc, 117) + "..."
 		}
 		paramCount := len(schema.Params)
 		sb.WriteString(fmt.Sprintf("| [`%s`](#%s) | %s | %d |\n", schema.Name, schema.Name, desc, paramCount))

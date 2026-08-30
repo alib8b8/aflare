@@ -38,3 +38,6 @@ jobs:
 
       - name: Type check
         run: npx tsc --noEmit
+
+      - name: Test (argv contract, no-shell spawn)
+        run: npm test

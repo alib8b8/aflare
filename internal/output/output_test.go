@@ -21,6 +21,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func newTestManager() (*OutputManager, *bytes.Buffer, *bytes.Buffer) {
@@ -254,6 +255,30 @@ func TestNumbered(t *testing.T) {
 		if !strings.Contains(got, expected) {
 			t.Errorf("Numbered() should contain %q, got %q", expected, got)
 		}
+	}
+}
+
+// TestNumberedADHDCJKTruncation pins the runtime half of the byte-truncation
+// bug: ADHD-mode items over 120 bytes used to be cut with item[:117], which
+// tears CJK runes and ships invalid UTF-8 into step output and logs.
+func TestNumberedADHDCJKTruncation(t *testing.T) {
+	om, outBuf, _ := newTestManager()
+	om.SetMode(ModeADHD)
+
+	// 50 × 3-byte runes = 150 bytes, well over the 120-byte budget. The cut
+	// must land on a rune boundary: 39 whole runes + "..." = 120 bytes.
+	item := strings.Repeat("模块描述", 12) + strings.Repeat("尾", 2)
+	om.Numbered([]string{item})
+	got := outBuf.String()
+
+	if !utf8.ValidString(got) {
+		t.Fatalf("ADHD-mode truncation emitted invalid UTF-8: %q", got)
+	}
+	if !strings.HasSuffix(strings.TrimSpace(got), "...") {
+		t.Errorf("truncated item should end with \"...\", got %q", got)
+	}
+	if strings.Contains(got, "\ufffd") {
+		t.Errorf("truncated item contains U+FFFD replacement char: %q", got)
 	}
 }
 

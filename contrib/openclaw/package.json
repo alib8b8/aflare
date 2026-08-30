@@ -26,6 +26,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "lint": "eslint src --ext .ts",
+    "test": "tsc && node --test \"dist/tools/*.test.js\"",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

@@ -23,6 +23,8 @@ import (
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/alib8b8/aflare/internal/strutil"
 )
 
 // Mode controls the output verbosity.
@@ -249,7 +251,9 @@ func (o *OutputManager) Numbered(items []string) {
 		}
 		if o.mode == ModeADHD {
 			if len(item) > 120 {
-				item = item[:117] + "..."
+				// Byte-level item[:117] tears CJK runes and emits invalid
+				// UTF-8 into step output — cut on a rune boundary instead.
+				item = strutil.Truncate(item, 117) + "..."
 			}
 			fmt.Fprintf(o.out, "%d. %s\n", i+1, item)
 		} else {

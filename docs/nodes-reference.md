@@ -24,11 +24,11 @@
 | [`coze`](#coze) | Call Coze LLM API | 15 |
 | [`critic`](#critic) | Critic agent that reviews output, identifies issues, and suggests improvements | 8 |
 | [`deepseek`](#deepseek) | Call DeepSeek LLM API | 15 |
-| [`doc_gen`](#doc_gen) | AI自动文档生成节点。自动生成和更新代码库文档，支持README、API文档、函数注释、模块�... | 6 |
+| [`doc_gen`](#doc_gen) | AI自动文档生成节点。自动生成和更新代码库文档，支持README、API文档、函数注释、模块... | 6 |
 | [`doc_parse`](#doc_parse) | Parse documents (PDF/images/HTML) into text, LaTeX, or HTML table format | 7 |
 | [`drone`](#drone) | Control MAVLink-compatible drones (PX4/ArduPilot) via HTTP bridge. Supports arm/disarm, takeoff, land, RTL, waypoint ... | 17 |
 | [`email_send`](#email_send) | Send an email over SMTP (implicit TLS on port 465, STARTTLS elsewhere; plaintext only for loopback relays) | 12 |
-| [`engineer_skills`](#engineer_skills) | 预置工程技能包，覆盖前端/后端/DevOps/架构/安全/数据/信创七大领域共 24 项技能。支持�... | 5 |
+| [`engineer_skills`](#engineer_skills) | 预置工程技能包，覆盖前端/后端/DevOps/架构/安全/数据/信创七大领域共 24 项技能。支持... | 5 |
 | [`evaluator`](#evaluator) | Evaluator agent that scores output against criteria with structured rubrics | 9 |
 | [`execute`](#execute) | Execute shell commands (disabled in safe mode) | 3 |
 | [`fastgpt`](#fastgpt) | Call FastGPT API | 5 |
