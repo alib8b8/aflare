@@ -33,6 +33,17 @@ jobs:
     - name: Check source watermark coverage
       run: go run ./cmd/aflare watermark check-source --all
 
+    # Blocking: docs/nodes-reference.md is generated from Schema() metadata
+    # (cmd/gen-nodes-doc). Nothing else pinned it, so forgetting to regenerate
+    # after adding a node let the doc silently drift (68 → 70 round). Diffing
+    # against a fresh generation turns that drift into a red build.
+    - name: Check nodes-reference freshness
+      run: |
+        cp docs/nodes-reference.md /tmp/nodes-ref.bak
+        go run ./cmd/gen-nodes-doc
+        diff /tmp/nodes-ref.bak docs/nodes-reference.md || \
+          (echo "::error::docs/nodes-reference.md is stale — run: go run ./cmd/gen-nodes-doc" && exit 1)
+
     - name: Test with race detector
       run: go test ./... -race -short
 
