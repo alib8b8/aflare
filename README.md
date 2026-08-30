@@ -94,7 +94,7 @@ aflare chat / agent          aflare create
   node tools                (WAL recovery · Saga · retry · audit)
 ```
 
-Currently at **v0.11.0**, targeting local users first — local data lives on your machine, aflare is the deterministic and secure control layer between AI and that data.
+Currently at **v0.12.0**, targeting local users first — local data lives on your machine, aflare is the deterministic and secure control layer between AI and that data.
 
 ---
 

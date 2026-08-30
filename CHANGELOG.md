@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-30
+
 ### Added
 
 - **examples/real-world/digital-company-marketing / digital-company-sales（数字公司两部蓝本，对照 OpenExecutive）**：把 OpenExecutive（2.8k⭐）的三个核心纪律——角色职责分解、交接物契约化、对外单一声音——映射为部门级 agent 工作流。市场部：Intelligence Analyst（researcher，HN Algolia 开放信号采集，对应 CSO 竞争分析）→ GTM Strategist（structured_output，定位简报 JSON 契约，对应 CMO 的 GTM 职责）→ Campaign Copy Lead（agent，input 列表合并两路输入产统一声音文案包，提示词显式禁止内部角色泄漏）→ Brand Guardian（critic，brand_consistency / single_voice / no_internal_role_leakage 等六项评审）。销售部同构：Account Researcher（含 HN 评论流查询——公开抱怨是最密集的免费 B2B 痛点信号）→ Sales Analyst（ICP 评分档案 JSON）→ Account Executive（外联序列，限定"只能引用档案支持的主张"）→ Sales Ops Review（pricing_discipline / promise_compliance / spam_sensitivity 评审）。两部默认 Ollama 本地可跑、零商业依赖，validate 通过
