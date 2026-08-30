@@ -25,6 +25,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -51,6 +52,57 @@ func TestSkillMetadataVersionSync(t *testing.T) {
 		}
 	}
 	t.Error("skills/aflare/SKILL.md has no `version:` field in its frontmatter")
+}
+
+// TestSkillDocsNoGhostPhrases guards the skill doc mirrors against phrases
+// that document removed features or pin node counts. The mirrors
+// (skills/aflare/ and .claude/skills/aflare/) are maintained by hand with
+// different frontmatter formats, so a body edit applied to one copy has
+// repeatedly missed the other (community nodes after #94, "70 built-in"
+// after email_send made it 71, "45+ nodes" before that). This denylist
+// turns each 50%-probability miss into a red test instead.
+func TestSkillDocsNoGhostPhrases(t *testing.T) {
+	docs := []string{
+		"../../skills/aflare/SKILL.md",
+		"../../skills/aflare/nodes-reference.md",
+		"../../skills/aflare/examples.md",
+		"../../.claude/skills/aflare/SKILL.md",
+		"../../.claude/skills/setup/SKILL.md",
+	}
+	// Features removed in #94 (community/template ecosystem); any mention
+	// in the skill docs is a ghost.
+	ghostPhrases := []string{
+		"community node",
+		"marketplace",
+		"install-pack",
+	}
+	// Hardcoded node counts drift on every node addition — the docs must
+	// point at `aflare list` instead (historical drifts: "45+ nodes",
+	// "68 registered nodes", "70 built-in nodes", "catalog of 70").
+	countRe := regexp.MustCompile(`\b\d+\+?\s+(?:built-in|registered)\s+nodes\b|\b\d+\+\s+nodes\b|catalog of \d+`)
+
+	checked := 0
+	for _, doc := range docs {
+		data, err := os.ReadFile(doc)
+		if err != nil {
+			// A mirror may be deliberately absent (e.g. tarball checkout);
+			// only files that exist are checked.
+			continue
+		}
+		checked++
+		lower := strings.ToLower(string(data))
+		for _, phrase := range ghostPhrases {
+			if strings.Contains(lower, phrase) {
+				t.Errorf("%s: ghost phrase %q documents a feature removed in #94 — update the wording", doc, phrase)
+			}
+		}
+		if m := countRe.FindString(lower); m != "" {
+			t.Errorf("%s: hardcoded node count %q drifts on every node addition — write \"run `aflare list` for the full catalog\" instead", doc, m)
+		}
+	}
+	if checked == 0 {
+		t.Skip("no skill docs found (expected in repo checkout)")
+	}
 }
 
 func TestGetVersion(t *testing.T) {
