@@ -3,6 +3,10 @@ steps:
   - node: execute
     params:
       command: tail -n 100 /var/log/server.log
+  - name: cool-down
+    node: wait
+    params:
+      duration: 30s
   - node: transform
     params:
       operation: filter_errors
