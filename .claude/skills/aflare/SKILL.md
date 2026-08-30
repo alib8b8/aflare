@@ -23,7 +23,7 @@ tags:
 
 ## Overview
 
-aflare is a workflow engine that chains together **nodes** (steps) to automate tasks. Each workflow is a YAML file defining a sequence of nodes. Supported node types include `fetch_url`, `execute`, `transform`, `ollama` (local LLM), `file_read`, `file_write`, `notify`, `call`, and custom community nodes. Workflows support error handling with retries, parallel execution, conditional branching, variable substitution, and workflow chaining.
+aflare is a workflow engine that chains together **nodes** (steps) to automate tasks. Each workflow is a YAML file defining a sequence of nodes. Supported node types include `fetch_url`, `execute`, `transform`, `ollama` (local LLM), `file_read`, `file_write`, `notify`, `call`, and custom nodes (run `aflare list` for the full catalog). Workflows support error handling with retries, parallel execution, conditional branching, variable substitution, and workflow chaining.
 
 ## Prerequisites
 
