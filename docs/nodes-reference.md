@@ -1,6 +1,6 @@
 # Node Reference
 
-> Auto-generated from `Schema()` metadata. 71 nodes registered.
+> Auto-generated from `Schema()` metadata. 72 nodes registered.
 
 | Node | Description | Params |
 |------|-------------|--------|
@@ -73,6 +73,7 @@
 | [`template_render`](#template_render) | Render Go templates with input data | 2 |
 | [`transform`](#transform) | Transform text using string operations | 1 |
 | [`verify`](#verify) | Agent-as-a-Judge verifier that validates outputs, claims, and results against specified criteria | 10 |
+| [`wait`](#wait) | Pause the workflow for a duration (delay/sleep), then pass input through | 1 |
 | [`xverse`](#xverse) | Call XVERSE LLM API | 15 |
 | [`yi`](#yi) | Call Yi LLM API | 15 |
 
@@ -1663,6 +1664,21 @@ Agent-as-a-Judge verifier that validates outputs, claims, and results against sp
 | `verifier_type` | string | No | factual | Type: factual, code_correctness, security, logic, consistency, custom (default: factual) |
 | `output_format` | string | No | detailed | Output: pass_fail, score, detailed, json (default: detailed) |
 | `rubric` | string | No |  | Custom scoring rubric for verification (optional) |
+
+---
+
+## wait
+
+Pause the workflow for a duration (delay/sleep), then pass input through
+
+- **Input**: string - input text, passed through unchanged after the wait
+- **Output**: string - the input, unchanged
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `duration` | string | Yes |  | How long to wait (Go duration format: 500ms, 10s, 2m, 1h; max 1h — use aflare schedule for longer gaps) |
 
 ---
 

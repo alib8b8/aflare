@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **wait 节点（工作流内延时）**：`node: wait` + `duration`（Go duration 格式：500ms / 10s / 2m / 1h），暂停后原样透传输入——可插入任意两步之间（poll → wait → poll）不断数据流。语义要点：裸数字（"10" = 10ns）与负值直接报错并给出格式指引；单次上限 1h（更长间隔应走 `aflare schedule` 而非钉死 worker）；select 实现，工作流取消 / 步级超时立即打断等待而非睡满。8 条单测（注册、透传、0s 直通、非法/缺失/负值/超限、取消打断）；docs/nodes-reference.md 重新生成（72 nodes），skills 镜像补 wait 条目
 - **email_send 节点（SMTP 通知）**：465 隐式 TLS / 其余端口 STARTTLS，明文仅限回环中继（AFLARE_ALLOW_LOOPBACK 门控）；AUTH PLAIN + LOGIN 回退；凭据走 password_env，内联 password 永不落日志；拨号时 Control hook IP 校验（与 HTTP 节点同 SSRF 策略，封 DNS-rebinding TOCTOU）；from/to/cc/subject 经 net/mail 解析并拒 CR/LF 防头注入，subject Q-encoding；收件人 ≤50、正文 ≤100KB、超时 ≤120s；21 条测试（fake SMTP server）
 - **HTTP/API 连接器**：http_request 可引用命名 http 连接器——base_url 源固定（绝对/协议相对 URL 拒绝）、bearer/basic/header 凭据经 CredentialResolver 运行时解析（不落 YAML）、read_only 默认仅 GET/HEAD、timeout 天花板；连接器注入的认证头与内联头冲突报错不静默覆盖
 - **MCP Server HTTP 传输（token 必须）**：`aflare mcp --port 8082`，POST /mcp（JSON-RPC 2.0）+ POST /v1/call（简化直调）；X-MCP-Token 常数时间比较，无免认证模式；请求体上限 1MiB；默认绑 127.0.0.1，非回环须显式 --host

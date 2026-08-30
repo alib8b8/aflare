@@ -271,6 +271,20 @@ Call another workflow file (nested workflows). Recursive depth tracked (max 10).
     vars: "input={{step.fetch}}"
 ```
 
+### wait
+
+Pause the workflow for a duration (delay/sleep), then pass the input through unchanged — drop it between any two steps (e.g. poll → wait → poll) without breaking the data flow. Honors workflow cancellation and per-step timeouts.
+
+**Parameters:**
+- `duration` (required) — How long to wait, Go duration format (`500ms`, `10s`, `2m`, `1h`; max `1h` — for longer gaps use `aflare schedule` instead of blocking a worker)
+
+**Example:**
+```yaml
+- node: wait
+  params:
+    duration: "30s"
+```
+
 ## YAML Workflow Structure
 
 ```yaml
