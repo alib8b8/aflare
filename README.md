@@ -17,8 +17,8 @@
     <a href="https://golang.org/">
       <img src="https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat-square" alt="Go" />
     </a>
-    <a href="LICENSE">
-      <img src="https://img.shields.io/badge/License-AGPL%20v3.0-blue.svg?style=flat-square" alt="license" />
+    <a href="LICENSE-COMMERCIAL.md">
+      <img src="https://img.shields.io/badge/License-AGPL%20v3%20%7C%20Commercial-blue.svg?style=flat-square" alt="license" />
     </a>
   </p>
 </div>
@@ -137,9 +137,12 @@ We welcome contributions! [Contributing →](CONTRIBUTING.md)
 
 ---
 
-## License
+## License — Dual Licensing
 
-GNU Affero General Public License v3.0 — [LICENSE](LICENSE)
+aflare ships under a dual license:
+
+- **Community Edition** — GNU AGPL v3.0, free ([LICENSE](LICENSE)). Note AGPL §13: offering aflare-based functionality as a service triggers source-disclosure obligations for the entire combined work.
+- **Commercial License** — for embedding aflare in closed-source products or SaaS without AGPL obligations ([LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md), [local_first_agent@126.com](mailto:local_first_agent@126.com)).
 
 ---
 

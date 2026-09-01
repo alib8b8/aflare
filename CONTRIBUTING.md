@@ -302,6 +302,18 @@ If you need help:
 2. Open a new issue
 3. Ask in discussions
 
-## 📜 License
+## 📜 License — Contributor Terms
 
-By contributing, you agree that your contributions will be licensed under the GNU Affero General Public License v3.0.
+aflare is dual-licensed: the community edition under GNU AGPL v3.0, plus a commercial license offered by the project owner (see [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md)). To keep both licenses viable, **all contributions are accepted under the following terms**:
+
+1. **Outbound license**: your contributions are licensed to everyone under the GNU Affero General Public License v3.0 ([LICENSE](LICENSE)), the same as the rest of the project.
+
+2. **Parallel commercial grant**: you also grant the project owner (alib8b8) a perpetual, worldwide, non-exclusive, royalty-free, irrevocable license to use, reproduce, modify, distribute, and sublicense your contributions as part of aflare's commercial licensing, under terms of the owner's choosing.
+
+   > This mirrors the "inbound = outbound, plus a relicensing grant for the project owner" pattern used by dual-licensed projects. Without it, even one unlicensed external line of code would make the entire repository unsellable commercially — so this grant is a condition of merge.
+
+3. **You retain copyright** of your contributions. The grant above is a license, not a copyright transfer — no CLA assignment is required.
+
+4. **Third-party code** must be compatible with both grants: permissively licensed (MIT / Apache-2.0 / BSD) with notices preserved. We cannot accept code copied from AGPL/GPL-**incompatible** sources into this repository. If your contribution derives from code you didn't write, disclose its origin in the PR.
+
+By submitting a pull request, you confirm that you have the right to make these grants and agree to the terms above.

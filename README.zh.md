@@ -17,8 +17,8 @@
     <a href="https://golang.org/">
       <img src="https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat-square" alt="Go" />
     </a>
-    <a href="LICENSE">
-      <img src="https://img.shields.io/badge/License-AGPL%20v3.0-blue.svg?style=flat-square" alt="许可证" />
+    <a href="LICENSE-COMMERCIAL.md">
+      <img src="https://img.shields.io/badge/License-AGPL%20v3%20%7C%20Commercial-blue.svg?style=flat-square" alt="许可证" />
     </a>
   </p>
 </div>
@@ -137,9 +137,12 @@ aflare chat / agent          aflare create
 
 ---
 
-## 许可证
+## 许可证 —— 双许可
 
-GNU Affero General Public License v3.0 —— [LICENSE](LICENSE)
+aflare 采用双许可模式：
+
+- **社区版** —— GNU AGPL v3.0，免费（[LICENSE](LICENSE)）。注意 AGPL §13 网络条款：基于 aflare 对外提供服务等同于分发，须开源整个组合作品。
+- **商业授权** —— 适用于将 aflare 嵌入闭源产品或 SaaS 而不履行 AGPL 义务的场景（[LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md)，[local_first_agent@126.com](mailto:local_first_agent@126.com)）。
 
 ---
 
