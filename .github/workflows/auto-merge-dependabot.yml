@@ -13,20 +13,63 @@ jobs:
     runs-on: ubuntu-latest
     if: github.actor == 'dependabot[bot]'
     steps:
+      # GITHUB_TOKEN approvals never satisfy branch protection's required
+      # reviews, and this repo's "Allow auto-merge" setting is off, so the
+      # old approve+`gh pr merge --auto` flow always failed. Auto-merge only
+      # works with a real identity: the DEPENDABOT_MERGE_TOKEN secret
+      # (fine-grained PAT scoped to this repo, contents:write +
+      # pull-requests:write). Without the secret, skip gracefully instead of
+      # failing every dependabot PR's check list.
+      - name: Check for merge token
+        id: token
+        env:
+          MERGE_TOKEN: ${{ secrets.DEPENDABOT_MERGE_TOKEN }}
+        run: |
+          if [ -z "$MERGE_TOKEN" ]; then
+            echo "::notice::DEPENDABOT_MERGE_TOKEN secret is not set — skipping auto-merge. Approve and merge dependabot PRs manually (GITHUB_TOKEN approvals never count toward required reviews)."
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Dependabot metadata
+        if: steps.token.outputs.has_token == 'true'
         id: metadata
         uses: dependabot/fetch-metadata@v3
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Approve PR
-        run: gh pr review --approve "$PR_URL"
+      # Never auto-merge major version bumps without human review.
+      - name: Skip major updates
+        id: major
+        if: steps.token.outputs.has_token == 'true'
+        run: |
+          if [ "${{ steps.metadata.outputs.update-type }}" = "version-update:semver-major" ]; then
+            echo "::notice::Major version bump — leaving for human review."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for CI checks
+        if: steps.token.outputs.has_token == 'true' && steps.major.outputs.skip != 'true'
+        run: gh pr checks --watch --fail-fast "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Auto-merge Dependabot PRs
-        run: gh pr merge --auto --squash "$PR_URL"
+      - name: Approve PR
+        if: steps.token.outputs.has_token == 'true' && steps.major.outputs.skip != 'true'
+        run: >
+          gh pr review --approve "$PR_URL"
+          --body "Automated approval: dependabot update, all CI checks green."
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.DEPENDABOT_MERGE_TOKEN }}
+
+      - name: Merge PR
+        if: steps.token.outputs.has_token == 'true' && steps.major.outputs.skip != 'true'
+        run: gh pr merge --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.DEPENDABOT_MERGE_TOKEN }}
