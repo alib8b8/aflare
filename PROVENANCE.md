@@ -87,13 +87,27 @@ All direct Go dependencies are permissively licensed (MIT / Apache-2.0 / BSD);
 no copyleft dependencies exist, so commercial binary distribution carries no
 source-disclosure obligation from third-party code.
 
-## 5. 签署 / Signature
+## 5. 联系渠道与签署人身份 / Contact Channels & Signatory Identity
+
+所有者使用两个互不混用的邮箱，分工如下 / The owner maintains two
+non-interchangeable mailboxes:
+
+| 邮箱 / Email | 用途 / Role |
+|--------------|-------------|
+| `sjxj19921205@gmail.com` | **开发者身份邮箱**——GitHub 账号 alib8b8 的已验证登记邮箱、git 提交身份（§2 表中的规范身份，.mailmap 的 canonical）。签署本文件的提交将以该邮箱为作者 / **developer identity** — GitHub-verified registration email of alib8b8 and the git commit identity (the canonical identity in §2); the signing commit will be authored with this address |
+| `local_first_agent@126.com` | **aflare 商业合作邮箱**——双许可询价、企业 CLA 签署件、商业合同往来（见 [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md)） / **aflare business channel** — commercial-license inquiries, corporate CLA signatures, and contract correspondence (see [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md)) |
+
+两个邮箱均归所有者一人控制；商业主体与代码作者为同一人。
+Both mailboxes are controlled by the same owner; the commercial party
+and the code author are one and the same person.
+
+## 6. 签署 / Signature
 
 > （所有者确认 §2–§4 全部待决项后填写 / To be completed by the owner after
 > resolving every open item in §2–§4）
 
 ```
-签署人 / Signed:  alib8b8
+签署人 / Signed:  alib8b8 <sjxj19921205@gmail.com>
 GitHub:           https://github.com/alib8b8
 日期 / Date:      YYYY-MM-DD
 声明 / Statement: 本人确认本文件第 2、3、4 节所述内容真实、完整，
