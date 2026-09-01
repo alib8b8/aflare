@@ -5,19 +5,20 @@
 # this file with PROVENANCE.md, which declares which identities belong to the
 # project owner.
 #
-# Canonical identity (GitHub-attributed noreply form, ID-prefixed):
-alib8b8 <115916856+alib8b8@users.noreply.github.com>
+# Canonical identity (owner's GitHub-verified registration email):
+alib8b8 <sjxj19921205@gmail.com>
 
-# --- Confirmed: same GitHub account, two email spellings ---
-alib8b8 <alib8b8@users.noreply.github.com> <alib8b8@users.noreply.github.com>
+# --- Confirmed: same GitHub account, two historical noreply spellings ---
+alib8b8 <sjxj19921205@gmail.com> <115916856+alib8b8@users.noreply.github.com>
+alib8b8 <sjxj19921205@gmail.com> <alib8b8@users.noreply.github.com>
 
 # --- Pending owner confirmation (see PROVENANCE.md §2 before enabling) ---
 # Uncomment each mapping only after the owner confirms the identity is theirs:
-# alib8b8 <115916856+alib8b8@users.noreply.github.com> Dev <dev@example.com>
-# alib8b8 <115916856+alib8b8@users.noreply.github.com> HKAIC User <user@hkaic.example.com>
-# alib8b8 <115916856+alib8b8@users.noreply.github.com> llm-box dev <dev@llm-box.local>
-# alib8b8 <115916856+alib8b8@users.noreply.github.com> llm-box <aln48xF1OWfWMFC8.llm-box@noreply.gitcode.com>
-# alib8b8 <115916856+alib8b8@users.noreply.github.com> Security Audit Bot <security@llm-box.local>
+# alib8b8 <sjxj19921205@gmail.com> Dev <dev@example.com>
+# alib8b8 <sjxj19921205@gmail.com> HKAIC User <user@hkaic.example.com>
+# alib8b8 <sjxj19921205@gmail.com> llm-box dev <dev@llm-box.local>
+# alib8b8 <sjxj19921205@gmail.com> llm-box <aln48xF1OWfWMFC8.llm-box@noreply.gitcode.com>
+# alib8b8 <sjxj19921205@gmail.com> Security Audit Bot <security@llm-box.local>
 
 # --- Intentionally NOT mapped ---
 # webbrain-one — third-party contributor (see PROVENANCE.md §3)

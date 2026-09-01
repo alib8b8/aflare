@@ -27,6 +27,7 @@ from, who holds copyright, and which third-party interests (if any) remain.
 |----------|--------|------|------|
 | `alib8b8 <115916856+alib8b8@users.noreply.github.com>` | 124 | 所有者 / owner | ✅ 确认 |
 | `alib8b8 <alib8b8@users.noreply.github.com>` | 109 | 所有者（同一 GitHub 账号，邮箱拼写不同）/ owner, alternate email spelling | ✅ 确认 |
+| `alib8b8 <sjxj19921205@gmail.com>` | 0（历史）—— 2026-09 起的提交使用 / 0 (historical); used for commits from 2026-09 onward | 所有者 GitHub 已验证登记邮箱，规范身份（.mailmap 的 canonical）/ owner's GitHub-verified registration email, canonical identity (see .mailmap) | ✅ 确认 |
 | `Dev <dev@example.com>` | 310 | **待确认** — 所有者的本地开发身份？ | ⬜ 未确认 |
 | `Security Audit Bot <security@llm-box.local>` | 90 | **待确认** — 所有者运营的自动化机器人？ | ⬜ 未确认 |
 | `HKAIC User <user@hkaic.example.com>` | 79 | **待确认** — 所有者在 HKAIC 平台上的会话身份？ | ⬜ 未确认 |
