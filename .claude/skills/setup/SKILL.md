@@ -1,15 +1,15 @@
 ---
 name: setup
-description: Guide for installing and configuring aflare, including binary installation, source builds, workflows directory setup, and initial workflow creation
+description: Install aflare (script, release binary, or source build), verify the install with doctor, initialize the ~/.aflare workspace, and run a first workflow end to end
 allowed-tools:
   - bash
   - file_read
   - file_write
   - edit
-version: "1.0.0"
+version: "2.0.0"
 author: alib8b8
 license: AGPL-3.0
-compatibility: ">=0.1.0"
+compatibility: ">=0.12.0"
 tags:
   - setup
   - installation
@@ -17,95 +17,84 @@ tags:
   - aflare
 ---
 
-# Setup Skill
+# aflare Setup
 
-## Overview
+Get aflare from zero to a passing first run. Four stages: install → verify →
+initialize → first workflow.
 
-The setup skill walks you through installing aflare and getting your first workflow running. aflare is a workflow engine that chains nodes (steps) to automate tasks — fetching URLs, executing commands, transforming data, calling local LLMs via Ollama, reading/writing files, and more. This skill covers binary installation, building from source, directory structure, configuration, secrets, and verification.
+## Stage 1 — Install the binary
 
-## Prerequisites
+Pick exactly one path:
 
-- **Go 1.26.0+** — required only if building from source
-- **Node.js >=22.0.0** — required for OpenClaw plugin development
-- **Git** — for cloning the repository and version control
-- **Ollama** (optional) — needed for local LLM inference in workflow nodes
-- **Docker** (optional) — for containerized deployments
+| Method | Command / link | Best for |
+|--------|----------------|----------|
+| Install script (Linux/macOS) | `curl -sL https://raw.githubusercontent.com/alib8b8/aflare/main/install.sh -o install.sh && bash install.sh` | Fastest default |
+| Install script (Windows) | `irm https://raw.githubusercontent.com/alib8b8/aflare/main/install.ps1 \| iex` | Fastest default on Windows |
+| Release asset | [GitHub Releases](https://github.com/alib8b8/aflare/releases) — pick the archive for your OS/arch | Pinned, checksum-verified installs |
+| Build from source | `git clone https://github.com/alib8b8/aflare.git && cd aflare && go install ./cmd/aflare` | Needs Go 1.26+ |
 
-## Instructions
+For mainland-China networks, prefix the GitHub URLs with `https://ghproxy.com/`.
 
-### 1. Install aflare
+## Stage 2 — Verify the install
 
-**Binary release:** Download the latest release asset for your platform from the [GitHub Releases](https://github.com/alib8b8/aflare/releases) page.
-
-**Build from source:**
-
-```bash
-git clone https://github.com/alib8b8/aflare.git
-cd aflare
-go build -o aflare ./cmd/aflare
-sudo mv aflare /usr/local/bin/
-```
-
-### 2. Verify Installation
+Two checks, both must pass:
 
 ```bash
-aflare --version
+aflare --version   # prints the installed version
+aflare doctor      # environment health check (add --offline to skip network probes)
 ```
 
-### 3. Create Workflows Directory
+If `aflare` is not found, the install directory is not on `PATH` — check with
+`which aflare` (Linux/macOS) or `where aflare` (Windows) and fix the shell
+profile.
+
+## Stage 3 — Initialize the workspace
+
+`aflare init` bootstraps the local layout (run without flags for the
+interactive flow; `--mcp` / `--agent` take shortcuts for MCP host and agent
+config):
 
 ```bash
-mkdir -p ~/.aflare/workflows
+aflare init
 ```
 
-### 4. Configure Secrets (Optional)
+Resulting layout under `~/.aflare/`:
+
+- `workflows/` — where your workflow YAMLs live
+- `config.yaml` — engine configuration (default model, safe mode, API keys)
+
+Secrets belong in the OS keyring, never in plaintext YAML. Store the ones your
+workflows reference as `{{secret.*}}`:
 
 ```bash
 aflare secrets init
 aflare secrets set --group api --key service <password>
 ```
 
-### 5. Test with a Sample Workflow
+(On headless systems set `AFLARE_SECRETS_PASSWORD` instead of the keyring.)
+
+## Stage 4 — First workflow
+
+Generate a workflow from a plain-language description, validate it, run it:
 
 ```bash
-aflare run examples/content-processor.yaml
+aflare create "fetch example.com and save it to example.html"
+aflare validate example-workflow.yaml
+aflare run example-workflow.yaml
 ```
 
-## Output
+Expected outcome: the TUI shows each node executing, ending with a completion
+line, and `example.html` exists in the working directory. `aflare list` prints
+the full node catalog if you want to hand-edit the YAML next.
 
-After a successful setup you should have:
-- A working `aflare` binary available in your PATH
-- A workflows directory at `~/.aflare/workflows/` (or a custom path)
-- An optional secrets store for sensitive parameters
-- A test run confirming the engine can execute workflows
+## Done means
 
-## Examples
+- [ ] `aflare --version` and `aflare doctor` both succeed
+- [ ] `~/.aflare/workflows/` exists
+- [ ] One workflow ran to completion with visible output
 
-```bash
-# Full installation from source
-git clone https://github.com/alib8b8/aflare.git
-cd aflare
-go build -o aflare ./cmd/aflare
-sudo mv aflare /usr/local/bin/
+## Where to go next
 
-# Create and run your first workflow
-mkdir -p ~/.aflare/workflows
-cat > ~/.aflare/workflows/hello.yaml << 'EOF'
-name: hello-world
-description: Simple hello world workflow
-steps:
-  - node: file_write
-    params:
-      path: "output.txt"
-    input: "Hello from aflare!"
-EOF
-aflare run ~/.aflare/workflows/hello.yaml
-```
-
-## Resources
-
-- [aflare GitHub Repository](https://github.com/alib8b8/aflare)
-- [Node Reference Documentation](docs/nodes-reference.md)
-- [Custom Nodes Guide](docs/custom-nodes.md)
-- [Example Workflows](examples/)
-- [OpenClaw Plugin](contrib/openclaw/)
+- Node catalog: `aflare list`, or [docs/nodes-reference.md](../../docs/nodes-reference.md)
+- Custom nodes: [docs/custom-nodes.md](../../docs/custom-nodes.md)
+- Ready-made workflows: [examples/](../../examples/)

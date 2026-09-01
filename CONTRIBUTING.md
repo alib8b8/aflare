@@ -317,3 +317,5 @@ aflare is dual-licensed: the community edition under GNU AGPL v3.0, plus a comme
 4. **Third-party code** must be compatible with both grants: permissively licensed (MIT / Apache-2.0 / BSD) with notices preserved. We cannot accept code copied from AGPL/GPL-**incompatible** sources into this repository. If your contribution derives from code you didn't write, disclose its origin in the PR.
 
 By submitting a pull request, you confirm that you have the right to make these grants and agree to the terms above.
+
+Individual and corporate CLA documents mirroring these terms are provided for signature-based workflows: [CLA-INDIVIDUAL.md](CLA-INDIVIDUAL.md) / [CLA-CORPORATE.md](CLA-CORPORATE.md). Checking the PR template's licensing box constitutes acceptance of the individual CLA.
