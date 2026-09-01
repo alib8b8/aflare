@@ -254,7 +254,11 @@ func buildProviderList(rcfg config.RouterConfig) []RouterProvider {
 func detectAvailableProviders() []RouterProvider {
 	candidates := []string{
 		"openai", "anthropic", "gemini", "deepseek", "qwen",
-		"kimi", "glm", "yi", "mistral", "ollama",
+		"kimi", "glm", "yi", "mistral",
+		"ark", "siliconflow", "qianfan", "hunyuan", "stepfun",
+		"openrouter", "xai", "groq", "perplexity", "together",
+		"fireworks", "cerebras", "nvidia",
+		"ollama",
 	}
 
 	var result []RouterProvider
@@ -309,6 +313,32 @@ func defaultModelFor(provider string) string {
 		return "yi-lightning"
 	case "mistral":
 		return "mistral-small-latest"
+	case "ark":
+		return "doubao-seed-2-1-pro-260628"
+	case "siliconflow":
+		return "Qwen/Qwen3-32B"
+	case "qianfan":
+		return "ernie-4.5-turbo-128k"
+	case "hunyuan":
+		return "hunyuan-pro"
+	case "stepfun":
+		return "step-2-16k"
+	case "xai":
+		return "grok-4"
+	case "groq":
+		return "llama-3.3-70b-versatile"
+	case "cerebras":
+		return "llama-3.3-70b"
+	case "perplexity":
+		return "sonar"
+	case "together":
+		return "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+	case "fireworks":
+		return "accounts/fireworks/models/llama-v3p3-70b-instruct"
+	case "nvidia":
+		return "meta/llama-3.3-70b-instruct"
+	case "openrouter":
+		return "openrouter/auto"
 	case "ollama":
 		return "llama3"
 	default:

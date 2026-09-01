@@ -197,6 +197,101 @@ var openAICompatibleConfigs = []core.LLMNodeConfig{
 		EnvAPIBase:      "HYGON_API_BASE", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "Hygon DCU",
 	},
+	// ---- Cloud aggregators & international providers (verified against
+	// each provider's published OpenAI-compatible docs) ----
+	{
+		Name:            "openrouter",
+		DefaultModel:    "openrouter/auto",
+		DefaultEndpoint: "https://openrouter.ai/api/v1",
+		EnvAPIKey:       "OPENROUTER_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "OpenRouter",
+	},
+	{
+		Name:            "groq",
+		DefaultModel:    "llama-3.3-70b-versatile",
+		DefaultEndpoint: "https://api.groq.com/openai/v1",
+		EnvAPIKey:       "GROQ_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "Groq",
+	},
+	{
+		Name:            "cerebras",
+		DefaultModel:    "llama-3.3-70b",
+		DefaultEndpoint: "https://api.cerebras.ai/v1",
+		EnvAPIKey:       "CEREBRAS_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "Cerebras",
+	},
+	{
+		Name:            "perplexity",
+		DefaultModel:    "sonar",
+		DefaultEndpoint: "https://api.perplexity.ai",
+		EnvAPIKey:       "PERPLEXITY_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "Perplexity",
+	},
+	{
+		Name:            "together",
+		DefaultModel:    "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+		DefaultEndpoint: "https://api.together.xyz/v1",
+		EnvAPIKey:       "TOGETHER_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "Together AI",
+	},
+	{
+		Name:            "fireworks",
+		DefaultModel:    "accounts/fireworks/models/llama-v3p3-70b-instruct",
+		DefaultEndpoint: "https://api.fireworks.ai/inference/v1",
+		EnvAPIKey:       "FIREWORKS_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "Fireworks AI",
+	},
+	{
+		Name:            "nvidia",
+		DefaultModel:    "meta/llama-3.3-70b-instruct",
+		DefaultEndpoint: "https://integrate.api.nvidia.com/v1",
+		EnvAPIKey:       "NVIDIA_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "NVIDIA NIM",
+	},
+	{
+		Name:            "xai",
+		DefaultModel:    "grok-4",
+		DefaultEndpoint: "https://api.x.ai/v1",
+		EnvAPIKey:       "XAI_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "xAI Grok",
+	},
+	// ---- Chinese cloud providers with native OpenAI-compatible
+	// endpoints (verified against each vendor's official docs) ----
+	{
+		Name:            "ark",
+		DefaultModel:    "doubao-seed-2-1-pro-260628",
+		DefaultEndpoint: "https://ark.cn-beijing.volces.com/api/v3",
+		EnvAPIKey:       "ARK_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "Volcengine Ark",
+	},
+	{
+		Name:            "siliconflow",
+		DefaultModel:    "Qwen/Qwen3-32B",
+		DefaultEndpoint: "https://api.siliconflow.cn/v1",
+		EnvAPIKey:       "SILICONFLOW_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "SiliconFlow",
+	},
+	{
+		Name:            "qianfan",
+		DefaultModel:    "ernie-4.5-turbo-128k",
+		DefaultEndpoint: "https://qianfan.baidubce.com/v2",
+		EnvAPIKey:       "QIANFAN_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "Baidu Qianfan",
+	},
+	{
+		Name:            "hunyuan",
+		DefaultModel:    "hunyuan-pro",
+		DefaultEndpoint: "https://api.hunyuan.cloud.tencent.com/v1",
+		EnvAPIKey:       "HUNYUAN_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "Tencent Hunyuan",
+	},
+	{
+		Name:            "stepfun",
+		DefaultModel:    "step-2-16k",
+		DefaultEndpoint: "https://api.stepfun.com/v1",
+		EnvAPIKey:       "STEPFUN_API_KEY", // #nosec G101 -- env var name, not a credential value
+		ProviderName:    "StepFun",
+	},
 }
 
 func init() {

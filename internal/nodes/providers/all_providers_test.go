@@ -30,10 +30,10 @@ import (
 // allProviderNames lists every LLM provider node that the providers
 // subpackage is expected to register via init().
 var allProviderNames = []string{
-	"anthropic", "ascend", "baichuan", "cambricon", "coze",
-	"deepseek", "fastgpt", "gemini", "glm", "hygon", "ima", "internlm",
-	"kimi", "mimo", "minimax", "mistral", "ollama",
-	"openai", "qwen", "xverse", "yi",
+	"anthropic", "ark", "ascend", "baichuan", "cambricon", "cerebras", "coze",
+	"deepseek", "fastgpt", "fireworks", "gemini", "glm", "groq", "hygon", "hunyuan", "ima", "internlm",
+	"kimi", "mimo", "minimax", "mistral", "nvidia", "ollama",
+	"openai", "openrouter", "perplexity", "qianfan", "qwen", "siliconflow", "stepfun", "together", "xai", "xverse", "yi",
 }
 
 // TestAllProvidersRegistered verifies that every expected provider is

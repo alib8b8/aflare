@@ -184,7 +184,7 @@ Print or send notifications.
     message: "Workflow completed!"
 ```
 
-## LLM Nodes (15+ providers)
+## LLM Nodes (30+ providers)
 
 All LLM nodes share common parameters:
 - `prompt` (required) — Prompt text. Can reference previous step outputs via `{{step.<name>}}` (or `{{step.<N>}}`, 0-based index)

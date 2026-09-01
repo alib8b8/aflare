@@ -1,16 +1,18 @@
 # Node Reference
 
-> Auto-generated from `Schema()` metadata. 72 nodes registered.
+> Auto-generated from `Schema()` metadata. 85 nodes registered.
 
 | Node | Description | Params |
 |------|-------------|--------|
 | [`a2a_agent`](#a2a_agent) | Sends the input as one task to an A2A agent (message/send with tasks/send fallback), polls tasks/get until a terminal... | 4 |
 | [`agent`](#agent) | Autonomous agent node with ReAct reasoning loop and tool use capabilities | 9 |
 | [`anthropic`](#anthropic) | Call Anthropic Claude via an OpenAI-compatible proxy (LiteLLM/one-api). Native api.anthropic.com is NOT OpenAI-compat... | 15 |
+| [`ark`](#ark) | Call Volcengine Ark LLM API | 15 |
 | [`ascend`](#ascend) | Call Ascend LLM API | 15 |
 | [`baichuan`](#baichuan) | Call Baichuan LLM API | 15 |
 | [`call`](#call) | Call another workflow file | 2 |
 | [`cambricon`](#cambricon) | Call Cambricon MLU LLM API | 15 |
+| [`cerebras`](#cerebras) | Call Cerebras LLM API | 15 |
 | [`clarify`](#clarify) | Pre-execution ambiguity checker: identifies unclear requirements and generates clarifying questions (ACQUIRE framework) | 8 |
 | [`cli_agent`](#cli_agent) | Runs one bounded task via an external CLI agent subprocess (codex exec, claude -p, gemini -p, or a generic command) w... | 9 |
 | [`cli_session`](#cli_session) | 交互式CLI会话节点。支持上下文保持、命令历史、快捷键、流式输出和自动补全，提供类... | 5 |
@@ -37,10 +39,13 @@
 | [`file_watch`](#file_watch) | Polls a file or directory for create/modify/delete events and returns them as JSON. Suitable for log-monitor and file... | 6 |
 | [`file_write`](#file_write) | Write content to a file | 4 |
 | [`files_list`](#files_list) | List files under a files/notes connector root (relative paths + sizes). Skips dotfiles/dot-directories and symlinks. ... | 3 |
+| [`fireworks`](#fireworks) | Call Fireworks AI LLM API | 15 |
 | [`gemini`](#gemini) | Call Google Gemini LLM API | 15 |
 | [`glm`](#glm) | Call GLM LLM API | 15 |
+| [`groq`](#groq) | Call Groq LLM API | 15 |
 | [`http_request`](#http_request) | Make HTTP requests with custom method, headers, and body | 13 |
 | [`human_in_loop`](#human_in_loop) | Human approval gate — pauses workflow for human review and approval before continuing | 5 |
+| [`hunyuan`](#hunyuan) | Call Tencent Hunyuan LLM API | 15 |
 | [`hygon`](#hygon) | Call Hygon DCU LLM API | 15 |
 | [`ima`](#ima) | Call IMA Copilot LLM API | 15 |
 | [`internlm`](#internlm) | Call InternLM LLM API | 15 |
@@ -54,26 +59,34 @@
 | [`mistral`](#mistral) | Call Mistral LLM API | 15 |
 | [`multimodal`](#multimodal) | Multimodal node for image analysis, OCR, and audio transcription using vision-capable LLMs | 10 |
 | [`notify`](#notify) | Send notifications (stdout, stderr, slack, discord, telegram, feishu, dingtalk, wecom, webhook) | 10 |
+| [`nvidia`](#nvidia) | Call NVIDIA NIM LLM API | 15 |
 | [`office`](#office) | Read .docx/.xlsx/.pptx documents (text, tables, slides) using pure-Go OOXML parsing | 5 |
 | [`ollama`](#ollama) | Call Ollama local LLM server | 3 |
 | [`openai`](#openai) | Call OpenAI LLM API | 15 |
+| [`openrouter`](#openrouter) | Call OpenRouter LLM API | 15 |
+| [`perplexity`](#perplexity) | Call Perplexity LLM API | 15 |
 | [`pipeline`](#pipeline) | Dependency-based parallel workflow executor: steps run as soon as their dependencies are met, no global barriers (Tun... | 2 |
 | [`planner`](#planner) | Task decomposition agent that breaks complex goals into actionable steps | 9 |
 | [`preference`](#preference) | User preference memory: store, retrieve, and learn user habits across sessions (MemSlides-inspired user profiling) | 7 |
+| [`qianfan`](#qianfan) | Call Baidu Qianfan LLM API | 15 |
 | [`qwen`](#qwen) | Call Qwen LLM API | 15 |
 | [`rag`](#rag) | Retrieval Augmented Generation node - chunk documents, search by query, and assemble context | 7 |
 | [`reflector`](#reflector) | Self-reflection agent that critiques output and iteratively improves it (Reflexion pattern) | 7 |
 | [`researcher`](#researcher) | Research agent that fetches information from URLs and summarizes findings | 7 |
 | [`search_aggregate`](#search_aggregate) | Multi-platform search aggregator with real-signal ranking: Reddit/Twitter/YouTube/HN/GitHub, sorted by votes/comments... | 8 |
 | [`session_manager`](#session_manager) | Multi-session memory management. Create isolated sessions, fork a session from a parent, merge sessions, and share fa... | 11 |
+| [`siliconflow`](#siliconflow) | Call SiliconFlow LLM API | 15 |
 | [`skill_distill`](#skill_distill) | Distill methodologies from books, videos, podcasts, and documents into callable skills. Supports workflow, decision, ... | 6 |
 | [`sql_query`](#sql_query) | Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1)... | 9 |
+| [`stepfun`](#stepfun) | Call StepFun LLM API | 15 |
 | [`structured_output`](#structured_output) | LLM-driven structured output with local JSON Schema validation and self-correction retries | 11 |
 | [`supervisor`](#supervisor) | Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates | 14 |
 | [`template_render`](#template_render) | Render Go templates with input data | 2 |
+| [`together`](#together) | Call Together AI LLM API | 15 |
 | [`transform`](#transform) | Transform text using string operations | 1 |
 | [`verify`](#verify) | Agent-as-a-Judge verifier that validates outputs, claims, and results against specified criteria | 10 |
 | [`wait`](#wait) | Pause the workflow for a duration (delay/sleep), then pass input through | 1 |
+| [`xai`](#xai) | Call xAI Grok LLM API | 15 |
 | [`xverse`](#xverse) | Call XVERSE LLM API | 15 |
 | [`yi`](#yi) | Call Yi LLM API | 15 |
 
@@ -134,6 +147,35 @@ Call Anthropic Claude via an OpenAI-compatible proxy (LiteLLM/one-api). Native a
 | `model` | string | No | claude-3-5-sonnet-latest | Model name (default: claude-3-5-sonnet-latest) |
 | `api_key` | string | No |  | Anthropic API key (or set ANTHROPIC_API_KEY env var) |
 | `endpoint` | string | No | https://api.anthropic.com/v1 | API base URL (default: https://api.anthropic.com/v1) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
+
+---
+
+## ark
+
+Call Volcengine Ark LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | doubao-seed-2-1-pro-260628 | Model name (default: doubao-seed-2-1-pro-260628) |
+| `api_key` | string | No |  | Volcengine Ark API key (or set ARK_API_KEY env var) |
+| `endpoint` | string | No | https://ark.cn-beijing.volces.com/api/v3 | API base URL (default: https://ark.cn-beijing.volces.com/api/v3) |
 | `system` | string | No |  | System prompt |
 | `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
 | `max_tokens` | string | No |  | Max tokens to generate |
@@ -237,6 +279,35 @@ Call Cambricon MLU LLM API
 | `model` | string | No | qwen2.5-7b | Model name (default: qwen2.5-7b) |
 | `api_key` | string | No |  | Cambricon MLU API key (or set CAMBRICON_API_KEY env var) |
 | `endpoint` | string | No | http://localhost:8081/v1 | API base URL (default: http://localhost:8081/v1) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
+
+---
+
+## cerebras
+
+Call Cerebras LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | llama-3.3-70b | Model name (default: llama-3.3-70b) |
+| `api_key` | string | No |  | Cerebras API key (or set CEREBRAS_API_KEY env var) |
+| `endpoint` | string | No | https://api.cerebras.ai/v1 | API base URL (default: https://api.cerebras.ai/v1) |
 | `system` | string | No |  | System prompt |
 | `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
 | `max_tokens` | string | No |  | Max tokens to generate |
@@ -806,6 +877,35 @@ List files under a files/notes connector root (relative paths + sizes). Skips do
 
 ---
 
+## fireworks
+
+Call Fireworks AI LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | accounts/fireworks/models/llama-v3p3-70b-instruct | Model name (default: accounts/fireworks/models/llama-v3p3-70b-instruct) |
+| `api_key` | string | No |  | Fireworks AI API key (or set FIREWORKS_API_KEY env var) |
+| `endpoint` | string | No | https://api.fireworks.ai/inference/v1 | API base URL (default: https://api.fireworks.ai/inference/v1) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
+
+---
+
 ## gemini
 
 Call Google Gemini LLM API
@@ -864,6 +964,35 @@ Call GLM LLM API
 
 ---
 
+## groq
+
+Call Groq LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | llama-3.3-70b-versatile | Model name (default: llama-3.3-70b-versatile) |
+| `api_key` | string | No |  | Groq API key (or set GROQ_API_KEY env var) |
+| `endpoint` | string | No | https://api.groq.com/openai/v1 | API base URL (default: https://api.groq.com/openai/v1) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
+
+---
+
 ## http_request
 
 Make HTTP requests with custom method, headers, and body
@@ -907,6 +1036,35 @@ Human approval gate — pauses workflow for human review and approval before con
 | `approval_env` | string | No | AFLARE_APPROVED | Environment variable to check for approval (mode=env) |
 | `prompt` | string | No |  | Custom prompt message for the human reviewer |
 | `on_approve` | string | No | original | What to output on approve: original, modified, passthrough (default: original) |
+
+---
+
+## hunyuan
+
+Call Tencent Hunyuan LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | hunyuan-pro | Model name (default: hunyuan-pro) |
+| `api_key` | string | No |  | Tencent Hunyuan API key (or set HUNYUAN_API_KEY env var) |
+| `endpoint` | string | No | https://api.hunyuan.cloud.tencent.com/v1 | API base URL (default: https://api.hunyuan.cloud.tencent.com/v1) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -1252,6 +1410,35 @@ Send notifications (stdout, stderr, slack, discord, telegram, feishu, dingtalk, 
 
 ---
 
+## nvidia
+
+Call NVIDIA NIM LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | meta/llama-3.3-70b-instruct | Model name (default: meta/llama-3.3-70b-instruct) |
+| `api_key` | string | No |  | NVIDIA NIM API key (or set NVIDIA_API_KEY env var) |
+| `endpoint` | string | No | https://integrate.api.nvidia.com/v1 | API base URL (default: https://integrate.api.nvidia.com/v1) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
+
+---
+
 ## office
 
 Read .docx/.xlsx/.pptx documents (text, tables, slides) using pure-Go OOXML parsing
@@ -1302,6 +1489,64 @@ Call OpenAI LLM API
 | `model` | string | No | gpt-3.5-turbo | Model name (default: gpt-3.5-turbo) |
 | `api_key` | string | No |  | OpenAI API key (or set OPENAI_API_KEY env var) |
 | `endpoint` | string | No | https://api.openai.com/v1 | API base URL (default: https://api.openai.com/v1) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
+
+---
+
+## openrouter
+
+Call OpenRouter LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | openrouter/auto | Model name (default: openrouter/auto) |
+| `api_key` | string | No |  | OpenRouter API key (or set OPENROUTER_API_KEY env var) |
+| `endpoint` | string | No | https://openrouter.ai/api/v1 | API base URL (default: https://openrouter.ai/api/v1) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
+
+---
+
+## perplexity
+
+Call Perplexity LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | sonar | Model name (default: sonar) |
+| `api_key` | string | No |  | Perplexity API key (or set PERPLEXITY_API_KEY env var) |
+| `endpoint` | string | No | https://api.perplexity.ai | API base URL (default: https://api.perplexity.ai) |
 | `system` | string | No |  | System prompt |
 | `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
 | `max_tokens` | string | No |  | Max tokens to generate |
@@ -1374,6 +1619,35 @@ User preference memory: store, retrieve, and learn user habits across sessions (
 | `value` | string | No |  | Preference value (for set/learn operations) |
 | `confidence` | string | No |  | Confidence 0-1, default 0.6 for learn, 1.0 for set |
 | `source` | string | No | explicit | Where this preference came from (explicit|learned|config) |
+
+---
+
+## qianfan
+
+Call Baidu Qianfan LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | ernie-4.5-turbo-128k | Model name (default: ernie-4.5-turbo-128k) |
+| `api_key` | string | No |  | Baidu Qianfan API key (or set QIANFAN_API_KEY env var) |
+| `endpoint` | string | No | https://qianfan.baidubce.com/v2 | API base URL (default: https://qianfan.baidubce.com/v2) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -1516,6 +1790,35 @@ Multi-session memory management. Create isolated sessions, fork a session from a
 
 ---
 
+## siliconflow
+
+Call SiliconFlow LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | Qwen/Qwen3-32B | Model name (default: Qwen/Qwen3-32B) |
+| `api_key` | string | No |  | SiliconFlow API key (or set SILICONFLOW_API_KEY env var) |
+| `endpoint` | string | No | https://api.siliconflow.cn/v1 | API base URL (default: https://api.siliconflow.cn/v1) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
+
+---
+
 ## skill_distill
 
 Distill methodologies from books, videos, podcasts, and documents into callable skills. Supports workflow, decision, analysis, creative, prompt, and checklist skill types.
@@ -1556,6 +1859,35 @@ Execute SQL via database/sql. The driver must be registered by the host program.
 | `read_only` | string | No | true | Reject writes if true (default). Set false to allow INSERT/UPDATE/DELETE/DDL. A read-only connector stays read-only regardless. |
 | `max_rows` | string | No | 1000 | Max rows to return (default 1000; a connector's max_rows is the ceiling). Protects against huge result sets. |
 | `timeout` | string | No | 30 | Query timeout in seconds (default 30; a connector's timeout is the ceiling). |
+
+---
+
+## stepfun
+
+Call StepFun LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | step-2-16k | Model name (default: step-2-16k) |
+| `api_key` | string | No |  | StepFun API key (or set STEPFUN_API_KEY env var) |
+| `endpoint` | string | No | https://api.stepfun.com/v1 | API base URL (default: https://api.stepfun.com/v1) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 
@@ -1628,6 +1960,35 @@ Render Go templates with input data
 
 ---
 
+## together
+
+Call Together AI LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | meta-llama/Llama-3.3-70B-Instruct-Turbo | Model name (default: meta-llama/Llama-3.3-70B-Instruct-Turbo) |
+| `api_key` | string | No |  | Together AI API key (or set TOGETHER_API_KEY env var) |
+| `endpoint` | string | No | https://api.together.xyz/v1 | API base URL (default: https://api.together.xyz/v1) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
+
+---
+
 ## transform
 
 Transform text using string operations
@@ -1679,6 +2040,35 @@ Pause the workflow for a duration (delay/sleep), then pass input through
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `duration` | string | Yes |  | How long to wait (Go duration format: 500ms, 10s, 2m, 1h; max 1h — use aflare schedule for longer gaps) |
+
+---
+
+## xai
+
+Call xAI Grok LLM API
+
+- **Input**: string - user message content
+- **Output**: string - AI response content
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `model` | string | No | grok-4 | Model name (default: grok-4) |
+| `api_key` | string | No |  | xAI Grok API key (or set XAI_API_KEY env var) |
+| `endpoint` | string | No | https://api.x.ai/v1 | API base URL (default: https://api.x.ai/v1) |
+| `system` | string | No |  | System prompt |
+| `temperature` | string | No |  | Sampling temperature 0.0-2.0 (default: provider default) |
+| `max_tokens` | string | No |  | Max tokens to generate |
+| `top_p` | string | No |  | Nucleus sampling probability mass 0.0-1.0 |
+| `frequency_penalty` | string | No |  | Penalty for repeated tokens -2.0 to 2.0 |
+| `presence_penalty` | string | No |  | Penalty for new tokens -2.0 to 2.0 |
+| `stop` | string | No |  | Stop sequences (comma-separated, e.g. '\n,END') |
+| `seed` | string | No |  | Random seed for deterministic sampling (int) |
+| `response_format` | string | No |  | Structured output: 'json_object' or 'json_schema:<schema_json>' |
+| `tools` | string | No |  | JSON array of tool definitions for function calling |
+| `tool_choice` | string | No |  | Tool selection: 'none', 'auto', or JSON object |
+| `user` | string | No |  | End-user identifier for provider-side abuse monitoring |
 
 ---
 

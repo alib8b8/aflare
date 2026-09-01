@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **LLM 供应商目录扩容：新增 13 家 OpenAI 兼容供应商（21 → 34 家 LLM 节点，85 registered nodes）**：全部走既有的 `core.OpenAICompatibleNode` 配置表驱动路径（openai_compatible.go 追加条目即注册，零新文件、零协议代码）。国内 5 家——火山方舟 Ark（`ark`，doubao-seed-2-1-pro，ARK_API_KEY）、硅基流动（`siliconflow`，Qwen/Qwen3-32B）、百度千帆（`qianfan`，ernie-4.5-turbo-128k，v2 端点原生 OpenAI 兼容）、腾讯混元（`hunyuan`，hunyuan-pro）、阶跃星辰（`stepfun`，step-2-16k）；国际 8 家——OpenRouter（`openrouter`，openrouter/auto，一家端点聚合全厂商，此前只能借 openai 节点 `endpoint` 参数曲线接入）、xAI Grok（`xai`，grok-4）、Groq、Cerebras、Perplexity（`sonar`）、Together、Fireworks、NVIDIA NIM。端点/环境变量名/默认模型逐一对照各厂商官方 OpenAI 兼容文档核实（Ark / 混元 / 硅基流动 / 千帆经官方文档检索确认）。配套接线：llm_router 的 `defaultModelFor` / `detectAvailableProviders` 候选名单与 `core.DefaultEndpointFor` 同步补全（新供应商设了环境变量即被路由自动检测与 fallback）；llm_pricing 增补有官方牌价的模型（grok-4 / sonar 系 / llama-3.3-70b-versatile / Llama-3.3-70B-Instruct-Turbo，无把握牌价的模型宁缺勿假——unknown 模型成本按 0 计不虚报）；README（中英）"20+" → "30+"、skills 镜像 LLM 节点数同步。回归钉子：`TestNewProviderContracts` 钉死 13 家的 name/env-var/endpoint/default-model 四元契约（环境变量名是公开 API——用户 shell 与 CI secrets 里写的就是它，静默改名即断部署；且必须符合路由器 `UPPER(name)+"_API_KEY"` 推导约定，偏离即破坏路由自动检测），`allProviderNames` 注册表名单 21 → 34，`defaultModelFor` / `DefaultEndpointFor` 表驱动测试补 13 家用例。docs/nodes-reference.md 重新生成（72 → 85 nodes）
+
 ## [0.12.0] - 2026-08-30
 
 ### Added
