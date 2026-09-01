@@ -107,7 +107,7 @@ aflare chat / agent          aflare create
 - **Agent + 工作流双模式** —— 对话式 ReAct Agent（`aflare chat`）与守护进程 Agent（`aflare agent`）共用一个内核；6 种可插拔能力（反思 / 人工介入 / 效用驱动 / 记忆 / 规划 / 工作流）。
 - **Agent 互联与指挥** —— aflare 指挥和监督其他 Agent：CLI 通道（`codex` / `claude` / `gemini` 或任意通用 CLI）与 A2A 协议通道，`supervisor` 节点真实委派，单 Agent 失败不拖垮整批。
 - **安全内建** —— HMAC 防篡改审计链、AES-GCM 加密密钥库、自动密钥脱敏、SSRF / 路径穿越 / 命令注入防御、出站异常监控 + 自动熔断隔离，四个安全等级（L0–L3）。
-- **可扩展生态** —— MCP Server / Client、Go 自定义节点、社区插件、CI 用的 [GitHub Action](action/README.md)、20+ 内置 LLM 供应商、面向 OpenClaw 生态的 [OpenClaw 插件](contrib/openclaw/README.md)。
+- **可扩展生态** —— MCP Server / Client、Go 自定义节点、社区插件、CI 用的 [GitHub Action](action/README.md)、30+ 内置 LLM 供应商、面向 OpenClaw 生态的 [OpenClaw 插件](contrib/openclaw/README.md)。
 - **开箱即用的示例** —— [`examples/real-world/`](examples/real-world/) 真实场景工作流包：工业监控（OpenFOAM 发散看门狗、相似案例 RAG 分诊）、DevOps CI 流水线、研究、批量处理，以及多智能体角色流水线（分析师→研究员→交易员→风控的交易团队、数字公司市场部与销售部）。
 
 ---

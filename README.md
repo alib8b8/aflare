@@ -107,7 +107,7 @@ Currently at **v0.12.0**, targeting local users first — local data lives on yo
 - **Dual Agent + Workflow mode** — conversational ReAct Agent (`aflare chat`) and daemon Agent (`aflare agent`) share one core; 6 pluggable capabilities (reflection / human-in-the-loop / utility / memory / planning / workflow).
 - **Agent interconnection & commanding** — aflare directs and supervises other agents: CLI channel (`codex` / `claude` / `gemini` or any generic CLI) and A2A protocol channel, with real delegation via the `supervisor` node and failure isolation per agent.
 - **Security built in** — HMAC tamper-evident audit chain, AES-GCM encrypted secrets, automatic secret redaction, SSRF / path-traversal / command-injection defenses, outbound anomaly monitoring + auto circuit-break, four security levels (L0–L3).
-- **Extensible ecosystem** — MCP Server / Client, custom nodes in Go, community plugins, [GitHub Action](action/README.md) for CI, 20+ built-in LLM providers, [OpenClaw plugin](contrib/openclaw/README.md) for the OpenClaw ecosystem.
+- **Extensible ecosystem** — MCP Server / Client, custom nodes in Go, community plugins, [GitHub Action](action/README.md) for CI, 30+ built-in LLM providers, [OpenClaw plugin](contrib/openclaw/README.md) for the OpenClaw ecosystem.
 - **Ready-to-run examples** — real-world workflow packs under [`examples/real-world/`](examples/real-world/): industrial monitoring (OpenFOAM divergence watchdog, similarity-RAG incident triage), DevOps CI pipelines, research, batch processing, and multi-agent role pipelines (analyst→researcher→trader→risk trading crew, digital-company marketing & sales departments).
 
 ---

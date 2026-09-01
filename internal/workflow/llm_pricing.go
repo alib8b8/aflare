@@ -112,6 +112,16 @@ var defaultPricing = map[string]ModelPricing{
 	// Mistral
 	"mistral-large": {2.00, 6.00},
 	"mistral-small": {0.20, 0.60},
+	// xAI Grok
+	"grok-4": {3.00, 15.00},
+	// Perplexity
+	"sonar":           {1.00, 1.00},
+	"sonar-pro":       {3.00, 15.00},
+	"sonar-reasoning": {2.00, 8.00},
+	// Groq
+	"llama-3.3-70b-versatile": {0.59, 0.79},
+	// Together AI
+	"meta-llama/llama-3.3-70b-instruct-turbo": {0.88, 0.88},
 	// Local / self-hosted — cost is amortised hardware, not per-call.
 	"ollama":  {0.00, 0.00},
 	"llama":   {0.00, 0.00},

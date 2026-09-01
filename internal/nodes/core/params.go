@@ -108,6 +108,32 @@ func DefaultEndpointFor(provider string) string {
 		return "http://localhost:8081/v1"
 	case "hygon":
 		return "http://localhost:8082/v1"
+	case "ark":
+		return "https://ark.cn-beijing.volces.com/api/v3"
+	case "siliconflow":
+		return "https://api.siliconflow.cn/v1"
+	case "qianfan":
+		return "https://qianfan.baidubce.com/v2"
+	case "hunyuan":
+		return "https://api.hunyuan.cloud.tencent.com/v1"
+	case "stepfun":
+		return "https://api.stepfun.com/v1"
+	case "xai":
+		return "https://api.x.ai/v1"
+	case "groq":
+		return "https://api.groq.com/openai/v1"
+	case "cerebras":
+		return "https://api.cerebras.ai/v1"
+	case "perplexity":
+		return "https://api.perplexity.ai"
+	case "together":
+		return "https://api.together.xyz/v1"
+	case "fireworks":
+		return "https://api.fireworks.ai/inference/v1"
+	case "nvidia":
+		return "https://integrate.api.nvidia.com/v1"
+	case "openrouter":
+		return "https://openrouter.ai/api/v1"
 	default:
 		return "http://localhost:11434"
 	}
