@@ -25,8 +25,13 @@ import (
 // CatalogEntry describes a community MCP server that `aflare mcp install`
 // can write into a project-level .mcp.json file. Commands follow the
 // official reference-server naming: npm-based servers start via
-// `npx -y <pkg>`; the Python-based fetch server starts via
-// `uvx mcp-server-fetch`.
+// `npx -y <pkg>@<version>`; the Python-based fetch server starts via
+// `uvx mcp-server-fetch@<version>`. Every entry pins an exact registry
+// version — an unpinned `npx -y <pkg>` resolves to whatever npm serves
+// that day, which is a silent supply-chain hole for a workflow engine
+// whose selling point is auditable, deterministic execution. Bump the
+// pins together with each release (TestCatalogEntriesPinned fails any
+// future entry added without a pin).
 type CatalogEntry struct {
 	Name        string
 	Description string
@@ -40,64 +45,48 @@ type CatalogEntry struct {
 var catalogOrder = []string{
 	"fetch",
 	"filesystem",
-	"git",
 	"memory",
-	"sqlite",
 	"sequential-thinking",
 	"everything",
-	"time",
 }
 
 // builtinCatalog is the built-in directory of community MCP servers
 // supported by `aflare mcp install`.
+//
+// Removed 2026-09: git, sqlite, and time — their npm packages
+// (@modelcontextprotocol/server-git, -sqlite, -time) were unpublished from
+// the registry (404), so `aflare mcp install <name>` wrote launch commands
+// that could not start. Do not re-add them without a live registry check.
 var builtinCatalog = map[string]CatalogEntry{
 	"fetch": {
 		Name:        "fetch",
 		Description: "抓取网页并转为 Markdown 供模型阅读（官方 Python 实现，经 uvx 启动）",
 		Command:     "uvx",
-		Args:        []string{"mcp-server-fetch"},
+		Args:        []string{"mcp-server-fetch@2026.8.18"},
 	},
 	"filesystem": {
 		Name:        "filesystem",
 		Description: "受控读写本地文件系统（默认开放当前目录，可在 .mcp.json 中改为指定路径）",
 		Command:     "npx",
-		Args:        []string{"-y", "@modelcontextprotocol/server-filesystem", "."},
-	},
-	"git": {
-		Name:        "git",
-		Description: "查询 Git 仓库状态、diff 与提交历史",
-		Command:     "npx",
-		Args:        []string{"-y", "@modelcontextprotocol/server-git"},
+		Args:        []string{"-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "."},
 	},
 	"memory": {
 		Name:        "memory",
 		Description: "基于知识图谱的持久化记忆存储",
 		Command:     "npx",
-		Args:        []string{"-y", "@modelcontextprotocol/server-memory"},
-	},
-	"sqlite": {
-		Name:        "sqlite",
-		Description: "查询与修改 SQLite 数据库（默认库文件 ./data.db，可在 .mcp.json 中调整）",
-		Command:     "npx",
-		Args:        []string{"-y", "@modelcontextprotocol/server-sqlite", "--db-path", "./data.db"},
+		Args:        []string{"-y", "@modelcontextprotocol/server-memory@2026.8.31"},
 	},
 	"sequential-thinking": {
 		Name:        "sequential-thinking",
 		Description: "结构化分步推理（思维链）工具",
 		Command:     "npx",
-		Args:        []string{"-y", "@modelcontextprotocol/server-sequential-thinking"},
+		Args:        []string{"-y", "@modelcontextprotocol/server-sequential-thinking@2026.8.31"},
 	},
 	"everything": {
 		Name:        "everything",
 		Description: "MCP 协议测试沙盒，覆盖全部协议特性（prompts/resources/tools）",
 		Command:     "npx",
-		Args:        []string{"-y", "@modelcontextprotocol/server-everything"},
-	},
-	"time": {
-		Name:        "time",
-		Description: "获取当前时间与格式化时区转换",
-		Command:     "npx",
-		Args:        []string{"-y", "@modelcontextprotocol/server-time"},
+		Args:        []string{"-y", "@modelcontextprotocol/server-everything@2026.8.31"},
 	},
 }
 
