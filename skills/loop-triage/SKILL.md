@@ -86,7 +86,7 @@ Updated `STATE.md` and appended `loop-run-log.md`. No code changes in L1 mode.
 **Typical run:**
 
 ```
-Run loop-triage skill. Read STATE.md. Check CI on main — green. Scan 1 open issue (#6 marketplace grade). 0 open PRs. No CI failures. Update STATE.md last run timestamp. Append to loop-run-log.md. No new high-priority items. Critique: quiet day; next run add commit scan.
+Run loop-triage skill. Read STATE.md. Check CI on main — green. Scan 1 open issue (#6 docs gap). 0 open PRs. No CI failures. Update STATE.md last run timestamp. Append to loop-run-log.md. No new high-priority items. Critique: quiet day; next run add commit scan.
 ```
 
 **CI failure run:**
