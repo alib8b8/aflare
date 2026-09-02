@@ -4,10 +4,19 @@
 >
 > 本文件由项目所有者签署后方为有效。签署方式：所有者逐项确认第 2、3、4 节的待决问题，
 > 删除本提示块，并以所有者 git 身份提交本文件（提交即签署）。
+> **签署提交必须本地完成并直接推送（别走网页合并）**：
+> `git config user.email sjxj19921205@gmail.com` → 本地改完文件 → `git commit`
+> → `git push`。网页端 squash 合并会把作者邮箱改写为 noreply，签署将无法验回
+> §2 身份表的 gmail 条目，「提交即签署」自废。
 >
 > This declaration takes effect only after the project owner signs it: confirm
 > every open question in §2/§3/§4, remove this notice block, and commit this
 > file with the owner's git identity (the commit IS the signature).
+> **The signing commit MUST be made and pushed locally (never via a web
+> merge)**: `git config user.email sjxj19921205@gmail.com` → edit locally →
+> `git commit` → `git push`. Web squash merges rewrite the author email to the
+> noreply address, and the signature would no longer verify against the §2
+> identity table.
 
 ---
 
@@ -27,7 +36,7 @@ from, who holds copyright, and which third-party interests (if any) remain.
 |----------|--------|------|------|
 | `alib8b8 <115916856+alib8b8@users.noreply.github.com>` | 124 | 所有者 / owner | ✅ 确认 |
 | `alib8b8 <alib8b8@users.noreply.github.com>` | 109 | 所有者（同一 GitHub 账号，邮箱拼写不同）/ owner, alternate email spelling | ✅ 确认 |
-| `alib8b8 <sjxj19921205@gmail.com>` | 0（历史）—— 2026-09 起的提交使用 / 0 (historical); used for commits from 2026-09 onward | 所有者 GitHub 已验证登记邮箱，规范身份（.mailmap 的 canonical）/ owner's GitHub-verified registration email, canonical identity (see .mailmap) | ✅ 确认 |
+| `alib8b8 <sjxj19921205@gmail.com>` | 0（历史）；本地推送提交使用——网页端 squash 合并仍记录 noreply 原始邮箱，经 .mailmap 归一显示 / 0 (historical); canonical for locally-pushed commits — web squash merges still record the noreply email (display-unified via .mailmap) | 所有者 GitHub 已验证登记邮箱，规范身份（.mailmap 的 canonical）/ owner's GitHub-verified registration email, canonical identity (see .mailmap) | ✅ 确认 |
 | `Dev <dev@example.com>` | 310 | **待确认** — 所有者的本地开发身份？ | ⬜ 未确认 |
 | `Security Audit Bot <security@llm-box.local>` | 90 | **待确认** — 所有者运营的自动化机器人？ | ⬜ 未确认 |
 | `HKAIC User <user@hkaic.example.com>` | 79 | **待确认** — 所有者在 HKAIC 平台上的会话身份？ | ⬜ 未确认 |
@@ -94,7 +103,7 @@ non-interchangeable mailboxes:
 
 | 邮箱 / Email | 用途 / Role |
 |--------------|-------------|
-| `sjxj19921205@gmail.com` | **开发者身份邮箱**——GitHub 账号 alib8b8 的已验证登记邮箱、git 提交身份（§2 表中的规范身份，.mailmap 的 canonical）。签署本文件的提交将以该邮箱为作者 / **developer identity** — GitHub-verified registration email of alib8b8 and the git commit identity (the canonical identity in §2); the signing commit will be authored with this address |
+| `sjxj19921205@gmail.com` | **开发者身份邮箱**——GitHub 账号 alib8b8 的已验证登记邮箱、git 提交身份（§2 表中的规范身份，.mailmap 的 canonical）。签署本文件的提交将以该邮箱为作者（须本地推送，网页合并会改写为 noreply——见文件头签署须知）/ **developer identity** — GitHub-verified registration email of alib8b8 and the git commit identity (the canonical identity in §2); the signing commit will be authored with this address (requires a local push; web merges rewrite it to the noreply address — see the signing notice at the top) |
 | `local_first_agent@126.com` | **aflare 商业合作邮箱**——双许可询价、企业 CLA 签署件、商业合同往来（见 [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md)） / **aflare business channel** — commercial-license inquiries, corporate CLA signatures, and contract correspondence (see [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md)) |
 
 两个邮箱均归所有者一人控制；商业主体与代码作者为同一人。
@@ -118,3 +127,21 @@ GitHub:           https://github.com/alib8b8
                   to grant both the AGPL v3.0 community license and
                   commercial licenses.
 ```
+
+### 签署验证 / Signature Verification
+
+验签署看**原始邮箱**，不是 `.mailmap` 归一后的显示层：
+
+```bash
+git log --no-use-mailmap --format='%an <%ae>' -1 <签署提交>
+```
+
+或 GitHub API（`commits/{sha}` 的 `commit.author.email`）。若验出的是
+noreply 地址，说明签署提交被网页端合并改写——签署无效，须按文件头签署须知
+本地重新提交推送。
+
+Verify against the **raw** email, not the `.mailmap`-unified display:
+`git log --no-use-mailmap --format='%an <%ae>' -1 <signing-commit>` or the
+GitHub API (`commit.author.email` of `commits/{sha}`). A noreply address
+means the signing commit was rewritten by a web merge — the signature is
+void and must be redone locally per the signing notice at the top.
