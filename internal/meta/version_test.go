@@ -54,13 +54,15 @@ func TestSkillMetadataVersionSync(t *testing.T) {
 	t.Error("skills/aflare/SKILL.md has no `version:` field in its frontmatter")
 }
 
-// TestSkillDocsNoGhostPhrases guards the skill doc mirrors against phrases
-// that document removed features or pin node counts. The mirrors
-// (skills/aflare/ and .claude/skills/aflare/) are maintained by hand with
-// different frontmatter formats, so a body edit applied to one copy has
-// repeatedly missed the other (community nodes after #94, "70 built-in"
-// after email_send made it 71, "45+ nodes" before that). This denylist
-// turns each 50%-probability miss into a red test instead.
+// TestSkillDocsNoGhostPhrases guards every shipped SKILL.md against phrases
+// that document removed features or pin node counts. The aflare and setup
+// docs are hand-kept mirrors (skills/ and .claude/skills/, with different
+// frontmatter formats), so a body edit applied to one copy has repeatedly
+// missed the other (community nodes after #94, "70 built-in" after
+// email_send made it 71, "45+ nodes" before that, and skills/setup staying
+// at 0.6.0 across four mirror drifts); grok and loop-triage are
+// single-copy skills with the same drift risk. This denylist turns each
+// 50%-probability miss into a red test instead.
 func TestSkillDocsNoGhostPhrases(t *testing.T) {
 	docs := []string{
 		"../../skills/aflare/SKILL.md",
@@ -68,6 +70,9 @@ func TestSkillDocsNoGhostPhrases(t *testing.T) {
 		"../../skills/aflare/examples.md",
 		"../../.claude/skills/aflare/SKILL.md",
 		"../../.claude/skills/setup/SKILL.md",
+		"../../skills/setup/SKILL.md",
+		"../../skills/grok/SKILL.md",
+		"../../skills/loop-triage/SKILL.md",
 	}
 	// Features removed in #94 (community/template ecosystem); any mention
 	// in the skill docs is a ghost.
