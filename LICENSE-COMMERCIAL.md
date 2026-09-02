@@ -13,7 +13,7 @@ aflare is available under a **dual license** model:
 
 ## When You Need a Commercial License
 
-You need a commercial license if you want to **any** of the following while **not** complying with AGPL:
+You need a commercial license if you want **any** of the following while **not** complying with AGPL:
 
 - Embed aflare in a proprietary product or internal platform without releasing your source code
 - Offer aflare-based services to customers while keeping your workflow definitions, integrations, or surrounding code closed

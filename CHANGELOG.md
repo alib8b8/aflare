@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **身份治理链收口：gmail 提交身份从显示层落到提交层**：#148 提交信息自称「本提交即首个使用 gmail 身份的提交」，但 GitHub API 原始数据显示网页端 squash 合并的作者邮箱全部是 noreply（邮箱隐私设置开启时，服务器端合并一律改写为 noreply）——gmail 此前只活在 .mailmap 显示层与提交信息文本里。修正三处：① PROVENANCE.md §2 身份表 gmail 行口径改为「本地推送提交使用」（网页 squash 合并仍记录 noreply 原始邮箱，经 .mailmap 归一显示）；② 签署须知补关键一条——签署 PROVENANCE 的提交必须本地完成并直推（`git config user.email sjxj19921205@gmail.com` → 本地 commit → push，别走网页合并），否则「提交即签署」验不回 gmail；③ §6 签署节补验证方法（验 raw email 而非 mailmap 显示层）。合并规范同步确立：需保留 gmail 作者身份的提交，本地合并后 push，替代网页端 Merge 按钮
 - **Auto-merge Dependabot 工作流修复**：旧流程三个缺陷叠加，导致每个 dependabot PR 的 auto-merge 检查必然失败（4 个 PR 积压于此）——① `pull_request` 触发即跑，不等 CI；② `gh pr merge --auto` 依赖仓库未启用的 "Allow auto-merge" 设置，GraphQL 直接拒绝；③ `GITHUB_TOKEN` 提交的批准永不计入分支保护的 required review，等了也白等。新流程：未配置 `DEPENDABOT_MERGE_TOKEN` secret 时优雅跳过（::notice 提示手动处理，不再红叉）；配置后（fine-grained PAT，仅本仓库，contents:write + pull-requests:write）全自动——`gh pr checks --watch` 等 CI 全绿 → PAT 批准（计入 required review）→ squash 合并；semver-major 升级永不自动合并，留人工评审
+- **aflare-action 文档 pin 回切**：示例 6 处 `@main` → `@v0.12.0`（README 中英 + action/README）；v0.12.0 是首个含 action/ 的 release tag，`@main` 不另行通知地移动；action/README 过期的 "Why @main?" 注记替换为正式 Pinning 说明（兑现仓库自立 TODO）
 
 ## [0.12.0] - 2026-08-30
 
