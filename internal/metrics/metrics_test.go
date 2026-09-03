@@ -192,6 +192,28 @@ func TestSetQueueDepth(t *testing.T) {
 	}
 }
 
+func TestRecordAgentDelegation(t *testing.T) {
+	const agent = "test_agent_delegation"
+	beforeSuccess := testutil.ToFloat64(agentDelegations.WithLabelValues("cli", agent, "success"))
+	beforeError := testutil.ToFloat64(agentDelegations.WithLabelValues("a2a", agent, "error"))
+	// Fresh label value → new histogram series, so the collected series
+	// count must grow (mirrors TestRecordNodeExecution_ObservesDuration).
+	beforeSeries := testutil.CollectAndCount(agentDelegationDuration)
+
+	RecordAgentDelegation("cli", agent, 10*time.Millisecond, nil)
+	RecordAgentDelegation("a2a", agent, 5*time.Millisecond, errors.New("remote down"))
+
+	if got := testutil.ToFloat64(agentDelegations.WithLabelValues("cli", agent, "success")); got != beforeSuccess+1 {
+		t.Errorf("cli success counter: got %v (before %v)", got, beforeSuccess)
+	}
+	if got := testutil.ToFloat64(agentDelegations.WithLabelValues("a2a", agent, "error")); got != beforeError+1 {
+		t.Errorf("a2a error counter: got %v (before %v)", got, beforeError)
+	}
+	if got := testutil.CollectAndCount(agentDelegationDuration); got <= beforeSeries {
+		t.Errorf("duration series: got %d (before %d), want a new series", got, beforeSeries)
+	}
+}
+
 func TestRegister_IncludesOpsMetrics(t *testing.T) {
 	Register()
 	families, err := prometheus.DefaultGatherer.Gather()

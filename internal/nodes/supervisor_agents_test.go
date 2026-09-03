@@ -145,7 +145,7 @@ func TestRunDelegations_ParallelFanOut(t *testing.T) {
 	}
 
 	// No plan → fan-out: every agent gets the full goal.
-	results := runDelegations(context.Background(), refs, "shared goal", nil, 0)
+	results := runDelegations(context.Background(), refs, "shared goal", nil, delegationOpts{})
 	if len(results) != 2 {
 		t.Fatalf("results = %d, want 2", len(results))
 	}
@@ -174,7 +174,7 @@ func TestRunDelegations_FailureIsolated(t *testing.T) {
 		{Name: "bad", Def: mustAgent(t, "bad")},
 	}
 
-	results := runDelegations(context.Background(), refs, "goal", nil, 0)
+	results := runDelegations(context.Background(), refs, "goal", nil, delegationOpts{})
 	byAgent := map[string]agentResult{}
 	for _, res := range results {
 		byAgent[res.Agent] = res
@@ -212,7 +212,7 @@ func TestRunDelegations_BoundedConcurrency(t *testing.T) {
 	}
 
 	start := time.Now()
-	results := runDelegations(context.Background(), refs, "goal", nil, 2)
+	results := runDelegations(context.Background(), refs, "goal", nil, delegationOpts{maxParallel: 2})
 	elapsed := time.Since(start)
 
 	if len(results) != 6 {
@@ -268,7 +268,7 @@ func TestDelegateToAgents_WithPlannerAndSynthesis(t *testing.T) {
 		return "SYNTHESIS: merged answer", nil
 	}
 
-	out, err := delegateToAgents(context.Background(), refs, "build feature X", llm, 0)
+	out, err := delegateToAgents(context.Background(), refs, "build feature X", llm, delegationOpts{})
 	if err != nil {
 		t.Fatalf("delegateToAgents: %v", err)
 	}
@@ -311,7 +311,7 @@ func TestDelegateToAgents_PlannerFailureFallsBackToFanOut(t *testing.T) {
 	llm := func(ctx context.Context, systemPrompt, userInput string) (string, error) {
 		return "", context.DeadlineExceeded
 	}
-	out, err := delegateToAgents(context.Background(), refs, "the goal", llm, 0)
+	out, err := delegateToAgents(context.Background(), refs, "the goal", llm, delegationOpts{})
 	if err != nil {
 		t.Fatalf("delegateToAgents: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestDelegateToAgents_NoLLMFanOut(t *testing.T) {
 	})
 	refs := []agentRef{{Name: "alpha", Def: mustAgent(t, "alpha")}}
 
-	out, err := delegateToAgents(context.Background(), refs, "the goal", nil, 0)
+	out, err := delegateToAgents(context.Background(), refs, "the goal", nil, delegationOpts{})
 	if err != nil {
 		t.Fatalf("delegateToAgents: %v", err)
 	}
@@ -357,7 +357,7 @@ func TestDelegateToAgents_A2AAgent(t *testing.T) {
 	})
 	refs := []agentRef{{Name: "remote", Def: mustAgent(t, "remote")}}
 
-	out, err := delegateToAgents(context.Background(), refs, "the goal", nil, 0)
+	out, err := delegateToAgents(context.Background(), refs, "the goal", nil, delegationOpts{})
 	if err != nil {
 		t.Fatalf("delegateToAgents: %v", err)
 	}
@@ -434,5 +434,161 @@ func TestSupervisor_PersonaOnlyUnchanged(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "not registered") {
 		t.Fatalf("persona-only run must not touch the agent registry: %v", err)
+	}
+}
+
+func TestDelegationFailure_Policies(t *testing.T) {
+	allOK := []agentResult{
+		{Agent: "a", OK: true},
+		{Agent: "b", OK: true},
+	}
+	mixed := []agentResult{
+		{Agent: "a", OK: true},
+		{Agent: "b", OK: false, Error: "boom"},
+	}
+	allFailed := []agentResult{
+		{Agent: "a", OK: false, Error: "boom"},
+		{Agent: "b", OK: false, Error: "bang"},
+	}
+
+	if err := delegationFailure("none", allFailed); err != nil {
+		t.Errorf("none policy must never fail, got %v", err)
+	}
+	if err := delegationFailure("none", mixed); err != nil {
+		t.Errorf("none policy must never fail, got %v", err)
+	}
+	if err := delegationFailure("all", allOK); err != nil {
+		t.Errorf("all policy with every success must not fail, got %v", err)
+	}
+	if err := delegationFailure("all", mixed); err != nil {
+		t.Errorf("all policy with one success must not fail, got %v", err)
+	}
+	if err := delegationFailure("all", allFailed); err == nil || !strings.Contains(err.Error(), "all 2 supervisor delegations failed") {
+		t.Errorf("all policy with every failure must fail with summary, got %v", err)
+	}
+	if err := delegationFailure("any", mixed); err == nil || !strings.Contains(err.Error(), "agent b") {
+		t.Errorf("any policy with one failure must fail naming the agent, got %v", err)
+	}
+	if err := delegationFailure("any", allOK); err != nil {
+		t.Errorf("any policy with all success must not fail, got %v", err)
+	}
+
+	if !allDelegationsOK(allOK) || allDelegationsOK(mixed) || allDelegationsOK(allFailed) {
+		t.Error("allDelegationsOK aggregate is wrong")
+	}
+}
+
+func TestDelegateToAgents_OKAggregate(t *testing.T) {
+	registerTestAgents(t, map[string]agentx.AgentDef{
+		"good": {Driver: agentx.DriverCLI, Profile: "generic", Binary: fakeCLIAgent(t, "GOOD")},
+		"bad":  {Driver: agentx.DriverCLI, Profile: "generic", Binary: "/nonexistent/aflare-test-binary"},
+	})
+	refs := []agentRef{
+		{Name: "good", Def: mustAgent(t, "good")},
+		{Name: "bad", Def: mustAgent(t, "bad")},
+	}
+
+	out, err := delegateToAgents(context.Background(), refs, "goal", nil, delegationOpts{})
+	if err != nil {
+		t.Fatalf("delegateToAgents (fail_on=none): %v", err)
+	}
+	var parsed struct {
+		OK      bool          `json:"ok"`
+		Results []agentResult `json:"results"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if parsed.OK {
+		t.Error("ok=true with one failed delegation, want false")
+	}
+	if len(parsed.Results) != 2 {
+		t.Fatalf("results = %+v", parsed.Results)
+	}
+
+	// Same batch with fail_on=any must fail the node.
+	_, err = delegateToAgents(context.Background(), refs, "goal", nil, delegationOpts{failOn: "any"})
+	if err == nil || !strings.Contains(err.Error(), "agent bad") {
+		t.Fatalf("fail_on=any with a failing agent must fail the node, got %v", err)
+	}
+
+	// fail_on=all only trips when everything failed: one success keeps
+	// the node green.
+	if _, err := delegateToAgents(context.Background(), refs, "goal", nil, delegationOpts{failOn: "all"}); err != nil {
+		t.Fatalf("fail_on=all with one success must not fail the node, got %v", err)
+	}
+}
+
+func TestRunDelegations_DelegationTimeoutApplies(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script fake agent is POSIX-only")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fake-slow")
+	script := "#!/bin/sh\nsleep 2\necho ok\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil { // #nosec G306 -- test helper must be executable
+		t.Fatalf("write fake agent: %v", err)
+	}
+
+	registerTestAgents(t, map[string]agentx.AgentDef{
+		"slow": {Driver: agentx.DriverCLI, Profile: "generic", Binary: path},
+	})
+	refs := []agentRef{{Name: "slow", Def: mustAgent(t, "slow")}}
+
+	start := time.Now()
+	results := runDelegations(context.Background(), refs, "goal", nil, delegationOpts{timeout: 100 * time.Millisecond})
+	elapsed := time.Since(start)
+	if len(results) != 1 || results[0].OK {
+		t.Fatalf("results = %+v, want one timeout failure", results)
+	}
+	if !strings.Contains(results[0].Error, "timed out") {
+		t.Errorf("error = %q, want timeout", results[0].Error)
+	}
+	if elapsed >= 2*time.Second {
+		t.Errorf("elapsed = %v, delegation_timeout must bound the wait", elapsed)
+	}
+}
+
+func TestSupervisor_InvalidFailOnFails(t *testing.T) {
+	registerTestAgents(t, map[string]agentx.AgentDef{
+		"fakey": {Driver: agentx.DriverCLI, Profile: "generic", Binary: fakeCLIAgent(t, "FAKEY")},
+	})
+	node := &SupervisorNode{}
+	_, err := node.Execute(context.Background(), "goal", map[string]string{
+		"specialists": "@fakey",
+		"fail_on":     "sometimes",
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid fail_on") {
+		t.Fatalf("err = %v, want invalid fail_on rejection", err)
+	}
+}
+
+func TestSupervisor_InvalidDelegationTimeoutFails(t *testing.T) {
+	registerTestAgents(t, map[string]agentx.AgentDef{
+		"fakey": {Driver: agentx.DriverCLI, Profile: "generic", Binary: fakeCLIAgent(t, "FAKEY")},
+	})
+	node := &SupervisorNode{}
+	_, err := node.Execute(context.Background(), "goal", map[string]string{
+		"specialists":        "@fakey",
+		"delegation_timeout": "soon",
+	})
+	if err == nil || !strings.Contains(err.Error(), "delegation_timeout") {
+		t.Fatalf("err = %v, want delegation_timeout rejection", err)
+	}
+}
+
+func TestSupervisor_FailOnAnyFailsNodeOnBadAgent(t *testing.T) {
+	registerTestAgents(t, map[string]agentx.AgentDef{
+		"bad": {Driver: agentx.DriverCLI, Profile: "generic", Binary: "/nonexistent/aflare-test-binary"},
+	})
+	node := &SupervisorNode{}
+	_, err := node.Execute(context.Background(), "goal", map[string]string{
+		"specialists": "@bad",
+		"fail_on":     "any",
+		"provider":    "openai",
+		"endpoint":    "http://127.0.0.1:1/v1/chat/completions",
+	})
+	if err == nil || !strings.Contains(err.Error(), "agent bad") {
+		t.Fatalf("err = %v, want delegation failure to fail the node under fail_on=any", err)
 	}
 }

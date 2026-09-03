@@ -50,5 +50,6 @@ func listAgents() error {
 	}
 	fmt.Println(strings.Repeat("-", 78))
 	fmt.Println("Delegate via supervisor specialists: \"@codex,@claude\", or the cli_agent / a2a_agent nodes.")
+	fmt.Println("Verify usability before delegating: aflare agent probe [name...]")
 	return nil
 }

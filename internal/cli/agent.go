@@ -46,9 +46,13 @@ import (
 func HandleAgent(args []string) error {
 	// `aflare agent list` inspects the registry of external agents
 	// aflare can command — not a daemon mode, so intercept it before
-	// daemon flag parsing.
+	// daemon flag parsing. Same for `aflare agent probe`, the
+	// pre-flight usability check.
 	if len(args) > 0 && args[0] == "list" {
 		return listAgents()
+	}
+	if len(args) > 0 && args[0] == "probe" {
+		return probeAgents(args[1:])
 	}
 
 	cfg := agent.DefaultConfig()

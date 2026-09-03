@@ -267,3 +267,42 @@ func TestIsValidModelName(t *testing.T) {
 		}
 	}
 }
+
+func TestRunCLI_StripsANSIEscapes(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script fake agent is POSIX-only")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fake-ansi")
+	// CSI color codes plus an OSC hyperlink — both commonly leak out of
+	// headless agent CLIs and would corrupt downstream JSON/parsing.
+	script := "#!/bin/sh\nprintf '\\033[32mgreen\\033[0m \\033]8;;https://x\\007link\\033]8;;\\007 done\\n'\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil { // #nosec G306 -- test helper must be executable
+		t.Fatalf("write fake agent: %v", err)
+	}
+
+	def := AgentDef{Name: "ansi", Driver: DriverCLI, Profile: "generic", Binary: path}
+	out, err := RunCLI(context.Background(), def, Task{Prompt: "x"})
+	if err != nil {
+		t.Fatalf("RunCLI: %v", err)
+	}
+	if out != "green link done" {
+		t.Errorf("output = %q, want ANSI-stripped %q", out, "green link done")
+	}
+}
+
+func TestStripANSI(t *testing.T) {
+	cases := map[string]string{
+		"plain":                  "plain",
+		"\x1b[31mred\x1b[0m":     "red",
+		"\x1b[2K\x1b[1Gprogress": "progress",
+		"\x1b]0;title\x07body":   "body",
+		"\x1b]8;;http://e\x1b\\text\x1b]8;;\x1b\\": "text",
+		"": "",
+	}
+	for in, want := range cases {
+		if got := stripANSI(in); got != want {
+			t.Errorf("stripANSI(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

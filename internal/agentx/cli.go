@@ -22,8 +22,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/aflare/internal/metrics"
 )
 
 // validProfiles lists the built-in CLI profiles. The generic profile
@@ -139,7 +142,10 @@ func RunCLI(ctx context.Context, def AgentDef, t Task) (string, error) {
 	// never forwards its own secrets store contents into the subprocess.
 	cmd.Env = os.Environ()
 
+	started := time.Now()
 	runErr := cmd.Run()
+	metrics.RecordAgentDelegation(string(DriverCLI), def.Name, time.Since(started), runErr)
+
 	stdoutData, _ := os.ReadFile(outFile.Name())
 	stderrData, _ := os.ReadFile(errFile.Name())
 	if len(stdoutData) > maxOutputBytes {
@@ -153,19 +159,35 @@ func RunCLI(ctx context.Context, def AgentDef, t Task) (string, error) {
 		if runCtx.Err() == context.DeadlineExceeded {
 			return "", fmt.Errorf("agent %q timed out after %s", def.Name, timeoutStr)
 		}
-		return "", fmt.Errorf("agent %q failed: %w\nstderr: %s", def.Name, runErr, strings.TrimSpace(string(stderrData)))
+		return "", fmt.Errorf("agent %q failed: %w\nstderr: %s", def.Name, runErr, stripANSI(strings.TrimSpace(string(stderrData))))
 	}
 
-	out := strings.TrimSpace(string(stdoutData))
+	out := stripANSI(strings.TrimSpace(string(stdoutData)))
 	if out == "" {
 		// Some CLIs emit the final message on stderr; fall back so a
 		// successful run doesn't turn into silence.
-		if fb := strings.TrimSpace(string(stderrData)); fb != "" {
+		if fb := stripANSI(strings.TrimSpace(string(stderrData))); fb != "" {
 			return fb, nil
 		}
 		return "", fmt.Errorf("agent %q produced no output", def.Name)
 	}
 	return out, nil
+}
+
+// ansiPattern matches the terminal escape sequences agent CLIs commonly
+// leave in non-interactive output: CSI sequences (colors, cursor moves,
+// progress redraws) and OSC sequences (window titles, hyperlinks).
+var ansiPattern = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]|\x1b\\][^\x07\x1b]*(\x07|\x1b\\\\)")
+
+// stripANSI removes terminal escape sequences from agent output. The
+// delegation result feeds downstream workflow steps (JSON parsing, file
+// writes, further prompts); stray CSI/OSC bytes would corrupt all of
+// them, and headless CLIs emit them more often than not.
+func stripANSI(s string) string {
+	if !strings.Contains(s, "\x1b") {
+		return s
+	}
+	return ansiPattern.ReplaceAllString(s, "")
 }
 
 // buildProfileArgs maps a delegation onto the CLI's non-interactive argv.

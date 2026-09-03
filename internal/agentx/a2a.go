@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/alib8b8/aflare/internal/httpclient"
+	"github.com/alib8b8/aflare/internal/metrics"
 )
 
 // a2aHTTPClient is the A2A client's shared HTTP client, built on the
@@ -212,14 +213,25 @@ func SendMessage(ctx context.Context, def AgentDef, t Task) (string, error) {
 	taskCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	started := time.Now()
 	task, err := a2aSendTask(taskCtx, def, base, prompt)
 	if err != nil {
+		metrics.RecordAgentDelegation(string(DriverA2A), def.Name, time.Since(started), err)
 		return "", err
 	}
 
 	// Some servers return the final state directly; otherwise poll.
 	task, err = a2aAwaitTerminal(taskCtx, def, base, task)
+	metrics.RecordAgentDelegation(string(DriverA2A), def.Name, time.Since(started), err)
 	if err != nil {
+		// We are abandoning a task the remote side may still be running
+		// (deadline hit or caller gone). Best-effort tasks/cancel so the
+		// agent stops burning tokens on work nobody will read; the note
+		// is appended to the error, never fatal — the delegation error
+		// stays the primary signal.
+		if task != nil && task.ID != "" {
+			err = fmt.Errorf("%w (%s)", err, a2aCancelTaskBestEffort(def, base, task.ID))
+		}
 		return "", err
 	}
 
@@ -240,6 +252,21 @@ func SendMessage(ctx context.Context, def AgentDef, t Task) (string, error) {
 		}
 		return "", fmt.Errorf("agent %q: task %s failed (state %q)", def.Name, task.ID, task.Status.State)
 	}
+}
+
+// a2aCancelTaskBestEffort asks the remote agent to cancel a task aflare
+// has stopped waiting for. It runs on a fresh short context because the
+// delegation context is already expired/canceled at this point. It
+// returns a human-readable outcome note for the delegation error chain:
+// confirmation on success, the failure reason otherwise.
+func a2aCancelTaskBestEffort(def AgentDef, base, taskID string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := a2aCallRetried[a2aTask](ctx, def, base, "tasks/cancel", map[string]any{"id": taskID}, isA2ADialError)
+	if err == nil {
+		return "remote task canceled"
+	}
+	return fmt.Sprintf("best-effort cancel failed: %v", err)
 }
 
 // a2aSendTask posts the delegation using JSON-RPC 2.0, trying the
@@ -277,7 +304,9 @@ func a2aSendTask(ctx context.Context, def AgentDef, base, prompt string) (*a2aTa
 }
 
 // a2aAwaitTerminal polls tasks/get until the task reaches a terminal
-// state, the context deadline hits, or the server errors.
+// state, the context deadline hits, or the server errors. On error the
+// last known task is returned alongside the error so the caller can
+// still best-effort cancel it remotely.
 func a2aAwaitTerminal(ctx context.Context, def AgentDef, base string, task *a2aTask) (*a2aTask, error) {
 	for {
 		if a2aTerminalStates[task.Status.State] {
@@ -285,7 +314,7 @@ func a2aAwaitTerminal(ctx context.Context, def AgentDef, base string, task *a2aT
 		}
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("agent %q: timed out waiting for task %s (last state %q)", def.Name, task.ID, task.Status.State)
+			return task, fmt.Errorf("agent %q: timed out waiting for task %s (last state %q)", def.Name, task.ID, task.Status.State)
 		case <-time.After(a2aPollInterval):
 		}
 		// tasks/get is an idempotent read, so any transient transport
@@ -294,7 +323,7 @@ func a2aAwaitTerminal(ctx context.Context, def AgentDef, base string, task *a2aT
 		// the whole delegation.
 		updated, err := a2aCallRetried[a2aTask](ctx, def, base, "tasks/get", map[string]any{"id": task.ID}, isA2ARetryableReadError)
 		if err != nil {
-			return nil, fmt.Errorf("agent %q: tasks/get for %s failed: %w", def.Name, task.ID, err)
+			return task, fmt.Errorf("agent %q: tasks/get for %s failed: %w", def.Name, task.ID, err)
 		}
 		if updated.ID == "" {
 			updated.ID = task.ID
