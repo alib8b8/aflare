@@ -200,6 +200,14 @@ func List() []AgentDef {
 	return out
 }
 
+// IsBuiltinAgentName reports whether name collides with a built-in preset
+// (codex / claude / gemini). `aflare agent add` refuses these names so a
+// remote agent card cannot silently shadow the local CLI presets.
+func IsBuiltinAgentName(name string) bool {
+	_, ok := builtinPresets()[name]
+	return ok
+}
+
 // Resolve validates that def is usable for its driver kind and applies
 // per-kind defaults.
 func (def AgentDef) Resolve() (AgentDef, error) {

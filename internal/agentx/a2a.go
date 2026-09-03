@@ -196,6 +196,13 @@ func SendMessage(ctx context.Context, def AgentDef, t Task) (string, error) {
 		return "", err
 	}
 
+	// Circuit breaker: fail fast when this endpoint has been failing
+	// consistently, instead of waiting out another full delegation
+	// timeout on a dead server.
+	if err := globalAgentBreakers.allow(ctx, def); err != nil {
+		return "", err
+	}
+
 	timeout := t.resolveTimeout()
 	timeoutStr := formatDuration(timeout)
 
@@ -217,6 +224,7 @@ func SendMessage(ctx context.Context, def AgentDef, t Task) (string, error) {
 	task, err := a2aSendTask(taskCtx, def, base, prompt)
 	if err != nil {
 		metrics.RecordAgentDelegation(string(DriverA2A), def.Name, time.Since(started), err)
+		globalAgentBreakers.record(def.Name, err)
 		return "", err
 	}
 
@@ -232,25 +240,35 @@ func SendMessage(ctx context.Context, def AgentDef, t Task) (string, error) {
 		if task != nil && task.ID != "" {
 			err = fmt.Errorf("%w (%s)", err, a2aCancelTaskBestEffort(def, base, task.ID))
 		}
+		globalAgentBreakers.record(def.Name, err)
 		return "", err
 	}
 
 	switch task.Status.State {
 	case "completed":
+		globalAgentBreakers.record(def.Name, nil)
 		return extractTaskText(task), nil
 	case "canceled":
-		return "", fmt.Errorf("agent %q: task %s was canceled", def.Name, task.ID)
+		err := fmt.Errorf("agent %q: task %s was canceled", def.Name, task.ID)
+		globalAgentBreakers.record(def.Name, err)
+		return "", err
 	case "rejected":
-		return "", fmt.Errorf("agent %q: task %s was rejected", def.Name, task.ID)
+		err := fmt.Errorf("agent %q: task %s was rejected", def.Name, task.ID)
+		globalAgentBreakers.record(def.Name, err)
+		return "", err
 	default: // failed and anything unknown
 		msg := ""
 		if task.Status.Message != nil {
 			msg = extractMessageText(*task.Status.Message)
 		}
+		var err error
 		if msg != "" {
-			return "", fmt.Errorf("agent %q: task %s failed: %s", def.Name, task.ID, msg)
+			err = fmt.Errorf("agent %q: task %s failed: %s", def.Name, task.ID, msg)
+		} else {
+			err = fmt.Errorf("agent %q: task %s failed (state %q)", def.Name, task.ID, task.Status.State)
 		}
-		return "", fmt.Errorf("agent %q: task %s failed (state %q)", def.Name, task.ID, task.Status.State)
+		globalAgentBreakers.record(def.Name, err)
+		return "", err
 	}
 }
 
@@ -322,6 +340,7 @@ func a2aAwaitTerminal(ctx context.Context, def AgentDef, base string, task *a2aT
 		// duplicate side effects — a single failed poll used to kill
 		// the whole delegation.
 		updated, err := a2aCallRetried[a2aTask](ctx, def, base, "tasks/get", map[string]any{"id": task.ID}, isA2ARetryableReadError)
+		metrics.RecordA2APoll(def.Name, err)
 		if err != nil {
 			return task, fmt.Errorf("agent %q: tasks/get for %s failed: %w", def.Name, task.ID, err)
 		}

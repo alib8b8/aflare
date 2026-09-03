@@ -165,6 +165,9 @@ scrape_configs:
 | `aflare_queue_depth` | gauge | — | daemon task queue (pending, not yet picked up by a worker) |
 | `aflare_workflow_executions_total` | counter | `status` | workflow executor |
 | `aflare_workflow_execution_duration_seconds` | histogram | — | workflow executor |
+| `aflare_agent_delegations_total` | counter | `driver`, `agent`, `status` | agentx delegation path (supervisor fan-out and single-step `cli_agent`/`a2a_agent` calls) |
+| `aflare_agent_delegation_duration_seconds` | histogram | `driver`, `agent` | agentx delegation path (supervisor fan-out and single-step `cli_agent`/`a2a_agent` calls) |
+| `aflare_a2a_polls_total` | counter | `agent`, `status` | A2A `tasks/get` polling loop (visibility into fixed-interval poll cost) |
 | `aflare_security_blocks_total` | counter | `block_type` | `SecurityStats.RecordBlock` |
 | `aflare_cache_hits_total` | counter | — | `CacheStats` (pull via `CollectSnapshot`) |
 | `aflare_cache_misses_total` | counter | — | `CacheStats` (pull via `CollectSnapshot`) |

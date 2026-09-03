@@ -94,7 +94,7 @@
 
 ## a2a_agent
 
-Sends the input as one task to an A2A agent (message/send with tasks/send fallback), polls tasks/get until a terminal state and returns the artifacts/status text.
+Sends the input as one task to an A2A agent (message/send with tasks/send fallback), polls tasks/get until a terminal state and returns the artifacts/status text. Consecutive failures trip a per-agent circuit breaker: calls fail fast with a `circuit-open` error until an agent-card probe succeeds, so one dead endpoint cannot burn the full timeout on every step.
 
 - **Input**: string - the task/prompt for the remote agent
 - **Output**: string - the agent's artifacts/status message text
@@ -347,7 +347,7 @@ Pre-execution ambiguity checker: identifies unclear requirements and generates c
 
 ## cli_agent
 
-Runs one bounded task via an external CLI agent subprocess (codex exec, claude -p, gemini -p, or a generic command) with timeout, sandbox and audit. Requires the agent CLI installed and authenticated.
+Runs one bounded task via an external CLI agent subprocess (codex exec, claude -p, gemini -p, or a generic command) with timeout, sandbox and audit. Requires the agent CLI installed and authenticated. Consecutive failures trip a per-agent circuit breaker (fast `circuit-open` failures until the agent recovers).
 
 - **Input**: string - the task/prompt for the agent
 - **Output**: string - the agent's final answer (stdout)
@@ -1934,7 +1934,7 @@ Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain spec
 | `specialists` | string | No | planner,researcher,critic,evaluator | Comma-separated specialists. Persona roles: planner,researcher,critic,code_review,evaluator,reflector,legal_expert,medical_expert,educational_expert,financial_expert,creative_writer,data_analyst. Registered external agents: prefix with @ (e.g. @codex,@claude,@my-a2a-agent) for real delegation |
 | `max_parallel` | string | No | 4 | Max concurrent external-agent delegations; excess subtasks queue (default: 4, max: 16) |
 | `fail_on` | string | No | none | Overall failure policy for delegated agents: none = never fail the node, failures stay isolated in the results (default); all = fail the node only if every delegation failed; any = fail the node if any delegation failed |
-| `delegation_timeout` | string | No |  | Per-delegation timeout for external agents, e.g. 30s, 10m (default: 10m, max: 60m) |
+| `delegation_timeout` | string | No |  | Per-delegation timeout for external agents, e.g. 30s, 10m (default: 10m, max: 60m). Agents failing repeatedly trip a per-agent circuit breaker: delegations fail fast with `circuit-open` instead of burning the full timeout, and recovery is probed via the agent card |
 | `strategy` | string | No | sequential | Strategy: sequential, parallel, hierarchical, mindsearch, moe, agency, swarm (default: sequential) |
 | `output_format` | string | No | json | Output format: json, markdown, summary (default: json) |
 | `domain` | string | No | general | Domain specialization: general,legal,medical,education,finance,creative,tech,business (default: general) |

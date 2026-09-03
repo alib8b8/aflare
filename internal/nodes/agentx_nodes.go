@@ -26,16 +26,29 @@ import (
 	"github.com/alib8b8/aflare/internal/config"
 )
 
-// The agentx registry is fed from the `agents:` config section. The
-// loader is lazy: config is only touched when an agent is first
-// resolved, so importing this package never triggers config file IO.
+// The agentx registry is fed from two user-managed sources on top of the
+// built-in presets: the `agents:` section of the main config (hand
+// edited) and the CLI-managed agent store (~/.aflare/config/agents.yaml,
+// written by `aflare agent add`). Store entries win over config entries —
+// the CLI is the more recent expression of intent. The loader is lazy:
+// files are only touched when an agent is first resolved, so importing
+// this package never triggers config IO.
 func init() {
 	agentx.SetLoader(func() map[string]agentx.AgentDef {
-		cfg, err := config.LoadConfig()
-		if err != nil || cfg == nil {
-			return nil
+		agents := make(map[string]agentx.AgentDef)
+		if cfg, err := config.LoadConfig(); err == nil && cfg != nil {
+			for name, def := range cfg.Agents {
+				agents[name] = def
+			}
 		}
-		return cfg.Agents
+		stored, err := agentx.LoadAgentStore(agentx.DefaultAgentStorePath())
+		if err != nil {
+			return agents
+		}
+		for name, def := range stored {
+			agents[name] = def
+		}
+		return agents
 	})
 }
 
@@ -136,7 +149,7 @@ func (n *CLIAgentNode) Description() string {
 func (n *CLIAgentNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "cli_agent",
-		Description: "Runs one bounded task via an external CLI agent subprocess (codex exec, claude -p, gemini -p, or a generic command) with timeout, sandbox and audit. Requires the agent CLI installed and authenticated.",
+		Description: "Runs one bounded task via an external CLI agent subprocess (codex exec, claude -p, gemini -p, or a generic command) with timeout, sandbox and audit. Requires the agent CLI installed and authenticated. Consecutive failures trip a per-agent circuit breaker (fast `circuit-open` failures until the agent recovers).",
 		Input:       "string - the task/prompt for the agent",
 		Output:      "string - the agent's final answer (stdout)",
 		Params: []ParamSchema{
@@ -191,7 +204,7 @@ func (n *A2AAgentNode) Description() string {
 func (n *A2AAgentNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "a2a_agent",
-		Description: "Sends the input as one task to an A2A agent (message/send with tasks/send fallback), polls tasks/get until a terminal state and returns the artifacts/status text.",
+		Description: "Sends the input as one task to an A2A agent (message/send with tasks/send fallback), polls tasks/get until a terminal state and returns the artifacts/status text. Consecutive failures trip a per-agent circuit breaker: calls fail fast with a `circuit-open` error until an agent-card probe succeeds, so one dead endpoint cannot burn the full timeout on every step.",
 		Input:       "string - the task/prompt for the remote agent",
 		Output:      "string - the agent's artifacts/status message text",
 		Params: []ParamSchema{
