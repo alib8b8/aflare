@@ -3,6 +3,11 @@
 # check must re-evaluate), and weekly so the Maintained/Vulnerabilities
 # checks stay fresh. Results are published to securityscorecards.dev,
 # which backs the README badge (publish_results: true).
+#
+# NOTE: deliberately NO pull_request trigger — and "Scorecard analysis" must
+# never be added as a required status check: this workflow never runs on PRs,
+# so a required check would strand every PR in "Expected" forever (see
+# AGENTS.md Toolchain).
 name: Scorecard supply-chain security
 
 on:

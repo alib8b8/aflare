@@ -14,7 +14,10 @@
   pushes + daily full-history rescan); verified false positives go into
   .gitleaksignore (fingerprints, not blanket path rules), never disable the scan.
 - ossf/scorecard-action@v2.4.4 in scorecard.yml — results are published (badge
-  in README); bump alongside other action pins.
+  in README); bump alongside other action pins. NEVER add "Scorecard analysis"
+  to the required status checks: scorecard.yml only runs on main pushes,
+  branch-protection changes and a weekly schedule, never on PRs — a required
+  Scorecard check would strand every PR in "Expected" forever.
 
 ## CI gate — must pass locally before any commit
 Run all of these; all must be green:
@@ -30,6 +33,12 @@ Coverage must stay ≥ 60% overall and per-package (agent / workflow / memory at
 
 ## Commit policy (GitHub + GitCode)
 - All changes go through a pull request — never push directly to main.
+  Branch protection enforces the required checks for everyone, admins
+  included (no bypass): gate (required) — the pr-review.yml aggregate gate —
+  plus Build & Test, Lint Check, Format Check, Security Scan, Vulnerability
+  Scan, test (amd64) and test (arm64). Scorecard analysis is deliberately
+  NOT among them (never runs on PRs; see Toolchain). A rejected push to main
+  means: move the commits to a branch and open a PR.
 - A PR may only be merged after CI is green (ci.yml + pr-review.yml, lint is
   blocking) AND the code-review checklist in docs/code-review.md has been
   applied (security / architecture / code-quality / testing sections).
