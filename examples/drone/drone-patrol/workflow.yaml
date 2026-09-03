@@ -16,7 +16,8 @@
 #   {{step.check_battery}}            → 步骤 check_battery 的完整输出
 #   {{step.takeoff.jsonpath:$.success}} → JSONPath 提取 success 字段
 #
-# 注意：loop/map/reduce 等复合步骤使用独立的表达式引擎，
+# 注意：本工作流使用顶层 depends_on 声明步骤依赖（DAG 调度）。
+# loop/map/reduce 等复合步骤使用独立的表达式引擎，
 # {{step.X}} 引用无法访问父 workflow 的步骤输出。
 # 如需在循环内判断条件，应将数据通过 loop items 传入，
 # 或在被调用的节点内部处理。
@@ -25,7 +26,7 @@ name: "无人机巡检"
 version: "1.0"
 
 steps:
-  # === 阶段 1: 起飞前检查 ===
+  # === 阶段 1: 起飞前检查（三项并发） ===
   - name: pre_flight_checks
     description: "起飞前安全检查"
     parallel:
@@ -49,53 +50,53 @@ steps:
           drone_model: PX4
 
   # === 阶段 2: 解锁 & 起飞 ===
-  - name: arm_and_takeoff
-    description: "解锁电机并起飞"
+  - name: arm
+    description: "解锁电机"
     depends_on: [pre_flight_checks]
-    steps:
-      - name: arm
-        node: drone
-        params:
-          action: arm
-          mode: simulate
-          drone_model: PX4
-      - name: takeoff
-        node: drone
-        params:
-          action: takeoff
-          mode: simulate
-          drone_model: PX4
-          target_altitude_m: "20"
-          flight_speed_ms: "5"
-        depends_on: [arm]
+    node: drone
+    params:
+      action: arm
+      mode: simulate
+      drone_model: PX4
+
+  - name: takeoff
+    description: "起飞至 20 米"
+    depends_on: [arm]
+    node: drone
+    params:
+      action: takeoff
+      mode: simulate
+      drone_model: PX4
+      target_altitude_m: "20"
+      flight_speed_ms: "5"
 
   # === 阶段 3: 巡检航线 ===
-  - name: patrol_mission
-    description: "执行巡检航线"
-    depends_on: [arm_and_takeoff]
-    steps:
-      - name: upload_waypoints
-        node: drone
-        params:
-          action: mission_upload
-          mode: simulate
-          drone_model: PX4
-          mission_type: patrol
-          waypoints: |
-            [
-              {"lat": 30.2750, "lon": 120.1560, "alt": 20},
-              {"lat": 30.2760, "lon": 120.1570, "alt": 20},
-              {"lat": 30.2770, "lon": 120.1560, "alt": 20},
-              {"lat": 30.2760, "lon": 120.1550, "alt": 20},
-              {"lat": 30.2750, "lon": 120.1560, "alt": 20}
-            ]
-      - name: start_patrol
-        node: drone
-        params:
-          action: mission_start
-          mode: simulate
-          drone_model: PX4
-        depends_on: [upload_waypoints]
+  - name: upload_waypoints
+    description: "上传巡检航点"
+    depends_on: [takeoff]
+    node: drone
+    params:
+      action: mission_upload
+      mode: simulate
+      drone_model: PX4
+      mission_type: patrol
+      waypoints: |
+        [
+          {"lat": 30.2750, "lon": 120.1560, "alt": 20},
+          {"lat": 30.2760, "lon": 120.1570, "alt": 20},
+          {"lat": 30.2770, "lon": 120.1560, "alt": 20},
+          {"lat": 30.2760, "lon": 120.1550, "alt": 20},
+          {"lat": 30.2750, "lon": 120.1560, "alt": 20}
+        ]
+
+  - name: start_patrol
+    description: "开始巡检航线"
+    depends_on: [upload_waypoints]
+    node: drone
+    params:
+      action: mission_start
+      mode: simulate
+      drone_model: PX4
 
   # === 阶段 4: 监控巡检进度 ===
   # 注意：aflare 的 loop 是 for-each 循环（遍历 items 列表），不是 while 循环。
@@ -105,7 +106,7 @@ steps:
   - name: monitor_patrol
     description: "监控巡检进度和电池状态（模拟 5 次轮询）"
     node: loop
-    depends_on: [patrol_mission]
+    depends_on: [start_patrol]
     loop:
       # 每行一个 item，共 5 次迭代，每次间隔 3 秒（由 sleep 步骤控制）
       items: "1\n2\n3\n4\n5"
@@ -123,33 +124,33 @@ steps:
           command: sleep 3
 
   # === 阶段 5: 降落 & 锁定 ===
-  - name: land_and_disarm
-    description: "降落并锁定电机"
+  - name: land
+    description: "降落"
     depends_on: [monitor_patrol]
-    steps:
-      - name: land
-        node: drone
-        params:
-          action: land
-          mode: simulate
-          drone_model: PX4
-      - name: disarm
-        node: drone
-        params:
-          action: disarm
-          mode: simulate
-          drone_model: PX4
-        depends_on: [land]
+    node: drone
+    params:
+      action: land
+      mode: simulate
+      drone_model: PX4
+
+  - name: disarm
+    description: "锁定电机"
+    depends_on: [land]
+    node: drone
+    params:
+      action: disarm
+      mode: simulate
+      drone_model: PX4
 
   # === 阶段 6: 完成报告 ===
   - name: mission_report
     description: "生成巡检报告"
-    depends_on: [land_and_disarm]
+    depends_on: [disarm]
     node: transform
     params:
       template: |
         无人机巡检任务完成
-        - 起飞: {{arm_and_takeoff.takeoff.success}}
-        - 巡检状态: {{patrol_mission.start_patrol.mission.state}}
-        - 电池: {{land_and_disarm.land.telemetry.battery_pct}}%
-        - 时间: {{land_and_disarm.land.timestamp}}
+        - 起飞: {{takeoff.success}}
+        - 巡检状态: {{start_patrol.mission.state}}
+        - 电池: {{land.telemetry.battery_pct}}%
+        - 时间: {{land.timestamp}}

@@ -12,7 +12,7 @@ on:
 jobs:
   soak:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
     - uses: actions/checkout@v7
 
@@ -41,3 +41,26 @@ jobs:
     # only surface under the longer schedules exercised here.
     - name: Race check on daemon packages
       run: go test ./internal/cli/ ./internal/scheduler/ ./internal/taskqueue/ -race -count=1 -timeout 20m
+
+    # Nightly fuzz: the 10 fuzz targets (workflow parser, expression
+    # engine, MCP request handler, policy loader, node inputs) only run
+    # their seed corpus in the per-PR gate. Bugs beyond the seeds surface
+    # only under sustained fuzzing — time-boxed 60s per target, nightly.
+    # Targets are enumerated from source so new fuzz functions are picked
+    # up automatically. FuzzExecuteCommand is safe to fuzz: it runs with
+    # dry_run=true (no real command execution).
+    - name: Fuzz all targets (60s each)
+      run: |
+        fail=0
+        for src in $(grep -rlE 'func Fuzz[A-Za-z0-9_]+\(' --include='*_test.go' internal/); do
+          pkg=$(dirname "$src")
+          for target in $(grep -oE 'func (Fuzz[A-Za-z0-9_]+)\(' "$src" | sed 's/func //;s/($//;s/(//'); do
+            echo "::group::fuzz ${pkg}.${target}"
+            if ! go test "${pkg}/" -run '^$' -fuzz "^${target}$" -fuzztime 60s; then
+              echo "::error::fuzz failure in ${pkg}.${target} — failing corpus is in ${pkg}/testdata/fuzz/${target}/"
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+        done
+        exit $fail

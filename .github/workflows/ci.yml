@@ -44,6 +44,32 @@ jobs:
         diff /tmp/nodes-ref.bak docs/nodes-reference.md || \
           (echo "::error::docs/nodes-reference.md is stale — run: go run ./cmd/gen-nodes-doc" && exit 1)
 
+    # Blocking: every example workflow must pass `aflare validate`. Examples
+    # are documentation AND regression surface — a broken example ships a bad
+    # first impression and hides engine regressions behind "the demo is just
+    # like that". The gate already paid off on day one: it caught
+    # examples/drone/drone-patrol/workflow.yaml using unsupported syntax
+    # (bare nested `steps:` without a `node:` field — never runnable).
+    # Files without a top-level `steps:` key (e.g.
+    # examples/finance/aml-review/scenes.yaml, a routing table) are data
+    # files, not workflows, and are skipped.
+    - name: Validate all example workflows
+      run: |
+        fail=0
+        for f in $(find examples -name '*.yaml' | sort); do
+          if ! grep -qE '^steps:' "$f"; then
+            echo "skip (no top-level steps:): $f"
+            continue
+          fi
+          echo "::group::validate $f"
+          if ! go run ./cmd/aflare validate "$f"; then
+            echo "::error::$f failed validation"
+            fail=1
+          fi
+          echo "::endgroup::"
+        done
+        exit $fail
+
     - name: Test with race detector
       run: go test ./... -race -short
 

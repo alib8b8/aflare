@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CI 防线三件套（examples 全量校验 / nightly fuzz / bench 回归门禁）**：
+  - **examples 全量校验门禁**（ci.yml）：仓库 40 个 yaml 样例此前只有 1 个（content-processor.yaml）被 action-test.yml 触碰，其余 39 个是零验证的死资产。新门禁对每个含顶层 `steps:` 的 yaml 跑 `aflare validate`（数据文件如 scenes.yaml 路由表自动跳过），坏样例立红。上线即抓到 drone-patrol 的不可运行语法（见 Fixed）
+  - **nightly fuzz**（soak.yml）：10 个 fuzz 目标（workflow 解析器、表达式引擎 ×2、MCP 请求处理、policy 加载与路径校验、节点输入 ×4）此前只在 PR CI 跑种子语料，种子之外的 bug 永远不炸。夜间每目标 time-boxed 60s；目标从源码枚举，新增 fuzz 函数自动纳入。FuzzExecuteCommand 以 dry_run=true 运行，无真实命令执行
+  - **bench 回归门禁**（benchmark.yml）：每周 benchstat 对比从纯报告（continue-on-error）升级为 blocking——任何显著（p 值通过）的 >15% 变慢/内存增长置红；阈值取 15% 以滤除共享 runner 噪声，与该 workflow 头注释既有口径一致
+
 - **版权来源治理四件套（商业授权前置条件）**：
   - `.claude/skills/setup/SKILL.md` 整体重写——原文件由外部贡献者 webbrain-one 撰写（c62e13f，111 行，早于贡献条款生效），重写版基于本仓库源码自行核实的事实（CLI 命令面、安装脚本、工作流布局）全新撰写，第三方表达清零；同批的 `.claude/skills/llm-box/SKILL.md`（122 行）此前已在改名提交中删除，无残留
   - `PROVENANCE.md` 版权与来源声明（草稿，未签名）——身份声明表（10 个历史 git 身份的归属与确认状态）、第三方贡献披露（webbrain-one 处置记录）、依赖许可声明、签名前必答的 HKAIC/llm-box 雇佣关系问题清单
@@ -21,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **examples/drone/drone-patrol/workflow.yaml 不可运行语法修复**：三个阶段（arm_and_takeoff / patrol_mission / land_and_disarm）使用了引擎不支持的裸嵌套 `steps:` 分组（无 `node:` 字段的子步骤既不是 parallel/loop/map 等复合类型，也不是可执行步骤）——该 example 自加入起从未通过 `aflare validate`，更不可能 `aflare run`。拍平为受支持的顶层 `depends_on` 链（arm → takeoff → upload_waypoints → start_patrol → … → land → disarm），报告模板引用同步改名（`{{arm_and_takeoff.takeoff.success}}` → `{{takeoff.success}}` 等）。由新加的 examples 全量校验门禁抓出（见 Added「CI 防线三件套」）
 - **身份治理链收口：gmail 提交身份从显示层落到提交层**：#148 提交信息自称「本提交即首个使用 gmail 身份的提交」，但 GitHub API 原始数据显示网页端 squash 合并的作者邮箱全部是 noreply（邮箱隐私设置开启时，服务器端合并一律改写为 noreply）——gmail 此前只活在 .mailmap 显示层与提交信息文本里。修正三处：① PROVENANCE.md §2 身份表 gmail 行口径改为「本地推送提交使用」（网页 squash 合并仍记录 noreply 原始邮箱，经 .mailmap 归一显示）；② 签署须知补关键一条——签署 PROVENANCE 的提交必须本地完成并直推（`git config user.email sjxj19921205@gmail.com` → 本地 commit → push，别走网页合并），否则「提交即签署」验不回 gmail；③ §6 签署节补验证方法（验 raw email 而非 mailmap 显示层）。合并规范同步确立：需保留 gmail 作者身份的提交，本地合并后 push，替代网页端 Merge 按钮
 - **Auto-merge Dependabot 工作流修复**：旧流程三个缺陷叠加，导致每个 dependabot PR 的 auto-merge 检查必然失败（4 个 PR 积压于此）——① `pull_request` 触发即跑，不等 CI；② `gh pr merge --auto` 依赖仓库未启用的 "Allow auto-merge" 设置，GraphQL 直接拒绝；③ `GITHUB_TOKEN` 提交的批准永不计入分支保护的 required review，等了也白等。新流程：未配置 `DEPENDABOT_MERGE_TOKEN` secret 时优雅跳过（::notice 提示手动处理，不再红叉）；配置后（fine-grained PAT，仅本仓库，contents:write + pull-requests:write）全自动——`gh pr checks --watch` 等 CI 全绿 → PAT 批准（计入 required review）→ squash 合并；semver-major 升级永不自动合并，留人工评审
 - **aflare-action 文档 pin 回切**：示例 6 处 `@main` → `@v0.12.0`（README 中英 + action/README）；v0.12.0 是首个含 action/ 的 release tag，`@main` 不另行通知地移动；action/README 过期的 "Why @main?" 注记替换为正式 Pinning 说明（兑现仓库自立 TODO）
