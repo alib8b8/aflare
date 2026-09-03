@@ -37,6 +37,10 @@
 package metrics
 
 import (
+	"context"
+	"errors"
+	"io/fs"
+	"net"
 	"sync"
 	"time"
 
@@ -84,6 +88,13 @@ const (
 
 	// ReAct agent conversation compaction (context budget exceeded).
 	AgentContextCompactionsName = "aflare_agent_context_compactions_total"
+
+	// Ops observability: workflow runtime health for the daemon. These answer
+	// "why is my workflow slow / stuck" — failure rate by error class, active
+	// runs, pending queue depth — as opposed to the product analytics above.
+	NodeFailuresName = "aflare_node_failures_total" // {node_name, error_class}
+	RunsActiveName   = "aflare_runs_active"         // gauge
+	QueueDepthName   = "aflare_queue_depth"         // gauge
 )
 
 var (
@@ -229,6 +240,24 @@ var (
 		Help: "Total number of times the ReAct agent conversation was compacted due to the context budget being exceeded.",
 	})
 
+	// Ops observability: node failures by error class (complements
+	// node_executions_total{status="error"} with the failure *reason*),
+	// in-flight workflow runs, and pending taskqueue depth.
+	nodeFailures = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: NodeFailuresName,
+		Help: "Total node execution failures, by node name and error class (timeout | canceled | not_found | other).",
+	}, []string{"node_name", "error_class"})
+
+	runsActive = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: RunsActiveName,
+		Help: "Number of workflow runs currently executing.",
+	})
+
+	queueDepth = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: QueueDepthName,
+		Help: "Number of tasks pending in the daemon task queue (not yet picked up by a worker).",
+	})
+
 	registerOnce sync.Once
 )
 
@@ -262,22 +291,63 @@ func Register() {
 			agentToolBatchSize,
 			agentToolBatchDuration,
 			agentContextCompactions,
+			nodeFailures,
+			runsActive,
+			queueDepth,
 		)
 	})
 }
 
 // RecordNodeExecution increments the node execution counter and observes the
-// execution duration. err is non-nil when the node execution failed. Call this
-// inline from the node execution path; it is a couple of atomic ops and does
-// not block.
+// execution duration. err is non-nil when the node execution failed; failures
+// are additionally counted in aflare_node_failures_total by error class.
+// Call this inline from the node execution path; it is a couple of atomic ops
+// and does not block.
 func RecordNodeExecution(name string, duration time.Duration, err error) {
 	status := "success"
 	if err != nil {
 		status = "error"
+		nodeFailures.WithLabelValues(name, errorClass(err)).Inc()
 	}
 	nodeExecutions.WithLabelValues(name, status).Inc()
 	nodeExecDuration.WithLabelValues(name).Observe(duration.Seconds())
 }
+
+// errorClass buckets a node execution failure into a small, stable set of
+// classes for aflare_node_failures_total. Classes are matched with
+// errors.Is/As so wrapped error chains classify correctly; anything else
+// falls into "other". Keep this list small — the goal is "timeout vs
+// canceled vs the rest", not a taxonomy.
+func errorClass(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, fs.ErrNotExist):
+		return "not_found"
+	default:
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			return "timeout"
+		}
+		return "other"
+	}
+}
+
+// IncActiveRuns increments the active workflow run gauge. Call once when a
+// workflow run actually starts executing (after any idempotency cache hit /
+// rejection short-circuits). Pair with DecActiveRuns via defer.
+func IncActiveRuns() { runsActive.Inc() }
+
+// DecActiveRuns decrements the active workflow run gauge.
+func DecActiveRuns() { runsActive.Dec() }
+
+// SetQueueDepth sets the pending-task-depth gauge. Called inline by the
+// taskqueue on every enqueue/dequeue mutation.
+func SetQueueDepth(n int) { queueDepth.Set(float64(n)) }
 
 // RecordWorkflowExecution increments the workflow execution counter and
 // observes the overall workflow duration. err is non-nil when the workflow

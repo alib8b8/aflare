@@ -28,6 +28,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -52,7 +53,8 @@ func HandleAgent(args []string) error {
 
 	cfg := agent.DefaultConfig()
 	var watchDir string
-	if err := parseAgentArgs(args, &cfg, &watchDir); err != nil {
+	opsPort := DefaultOpsPort
+	if err := parseAgentArgs(args, &cfg, &watchDir, &opsPort); err != nil {
 		return err
 	}
 
@@ -93,6 +95,29 @@ func HandleAgent(args []string) error {
 
 	// ── Scheduler ───────────────────────────────────────────────────────
 	sched := scheduler.New()
+
+	// Last-run persistence: record every fire so a restart can tell which
+	// tasks missed runs while the daemon was down (marked, not replayed).
+	lastRunPath := scheduler.DefaultLastRunPath()
+	lastRuns, err := scheduler.LoadLastRuns(lastRunPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+		lastRuns = map[string]time.Time{}
+	}
+	var lastRunsMu sync.Mutex
+	sched.SetOnFire(func(taskID string, firedAt time.Time) {
+		lastRunsMu.Lock()
+		lastRuns[taskID] = firedAt
+		snapshot := make(map[string]time.Time, len(lastRuns))
+		for id, t := range lastRuns {
+			snapshot[id] = t
+		}
+		lastRunsMu.Unlock()
+		if err := scheduler.SaveLastRuns(lastRunPath, snapshot); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to persist last-run for %s: %v\n", taskID, err)
+		}
+	})
+
 	sched.Start()
 	defer sched.Stop()
 
@@ -115,6 +140,8 @@ func HandleAgent(args []string) error {
 			}
 		}); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to add scheduled task %s: %v\n", entry.ID, err)
+		} else if err := sched.RestoreLastRun(entry.ID, lastRuns[entry.ID]); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to restore last-run for %s: %v\n", entry.ID, err)
 		}
 		if entry.Description != "" {
 			fmt.Printf("Loaded scheduled task: %s (%s) → %s\n", entry.ID, entry.Cron, entry.Description)
@@ -156,6 +183,11 @@ func HandleAgent(args []string) error {
 	// ── Signal Handling ─────────────────────────────────────────────────
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	// ── Ops Endpoint (opt-in) ───────────────────────────────────────────
+	// Prometheus /metrics + pprof on a dedicated listener; off unless
+	// AFLARE_METRICS / AFLARE_PPROF is set (see agent_ops.go).
+	startOpsServer(ctx, opsPort)
 
 	fmt.Println(agent.WelcomeMessage(meta.GetVersion()))
 	fmt.Println("Agent running in daemon mode (scheduler + filewatch + stdin).")
@@ -336,6 +368,7 @@ func PrintAgentUsage() {
 	fmt.Println("  --context-budget <n>      Context budget in tokens (default: per provider, e.g. 8000 for ollama)")
 	fmt.Println("  --safe-mode, -s            Block execute and destructive tools")
 	fmt.Println("  --watch <dir>             Watch directory for file changes, feed to agent")
+	fmt.Println("  --ops-port <n>            Ops endpoint port: /metrics + /debug/pprof (default: 9090)")
 	fmt.Println("  --help, -h                 Show this help")
 	fmt.Println()
 	fmt.Println("Capabilities (--custom -c):")
@@ -358,7 +391,7 @@ func PrintAgentUsage() {
 }
 
 // parseAgentArgs parses CLI arguments for the agent command.
-func parseAgentArgs(args []string, cfg *agent.Config, watchDir *string) error {
+func parseAgentArgs(args []string, cfg *agent.Config, watchDir *string, opsPort *int) error {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--smart":
@@ -419,6 +452,15 @@ func parseAgentArgs(args []string, cfg *agent.Config, watchDir *string) error {
 		case "--watch":
 			if i+1 < len(args) {
 				*watchDir = args[i+1]
+				i++
+			}
+		case "--ops-port":
+			if i+1 < len(args) {
+				if n, err := strconv.Atoi(args[i+1]); err == nil && n > 0 && n < 65536 {
+					*opsPort = n
+				} else {
+					fmt.Fprintf(os.Stderr, "Warning: invalid --ops-port %q, using default %d\n", args[i+1], DefaultOpsPort)
+				}
 				i++
 			}
 		case "--no-stdin":

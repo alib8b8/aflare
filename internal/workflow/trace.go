@@ -92,6 +92,10 @@ type StepTrace struct {
 	InputLen        int           // length of step input in bytes
 	OutputLen       int           // length of step output in bytes
 	ErrorText       string        // error text, if the step failed
+	// Resumed marks a DAG step whose output was restored from a checkpoint
+	// instead of being re-executed (crash resume). Attempts is 0 and the
+	// durations are 0 for such steps.
+	Resumed bool
 	// LLM holds per-call LLM telemetry for steps whose node published it
 	// (B-2). One entry per LLM call, in call order — a retried LLM step
 	// with 2 attempts yields 2 entries. Nil for non-LLM steps or when no

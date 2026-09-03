@@ -74,6 +74,13 @@ type Task struct {
 
 	schedule *cronSchedule
 	nextRun  time.Time
+	// lastRun is the most recent fire time: set by the tick loop on every
+	// dispatch, or restored from the persisted last-run store on startup.
+	lastRun time.Time
+	// missedRuns counts scheduled fire times that were skipped between the
+	// restored lastRun and process start (daemon downtime). Marked, never
+	// replayed — see RestoreLastRun.
+	missedRuns int
 }
 
 // TaskInfo is a read-only snapshot of a scheduled task, exposed via ListTasks.
@@ -81,6 +88,12 @@ type TaskInfo struct {
 	ID      string
 	Expr    string
 	NextRun time.Time
+	// LastRun is the most recent fire time restored from or recorded by
+	// this process (zero when the task has never fired).
+	LastRun time.Time
+	// MissedRuns counts scheduled fire times between LastRun and process
+	// start that were skipped (daemon downtime). Marked, not replayed.
+	MissedRuns int
 }
 
 type Scheduler struct {
@@ -95,6 +108,10 @@ type Scheduler struct {
 	taskWg     sync.WaitGroup
 	taskCtx    context.Context
 	taskCancel context.CancelFunc
+	// onFire, when set, is invoked (outside the scheduler lock) each time
+	// a task is dispatched, with the fire timestamp. Callers persist it as
+	// the task's last-run so the next restart can detect missed runs.
+	onFire func(taskID string, firedAt time.Time)
 }
 
 type cronSchedule struct {
@@ -198,13 +215,83 @@ func (s *Scheduler) ListTasks() []TaskInfo {
 	tasks := make([]TaskInfo, 0, len(s.tasks))
 	for _, task := range s.tasks {
 		tasks = append(tasks, TaskInfo{
-			ID:      task.ID,
-			Expr:    task.Expr,
-			NextRun: task.nextRun,
+			ID:         task.ID,
+			Expr:       task.Expr,
+			NextRun:    task.nextRun,
+			LastRun:    task.lastRun,
+			MissedRuns: task.missedRuns,
 		})
 	}
 	sortTasksByID(tasks)
 	return tasks
+}
+
+// SetOnFire registers a callback invoked each time a task is dispatched.
+// Set it before Start to observe every fire. The callback runs on the tick
+// loop goroutine (outside the scheduler lock) and must not call back into
+// the Scheduler.
+func (s *Scheduler) SetOnFire(fn func(taskID string, firedAt time.Time)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onFire = fn
+}
+
+// MaxMissedRunCount caps how many missed fire times are counted for a
+// single task after downtime. A per-minute task that was down for weeks
+// would otherwise iterate millions of cron slots; beyond "many" the exact
+// count is not actionable.
+const MaxMissedRunCount = 1000
+
+// RestoreLastRun restores a task's last fire time (typically loaded from
+// the persisted last-run store) and counts how many scheduled fire times
+// were missed between then and now. Missed runs are marked (visible via
+// ListTasks and a warning log) but NOT replayed — honest semantics for a
+// scheduler that must not silently pretend downtime never happened, nor
+// flood the agent with a backlog of stale triggers.
+func (s *Scheduler) RestoreLastRun(id string, lastRun time.Time) error {
+	if lastRun.IsZero() {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	task, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task with id %q not found", id)
+	}
+
+	missed := countMissedRuns(task.schedule, lastRun, time.Now())
+	task.lastRun = lastRun
+	task.missedRuns = missed
+	if missed > 0 {
+		logger.Warn("scheduled task missed runs during downtime (marked, not replayed)",
+			"task_id", id,
+			"cron", task.Expr,
+			"missed_runs", missed,
+			"last_run", lastRun.Format(time.RFC3339),
+		)
+	}
+	return nil
+}
+
+// countMissedRuns counts scheduled fire times strictly between lastRun and
+// now, capped at MaxMissedRunCount.
+func countMissedRuns(schedule *cronSchedule, lastRun, now time.Time) int {
+	if schedule == nil || !lastRun.Before(now) {
+		return 0
+	}
+	count := 0
+	t := lastRun
+	for count < MaxMissedRunCount {
+		nxt := nextRunTime(schedule, t)
+		if nxt.IsZero() || !nxt.Before(now) {
+			break
+		}
+		count++
+		t = nxt
+	}
+	return count
 }
 
 func sortTasksByID(tasks []TaskInfo) {
@@ -276,6 +363,7 @@ func (s *Scheduler) run() {
 func (s *Scheduler) checkAndRunTasks(now time.Time, taskCtx context.Context) {
 	s.mu.RLock()
 	var tasksToRun []*Task
+	onFire := s.onFire
 	for _, task := range s.tasks {
 		if !task.nextRun.After(now) {
 			tasksToRun = append(tasksToRun, task)
@@ -310,8 +398,15 @@ func (s *Scheduler) checkAndRunTasks(now time.Time, taskCtx context.Context) {
 		s.mu.Lock()
 		if t, ok := s.tasks[task.ID]; ok {
 			t.nextRun = nextRunTime(t.schedule, now.Add(time.Minute))
+			t.lastRun = now
 		}
 		s.mu.Unlock()
+		// Persist the fire time (outside the lock): recording at dispatch —
+		// not at completion — means a crash mid-task is still counted as
+		// "fired", so a restart never double-triggers it.
+		if onFire != nil {
+			onFire(task.ID, now)
+		}
 	}
 }
 

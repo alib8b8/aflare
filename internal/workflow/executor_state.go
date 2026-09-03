@@ -17,22 +17,23 @@
 // This file implements workflow state persistence for checkpoint/resume.
 //
 // The Executor (see executor.go) uses these primitives to support resuming a
-// partially-completed sequential workflow run:
+// partially-completed workflow run on both execution paths:
 //
 //   - SaveCurrentState / RestoreState move the in-memory engine state
 //     (step outputs, variables, flowing data) into and out of a WorkflowState
-//     snapshot. These are now called from the Executor's sequential path.
+//     snapshot. These are called from the Executor's sequential and DAG paths.
 //   - saveCheckpoint / loadCheckpoint persist that snapshot to disk so a
-//     crashed or interrupted run can be resumed later from the last
-//     successfully-completed step.
+//     crashed or interrupted run can be resumed later.
 //
 // Checkpoint semantics:
-//   - Checkpoints are per-step: a new snapshot is written after each step in
-//     the sequential execution path completes successfully.
-//   - Only the sequential execution path supports checkpoint/resume. The DAG
-//     scheduling path (used when any step declares depends_on) does NOT
-//     support checkpoints, because steps run concurrently and there is no
-//     single linear "progress" cursor to persist.
+//   - Sequential path: checkpoints are per-step; the StepIndex cursor marks
+//     the last completed step and the run resumes from the next one.
+//   - DAG path: checkpoints persist the SET of completed node outputs
+//     (StepOutputs, monotonic — a node, once completed, never re-runs within
+//     a run). On resume the completed outputs are restored into the engine
+//     and only the remaining subgraph executes. StepNames pins the workflow
+//     shape; a resume against a modified workflow is rejected rather than
+//     attaching stale outputs to the wrong steps.
 //   - Checkpoint failures are non-fatal: the Executor logs the error and
 //     continues executing the workflow without interrupting it.
 //
@@ -51,6 +52,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/alib8b8/aflare/internal/fsutil"
 )
 
 // WorkflowState represents the persisted state of a workflow execution.
@@ -62,6 +65,14 @@ type WorkflowState struct {
 	StepOutputs  map[int]string    `json:"step_outputs"`
 	Variables    map[string]string `json:"variables"`
 	SavedAt      time.Time         `json:"saved_at"`
+	// DAGMode marks a checkpoint written by the DAG executor: StepOutputs
+	// is the set of completed nodes (there is no linear StepIndex cursor),
+	// and StepNames pins the workflow shape the indices refer to.
+	DAGMode bool `json:"dag_mode,omitempty"`
+	// StepNames records the step names at save time (DAG checkpoints).
+	// A resume against a workflow whose step list differs is rejected —
+	// index-based outputs would silently attach to the wrong steps.
+	StepNames []string `json:"step_names,omitempty"`
 }
 
 // SaveState persists the current workflow state to a file.
@@ -78,7 +89,9 @@ func SaveState(path string, state *WorkflowState) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(safePath, data, 0600)
+	// Atomic (temp + rename): a crash mid-write must leave the previous
+	// checkpoint intact, not a truncated JSON file the next run cannot load.
+	return fsutil.WriteFileAtomic(safePath, data, 0600)
 }
 
 // saveCheckpoint persists a WorkflowState snapshot to the given path.
@@ -100,7 +113,10 @@ func saveCheckpoint(path string, state *WorkflowState) error {
 			return fmt.Errorf("failed to create checkpoint directory %s: %w", dir, err)
 		}
 	}
-	if err := os.WriteFile(path, data, 0600); err != nil {
+	// Atomic (temp + rename): this file IS the crash-recovery mechanism —
+	// writing it non-atomically means the crash it guards against corrupts
+	// it (a half-written JSON document), losing the run's last good state.
+	if err := fsutil.WriteFileAtomic(path, data, 0600); err != nil {
 		return fmt.Errorf("failed to write checkpoint file %s: %w", path, err)
 	}
 	return nil
@@ -131,6 +147,14 @@ func loadCheckpoint(path string) (*WorkflowState, error) {
 	}
 	var state WorkflowState
 	if err := json.Unmarshal(data, &state); err != nil {
+		// Preserve the corrupt file before the caller starts fresh: it may
+		// be recoverable by hand (e.g. truncated tail), and silently losing
+		// the last snapshot of a crashed run is exactly what checkpointing
+		// exists to prevent.
+		preserved := fsutil.PreserveCorrupt(safePath)
+		if preserved != "" {
+			return nil, fmt.Errorf("failed to parse checkpoint file (corrupt copy preserved at %s): %w", preserved, err)
+		}
 		return nil, fmt.Errorf("failed to parse checkpoint file: %w", err)
 	}
 	return &state, nil

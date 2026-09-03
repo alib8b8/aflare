@@ -18,9 +18,12 @@ package workflow
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"runtime/debug"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/alib8b8/aflare/internal/logger"
@@ -156,8 +159,11 @@ func dispatchDAGStep(otelCtx, timeoutCtx context.Context, ps dagPreparedStep, re
 // processDAGStepResult processes a single step's result: applies error
 // recovery, writes output to engine/resolver, records trace, and appends to
 // allResults. levelIdx is the step's static topological level (used as the
-// trace BatchIndex). Returns updated allResults, lastOutput, and abortErr
-// (non-nil only when no recovery applied and the workflow must stop).
+// trace BatchIndex). Returns updated allResults, lastOutput, abortErr
+// (non-nil only when no recovery applied and the workflow must stop), and
+// stepOK (true when the step completed successfully or was fully recovered —
+// continue_on_error is NOT ok: the step failed, so a crash resume must
+// re-run it rather than cache its empty output).
 func processDAGStepResult(
 	stepIdx, levelIdx int,
 	ps dagPreparedStep,
@@ -172,7 +178,7 @@ func processDAGStepResult(
 	program *tea.Program,
 	allResults []StepResult,
 	lastOutput string,
-) ([]StepResult, string, error) {
+) ([]StepResult, string, error, bool) {
 	var output string
 	// resultErr is the TRACE error: recorded in StepResult/trace and used for
 	// logging. For continue_on_error it keeps the original error so the trace
@@ -204,6 +210,10 @@ func processDAGStepResult(
 		logger.Info("DAG step skipped by condition", "index", stepIdx, "node", wStep.Node)
 	default:
 		res := batchOutputs[stepIdx]
+		// Prometheus node metric: the node actually ran in this branch (the
+		// skipped/eval-error branches above never dispatched it). Raw
+		// pre-recovery error, same policy as the sequential path.
+		metrics.RecordNodeExecution(wStep.Node, res.duration, res.err)
 		output = res.output
 		resultErr = res.err
 		abortErr = res.err
@@ -293,7 +303,7 @@ func processDAGStepResult(
 		logger.Info("DAG step completed", "index", stepIdx, "node", wStep.Node, "duration", duration)
 	}
 
-	return allResults, lastOutput, abortErr
+	return allResults, lastOutput, abortErr, resultErr == nil
 }
 
 // ── P1-6 动态就绪队列调度器 ──
@@ -334,6 +344,19 @@ type dagScheduler struct {
 	dispatchAt  map[int]time.Time
 	levelStart  []time.Time
 	levelEnd    []time.Time
+
+	// statePath, when set, enables per-node checkpointing: after every
+	// finalized node the completed-output set is persisted atomically. On
+	// resume the completed nodes are restored and never re-executed.
+	statePath string
+	// resumed is the set of step indices restored from a checkpoint
+	// (populated before run(); read-only afterwards).
+	resumed map[int]bool
+	// completedOK is the set of steps that completed successfully (or were
+	// skipped / fully recovered). Only these outputs are checkpointed: a
+	// failed step (incl. continue_on_error) must re-run after a crash
+	// resume, not have its failure cached as a completion.
+	completedOK map[int]bool
 
 	processPos    int   // dispatchSeq 中下一个待处理的步骤
 	aborted       bool  // 任一步骤失败且无恢复后置位：停止派发新步骤
@@ -382,6 +405,8 @@ func newDAGScheduler(
 		levelStart:   make([]time.Time, numLevels),
 		levelEnd:     make([]time.Time, numLevels),
 		allResults:   make([]StepResult, 0, n),
+		resumed:      make(map[int]bool),
+		completedOK:  make(map[int]bool, n),
 	}
 	for i := 0; i < n; i++ {
 		s.pending[i] = len(graph.deps[i])
@@ -449,6 +474,7 @@ func (s *dagScheduler) finalize(idx int, output string) {
 	s.engine.SetStepOutput(idx, s.wf.Steps[idx].Name, output)
 	s.resolver.set(idx, output)
 	s.finalized[idx] = true
+	s.completedOK[idx] = true // finalize 只在成功（或 skipped）时调用
 	s.propagateDeps(idx)
 }
 
@@ -488,7 +514,8 @@ func (s *dagScheduler) processNextResult() {
 		metrics.RecordDAGStepReorderWait(time.Since(at))
 	}
 	var abortErr error
-	s.allResults, s.lastOutput, abortErr = processDAGStepResult(
+	var stepOK bool
+	s.allResults, s.lastOutput, abortErr, stepOK = processDAGStepResult(
 		want, s.levelOf[want], wantPs, s.wf.Steps[want], s.results,
 		s.timeoutCtx, s.engine, s.resolver, s.reg, s.graph, s.trace, s.program,
 		s.allResults, s.lastOutput,
@@ -512,6 +539,13 @@ func (s *dagScheduler) processNextResult() {
 		// （engine/resolver 已在 processDAGStepResult 中写入）。
 		s.propagateDeps(want)
 	}
+	if stepOK {
+		// 恢复成功且未提前 finalize 的步骤也计为完成（continue_on_error
+		// 的 stepOK=false：失败结果不缓存，崩溃恢复后重跑）。
+		s.completedOK[want] = true
+		// 已完成节点集合单调递增，天然好存：每步定局后原子写盘。
+		s.saveCheckpointState()
+	}
 }
 
 // propagateDeps 将步骤 idx 的完成通知其依赖方：pending 减一，降为 0 者
@@ -529,6 +563,112 @@ func (s *dagScheduler) propagateDeps(idx int) {
 			s.readyQueue = append(s.readyQueue, d)
 		}
 	}
+}
+
+// applyResumed folds a restored completed-node set into the scheduler state:
+// resumed steps never enter the ready queue, and their dependents get the
+// pending-count credit as if the node had just completed. Outputs must
+// already be written back to engine/resolver by the caller. Must be called
+// once, before run().
+func (s *dagScheduler) applyResumed(resumed map[int]bool) {
+	s.resumed = resumed
+	if len(resumed) == 0 {
+		return
+	}
+
+	// A resumed step's own dependencies are moot (it already completed):
+	// zero its pending count so a later propagateDeps on one of its
+	// dependencies decrements it below zero instead of to exactly 0,
+	// which would re-enqueue (and re-run) the restored step.
+	for idx := range resumed {
+		s.pending[idx] = 0
+	}
+
+	// Drop resumed steps from the initial ready queue (they were only
+	// enqueued because they have no dependencies).
+	kept := s.readyQueue[:0]
+	for _, idx := range s.readyQueue {
+		if !resumed[idx] {
+			kept = append(kept, idx)
+		}
+	}
+	s.readyQueue = kept
+
+	// Credit dependents of every resumed step; index order per step via
+	// sorted dependents, then a final sort keeps the queue globally
+	// deterministic (matching the fresh-start index order). Resumed
+	// dependents are skipped: their pending is already zeroed above.
+	for idx := range resumed {
+		dependents := make([]int, 0, len(s.graph.dependents[idx]))
+		for d := range s.graph.dependents[idx] {
+			dependents = append(dependents, d)
+		}
+		sort.Ints(dependents)
+		for _, d := range dependents {
+			if resumed[d] {
+				continue
+			}
+			s.pending[d]--
+			if s.pending[d] == 0 {
+				s.readyQueue = append(s.readyQueue, d)
+			}
+		}
+	}
+	sort.Ints(s.readyQueue)
+}
+
+// saveCheckpointState persists the completed-output set as a DAG checkpoint
+// (atomic write). Called from the scheduler goroutine after every finalized
+// step, so the file always reflects a consistent prefix of completions.
+// Only completedOK steps are written — engine.stepOutputs also carries
+// outputs of failed steps (written unconditionally by
+// processDAGStepResult), which must NOT be cached as completions.
+// Failures are non-fatal, mirroring the sequential path.
+func (s *dagScheduler) saveCheckpointState() {
+	if s.statePath == "" {
+		return
+	}
+	state := &WorkflowState{
+		WorkflowName: s.wf.Name,
+		StepIndex:    -1, // no linear cursor in DAG mode
+		Data:         s.lastOutput,
+		StepOutputs:  make(map[int]string, len(s.completedOK)),
+		Variables:    make(map[string]string, len(s.engine.variables)),
+		SavedAt:      time.Now(),
+		DAGMode:      true,
+		StepNames:    make([]string, len(s.wf.Steps)),
+	}
+	for i, st := range s.wf.Steps {
+		state.StepNames[i] = st.Name
+	}
+	for idx := range s.completedOK {
+		if out, ok := s.engine.stepOutputs["idx:"+strconv.Itoa(idx)]; ok {
+			state.StepOutputs[idx] = out
+		}
+	}
+	for k, v := range s.engine.variables {
+		state.Variables[k] = v
+	}
+	if err := saveCheckpoint(s.statePath, state); err != nil {
+		logger.Warn("failed to save DAG checkpoint, continuing without",
+			"path", s.statePath, "error", err)
+	}
+}
+
+// dagCheckpointCompatible reports whether a DAG checkpoint's recorded step
+// names match the workflow being executed. A mismatch means the workflow
+// definition changed between crash and resume — index-based outputs would
+// attach to the wrong steps, so the caller must start fresh instead.
+func dagCheckpointCompatible(state *WorkflowState, wf *Workflow) bool {
+	if len(state.StepNames) != len(wf.Steps) {
+		return false
+	}
+	for i, name := range state.StepNames {
+		if wf.Steps[i].Name != name {
+			return false
+		}
+	}
+	return true
 }
 
 // recordLevelBatches 记录各拓扑层级的 trace 时间线（层级内全部步骤被
@@ -585,10 +725,17 @@ func (s *dagScheduler) recordLevelBatches(levels [][]int) {
 //   - 否则取最后一个完成的步骤输出。
 //   - 建议 DAG 模式用 wf.output 显式指定，语义最清晰。
 //
+// Checkpoint/resume: when statePath is set, a DAG checkpoint (completed-node
+// set) is loaded before scheduling — completed nodes are restored into the
+// engine and never re-executed; only the remaining subgraph runs. After
+// every finalized node the completed set is persisted atomically. A
+// checkpoint written by the sequential path (or against a different step
+// list) is rejected and the run starts fresh.
+//
 // timeout is the overall workflow timeout applied to the derived context.
 // Callers that go through an Executor pass e.workflowTimeout; the legacy
 // ExecuteWorkflowWithTrace global entry point passes DefaultWorkflowTimeout.
-func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, timeout time.Duration) (string, []StepResult, *WorkflowTrace, error) {
+func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program, timeout time.Duration, statePath string) (string, []StepResult, *WorkflowTrace, error) {
 	if len(wf.Steps) > MaxSteps {
 		return "", nil, nil, fmt.Errorf("workflow has too many steps (%d, max %d)", len(wf.Steps), MaxSteps)
 	}
@@ -672,6 +819,80 @@ func executeWorkflowDAG(ctx context.Context, wf *Workflow, reg *nodes.Registry, 
 	// 调度状态与派发/处理两层机制封装在 dagScheduler（见其类型注释）。
 	sched := newDAGScheduler(wf, graph, reg, program, otelCtx, timeoutCtx,
 		globalLimiter, engine, resolver, trace, initialInput, levelOf, len(levels))
+	sched.statePath = statePath
+
+	// ── Checkpoint resume ──
+	// 恢复"已完成节点集合"：输出灌回 engine/resolver，重启后这些节点
+	// 标记为 resumed（不重跑），图剩下的边照跑。
+	if statePath != "" {
+		if state, cpErr := loadCheckpoint(statePath); cpErr == nil && state != nil {
+			switch {
+			case !state.DAGMode:
+				// 顺序模式的 checkpoint 用 StepIndex 游标，语义不同：
+				// 拒绝混用，避免把线性游标误读为节点集合。
+				logger.Warn("ignoring sequential checkpoint in DAG mode, starting fresh", "path", statePath)
+			case !dagCheckpointCompatible(state, wf):
+				logger.Warn("DAG checkpoint does not match current workflow steps, starting fresh",
+					"path", statePath, "checkpoint_steps", len(state.StepNames), "current_steps", len(wf.Steps))
+			default:
+				resumed := make(map[int]bool, len(state.StepOutputs))
+				for idx, out := range state.StepOutputs {
+					if idx < 0 || idx >= len(wf.Steps) {
+						continue
+					}
+					engine.SetStepOutput(idx, wf.Steps[idx].Name, out)
+					resolver.set(idx, out)
+					resumed[idx] = true
+				}
+				for k, v := range state.Variables {
+					engine.SetVariable(k, v)
+				}
+				sched.applyResumed(resumed)
+				sched.lastOutput = state.Data
+				logger.Info("Resuming DAG workflow from checkpoint",
+					"name", wf.Name, "resumed_nodes", len(resumed), "steps", n, "checkpoint", statePath)
+
+				// Record resumed nodes in trace/results (index order for
+				// determinism): they are part of this run's outcome even
+				// though they were not re-executed.
+				resumedIdx := make([]int, 0, len(resumed))
+				for idx := range resumed {
+					resumedIdx = append(resumedIdx, idx)
+				}
+				sort.Ints(resumedIdx)
+				for _, idx := range resumedIdx {
+					wStep := wf.Steps[idx]
+					out := state.StepOutputs[idx]
+					deps := make([]int, 0, len(graph.deps[idx]))
+					for d := range graph.deps[idx] {
+						deps = append(deps, d)
+					}
+					sort.Ints(deps)
+					tracePtr := trace.recordStep(StepTrace{
+						Index:           idx,
+						NodeName:        wStep.Node,
+						StepName:        wStep.Name,
+						BatchIndex:      levelOf[idx],
+						Dependencies:    deps,
+						ConditionPassed: true,
+						Resumed:         true,
+						OutputLen:       len(out),
+					})
+					sched.allResults = append(sched.allResults, StepResult{
+						StepIndex: idx,
+						NodeName:  wStep.Node,
+						Output:    out,
+						Trace:     tracePtr,
+					})
+				}
+			}
+		} else if cpErr != nil && !errors.Is(cpErr, os.ErrNotExist) {
+			// 损坏文件已在 loadCheckpoint 中保全（.corrupt-*），诚实报错
+			// 而非静默丢状态。
+			logger.Warn("failed to load DAG checkpoint, starting fresh", "path", statePath, "error", cpErr)
+		}
+	}
+
 	sched.run()
 
 	if IsShuttingDown() {

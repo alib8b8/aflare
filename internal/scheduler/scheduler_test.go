@@ -633,3 +633,149 @@ func TestDaysInMonth(t *testing.T) {
 		t.Error("expected 30 days in April")
 	}
 }
+
+// ── last-run restore & misfire marking ──────────────────────────────────
+
+// TestRestoreLastRun_MarksMissedRuns verifies that restoring a last-run
+// timestamp from before a downtime counts the skipped fire times and
+// exposes them via ListTasks (marked — the scheduler never replays them).
+func TestRestoreLastRun_MarksMissedRuns(t *testing.T) {
+	s := New()
+	_ = s.AddTask("hourly", "0 * * * *", func(context.Context) {})
+
+	// "Fired" three hours ago: with an hourly cron that is ~3 missed runs
+	// (the exact count depends on the current minute, so assert a range).
+	lastRun := time.Now().Add(-3 * time.Hour)
+	if err := s.RestoreLastRun("hourly", lastRun); err != nil {
+		t.Fatalf("RestoreLastRun: %v", err)
+	}
+
+	tasks := s.ListTasks()
+	var found bool
+	for _, ti := range tasks {
+		if ti.ID != "hourly" {
+			continue
+		}
+		found = true
+		if !ti.LastRun.Equal(lastRun) {
+			t.Errorf("LastRun = %v, want %v", ti.LastRun, lastRun)
+		}
+		if ti.MissedRuns < 2 || ti.MissedRuns > 4 {
+			t.Errorf("MissedRuns = %d, want 2–4 for 3h downtime on hourly cron", ti.MissedRuns)
+		}
+	}
+	if !found {
+		t.Fatal("task hourly not in ListTasks")
+	}
+}
+
+func TestRestoreLastRun_UnknownTask(t *testing.T) {
+	s := New()
+	if err := s.RestoreLastRun("ghost", time.Now()); err == nil {
+		t.Error("expected error for unknown task")
+	}
+}
+
+// TestRestoreLastRun_ZeroTimeIsNoop verifies that a zero timestamp (never
+// fired) restores nothing and fabricates no misfires.
+func TestRestoreLastRun_ZeroTimeIsNoop(t *testing.T) {
+	s := New()
+	_ = s.AddTask("fresh", "0 * * * *", func(context.Context) {})
+
+	if err := s.RestoreLastRun("fresh", time.Time{}); err != nil {
+		t.Fatalf("zero time should be a no-op, got %v", err)
+	}
+	for _, ti := range s.ListTasks() {
+		if ti.ID == "fresh" && (ti.MissedRuns != 0 || !ti.LastRun.IsZero()) {
+			t.Errorf("zero restore must not touch state: %+v", ti)
+		}
+	}
+}
+
+// TestRestoreLastRun_RecentRunNoMissed is intentionally NOT wall-clock
+// based: for any cron there exists a wall-clock moment where "one minute
+// ago" genuinely straddles a fire time (e.g. just past midnight for a daily
+// cron), which would make the assertion flaky. The no-fabrication property
+// is instead pinned deterministically by TestCountMissedRuns_ExactCount
+// (half-open window: a fire AT "now" is not missed).
+
+// TestCountMissedRuns_CappedAtMax verifies the iteration cap: a last-run
+// far in the past must not spin the counter unbounded.
+func TestCountMissedRuns_CappedAtMax(t *testing.T) {
+	schedule, err := parseCronExpr("* * * * *")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := countMissedRuns(schedule, time.Now().AddDate(-10, 0, 0), time.Now())
+	if got != MaxMissedRunCount {
+		t.Errorf("countMissedRuns for 10y downtime = %d, want cap %d", got, MaxMissedRunCount)
+	}
+}
+
+func TestCountMissedRuns_ExactCount(t *testing.T) {
+	schedule, err := parseCronExpr("*/30 * * * *")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Half-open window (09:00, 11:00) with fires at :00/:30 — the fires
+	// strictly inside are 09:30, 10:00, 10:30 = 3 (11:00 itself is not
+	// "missed", it belongs to the next live dispatch).
+	from := time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 9, 1, 11, 0, 0, 0, time.UTC)
+	if got := countMissedRuns(schedule, from, to); got != 3 {
+		t.Errorf("countMissedRuns = %d, want 3", got)
+	}
+	// No missed runs when lastRun >= now.
+	if got := countMissedRuns(schedule, to, from); got != 0 {
+		t.Errorf("countMissedRuns(reversed) = %d, want 0", got)
+	}
+	// Nil schedule is tolerated.
+	if got := countMissedRuns(nil, from, to); got != 0 {
+		t.Errorf("countMissedRuns(nil) = %d, want 0", got)
+	}
+}
+
+// TestSetOnFire_FiresOnDispatch verifies the onFire callback fires with the
+// task ID and fire timestamp when a due task is dispatched.
+func TestSetOnFire_FiresOnDispatch(t *testing.T) {
+	s := New()
+
+	fired := make(chan string, 1)
+	s.SetOnFire(func(taskID string, firedAt time.Time) {
+		select {
+		case fired <- taskID:
+		default:
+		}
+		if firedAt.IsZero() {
+			t.Error("onFire got zero timestamp")
+		}
+	})
+
+	_ = s.AddTask("watchme", "* * * * *", func(context.Context) {})
+
+	// Force the task due now so the next 1s tick fires it.
+	s.mu.Lock()
+	if task, ok := s.tasks["watchme"]; ok {
+		task.nextRun = time.Now().Add(-time.Second)
+	}
+	s.mu.Unlock()
+
+	s.Start()
+	defer s.Stop()
+
+	select {
+	case id := <-fired:
+		if id != "watchme" {
+			t.Errorf("onFire task ID = %q, want %q", id, "watchme")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("onFire was not invoked for a dispatched task")
+	}
+
+	// lastRun must be recorded alongside the callback.
+	for _, ti := range s.ListTasks() {
+		if ti.ID == "watchme" && ti.LastRun.IsZero() {
+			t.Error("lastRun not recorded on dispatch")
+		}
+	}
+}

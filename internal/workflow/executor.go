@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alib8b8/aflare/internal/metrics"
 	"github.com/alib8b8/aflare/internal/nodes"
 	tea "github.com/charmbracelet/bubbletea"
 	"gopkg.in/yaml.v3"
@@ -153,8 +154,11 @@ func ExecuteWorkflowWithTUI(ctx context.Context, wf *Workflow, reg *nodes.Regist
 // different timeout, build an Executor via NewExecutor().WithTimeout(d)
 // (per-executor, no global mutable state).
 func ExecuteWorkflowWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Registry, program *tea.Program) (string, []StepResult, *WorkflowTrace, error) {
+	metrics.IncActiveRuns()
+	defer metrics.DecActiveRuns()
+
 	if hasDAGDeclarations(wf.Steps) {
-		out, results, trace, err := executeWorkflowDAG(ctx, wf, reg, program, DefaultWorkflowTimeout)
+		out, results, trace, err := executeWorkflowDAG(ctx, wf, reg, program, DefaultWorkflowTimeout, "")
 		recordWorkflowMetrics(trace, err)
 		return out, results, trace, err
 	}
@@ -172,11 +176,11 @@ func ExecuteWorkflowWithTrace(ctx context.Context, wf *Workflow, reg *nodes.Regi
 //	out, results, err := exec.Execute(ctx, wf, reg)
 //
 // When statePath is set and a checkpoint file already exists, execution
-// resumes from the step after the one recorded in the checkpoint. After each
-// sequential step completes, a fresh snapshot is written to statePath.
-//
-// Checkpoint/resume is only supported on the sequential execution path.
-// Workflows that declare depends_on (DAG mode) ignore statePath.
+// resumes from it. On the sequential path that means "the step after the
+// recorded cursor"; on the DAG path (depends_on) it means "skip every node
+// whose output is already in the checkpoint and run the remaining subgraph".
+// After each step/node completes, a fresh snapshot is written to statePath
+// (atomically — see internal/fsutil).
 type Executor struct {
 	statePath       string
 	walPath         string // when set, use append-only WAL instead of JSON checkpoint

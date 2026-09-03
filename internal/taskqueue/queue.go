@@ -25,6 +25,8 @@ import (
 	"log"
 	"sync"
 	"time"
+
+	"github.com/alib8b8/aflare/internal/metrics"
 )
 
 // TaskStatus represents the lifecycle state of a queued task.
@@ -118,6 +120,7 @@ func (q *Queue) Enqueue(task *Task) error {
 	q.statuses[task.ID] = task
 
 	q.queue = append(q.queue, task)
+	metrics.SetQueueDepth(len(q.queue))
 
 	// Signal non-empty
 	select {
@@ -137,6 +140,7 @@ func (q *Queue) Dequeue(ctx context.Context) (*Task, error) {
 		if len(q.queue) > 0 {
 			task := q.queue[0]
 			q.queue = q.queue[1:]
+			metrics.SetQueueDepth(len(q.queue))
 			q.active[task.ID] = true
 			// Mark as running
 			task.Status = StatusRunning

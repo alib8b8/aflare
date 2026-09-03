@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **崩溃恢复的最后一公里（DAG checkpoint / 状态写盘原子化 / scheduler misfire 标记）**：确定性引擎的自然卖点——崩溃后重启、跳过已完成节点、从断点续跑——此前只兑现了一半。四处收口：
+  - **DAG checkpoint**：`executeWorkflowDAG` 此前直接报 "checkpoint/resume is not supported in DAG mode"（executor_executor.go），现在持久化已完成节点集合（StepOutputs，节点一旦完成在单次 run 内单调递增、天然好存）；重启恢复时已完成输出直接回填引擎、标记 cached，仅运行剩余子图。`WorkflowState` 新增 `dag_mode` / `step_names` 钉住快照对应的工作流形状——对步骤列表不一致的工作流 resume 直接拒绝（报错），而非把陈旧输出静默挂到错误的步骤上。WAL 仍是顺序模式专属（线性游标语义），两路径并存时 DAG 只读 JSON checkpoint 不双读
+  - **状态写盘原子化**：新增 `internal/fsutil.WriteFileAtomic`（同目录临时文件 + fsync + rename + 目录 fsync）——`SaveState` / `saveCheckpoint` / `SaveSchedules` 三处此前都是裸 `os.WriteFile`，防崩溃的文件本身会被崩溃写坏（写一半的 JSON）。调度定义同批收口：非原子写崩溃后 daemon 会以零调度重启、所有任务静默停摆
+  - **损坏文件保全**：checkpoint 解析失败（如崩溃截断的尾部）不再静默丢状态——`PreserveCorrupt` 把坏文件挪到 `<path>.corrupt-<unix-nano>` 后才报错起跑，用户最后一份可手工恢复的快照不会被"starting fresh"覆盖
+  - **scheduler last-run 持久化 + missed 标记**：`aflare agent` 起 daemon 时记录每个任务的最近触发时刻（`lastrun_store`，dispatch 时写而非完成时写——崩溃 mid-task 的重启不会双触发）；启动时 `RestoreLastRun` 数出停机期间错过的触发次数（封顶 1000，分钟级任务停机数周不至迭代百万槽位），`ListTasks` 暴露 `LastRun`/`MissedRuns` 并告警日志。只标记不补跑：语义诚实——不假装停机没发生过，也不用陈旧积压淹没 agent
+- **运维可观测性：节点级 Prometheus 指标 + daemon opt-in ops 端点**：原 4 个指标全是产品分析类（session/template/capability/provider），daemon 用户回答不了"我的工作流为什么慢/卡"。三块补齐：
+  - **新指标**：`aflare_node_failures_total`（node_name × error_class：timeout/canceled/not_found/other）、`aflare_runs_active`（在途 run 数，幂等缓存命中不计）、`aflare_queue_depth`（daemon 任务队列待取数，Enqueue/Dequeue 实时更新）；`aflare_llm_tokens_total` 已有，不重复造
+  - **指标接线修复**：workflow executor 的顺序 / DAG 两条路径都是直接 dispatch `node.Execute`（不走 `Registry.ExecuteWithStats`），节点时延/失败序列对 workflow run 全盲——现在两条路径在步骤完成处调用 `RecordNodeExecution`，且用 raw pre-recovery error（被 fallback / capture_error 掩盖的节点失败对运维仍是失败；condition 跳过与 eval 失败的步骤从未派发节点、不计数）
+  - **daemon ops 端点**：`aflare agent --ops-port 9090`（默认 9090）+ `AFLARE_METRICS=1` / `AFLARE_PPROF=1` 双开关 opt-in——默认一个端口都不开（local-first 口径：不主动开端口，开的人自己负责）；默认绑 127.0.0.1（`AFLARE_OPS_ADDR` 可覆盖），无认证无限流（与 WebUI 端点不同，trusted networks only）；`--debug` 之外的 pprof 首次对 daemon 可用
+- **`aflare audit tail`（审计日志实时订阅 + JSONL/SIEM 输出）**：HMAC 链与 bundle 此前的输出形态只有文件，企业尽调要的实时订阅是纯 I/O 包装——引擎一行未动，完整性校验仍在 `aflare audit verify`。默认打印最近 10 条后跟随新追加记录（tail -f，500ms 轮询——append-only 本地日志上轮询比 fsnotify 便宜且零新依赖）；`--json` 原样透传磁盘上的 JSONL 字节（SIEM forwarder 摄入的与哈希链覆盖的字节一致）；`-n 0` 纯跟随不吐历史；文件变小（截断/轮转）从头重读并 stderr 告警——对哈希链日志这本身就是篡改信号；后向分块扫描定位末尾 N 条不整文件加载，写一半的尾行等完整了才发出
 - **CI 防线三件套（examples 全量校验 / nightly fuzz / bench 回归门禁）**：
   - **examples 全量校验门禁**（ci.yml）：仓库 40 个 yaml 样例此前只有 1 个（content-processor.yaml）被 action-test.yml 触碰，其余 39 个是零验证的死资产。新门禁对每个含顶层 `steps:` 的 yaml 跑 `aflare validate`（数据文件如 scenes.yaml 路由表自动跳过），坏样例立红。上线即抓到 drone-patrol 的不可运行语法（见 Fixed）
   - **nightly fuzz**（soak.yml）：10 个 fuzz 目标（workflow 解析器、表达式引擎 ×2、MCP 请求处理、policy 加载与路径校验、节点输入 ×4）此前只在 PR CI 跑种子语料，种子之外的 bug 永远不炸。夜间每目标 time-boxed 60s；目标从源码枚举，新增 fuzz 函数自动纳入。FuzzExecuteCommand 以 dry_run=true 运行，无真实命令执行

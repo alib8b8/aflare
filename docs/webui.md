@@ -158,8 +158,11 @@ scrape_configs:
 
 | Metric | Type | Labels | Source |
 |--------|------|--------|--------|
-| `aflare_node_executions_total` | counter | `node_name`, `status` | `Registry.ExecuteWithStats` |
-| `aflare_node_execution_duration_seconds` | histogram | `node_name` | `Registry.ExecuteWithStats` |
+| `aflare_node_executions_total` | counter | `node_name`, `status` | `Registry.ExecuteWithStats` + workflow executor (seq/DAG step completion) |
+| `aflare_node_execution_duration_seconds` | histogram | `node_name` | `Registry.ExecuteWithStats` + workflow executor (seq/DAG step completion) |
+| `aflare_node_failures_total` | counter | `node_name`, `error_class` (`timeout`/`canceled`/`not_found`/`other`) | node execution failure path |
+| `aflare_runs_active` | gauge | — | workflow executor (in-flight runs; idempotency cache hits are not counted) |
+| `aflare_queue_depth` | gauge | — | daemon task queue (pending, not yet picked up by a worker) |
 | `aflare_workflow_executions_total` | counter | `status` | workflow executor |
 | `aflare_workflow_execution_duration_seconds` | histogram | — | workflow executor |
 | `aflare_security_blocks_total` | counter | `block_type` | `SecurityStats.RecordBlock` |
@@ -180,6 +183,26 @@ scrape from the existing internal stats accumulators via `CollectSnapshot`.
 > combination has been touched (e.g. `aflare_node_executions_total` shows up
 > after the first node execution). Plain counters (cache hits/misses) are
 > always emitted, even at zero.
+
+### Daemon ops endpoint (`aflare agent`)
+
+The agent daemon exposes the same opt-in endpoints on a dedicated listener,
+off by default (local-first: the daemon opens no ports unless asked):
+
+```bash
+AFLARE_METRICS=1 AFLARE_PPROF=1 aflare agent --ops-port 9090
+```
+
+| Flag / env | Default | Meaning |
+|------------|---------|---------|
+| `--ops-port <n>` | `9090` | Port for the ops listener |
+| `AFLARE_OPS_ADDR` | `127.0.0.1` | Bind address (e.g. `0.0.0.0` in a container) |
+| `AFLARE_METRICS=1` | off | Enable `GET /metrics` |
+| `AFLARE_PPROF=1` | off | Enable `GET /debug/pprof/*` |
+
+Unlike the WebUI endpoints there is no auth middleware and no rate limiter —
+the listener binds to localhost by default and is intended for trusted
+networks only; whoever enables it is responsible for access control.
 
 ## Usage Tips
 

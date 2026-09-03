@@ -22,6 +22,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alib8b8/aflare/internal/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // ── Enqueue / Dedup ────────────────────────────────────────────────────────
@@ -351,4 +354,58 @@ func TestPruneStatuses_LargeVolume(t *testing.T) {
 	// Should not panic or hang
 	summary := q.StatusSummary()
 	t.Logf("status summary: %+v", summary)
+}
+
+// ── Prometheus queue-depth gauge ──────────────────────────────────────────
+
+// queueDepthGaugeValue reads aflare_queue_depth from the default Prometheus
+// registry (the gauge itself is unexported in the metrics package).
+func queueDepthGaugeValue(t *testing.T) float64 {
+	t.Helper()
+	metrics.Register() // idempotent
+	mfs, err := prometheus.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Gather: %v", err)
+	}
+	for _, mf := range mfs {
+		if mf.GetName() != metrics.QueueDepthName {
+			continue
+		}
+		for _, m := range mf.GetMetric() {
+			if m.GetGauge() != nil {
+				return m.GetGauge().GetValue()
+			}
+		}
+	}
+	t.Fatalf("metric %s not found in default registry", metrics.QueueDepthName)
+	return 0
+}
+
+func TestQueue_DepthGaugeTracksMutations(t *testing.T) {
+	q := New(0)
+
+	q.Enqueue(&Task{ID: "gauge-1", Message: "m"})
+	q.Enqueue(&Task{ID: "gauge-2", Message: "m"})
+	if got := queueDepthGaugeValue(t); got != 2 {
+		t.Errorf("queue depth after 2 enqueues = %v, want 2", got)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	task, err := q.Dequeue(ctx)
+	if err != nil {
+		t.Fatalf("Dequeue failed: %v", err)
+	}
+	if task.ID != "gauge-1" {
+		t.Fatalf("expected gauge-1, got %s", task.ID)
+	}
+	if got := queueDepthGaugeValue(t); got != 1 {
+		t.Errorf("queue depth after dequeue = %v, want 1", got)
+	}
+
+	// Dedup enqueue (same ID as active task) must not change the depth.
+	q.Enqueue(&Task{ID: "gauge-1", Message: "dup"})
+	if got := queueDepthGaugeValue(t); got != 1 {
+		t.Errorf("queue depth after dedup enqueue = %v, want 1", got)
+	}
 }

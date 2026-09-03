@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/alib8b8/aflare/internal/fsutil"
 	"github.com/alib8b8/aflare/internal/meta"
 )
 
@@ -79,7 +80,10 @@ func SaveSchedules(path string, entries []ScheduleEntry) error {
 		return fmt.Errorf("failed to marshal schedules: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0600); err != nil {
+	// Atomic (temp + rename): a crash mid-write must not destroy the
+	// user's schedule list — without it the daemon restarts with zero
+	// schedules and every task silently stops firing.
+	if err := fsutil.WriteFileAtomic(path, data, 0600); err != nil {
 		return fmt.Errorf("failed to write schedules file: %w", err)
 	}
 	return nil

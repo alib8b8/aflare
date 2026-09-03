@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/metrics"
 	"github.com/alib8b8/aflare/internal/nodes"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -315,6 +316,12 @@ func (e *Executor) ExecuteWithTrace(ctx context.Context, wf *Workflow, reg *node
 
 	audit.recordStart()
 
+	// Ops gauge: count only real executions — the idempotency short-circuits
+	// above (cache hit / in-progress rejection) never reach this point, so
+	// they are not counted as active runs.
+	metrics.IncActiveRuns()
+	defer metrics.DecActiveRuns()
+
 	var (
 		out     string
 		results []StepResult
@@ -322,15 +329,18 @@ func (e *Executor) ExecuteWithTrace(ctx context.Context, wf *Workflow, reg *node
 		err     error
 	)
 	if hasDAGDeclarations(wf.Steps) {
-		// DAG mode does not support checkpoint/resume; fall through to the
-		// standard DAG executor which ignores statePath.
-		if e.statePath != "" {
-			logger.Warn("checkpoint/resume is not supported in DAG mode, ignoring statePath", "path", e.statePath)
-		}
+		// DAG mode supports JSON checkpoint resume (completed-node set).
+		// The WAL is a sequential-path construct (linear step cursor);
+		// it stays unsupported here.
 		if e.walPath != "" {
 			logger.Warn("WAL checkpoint/resume is not supported in DAG mode, ignoring walPath", "path", e.walPath)
 		}
-		out, results, trace, err = executeWorkflowDAG(ctx, wf, reg, program, e.workflowTimeout)
+		walPath := e.walPath
+		statePath := e.statePath
+		if walPath != "" {
+			statePath = "" // WAL path would be the sequential source of truth; do not double-read it as a DAG checkpoint
+		}
+		out, results, trace, err = executeWorkflowDAG(ctx, wf, reg, program, e.workflowTimeout, statePath)
 	} else {
 		// WAL takes precedence over JSON checkpoint when both are configured.
 		statePath := e.statePath

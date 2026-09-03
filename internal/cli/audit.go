@@ -48,6 +48,11 @@ func HandleAudit(args []string) error {
 		if err := HandleAuditExport(args[1:]); err != nil {
 			return err
 		}
+	case "tail":
+		if err := HandleAuditTail(args[1:]); err != nil {
+			fmt.Printf("❌ %v\n", err)
+			return exitErr(1)
+		}
 	case "-h", "--help", "help":
 		PrintAuditUsage()
 	default:
@@ -427,6 +432,8 @@ func PrintAuditUsage() {
 	fmt.Println("        Verify the audit log HMAC hash chain, or verify an exported bundle")
 	fmt.Println("  export [--out <path>] [--since <date>] [--until <date>] [--file <path>]")
 	fmt.Println("        Export a signed audit bundle as a single JSON file (refuses a broken chain)")
+	fmt.Println("  tail [-n <count>] [--json] [--file <path>]")
+	fmt.Println("        Live tail -f of the audit log; --json streams raw JSONL records for SIEM")
 	fmt.Println("  -h, --help               Show this help message")
 	fmt.Println("\nOptions:")
 	fmt.Println("  --file, -f <path>   Path to the audit log file (defaults to the standard location)")

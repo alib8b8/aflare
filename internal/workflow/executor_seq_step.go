@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/alib8b8/aflare/internal/logger"
+	"github.com/alib8b8/aflare/internal/metrics"
 	"github.com/alib8b8/aflare/internal/nodes"
 	"github.com/alib8b8/aflare/internal/telemetry"
 	"github.com/alib8b8/aflare/internal/tui"
@@ -328,6 +329,15 @@ func (s *seqExecState) executeRegularStep(i int, wStep WorkflowStep, stepStart t
 			}
 		}
 	}
+
+	// Prometheus node metric: one observation per executed step. The workflow
+	// executor dispatches node.Execute directly (not through
+	// Registry.ExecuteWithStats), so without this the node latency/failure
+	// series are blind to workflow runs. The raw pre-recovery error is used:
+	// a node failure masked by fallback/capture_error is still a node
+	// failure for ops. Condition-skipped and eval-failed steps never reach
+	// this point (no node execution happened).
+	metrics.RecordNodeExecution(wStep.Node, duration, execErr)
 
 	// Error recovery.
 	resultErr := execErr

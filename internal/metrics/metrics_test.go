@@ -17,7 +17,10 @@
 package metrics
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"io/fs"
 	"testing"
 	"time"
 
@@ -133,6 +136,83 @@ func TestRegister_Idempotent(t *testing.T) {
 	// again should not panic.
 	Register()
 	Register()
+}
+
+// ── Ops observability: node failures / active runs / queue depth ──
+
+func TestRecordNodeExecution_ClassifiesFailures(t *testing.T) {
+	const node = "test_node_failure_class"
+	cases := []struct {
+		err  error
+		want string
+	}{
+		{context.DeadlineExceeded, "timeout"},
+		{fmt.Errorf("wrapped: %w", context.DeadlineExceeded), "timeout"},
+		{context.Canceled, "canceled"},
+		{fmt.Errorf("open missing.txt: %w", fs.ErrNotExist), "not_found"},
+		{errors.New("boom"), "other"},
+	}
+	for _, tc := range cases {
+		before := testutil.ToFloat64(nodeFailures.WithLabelValues(node, tc.want))
+		RecordNodeExecution(node, time.Millisecond, tc.err)
+		if got := testutil.ToFloat64(nodeFailures.WithLabelValues(node, tc.want)); got != before+1 {
+			t.Errorf("error class %q: expected %v, got %v", tc.want, before+1, got)
+		}
+	}
+	// Successful executions must not touch any failure class.
+	beforeOther := testutil.ToFloat64(nodeFailures.WithLabelValues(node, "other"))
+	RecordNodeExecution(node, time.Millisecond, nil)
+	if got := testutil.ToFloat64(nodeFailures.WithLabelValues(node, "other")); got != beforeOther {
+		t.Errorf("success must not increment failures: got %v (before %v)", got, beforeOther)
+	}
+}
+
+func TestRunsActiveGauge(t *testing.T) {
+	before := testutil.ToFloat64(runsActive)
+	IncActiveRuns()
+	IncActiveRuns()
+	if got := testutil.ToFloat64(runsActive); got != before+2 {
+		t.Errorf("after 2 Inc: expected %v, got %v", before+2, got)
+	}
+	DecActiveRuns()
+	DecActiveRuns()
+	if got := testutil.ToFloat64(runsActive); got != before {
+		t.Errorf("after 2 Dec: expected back to %v, got %v", before, got)
+	}
+}
+
+func TestSetQueueDepth(t *testing.T) {
+	SetQueueDepth(7)
+	if got := testutil.ToFloat64(queueDepth); got != 7 {
+		t.Errorf("queue depth: expected 7, got %v", got)
+	}
+	SetQueueDepth(0)
+	if got := testutil.ToFloat64(queueDepth); got != 0 {
+		t.Errorf("queue depth: expected 0, got %v", got)
+	}
+}
+
+func TestRegister_IncludesOpsMetrics(t *testing.T) {
+	Register()
+	families, err := prometheus.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Gather: %v", err)
+	}
+	want := map[string]bool{
+		NodeFailuresName: false,
+		RunsActiveName:   false,
+		QueueDepthName:   false,
+	}
+	for _, f := range families {
+		if _, ok := want[f.GetName()]; ok {
+			want[f.GetName()] = true
+		}
+	}
+	for name, found := range want {
+		if !found {
+			t.Errorf("metric %s not registered", name)
+		}
+	}
 }
 
 func TestCollectSnapshot_CacheDelta(t *testing.T) {
