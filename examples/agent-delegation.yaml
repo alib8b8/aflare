@@ -27,6 +27,9 @@ name: Agent Delegation
 steps:
   # 方式一：supervisor 真实委派 —— @ 前缀引用注册的 Agent
   # LLM 规划子任务 → 并行监督执行（max_parallel 背压）→ 汇总综合
+  # 断点续跑：aflare run --resume examples/agent-delegation.yaml 时，已完成
+  # 的委派按 (agent, subtask) 记入 checkpoint 侧车文件，崩溃后 resume 只
+  # 重派未完成的委派（结果信封里 resumed 字段报告恢复数），不重复烧 token
   - id: orchestrate
     node: supervisor
     params:

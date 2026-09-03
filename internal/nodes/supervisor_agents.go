@@ -125,7 +125,7 @@ type delegationOpts struct {
 func delegateToAgents(ctx context.Context, refs []agentRef, goal string, llm llmCaller, opts delegationOpts) (string, error) {
 	plan, planned := planDelegations(ctx, refs, goal, llm)
 
-	results := runDelegations(ctx, refs, goal, plan, opts)
+	results, restored := runDelegations(ctx, refs, goal, plan, opts)
 
 	if err := delegationFailure(opts.failOn, results); err != nil {
 		return "", err
@@ -138,6 +138,9 @@ func delegateToAgents(ctx context.Context, refs []agentRef, goal string, llm llm
 		"planned": planned,
 		"ok":      allDelegationsOK(results),
 		"results": results,
+	}
+	if restored > 0 {
+		out["resumed"] = restored
 	}
 	if synthesis != "" {
 		out["synthesis"] = synthesis
@@ -251,7 +254,13 @@ func parseDelegationPlan(resp string, refs []agentRef) ([]delegation, error) {
 // Unplanned agents are skipped when a plan exists; without a plan every
 // agent receives the full goal. Each result records success/failure so
 // one failing agent cannot sink the batch.
-func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []delegation, opts delegationOpts) []agentResult {
+//
+// When the step runs under a checkpoint scope (see
+// supervisor_checkpoint.go), delegations that already succeeded in a
+// previous crashed attempt of this step are restored instead of
+// re-executed, and every fresh success is recorded so the next resume
+// skips it. The second return value counts the restored delegations.
+func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []delegation, opts delegationOpts) ([]agentResult, int) {
 	byName := make(map[string]agentx.AgentDef, len(refs))
 	for _, ref := range refs {
 		byName[ref.Name] = ref.Def
@@ -266,6 +275,20 @@ func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []de
 		}
 	}
 
+	// Delegation-level resume: restore what a previous attempt of this
+	// step already finished, re-dispatch only the rest.
+	resume := newDelegationResume(ctx, goal)
+	var pending []delegation
+	results := make([]agentResult, 0, len(jobs))
+	for _, job := range jobs {
+		if res, ok := resume.restore(job.Agent, job.Subtask); ok {
+			results = append(results, res)
+			continue
+		}
+		pending = append(pending, job)
+	}
+	restored := len(results)
+
 	maxParallel := opts.maxParallel
 	if maxParallel <= 0 {
 		maxParallel = defaultDelegationParallelism
@@ -273,9 +296,9 @@ func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []de
 	maxParallel = clampParallelism(maxParallel)
 	sem := make(chan struct{}, maxParallel)
 
-	results := make([]agentResult, len(jobs))
+	fresh := make([]agentResult, len(pending))
 	var wg sync.WaitGroup
-	for i, job := range jobs {
+	for i, job := range pending {
 		wg.Add(1)
 		go func(i int, job delegation) {
 			defer wg.Done()
@@ -284,7 +307,7 @@ func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []de
 			select {
 			case sem <- struct{}{}:
 			case <-ctx.Done():
-				results[i] = agentResult{Agent: job.Agent, Subtask: job.Subtask, Error: ctx.Err().Error()}
+				fresh[i] = agentResult{Agent: job.Agent, Subtask: job.Subtask, Error: ctx.Err().Error()}
 				return
 			}
 			defer func() { <-sem }()
@@ -311,13 +334,16 @@ func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []de
 			} else {
 				res.OK = true
 				res.Output = out
+				resume.record(res)
 			}
-			results[i] = res
+			fresh[i] = res
 		}(i, job)
 	}
 	wg.Wait()
+
+	results = append(results, fresh...)
 	sort.Slice(results, func(i, j int) bool { return results[i].Agent < results[j].Agent })
-	return results
+	return results, restored
 }
 
 // synthesizeResults merges delegation outputs via the LLM. Falls back to

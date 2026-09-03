@@ -61,7 +61,7 @@ func (n *SupervisorNode) Schema() NodeSchema {
 	)
 	return NodeSchema{
 		Name:        "supervisor",
-		Description: "Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates",
+		Description: "Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates. External-agent delegations are checkpointed at (agent, subtask) granularity when the run uses --resume: a crashed supervisor step restores its finished delegations and re-dispatches only the unfinished ones (reported as `resumed` in the results envelope); without checkpointing the behavior is exactly one-shot",
 		Input:       "string - the overall goal or task to supervise",
 		Output:      "string - structured task plan with delegation and synthesis",
 		Params:      params,
@@ -151,7 +151,7 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 		if outputFormat != "json" {
 			// Raw text mode: return only the synthesis so callers get a
 			// direct answer, not the supervision envelope.
-			results := runDelegations(ctx, agentRefs, input, nil, delegationOpts)
+			results, _ := runDelegations(ctx, agentRefs, input, nil, delegationOpts)
 			if err := delegationFailure(delegationOpts.failOn, results); err != nil {
 				return "", err
 			}
