@@ -149,7 +149,7 @@ func (n *CLIAgentNode) Description() string {
 func (n *CLIAgentNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "cli_agent",
-		Description: "Runs one bounded task via an external CLI agent subprocess (codex exec, claude -p, gemini -p, or a generic command) with timeout, sandbox and audit. Requires the agent CLI installed and authenticated.",
+		Description: "Runs one bounded task via an external CLI agent subprocess (codex exec, claude -p, gemini -p, or a generic command) with timeout, sandbox and audit. Requires the agent CLI installed and authenticated. Consecutive failures trip a per-agent circuit breaker (fast `circuit-open` failures until the agent recovers).",
 		Input:       "string - the task/prompt for the agent",
 		Output:      "string - the agent's final answer (stdout)",
 		Params: []ParamSchema{
@@ -204,7 +204,7 @@ func (n *A2AAgentNode) Description() string {
 func (n *A2AAgentNode) Schema() NodeSchema {
 	return NodeSchema{
 		Name:        "a2a_agent",
-		Description: "Sends the input as one task to an A2A agent (message/send with tasks/send fallback), polls tasks/get until a terminal state and returns the artifacts/status text.",
+		Description: "Sends the input as one task to an A2A agent (message/send with tasks/send fallback), polls tasks/get until a terminal state and returns the artifacts/status text. Consecutive failures trip a per-agent circuit breaker: calls fail fast with a `circuit-open` error until an agent-card probe succeeds, so one dead endpoint cannot burn the full timeout on every step.",
 		Input:       "string - the task/prompt for the remote agent",
 		Output:      "string - the agent's artifacts/status message text",
 		Params: []ParamSchema{
