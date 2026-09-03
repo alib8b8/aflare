@@ -465,7 +465,18 @@ func (s *dagScheduler) dispatchReady() {
 			s.finalize(idx, "")
 			continue
 		}
-		dispatchDAGStep(s.otelCtx, s.timeoutCtx, ps, s.reg, s.program, s.limiter, s.resultChan)
+		// Checkpoint scope: when statePath is set, stamp the step's
+		// identity into its context so checkpoint-aware nodes (supervisor
+		// delegation resume) can persist sub-step progress next to the
+		// workflow checkpoint.
+		stepCtx := s.otelCtx
+		if s.statePath != "" {
+			stepCtx = nodes.WithStepCheckpoint(stepCtx, nodes.StepCheckpoint{
+				StatePath: s.statePath,
+				Step:      ps.wStep.Name,
+			})
+		}
+		dispatchDAGStep(stepCtx, s.timeoutCtx, ps, s.reg, s.program, s.limiter, s.resultChan)
 	}
 }
 

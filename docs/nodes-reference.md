@@ -1922,6 +1922,7 @@ Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain spec
 
 - **Input**: string - the overall goal or task to supervise
 - **Output**: string - structured task plan with delegation and synthesis
+- **Delegation-level resume**: when the workflow runs with checkpointing (`aflare run --resume`), each successful external-agent delegation is recorded in a sidecar file next to the workflow checkpoint. If the process crashes mid-step, resume restores the finished delegations and re-dispatches only the unfinished ones — no duplicate side effects or token burn. The envelope reports the count as `resumed`; without checkpointing the behavior is exactly one-shot.
 
 ### Parameters
 

@@ -413,6 +413,16 @@ func (s *seqExecState) newStepContext(parent context.Context, timeout time.Durat
 // executeNode dispatches node execution, handling streaming nodes when a TUI
 // program is attached.
 func (s *seqExecState) executeNode(ctx context.Context, i int, wStep WorkflowStep, node nodes.Node, evaluatedParams map[string]string, stepInput string) (string, error) {
+	// Checkpoint scope: when statePath is set, stamp the step's identity
+	// into its context so checkpoint-aware nodes (supervisor delegation
+	// resume) can persist sub-step progress next to the workflow
+	// checkpoint.
+	if s.statePath != "" {
+		ctx = nodes.WithStepCheckpoint(ctx, nodes.StepCheckpoint{
+			StatePath: s.statePath,
+			Step:      wStep.Name,
+		})
+	}
 	if s.program != nil {
 		if streamingNode, ok := node.(nodes.StreamingNode); ok {
 			sink := newStreamSink(s.program, i, wStep.Node)

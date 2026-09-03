@@ -145,7 +145,7 @@ func TestRunDelegations_ParallelFanOut(t *testing.T) {
 	}
 
 	// No plan → fan-out: every agent gets the full goal.
-	results := runDelegations(context.Background(), refs, "shared goal", nil, delegationOpts{})
+	results, _ := runDelegations(context.Background(), refs, "shared goal", nil, delegationOpts{})
 	if len(results) != 2 {
 		t.Fatalf("results = %d, want 2", len(results))
 	}
@@ -174,7 +174,7 @@ func TestRunDelegations_FailureIsolated(t *testing.T) {
 		{Name: "bad", Def: mustAgent(t, "bad")},
 	}
 
-	results := runDelegations(context.Background(), refs, "goal", nil, delegationOpts{})
+	results, _ := runDelegations(context.Background(), refs, "goal", nil, delegationOpts{})
 	byAgent := map[string]agentResult{}
 	for _, res := range results {
 		byAgent[res.Agent] = res
@@ -212,7 +212,7 @@ func TestRunDelegations_BoundedConcurrency(t *testing.T) {
 	}
 
 	start := time.Now()
-	results := runDelegations(context.Background(), refs, "goal", nil, delegationOpts{maxParallel: 2})
+	results, _ := runDelegations(context.Background(), refs, "goal", nil, delegationOpts{maxParallel: 2})
 	elapsed := time.Since(start)
 
 	if len(results) != 6 {
@@ -536,7 +536,7 @@ func TestRunDelegations_DelegationTimeoutApplies(t *testing.T) {
 	refs := []agentRef{{Name: "slow", Def: mustAgent(t, "slow")}}
 
 	start := time.Now()
-	results := runDelegations(context.Background(), refs, "goal", nil, delegationOpts{timeout: 100 * time.Millisecond})
+	results, _ := runDelegations(context.Background(), refs, "goal", nil, delegationOpts{timeout: 100 * time.Millisecond})
 	elapsed := time.Since(start)
 	if len(results) != 1 || results[0].OK {
 		t.Fatalf("results = %+v, want one timeout failure", results)

@@ -151,7 +151,7 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 		if outputFormat != "json" {
 			// Raw text mode: return only the synthesis so callers get a
 			// direct answer, not the supervision envelope.
-			results := runDelegations(ctx, agentRefs, input, nil, delegationOpts)
+			results, _ := runDelegations(ctx, agentRefs, input, nil, delegationOpts)
 			if err := delegationFailure(delegationOpts.failOn, results); err != nil {
 				return "", err
 			}
