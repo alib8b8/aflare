@@ -54,6 +54,9 @@ func HandleAgent(args []string) error {
 	if len(args) > 0 && args[0] == "probe" {
 		return probeAgents(args[1:])
 	}
+	if len(args) > 0 && args[0] == "add" {
+		return addAgent(args[1:])
+	}
 
 	cfg := agent.DefaultConfig()
 	var watchDir string

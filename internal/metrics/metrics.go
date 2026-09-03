@@ -101,6 +101,12 @@ const (
 	// name — the supervisor counterpart of node_executions_total.
 	AgentDelegationsName        = "aflare_agent_delegations_total"           // {driver, agent, status}
 	AgentDelegationDurationName = "aflare_agent_delegation_duration_seconds" // {driver, agent}
+
+	// A2A task polling cost: one observation per tasks/get poll cycle,
+	// by agent and outcome. Long-running remote tasks poll at a fixed
+	// interval, so this counter makes the per-task polling overhead
+	// (round trips that returned no state change) visible.
+	A2APollsName = "aflare_a2a_polls_total" // {agent, status}
 )
 
 var (
@@ -276,6 +282,12 @@ var (
 		Buckets: prometheus.DefBuckets,
 	}, []string{"driver", "agent"})
 
+	// A2A tasks/get poll cycles, by agent and outcome.
+	a2aPolls = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: A2APollsName,
+		Help: "Total A2A tasks/get polls, by agent name and status (success/error).",
+	}, []string{"agent", "status"})
+
 	registerOnce sync.Once
 )
 
@@ -314,6 +326,7 @@ func Register() {
 			queueDepth,
 			agentDelegations,
 			agentDelegationDuration,
+			a2aPolls,
 		)
 	})
 }
@@ -480,6 +493,18 @@ func RecordAgentDelegation(driver, agent string, duration time.Duration, err err
 	}
 	agentDelegations.WithLabelValues(driver, agent, status).Inc()
 	agentDelegationDuration.WithLabelValues(driver, agent).Observe(duration.Seconds())
+}
+
+// RecordA2APoll records one A2A tasks/get poll cycle by agent and
+// outcome. A delegation that waits N poll intervals on a remote task
+// yields N observations, making the polling cost of long-running A2A
+// tasks (and of servers that never reach a terminal state) visible.
+func RecordA2APoll(agent string, err error) {
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+	a2aPolls.WithLabelValues(agent, status).Inc()
 }
 
 // --- Snapshot collection -------------------------------------------------

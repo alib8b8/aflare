@@ -96,7 +96,19 @@ func a2aTestServer(t *testing.T, sendMethod string) (*httptest.Server, *atomic.I
 	return srv, &calls
 }
 
+// isolateBreaker gives a test a pristine circuit-breaker state. The
+// global breaker is keyed by agent name and most tests here share the
+// name "r"; without a reset, accumulated failures open the circuit
+// mid-file and later tests assert on CircuitOpenError instead of the
+// failure they mean to exercise.
+func isolateBreaker(t *testing.T) {
+	t.Helper()
+	resetAgentBreakers()
+	t.Cleanup(resetAgentBreakers)
+}
+
 func TestSendMessage_ModernMethod(t *testing.T) {
+	isolateBreaker(t)
 	srv, calls := a2aTestServer(t, "message/send")
 	def := AgentDef{Name: "r", Driver: DriverA2A, URL: srv.URL + "/"}
 
@@ -113,6 +125,7 @@ func TestSendMessage_ModernMethod(t *testing.T) {
 }
 
 func TestSendMessage_LegacyFallback(t *testing.T) {
+	isolateBreaker(t)
 	// Server only accepts the older draft method name: message/send must
 	// fail with -32601 and the client must retry with tasks/send.
 	srv, calls := a2aTestServer(t, "tasks/send")
@@ -131,6 +144,7 @@ func TestSendMessage_LegacyFallback(t *testing.T) {
 }
 
 func TestSendMessage_AuthHeaderFromEnv(t *testing.T) {
+	isolateBreaker(t)
 	t.Setenv("AFLARE_TEST_A2A_KEY", "sekrit")
 	var gotAuth atomic.Value
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -163,6 +177,7 @@ func TestSendMessage_AuthHeaderFromEnv(t *testing.T) {
 }
 
 func TestSendMessage_FailedTask(t *testing.T) {
+	isolateBreaker(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -186,6 +201,7 @@ func TestSendMessage_FailedTask(t *testing.T) {
 }
 
 func TestSendMessage_RejectedTask(t *testing.T) {
+	isolateBreaker(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -206,6 +222,7 @@ func TestSendMessage_RejectedTask(t *testing.T) {
 }
 
 func TestSendMessage_TimeoutWhileWorking(t *testing.T) {
+	isolateBreaker(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Method string `json:"method"`
@@ -245,6 +262,7 @@ func TestSendMessage_TimeoutWhileWorking(t *testing.T) {
 }
 
 func TestSendMessage_BadURLRejected(t *testing.T) {
+	isolateBreaker(t)
 	tests := []string{"ftp://example.com/", "http://user:pass@example.com/", "not a url", "http://example.com/#frag"}
 	for _, raw := range tests {
 		def := AgentDef{Name: "r", Driver: DriverA2A, URL: raw}
@@ -255,6 +273,7 @@ func TestSendMessage_BadURLRejected(t *testing.T) {
 }
 
 func TestSendMessage_EmptyPromptRejected(t *testing.T) {
+	isolateBreaker(t)
 	def := AgentDef{Name: "r", Driver: DriverA2A, URL: "http://127.0.0.1:1/"}
 	if _, err := SendMessage(context.Background(), def, Task{Prompt: "  "}); err == nil {
 		t.Fatal("empty prompt accepted, want rejection")
@@ -262,6 +281,7 @@ func TestSendMessage_EmptyPromptRejected(t *testing.T) {
 }
 
 func TestSendMessage_AuditFailClosed(t *testing.T) {
+	isolateBreaker(t)
 	def := AgentDef{Name: "r", Driver: DriverA2A, URL: "http://127.0.0.1:1/"}
 	_, err := SendMessage(context.Background(), def, Task{
 		Prompt: "x",
@@ -302,6 +322,7 @@ func TestFetchAgentCard_NoCardAnywhere(t *testing.T) {
 // 502 on tasks/get no longer kills the whole delegation: the poll is an
 // idempotent read, so it is retried and the delegation completes.
 func TestSendMessage_PollRetriesTransient5xx(t *testing.T) {
+	isolateBreaker(t)
 	var polls atomic.Int32
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -364,6 +385,7 @@ func TestSendMessage_PollRetriesTransient5xx(t *testing.T) {
 // retry policy: message/send is not idempotent, so a server-side 5xx
 // (request was delivered) must NOT be retried.
 func TestSendMessage_SubmitDoesNotRetryServerErrors(t *testing.T) {
+	isolateBreaker(t)
 	var sends atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -397,6 +419,7 @@ func TestSendMessage_SubmitDoesNotRetryServerErrors(t *testing.T) {
 // the submit retry policy: a dial failure means the request never
 // reached the agent, so the submit IS retried (three attempts total).
 func TestSendMessage_SubmitRetriesDialErrors(t *testing.T) {
+	isolateBreaker(t)
 	// Reserve a port and close it: nothing listens, so every attempt
 	// fails at connection establishment.
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -460,6 +483,7 @@ func TestA2AErrorClassification(t *testing.T) {
 // the remote task is still working, aflare must stop waiting AND fire a
 // best-effort tasks/cancel so the remote agent does not keep running.
 func TestSendMessage_TimeoutCancelsRemoteTask(t *testing.T) {
+	isolateBreaker(t)
 	var canceled atomic.Value
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

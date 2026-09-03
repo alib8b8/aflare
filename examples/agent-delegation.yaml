@@ -14,6 +14,13 @@
 # 注册后可用 `aflare agent list` 查看；委派前可 `aflare agent probe` 预检
 # （CLI binary 是否在 PATH、A2A agent card 是否可达，任一不可用退出码非 0）。
 #
+# A2A Agent 也可以不手编配置，直接从 AgentCard 注册（推荐）：
+#   aflare agent add http://127.0.0.1:8080/ --api-key-env MY_AGENT_KEY
+#   → 自动拉取 /.well-known/agent-card.json，name/description/skills
+#     填进 AgentDef（skills 进 description，供 supervisor 规划路由），
+#     落盘 ~/.aflare/config/agents.yaml（store 条目优先于主配置的 agents: 段；
+#     密钥照旧只记环境变量名，不落盘）。
+#
 # 运行：aflare run examples/agent-delegation.yaml
 name: Agent Delegation
 

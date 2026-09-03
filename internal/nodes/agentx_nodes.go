@@ -26,16 +26,29 @@ import (
 	"github.com/alib8b8/aflare/internal/config"
 )
 
-// The agentx registry is fed from the `agents:` config section. The
-// loader is lazy: config is only touched when an agent is first
-// resolved, so importing this package never triggers config file IO.
+// The agentx registry is fed from two user-managed sources on top of the
+// built-in presets: the `agents:` section of the main config (hand
+// edited) and the CLI-managed agent store (~/.aflare/config/agents.yaml,
+// written by `aflare agent add`). Store entries win over config entries —
+// the CLI is the more recent expression of intent. The loader is lazy:
+// files are only touched when an agent is first resolved, so importing
+// this package never triggers config IO.
 func init() {
 	agentx.SetLoader(func() map[string]agentx.AgentDef {
-		cfg, err := config.LoadConfig()
-		if err != nil || cfg == nil {
-			return nil
+		agents := make(map[string]agentx.AgentDef)
+		if cfg, err := config.LoadConfig(); err == nil && cfg != nil {
+			for name, def := range cfg.Agents {
+				agents[name] = def
+			}
 		}
-		return cfg.Agents
+		stored, err := agentx.LoadAgentStore(agentx.DefaultAgentStorePath())
+		if err != nil {
+			return agents
+		}
+		for name, def := range stored {
+			agents[name] = def
+		}
+		return agents
 	})
 }
 

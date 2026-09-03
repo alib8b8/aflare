@@ -98,9 +98,18 @@ func RunCLI(ctx context.Context, def AgentDef, t Task) (string, error) {
 		return "", err
 	}
 
+	// Circuit breaker: fail fast when this agent has been failing
+	// consistently, instead of spending another full delegation timeout
+	// on a broken binary.
+	if err := globalAgentBreakers.allow(ctx, def); err != nil {
+		return "", err
+	}
+
 	resolvedBinary, err := exec.LookPath(def.Binary)
 	if err != nil {
-		return "", fmt.Errorf("agent %q: binary %q not found: %w", def.Name, def.Binary, err)
+		lookupErr := fmt.Errorf("agent %q: binary %q not found: %w", def.Name, def.Binary, err)
+		globalAgentBreakers.record(def.Name, lookupErr)
+		return "", lookupErr
 	}
 
 	timeout := t.resolveTimeout()
@@ -156,6 +165,7 @@ func RunCLI(ctx context.Context, def AgentDef, t Task) (string, error) {
 	}
 
 	if runErr != nil {
+		globalAgentBreakers.record(def.Name, runErr)
 		if runCtx.Err() == context.DeadlineExceeded {
 			return "", fmt.Errorf("agent %q timed out after %s", def.Name, timeoutStr)
 		}
@@ -167,10 +177,14 @@ func RunCLI(ctx context.Context, def AgentDef, t Task) (string, error) {
 		// Some CLIs emit the final message on stderr; fall back so a
 		// successful run doesn't turn into silence.
 		if fb := stripANSI(strings.TrimSpace(string(stderrData))); fb != "" {
+			globalAgentBreakers.record(def.Name, nil)
 			return fb, nil
 		}
-		return "", fmt.Errorf("agent %q produced no output", def.Name)
+		noOutErr := fmt.Errorf("agent %q produced no output", def.Name)
+		globalAgentBreakers.record(def.Name, noOutErr)
+		return "", noOutErr
 	}
+	globalAgentBreakers.record(def.Name, nil)
 	return out, nil
 }
 

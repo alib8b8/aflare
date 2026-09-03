@@ -214,6 +214,23 @@ func TestRecordAgentDelegation(t *testing.T) {
 	}
 }
 
+func TestRecordA2APoll(t *testing.T) {
+	const agent = "test_agent_a2a_poll"
+	beforeOK := testutil.ToFloat64(a2aPolls.WithLabelValues(agent, "success"))
+	beforeErr := testutil.ToFloat64(a2aPolls.WithLabelValues(agent, "error"))
+
+	RecordA2APoll(agent, nil)
+	RecordA2APoll(agent, nil)
+	RecordA2APoll(agent, errors.New("tasks/get 503"))
+
+	if got := testutil.ToFloat64(a2aPolls.WithLabelValues(agent, "success")); got != beforeOK+2 {
+		t.Errorf("success polls: got %v (before %v), want +2", got, beforeOK)
+	}
+	if got := testutil.ToFloat64(a2aPolls.WithLabelValues(agent, "error")); got != beforeErr+1 {
+		t.Errorf("error polls: got %v (before %v), want +1", got, beforeErr)
+	}
+}
+
 func TestRegister_IncludesOpsMetrics(t *testing.T) {
 	Register()
 	families, err := prometheus.DefaultGatherer.Gather()
