@@ -58,7 +58,7 @@ var openAICompatibleConfigs = []core.LLMNodeConfig{
 	},
 	{
 		Name:            "anthropic",
-		DefaultModel:    "claude-3-5-sonnet-latest",
+		DefaultModel:    "claude-sonnet-5",
 		DefaultEndpoint: "https://api.anthropic.com/v1",
 		EnvAPIKey:       "ANTHROPIC_API_KEY", // #nosec G101 -- env var name, not a credential value
 		ProviderName:    "Anthropic",
@@ -72,6 +72,13 @@ var openAICompatibleConfigs = []core.LLMNodeConfig{
 		// protocol. See docs/llm-providers.md (added separately) for
 		// setup instructions. The description makes this limit visible
 		// in `aflare list` so users are not surprised by 404s.
+		// Default model: claude-sonnet-5 is the current mainstream Claude
+		// model ($2/$10 per MTok). The previous default
+		// (claude-3-5-sonnet-latest) was retired off the direct API in
+		// 2026 — proxies reject it for accounts created after the
+		// retirement. Note: on Claude Fable 5.1 / Mythos 5.1 the
+		// tool_choice values "any"/"tool" return a 400 ("auto"/"none"
+		// still work) — prefer strict tool use or structured outputs.
 		DescriptionOverride: "Call Anthropic Claude via an OpenAI-compatible proxy (LiteLLM/one-api). Native api.anthropic.com is NOT OpenAI-compatible and will 404; configure `endpoint` to point at a proxy that translates the protocol.",
 	},
 	{

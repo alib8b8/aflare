@@ -298,7 +298,7 @@ func defaultModelFor(provider string) string {
 	case "openai":
 		return "gpt-4o-mini"
 	case "anthropic":
-		return "claude-3-haiku-20240307"
+		return "claude-haiku-4-5"
 	case "gemini":
 		return "gemini-1.5-flash"
 	case "deepseek":

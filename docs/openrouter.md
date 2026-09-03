@@ -51,7 +51,7 @@ workflow:
 
 - node: qwen              # hard step, routed through OpenRouter
   params:
-    model: "anthropic/claude-sonnet-4"
+    model: "anthropic/claude-sonnet-5"
     endpoint: "https://openrouter.ai/api/v1"
     api_key: "{{secret.OPENROUTER_API_KEY}}"
 ```

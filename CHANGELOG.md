@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Claude 供应商配置对齐 2026-09 API 现状（retired 模型清理 + 牌价表补全）**：Anthropic 已将 Claude 3 / 3.5 全系标 retired（仅 Bedrock / Google Cloud 保留），9 月 1 日发布 Fable 5.1 / Mythos 5.1。仓库三处配置仍钉在 retired 模型上，用户照默认配置调用直接失败：
+  - **`anthropic` 节点默认模型**：`claude-3-5-sonnet-latest` → `claude-sonnet-5`（当前主流，$2/$10 per MTok——官方 8 月 10 日宣布 introductory 价转正，原定 9 月 1 日涨到 $3/$15 的涨价已取消）；注释同步补 Fable 5.1 / Mythos 5.1 的 `tool_choice` 注意事项（`any`/`tool` 返回 400，`auto`/`none` 不受影响，应改用 strict tool use 或 structured outputs）
+  - **llm_router fallback 模型**：`defaultModelFor("anthropic")` 的 `claude-3-haiku-20240307`（2024 年 3 月的模型）→ `claude-haiku-4-5`（$1/$5，haiku 档位本就是 router 降级路径的正确定位——参照 openai 条目 fallback 用 gpt-4o-mini 的既有模式）
+  - **llm_pricing 牌价表**：此前只有 claude-3 代条目——用户走代理调用任何 4.5/5 代模型（sonnet-5 / opus-5 / haiku-4.5 / fable-5）成本归因全按 $0 计，而 LLM 成本归因（cost_usd 写入审计日志、预算告警）是本项目核心卖点，对 Claude 用户完全失效。现按官方定价页补全现役代：fable-5 / mythos-5（$10/$50）、opus-5 与 opus-4-5~4-8（$5/$25）、sonnet-5（$2/$10）、sonnet-4-5/4-6（$3/$15）、haiku-4-5（$1/$5）；retired 代保留并标注（Bedrock/GCP 路由仍是这个价，`claude-opus-4` 前缀条目同时覆盖 4-1 变体）。最长前缀匹配保证日期后缀变体（如 `claude-sonnet-5-20260630`）落到正确档位且不跨代串价；回归钉子 `TestComputeLLMCost_ClaudeCurrentGeneration` 钉死各档牌价与前缀行为，`TestDefaultModelFor` 断言同步。docs/nodes-reference.md 重新生成，openrouter.md 示例的 retired `anthropic/claude-sonnet-4` 改为 `claude-sonnet-5`
+
 - **崩溃恢复的最后一公里（DAG checkpoint / 状态写盘原子化 / scheduler misfire 标记）**：确定性引擎的自然卖点——崩溃后重启、跳过已完成节点、从断点续跑——此前只兑现了一半。四处收口：
   - **DAG checkpoint**：`executeWorkflowDAG` 此前直接报 "checkpoint/resume is not supported in DAG mode"（executor_executor.go），现在持久化已完成节点集合（StepOutputs，节点一旦完成在单次 run 内单调递增、天然好存）；重启恢复时已完成输出直接回填引擎、标记 cached，仅运行剩余子图。`WorkflowState` 新增 `dag_mode` / `step_names` 钉住快照对应的工作流形状——对步骤列表不一致的工作流 resume 直接拒绝（报错），而非把陈旧输出静默挂到错误的步骤上。WAL 仍是顺序模式专属（线性游标语义），两路径并存时 DAG 只读 JSON checkpoint 不双读
   - **状态写盘原子化**：新增 `internal/fsutil.WriteFileAtomic`（同目录临时文件 + fsync + rename + 目录 fsync）——`SaveState` / `saveCheckpoint` / `SaveSchedules` 三处此前都是裸 `os.WriteFile`，防崩溃的文件本身会被崩溃写坏（写一半的 JSON）。调度定义同批收口：非原子写崩溃后 daemon 会以零调度重启、所有任务静默停摆

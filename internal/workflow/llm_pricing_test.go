@@ -53,12 +53,49 @@ func TestComputeLLMCost_PrefixMatch(t *testing.T) {
 		{"GPT-4O-MINI-2024-07-18", computeLLMCost("gpt-4o-mini", 1000, 0), "gpt-4o-mini"},
 		{"claude-3-haiku-20240307", computeLLMCost("claude-3-haiku", 1000, 0), "claude-3-haiku"},
 		{"deepseek-chat-1234", computeLLMCost("deepseek-chat", 1000, 0), "deepseek-chat"},
+		// Current Claude generation: dated variants must price against
+		// their exact base, not a shorter (wrong) prefix — the table has
+		// both "claude-sonnet-4-6" ($3/$15) and "claude-sonnet-5"
+		// ($2/$10), so a suffix on either must not cross-match.
+		{"claude-sonnet-5-20260630", computeLLMCost("claude-sonnet-5", 1000, 0), "claude-sonnet-5"},
+		{"claude-opus-4-6-20260101", computeLLMCost("claude-opus-4-6", 1000, 0), "claude-opus-4-6"},
+		{"claude-haiku-4-5-20251001", computeLLMCost("claude-haiku-4-5", 1000, 0), "claude-haiku-4-5"},
 	}
 	for _, c := range cases {
 		got := computeLLMCost(c.model, 1000, 0)
 		if !almostEqual(got, c.baseCost, 1e-12) {
 			t.Errorf("prefix match failed: computeLLMCost(%q) = %.10f, want %.10f (same as %q)",
 				c.model, got, c.baseCost, c.base)
+		}
+	}
+}
+
+// TestComputeLLMCost_ClaudeCurrentGeneration pins the official list prices of
+// the current Claude generation (checked against Anthropic's pricing page,
+// 2026-09). Claude cost attribution was silently $0 for every model shipped
+// after the claude-3 family retired — these anchors keep the table honest and
+// catch accidental cross-generation prefix drift (e.g. sonnet-5 accidentally
+// priced at the sonnet-4-6 rate).
+func TestComputeLLMCost_ClaudeCurrentGeneration(t *testing.T) {
+	cases := []struct {
+		model       string
+		inputPer1M  float64
+		outputPer1M float64
+	}{
+		{"claude-sonnet-5", 2.00, 10.00},
+		{"claude-opus-5", 5.00, 25.00},
+		{"claude-haiku-4-5", 1.00, 5.00},
+		{"claude-fable-5", 10.00, 50.00},
+		{"claude-fable-5-1", 10.00, 50.00}, // prefix: fable-5 covers 5.1
+		{"claude-sonnet-4-5", 3.00, 15.00},
+		{"claude-3-5-sonnet-latest", 3.00, 15.00}, // retired gen, Bedrock route
+	}
+	for _, c := range cases {
+		got := computeLLMCost(c.model, 1_000_000, 1_000_000)
+		want := c.inputPer1M + c.outputPer1M
+		if !almostEqual(got, want, 1e-9) {
+			t.Errorf("computeLLMCost(%q, 1M in + 1M out) = %.4f, want %.4f ($%.2f/$%.2f per MTok)",
+				c.model, got, want, c.inputPer1M, c.outputPer1M)
 		}
 	}
 }

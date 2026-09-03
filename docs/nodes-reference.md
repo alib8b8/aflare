@@ -144,7 +144,7 @@ Call Anthropic Claude via an OpenAI-compatible proxy (LiteLLM/one-api). Native a
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `model` | string | No | claude-3-5-sonnet-latest | Model name (default: claude-3-5-sonnet-latest) |
+| `model` | string | No | claude-sonnet-5 | Model name (default: claude-sonnet-5) |
 | `api_key` | string | No |  | Anthropic API key (or set ANTHROPIC_API_KEY env var) |
 | `endpoint` | string | No | https://api.anthropic.com/v1 | API base URL (default: https://api.anthropic.com/v1) |
 | `system` | string | No |  | System prompt |

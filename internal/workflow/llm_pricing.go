@@ -82,7 +82,24 @@ var defaultPricing = map[string]ModelPricing{
 	"o1-mini":       {3.00, 12.00},
 	"o1-preview":    {15.00, 60.00},
 	"o3-mini":       {1.10, 4.40},
-	// Anthropic
+	// Anthropic (current generation, list prices as of 2026-09;
+	// longest-prefix matching makes each key cover its dated variants,
+	// e.g. "claude-opus-4-6" also prices "claude-opus-4-6-20260101")
+	"claude-fable-5":    {10.00, 50.00}, // Fable 5.1 / Mythos 5(.1) share the price
+	"claude-mythos-5":   {10.00, 50.00},
+	"claude-opus-5":     {5.00, 25.00}, // Opus 4.5–4.8 share the price
+	"claude-opus-4-8":   {5.00, 25.00},
+	"claude-opus-4-7":   {5.00, 25.00},
+	"claude-opus-4-6":   {5.00, 25.00},
+	"claude-opus-4-5":   {5.00, 25.00},
+	"claude-sonnet-5":   {2.00, 10.00}, // $2/$10 intro pricing made standard 2026-09-01
+	"claude-sonnet-4-6": {3.00, 15.00},
+	"claude-sonnet-4-5": {3.00, 15.00},
+	"claude-haiku-4-5":  {1.00, 5.00},
+	// Anthropic (retired generation — still served on Bedrock/Google
+	// Cloud at these prices, kept for cost attribution on those routes)
+	"claude-opus-4":     {15.00, 75.00}, // covers bare opus-4 and opus-4-1
+	"claude-sonnet-4":   {3.00, 15.00},  // covers bare sonnet-4 and sonnet-4-1
 	"claude-3-5-sonnet": {3.00, 15.00},
 	"claude-3-5-haiku":  {0.80, 4.00},
 	"claude-3-opus":     {15.00, 75.00},

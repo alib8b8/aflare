@@ -44,7 +44,7 @@ func TestDefaultModelFor(t *testing.T) {
 		want     string
 	}{
 		{"openai", "gpt-4o-mini"},
-		{"anthropic", "claude-3-haiku-20240307"},
+		{"anthropic", "claude-haiku-4-5"},
 		{"gemini", "gemini-1.5-flash"},
 		{"deepseek", "deepseek-chat"},
 		{"qwen", "qwen-plus"},
