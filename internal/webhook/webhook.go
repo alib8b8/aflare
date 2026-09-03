@@ -24,6 +24,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -31,6 +32,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -51,6 +53,17 @@ const (
 	serverWriteTimeout    = 10 * time.Second
 	serverShutdownTimeout = 5 * time.Second
 	maxConcurrentTasks    = 100 // Limit concurrent webhook executions to prevent goroutine leaks
+
+	// Replay protection: an HMAC proves integrity, not freshness — a
+	// captured delivery would otherwise trigger the workflow on every
+	// replay, forever. Timestamped signatures must fall within this
+	// window of server time (± to tolerate clock drift).
+	signatureMaxAge = 5 * time.Minute
+	// Platform deliveries (GitHub/Gitea/Forgejo) carry no timestamp in
+	// their signature, so their delivery IDs are deduplicated for this
+	// long instead: a verbatim replay of the same delivery is rejected.
+	deliveryDedupWindow = 24 * time.Hour
+	deliveryCacheLimit  = 8192
 )
 
 // TaskStatus represents the execution status of a task.
@@ -134,6 +147,7 @@ type WebhookServer struct {
 	registry     *nodes.Registry
 	rateLimiter  *RateLimiter
 	workflowsDir string
+	deliveries   *deliveryCache
 
 	mu       sync.RWMutex
 	tasks    map[string]*Task
@@ -155,6 +169,7 @@ func NewWebhookServer(port, secret string, registry *nodes.Registry) *WebhookSer
 		secret:      secret,
 		registry:    registry,
 		rateLimiter: NewRateLimiter(rateLimitPerMin, time.Minute),
+		deliveries:  newDeliveryCache(deliveryDedupWindow, deliveryCacheLimit),
 		tasks:       make(map[string]*Task),
 		stopCh:      make(chan struct{}),
 		sem:         make(chan struct{}, maxConcurrentTasks),
@@ -297,10 +312,11 @@ func (s *WebhookServer) requireSecret(w http.ResponseWriter, r *http.Request) bo
 // credential forms are accepted, both verified in constant time:
 //
 //  1. X-Hub-Signature-256 — the GitHub webhook signature scheme (also used
-//     by Gitea/Forgejo): "sha256=<hex HMAC-SHA256 of the raw body>" keyed by
-//     the same secret configured in the repository webhook settings. Proves
-//     both the delivery origin and body integrity, so it works for
-//     untrusted callers where a shared-secret header alone cannot.
+//     by Gitea/Forgejo): "sha256=<hex HMAC-SHA256 ...>" keyed by the same
+//     secret configured in the repository webhook settings. Proves both the
+//     delivery origin and body integrity, so it works for untrusted callers
+//     where a shared-secret header alone cannot. Replay protection is
+//     enforced (see verifySignature).
 //  2. X-Webhook-Secret — the plain shared-secret header for trusted
 //     automation callers (curl, n8n, cron jobs, ...).
 //
@@ -312,17 +328,71 @@ func (s *WebhookServer) requireAuth(w http.ResponseWriter, r *http.Request, body
 		return true
 	}
 	if sig := r.Header.Get("X-Hub-Signature-256"); sig != "" {
-		if verifyWebhookSignature(body, s.secret, sig) {
-			return true
-		}
-		logger.Warn("webhook request rejected: invalid X-Hub-Signature-256",
-			"client", getClientIP(r),
-			"workflow", strings.TrimPrefix(r.URL.Path, "/webhook/"),
-		)
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return false
+		return s.verifySignature(w, r, body, sig)
 	}
 	return s.requireSecret(w, r)
+}
+
+// verifySignature authenticates an HMAC-signed delivery WITH replay
+// protection. Two freshness schemes, in order of preference:
+//
+//  1. X-Timestamp — for aflare's own trigger chain (curl, n8n, scripts):
+//     the MAC must cover "<unix-seconds>.<body>" and the timestamp must be
+//     within ±signatureMaxAge of server time, so a captured request stops
+//     being valid once the window closes.
+//
+//  2. Platform delivery ID (X-GitHub-Delivery / X-Gitea-Delivery /
+//     X-Gogs-Delivery) — forges sign only the body and cannot add a
+//     timestamp, so those deliveries use the classic body-only MAC and are
+//     deduplicated by delivery ID: a verbatim replay of the same delivery
+//     is rejected.
+//
+// A signature with NEITHER is rejected: an unbound body-only MAC is valid
+// forever, which is exactly the replay hole this closes.
+func (s *WebhookServer) verifySignature(w http.ResponseWriter, r *http.Request, body []byte, sig string) bool {
+	workflowName := strings.TrimPrefix(r.URL.Path, "/webhook/")
+	client := getClientIP(r)
+
+	if ts := r.Header.Get("X-Timestamp"); ts != "" {
+		if err := verifyTimestampedSignature(body, s.secret, sig, ts); err != nil {
+			logger.Warn("webhook request rejected: timestamped signature verification failed",
+				"client", client,
+				"workflow", workflowName,
+				"err", err.Error(),
+			)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return false
+		}
+		return true
+	}
+
+	if delivery := platformDeliveryID(r); delivery != "" {
+		if !verifyWebhookSignature(body, s.secret, sig) {
+			logger.Warn("webhook request rejected: invalid X-Hub-Signature-256",
+				"client", client,
+				"workflow", workflowName,
+			)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return false
+		}
+		if !s.deliveries.Record(delivery) {
+			logger.Warn("webhook request rejected: replayed delivery",
+				"client", client,
+				"workflow", workflowName,
+				"delivery_id", delivery,
+			)
+			http.Error(w, "replayed delivery", http.StatusUnauthorized)
+			return false
+		}
+		return true
+	}
+
+	logger.Warn("webhook request rejected: body-only signature without X-Timestamp or platform delivery ID (replayable)",
+		"client", client,
+		"workflow", workflowName,
+	)
+	http.Error(w, "unauthorized: signature requires X-Timestamp (or platform delivery headers)", http.StatusUnauthorized)
+	return false
 }
 
 // verifyWebhookSignature checks a GitHub-style X-Hub-Signature-256 header
@@ -330,17 +400,121 @@ func (s *WebhookServer) requireAuth(w http.ResponseWriter, r *http.Request, body
 // keyed by secret. Malformed headers and decode failures return false
 // immediately; the digest comparison is constant time.
 func verifyWebhookSignature(body []byte, secret, header string) bool {
-	const prefix = "sha256="
-	if !strings.HasPrefix(header, prefix) {
-		return false
-	}
-	got, err := hex.DecodeString(strings.TrimPrefix(header, prefix))
-	if err != nil {
+	got, ok := parseSignatureHeader(header)
+	if !ok {
 		return false
 	}
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body) // hash.Hash.Write never returns an error
 	return hmac.Equal(got, mac.Sum(nil))
+}
+
+// verifyTimestampedSignature checks the timestamped MAC scheme:
+//
+//	X-Timestamp: <unix seconds>
+//	X-Hub-Signature-256: sha256=<hex HMAC-SHA256(secret, "<ts>." + body)>
+//
+// The timestamp is enforced against server time (±signatureMaxAge) AND
+// bound into the MAC, so it can be neither replayed after the window nor
+// swapped on a captured signature. The timestamp is re-encoded via
+// FormatInt before signing so equivalent forms ("007" vs "7") cannot shift
+// the MAC input.
+func verifyTimestampedSignature(body []byte, secret, header, tsHeader string) error {
+	ts, err := strconv.ParseInt(strings.TrimSpace(tsHeader), 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid X-Timestamp %q", tsHeader)
+	}
+	drift := time.Now().Unix() - ts
+	if drift < 0 {
+		drift = -drift
+	}
+	if drift > int64(signatureMaxAge/time.Second) {
+		return fmt.Errorf("timestamp %d is %ds from server time (max ±%s)", ts, drift, signatureMaxAge)
+	}
+	got, ok := parseSignatureHeader(header)
+	if !ok {
+		return errors.New("malformed X-Hub-Signature-256")
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(strconv.FormatInt(ts, 10)))
+	mac.Write([]byte("."))
+	mac.Write(body)
+	if !hmac.Equal(got, mac.Sum(nil)) {
+		return errors.New("signature mismatch (MAC must cover \"<timestamp>.<body>\")")
+	}
+	return nil
+}
+
+// parseSignatureHeader decodes a "sha256=<hex>" signature header into the
+// raw digest. False covers every malformed form (wrong prefix, bad hex,
+// empty digest).
+func parseSignatureHeader(header string) ([]byte, bool) {
+	const prefix = "sha256="
+	if !strings.HasPrefix(header, prefix) {
+		return nil, false
+	}
+	got, err := hex.DecodeString(strings.TrimPrefix(header, prefix))
+	if err != nil || len(got) == 0 {
+		return nil, false
+	}
+	return got, true
+}
+
+// platformDeliveryID returns the unique delivery identifier forge platforms
+// attach to every webhook delivery, or "" when the caller is not a forge.
+func platformDeliveryID(r *http.Request) string {
+	for _, h := range []string{"X-GitHub-Delivery", "X-Gitea-Delivery", "X-Gogs-Delivery"} {
+		if v := strings.TrimSpace(r.Header.Get(h)); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// deliveryCache deduplicates platform delivery IDs so a captured delivery
+// cannot be replayed verbatim. IDs are only recorded AFTER the HMAC
+// verified, so unauthenticated traffic can never grow the cache.
+type deliveryCache struct {
+	mu     sync.Mutex
+	seen   map[string]time.Time
+	window time.Duration
+	limit  int
+}
+
+func newDeliveryCache(window time.Duration, limit int) *deliveryCache {
+	return &deliveryCache{
+		seen:   make(map[string]time.Time),
+		window: window,
+		limit:  limit,
+	}
+}
+
+// Record reports whether id is a first sighting (true, and remembered for
+// the window) or a replay (false). A replay refreshes the entry so a
+// sustained replay attack cannot simply wait out the window.
+func (c *deliveryCache) Record(id string) bool {
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if ts, ok := c.seen[id]; ok && now.Sub(ts) < c.window {
+		c.seen[id] = now
+		return false
+	}
+	if len(c.seen) >= c.limit {
+		c.sweepLocked(now)
+	}
+	c.seen[id] = now
+	return true
+}
+
+// sweepLocked drops expired entries once the cache hits its limit. Delivery
+// volume from verified forges is tiny; this is a bound, not a hot path.
+func (c *deliveryCache) sweepLocked(now time.Time) {
+	for id, ts := range c.seen {
+		if now.Sub(ts) >= c.window {
+			delete(c.seen, id)
+		}
+	}
 }
 
 func (s *WebhookServer) handleWebhook(w http.ResponseWriter, r *http.Request) {

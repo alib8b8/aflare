@@ -226,6 +226,8 @@
   "doctor.crypto.secrets_sm4_desc": "Secrets store is SM4-GCM; older binaries cannot read it",
   "doctor.crypto.secrets_sm4_hint": "To roll back to the old-version-readable format:\n  1. export AFLARE_SECRETS_CIPHER=aes-gcm\n  2. Trigger any save (e.g. aflare secrets set with the same value) to rewrite the store in the legacy format",
   "doctor.crypto.secrets_unknown": "  ? secrets store uses unknown cipher %q",
+  "doctor.crypto.secrets_kdf_argon2": "  ✓ secrets KDF: Argon2id (memory-hard)",
+  "doctor.crypto.secrets_kdf_pbkdf2": "  ⚠ secrets KDF: PBKDF2-SHA256 — the next save upgrades it to Argon2id automatically",
   "doctor.crypto.warn_hmac_sm3": "  ⚠ AFLARE_AUDIT_HMAC_ALGO=sm3 is set: new audit records will be SM3-signed (upgrade all binaries before enabling)",
   "doctor.crypto.warn_cipher_sm4": "  ⚠ AFLARE_SECRETS_CIPHER=sm4-gcm is set: the next save re-encrypts to SM4-GCM (older binaries cannot read it)",
   "doctor.llm.not_configured": "  ⊘ LLM not configured (run aflare init to configure)",

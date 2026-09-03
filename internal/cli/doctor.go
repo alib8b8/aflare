@@ -233,8 +233,8 @@ func checkCryptoCompat(problems *[]doctorProblem, secretsPath string) {
 		}
 	}
 
-	// Secrets store at-rest cipher.
-	cipherName, legacy, err := secrets.InspectFile(secretsPath)
+	// Secrets store at-rest cipher + KDF.
+	cipherName, kdfName, legacy, err := secrets.InspectFile(secretsPath)
 	switch {
 	case err != nil:
 		fmt.Println(i18n.T("doctor.crypto.secrets_check_fail", err))
@@ -258,6 +258,14 @@ func checkCryptoCompat(problems *[]doctorProblem, secretsPath string) {
 		})
 	default:
 		fmt.Println(i18n.T("doctor.crypto.secrets_unknown", cipherName))
+	}
+	if cipherName != "" && err == nil {
+		switch kdfName {
+		case secrets.KDFArgon2id:
+			fmt.Println(i18n.T("doctor.crypto.secrets_kdf_argon2"))
+		case secrets.KDFPBKDF2:
+			fmt.Println(i18n.T("doctor.crypto.secrets_kdf_pbkdf2"))
+		}
 	}
 
 	// Explicit opt-in env vars: warn even before any data is written.

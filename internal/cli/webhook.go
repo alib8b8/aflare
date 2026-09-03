@@ -43,7 +43,12 @@ import (
 //
 // Authentication when --secret (or AFLARE_WEBHOOK_SECRET) is configured:
 //   - GitHub-style X-Hub-Signature-256 signature (also Gitea/Forgejo) —
-//     configure the same secret in the repository webhook settings
+//     configure the same secret in the repository webhook settings;
+//     platform deliveries are deduplicated by delivery ID
+//   - timestamped X-Hub-Signature-256 for own automation callers: send
+//     X-Timestamp (unix seconds) and sign "<timestamp>." + body; the
+//     request is rejected once the timestamp is more than 5 minutes
+//     from server time (replay protection)
 //   - plain X-Webhook-Secret header for trusted automation callers
 //
 // Without a secret the server binds 127.0.0.1 only; binding a non-loopback
@@ -132,7 +137,7 @@ func HandleWebhook(args []string) error {
 	if secret == "" {
 		fmt.Println("Auth: none (loopback only)")
 	} else {
-		fmt.Println("Auth: X-Hub-Signature-256 (GitHub/Gitea) or X-Webhook-Secret")
+		fmt.Println("Auth: X-Hub-Signature-256 + X-Timestamp (freshness, ±5min) or X-Webhook-Secret")
 	}
 	fmt.Println("Press Ctrl+C to stop")
 
@@ -175,8 +180,12 @@ func PrintWebhookUsage() {
 	fmt.Println("  --help, -h            - Show this help message")
 	fmt.Println("\nAuthentication (when a secret is configured):")
 	fmt.Println("  GitHub/Gitea/Forgejo: configure the same secret in the repository webhook")
-	fmt.Println("    settings; deliveries are accepted via X-Hub-Signature-256 signature.")
-	fmt.Println("  Other callers: send the secret in the X-Webhook-Secret header.")
+	fmt.Println("    settings; deliveries are accepted via X-Hub-Signature-256 signature and")
+	fmt.Println("    deduplicated by delivery ID (replayed deliveries are rejected).")
+	fmt.Println("  Own automation (curl/n8n/scripts): send X-Timestamp (unix seconds) and")
+	fmt.Println("    X-Hub-Signature-256 = HMAC-SHA256(secret, \"<timestamp>.\" + body);")
+	fmt.Println("    requests older than 5 minutes are rejected (replay protection).")
+	fmt.Println("  Trusted callers: send the secret in the X-Webhook-Secret header.")
 	fmt.Println("\nExamples:")
 	fmt.Println("  aflare webhook")
 	fmt.Println("  aflare webhook --port 9090 --secret $(cat ~/.aflare/webhook-secret)")

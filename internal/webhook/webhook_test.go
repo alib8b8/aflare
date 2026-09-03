@@ -30,6 +30,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -395,11 +396,25 @@ func signBody(t *testing.T, body []byte, secret string) string {
 	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
 }
 
+// signTimestamped computes the timestamped signature scheme: the MAC covers
+// "<unix-seconds>." + body, and the matching X-Timestamp value is returned
+// alongside the header value.
+func signTimestamped(t *testing.T, body []byte, secret string, ts int64) (sig, tsHeader string) {
+	t.Helper()
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(strconv.FormatInt(ts, 10)))
+	mac.Write([]byte("."))
+	mac.Write(body)
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil)), strconv.FormatInt(ts, 10)
+}
+
 // TestWebhookServer_GitHubSignatureAuth covers the GitHub-style signature
 // credential: a correctly signed delivery must be accepted without the
 // shared-secret header, while a bad signature must be rejected — even when
 // the request also carries a valid shared secret (a bad signature is tamper
-// evidence, not a missing credential).
+// evidence, not a missing credential). GitHub deliveries always carry an
+// X-GitHub-Delivery ID, which is what authorizes the body-only MAC (see
+// verifySignature).
 func TestWebhookServer_GitHubSignatureAuth(t *testing.T) {
 	srv, tmpDir, cleanup := setupTestServer(t)
 	defer cleanup()
@@ -418,9 +433,10 @@ steps:
 
 	body := []byte(`{"action":"opened","pr":123}`)
 
-	// 1. Valid signature, no shared-secret header → accepted (202).
+	// 1. Valid signature + delivery ID, no shared-secret header → accepted (202).
 	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/webhook/gh", bytes.NewReader(body))
 	req.Header.Set("X-Hub-Signature-256", signBody(t, body, "gh-webhook-secret"))
+	req.Header.Set("X-GitHub-Delivery", "d-1")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("webhook request failed: %v", err)
@@ -434,6 +450,7 @@ steps:
 	// fallback to the shared-secret check even though the header is valid.
 	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/webhook/gh", bytes.NewReader([]byte(`{"action":"tampered"}`)))
 	req.Header.Set("X-Hub-Signature-256", signBody(t, body, "gh-webhook-secret"))
+	req.Header.Set("X-GitHub-Delivery", "d-2")
 	req.Header.Set("X-Webhook-Secret", "gh-webhook-secret")
 	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
@@ -447,6 +464,7 @@ steps:
 	// 3. Signature keyed with the wrong secret → 401.
 	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/webhook/gh", bytes.NewReader(body))
 	req.Header.Set("X-Hub-Signature-256", signBody(t, body, "wrong-secret"))
+	req.Header.Set("X-GitHub-Delivery", "d-3")
 	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("webhook request failed: %v", err)
@@ -457,7 +475,7 @@ steps:
 	}
 
 	// 4. Malformed signature header values → 401.
-	for _, bad := range []string{
+	for i, bad := range []string{
 		"sha256=not-hex-at-all",
 		"sha1=deadbeef", // wrong algorithm prefix
 		"deadbeef",      // missing prefix
@@ -465,6 +483,7 @@ steps:
 	} {
 		req, _ = http.NewRequest(http.MethodPost, ts.URL+"/webhook/gh", bytes.NewReader(body))
 		req.Header.Set("X-Hub-Signature-256", bad)
+		req.Header.Set("X-GitHub-Delivery", fmt.Sprintf("d-4-%d", i))
 		resp, err = http.DefaultClient.Do(req)
 		if err != nil {
 			t.Fatalf("webhook request failed: %v", err)
@@ -478,6 +497,7 @@ steps:
 	// 5. Signed delivery actually executes the workflow with the body as input.
 	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/webhook/gh", bytes.NewReader([]byte("signed-run")))
 	req.Header.Set("X-Hub-Signature-256", signBody(t, []byte("signed-run"), "gh-webhook-secret"))
+	req.Header.Set("X-GitHub-Delivery", "d-5")
 	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("webhook request failed: %v", err)
@@ -493,6 +513,160 @@ steps:
 	}
 	if task.Output != "signed-run " {
 		t.Errorf("expected body to flow into {{var.input}}, got output %q", task.Output)
+	}
+}
+
+// TestWebhookServer_TimestampedSignatureReplayProtection covers the
+// freshness scheme for aflare's own trigger chain: the MAC must cover
+// "<timestamp>.<body>" and the timestamp must be within ±5min of server
+// time. A captured request therefore becomes worthless once the window
+// closes — the core replay fix.
+func TestWebhookServer_TimestampedSignatureReplayProtection(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	srv.secret = "ts-secret"
+
+	createWorkflowFile(t, tmpDir, "ts", `name: ts-workflow
+steps:
+  - node: echo
+`)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	body := []byte(`{"event":"deploy"}`)
+
+	post := func(sig, tsHeader string) int {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/webhook/ts", bytes.NewReader(body))
+		req.Header.Set("X-Hub-Signature-256", sig)
+		if tsHeader != "" {
+			req.Header.Set("X-Timestamp", tsHeader)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("webhook request failed: %v", err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	// 1. Fresh timestamp + correctly bound MAC → accepted.
+	now := time.Now().Unix()
+	sig, tsHdr := signTimestamped(t, body, "ts-secret", now)
+	if code := post(sig, tsHdr); code != http.StatusAccepted {
+		t.Errorf("fresh timestamped signature: expected 202, got %d", code)
+	}
+
+	// 2. Timestamp 10 minutes in the past (outside the window) → 401,
+	// even though the MAC itself is perfectly valid: this is the replay
+	// of a captured request.
+	sig, tsHdr = signTimestamped(t, body, "ts-secret", now-600)
+	if code := post(sig, tsHdr); code != http.StatusUnauthorized {
+		t.Errorf("expired timestamp: expected 401, got %d", code)
+	}
+
+	// 3. Timestamp 10 minutes in the future (clock-skew abuse) → 401.
+	sig, tsHdr = signTimestamped(t, body, "ts-secret", now+600)
+	if code := post(sig, tsHdr); code != http.StatusUnauthorized {
+		t.Errorf("future timestamp: expected 401, got %d", code)
+	}
+
+	// 4. Timestamp inside the window but MAC covers only the body (a
+	// caller that ignored the binding) → 401.
+	if code := post(signBody(t, body, "ts-secret"), strconv.FormatInt(now, 10)); code != http.StatusUnauthorized {
+		t.Errorf("body-only MAC with X-Timestamp: expected 401, got %d", code)
+	}
+
+	// 5. Fresh MAC over a DIFFERENT timestamp (timestamp swapped on a
+	// captured signature) → 401: the binding cuts both ways.
+	sig, _ = signTimestamped(t, body, "ts-secret", now)
+	if code := post(sig, strconv.FormatInt(now-30, 10)); code != http.StatusUnauthorized {
+		t.Errorf("swapped timestamp: expected 401, got %d", code)
+	}
+
+	// 6. Edge of the window (±4min59s) is still inside → accepted.
+	sig, tsHdr = signTimestamped(t, body, "ts-secret", now-int64(4*time.Minute/time.Second)-59)
+	if code := post(sig, tsHdr); code != http.StatusAccepted {
+		t.Errorf("edge-of-window timestamp: expected 202, got %d", code)
+	}
+}
+
+// TestWebhookServer_BodyOnlySignatureRejected pins the closed hole: a
+// signature with neither X-Timestamp nor a platform delivery header used to
+// be accepted and was replayable forever. It must now be rejected.
+func TestWebhookServer_BodyOnlySignatureRejected(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	srv.secret = "ts-secret"
+
+	createWorkflowFile(t, tmpDir, "ts", `name: ts-workflow
+steps:
+  - node: echo
+`)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	body := []byte("capture-me")
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/webhook/ts", bytes.NewReader(body))
+	req.Header.Set("X-Hub-Signature-256", signBody(t, body, "ts-secret"))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("webhook request failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("unbound body-only signature: expected 401, got %d", resp.StatusCode)
+	}
+}
+
+// TestWebhookServer_GitHubDeliveryReplayRejected covers the platform path:
+// a verbatim replay of an already-seen delivery ID is rejected, while a
+// genuinely new delivery (new ID, same body — GitHub redelivers) is
+// accepted.
+func TestWebhookServer_GitHubDeliveryReplayRejected(t *testing.T) {
+	srv, tmpDir, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	srv.secret = "gh-webhook-secret"
+
+	createWorkflowFile(t, tmpDir, "gh", `name: gh-workflow
+steps:
+  - node: echo
+`)
+
+	ts := httptest.NewServer(srv.handler())
+	defer ts.Close()
+
+	body := []byte(`{"action":"opened"}`)
+	post := func(deliveryID string) int {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+"/webhook/gh", bytes.NewReader(body))
+		req.Header.Set("X-Hub-Signature-256", signBody(t, body, "gh-webhook-secret"))
+		req.Header.Set("X-GitHub-Delivery", deliveryID)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("webhook request failed: %v", err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	// First sighting → accepted.
+	if code := post("delivery-aaa"); code != http.StatusAccepted {
+		t.Errorf("first delivery: expected 202, got %d", code)
+	}
+	// Verbatim replay (same delivery ID) → rejected.
+	if code := post("delivery-aaa"); code != http.StatusUnauthorized {
+		t.Errorf("replayed delivery: expected 401, got %d", code)
+	}
+	// A redelivery with a new ID (how the platform actually redelivers)
+	// is a new event → accepted.
+	if code := post("delivery-bbb"); code != http.StatusAccepted {
+		t.Errorf("new delivery ID: expected 202, got %d", code)
 	}
 }
 

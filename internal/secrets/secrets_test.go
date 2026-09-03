@@ -22,6 +22,17 @@ import (
 	"testing"
 )
 
+// TestMain dials the Argon2id work parameters down to a token 1 MiB so the
+// package's many save/load round-trips stay fast under -race. The KDF's
+// functional behavior (key derivation, header negotiation, migration) is
+// parameter-independent; production parameters are exercised implicitly by
+// every real save.
+func TestMain(m *testing.M) {
+	argon2Memory = 1024 // KiB
+	argon2Threads = 1
+	os.Exit(m.Run())
+}
+
 func TestNewSecretManager(t *testing.T) {
 	sm, err := NewSecretManager("test-password")
 	if err != nil {

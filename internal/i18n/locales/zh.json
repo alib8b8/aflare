@@ -226,6 +226,8 @@
   "doctor.crypto.secrets_sm4_desc": "secrets 存储为 SM4-GCM，旧版本二进制无法读取",
   "doctor.crypto.secrets_sm4_hint": "如需回滚到旧版本可读：\n  1. export AFLARE_SECRETS_CIPHER=aes-gcm\n  2. 任意触发一次保存（如 aflare secrets set 同名值）即可重写为传统格式",
   "doctor.crypto.secrets_unknown": "  ? secrets 存储使用未知算法 %q",
+  "doctor.crypto.secrets_kdf_argon2": "  ✓ secrets KDF：Argon2id（内存硬化）",
+  "doctor.crypto.secrets_kdf_pbkdf2": "  ⚠ secrets KDF：PBKDF2-SHA256 —— 下次保存将自动升级为 Argon2id",
   "doctor.crypto.warn_hmac_sm3": "  ⚠ AFLARE_AUDIT_HMAC_ALGO=sm3 已设置：新审计记录将以 SM3 签名（先升级全部二进制再启用）",
   "doctor.crypto.warn_cipher_sm4": "  ⚠ AFLARE_SECRETS_CIPHER=sm4-gcm 已设置：下次保存将重加密为 SM4-GCM（旧版本二进制无法读取）",
   "doctor.llm.not_configured": "  ⊘ LLM 未配置（运行 aflare init 配置 LLM）",

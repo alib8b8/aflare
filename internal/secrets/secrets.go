@@ -35,9 +35,11 @@ import (
 
 	"github.com/emmansun/gmsm/sm4"
 	"github.com/zalando/go-keyring"
+	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/term"
 
+	"github.com/alib8b8/aflare/internal/fsutil"
 	"github.com/alib8b8/aflare/internal/logger"
 )
 
@@ -48,18 +50,37 @@ const (
 	CipherSM4GCM = "sm4-gcm"
 )
 
-// On-disk format. Versioned files start with an 8-byte header
-// (magic "AFLSEC" + version byte + cipher ID byte) followed by the 16-byte
-// PBKDF2 salt and the AEAD ciphertext (nonce || ciphertext+tag). Legacy files
-// written before the header existed start directly with the salt and are
-// always decrypted as AES-256-GCM.
+// Key-derivation function names for the at-rest encryption of the secrets
+// store. New writes default to Argon2id (memory-hard: GPU cracking costs an
+// order of magnitude more than PBKDF2). PBKDF2 stays selectable so shared
+// fleets can pin the legacy KDF — and with aes-gcm, the byte-compatible
+// headerless format — via AFLARE_SECRETS_KDF=pbkdf2.
+const (
+	KDFArgon2id = "argon2id"
+	KDFPBKDF2   = "pbkdf2"
+)
+
+// On-disk format. Versioned files start with a header
+// (magic "AFLSEC" + version byte + cipher ID byte [+ KDF ID byte for v2])
+// followed by the 16-byte KDF salt and the AEAD ciphertext
+// (nonce || ciphertext+tag). Legacy files written before the header existed
+// start directly with the salt and are always decrypted as
+// AES-256-GCM + PBKDF2.
+//
+//	v1 (8 bytes): magic + 0x01 + cipherID          — PBKDF2 implied
+//	v2 (9 bytes): magic + 0x02 + cipherID + kdfID  — KDF from header
 const (
 	secretsEnvCipher = "AFLARE_SECRETS_CIPHER"
+	secretsEnvKDF    = "AFLARE_SECRETS_KDF"
 	secretsMagic     = "AFLSEC"
-	secretsVersion   = 0x01
-	secretsHdrSize   = 8
+	secretsVersion1  = 0x01
+	secretsVersion2  = 0x02
+	secretsHdrSizeV1 = 8
+	secretsHdrSizeV2 = 9
 	cipherIDAESGCM   = 0x01
 	cipherIDSM4GCM   = 0x02
+	kdfIDPBKDF2      = 0x01
+	kdfIDArgon2id    = 0x02
 )
 
 const (
@@ -69,11 +90,25 @@ const (
 	pbkdf2SaltSize   = 16
 )
 
+// Argon2id work parameters: the OWASP-recommended interactive profile
+// (64 MiB, 1 pass, 2 lanes) — ~50ms on a laptop, prohibitive on a GPU rig.
+// Package-level variables so tests can dial them down; production code
+// must not modify them.
+var (
+	argon2Time    = 1
+	argon2Memory  = 64 * 1024 // KiB
+	argon2Threads = 2
+)
+
 var defaultSecretsPath string
 
 // sm4CompatWarnOnce rate-limits the pre-0.9.0 incompatibility warning to
 // one line per process, no matter how often the store is saved.
 var sm4CompatWarnOnce sync.Once
+
+// kdfUpgradeWarnOnce rate-limits the pbkdf2→argon2id upgrade notice to one
+// line per process, mirroring sm4CompatWarnOnce.
+var kdfUpgradeWarnOnce sync.Once
 
 func init() {
 	if home, err := os.UserHomeDir(); err == nil {
@@ -96,9 +131,9 @@ type SecretGroup struct {
 }
 
 // SecretManager keeps the in-memory secret groups plus the crypto material
-// needed to persist them. The master password and cipher name are retained so
-// SaveToFile can re-derive a key when the configured cipher differs from the
-// one the store was loaded with.
+// needed to persist them. The master password, cipher name, and KDF name are
+// retained so SaveToFile can re-derive a key when the configured cipher or
+// KDF differs from the ones the store was loaded with.
 type SecretManager struct {
 	mu             sync.RWMutex
 	groups         map[string]*SecretGroup
@@ -106,6 +141,7 @@ type SecretManager struct {
 	salt           []byte
 	masterPassword string
 	cipherName     string
+	kdfName        string
 }
 
 // cipherKeySize returns the PBKDF2 output length required by the cipher:
@@ -142,6 +178,39 @@ func configuredCipher() (string, error) {
 	return resolveSecretsCipher(os.Getenv(secretsEnvCipher))
 }
 
+// resolveSecretsKDF maps an AFLARE_SECRETS_KDF value to a KDF name. Empty
+// and "argon2id" map to argon2id (the memory-hard default); "pbkdf2" pins
+// the legacy KDF. Unknown values are rejected so a typo cannot silently
+// downgrade the store's key derivation.
+func resolveSecretsKDF(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", KDFArgon2id:
+		return KDFArgon2id, nil
+	case KDFPBKDF2:
+		return KDFPBKDF2, nil
+	default:
+		return "", fmt.Errorf("invalid %s value %q (want %q or %q)",
+			secretsEnvKDF, value, KDFArgon2id, KDFPBKDF2)
+	}
+}
+
+// configuredKDF returns the KDF selected by AFLARE_SECRETS_KDF.
+func configuredKDF() (string, error) {
+	return resolveSecretsKDF(os.Getenv(secretsEnvKDF))
+}
+
+// kdfNameByID maps an on-disk KDF identifier byte back to a KDF name.
+func kdfNameByID(id byte) (string, error) {
+	switch id {
+	case kdfIDPBKDF2:
+		return KDFPBKDF2, nil
+	case kdfIDArgon2id:
+		return KDFArgon2id, nil
+	default:
+		return "", fmt.Errorf("unknown kdf id %d in secrets file header", id)
+	}
+}
+
 // cipherIDByName returns the on-disk cipher identifier byte for a cipher name.
 func cipherIDByName(cipherName string) (byte, error) {
 	switch cipherName {
@@ -171,38 +240,64 @@ func cipherNameByID(id byte) (string, error) {
 // which is uniformly random and collides with the 6-byte magic with
 // negligible probability.
 func hasSecretsHeader(data []byte) bool {
-	return len(data) >= secretsHdrSize && bytes.Equal(data[:len(secretsMagic)], []byte(secretsMagic))
+	return len(data) >= secretsHdrSizeV1 && bytes.Equal(data[:len(secretsMagic)], []byte(secretsMagic))
 }
 
-// InspectFile reports the at-rest cipher of a secrets store without
-// decrypting it: the header cipher for versioned files, CipherAESGCM for
-// legacy headerless files. A missing file yields ("", false, nil) so
-// callers can distinguish "no store yet" from a real read error.
-func InspectFile(path string) (cipherName string, legacy bool, err error) {
+// InspectFile reports the at-rest cipher and KDF of a secrets store without
+// decrypting it: the header values for versioned files, AES-GCM + PBKDF2
+// for legacy headerless files. A missing file yields ("", "", false, nil)
+// so callers can distinguish "no store yet" from a real read error.
+func InspectFile(path string) (cipherName, kdfName string, legacy bool, err error) {
 	data, err := os.ReadFile(path) // #nosec G304 -- caller-supplied store path
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", false, nil
+			return "", "", false, nil
 		}
-		return "", false, fmt.Errorf("failed to read file: %w", err)
+		return "", "", false, fmt.Errorf("failed to read file: %w", err)
 	}
 	if !hasSecretsHeader(data) {
-		return CipherAESGCM, true, nil
+		return CipherAESGCM, KDFPBKDF2, true, nil
 	}
 	// Validate the version byte exactly like LoadFromFile so doctor never
 	// misdiagnoses a future-format file by reading its bytes out of context.
-	if version := data[len(secretsMagic)]; version != secretsVersion {
-		return "", false, fmt.Errorf("unsupported secrets file version %d", version)
+	version := data[len(secretsMagic)]
+	switch version {
+	case secretsVersion1:
+		name, err := cipherNameByID(data[len(secretsMagic)+1])
+		if err != nil {
+			return "", "", false, err
+		}
+		return name, KDFPBKDF2, false, nil
+	case secretsVersion2:
+		if len(data) < secretsHdrSizeV2 {
+			return "", "", false, fmt.Errorf("secrets file header truncated")
+		}
+		name, err := cipherNameByID(data[len(secretsMagic)+1])
+		if err != nil {
+			return "", "", false, err
+		}
+		kdf, err := kdfNameByID(data[len(secretsMagic)+2])
+		if err != nil {
+			return "", "", false, err
+		}
+		return name, kdf, false, nil
+	default:
+		return "", "", false, fmt.Errorf("unsupported secrets file version %d", version)
 	}
-	name, err := cipherNameByID(data[len(secretsMagic)+1])
-	if err != nil {
-		return "", false, err
-	}
-	return name, false, nil
 }
 
-func deriveKey(masterPassword string, salt []byte, keyLen int) []byte {
-	return pbkdf2.Key([]byte(masterPassword), salt, pbkdf2Iterations, keyLen, sha256.New)
+// deriveKey derives the cipher key from the master password with the
+// selected KDF: Argon2id (memory-hard, default) or PBKDF2-SHA256 (legacy).
+func deriveKey(masterPassword string, salt []byte, keyLen int, kdfName string) ([]byte, error) {
+	switch kdfName {
+	case KDFArgon2id:
+		return argon2.IDKey([]byte(masterPassword), salt,
+			uint32(argon2Time), uint32(argon2Memory), uint8(argon2Threads), uint32(keyLen)), nil
+	case KDFPBKDF2:
+		return pbkdf2.Key([]byte(masterPassword), salt, pbkdf2Iterations, keyLen, sha256.New), nil
+	default:
+		return nil, fmt.Errorf("unsupported secrets kdf: %s", kdfName)
+	}
 }
 
 func generateSalt() ([]byte, error) {
@@ -236,13 +331,17 @@ func newAEAD(cipherName string, key []byte) (cipher.AEAD, error) {
 	return aead, nil
 }
 
-func newSecretManagerWithSalt(masterPassword string, salt []byte, cipherName string) (*SecretManager, error) {
+func newSecretManagerWithSalt(masterPassword string, salt []byte, cipherName, kdfName string) (*SecretManager, error) {
 	keyLen, err := cipherKeySize(cipherName)
 	if err != nil {
 		return nil, err
 	}
 
-	aead, err := newAEAD(cipherName, deriveKey(masterPassword, salt, keyLen))
+	key, err := deriveKey(masterPassword, salt, keyLen, kdfName)
+	if err != nil {
+		return nil, err
+	}
+	aead, err := newAEAD(cipherName, key)
 	if err != nil {
 		return nil, err
 	}
@@ -253,13 +352,19 @@ func newSecretManagerWithSalt(masterPassword string, salt []byte, cipherName str
 		salt:           salt,
 		masterPassword: masterPassword,
 		cipherName:     cipherName,
+		kdfName:        kdfName,
 	}, nil
 }
 
-// NewSecretManager creates a fresh secret manager. The at-rest cipher follows
-// the AFLARE_SECRETS_CIPHER selection (aes-gcm by default).
+// NewSecretManager creates a fresh secret manager. The at-rest cipher and
+// KDF follow the AFLARE_SECRETS_CIPHER / AFLARE_SECRETS_KDF selections
+// (aes-gcm + argon2id by default).
 func NewSecretManager(masterPassword string) (*SecretManager, error) {
 	cipherName, err := configuredCipher()
+	if err != nil {
+		return nil, err
+	}
+	kdfName, err := configuredKDF()
 	if err != nil {
 		return nil, err
 	}
@@ -267,12 +372,13 @@ func NewSecretManager(masterPassword string) (*SecretManager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate salt: %w", err)
 	}
-	return newSecretManagerWithSalt(masterPassword, salt, cipherName)
+	return newSecretManagerWithSalt(masterPassword, salt, cipherName, kdfName)
 }
 
-// LoadFromFile loads the encrypted secrets store. The decryption cipher is
-// determined by the file header; files without a header (legacy format) are
-// decrypted as AES-256-GCM regardless of the current cipher configuration.
+// LoadFromFile loads the encrypted secrets store. The decryption cipher and
+// KDF are determined by the file header (v2), the file header with PBKDF2
+// implied (v1), or AES-256-GCM + PBKDF2 for legacy headerless files —
+// regardless of the current cipher/KDF configuration.
 func LoadFromFile(path, masterPassword string) (*SecretManager, error) {
 	data, err := os.ReadFile(path) // #nosec G304 -- internally generated secrets path
 	if err != nil {
@@ -283,16 +389,33 @@ func LoadFromFile(path, masterPassword string) (*SecretManager, error) {
 	}
 
 	cipherName := CipherAESGCM
+	kdfName := KDFPBKDF2
 	payload := data
 	if hasSecretsHeader(data) {
-		if version := data[len(secretsMagic)]; version != secretsVersion {
+		version := data[len(secretsMagic)]
+		switch version {
+		case secretsVersion1:
+			cipherName, err = cipherNameByID(data[len(secretsMagic)+1])
+			if err != nil {
+				return nil, err
+			}
+			payload = data[secretsHdrSizeV1:]
+		case secretsVersion2:
+			if len(data) < secretsHdrSizeV2 {
+				return nil, fmt.Errorf("secrets file header truncated")
+			}
+			cipherName, err = cipherNameByID(data[len(secretsMagic)+1])
+			if err != nil {
+				return nil, err
+			}
+			kdfName, err = kdfNameByID(data[len(secretsMagic)+2])
+			if err != nil {
+				return nil, err
+			}
+			payload = data[secretsHdrSizeV2:]
+		default:
 			return nil, fmt.Errorf("unsupported secrets file version %d", version)
 		}
-		cipherName, err = cipherNameByID(data[len(secretsMagic)+1])
-		if err != nil {
-			return nil, err
-		}
-		payload = data[secretsHdrSize:]
 	}
 
 	if len(payload) < pbkdf2SaltSize {
@@ -302,7 +425,7 @@ func LoadFromFile(path, masterPassword string) (*SecretManager, error) {
 	salt := payload[:pbkdf2SaltSize]
 	ciphertext := payload[pbkdf2SaltSize:]
 
-	sm, err := newSecretManagerWithSalt(masterPassword, salt, cipherName)
+	sm, err := newSecretManagerWithSalt(masterPassword, salt, cipherName, kdfName)
 	if err != nil {
 		return nil, err
 	}
@@ -326,18 +449,18 @@ func LoadFromFile(path, masterPassword string) (*SecretManager, error) {
 	return sm, nil
 }
 
-// SaveToFile persists the store. The cipher used for writing follows the
-// current AFLARE_SECRETS_CIPHER selection, so switching the environment
-// variable re-encrypts the store on the next save (loading, in contrast,
-// always follows the file header).
+// SaveToFile persists the store. The cipher and KDF used for writing follow
+// the current AFLARE_SECRETS_CIPHER / AFLARE_SECRETS_KDF selections, so
+// switching either environment variable re-encrypts the store on the next
+// save (loading, in contrast, always follows the file header).
 //
-// Backward compatibility: with the default aes-gcm selection the file is
-// written in the legacy headerless format, byte-compatible with binaries
-// before 0.9.0. The versioned header is written only for non-default
-// ciphers (sm4-gcm), which old binaries cannot read anyway — so mixed
-// fleets stay compatible until guomi is explicitly opted into. Switching
-// the environment variable back to aes-gcm and saving rewrites the file
-// in the legacy format (a rollback path for shared-home fleets).
+// On-disk format selection:
+//   - argon2id (default KDF): v2 header carrying cipher + KDF. A store
+//     loaded with pbkdf2 is transparently upgraded on its next save.
+//   - pbkdf2 + sm4-gcm: v1 header, byte-identical to pre-Argon2id stores.
+//   - pbkdf2 + aes-gcm: headerless legacy bytes, byte-compatible with
+//     binaries before 0.9.0 — the maximum-compatibility rollback path
+//     (set both env vars to the legacy values and re-save).
 func (sm *SecretManager) SaveToFile(path string) error {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
@@ -346,15 +469,24 @@ func (sm *SecretManager) SaveToFile(path string) error {
 	if err != nil {
 		return err
 	}
+	kdfName, err := configuredKDF()
+	if err != nil {
+		return err
+	}
 
 	aead := sm.aead
-	if cipherName != sm.cipherName {
-		// Re-key for the newly selected cipher, reusing the existing salt.
+	if cipherName != sm.cipherName || kdfName != sm.kdfName {
+		// Re-key for the newly selected cipher/KDF, reusing the existing
+		// salt (the AEAD nonce is fresh per save, so reuse is safe).
 		keyLen, kerr := cipherKeySize(cipherName)
 		if kerr != nil {
 			return kerr
 		}
-		aead, kerr = newAEAD(cipherName, deriveKey(sm.masterPassword, sm.salt, keyLen))
+		key, kerr := deriveKey(sm.masterPassword, sm.salt, keyLen, kdfName)
+		if kerr != nil {
+			return kerr
+		}
+		aead, kerr = newAEAD(cipherName, key)
 		if kerr != nil {
 			return kerr
 		}
@@ -377,50 +509,61 @@ func (sm *SecretManager) SaveToFile(path string) error {
 	}
 	ciphertext := aead.Seal(nonce, nonce, plaintext, nil)
 
-	output := make([]byte, 0, secretsHdrSize+len(sm.salt)+len(ciphertext))
-	if cipherName != CipherAESGCM {
-		// Non-default cipher: tag the file so LoadFromFile (and humans)
-		// can tell which suite encrypted it. The default AES path stays
-		// headerless for pre-0.9.0 byte compatibility.
+	// Header selection (see the function comment for the compatibility
+	// matrix). The default (argon2id) always tags the file so the KDF is
+	// discoverable on load.
+	var header []byte
+	switch {
+	case kdfName == KDFArgon2id:
 		cipherID, cerr := cipherIDByName(cipherName)
 		if cerr != nil {
 			return cerr
 		}
-		output = append(output, secretsMagic...)
-		output = append(output, secretsVersion, cipherID)
+		header = make([]byte, 0, secretsHdrSizeV2)
+		header = append(header, secretsMagic...)
+		header = append(header, secretsVersion2, cipherID, kdfIDArgon2id)
+		if sm.kdfName != KDFArgon2id {
+			kdfUpgradeWarnOnce.Do(func() {
+				logger.Warn("secrets store KDF upgraded to argon2id; older aflare binaries cannot read this file",
+					"rollback", "set "+secretsEnvKDF+"=pbkdf2 and re-save")
+			})
+		}
+	case cipherName != CipherAESGCM:
+		// pbkdf2 + non-default cipher: v1 header, byte-identical to the
+		// pre-Argon2id format for that cipher.
+		cipherID, cerr := cipherIDByName(cipherName)
+		if cerr != nil {
+			return cerr
+		}
+		header = make([]byte, 0, secretsHdrSizeV1)
+		header = append(header, secretsMagic...)
+		header = append(header, secretsVersion1, cipherID)
 		sm4CompatWarnOnce.Do(func() {
 			logger.Warn("secrets store is being written with a non-default cipher; binaries before 0.9.0 cannot read this file",
 				"cipher", cipherName,
 				"rollback", "set "+secretsEnvCipher+"=aes-gcm and re-save")
 		})
+	default:
+		// pbkdf2 + aes-gcm: headerless legacy bytes (pre-0.9.0 compatible).
 	}
+
+	output := make([]byte, 0, len(header)+len(sm.salt)+len(ciphertext))
+	output = append(output, header...)
 	output = append(output, sm.salt...)
 	output = append(output, ciphertext...)
 
-	// Atomic write: write to .tmp first, then rename to final path.
-	// This prevents file corruption on partial writes (e.g. crash mid-write).
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
-	tmpPath := path + ".tmp"
-	// Clear any pre-existing tmp path before writing: in a writable shared
-	// directory an attacker could plant secrets.dat.tmp -> /etc/... and have
-	// the atomic write clobber the target. os.Remove never follows symlinks,
-	// so removing it keeps the write inside the directory we control.
-	if fi, err := os.Lstat(tmpPath); err == nil {
-		if fi.IsDir() {
-			return fmt.Errorf("refusing to write temporary file %s: a directory already exists there", tmpPath)
-		}
-		if err := os.Remove(tmpPath); err != nil {
-			return fmt.Errorf("failed to clear stale temporary file: %w", err)
-		}
-	}
-	if err := os.WriteFile(tmpPath, output, 0600); err != nil {
-		return fmt.Errorf("failed to write temporary file: %w", err)
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		return fmt.Errorf("failed to rename temporary file: %w", err)
+	// Crash-safe atomic write (temp file + fsync + rename, then directory
+	// fsync). The secrets store is the one file a mid-write crash must never
+	// destroy: without the fsync, the rename can hit the disk before the
+	// data does, leaving an empty store — and every API key in it — gone.
+	// os.CreateTemp inside refuses to follow planted symlinks (O_EXCL), so
+	// the old fixed-name tmp dance is not needed either.
+	if err := fsutil.WriteFileAtomic(path, output, 0600); err != nil {
+		return err
 	}
 
 	return nil
