@@ -21,9 +21,26 @@ echo "→ go vet..."
 go vet ./...
 echo "  ✅ go vet"
 
-# 3. Fast unit tests on changed packages
+# 3. Source watermark coverage (CI gate "Check source watermark coverage").
+# Only runs when .go files are staged — a docs-only commit cannot change
+# coverage. Full-repo check (~1s warm) to match CI exactly; a pass here
+# means the push can never red-X on this gate.
+echo "→ watermark check-source..."
+STAGED_GO=$(git diff --cached --name-only --diff-filter=ACMR | grep '\.go$' || true)
+if [ -n "$STAGED_GO" ]; then
+    if ! go run ./cmd/aflare watermark check-source --all; then
+        echo "  ❌ Go files missing a source watermark (see list above)"
+        echo "  Run: go run ./cmd/aflare watermark encode-source --all"
+        exit 1
+    fi
+    echo "  ✅ watermark check-source"
+else
+    echo "  (no Go files staged)"
+fi
+
+# 4. Fast unit tests on changed packages
 echo "→ go test (short)..."
-CHANGED=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' | grep -v '_test\.go$' | xargs -I{} dirname {} | sort -u | sed 's|^|./|')
+CHANGED=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' | grep -v '_test\.go$' | xargs -I{} dirname {} | sort -u | sed 's|^|./|' || true)
 if [ -n "$CHANGED" ]; then
     # Convert dirs to Go packages
     PKGS=$(echo "$CHANGED" | while read d; do
@@ -40,9 +57,9 @@ else
 fi
 echo "  ✅ go test"
 
-# 4. Check for security patterns in staged changes
+# 5. Check for security patterns in staged changes
 echo "→ security scan..."
-STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$')
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || true)
 if [ -n "$STAGED" ]; then
     ISSUES=""
     # Check for path traversal
