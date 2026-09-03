@@ -21,6 +21,20 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          # gitleaks needs the git history to diff pushes against their base
+          fetch-depth: 0
+
+      # Blocking on every push/scheduled run: a leaked credential in a new
+      # commit must fail the scan (the historical logs.zip slip is exactly
+      # the class of mistake this catches before it spreads). Scheduled runs
+      # rescan the full history with updated rules; verified false positives
+      # live in .gitleaksignore. GITLEAKS_VERSION pins the scanner binary.
+      - name: Run gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: '8.30.1'
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -29,7 +43,7 @@ jobs:
 
       - name: Install security tools
         run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
           go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
       - name: Run gosec security scan

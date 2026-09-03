@@ -7,6 +7,14 @@
 - govulncheck v1.7.0 — pinned in mise.toml and in all four workflows that run it
   (ci.yml, pr-review.yml, supply-chain.yml, security-auto-fix.yml); keep them in
   sync when bumping.
+- gosec v2.29.0 — pinned in both workflows that install it (pr-review.yml,
+  security-auto-fix.yml); never `@latest` (same all-tools-pinned rule).
+- Secret scan: gitleaks/gitleaks-action@v3 + gitleaks 8.30.1 (GITLEAKS_VERSION
+  env) runs in pr-review.yml (blocking on PRs) and security-auto-fix.yml (main
+  pushes + daily full-history rescan); verified false positives go into
+  .gitleaksignore (fingerprints, not blanket path rules), never disable the scan.
+- ossf/scorecard-action@v2.4.4 in scorecard.yml — results are published (badge
+  in README); bump alongside other action pins.
 
 ## CI gate — must pass locally before any commit
 Run all of these; all must be green:

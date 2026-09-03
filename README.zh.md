@@ -20,6 +20,9 @@
     <a href="LICENSE-COMMERCIAL.md">
       <img src="https://img.shields.io/badge/License-AGPL%20v3%20%7C%20Commercial-blue.svg?style=flat-square" alt="许可证" />
     </a>
+    <a href="https://securityscorecards.dev/viewer/?uri=github.com/alib8b8/aflare">
+      <img src="https://api.securityscorecards.dev/projects/github.com/alib8b8/aflare/badge.svg" alt="OpenSSF Scorecard" />
+    </a>
   </p>
 </div>
 

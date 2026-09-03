@@ -1,0 +1,53 @@
+# OSSF Scorecard — supply-chain security score for the default branch.
+# Runs on main pushes, on branch-protection changes (Branch-Protection
+# check must re-evaluate), and weekly so the Maintained/Vulnerabilities
+# checks stay fresh. Results are published to securityscorecards.dev,
+# which backs the README badge (publish_results: true).
+name: Scorecard supply-chain security
+
+on:
+  branch_protection_rule:
+  schedule:
+    - cron: '17 2 * * 6'  # weekly on Saturday
+  push:
+    branches: [ main ]
+
+# Declare default permissions as read only.
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed to upload the results to code-scanning dashboard.
+      security-events: write
+      # Needed for GitHub OIDC token if publish_results is true.
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@v2.4.4
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Publish the results for public repositories to enable scorecard
+          # badges — https://github.com/ossf/scorecard-action#publishing-results
+          publish_results: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload to code-scanning
+        uses: github/codeql-action/upload-sarif@v4.37.9
+        with:
+          sarif_file: results.sarif

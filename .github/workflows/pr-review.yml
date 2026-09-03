@@ -63,6 +63,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          # gitleaks needs the git history to diff PR commits against their base
+          fetch-depth: 0
+
+      # Blocking: a leaked credential must red-cross the PR before merge.
+      # GITLEAKS_VERSION pins the scanner binary (all-tools-pinned rule);
+      # verified false positives go into .gitleaksignore, never disable this.
+      - name: Run gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: '8.30.1'
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -73,7 +85,7 @@ jobs:
       # security-auto-fix.yml workflow tracks its findings via issues.
       - name: Run gosec security scan
         run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
           gosec -fmt=text -out=gosec-results.txt ./... || true
         continue-on-error: true
 

@@ -1,0 +1,39 @@
+# gitleaks false-positive fingerprints (test fixtures & docs examples).
+# Suppressed per-finding on purpose: a NEW finding — even in a test
+# file — still fails the scan; extend this file only for verified
+# false positives (the gitleaks PR comment prints the fingerprint).
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:docs/api.md:curl-auth-header:118
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:docs/api.md:curl-auth-header:17
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:docs/api.md:curl-auth-header:27
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:docs/api.md:curl-auth-header:301
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:docs/api.md:curl-auth-header:345
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:docs/api.md:curl-auth-header:45
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:docs/api.md:curl-auth-header:72
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/ai/ai_test.go:generic-api-key:105
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/cli/config_cmd_test.go:generic-api-key:267
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/cli/config_cmd_test.go:generic-api-key:306
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/cli/config_cmd_test.go:generic-api-key:534
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/cli/config_cmd_test.go:generic-api-key:74
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/code_review_test.go:generic-api-key:141
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/code_review_test.go:generic-api-key:240
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/code_review_test.go:generic-api-key:285
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/code_review_test.go:generic-api-key:371
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/code_review_test.go:generic-api-key:396
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/code_review_test.go:generic-api-key:420
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/core/security_test.go:aws-access-token:743
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/core/security_test.go:aws-access-token:748
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/core/security_test.go:aws-access-token:809
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/core/security_test.go:aws-access-token:820
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/core/security_test.go:aws-access-token:832
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/core/security_test.go:generic-api-key:639
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/core/security_test.go:generic-api-key:641
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/core/security_test.go:generic-api-key:644
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/core/security_test.go:generic-api-key:645
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/core/security_test.go:generic-api-key:646
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/nodes_coverage_boost2_test.go:aws-access-token:268
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/nodes/nodes_coverage_boost2_test.go:aws-access-token:272
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/secrets/secrets_test.go:generic-api-key:115
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/secrets/secrets_test.go:generic-api-key:94
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/workflow/executor_llm_trace_redact_test.go:jwt:109
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/workflow/executor_llm_trace_redact_test.go:jwt:61
+6a3b6f9ff0116f9b33ce85dc6ab5d21ab44c2fcc:internal/workflow/executor_llm_trace_redact_test.go:private-key:79
