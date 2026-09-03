@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Agent 编排深化（委派治理三件套：失败策略/熔断/断点续跑 + agent add/probe 注册预检，v0.11 agentx 章节延续）**：supervisor 把活派出去之后的"然后呢"——失败怎么办、卡死怎么办、崩了怎么办、怎么接入新 Agent——四处收口：
+  - **委派失败策略与超时（supervisor 新参数）**：`fail_on`（`none`=失败隔离在结果里、节点不炸（默认）/ `all`=全军覆没才炸 / `any`=一败即炸；非法值直接报错——笔误不许静默放宽严格策略）；`delegation_timeout`（单委派超时，默认 10m、上限 60m）——超时/取消时对 A2A 远端 best-effort `tasks/cancel`（5s 预算），不在远端留孤儿任务空转
+  - **Agent 熔断**：单个 Agent 连续 3 次委派失败即 circuit-open 快失败（不再傻等烧满 delegation_timeout），60s 冷却后半开探活——A2A 走 FetchAgentCard（原生产零调用的死代码就此进入委派主路径），CLI Agent 直接放行一次委派自证；探活成功转 closed、再失败重回 open
+  - **委派级断点续跑**：引擎 checkpoint 只到节点粒度——supervisor 跑 20 个委派、完成 15 个时崩溃，resume 会整节点重跑，15 个已完成的全部重新执行（副作用重复、token 重复烧）。现在每个成功委派按 (agent, subtask) 追加进侧车文件 `<checkpoint>.<step>.delegations.json`（原子写；goal hash 钉住计划——goal 变了旧条目全部失效；损坏文件保留现场后从零开始），resume 恢复已完成委派、只重派未完成的；结果信封新增 `resumed` 字段报告恢复数；无 checkpoint scope 时零 IO、行为与一次性执行完全一致。执行器（seq/DAG）在 statePath 启用时向步骤 ctx 注入 StepCheckpoint（checkpoint 路径 + 步骤名），节点内长任务可据此做子步骤级持久化。已知限制：sidecar 随 statePath 生存，主 checkpoint 删除后 sidecar 文件仍留存（单机本地量级无碍，待后续挂生命周期清理）
+  - **`aflare agent add <url>` 自动注册**：拉取 AgentCard 自动填 AgentDef（name / description / skills 摘进 description 供 supervisor 规划路由），原子写落盘 `~/.aflare/config/agents.yaml`（symlink 防御）；store 条目优先于主配置 `agents:` 段；`api_key_env` 只记环境变量名、密钥永不落盘
+  - **`aflare agent probe [name...]` 预检**：委派前验证 Agent 真的可用——CLI 二进制必须在 PATH 可解析、A2A 端点必须能吐 agent card；任一不可用退出非零，可直接进 CI / 预检脚本当门禁
+  - **委派输出 ANSI 清洗**：headless CLI 代理输出常见的 CSI/OSC 终端转义序列（颜色、光标移动、进度重绘、超链接）在进入下游前剥除——委派结果要喂 JSON 解析 / 文件写入 / 后续 prompt，杂散转义字节会污染这一切
+  - **委派指标**：`aflare_agent_delegations_total{driver,agent,status}`（按驱动/Agent/成败计数）、`aflare_agent_delegation_duration_seconds{driver,agent}`（耗时分布）、`aflare_a2a_polls_total{agent,status}`（A2A tasks/get 固定轮询的成本可视化）——supervisor 委派从黑盒变成可观测
+- **webhook 重放防护（时间戳签名 + delivery 去重）+ secrets 存储加固（Argon2id + 原子写）**：
+  - **重放防护**：HMAC 证明完整性、不证明新鲜度——被截获的 delivery 此前可以永远重放、每次都触发工作流。现在双通道防重放：① `X-Timestamp` 时间戳签名（aflare 自有触发链：curl / n8n / 脚本）——MAC 必须覆盖 `<unix-seconds>.<body>` 且时间戳落在服务器时间 ±5 分钟窗口（容忍时钟漂移）；② 平台 delivery ID 去重（GitHub / Gitea / Forgejo 的签名只覆盖 body、不带时间戳）——`X-GitHub-Delivery` / `X-Gitea-Delivery` / `X-Gogs-Delivery` 在 24h 窗口内去重（8192 条上限的内存缓存），同一 delivery 原样重放直接拒绝
+  - **secrets KDF 升级**：新写入默认 Argon2id（OWASP 交互级参数 t=1 / 64MiB / p=2，GPU 撞库成本比 PBKDF2 高一个数量级）；pbkdf2 旧格式文件读取兼容、下次保存透明升级为 v2 头（+1 字节 KDF ID，升级提示每进程限一次并给出回滚方法）；共享机队可经 `AFLARE_SECRETS_KDF=pbkdf2` 钉住旧 KDF（非默认 cipher 下保持逐字节兼容的 v1 头）；存储文件改走 `fsutil.WriteFileAtomic`（0600）——防崩溃的密码库本身不会再被崩溃写坏
+- **安全门禁与分支保护收口（gitleaks 进 PR/main 门禁 + gosec/Scorecard pin + required checks 治理）**：
+  - **gitleaks 密钥扫描**（8.30.1 pin）：pr-review.yml 对 PR 阻断式扫描、security-auto-fix.yml 在 main push + 每日全历史复扫；误报走 `.gitleaksignore` 指纹（精确到单条，不做路径级豁免），绝不关扫描
+  - **gosec pin v2.29.0**（与 golangci-lint / govulncheck 同款全工具 pin 纪律，永不 `@latest`）
+  - **OpenSSF Scorecard**（scorecard-action@v2.4.4）：结果发布为 README badge；只跑 main push / 分支保护变更 / 周计划——**永不进 required checks**（它在 PR 上根本不跑，设为必需会让每个 PR 永远卡在 "Expected"）
+  - **分支保护收口**：pr-review.yml 聚合门禁（gate）进 required checks，管理员不豁免（no bypass）——被拒的 main 直推一律走分支 + PR
+
 - **Claude 供应商配置对齐 2026-09 API 现状（retired 模型清理 + 牌价表补全）**：Anthropic 已将 Claude 3 / 3.5 全系标 retired（仅 Bedrock / Google Cloud 保留），9 月 1 日发布 Fable 5.1 / Mythos 5.1。仓库三处配置仍钉在 retired 模型上，用户照默认配置调用直接失败：
   - **`anthropic` 节点默认模型**：`claude-3-5-sonnet-latest` → `claude-sonnet-5`（当前主流，$2/$10 per MTok——官方 8 月 10 日宣布 introductory 价转正，原定 9 月 1 日涨到 $3/$15 的涨价已取消）；注释同步补 Fable 5.1 / Mythos 5.1 的 `tool_choice` 注意事项（`any`/`tool` 返回 400，`auto`/`none` 不受影响，应改用 strict tool use 或 structured outputs）
   - **llm_router fallback 模型**：`defaultModelFor("anthropic")` 的 `claude-3-haiku-20240307`（2024 年 3 月的模型）→ `claude-haiku-4-5`（$1/$5，haiku 档位本就是 router 降级路径的正确定位——参照 openai 条目 fallback 用 gpt-4o-mini 的既有模式）
@@ -43,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **源码水印双行累积根治（encode-source 写入前预剥离陈旧水印行）**：新建文件时手抄旧文件头部，会把旧文件的水印行一起抄过来——该行 payload 哈希属于旧文件、对新内容永远无法解码，encode-source 再补一条有效的 → 「有效+无效」双行，每个 PR 都会再添几个（存量 26 个文件）。现 `EncodeSource` 写入新水印前先剥离全部既有水印行（按行判定：`// aflare` 前缀后仅跟零宽字符即为水印行；普通注释如「// aflare never exposes itself...」带可见文本，不受影响），重编码保持幂等——恰好一条新水印行；配套回归测试钉死：陈旧行（完整但属于旧内容 / 截断损毁两种形态）全部剥离、纯注释存活、strip(encode(带陈旧行的 src)) 精确还原干净源码。存量 26 个文件经 strip-source + encode-source 产品路径逐个刷新清理，全仓 483 个 .go 文件零双行、check-source 门禁绿
 - **examples/drone/drone-patrol/workflow.yaml 不可运行语法修复**：三个阶段（arm_and_takeoff / patrol_mission / land_and_disarm）使用了引擎不支持的裸嵌套 `steps:` 分组（无 `node:` 字段的子步骤既不是 parallel/loop/map 等复合类型，也不是可执行步骤）——该 example 自加入起从未通过 `aflare validate`，更不可能 `aflare run`。拍平为受支持的顶层 `depends_on` 链（arm → takeoff → upload_waypoints → start_patrol → … → land → disarm），报告模板引用同步改名（`{{arm_and_takeoff.takeoff.success}}` → `{{takeoff.success}}` 等）。由新加的 examples 全量校验门禁抓出（见 Added「CI 防线三件套」）
 - **身份治理链收口：gmail 提交身份从显示层落到提交层**：#148 提交信息自称「本提交即首个使用 gmail 身份的提交」，但 GitHub API 原始数据显示网页端 squash 合并的作者邮箱全部是 noreply（邮箱隐私设置开启时，服务器端合并一律改写为 noreply）——gmail 此前只活在 .mailmap 显示层与提交信息文本里。修正三处：① PROVENANCE.md §2 身份表 gmail 行口径改为「本地推送提交使用」（网页 squash 合并仍记录 noreply 原始邮箱，经 .mailmap 归一显示）；② 签署须知补关键一条——签署 PROVENANCE 的提交必须本地完成并直推（`git config user.email sjxj19921205@gmail.com` → 本地 commit → push，别走网页合并），否则「提交即签署」验不回 gmail；③ §6 签署节补验证方法（验 raw email 而非 mailmap 显示层）。合并规范同步确立：需保留 gmail 作者身份的提交，本地合并后 push，替代网页端 Merge 按钮
 - **Auto-merge Dependabot 工作流修复**：旧流程三个缺陷叠加，导致每个 dependabot PR 的 auto-merge 检查必然失败（4 个 PR 积压于此）——① `pull_request` 触发即跑，不等 CI；② `gh pr merge --auto` 依赖仓库未启用的 "Allow auto-merge" 设置，GraphQL 直接拒绝；③ `GITHUB_TOKEN` 提交的批准永不计入分支保护的 required review，等了也白等。新流程：未配置 `DEPENDABOT_MERGE_TOKEN` secret 时优雅跳过（::notice 提示手动处理，不再红叉）；配置后（fine-grained PAT，仅本仓库，contents:write + pull-requests:write）全自动——`gh pr checks --watch` 等 CI 全绿 → PAT 批准（计入 required review）→ squash 合并；semver-major 升级永不自动合并，留人工评审

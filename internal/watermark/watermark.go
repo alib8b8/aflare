@@ -789,10 +789,17 @@ const (
 // The watermark is invisible to human readers (zero-width characters are not
 // rendered) but can be detected by DecodeSource. It survives copy-paste and
 // partial file truncation because the payload is sharded redundantly.
+//
+// Any watermark lines already present in src are stripped first: a
+// hand-copied file header drags the source file's watermark along, and the
+// stale copy (its payload hash belongs to the old file) would otherwise sit
+// next to the fresh watermark as a permanently undecodable duplicate.
 func EncodeSource(src string) string {
 	if src == "" {
 		return src
 	}
+
+	src = stripAllSourceWatermarkLines(src)
 
 	// Build the watermark payload from the source content.
 	payload := buildPayload(src, ResolveDeployID())
@@ -916,4 +923,48 @@ func StripSourceWatermark(src string) string {
 	}
 
 	return src[:lineStart] + src[lineEnd:]
+}
+
+// isSourceWatermarkLine reports whether line is a source-watermark comment:
+// the zwPrefix immediately followed by nothing but zero-width watermark
+// characters (plus optional trailing ASCII whitespace). Plain comments that
+// merely begin with the prefix — e.g. "// aflare never exposes itself..." —
+// carry visible text and must survive stripping.
+func isSourceWatermarkLine(line string) bool {
+	if !strings.HasPrefix(line, zwPrefix) {
+		return false
+	}
+	rest := strings.TrimRight(line[len(zwPrefix):], " \t\r")
+	if rest == "" {
+		return false
+	}
+	for _, r := range rest {
+		switch r {
+		case zwBit0, zwBit1, zwStart, zwEnd, zwEndLegacy:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// stripAllSourceWatermarkLines removes every source-watermark line from src.
+//
+// Unlike StripSourceWatermark — which removes the first structurally intact
+// watermark and backs the strip-source command — this variant is line-based
+// and also removes stale lines whose zero-width payload was mangled by a
+// copy-paste (missing shard markers, corrupted bits). A hand-copied file
+// header drags the source file's watermark along; those leftovers never
+// decode again and would otherwise accumulate one per copy cycle next to
+// every freshly embedded watermark.
+func stripAllSourceWatermarkLines(src string) string {
+	lines := strings.Split(src, "\n")
+	kept := lines[:0]
+	for _, line := range lines {
+		if isSourceWatermarkLine(line) {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
 }

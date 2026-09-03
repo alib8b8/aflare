@@ -600,11 +600,66 @@ func TestSourceWatermark_TamperResistant(t *testing.T) {
 }
 
 func TestSourceWatermark_Idempotent(t *testing.T) {
-	// Encoding twice should not stack watermarks.
+	// Encoding an already-encoded file refreshes the watermark in place:
+	// the previous line is stripped, exactly one fresh line remains.
 	once := EncodeSource(sampleGoSource)
 	twice := EncodeSource(once)
-	// The second encode should not add another watermark line.
-	if strings.Count(twice, zwPrefix) > strings.Count(once, zwPrefix)+1 {
-		t.Error("double encoding should not stack watermarks")
+	if n := strings.Count(twice, zwPrefix); n != 1 {
+		t.Errorf("double encoding must leave exactly one watermark line, got %d", n)
+	}
+	if !HasSourceWatermark(twice) {
+		t.Error("re-encoded source should still carry a valid watermark")
+	}
+}
+
+func TestEncodeSource_StripsStaleWatermarkLines(t *testing.T) {
+	// A header hand-copied from an older watermarked file drags that file's
+	// watermark line along. The stale copy never decodes against the new
+	// content, yet before the strip fix it survived next to the freshly
+	// embedded watermark — accumulating one more dead line per copy cycle.
+	other := EncodeSource(sampleGoSource + "\n// extra content changes the hash\n")
+	var stale string
+	for _, line := range strings.Split(other, "\n") {
+		if strings.HasPrefix(line, zwPrefix) {
+			stale = line
+			break
+		}
+	}
+	if stale == "" {
+		t.Fatal("fixture setup: no watermark line found in encoded sample")
+	}
+	// Truncated copy: shard markers lost, only zw bits remain — the shape
+	// found in real double-watermarked files.
+	broken := zwPrefix + string(zwBit0) + string(zwBit1) + string(zwBit0)
+
+	copied := strings.Replace(sampleGoSource, "//\n// This program",
+		"//\n"+stale+"\n"+broken+"\n// This program", 1)
+
+	encoded := EncodeSource(copied)
+	if n := strings.Count(encoded, zwPrefix); n != 1 {
+		t.Fatalf("EncodeSource must leave exactly one watermark line, got %d", n)
+	}
+	if _, ok := DecodeSource(encoded); !ok {
+		t.Error("the single remaining watermark should decode")
+	}
+	if strings.Contains(encoded, broken) {
+		t.Error("the truncated stale watermark line should be stripped")
+	}
+	// Stripping the fresh watermark must restore the clean source: no blank
+	// line residue, no stale bytes.
+	if cleaned := StripSourceWatermark(encoded); cleaned != sampleGoSource {
+		t.Errorf("strip(encode(copied)) should equal the clean source\n got: %q\nwant: %q", cleaned, sampleGoSource)
+	}
+}
+
+func TestStripAllSourceWatermarkLines_PreservesPlainComments(t *testing.T) {
+	// Comments that merely begin with the prefix carry visible text and
+	// must never be stripped.
+	src := "// aflare never exposes itself as the subordinate side.\n" +
+		zwPrefix + string(zwStart) + string(zwBit0) + string(zwEnd) + "\n" +
+		"package main\n"
+	want := "// aflare never exposes itself as the subordinate side.\npackage main\n"
+	if got := stripAllSourceWatermarkLines(src); got != want {
+		t.Errorf("plain // aflare comments must survive stripping\n got: %q\nwant: %q", got, want)
 	}
 }
