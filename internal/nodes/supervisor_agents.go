@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alib8b8/aflare/internal/agentx"
 )
@@ -97,22 +98,45 @@ func clampParallelism(n int) int {
 	return n
 }
 
+// delegationOpts is the supervisor's delegation policy.
+type delegationOpts struct {
+	// maxParallel caps concurrent delegations (backpressure).
+	maxParallel int
+
+	// failOn decides when failed delegations fail the whole node:
+	// "none" (default — failures stay isolated in the results), "all"
+	// (fail only when every delegation failed) or "any" (fail on the
+	// first failure).
+	failOn string
+
+	// timeout is the per-delegation timeout; 0 means the agentx
+	// default (10m, clamped to 60m).
+	timeout time.Duration
+}
+
 // delegateToAgents runs the real-delegation loop: LLM planning (when an
 // LLM is available), parallel supervised execution, LLM synthesis (when
 // available). When no LLM is configured the input is fanned out to every
 // listed agent and the raw outputs are merged — command and supervision
-// still work without a planner. At most maxParallel delegations run at
-// once (backpressure: excess jobs queue instead of spiking the host).
-func delegateToAgents(ctx context.Context, refs []agentRef, goal string, llm llmCaller, maxParallel int) (string, error) {
+// still work without a planner. The envelope carries an "ok" aggregate so
+// downstream steps can branch on overall success without parsing each
+// result; fail_on can additionally turn failed delegations into a node
+// error.
+func delegateToAgents(ctx context.Context, refs []agentRef, goal string, llm llmCaller, opts delegationOpts) (string, error) {
 	plan, planned := planDelegations(ctx, refs, goal, llm)
 
-	results := runDelegations(ctx, refs, goal, plan, maxParallel)
+	results := runDelegations(ctx, refs, goal, plan, opts)
+
+	if err := delegationFailure(opts.failOn, results); err != nil {
+		return "", err
+	}
 
 	synthesis := synthesizeResults(ctx, goal, results, llm)
 
 	out := map[string]any{
 		"mode":    "agent-delegation",
 		"planned": planned,
+		"ok":      allDelegationsOK(results),
 		"results": results,
 	}
 	if synthesis != "" {
@@ -123,6 +147,51 @@ func delegateToAgents(ctx context.Context, refs []agentRef, goal string, llm llm
 		return "", fmt.Errorf("marshal delegation output: %w", err)
 	}
 	return string(data), nil
+}
+
+// allDelegationsOK reports whether every delegation succeeded.
+func allDelegationsOK(results []agentResult) bool {
+	for _, res := range results {
+		if !res.OK {
+			return false
+		}
+	}
+	return true
+}
+
+// anyDelegationOK reports whether at least one delegation succeeded.
+func anyDelegationOK(results []agentResult) bool {
+	for _, res := range results {
+		if res.OK {
+			return true
+		}
+	}
+	return false
+}
+
+// delegationFailure applies the fail_on policy: "any" fails on the first
+// failed delegation, "all" only when every delegation failed, "none"
+// (default) never fails the node — per-agent failures stay isolated in
+// the results envelope.
+func delegationFailure(failOn string, results []agentResult) error {
+	switch failOn {
+	case "any":
+		for _, res := range results {
+			if !res.OK {
+				return fmt.Errorf("supervisor delegation failed: agent %s: %s", res.Agent, res.Error)
+			}
+		}
+	case "all":
+		if len(results) > 0 && !anyDelegationOK(results) {
+			var sb strings.Builder
+			fmt.Fprintf(&sb, "all %d supervisor delegations failed", len(results))
+			for _, res := range results {
+				fmt.Fprintf(&sb, "\n- %s: %s", res.Agent, res.Error)
+			}
+			return fmt.Errorf("%s", sb.String())
+		}
+	}
+	return nil
 }
 
 // llmCaller abstracts runAgentLLM so tests can inject a fake planner.
@@ -177,12 +246,12 @@ func parseDelegationPlan(resp string, refs []agentRef) ([]delegation, error) {
 }
 
 // runDelegations executes the plan in parallel with per-delegation
-// supervision, bounded to maxParallel concurrent delegations (excess
+// supervision, bounded to opts.maxParallel concurrent delegations (excess
 // jobs queue on the semaphore — backpressure instead of fork bombs).
 // Unplanned agents are skipped when a plan exists; without a plan every
 // agent receives the full goal. Each result records success/failure so
 // one failing agent cannot sink the batch.
-func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []delegation, maxParallel int) []agentResult {
+func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []delegation, opts delegationOpts) []agentResult {
 	byName := make(map[string]agentx.AgentDef, len(refs))
 	for _, ref := range refs {
 		byName[ref.Name] = ref.Def
@@ -197,6 +266,7 @@ func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []de
 		}
 	}
 
+	maxParallel := opts.maxParallel
 	if maxParallel <= 0 {
 		maxParallel = defaultDelegationParallelism
 	}
@@ -222,8 +292,9 @@ func runDelegations(ctx context.Context, refs []agentRef, goal string, plan []de
 			def := byName[job.Agent]
 			def.Name = job.Agent
 			task := agentx.Task{
-				Prompt: job.Subtask,
-				Audit:  auditLog,
+				Prompt:  job.Subtask,
+				Timeout: opts.timeout,
+				Audit:   auditLog,
 			}
 			var out string
 			var err error

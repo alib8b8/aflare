@@ -95,6 +95,12 @@ const (
 	NodeFailuresName = "aflare_node_failures_total" // {node_name, error_class}
 	RunsActiveName   = "aflare_runs_active"         // gauge
 	QueueDepthName   = "aflare_queue_depth"         // gauge
+
+	// Supervisor delegation observability: every command handed to an
+	// external agent (CLI subprocess or A2A task), by driver and agent
+	// name — the supervisor counterpart of node_executions_total.
+	AgentDelegationsName        = "aflare_agent_delegations_total"           // {driver, agent, status}
+	AgentDelegationDurationName = "aflare_agent_delegation_duration_seconds" // {driver, agent}
 )
 
 var (
@@ -258,6 +264,18 @@ var (
 		Help: "Number of tasks pending in the daemon task queue (not yet picked up by a worker).",
 	})
 
+	// Supervisor delegations to external agents (CLI + A2A channels).
+	agentDelegations = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: AgentDelegationsName,
+		Help: "Total delegations to external agents, by driver (cli|a2a), agent name and status (success/error).",
+	}, []string{"driver", "agent", "status"})
+
+	agentDelegationDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    AgentDelegationDurationName,
+		Help:    "Wall-clock duration of one external-agent delegation, in seconds.",
+		Buckets: prometheus.DefBuckets,
+	}, []string{"driver", "agent"})
+
 	registerOnce sync.Once
 )
 
@@ -294,6 +312,8 @@ func Register() {
 			nodeFailures,
 			runsActive,
 			queueDepth,
+			agentDelegations,
+			agentDelegationDuration,
 		)
 	})
 }
@@ -447,6 +467,19 @@ func RecordAgentToolBatch(count int, duration time.Duration) {
 // conversation compactions (context budget exceeded).
 func IncAgentContextCompactions() {
 	agentContextCompactions.Inc()
+}
+
+// RecordAgentDelegation records one external-agent delegation (CLI
+// subprocess or A2A task): increments the counter by driver/agent/status
+// and observes the wall-clock duration. Recorded centrally inside the
+// agentx drivers so every call site (nodes, supervisor, CLI) reports.
+func RecordAgentDelegation(driver, agent string, duration time.Duration, err error) {
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+	agentDelegations.WithLabelValues(driver, agent, status).Inc()
+	agentDelegationDuration.WithLabelValues(driver, agent).Observe(duration.Seconds())
 }
 
 // --- Snapshot collection -------------------------------------------------

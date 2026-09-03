@@ -454,3 +454,48 @@ func TestA2AErrorClassification(t *testing.T) {
 		t.Error("HTTP 404 classified as retryable, want permanent")
 	}
 }
+
+// TestSendMessage_TimeoutCancelsRemoteTask pins the failure-isolation
+// contract for abandoned tasks: when the delegation deadline hits while
+// the remote task is still working, aflare must stop waiting AND fire a
+// best-effort tasks/cancel so the remote agent does not keep running.
+func TestSendMessage_TimeoutCancelsRemoteTask(t *testing.T) {
+	var canceled atomic.Value
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Method string         `json:"method"`
+			Params map[string]any `json:"params"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		result := map[string]any{}
+		switch req.Method {
+		case "message/send":
+			result = map[string]any{"id": "t-timeout", "status": map[string]any{"state": "working"}}
+		case "tasks/get":
+			result = map[string]any{"id": "t-timeout", "status": map[string]any{"state": "working"}}
+		case "tasks/cancel":
+			canceled.Store(req.Params["id"])
+			result = map[string]any{"id": "t-timeout", "status": map[string]any{"state": "canceled"}}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": 1, "result": result})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	def := AgentDef{Name: "slowpoke", Driver: DriverA2A, URL: srv.URL + "/"}
+	_, err := SendMessage(context.Background(), def, Task{
+		Prompt:  "long task",
+		Timeout: 50 * time.Millisecond,
+	})
+	if err == nil || !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("err = %v, want timeout error", err)
+	}
+	if !strings.Contains(err.Error(), "remote task canceled") {
+		t.Errorf("error = %v, want cancel confirmation note", err)
+	}
+	if got, _ := canceled.Load().(string); got != "t-timeout" {
+		t.Errorf("tasks/cancel received id = %v, want t-timeout", got)
+	}
+}

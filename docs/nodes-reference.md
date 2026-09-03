@@ -80,7 +80,7 @@
 | [`sql_query`](#sql_query) | Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1)... | 9 |
 | [`stepfun`](#stepfun) | Call StepFun LLM API | 15 |
 | [`structured_output`](#structured_output) | LLM-driven structured output with local JSON Schema validation and self-correction retries | 11 |
-| [`supervisor`](#supervisor) | Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates | 14 |
+| [`supervisor`](#supervisor) | Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates | 16 |
 | [`template_render`](#template_render) | Render Go templates with input data | 2 |
 | [`together`](#together) | Call Together AI LLM API | 15 |
 | [`transform`](#transform) | Transform text using string operations | 1 |
@@ -1933,6 +1933,8 @@ Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain spec
 | `endpoint` | string | No |  | API endpoint URL |
 | `specialists` | string | No | planner,researcher,critic,evaluator | Comma-separated specialists. Persona roles: planner,researcher,critic,code_review,evaluator,reflector,legal_expert,medical_expert,educational_expert,financial_expert,creative_writer,data_analyst. Registered external agents: prefix with @ (e.g. @codex,@claude,@my-a2a-agent) for real delegation |
 | `max_parallel` | string | No | 4 | Max concurrent external-agent delegations; excess subtasks queue (default: 4, max: 16) |
+| `fail_on` | string | No | none | Overall failure policy for delegated agents: none = never fail the node, failures stay isolated in the results (default); all = fail the node only if every delegation failed; any = fail the node if any delegation failed |
+| `delegation_timeout` | string | No |  | Per-delegation timeout for external agents, e.g. 30s, 10m (default: 10m, max: 60m) |
 | `strategy` | string | No | sequential | Strategy: sequential, parallel, hierarchical, mindsearch, moe, agency, swarm (default: sequential) |
 | `output_format` | string | No | json | Output format: json, markdown, summary (default: json) |
 | `domain` | string | No | general | Domain specialization: general,legal,medical,education,finance,creative,tech,business (default: general) |

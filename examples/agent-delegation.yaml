@@ -11,7 +11,8 @@
 #       url: http://127.0.0.1:8080/
 #       api_key_env: MY_AGENT_KEY  # Bearer token 从该环境变量读取，不落盘
 #
-# 注册后可用 `aflare agent list` 查看。
+# 注册后可用 `aflare agent list` 查看；委派前可 `aflare agent probe` 预检
+# （CLI binary 是否在 PATH、A2A agent card 是否可达，任一不可用退出码非 0）。
 #
 # 运行：aflare run examples/agent-delegation.yaml
 name: Agent Delegation
@@ -24,6 +25,9 @@ steps:
     params:
       specialists: "@codex,@research"
       max_parallel: "2"          # 并发委派上限（默认 4，上限 16）
+      delegation_timeout: 10m    # 单次委派超时（默认 10m，上限 60m）
+      fail_on: none              # 失败语义：none=失败隔离在结果里（默认）/
+                                # all=全灭才失败 / any=任一失败即失败
       output_format: markdown     # 直接返回综合结果文本
 
   # 方式二：cli_agent 单步委派 —— 精确控制一次外部 Agent 调用

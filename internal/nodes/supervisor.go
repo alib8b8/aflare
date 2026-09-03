@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type SupervisorNode struct{}
@@ -47,6 +48,8 @@ func (n *SupervisorNode) Schema() NodeSchema {
 	params = append(params,
 		ParamSchema{Name: "specialists", Type: "string", Description: "Comma-separated specialists. Persona roles: planner,researcher,critic,code_review,evaluator,reflector,legal_expert,medical_expert,educational_expert,financial_expert,creative_writer,data_analyst. Registered external agents: prefix with @ (e.g. @codex,@claude,@my-a2a-agent) for real delegation", Required: false, Default: "planner,researcher,critic,evaluator"},
 		ParamSchema{Name: "max_parallel", Type: "string", Description: "Max concurrent external-agent delegations; excess subtasks queue (default: 4, max: 16)", Required: false, Default: "4"},
+		ParamSchema{Name: "fail_on", Type: "string", Description: "Overall failure policy for delegated agents: none = never fail the node, failures stay isolated in the results (default); all = fail the node only if every delegation failed; any = fail the node if any delegation failed", Required: false, Default: "none"},
+		ParamSchema{Name: "delegation_timeout", Type: "string", Description: "Per-delegation timeout for external agents, e.g. 30s, 10m (default: 10m, max: 60m)", Required: false},
 		ParamSchema{Name: "strategy", Type: "string", Description: "Strategy: sequential, parallel, hierarchical, mindsearch, moe, agency, swarm (default: sequential)", Required: false, Default: "sequential"},
 		ParamSchema{Name: "output_format", Type: "string", Description: "Output format: json, markdown, summary (default: json)", Required: false, Default: "json"},
 		ParamSchema{Name: "domain", Type: "string", Description: "Domain specialization: general,legal,medical,education,finance,creative,tech,business (default: general)", Required: false, Default: "general"},
@@ -98,6 +101,27 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 	}
 	maxParallel = clampParallelism(maxParallel)
 
+	// Delegation failure policy: unlike concurrency, a typo here must
+	// not silently loosen a strict policy — invalid values fail the
+	// node instead of degrading to "none".
+	failOn := strings.TrimSpace(getParam(params, "fail_on", "none"))
+	switch failOn {
+	case "none", "all", "any":
+	default:
+		return "", fmt.Errorf("supervisor: invalid fail_on %q (valid: none, all, any)", failOn)
+	}
+
+	// Per-delegation timeout; 0 keeps the agentx default (10m).
+	var delegationTimeout time.Duration
+	if v := strings.TrimSpace(getParam(params, "delegation_timeout", "")); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			return "", fmt.Errorf("supervisor: invalid delegation_timeout %q (e.g. 30s, 10m)", v)
+		}
+		delegationTimeout = d
+	}
+	delegationOpts := delegationOpts{maxParallel: maxParallel, failOn: failOn, timeout: delegationTimeout}
+
 	if collaborationTemplate != "" {
 		if template, ok := collaborationTemplates[collaborationTemplate]; ok {
 			if roleSpecialists, ok := template[templateRole]; ok {
@@ -127,10 +151,13 @@ func (n *SupervisorNode) Execute(ctx context.Context, input string, params map[s
 		if outputFormat != "json" {
 			// Raw text mode: return only the synthesis so callers get a
 			// direct answer, not the supervision envelope.
-			results := runDelegations(ctx, agentRefs, input, nil, maxParallel)
+			results := runDelegations(ctx, agentRefs, input, nil, delegationOpts)
+			if err := delegationFailure(delegationOpts.failOn, results); err != nil {
+				return "", err
+			}
 			return synthesizeResults(ctx, input, results, llm), nil
 		}
-		return delegateToAgents(ctx, agentRefs, input, llm, maxParallel)
+		return delegateToAgents(ctx, agentRefs, input, llm, delegationOpts)
 	}
 	specialistList = personas
 
