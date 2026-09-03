@@ -80,7 +80,7 @@
 | [`sql_query`](#sql_query) | Execute SQL via database/sql. The driver must be registered by the host program. Uses parameterized queries (? or $1)... | 9 |
 | [`stepfun`](#stepfun) | Call StepFun LLM API | 15 |
 | [`structured_output`](#structured_output) | LLM-driven structured output with local JSON Schema validation and self-correction retries | 11 |
-| [`supervisor`](#supervisor) | Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates | 16 |
+| [`supervisor`](#supervisor) | Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates.... | 16 |
 | [`template_render`](#template_render) | Render Go templates with input data | 2 |
 | [`together`](#together) | Call Together AI LLM API | 15 |
 | [`transform`](#transform) | Transform text using string operations | 1 |
@@ -1918,11 +1918,10 @@ LLM-driven structured output with local JSON Schema validation and self-correcti
 
 ## supervisor
 
-Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates
+Advanced supervisor with MoE routing, MindSearch deep research, 232+ domain specialists, and collaboration templates. External-agent delegations are checkpointed at (agent, subtask) granularity when the run uses --resume: a crashed supervisor step restores its finished delegations and re-dispatches only the unfinished ones (reported as `resumed` in the results envelope); without checkpointing the behavior is exactly one-shot
 
 - **Input**: string - the overall goal or task to supervise
 - **Output**: string - structured task plan with delegation and synthesis
-- **Delegation-level resume**: when the workflow runs with checkpointing (`aflare run --resume`), each successful external-agent delegation is recorded in a sidecar file next to the workflow checkpoint. If the process crashes mid-step, resume restores the finished delegations and re-dispatches only the unfinished ones — no duplicate side effects or token burn. The envelope reports the count as `resumed`; without checkpointing the behavior is exactly one-shot.
 
 ### Parameters
 
