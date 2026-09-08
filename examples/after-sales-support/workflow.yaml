@@ -1,0 +1,262 @@
+name: after-sales-support
+description: |
+  售后智能客服示例：把一次零散求助串成完整服务链路 ——
+  情绪识别 → 产品消歧 → 看图识错 → 知识库排障 → 升级判定 → 工单归档。
+
+  设计要点（流程编排与规则约束结合）：
+  - 规则层（condition）：情绪信号、产品信号、歧义判定、升级判定全部是
+    显式正则规则 —— 该安抚、该反问、该升级由流程决定，不是模型即兴。
+  - 检索层（rag）：产品 / 错误码 / 排障手册走关键词+短语混合检索；
+    中文分词限制下，规则层先把用户原话提炼成干净查询词（如"扫地机器人"），
+    再交给 rag —— 这一步是"编排补检索短板"的直接演示。
+  - 多模态（multimodal）：报错照片 OCR；离线（无 tesseract / 无视觉模型）
+    时降级到预提取文本，链路不断。
+  - LLM 应答（agent）：共情话术 + 口语化排障引导；离线时 fallback 降级为
+    规则化应答，检索结果不丢失。接入 ollama 等本地模型即恢复完整体验。
+
+  演示场景（改 vars 重跑即可切换）：
+  - 默认：含糊诉求"S1 Pro 不吸了"（吸奶器 / 扫地机都"吸"）→ 澄清反问 →
+    确认扫地机 → 照片 E-13 主刷过载 → 自助修复 → 闭环。
+  - 升级场景：error_photo 换 error-e99.png、photo_text_fallback 换
+    "E-99 MOTOR BURNOUT" → 主电机烧毁 → 升级人工 + 经销商质保提示。
+
+  运行：aflare run examples/after-sales-support/workflow.yaml
+  断点：中途 Ctrl-C 后 aflare run --resume 可从已完成步骤续跑。
+
+vars:
+  user_name: "王女士"
+  # 场景一：含糊诉求 —— 只说"S1 Pro 不吸了"，两台设备都可能
+  user_message: "我的 S1 Pro 不吸了！明天要开派对，急死了！！"
+  # 消歧反问后的用户回复。交互式部署中此步应替换为 human_in_loop /
+  # WebUI 对话；本示例以 var 模拟，保证离线可跑、结果确定。
+  user_clarified: "扫地机器人，派对前要把家里打扫干净"
+  clarify_question: "您说的 S1 Pro 是哪一台？A. S1 Pro 智能吸奶器 B. S1 Pro 扫地机器人"
+  # 报错照片（fixtures/ 由 genscreen.go 生成）
+  error_photo: "examples/after-sales-support/fixtures/error-e13.png"
+  # 离线降级用的预 OCR 文本；在线时由视觉模型识别照片产出
+  photo_text_fallback: "E-13 BRUSH OVERLOAD"
+  # 知识库
+  kb_products: "examples/after-sales-support/kb/products"
+  kb_errors: "examples/after-sales-support/kb/error-codes.md"
+  kb_manuals: "examples/after-sales-support/kb/manuals"
+  kb_dealers: "examples/after-sales-support/kb/dealers.md"
+  # 应答话术的 LLM provider（不可用时自动降级，链路不断）
+  provider: "ollama"
+  model: "llama3"
+  ticket_path: "after-sales-ticket.md"
+
+steps:
+  # ── 1. 情绪识别（规则层）─────────────────────────────────────────
+  # 焦虑 / 愤怒信号词命中 → 应答必须"先接住情绪"
+  - name: emotion_flag
+    node: condition
+    input: "{{var.user_message}}"
+    params:
+      expr: 'regex:(急|气|疯|崩溃|救命|哭|派对|！！|!!|啊)'
+
+  # ── 2. 产品消歧：信号提取 ────────────────────────────────────────
+  # 两类产品信号各查一次；都为 false 即"含糊诉求"，需要澄清反问
+  - name: vacuum_signal
+    node: condition
+    input: "{{var.user_message}}"
+    params:
+      expr: 'regex:(扫地|吸尘|清扫|打扫|尘盒|主刷|拖地|回充)'
+
+  - name: pump_signal
+    node: condition
+    input: "{{var.user_message}}"
+    params:
+      expr: 'regex:(吸奶|哺乳|堵奶|乳房|喇叭罩|奶瓶|吸乳)'
+
+  # 探针：拼接两个信号值，"false,false" = 双无 → 歧义
+  - name: ambiguity_probe
+    node: template_render
+    params:
+      template: "{{step.vacuum_signal}},{{step.pump_signal}}"
+
+  - name: ambiguity_flag
+    node: condition
+    input: "{{step.ambiguity_probe}}"
+    params:
+      expr: 'equals:false,false'
+
+  # ── 3. 消歧分支：含糊则反问，否则原话直通 ────────────────────────
+  # 分支最后一步（answered）的输出成为本 if 步骤的输出
+  - name: clarification
+    if:
+      condition: "{{step.ambiguity_flag}}"
+      then:
+        - name: question
+          node: template_render
+          params:
+            template: "{{var.clarify_question}}"
+        - name: answered
+          node: template_render
+          params:
+            template: "{{var.user_clarified}}"
+      else:
+        - name: answered
+          node: template_render
+          params:
+            template: "{{var.user_message}}"
+
+  # ── 4. 查询词提炼：把用户话术映射成干净的检索词 ──────────────────
+  # 中文分词限制下，直接拿整句检索会零命中；规则先提炼出标准产品词
+  - name: cue_vacuum
+    node: condition
+    input: "{{step.clarification}}"
+    params:
+      expr: 'regex:(扫地|吸尘|清扫|打扫|尘盒|主刷|拖地|回充)'
+
+  - name: product_query
+    if:
+      condition: "{{step.cue_vacuum}}"
+      then:
+        - name: cue
+          node: template_render
+          params:
+            template: "扫地机器人"
+      else:
+        - name: cue
+          node: template_render
+          params:
+            template: "吸奶器"
+
+  # ── 5. 产品档案检索 ──────────────────────────────────────────────
+  - name: resolve_product
+    node: rag
+    input: "{{step.product_query}}"
+    params:
+      source: "{{var.kb_products}}"
+      source_type: dir
+      search_method: hybrid
+      top_k: "1"
+
+  # ── 6. 看图识错（multimodal，带降级）─────────────────────────────
+  # 在线：视觉模型读照片 OCR；离线：降级到预提取文本，链路不断
+  - name: photo_reading
+    node: multimodal
+    input: "读取这张设备报错屏幕照片中的错误代码与提示文字，原样输出"
+    fallback: "{{var.photo_text_fallback}}"
+    params:
+      mode: ocr
+      image_path: "{{var.error_photo}}"
+      lang: "chi_sim+eng"
+
+  # ── 7. 错误码定位 ────────────────────────────────────────────────
+  - name: error_detail
+    node: rag
+    input: "{{step.photo_reading}}"
+    params:
+      source: "{{var.kb_errors}}"
+      search_method: keyword
+      top_k: "1"
+
+  # ── 8. 排障步骤检索 ──────────────────────────────────────────────
+  - name: manual_steps
+    node: rag
+    input: "{{step.error_detail}}"
+    params:
+      source: "{{var.kb_manuals}}"
+      source_type: dir
+      search_method: keyword
+      top_k: "2"
+
+  # ── 9. 升级判定（规则层）─────────────────────────────────────────
+  # 错误详情携带 ESCALATE 标记 → 转人工；SELF-FIX → 自助闭环
+  - name: escalation_flag
+    node: condition
+    input: "{{step.error_detail}}"
+    params:
+      expr: 'regex:ESCALATE'
+
+  # ── 10. 组装应答提示词 ───────────────────────────────────────────
+  - name: reply_prompt
+    node: template_render
+    params:
+      template: |
+        你是家电品牌的售后客服，正在回复一位报修用户。要求：
+        1. 若情绪焦虑标记为 true，第一句必须先接住情绪（简短共情，不夸张）；
+           为 false 则直接进入正题。
+        2. 只用已确认的产品与错误码信息作答，不编造知识库之外的内容。
+        3. 排障步骤分条列出，每条一行，口语化但准确。
+        4. 结尾给出"若仍不行"的下一步。
+
+        用户消息：{{var.user_message}}
+        情绪焦虑标记：{{step.emotion_flag}}
+        已确认产品（检索上下文）：{{step.resolve_product}}
+        照片识别结果：{{step.photo_reading}}
+        错误码详情（检索上下文）：{{step.error_detail}}
+        排障手册（检索上下文）：{{step.manual_steps}}
+
+  # ── 11. LLM 应答（离线降级为规则化应答，检索结果不丢）───────────
+  - name: reply
+    node: agent
+    fallback: |
+      {{var.user_name}}您好，别急，我们一步步来处理：
+      【设备】{{step.resolve_product}}
+      【诊断】{{step.error_detail}}
+      【自助修复步骤】{{step.manual_steps}}
+      （当前为离线降级应答：LLM 服务不可用，以上内容来自知识库检索，
+      接入 provider 后本段由共情话术替换。）
+    params:
+      provider: "{{var.provider}}"
+      model: "{{var.model}}"
+      max_iterations: "3"
+
+  # ── 12. 结案分支：升级人工 vs 自助闭环 ──────────────────────────
+  # 案情简报经 input 传入分支（分支内 {{step.*}} 命名空间隔离，
+  # 只能靠 {{input}} 取外部数据）
+  - name: closing
+    input: |
+      用户：{{var.user_name}}
+      诉求：{{var.user_message}}
+      照片识别：{{step.photo_reading}}
+      错误详情：{{step.error_detail}}
+    if:
+      condition: "{{step.escalation_flag}}"
+      then:
+        - name: escalate_notify
+          node: notify
+          params:
+            channel: stdout
+            message: "【升级人工工单】{{input}} | 经销商质保政策见 {{var.kb_dealers}}"
+        - name: outcome
+          node: template_render
+          params:
+            template: "escalated 已升级人工，返厂流程已启动"
+      else:
+        - name: outcome
+          node: template_render
+          params:
+            template: "resolved 自助修复闭环"
+
+  # ── 13. 工单归档（审计链自动记录全流程）────────────────────────
+  - name: ticket
+    node: file_write
+    input: |
+      # 售后工单（aflare 自动归档）
+
+      - 用户：{{var.user_name}}
+      - 诉求：{{var.user_message}}
+      - 触发消歧反问：{{step.ambiguity_flag}}
+      - 确认设备检索：{{step.resolve_product}}
+      - 照片识别：{{step.photo_reading}}
+      - 错误详情：{{step.error_detail}}
+      - 处理结果：{{step.closing}}
+
+      ## 应答全文
+
+      {{step.reply}}
+    params:
+      path: "{{var.ticket_path}}"
+
+  # ── 14. 最终输出 ────────────────────────────────────────────────
+  - name: summary
+    node: template_render
+    params:
+      template: |
+        ══ 售后服务闭环 ══
+        处理结果：{{step.closing}}
+
+        {{step.reply}}

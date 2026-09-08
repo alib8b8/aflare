@@ -1,0 +1,5 @@
+{"ticket_id":"T-1001","product":"S1 Pro 扫地机器人","error_code":"E-13","resolution":"self-service","duration":"3分钟","note":"清理主刷缠绕毛发后重置成功，无需升级"}
+{"ticket_id":"T-1002","product":"S1 Pro 扫地机器人","error_code":"E-99","resolution":"escalated","duration":"5个工作日","note":"返厂更换主电机，质保内免费"}
+{"ticket_id":"T-1003","product":"S1 Pro 吸奶器","error_code":"B-07","resolution":"self-service","duration":"5分钟","note":"更换备用密封圈后吸力恢复"}
+{"ticket_id":"T-1004","product":"S1 Pro 吸奶器","error_code":"B-12","resolution":"self-service","duration":"2分钟","note":"清洁卡槽后重新安装喇叭罩"}
+{"ticket_id":"T-1005","product":"S1 Pro 扫地机器人","error_code":"E-13","resolution":"escalated","duration":"1天","note":"用户两次清理后仍报错，升级人工检测发现电机老化"}
