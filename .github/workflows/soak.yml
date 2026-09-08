@@ -56,7 +56,11 @@ jobs:
           pkg=$(dirname "$src")
           for target in $(grep -oE 'func (Fuzz[A-Za-z0-9_]+)\(' "$src" | sed 's/func //;s/($//;s/(//'); do
             echo "::group::fuzz ${pkg}.${target}"
-            if ! go test "${pkg}/" -run '^$' -fuzz "^${target}$" -fuzztime 60s; then
+            # "./" prefix is required: a bare internal/... path is resolved
+            # against std ("package internal/workflow is not in std") because
+            # the module is github.com/alib8b8/aflare — every target then
+            # fails as [setup failed] and is misreported as a fuzz finding.
+            if ! go test "./${pkg}/" -run '^$' -fuzz "^${target}$" -fuzztime 60s; then
               echo "::error::fuzz failure in ${pkg}.${target} — failing corpus is in ${pkg}/testdata/fuzz/${target}/"
               fail=1
             fi
