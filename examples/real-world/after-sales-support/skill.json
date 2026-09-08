@@ -1,0 +1,86 @@
+{
+  "id": "real-world/after-sales-support",
+  "name": "after-sales-support",
+  "version": "1.0.0",
+  "description": "AI after-sales customer service closed loop: emotion detection, product disambiguation (S1 Pro breast pump vs robot vacuum), error-photo OCR, RAG over product/error-code/manual knowledge bases, rule-based self-fix vs escalate decision, and ticket archiving. Rules decide, retrieval grounds, the LLM empathizes; every layer degrades offline via fallback.",
+  "author": "aflare community",
+  "category": "customer-service",
+  "tags": [
+    "customer-service",
+    "after-sales",
+    "rag",
+    "multimodal",
+    "ocr",
+    "emotion-detection",
+    "escalation",
+    "real-world"
+  ],
+  "keywords": [
+    "after-sales",
+    "customer service",
+    "emotion detection",
+    "disambiguation",
+    "rag",
+    "ocr",
+    "error code",
+    "escalation",
+    "ticket"
+  ],
+  "inputs": [
+    {
+      "name": "user_name",
+      "type": "string",
+      "required": false,
+      "default": "王女士"
+    },
+    {
+      "name": "user_message",
+      "type": "string",
+      "required": false,
+      "default": "我的 S1 Pro 不吸了！明天要开派对，急死了！！"
+    },
+    {
+      "name": "user_clarified",
+      "type": "string",
+      "required": false,
+      "default": "扫地机器人，派对前要把家里打扫干净"
+    },
+    {
+      "name": "error_photo",
+      "type": "string",
+      "required": false,
+      "default": "examples/real-world/after-sales-support/fixtures/error-e13.png"
+    },
+    {
+      "name": "photo_text_fallback",
+      "type": "string",
+      "required": false,
+      "default": "E-13 BRUSH OVERLOAD"
+    },
+    {
+      "name": "ticket_path",
+      "type": "string",
+      "required": false,
+      "default": "after-sales-ticket.md"
+    },
+    {
+      "name": "provider",
+      "type": "string",
+      "required": false,
+      "default": "ollama"
+    },
+    {
+      "name": "model",
+      "type": "string",
+      "required": false,
+      "default": "llama3"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "ticket",
+      "type": "string"
+    }
+  ],
+  "dependencies": "optional: tesseract or a vision model for photo OCR (falls back to pre-extracted text); optional: ollama for empathetic LLM replies (falls back to a rule-based reply that still carries the retrieval results)"
+}

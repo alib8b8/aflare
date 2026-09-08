@@ -188,6 +188,28 @@ func TestHybridSearch(t *testing.T) {
 	}
 }
 
+func TestHybridSearchMultiDocIndexCollision(t *testing.T) {
+	// 回归：Index 在每个文档内从 0 重新计数，两个文档的首个 chunk
+	// Index 同为 0。旧实现以 Index 为 scoreMap 键，只命中 a.md 的查询
+	// 会把分数串到 b.md 上（b.md 也带上 a.md 的分数、甚至排在前面）。
+	// 注：查询用 ASCII 词（tokenize 的 \w 不匹配中文），确保 keyword
+	// 路径只命中 a.md，从而确定性复现键冲突。
+	chunks := []Chunk{
+		{Text: "vacuum robot cleaner floor brush", Source: "a.md", Index: 0},
+		{Text: "breast pump milk baby feeding", Source: "b.md", Index: 0},
+	}
+	result := hybridSearch("vacuum robot", chunks)
+	if len(result) != 1 {
+		t.Fatalf("hybridSearch(multi-doc) = %d chunks, want 1 (only a.md matches)", len(result))
+	}
+	if result[0].Source != "a.md" {
+		t.Errorf("hybridSearch first result Source = %q, want a.md (index collision regression)", result[0].Source)
+	}
+	if result[0].Score <= 0 {
+		t.Errorf("hybridSearch first result Score = %f, want > 0", result[0].Score)
+	}
+}
+
 // ----------------------------------------------------------------------------
 // skill_distill.go: generateDistilledSkill / generateSteps / generateRules /
 // generateExamples / generatePitfalls / Execute

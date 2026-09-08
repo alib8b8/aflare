@@ -1,7 +1,10 @@
+// Copyright (c) 2026 aflare Contributors
+//
+// aflare‍​‌​​​​​‌​‌​​​‌‌​​‌​​‌‌​​​‌​‌​​‌​​​​​​​‌​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​‌‌​‌​‌​‌​​‌‌‌‌‌‌‌​‌​‌‌‌​‌​​​​‌​​​‌‌‌​‌‌‌‌​​​​​​​​​‌​​​​​‌​​​‌‌​​‌​​​​‌​​‌‌‌‌​‌​​​​​​​​​​​​​​​​​‌​​​​​‌​‌‌‌​‌‌​​⁠
 //go:build ignore
 
 // 售后示例的报错屏幕图生成器：设备屏幕风格的 E-13 / E-99 报错图。
-// 纯标准库 + 手写 5x7 点阵字体，运行：go run examples/after-sales-support/genscreen.go out1.png out2.png
+// 纯标准库 + 手写 5x7 点阵字体，运行：go run examples/real-world/after-sales-support/genscreen.go out1.png out2.png
 package main
 
 import (

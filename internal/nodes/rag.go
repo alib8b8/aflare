@@ -355,12 +355,19 @@ func hybridSearch(query string, chunks []Chunk) []Chunk {
 	keywordResults := keywordSearch(query, chunks)
 	phraseResults := phraseSearch(query, chunks)
 
-	scoreMap := make(map[int]float64)
+	// chunk 身份 = (Source, Index)：Index 在每个文档内从 0 重新计数，
+	// 多文档混合检索时若仅以 Index 为键，不同文档的同序号 chunk 会
+	// 在 scoreMap 中串分（分数污染），必须用复合键区分。
+	type chunkKey struct {
+		source string
+		index  int
+	}
+	scoreMap := make(map[chunkKey]float64)
 	for i, chunk := range keywordResults {
-		scoreMap[chunk.Index] += float64(len(keywordResults)-i) / float64(len(keywordResults))
+		scoreMap[chunkKey{chunk.Source, chunk.Index}] += float64(len(keywordResults)-i) / float64(len(keywordResults))
 	}
 	for i, chunk := range phraseResults {
-		scoreMap[chunk.Index] += float64(len(phraseResults)-i) / float64(len(phraseResults)) * 1.5
+		scoreMap[chunkKey{chunk.Source, chunk.Index}] += float64(len(phraseResults)-i) / float64(len(phraseResults)) * 1.5
 	}
 
 	type scoredChunk struct {
@@ -370,7 +377,7 @@ func hybridSearch(query string, chunks []Chunk) []Chunk {
 
 	var scored []scoredChunk
 	for _, chunk := range chunks {
-		if score, ok := scoreMap[chunk.Index]; ok && score > 0 {
+		if score, ok := scoreMap[chunkKey{chunk.Source, chunk.Index}]; ok && score > 0 {
 			sc := chunk
 			sc.Score = score
 			scored = append(scored, scoredChunk{chunk: sc, score: score})

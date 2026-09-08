@@ -14,13 +14,13 @@ description: |
   - LLM 应答（agent）：共情话术 + 口语化排障引导；离线时 fallback 降级为
     规则化应答，检索结果不丢失。接入 ollama 等本地模型即恢复完整体验。
 
-  演示场景（改 vars 重跑即可切换）：
+  演示场景（--set 覆盖 vars 即可切换，见包内 README.md）：
   - 默认：含糊诉求"S1 Pro 不吸了"（吸奶器 / 扫地机都"吸"）→ 澄清反问 →
     确认扫地机 → 照片 E-13 主刷过载 → 自助修复 → 闭环。
   - 升级场景：error_photo 换 error-e99.png、photo_text_fallback 换
     "E-99 MOTOR BURNOUT" → 主电机烧毁 → 升级人工 + 经销商质保提示。
 
-  运行：aflare run examples/after-sales-support/workflow.yaml
+  运行：aflare run examples/real-world/after-sales-support/workflow.yaml
   断点：中途 Ctrl-C 后 aflare run --resume 可从已完成步骤续跑。
 
 vars:
@@ -32,14 +32,14 @@ vars:
   user_clarified: "扫地机器人，派对前要把家里打扫干净"
   clarify_question: "您说的 S1 Pro 是哪一台？A. S1 Pro 智能吸奶器 B. S1 Pro 扫地机器人"
   # 报错照片（fixtures/ 由 genscreen.go 生成）
-  error_photo: "examples/after-sales-support/fixtures/error-e13.png"
+  error_photo: "examples/real-world/after-sales-support/fixtures/error-e13.png"
   # 离线降级用的预 OCR 文本；在线时由视觉模型识别照片产出
   photo_text_fallback: "E-13 BRUSH OVERLOAD"
   # 知识库
-  kb_products: "examples/after-sales-support/kb/products"
-  kb_errors: "examples/after-sales-support/kb/error-codes.md"
-  kb_manuals: "examples/after-sales-support/kb/manuals"
-  kb_dealers: "examples/after-sales-support/kb/dealers.md"
+  kb_products: "examples/real-world/after-sales-support/kb/products"
+  kb_errors: "examples/real-world/after-sales-support/kb/error-codes"
+  kb_manuals: "examples/real-world/after-sales-support/kb/manuals"
+  kb_dealers: "examples/real-world/after-sales-support/kb/dealers.md"
   # 应答话术的 LLM provider（不可用时自动降级，链路不断）
   provider: "ollama"
   model: "llama3"
@@ -144,23 +144,29 @@ steps:
       lang: "chi_sim+eng"
 
   # ── 7. 错误码定位 ────────────────────────────────────────────────
+  # 知识库一码一文件：检回的 chunk 只含当前错误码的升级判定，
+  # 不会把其他错误码的 ESCALATE 标记混进来污染升级判定
   - name: error_detail
     node: rag
     input: "{{step.photo_reading}}"
     params:
       source: "{{var.kb_errors}}"
+      source_type: dir
       search_method: keyword
       top_k: "1"
 
   # ── 8. 排障步骤检索 ──────────────────────────────────────────────
+  # 查询用提炼词（产品词 + 照片识读），不直接用上游检索上下文 ——
+  # 上下文里的样板词（"Retrieved N chunks" 等）会污染下一次检索。
+  # top_k 1：一码一册，只取分数最高的那本手册
   - name: manual_steps
     node: rag
-    input: "{{step.error_detail}}"
+    input: "{{step.product_query}} {{step.photo_reading}}"
     params:
       source: "{{var.kb_manuals}}"
       source_type: dir
       search_method: keyword
-      top_k: "2"
+      top_k: "1"
 
   # ── 9. 升级判定（规则层）─────────────────────────────────────────
   # 错误详情携带 ESCALATE 标记 → 转人工；SELF-FIX → 自助闭环

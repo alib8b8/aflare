@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **examples/real-world/after-sales-support（AI 售后智能客服示例包）**：把一次零散求助串成完整服务闭环——情绪识别 → 产品消歧 → 看图识错 → 知识库排障 → 升级判定 → 工单归档，演示"流程编排与规则约束结合"的完整范式：
+  - **四层分工**：规则层（condition 正则——该安抚、该反问、该升级由流程决定，不是模型即兴）→ 检索层（rag 三库检索，规则层先把用户话术提炼成干净查询词，中文分词短板由编排补齐）→ 多模态（multimodal 报错照片 OCR）→ LLM 应答（agent 共情话术），全部带离线降级，零外部依赖可跑、结果确定
+  - **两个内置场景**（`--set` 切换）：E-13 主刷过载 → 澄清反问（"S1 Pro 不吸了"——吸奶器 / 扫地机都"吸"）→ 自助修复闭环；E-99 电机烧毁 → 升级人工 + notify 携带经销商质保提示。每次运行产出审计工单（全流程判定 + 检索依据 + 应答全文）
+  - **知识库设计示范**：一码一文件（检回的 chunk 不会把其他错误码的 ESCALATE 标记混进来污染升级判定）+ 下游检索用提炼词而非上游组装上下文（样板词会污染下一次检索）；fixtures 报错图由 genscreen.go（纯标准库点阵绘制）可再生成
 - **Agent 编排深化（委派治理三件套：失败策略/熔断/断点续跑 + agent add/probe 注册预检，v0.11 agentx 章节延续）**：supervisor 把活派出去之后的"然后呢"——失败怎么办、卡死怎么办、崩了怎么办、怎么接入新 Agent——四处收口：
   - **委派失败策略与超时（supervisor 新参数）**：`fail_on`（`none`=失败隔离在结果里、节点不炸（默认）/ `all`=全军覆没才炸 / `any`=一败即炸；非法值直接报错——笔误不许静默放宽严格策略）；`delegation_timeout`（单委派超时，默认 10m、上限 60m）——超时/取消时对 A2A 远端 best-effort `tasks/cancel`（5s 预算），不在远端留孤儿任务空转
   - **Agent 熔断**：单个 Agent 连续 3 次委派失败即 circuit-open 快失败（不再傻等烧满 delegation_timeout），60s 冷却后半开探活——A2A 走 FetchAgentCard（原生产零调用的死代码就此进入委派主路径），CLI Agent 直接放行一次委派自证；探活成功转 closed、再失败重回 open
@@ -60,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **RAG hybridSearch 多文档分数串扰（scoreMap 键冲突）**：chunk 的 Index 在每个文档内从 0 重新计数，多文档混合检索时不同文档的同序号 chunk 在 scoreMap 中共用一个键——A 文档的关键词排名分与 B 文档的短语命中分互相累加、彼此污染（实际症状：查询"扫地机器人"却把吸奶器档案排到第一位并带上本属于扫地机的 3.50 分）。键改为 (Source, Index) 复合结构，chunk 身份全局唯一；配套回归测试 TestHybridSearchMultiDocIndexCollision 以双文档同 Index 布局钉死该场景（旧实现下两 chunk 同分、双双入选）
 - **源码水印双行累积根治（encode-source 写入前预剥离陈旧水印行）**：新建文件时手抄旧文件头部，会把旧文件的水印行一起抄过来——该行 payload 哈希属于旧文件、对新内容永远无法解码，encode-source 再补一条有效的 → 「有效+无效」双行，每个 PR 都会再添几个（存量 26 个文件）。现 `EncodeSource` 写入新水印前先剥离全部既有水印行（按行判定：`// aflare` 前缀后仅跟零宽字符即为水印行；普通注释如「// aflare never exposes itself...」带可见文本，不受影响），重编码保持幂等——恰好一条新水印行；配套回归测试钉死：陈旧行（完整但属于旧内容 / 截断损毁两种形态）全部剥离、纯注释存活、strip(encode(带陈旧行的 src)) 精确还原干净源码。存量 26 个文件经 strip-source + encode-source 产品路径逐个刷新清理，全仓 483 个 .go 文件零双行、check-source 门禁绿
 - **examples/drone/drone-patrol/workflow.yaml 不可运行语法修复**：三个阶段（arm_and_takeoff / patrol_mission / land_and_disarm）使用了引擎不支持的裸嵌套 `steps:` 分组（无 `node:` 字段的子步骤既不是 parallel/loop/map 等复合类型，也不是可执行步骤）——该 example 自加入起从未通过 `aflare validate`，更不可能 `aflare run`。拍平为受支持的顶层 `depends_on` 链（arm → takeoff → upload_waypoints → start_patrol → … → land → disarm），报告模板引用同步改名（`{{arm_and_takeoff.takeoff.success}}` → `{{takeoff.success}}` 等）。由新加的 examples 全量校验门禁抓出（见 Added「CI 防线三件套」）
 - **身份治理链收口：gmail 提交身份从显示层落到提交层**：#148 提交信息自称「本提交即首个使用 gmail 身份的提交」，但 GitHub API 原始数据显示网页端 squash 合并的作者邮箱全部是 noreply（邮箱隐私设置开启时，服务器端合并一律改写为 noreply）——gmail 此前只活在 .mailmap 显示层与提交信息文本里。修正三处：① PROVENANCE.md §2 身份表 gmail 行口径改为「本地推送提交使用」（网页 squash 合并仍记录 noreply 原始邮箱，经 .mailmap 归一显示）；② 签署须知补关键一条——签署 PROVENANCE 的提交必须本地完成并直推（`git config user.email sjxj19921205@gmail.com` → 本地 commit → push，别走网页合并），否则「提交即签署」验不回 gmail；③ §6 签署节补验证方法（验 raw email 而非 mailmap 显示层）。合并规范同步确立：需保留 gmail 作者身份的提交，本地合并后 push，替代网页端 Merge 按钮
