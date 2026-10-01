@@ -45,10 +45,10 @@
     "directory": "contrib/openclaw"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.6.3",
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.1"
   }
 }
