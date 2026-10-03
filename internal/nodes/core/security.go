@@ -287,6 +287,15 @@ func RedactSensitive(s string) string {
 	return result
 }
 
+// lookupIP is the DNS resolver used by the SSRF validators (ValidateURL,
+// ValidateLMLEndpoint). It is a package-level var so tests — notably the
+// fuzz harness (core/endpoint_fuzz_test.go) — can stub it: fuzzing hammers
+// thousands of generated hostnames per second, and real DNS lookups for
+// fuzz-generated names (e.g. the trailing-dot FQDN "exXmple.Com.") are slow
+// and non-deterministic on CI runners, which intermittently tripped the
+// fuzz harness's 5s hang guard in the nightly soak. Default: net.LookupIP.
+var lookupIP = net.LookupIP
+
 // ValidateURL checks if a URL is safe to request (SSRF protection).
 func ValidateURL(rawURL string) error {
 	u, err := url.Parse(rawURL)
@@ -338,7 +347,7 @@ func ValidateURL(rawURL string) error {
 		}
 	} else {
 		// DNS-resolve the hostname to prevent domain-based SSRF
-		ips, err := net.LookupIP(host)
+		ips, err := lookupIP(host)
 		if err != nil {
 			return fmt.Errorf("failed to resolve host %s: %w", host, err)
 		}
@@ -518,7 +527,7 @@ func ValidateLMLEndpoint(rawURL string) error {
 	}
 
 	// DNS-resolve the hostname to prevent domain-based SSRF
-	ips, err := net.LookupIP(host)
+	ips, err := lookupIP(host)
 	if err != nil {
 		return fmt.Errorf("failed to resolve host %s: %w", host, err)
 	}
