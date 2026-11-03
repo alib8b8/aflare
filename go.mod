@@ -2,7 +2,7 @@ module github.com/alib8b8/aflare
 
 go 1.26.0
 
-toolchain go1.26.7
+toolchain go1.26.10
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
